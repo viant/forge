@@ -343,7 +343,7 @@ for (const scenario of [
 }
 
 assert.equal(
-  runtimeCapacityInventoryLadderScenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Semantic Binding")),
+  runtimeCapacityInventoryLadderScenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").toUpperCase().includes("SEMANTIC BINDING")),
   true,
 );
 assert.equal(

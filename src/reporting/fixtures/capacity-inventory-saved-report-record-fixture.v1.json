@@ -5,7 +5,7 @@
     "version": 1,
     "kind": "reportFill",
     "specVersion": 1,
-    "specHash": "fnv1a:135adb8d",
+    "specHash": "fnv1a:7fbf8edb",
     "source": {
       "kind": "dashboard.reportBuilder",
       "containerId": "demoReportBuilder",
@@ -34,9 +34,7 @@
           },
           "filters": {
             "From": "2026-05-01",
-            "To": "2026-05-04",
-            "from": "2026-05-01",
-            "to": "2026-05-04"
+            "To": "2026-05-04"
           },
           "semanticSelection": {
             "modelRef": "model://example/performance/delivery@v1",
@@ -59,7 +57,7 @@
           ]
         },
         "provenance": {
-          "requestHash": "fnv1a:bd2ea18f",
+          "requestHash": "fnv1a:8e4bc16b",
           "rowCount": 2,
           "truncated": false,
           "hasMore": false,
@@ -81,16 +79,26 @@
       {
         "id": "scopeFilters",
         "kind": "filterBarBlock",
-        "title": "Scope",
+        "title": "Filters",
+        "datasetRef": "primary",
         "paramIds": [
           "dateRange",
           "channelsFilter"
         ],
         "content": {
-          "title": "Scope",
+          "title": "Filters",
+          "mode": "baseline",
+          "placement": "inherit",
+          "groupOrder": [],
+          "visibleGroups": [],
+          "collapsedGroups": [],
           "params": [
             {
               "id": "dateRange",
+              "groupId": "dateRange",
+              "label": "dateRange",
+              "type": "dateRange",
+              "required": true,
               "value": {
                 "start": "2026-05-01",
                 "end": "2026-05-04"
@@ -98,6 +106,20 @@
             },
             {
               "id": "channelsFilter",
+              "groupId": "channelsFilter",
+              "label": "Channels",
+              "type": "multiSelect",
+              "multiple": true,
+              "options": [
+                {
+                  "label": "Display",
+                  "value": "Display"
+                },
+                {
+                  "label": "CTV",
+                  "value": "CTV"
+                }
+              ],
               "value": []
             }
           ]
@@ -339,11 +361,13 @@
         "secondaryLabel": "Channel",
         "description": "Highlights the leading channel row before drilling deeper.",
         "emptyLabel": "No inventory KPI value available.",
+        "valueFormat": "compactNumber",
         "content": {
           "title": "Top Channel KPI",
           "description": "Highlights the leading channel row before drilling deeper.",
           "valueField": "avails",
           "valueLabel": "Avails",
+          "valueFormat": "compactNumber",
           "value": 158400,
           "rowCount": 2,
           "secondaryField": "channelV2",
@@ -359,9 +383,9 @@
     "version": 1,
     "kind": "reportPrint",
     "specVersion": 1,
-    "specHash": "fnv1a:135adb8d",
+    "specHash": "fnv1a:7fbf8edb",
     "fillVersion": 1,
-    "fillHash": "fnv1a:586d192a",
+    "fillHash": "fnv1a:3ca90b40",
     "source": {
       "kind": "dashboard.reportBuilder",
       "containerId": "demoReportBuilder",
@@ -392,7 +416,7 @@
               "width": 720,
               "height": 20
             },
-            "text": "Scope",
+            "text": "Filters",
             "fontSize": 14,
             "fontWeight": "600",
             "color": "#101828"
@@ -419,7 +443,7 @@
               "width": 720,
               "height": 16
             },
-            "text": "channelsFilter:",
+            "text": "Channels:",
             "fontSize": 12,
             "color": "#344054"
           },
@@ -517,7 +541,7 @@
             },
             "rowKey": "row_1",
             "columnKey": "avails",
-            "text": "158400",
+            "text": "158 400",
             "format": "compactNumber",
             "align": "right"
           },
@@ -558,7 +582,7 @@
             },
             "rowKey": "row_2",
             "columnKey": "avails",
-            "text": "138200",
+            "text": "138 200",
             "format": "compactNumber",
             "align": "right"
           },
@@ -585,7 +609,7 @@
               "width": 720,
               "height": 164
             },
-            "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 164\" width=\"720\" height=\"164\">\n      \n    <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"116\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n\n    <line x1=\"310.66666666666663\" y1=\"16\" x2=\"310.66666666666663\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"310.66666666666663\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">52.8K</text>\n  \n\n    <line x1=\"505.3333333333333\" y1=\"16\" x2=\"505.3333333333333\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"505.3333333333333\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">105.6K</text>\n  \n\n    <line x1=\"700\" y1=\"16\" x2=\"700\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"700\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">158.4K</text>\n  \n      <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <text x=\"108\" y=\"34\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">Display</text>\n    \n\n      <text x=\"108\" y=\"72\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">CTV</text>\n    \n      \n        <rect x=\"116\" y=\"16\" width=\"584\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"706\" y=\"42\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">158.4K</text>\n      \n\n        <rect x=\"116\" y=\"54\" width=\"509.52525252525254\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"631.5252525252525\" y=\"80\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">138.2K</text>\n      \n      \n      <rect x=\"12\" y=\"137\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"148\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n    </svg>"
+            "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 164\" width=\"720\" height=\"164\">\n      \n    <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"116\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n\n    <line x1=\"310.66666666666663\" y1=\"16\" x2=\"310.66666666666663\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"310.66666666666663\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">52.8K</text>\n  \n\n    <line x1=\"505.3333333333333\" y1=\"16\" x2=\"505.3333333333333\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"505.3333333333333\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">105.6K</text>\n  \n\n    <line x1=\"700\" y1=\"16\" x2=\"700\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"700\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">158.4K</text>\n  \n      \n      <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <text x=\"108\" y=\"34\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">Display</text>\n    \n\n      <text x=\"108\" y=\"72\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">CTV</text>\n    \n      \n        <rect x=\"116\" y=\"16\" width=\"584\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"706\" y=\"42\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">158 400</text>\n      \n\n        <rect x=\"116\" y=\"54\" width=\"509.52525252525254\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"631.5252525252525\" y=\"80\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">138 200</text>\n      \n      \n      \n      <rect x=\"12\" y=\"137\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"148\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n    </svg>"
           },
           {
             "id": "narrativeIntro__title_0",
@@ -663,7 +687,7 @@
               "width": 348,
               "height": 24
             },
-            "text": "Avails: 158400",
+            "text": "Avails: 158 400",
             "fontSize": 20,
             "fontWeight": "700",
             "color": "#101828"
@@ -830,7 +854,7 @@
     "bookmarks": [
       {
         "id": "bookmark.scopeFilters",
-        "title": "Scope",
+        "title": "Filters",
         "pageNumber": 1,
         "level": 1,
         "elementId": "scopeFilters__title_0",
@@ -1059,6 +1083,39 @@
           },
           "refinements": [],
           "calculatedFields": [],
+          "scope": {
+            "params": [
+              {
+                "id": "dateRange",
+                "kind": "dateRange",
+                "label": "dateRange",
+                "required": true,
+                "value": {
+                  "start": "2026-05-01",
+                  "end": "2026-05-04"
+                }
+              },
+              {
+                "id": "channelsFilter",
+                "kind": "multiSelect",
+                "label": "Channels",
+                "required": false,
+                "multiple": true,
+                "options": [
+                  {
+                    "label": "Display",
+                    "value": "Display"
+                  },
+                  {
+                    "label": "CTV",
+                    "value": "CTV"
+                  }
+                ],
+                "value": []
+              }
+            ],
+            "dataSourceRef": "demoReportSource"
+          },
           "datasets": [
             {
               "id": "primary",
@@ -1072,9 +1129,7 @@
                 },
                 "filters": {
                   "From": "2026-05-01",
-                  "To": "2026-05-04",
-                  "from": "2026-05-01",
-                  "to": "2026-05-04"
+                  "To": "2026-05-04"
                 },
                 "semanticSelection": {
                   "modelRef": "model://example/performance/delivery@v1",
@@ -1102,7 +1157,8 @@
             {
               "id": "scopeFilters",
               "kind": "filterBarBlock",
-              "title": "Scope",
+              "title": "Filters",
+              "datasetRef": "primary",
               "paramIds": [
                 "dateRange",
                 "channelsFilter"
@@ -1203,37 +1259,16 @@
               "secondaryField": "channelV2",
               "secondaryLabel": "Channel",
               "description": "Highlights the leading channel row before drilling deeper.",
-              "emptyLabel": "No inventory KPI value available."
+              "emptyLabel": "No inventory KPI value available.",
+              "valueFormat": "compactNumber"
             }
-          ],
-          "scope": {
-            "params": [
-              {
-                "id": "dateRange",
-                "kind": "dateRange",
-                "label": "dateRange",
-                "required": true,
-                "value": {
-                  "start": "2026-05-01",
-                  "end": "2026-05-04"
-                }
-              },
-              {
-                "id": "channelsFilter",
-                "kind": "multiSelect",
-                "label": "Channels",
-                "required": false,
-                "value": []
-              }
-            ],
-            "dataSourceRef": "demoReportSource"
-          }
+          ]
         },
         "reportFill": {
           "version": 1,
           "kind": "reportFill",
           "specVersion": 1,
-          "specHash": "fnv1a:135adb8d",
+          "specHash": "fnv1a:7fbf8edb",
           "source": {
             "kind": "dashboard.reportBuilder",
             "containerId": "demoReportBuilder",
@@ -1262,9 +1297,7 @@
                 },
                 "filters": {
                   "From": "2026-05-01",
-                  "To": "2026-05-04",
-                  "from": "2026-05-01",
-                  "to": "2026-05-04"
+                  "To": "2026-05-04"
                 },
                 "semanticSelection": {
                   "modelRef": "model://example/performance/delivery@v1",
@@ -1287,7 +1320,7 @@
                 ]
               },
               "provenance": {
-                "requestHash": "fnv1a:bd2ea18f",
+                "requestHash": "fnv1a:8e4bc16b",
                 "rowCount": 2,
                 "truncated": false,
                 "hasMore": false,
@@ -1309,16 +1342,26 @@
             {
               "id": "scopeFilters",
               "kind": "filterBarBlock",
-              "title": "Scope",
+              "title": "Filters",
+              "datasetRef": "primary",
               "paramIds": [
                 "dateRange",
                 "channelsFilter"
               ],
               "content": {
-                "title": "Scope",
+                "title": "Filters",
+                "mode": "baseline",
+                "placement": "inherit",
+                "groupOrder": [],
+                "visibleGroups": [],
+                "collapsedGroups": [],
                 "params": [
                   {
                     "id": "dateRange",
+                    "groupId": "dateRange",
+                    "label": "dateRange",
+                    "type": "dateRange",
+                    "required": true,
                     "value": {
                       "start": "2026-05-01",
                       "end": "2026-05-04"
@@ -1326,6 +1369,20 @@
                   },
                   {
                     "id": "channelsFilter",
+                    "groupId": "channelsFilter",
+                    "label": "Channels",
+                    "type": "multiSelect",
+                    "multiple": true,
+                    "options": [
+                      {
+                        "label": "Display",
+                        "value": "Display"
+                      },
+                      {
+                        "label": "CTV",
+                        "value": "CTV"
+                      }
+                    ],
                     "value": []
                   }
                 ]
@@ -1567,11 +1624,13 @@
               "secondaryLabel": "Channel",
               "description": "Highlights the leading channel row before drilling deeper.",
               "emptyLabel": "No inventory KPI value available.",
+              "valueFormat": "compactNumber",
               "content": {
                 "title": "Top Channel KPI",
                 "description": "Highlights the leading channel row before drilling deeper.",
                 "valueField": "avails",
                 "valueLabel": "Avails",
+                "valueFormat": "compactNumber",
                 "value": 158400,
                 "rowCount": 2,
                 "secondaryField": "channelV2",
@@ -1587,9 +1646,9 @@
           "version": 1,
           "kind": "reportPrint",
           "specVersion": 1,
-          "specHash": "fnv1a:135adb8d",
+          "specHash": "fnv1a:7fbf8edb",
           "fillVersion": 1,
-          "fillHash": "fnv1a:586d192a",
+          "fillHash": "fnv1a:3ca90b40",
           "source": {
             "kind": "dashboard.reportBuilder",
             "containerId": "demoReportBuilder",
@@ -1620,7 +1679,7 @@
                     "width": 720,
                     "height": 20
                   },
-                  "text": "Scope",
+                  "text": "Filters",
                   "fontSize": 14,
                   "fontWeight": "600",
                   "color": "#101828"
@@ -1647,7 +1706,7 @@
                     "width": 720,
                     "height": 16
                   },
-                  "text": "channelsFilter:",
+                  "text": "Channels:",
                   "fontSize": 12,
                   "color": "#344054"
                 },
@@ -1745,7 +1804,7 @@
                   },
                   "rowKey": "row_1",
                   "columnKey": "avails",
-                  "text": "158400",
+                  "text": "158 400",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -1786,7 +1845,7 @@
                   },
                   "rowKey": "row_2",
                   "columnKey": "avails",
-                  "text": "138200",
+                  "text": "138 200",
                   "format": "compactNumber",
                   "align": "right"
                 },
@@ -1813,7 +1872,7 @@
                     "width": 720,
                     "height": 164
                   },
-                  "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 164\" width=\"720\" height=\"164\">\n      \n    <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"116\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n\n    <line x1=\"310.66666666666663\" y1=\"16\" x2=\"310.66666666666663\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"310.66666666666663\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">52.8K</text>\n  \n\n    <line x1=\"505.3333333333333\" y1=\"16\" x2=\"505.3333333333333\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"505.3333333333333\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">105.6K</text>\n  \n\n    <line x1=\"700\" y1=\"16\" x2=\"700\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"700\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">158.4K</text>\n  \n      <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <text x=\"108\" y=\"34\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">Display</text>\n    \n\n      <text x=\"108\" y=\"72\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">CTV</text>\n    \n      \n        <rect x=\"116\" y=\"16\" width=\"584\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"706\" y=\"42\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">158.4K</text>\n      \n\n        <rect x=\"116\" y=\"54\" width=\"509.52525252525254\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"631.5252525252525\" y=\"80\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">138.2K</text>\n      \n      \n      <rect x=\"12\" y=\"137\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"148\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n    </svg>"
+                  "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 164\" width=\"720\" height=\"164\">\n      \n    <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"116\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n\n    <line x1=\"310.66666666666663\" y1=\"16\" x2=\"310.66666666666663\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"310.66666666666663\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">52.8K</text>\n  \n\n    <line x1=\"505.3333333333333\" y1=\"16\" x2=\"505.3333333333333\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"505.3333333333333\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">105.6K</text>\n  \n\n    <line x1=\"700\" y1=\"16\" x2=\"700\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"700\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">158.4K</text>\n  \n      \n      <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <text x=\"108\" y=\"34\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">Display</text>\n    \n\n      <text x=\"108\" y=\"72\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">CTV</text>\n    \n      \n        <rect x=\"116\" y=\"16\" width=\"584\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"706\" y=\"42\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">158 400</text>\n      \n\n        <rect x=\"116\" y=\"54\" width=\"509.52525252525254\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"631.5252525252525\" y=\"80\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">138 200</text>\n      \n      \n      \n      <rect x=\"12\" y=\"137\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"148\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n    </svg>"
                 },
                 {
                   "id": "narrativeIntro__title_0",
@@ -1891,7 +1950,7 @@
                     "width": 348,
                     "height": 24
                   },
-                  "text": "Avails: 158400",
+                  "text": "Avails: 158 400",
                   "fontSize": 20,
                   "fontWeight": "700",
                   "color": "#101828"
@@ -2058,7 +2117,7 @@
           "bookmarks": [
             {
               "id": "bookmark.scopeFilters",
-              "title": "Scope",
+              "title": "Filters",
               "pageNumber": 1,
               "level": 1,
               "elementId": "scopeFilters__title_0",
@@ -2098,6 +2157,42 @@
             }
           ],
           "diagnostics": []
+        },
+        "semanticBindingViewState": {
+          "title": "Semantic Binding",
+          "chips": [
+            "Model Ad Delivery",
+            "Entity Line Delivery",
+            "Dimensions Channel",
+            "Measures Available Impressions"
+          ],
+          "modelLabel": "Ad Delivery",
+          "entityLabel": "Line Delivery",
+          "fieldGroups": [
+            {
+              "id": "dimensions",
+              "title": "Selected dimensions (1)",
+              "fields": [
+                {
+                  "id": "channel",
+                  "label": "Channel",
+                  "rawId": "channelV2"
+                }
+              ]
+            },
+            {
+              "id": "measures",
+              "title": "Selected measures (1)",
+              "fields": [
+                {
+                  "id": "available_impressions",
+                  "label": "Available Impressions",
+                  "rawId": "avails",
+                  "format": "compactNumber"
+                }
+              ]
+            }
+          ]
         }
       }
     }
@@ -2299,6 +2394,39 @@
       },
       "refinements": [],
       "calculatedFields": [],
+      "scope": {
+        "params": [
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "label": "dateRange",
+            "required": true,
+            "value": {
+              "start": "2026-05-01",
+              "end": "2026-05-04"
+            }
+          },
+          {
+            "id": "channelsFilter",
+            "kind": "multiSelect",
+            "label": "Channels",
+            "required": false,
+            "multiple": true,
+            "options": [
+              {
+                "label": "Display",
+                "value": "Display"
+              },
+              {
+                "label": "CTV",
+                "value": "CTV"
+              }
+            ],
+            "value": []
+          }
+        ],
+        "dataSourceRef": "demoReportSource"
+      },
       "datasets": [
         {
           "id": "primary",
@@ -2312,9 +2440,7 @@
             },
             "filters": {
               "From": "2026-05-01",
-              "To": "2026-05-04",
-              "from": "2026-05-01",
-              "to": "2026-05-04"
+              "To": "2026-05-04"
             },
             "semanticSelection": {
               "modelRef": "model://example/performance/delivery@v1",
@@ -2342,7 +2468,8 @@
         {
           "id": "scopeFilters",
           "kind": "filterBarBlock",
-          "title": "Scope",
+          "title": "Filters",
+          "datasetRef": "primary",
           "paramIds": [
             "dateRange",
             "channelsFilter"
@@ -2443,37 +2570,16 @@
           "secondaryField": "channelV2",
           "secondaryLabel": "Channel",
           "description": "Highlights the leading channel row before drilling deeper.",
-          "emptyLabel": "No inventory KPI value available."
+          "emptyLabel": "No inventory KPI value available.",
+          "valueFormat": "compactNumber"
         }
-      ],
-      "scope": {
-        "params": [
-          {
-            "id": "dateRange",
-            "kind": "dateRange",
-            "label": "dateRange",
-            "required": true,
-            "value": {
-              "start": "2026-05-01",
-              "end": "2026-05-04"
-            }
-          },
-          {
-            "id": "channelsFilter",
-            "kind": "multiSelect",
-            "label": "Channels",
-            "required": false,
-            "value": []
-          }
-        ],
-        "dataSourceRef": "demoReportSource"
-      }
+      ]
     },
     "reportFill": {
       "version": 1,
       "kind": "reportFill",
       "specVersion": 1,
-      "specHash": "fnv1a:135adb8d",
+      "specHash": "fnv1a:7fbf8edb",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "demoReportBuilder",
@@ -2502,9 +2608,7 @@
             },
             "filters": {
               "From": "2026-05-01",
-              "To": "2026-05-04",
-              "from": "2026-05-01",
-              "to": "2026-05-04"
+              "To": "2026-05-04"
             },
             "semanticSelection": {
               "modelRef": "model://example/performance/delivery@v1",
@@ -2527,7 +2631,7 @@
             ]
           },
           "provenance": {
-            "requestHash": "fnv1a:bd2ea18f",
+            "requestHash": "fnv1a:8e4bc16b",
             "rowCount": 2,
             "truncated": false,
             "hasMore": false,
@@ -2549,16 +2653,26 @@
         {
           "id": "scopeFilters",
           "kind": "filterBarBlock",
-          "title": "Scope",
+          "title": "Filters",
+          "datasetRef": "primary",
           "paramIds": [
             "dateRange",
             "channelsFilter"
           ],
           "content": {
-            "title": "Scope",
+            "title": "Filters",
+            "mode": "baseline",
+            "placement": "inherit",
+            "groupOrder": [],
+            "visibleGroups": [],
+            "collapsedGroups": [],
             "params": [
               {
                 "id": "dateRange",
+                "groupId": "dateRange",
+                "label": "dateRange",
+                "type": "dateRange",
+                "required": true,
                 "value": {
                   "start": "2026-05-01",
                   "end": "2026-05-04"
@@ -2566,6 +2680,20 @@
               },
               {
                 "id": "channelsFilter",
+                "groupId": "channelsFilter",
+                "label": "Channels",
+                "type": "multiSelect",
+                "multiple": true,
+                "options": [
+                  {
+                    "label": "Display",
+                    "value": "Display"
+                  },
+                  {
+                    "label": "CTV",
+                    "value": "CTV"
+                  }
+                ],
                 "value": []
               }
             ]
@@ -2807,11 +2935,13 @@
           "secondaryLabel": "Channel",
           "description": "Highlights the leading channel row before drilling deeper.",
           "emptyLabel": "No inventory KPI value available.",
+          "valueFormat": "compactNumber",
           "content": {
             "title": "Top Channel KPI",
             "description": "Highlights the leading channel row before drilling deeper.",
             "valueField": "avails",
             "valueLabel": "Avails",
+            "valueFormat": "compactNumber",
             "value": 158400,
             "rowCount": 2,
             "secondaryField": "channelV2",
@@ -2827,9 +2957,9 @@
       "version": 1,
       "kind": "reportPrint",
       "specVersion": 1,
-      "specHash": "fnv1a:135adb8d",
+      "specHash": "fnv1a:7fbf8edb",
       "fillVersion": 1,
-      "fillHash": "fnv1a:586d192a",
+      "fillHash": "fnv1a:3ca90b40",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "demoReportBuilder",
@@ -2860,7 +2990,7 @@
                 "width": 720,
                 "height": 20
               },
-              "text": "Scope",
+              "text": "Filters",
               "fontSize": 14,
               "fontWeight": "600",
               "color": "#101828"
@@ -2887,7 +3017,7 @@
                 "width": 720,
                 "height": 16
               },
-              "text": "channelsFilter:",
+              "text": "Channels:",
               "fontSize": 12,
               "color": "#344054"
             },
@@ -2985,7 +3115,7 @@
               },
               "rowKey": "row_1",
               "columnKey": "avails",
-              "text": "158400",
+              "text": "158 400",
               "format": "compactNumber",
               "align": "right"
             },
@@ -3026,7 +3156,7 @@
               },
               "rowKey": "row_2",
               "columnKey": "avails",
-              "text": "138200",
+              "text": "138 200",
               "format": "compactNumber",
               "align": "right"
             },
@@ -3053,7 +3183,7 @@
                 "width": 720,
                 "height": 164
               },
-              "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 164\" width=\"720\" height=\"164\">\n      \n    <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"116\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n\n    <line x1=\"310.66666666666663\" y1=\"16\" x2=\"310.66666666666663\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"310.66666666666663\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">52.8K</text>\n  \n\n    <line x1=\"505.3333333333333\" y1=\"16\" x2=\"505.3333333333333\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"505.3333333333333\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">105.6K</text>\n  \n\n    <line x1=\"700\" y1=\"16\" x2=\"700\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"700\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">158.4K</text>\n  \n      <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <text x=\"108\" y=\"34\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">Display</text>\n    \n\n      <text x=\"108\" y=\"72\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">CTV</text>\n    \n      \n        <rect x=\"116\" y=\"16\" width=\"584\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"706\" y=\"42\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">158.4K</text>\n      \n\n        <rect x=\"116\" y=\"54\" width=\"509.52525252525254\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"631.5252525252525\" y=\"80\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">138.2K</text>\n      \n      \n      <rect x=\"12\" y=\"137\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"148\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n    </svg>"
+              "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 164\" width=\"720\" height=\"164\">\n      \n    <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"116\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n\n    <line x1=\"310.66666666666663\" y1=\"16\" x2=\"310.66666666666663\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"310.66666666666663\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">52.8K</text>\n  \n\n    <line x1=\"505.3333333333333\" y1=\"16\" x2=\"505.3333333333333\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"505.3333333333333\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">105.6K</text>\n  \n\n    <line x1=\"700\" y1=\"16\" x2=\"700\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"700\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">158.4K</text>\n  \n      \n      <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <text x=\"108\" y=\"34\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">Display</text>\n    \n\n      <text x=\"108\" y=\"72\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">CTV</text>\n    \n      \n        <rect x=\"116\" y=\"16\" width=\"584\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"706\" y=\"42\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">158 400</text>\n      \n\n        <rect x=\"116\" y=\"54\" width=\"509.52525252525254\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"631.5252525252525\" y=\"80\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">138 200</text>\n      \n      \n      \n      <rect x=\"12\" y=\"137\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"148\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n    </svg>"
             },
             {
               "id": "narrativeIntro__title_0",
@@ -3131,7 +3261,7 @@
                 "width": 348,
                 "height": 24
               },
-              "text": "Avails: 158400",
+              "text": "Avails: 158 400",
               "fontSize": 20,
               "fontWeight": "700",
               "color": "#101828"
@@ -3298,7 +3428,7 @@
       "bookmarks": [
         {
           "id": "bookmark.scopeFilters",
-          "title": "Scope",
+          "title": "Filters",
           "pageNumber": 1,
           "level": 1,
           "elementId": "scopeFilters__title_0",
@@ -3363,6 +3493,21 @@
       "title": "Capacity Inventory Top Channels Q3",
       "subtitle": "Q2 Channel Ladder",
       "description": "Capacity-first authored report starter seeded for Channel -> Publisher -> Site Type drill flows.",
+      "templateId": "capacity_inventory_brief",
+      "templateLabel": "Capacity Inventory Brief",
+      "binding": {
+        "mode": "semantic",
+        "modelRef": "model://example/performance/delivery@v1",
+        "entity": "line_delivery",
+        "selectedDimensions": [
+          "event_date",
+          "channel",
+          "country_code"
+        ],
+        "selectedMeasures": [
+          "available_impressions"
+        ]
+      },
       "semanticSummary": {
         "kind": "semantic",
         "modelRef": "model://example/performance/delivery@v1",
@@ -3403,11 +3548,543 @@
             "kind": "multiSelect",
             "label": "Channels",
             "required": false,
+            "multiple": true,
+            "options": [
+              {
+                "label": "Display",
+                "value": "Display"
+              },
+              {
+                "label": "CTV",
+                "value": "CTV"
+              }
+            ],
             "value": []
           }
         ],
         "dataSourceRef": "demoReportSource"
       },
+      "presentation": {
+        "orderFields": [
+          {
+            "value": "eventDate",
+            "field": "eventDate",
+            "default": true,
+            "defaultDirection": "asc"
+          },
+          {
+            "value": "avails",
+            "field": "avails",
+            "defaultDirection": "desc"
+          },
+          {
+            "value": "hhUniqs",
+            "field": "hhUniqs",
+            "defaultDirection": "desc"
+          }
+        ],
+        "defaultTablePresets": [
+          {
+            "title": "Inventory Ladder",
+            "dimensions": [
+              "channelV2"
+            ],
+            "measures": [
+              "avails",
+              "hhUniqs"
+            ],
+            "primaryMeasure": "avails",
+            "orderField": "avails",
+            "orderDir": "desc",
+            "pageSize": 12,
+            "clearChart": true
+          },
+          {
+            "title": "Location Ladder",
+            "dimensions": [
+              "country"
+            ],
+            "measures": [
+              "avails",
+              "hhUniqs"
+            ],
+            "primaryMeasure": "avails",
+            "orderField": "avails",
+            "orderDir": "desc",
+            "pageSize": 12,
+            "clearChart": true
+          }
+        ],
+        "defaultMode": "chart",
+        "pageSize": 50,
+        "chartCreationMode": "explicit",
+        "defaultChartSpecs": [
+          {
+            "title": "Inventory · Top Channels",
+            "type": "horizontal_bar",
+            "xField": "channelV2",
+            "yFields": [
+              "avails"
+            ]
+          },
+          {
+            "title": "Locations · Top Markets",
+            "type": "horizontal_bar",
+            "xField": "country",
+            "yFields": [
+              "avails"
+            ]
+          }
+        ]
+      },
+      "datasets": [
+        {
+          "id": "primary",
+          "dataSourceRef": "demoReportSource",
+          "label": "Report Builder Demo",
+          "description": "Primary report dataset",
+          "kindLabel": "primary",
+          "request": {
+            "measures": {
+              "avails": true
+            },
+            "dimensions": {
+              "channelV2": true
+            },
+            "filters": {
+              "From": "2026-05-01",
+              "To": "2026-05-04"
+            },
+            "semanticSelection": {
+              "modelRef": "model://example/performance/delivery@v1",
+              "entity": "line_delivery",
+              "selection": {
+                "dimensions": [
+                  "channel"
+                ],
+                "measures": [
+                  "available_impressions"
+                ]
+              },
+              "refinements": [],
+              "parameters": {}
+            },
+            "limit": 12,
+            "offset": 0,
+            "orderBy": [
+              "avails desc"
+            ]
+          },
+          "dimensions": [
+            {
+              "id": "eventDate",
+              "key": "eventDate",
+              "semanticRef": "event_date",
+              "label": "Event Date",
+              "default": true,
+              "chartAxis": true,
+              "format": "date",
+              "semanticDataType": "date"
+            },
+            {
+              "id": "channelV2",
+              "key": "channelV2",
+              "semanticRef": "channel",
+              "label": "Channel",
+              "default": true,
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeChannelV2",
+                "excludeParamPath": "filters.excludeChannelV2"
+              },
+              "semanticDataType": "string"
+            },
+            {
+              "id": "country",
+              "key": "country",
+              "semanticRef": "country_code",
+              "label": "Market",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeCountry",
+                "excludeParamPath": "filters.excludeCountry"
+              },
+              "semanticDataType": "string"
+            },
+            {
+              "id": "publisher",
+              "key": "publisher",
+              "semanticRef": "publisher",
+              "label": "Publisher",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includePublisher",
+                "excludeParamPath": "filters.excludePublisher"
+              },
+              "semanticDataType": "string"
+            },
+            {
+              "id": "siteType",
+              "key": "siteType",
+              "semanticRef": "site_type",
+              "label": "Site Type",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeSiteType",
+                "excludeParamPath": "filters.excludeSiteType"
+              },
+              "semanticDataType": "string"
+            },
+            {
+              "id": "region",
+              "key": "region",
+              "semanticRef": "region",
+              "label": "Region",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeLocationDim",
+                "excludeParamPath": "filters.excludeLocationDim",
+                "format": "locationTuple",
+                "parentField": "country"
+              },
+              "semanticDataType": "string"
+            },
+            {
+              "id": "metrocode",
+              "key": "metrocode",
+              "semanticRef": "metro_code",
+              "label": "Metro Area",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeMetrocode",
+                "excludeParamPath": "filters.excludeMetrocode"
+              },
+              "semanticDataType": "string"
+            }
+          ],
+          "measures": [
+            {
+              "id": "avails",
+              "key": "avails",
+              "semanticRef": "available_impressions",
+              "label": "Available Impressions",
+              "default": true,
+              "format": "compactNumber",
+              "semanticDataType": "number"
+            },
+            {
+              "id": "hhUniqs",
+              "key": "hhUniqs",
+              "semanticRef": "household_uniques",
+              "label": "Household Uniques",
+              "format": "compactNumber",
+              "semanticDataType": "number"
+            }
+          ],
+          "computedMeasures": [
+            {
+              "id": "reachRate",
+              "key": "reachRate",
+              "label": "Reach Rate",
+              "format": "percent",
+              "compute": {
+                "type": "ratio",
+                "numerator": "hhUniqs",
+                "denominator": "avails",
+                "scale": 100,
+                "decimals": 2
+              }
+            }
+          ],
+          "columnOptions": [
+            {
+              "key": "eventDate",
+              "label": "Event Date",
+              "kind": "dimension",
+              "sourceKey": "eventDate",
+              "format": "date",
+              "semanticRef": "event_date",
+              "default": true,
+              "chartAxis": true
+            },
+            {
+              "key": "channelV2",
+              "label": "Channel",
+              "kind": "dimension",
+              "sourceKey": "channelV2",
+              "semanticRef": "channel",
+              "default": true,
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeChannelV2",
+                "excludeParamPath": "filters.excludeChannelV2"
+              }
+            },
+            {
+              "key": "country",
+              "label": "Market",
+              "kind": "dimension",
+              "sourceKey": "country",
+              "semanticRef": "country_code",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeCountry",
+                "excludeParamPath": "filters.excludeCountry"
+              }
+            },
+            {
+              "key": "publisher",
+              "label": "Publisher",
+              "kind": "dimension",
+              "sourceKey": "publisher",
+              "semanticRef": "publisher",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includePublisher",
+                "excludeParamPath": "filters.excludePublisher"
+              }
+            },
+            {
+              "key": "siteType",
+              "label": "Site Type",
+              "kind": "dimension",
+              "sourceKey": "siteType",
+              "semanticRef": "site_type",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeSiteType",
+                "excludeParamPath": "filters.excludeSiteType"
+              }
+            },
+            {
+              "key": "region",
+              "label": "Region",
+              "kind": "dimension",
+              "sourceKey": "region",
+              "semanticRef": "region",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeLocationDim",
+                "excludeParamPath": "filters.excludeLocationDim",
+                "format": "locationTuple",
+                "parentField": "country"
+              }
+            },
+            {
+              "key": "metrocode",
+              "label": "Metro Area",
+              "kind": "dimension",
+              "sourceKey": "metrocode",
+              "semanticRef": "metro_code",
+              "runtimeFilter": {
+                "includeParamPath": "filters.includeMetrocode",
+                "excludeParamPath": "filters.excludeMetrocode"
+              }
+            },
+            {
+              "key": "avails",
+              "label": "Available Impressions",
+              "kind": "measure",
+              "sourceKey": "avails",
+              "format": "compactNumber",
+              "semanticRef": "available_impressions",
+              "default": true
+            },
+            {
+              "key": "hhUniqs",
+              "label": "Household Uniques",
+              "kind": "measure",
+              "sourceKey": "hhUniqs",
+              "format": "compactNumber",
+              "semanticRef": "household_uniques"
+            },
+            {
+              "key": "reachRate",
+              "label": "Reach Rate",
+              "kind": "measure",
+              "format": "percent"
+            }
+          ],
+          "valueFieldOptions": [
+            {
+              "value": "avails",
+              "label": "Available Impressions",
+              "format": "compactNumber",
+              "semanticRef": "available_impressions",
+              "default": true
+            },
+            {
+              "value": "hhUniqs",
+              "label": "Household Uniques",
+              "format": "compactNumber",
+              "semanticRef": "household_uniques"
+            },
+            {
+              "value": "reachRate",
+              "label": "Reach Rate",
+              "format": "percent"
+            }
+          ],
+          "secondaryFieldOptions": [
+            {
+              "value": "eventDate",
+              "label": "Event Date",
+              "format": "date",
+              "semanticRef": "event_date",
+              "default": true
+            },
+            {
+              "value": "channelV2",
+              "label": "Channel",
+              "semanticRef": "channel",
+              "default": true
+            },
+            {
+              "value": "country",
+              "label": "Market",
+              "semanticRef": "country_code"
+            },
+            {
+              "value": "publisher",
+              "label": "Publisher",
+              "semanticRef": "publisher"
+            },
+            {
+              "value": "siteType",
+              "label": "Site Type",
+              "semanticRef": "site_type"
+            },
+            {
+              "value": "region",
+              "label": "Region",
+              "semanticRef": "region"
+            },
+            {
+              "value": "metrocode",
+              "label": "Metro Area",
+              "semanticRef": "metro_code"
+            }
+          ],
+          "chartFieldOptions": [
+            {
+              "key": "eventDate",
+              "aliases": [
+                "eventDate"
+              ],
+              "label": "Event Date",
+              "kind": "dimension",
+              "format": "date",
+              "semanticRef": "event_date",
+              "default": true,
+              "chartAxis": true
+            },
+            {
+              "key": "channelV2",
+              "aliases": [
+                "channelV2"
+              ],
+              "label": "Channel",
+              "kind": "dimension",
+              "semanticRef": "channel",
+              "default": true
+            },
+            {
+              "key": "country",
+              "aliases": [
+                "country"
+              ],
+              "label": "Market",
+              "kind": "dimension",
+              "semanticRef": "country_code"
+            },
+            {
+              "key": "publisher",
+              "aliases": [
+                "publisher"
+              ],
+              "label": "Publisher",
+              "kind": "dimension",
+              "semanticRef": "publisher"
+            },
+            {
+              "key": "siteType",
+              "aliases": [
+                "siteType"
+              ],
+              "label": "Site Type",
+              "kind": "dimension",
+              "semanticRef": "site_type"
+            },
+            {
+              "key": "region",
+              "aliases": [
+                "region"
+              ],
+              "label": "Region",
+              "kind": "dimension",
+              "semanticRef": "region"
+            },
+            {
+              "key": "metrocode",
+              "aliases": [
+                "metrocode"
+              ],
+              "label": "Metro Area",
+              "kind": "dimension",
+              "semanticRef": "metro_code"
+            },
+            {
+              "key": "avails",
+              "aliases": [
+                "avails"
+              ],
+              "label": "Available Impressions",
+              "kind": "measure",
+              "format": "compactNumber",
+              "semanticRef": "available_impressions",
+              "default": true,
+              "align": "right"
+            },
+            {
+              "key": "hhUniqs",
+              "aliases": [
+                "hhUniqs"
+              ],
+              "label": "Household Uniques",
+              "kind": "measure",
+              "format": "compactNumber",
+              "semanticRef": "household_uniques",
+              "align": "right"
+            },
+            {
+              "key": "reachRate",
+              "aliases": [
+                "reachRate"
+              ],
+              "label": "Reach Rate",
+              "kind": "measure",
+              "format": "percent",
+              "align": "right"
+            }
+          ],
+          "scopeParamOptions": [
+            {
+              "value": "dateRange",
+              "label": "dateRange",
+              "kind": "dateRange",
+              "required": true,
+              "startParamPath": "filters.From",
+              "endParamPath": "filters.To"
+            },
+            {
+              "value": "channelsFilter",
+              "label": "Channels",
+              "kind": "multiSelect",
+              "required": false,
+              "multiple": true,
+              "options": [
+                {
+                  "label": "Display",
+                  "value": "Display"
+                },
+                {
+                  "label": "CTV",
+                  "value": "CTV"
+                }
+              ]
+            }
+          ]
+        }
+      ],
       "layout": {
         "type": "stack",
         "items": [
@@ -3432,6 +4109,44 @@
       },
       "blocks": [
         {
+          "id": "scopeFilters",
+          "kind": "filterBarBlock",
+          "title": "Filters",
+          "datasetRef": "primary",
+          "paramIds": [
+            "dateRange",
+            "channelsFilter"
+          ]
+        },
+        {
+          "id": "activeDrillPath",
+          "kind": "refinementBarBlock",
+          "title": "Active Drill Path",
+          "actionKinds": [
+            "remove",
+            "clearAll"
+          ],
+          "emptyLabel": "No active inventory drill path"
+        },
+        {
+          "id": "narrativeIntro",
+          "kind": "markdownBlock",
+          "title": "Inventory Outlook",
+          "markdown": "## Inventory Outlook\nStart at Channel, then drill deeper through Publisher and Site Type."
+        },
+        {
+          "id": "headlineKpi",
+          "kind": "kpiBlock",
+          "title": "Top Channel KPI",
+          "datasetRef": "primary",
+          "valueField": "avails",
+          "valueLabel": "Avails",
+          "secondaryField": "channelV2",
+          "secondaryLabel": "Channel",
+          "description": "Highlights the leading channel row before drilling deeper.",
+          "emptyLabel": "No inventory KPI value available."
+        },
+        {
           "id": "primaryBuilder",
           "kind": "reportBuilderBlock",
           "title": "Capacity Inventory Top Channels Q3",
@@ -3443,158 +4158,6 @@
           },
           "config": {
             "title": "Report Builder Demo",
-            "binding": {
-              "mode": "semantic",
-              "modelRef": "model://example/performance/delivery@v1",
-              "entity": "line_delivery",
-              "selectedDimensions": [
-                "event_date",
-                "channel",
-                "country_code"
-              ],
-              "selectedMeasures": [
-                "available_impressions"
-              ]
-            },
-            "measures": [
-              {
-                "id": "avails",
-                "key": "avails",
-                "semanticRef": "available_impressions",
-                "label": "Available Impressions",
-                "default": true,
-                "format": "compactNumber",
-                "semanticDataType": "number"
-              },
-              {
-                "id": "hhUniqs",
-                "key": "hhUniqs",
-                "semanticRef": "household_uniques",
-                "label": "Household Uniques",
-                "format": "compactNumber",
-                "semanticDataType": "number"
-              }
-            ],
-            "computedMeasures": [
-              {
-                "id": "reachRate",
-                "key": "reachRate",
-                "label": "Reach Rate",
-                "format": "percent",
-                "compute": {
-                  "type": "ratio",
-                  "numerator": "hhUniqs",
-                  "denominator": "avails",
-                  "scale": 100,
-                  "decimals": 2
-                }
-              }
-            ],
-            "dimensions": [
-              {
-                "id": "eventDate",
-                "key": "eventDate",
-                "semanticRef": "event_date",
-                "label": "Event Date",
-                "default": true,
-                "chartAxis": true,
-                "format": "date",
-                "semanticDataType": "date"
-              },
-              {
-                "id": "channelV2",
-                "key": "channelV2",
-                "semanticRef": "channel",
-                "label": "Channel",
-                "default": true,
-                "runtimeFilter": {
-                  "includeParamPath": "filters.includeChannelV2",
-                  "excludeParamPath": "filters.excludeChannelV2"
-                },
-                "semanticDataType": "string"
-              },
-              {
-                "id": "country",
-                "key": "country",
-                "semanticRef": "country_code",
-                "label": "Market",
-                "runtimeFilter": {
-                  "includeParamPath": "filters.includeCountry",
-                  "excludeParamPath": "filters.excludeCountry"
-                },
-                "semanticDataType": "string"
-              },
-              {
-                "id": "publisher",
-                "key": "publisher",
-                "semanticRef": "publisher",
-                "label": "Publisher",
-                "runtimeFilter": {
-                  "includeParamPath": "filters.includePublisher",
-                  "excludeParamPath": "filters.excludePublisher"
-                },
-                "semanticDataType": "string"
-              },
-              {
-                "id": "siteType",
-                "key": "siteType",
-                "semanticRef": "site_type",
-                "label": "Site Type",
-                "runtimeFilter": {
-                  "includeParamPath": "filters.includeSiteType",
-                  "excludeParamPath": "filters.excludeSiteType"
-                },
-                "semanticDataType": "string"
-              },
-              {
-                "id": "region",
-                "key": "region",
-                "semanticRef": "region",
-                "label": "Region",
-                "runtimeFilter": {
-                  "includeParamPath": "filters.includeLocationDim",
-                  "excludeParamPath": "filters.excludeLocationDim",
-                  "format": "locationTuple",
-                  "parentField": "country"
-                },
-                "semanticDataType": "string"
-              },
-              {
-                "id": "metrocode",
-                "key": "metrocode",
-                "semanticRef": "metro_code",
-                "label": "Metro Area",
-                "runtimeFilter": {
-                  "includeParamPath": "filters.includeMetrocode",
-                  "excludeParamPath": "filters.excludeMetrocode"
-                },
-                "semanticDataType": "string"
-              }
-            ],
-            "staticFilters": [
-              {
-                "id": "dateRange",
-                "type": "dateRange",
-                "required": true,
-                "startParamPath": "filters.From",
-                "endParamPath": "filters.To"
-              },
-              {
-                "id": "channelsFilter",
-                "label": "Channels",
-                "multiple": true,
-                "options": [
-                  {
-                    "label": "Display",
-                    "value": "Display"
-                  },
-                  {
-                    "label": "CTV",
-                    "value": "CTV"
-                  }
-                ]
-              }
-            ],
             "drillMetadata": {
               "hierarchies": [
                 {
@@ -3682,75 +4245,84 @@
                 }
               ]
             },
-            "result": {
-              "chartCreationMode": "explicit",
-              "defaultMode": "chart",
-              "pageSize": 50,
-              "defaultTablePresets": [
+            "semanticModel": {
+              "modelRef": "model://example/performance/delivery@v1",
+              "version": 1,
+              "label": "Ad Delivery",
+              "entities": [
                 {
-                  "title": "Inventory Ladder",
+                  "id": "line_delivery",
+                  "label": "Line Delivery",
                   "dimensions": [
-                    "channelV2"
+                    {
+                      "id": "event_date",
+                      "key": "event_date",
+                      "label": "Event Date",
+                      "featureType": "dimension",
+                      "dataType": "date"
+                    },
+                    {
+                      "id": "channel",
+                      "key": "channel",
+                      "label": "Channel",
+                      "featureType": "dimension",
+                      "dataType": "string"
+                    },
+                    {
+                      "id": "country_code",
+                      "key": "country_code",
+                      "label": "Market",
+                      "featureType": "dimension",
+                      "dataType": "string"
+                    },
+                    {
+                      "id": "publisher",
+                      "key": "publisher",
+                      "label": "Publisher",
+                      "featureType": "dimension",
+                      "dataType": "string"
+                    },
+                    {
+                      "id": "site_type",
+                      "key": "site_type",
+                      "label": "Site Type",
+                      "featureType": "dimension",
+                      "dataType": "string"
+                    },
+                    {
+                      "id": "region",
+                      "key": "region",
+                      "label": "Region",
+                      "featureType": "dimension",
+                      "dataType": "string"
+                    },
+                    {
+                      "id": "metro_code",
+                      "key": "metro_code",
+                      "label": "Metro Area",
+                      "featureType": "dimension",
+                      "dataType": "string"
+                    }
                   ],
                   "measures": [
-                    "avails",
-                    "hhUniqs"
-                  ],
-                  "primaryMeasure": "avails",
-                  "orderField": "avails",
-                  "orderDir": "desc",
-                  "pageSize": 12,
-                  "clearChart": true
-                },
-                {
-                  "title": "Location Ladder",
-                  "dimensions": [
-                    "country"
-                  ],
-                  "measures": [
-                    "avails",
-                    "hhUniqs"
-                  ],
-                  "primaryMeasure": "avails",
-                  "orderField": "avails",
-                  "orderDir": "desc",
-                  "pageSize": 12,
-                  "clearChart": true
-                }
-              ],
-              "orderFields": [
-                {
-                  "value": "eventDate",
-                  "field": "eventDate",
-                  "default": true,
-                  "defaultDirection": "asc"
-                },
-                {
-                  "value": "avails",
-                  "field": "avails",
-                  "defaultDirection": "desc"
-                },
-                {
-                  "value": "hhUniqs",
-                  "field": "hhUniqs",
-                  "defaultDirection": "desc"
-                }
-              ],
-              "defaultChartSpecs": [
-                {
-                  "title": "Inventory · Top Channels",
-                  "type": "horizontal_bar",
-                  "xField": "channelV2",
-                  "yFields": [
-                    "avails"
-                  ]
-                },
-                {
-                  "title": "Locations · Top Markets",
-                  "type": "horizontal_bar",
-                  "xField": "country",
-                  "yFields": [
-                    "avails"
+                    {
+                      "id": "available_impressions",
+                      "key": "available_impressions",
+                      "label": "Available Impressions",
+                      "featureType": "measure",
+                      "dataType": "number",
+                      "format": "compactNumber",
+                      "aggregation": "sum"
+                    },
+                    {
+                      "id": "household_uniques",
+                      "key": "household_uniques",
+                      "label": "Household Uniques",
+                      "featureType": "measure",
+                      "dataType": "number",
+                      "format": "compactNumber",
+                      "aggregation": "sum"
+                    }
                   ]
                 }
               ]
@@ -3764,19 +4336,6 @@
             "selectedDimensions": [
               "channelV2"
             ],
-            "binding": {
-              "mode": "semantic",
-              "modelRef": "model://example/performance/delivery@v1",
-              "entity": "line_delivery",
-              "selectedDimensions": [
-                "event_date",
-                "channel",
-                "country_code"
-              ],
-              "selectedMeasures": [
-                "available_impressions"
-              ]
-            },
             "localCalculatedFields": [],
             "localTableCalculations": [],
             "viewMode": "chart",
@@ -3793,7 +4352,7 @@
             "pageSize": 12,
             "orderField": "avails",
             "orderDir": "desc",
-            "staticFilters": {
+            "scopeParams": {
               "dateRange": {
                 "start": "2026-05-01",
                 "end": "2026-05-04"
@@ -3819,43 +4378,6 @@
               "target": "staticFilters.channelsFilter"
             }
           ]
-        },
-        {
-          "id": "scopeFilters",
-          "kind": "filterBarBlock",
-          "title": "Scope",
-          "paramIds": [
-            "dateRange",
-            "channelsFilter"
-          ]
-        },
-        {
-          "id": "activeDrillPath",
-          "kind": "refinementBarBlock",
-          "title": "Active Drill Path",
-          "actionKinds": [
-            "remove",
-            "clearAll"
-          ],
-          "emptyLabel": "No active inventory drill path"
-        },
-        {
-          "id": "narrativeIntro",
-          "kind": "markdownBlock",
-          "title": "Inventory Outlook",
-          "markdown": "## Inventory Outlook\nStart at Channel, then drill deeper through Publisher and Site Type."
-        },
-        {
-          "id": "headlineKpi",
-          "kind": "kpiBlock",
-          "title": "Top Channel KPI",
-          "datasetRef": "primary",
-          "valueField": "avails",
-          "valueLabel": "Avails",
-          "secondaryField": "channelV2",
-          "secondaryLabel": "Channel",
-          "description": "Highlights the leading channel row before drilling deeper.",
-          "emptyLabel": "No inventory KPI value available."
         }
       ]
     },
@@ -4040,6 +4562,39 @@
       },
       "refinements": [],
       "calculatedFields": [],
+      "scope": {
+        "params": [
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "label": "dateRange",
+            "required": true,
+            "value": {
+              "start": "2026-05-01",
+              "end": "2026-05-04"
+            }
+          },
+          {
+            "id": "channelsFilter",
+            "kind": "multiSelect",
+            "label": "Channels",
+            "required": false,
+            "multiple": true,
+            "options": [
+              {
+                "label": "Display",
+                "value": "Display"
+              },
+              {
+                "label": "CTV",
+                "value": "CTV"
+              }
+            ],
+            "value": []
+          }
+        ],
+        "dataSourceRef": "demoReportSource"
+      },
       "datasets": [
         {
           "id": "primary",
@@ -4053,9 +4608,7 @@
             },
             "filters": {
               "From": "2026-05-01",
-              "To": "2026-05-04",
-              "from": "2026-05-01",
-              "to": "2026-05-04"
+              "To": "2026-05-04"
             },
             "semanticSelection": {
               "modelRef": "model://example/performance/delivery@v1",
@@ -4083,7 +4636,8 @@
         {
           "id": "scopeFilters",
           "kind": "filterBarBlock",
-          "title": "Scope",
+          "title": "Filters",
+          "datasetRef": "primary",
           "paramIds": [
             "dateRange",
             "channelsFilter"
@@ -4184,31 +4738,10 @@
           "secondaryField": "channelV2",
           "secondaryLabel": "Channel",
           "description": "Highlights the leading channel row before drilling deeper.",
-          "emptyLabel": "No inventory KPI value available."
+          "emptyLabel": "No inventory KPI value available.",
+          "valueFormat": "compactNumber"
         }
-      ],
-      "scope": {
-        "params": [
-          {
-            "id": "dateRange",
-            "kind": "dateRange",
-            "label": "dateRange",
-            "required": true,
-            "value": {
-              "start": "2026-05-01",
-              "end": "2026-05-04"
-            }
-          },
-          {
-            "id": "channelsFilter",
-            "kind": "multiSelect",
-            "label": "Channels",
-            "required": false,
-            "value": []
-          }
-        ],
-        "dataSourceRef": "demoReportSource"
-      }
+      ]
     },
     "compileState": {
       "status": "clean",

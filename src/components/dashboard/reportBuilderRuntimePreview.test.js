@@ -732,6 +732,39 @@ assert.equal(
   false,
 );
 
+const templateSeededPreview = buildReportBuilderRuntimePreview({
+  model: {
+    ...model,
+    document: {
+      ...model.document,
+      templateId: "capacity_inventory_brief",
+      templateLabel: "Capacity Inventory Brief",
+    },
+  },
+  rows: [
+    { channelV2: "Display", publisherId: "Acme Media", avails: 1250000 },
+  ],
+  hasMore: false,
+  error: null,
+  additionalDiagnostics: [],
+  pageGeometry: {
+    width: 792,
+    height: 612,
+    marginTop: 36,
+    marginRight: 36,
+    marginBottom: 36,
+    marginLeft: 36,
+    headerHeight: 36,
+    footerHeight: 24,
+  },
+});
+assert.equal(templateSeededPreview.exportRequest.source.from, "preset");
+assert.equal(templateSeededPreview.exportRequest.source.artifactKind, "reportBuilder.reportTemplate");
+assert.equal(templateSeededPreview.exportRequest.source.sourceArtifactId, "capacity_inventory_brief");
+assert.equal(templateSeededPreview.exportRequest.source.windowKey, "capacityBuilder");
+assert.equal(templateSeededPreview.exportRequest.source.templateLabel, "Capacity Inventory Brief");
+assert.equal(validateReportExportRequest(templateSeededPreview.exportRequest).valid, true);
+
 const canonicalDocumentPreviewModel = {
   ...model,
   semanticBindingViewState: null,
@@ -1228,6 +1261,137 @@ const authoredChartPreview = buildReportBuilderRuntimePreview({
 });
 assert.equal(authoredChartPreview.reportFill.blocks.some((block) => block.kind === "chartBlock" && block.id === "trendChart" && block.content?.chartSpec?.title === "Trend Chart" && block.content?.chartModel?.type === "line"), true);
 assert.equal(authoredChartPreview.reportPrint.pages[0].elements.some((element) => element.kind === "svg" && element.id.includes("trendChart")), true);
+
+const authoredEnhancedBlocksModel = buildReportBuilderRuntimePreviewModel({
+  container,
+  config,
+  state: {
+    ...state,
+    reportDocumentBlocks: [
+      {
+        id: "overviewSection",
+        kind: "sectionBlock",
+        title: "Overview",
+        navigationLabel: "Overview",
+        subtitle: "Leadership snapshot",
+      },
+      {
+        id: "summaryPanel",
+        kind: "compositeBlock",
+        title: "Summary panel",
+        description: "Groups the intro and process blocks.",
+        childBlockIds: ["directIntro", "integrationFlow"],
+      },
+      {
+        id: "launchCallout",
+        kind: "calloutBlock",
+        title: "Launch update",
+        icon: "warning-sign",
+        description: "Important rollout note.",
+        tone: "warning",
+        badges: ["Executive", "Launch Ready"],
+        body: "Publisher activation is staged for Friday.",
+      },
+      {
+        id: "sectionTabs",
+        kind: "tabGroupBlock",
+        title: "Forecast views",
+        sectionIds: ["overviewSection"],
+        defaultSectionId: "overviewSection",
+      },
+      {
+        id: "directIntro",
+        kind: "infoPanelBlock",
+        title: "What is a Direct Integration Path?",
+        eyebrow: "What is it?",
+        description: "Explains the direct path concept.",
+        tone: "info",
+        body: "A direct integration connects bidding directly into the publisher ad server.",
+      },
+      {
+        id: "integrationFlow",
+        kind: "stepperBlock",
+        title: "Direct Integration Path",
+        description: "Three stages to define a direct path.",
+        steps: [
+          { id: "step_1", title: "Bid directly", body: "Connect bidding directly to the publisher ad server." },
+          { id: "step_2", title: "Uncap QPS", body: "Enable access to the full inventory set." },
+        ],
+      },
+      {
+        id: "topChannels",
+        kind: "collectionBlock",
+        title: "Top Channels",
+        datasetRef: "primary",
+        itemTitleField: "channelV2",
+        valueField: "avails",
+        valueLabel: "Avails",
+        secondaryField: "eventDate",
+        secondaryLabel: "Date",
+        rowLimit: 2,
+        bodyTemplate: "**${valueLabel}:** ${value}",
+      },
+      {
+        id: "publisherPipeline",
+        kind: "kanbanBlock",
+        title: "Publisher Pipeline",
+        description: "Track publisher activations by stage.",
+        columns: [
+          {
+            id: "signed",
+            title: "Signed",
+            cards: [
+              { id: "tubi", title: "Tubi", body: "SpringServe integration live.", badge: "Live" },
+            ],
+          },
+        ],
+      },
+      {
+        id: "integrationTimeline",
+        kind: "timelineBlock",
+        title: "Integration Timeline",
+        description: "Track rollout milestones.",
+        events: [
+          { id: "event_1", date: "2026-07-15", badge: "Target", title: "Roku signed", body: "Expected signature date." },
+        ],
+      },
+    ],
+    reportDocumentLayout: {
+      type: "stack",
+      items: [
+        { blockId: "overviewSection" },
+        { blockId: "summaryPanel" },
+        { blockId: "launchCallout" },
+        { blockId: "sectionTabs" },
+        { blockId: "directIntro" },
+        { blockId: "integrationFlow" },
+        { blockId: "primaryBuilder" },
+        { blockId: "topChannels" },
+        { blockId: "publisherPipeline" },
+        { blockId: "integrationTimeline" },
+      ],
+    },
+  },
+});
+const authoredEnhancedPreview = buildReportBuilderRuntimePreview({
+  model: authoredEnhancedBlocksModel,
+  rows: [
+    { eventDate: "2026-07-14", channelV2: "CTV", avails: 1200000 },
+    { eventDate: "2026-07-13", channelV2: "Display", avails: 980000 },
+  ],
+  hasMore: false,
+});
+assert.equal(authoredEnhancedPreview.reportFill.blocks.some((block) => block.kind === "sectionBlock" && block.id === "overviewSection"), true);
+assert.equal(authoredEnhancedPreview.reportFill.blocks.some((block) => block.kind === "compositeBlock" && block.id === "summaryPanel" && block.content?.childBlockIds?.length === 2), true);
+assert.equal(authoredEnhancedPreview.reportFill.blocks.some((block) => block.kind === "calloutBlock" && block.id === "launchCallout" && block.content?.badges?.length === 2), true);
+assert.equal(authoredEnhancedPreview.reportFill.blocks.some((block) => block.kind === "tabGroupBlock" && block.id === "sectionTabs" && block.content?.tabs?.[0]?.id === "overviewSection"), true);
+assert.equal(authoredEnhancedPreview.reportFill.blocks.some((block) => block.kind === "infoPanelBlock" && block.id === "directIntro"), true);
+assert.equal(authoredEnhancedPreview.reportFill.blocks.some((block) => block.kind === "stepperBlock" && block.id === "integrationFlow"), true);
+assert.equal(authoredEnhancedPreview.reportFill.blocks.some((block) => block.kind === "collectionBlock" && block.id === "topChannels" && block.content?.items?.length === 2), true);
+assert.equal(authoredEnhancedPreview.reportFill.blocks.some((block) => block.kind === "kanbanBlock" && block.id === "publisherPipeline"), true);
+assert.equal(authoredEnhancedPreview.reportFill.blocks.some((block) => block.kind === "timelineBlock" && block.id === "integrationTimeline"), true);
+assert.equal(authoredEnhancedPreview.reportPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.integrationTimeline"), true);
+assert.equal(authoredEnhancedPreview.reportPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.publisherPipeline"), true);
 
 const authoredComputedChartModel = buildReportBuilderRuntimePreviewModel({
   container,

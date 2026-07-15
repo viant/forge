@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"unicode/utf16"
 
@@ -61,29 +62,60 @@ type Provenance struct {
 }
 
 type Block struct {
-	ID                   string                `json:"id"`
-	Kind                 string                `json:"kind"`
-	Title                string                `json:"title,omitempty"`
-	DatasetRef           string                `json:"datasetRef,omitempty"`
-	Columns              []TableColumn         `json:"columns,omitempty"`
-	Content              *TableContent         `json:"content,omitempty"`
-	ChartSpec            map[string]any        `json:"chartSpec,omitempty"`
-	ChartModel           map[string]any        `json:"chartModel,omitempty"`
-	ValueField           string                `json:"valueField,omitempty"`
-	ValueLabel           string                `json:"valueLabel,omitempty"`
-	SecondaryField       string                `json:"secondaryField,omitempty"`
-	SecondaryLabel       string                `json:"secondaryLabel,omitempty"`
-	SecondaryDisplayKey  string                `json:"secondaryDisplayKey,omitempty"`
-	Description          string                `json:"description,omitempty"`
-	EmptyLabel           string                `json:"emptyLabel,omitempty"`
-	Markdown             string                `json:"markdown,omitempty"`
-	Geo                  map[string]any        `json:"geo,omitempty"`
-	ChartContent         *ChartContent         `json:"-"`
-	GeoContent           *GeoContent           `json:"-"`
-	KPIContent           *KPIContent           `json:"-"`
-	FilterBarContent     *FilterBarContent     `json:"-"`
-	RefinementBarContent *RefinementBarContent `json:"-"`
-	MarkdownContent      *MarkdownContent      `json:"-"`
+	ID                       string                `json:"id"`
+	Kind                     string                `json:"kind"`
+	Title                    string                `json:"title,omitempty"`
+	DatasetRef               string                `json:"datasetRef,omitempty"`
+	Columns                  []TableColumn         `json:"columns,omitempty"`
+	Content                  *TableContent         `json:"content,omitempty"`
+	ChartSpec                map[string]any        `json:"chartSpec,omitempty"`
+	ChartModel               map[string]any        `json:"chartModel,omitempty"`
+	ValueField               string                `json:"valueField,omitempty"`
+	ValueLabel               string                `json:"valueLabel,omitempty"`
+	ValueFormat              string                `json:"valueFormat,omitempty"`
+	SecondaryField           string                `json:"secondaryField,omitempty"`
+	SecondaryLabel           string                `json:"secondaryLabel,omitempty"`
+	SecondaryFormat          string                `json:"secondaryFormat,omitempty"`
+	SecondaryDisplayKey      string                `json:"secondaryDisplayKey,omitempty"`
+	SecondaryDisplayValueMap map[string]any        `json:"secondaryDisplayValueMap,omitempty"`
+	Description              string                `json:"description,omitempty"`
+	EmptyLabel               string                `json:"emptyLabel,omitempty"`
+	RowSelector              string                `json:"rowSelector,omitempty"`
+	PresentationMode         string                `json:"presentationMode,omitempty"`
+	BodyFormat               string                `json:"bodyFormat,omitempty"`
+	BodyTemplate             string                `json:"bodyTemplate,omitempty"`
+	ParamIDs                 []string              `json:"paramIds,omitempty"`
+	Mode                     string                `json:"mode,omitempty"`
+	Placement                string                `json:"placement,omitempty"`
+	GroupOrder               []string              `json:"groupOrder,omitempty"`
+	VisibleGroups            []string              `json:"visibleGroups,omitempty"`
+	CollapsedGroups          []string              `json:"collapsedGroups,omitempty"`
+	Markdown                 string                `json:"markdown,omitempty"`
+	Geo                      map[string]any        `json:"geo,omitempty"`
+	Icon                     string                `json:"icon,omitempty"`
+	Tone                     string                `json:"tone,omitempty"`
+	Badges                   []string              `json:"badges,omitempty"`
+	ChildBlockIDs            []string              `json:"childBlockIds,omitempty"`
+	SectionIDs               []string              `json:"sectionIds,omitempty"`
+	DefaultSectionID         string                `json:"defaultSectionId,omitempty"`
+	ItemTitleField           string                `json:"itemTitleField,omitempty"`
+	ItemTitleLabel           string                `json:"itemTitleLabel,omitempty"`
+	Layout                   string                `json:"layout,omitempty"`
+	ChartContent             *ChartContent         `json:"-"`
+	GeoContent               *GeoContent           `json:"-"`
+	KPIContent               *KPIContent           `json:"-"`
+	CollectionContent        *CollectionContent    `json:"-"`
+	SectionContent           *SectionContent       `json:"-"`
+	CompositeContent         *CompositeContent     `json:"-"`
+	TabGroupContent          *TabGroupContent      `json:"-"`
+	StepperContent           *StepperContent       `json:"-"`
+	InfoPanelContent         *InfoPanelContent     `json:"-"`
+	CalloutContent           *CalloutContent       `json:"-"`
+	KanbanContent            *KanbanContent        `json:"-"`
+	TimelineContent          *TimelineContent      `json:"-"`
+	FilterBarContent         *FilterBarContent     `json:"-"`
+	RefinementBarContent     *RefinementBarContent `json:"-"`
+	MarkdownContent          *MarkdownContent      `json:"-"`
 }
 
 type TableColumn struct {
@@ -119,12 +151,23 @@ type ResolvedTableCell struct {
 }
 
 type ResolvedTableCellVisualState struct {
-	Kind    string   `json:"kind"`
-	Value   *float64 `json:"value,omitempty"`
-	Percent *float64 `json:"percent,omitempty"`
-	Palette []string `json:"palette,omitempty"`
-	Tone    string   `json:"tone,omitempty"`
-	Label   string   `json:"label,omitempty"`
+	Kind            string                           `json:"kind"`
+	Value           *float64                         `json:"value,omitempty"`
+	Percent         *float64                         `json:"percent,omitempty"`
+	Palette         []string                         `json:"palette,omitempty"`
+	Tone            string                           `json:"tone,omitempty"`
+	Label           string                           `json:"label,omitempty"`
+	BackgroundColor string                           `json:"backgroundColor,omitempty"`
+	BorderColor     string                           `json:"borderColor,omitempty"`
+	TextColor       string                           `json:"textColor,omitempty"`
+	Segments        []ResolvedTableCellVisualSegment `json:"segments,omitempty"`
+}
+
+type ResolvedTableCellVisualSegment struct {
+	Label   string  `json:"label"`
+	Color   string  `json:"color"`
+	Value   float64 `json:"value"`
+	Percent float64 `json:"percent"`
 }
 
 type ChartContent struct {
@@ -195,21 +238,125 @@ type ResolvedGeoLegendRule struct {
 }
 
 type KPIContent struct {
-	Title          string `json:"title"`
-	Description    string `json:"description,omitempty"`
-	ValueField     string `json:"valueField"`
-	ValueLabel     string `json:"valueLabel"`
-	Value          any    `json:"value"`
-	RowCount       *int   `json:"rowCount"`
-	SecondaryField string `json:"secondaryField,omitempty"`
-	SecondaryLabel string `json:"secondaryLabel,omitempty"`
-	SecondaryValue any    `json:"secondaryValue,omitempty"`
-	EmptyLabel     string `json:"emptyLabel,omitempty"`
+	Title                    string         `json:"title"`
+	Description              string         `json:"description,omitempty"`
+	ValueField               string         `json:"valueField"`
+	ValueLabel               string         `json:"valueLabel"`
+	ValueFormat              string         `json:"valueFormat,omitempty"`
+	Value                    any            `json:"value"`
+	RowCount                 *int           `json:"rowCount"`
+	SecondaryField           string         `json:"secondaryField,omitempty"`
+	SecondaryLabel           string         `json:"secondaryLabel,omitempty"`
+	SecondaryFormat          string         `json:"secondaryFormat,omitempty"`
+	SecondaryDisplayKey      string         `json:"secondaryDisplayKey,omitempty"`
+	SecondaryDisplayValueMap map[string]any `json:"secondaryDisplayValueMap,omitempty"`
+	SecondaryValue           any            `json:"secondaryValue,omitempty"`
+	EmptyLabel               string         `json:"emptyLabel,omitempty"`
+	RowSelector              string         `json:"rowSelector,omitempty"`
+	PresentationMode         string         `json:"presentationMode,omitempty"`
+	BodyFormat               string         `json:"bodyFormat,omitempty"`
+	BodyTemplate             string         `json:"bodyTemplate,omitempty"`
+	BodyMarkdown             string         `json:"bodyMarkdown,omitempty"`
+}
+
+type CollectionItemContent struct {
+	Index           *int   `json:"index,omitempty"`
+	Title           any    `json:"title"`
+	ItemTitleField  string `json:"itemTitleField,omitempty"`
+	ItemTitleLabel  string `json:"itemTitleLabel,omitempty"`
+	ValueField      string `json:"valueField,omitempty"`
+	ValueLabel      string `json:"valueLabel,omitempty"`
+	ValueFormat     string `json:"valueFormat,omitempty"`
+	Value           any    `json:"value,omitempty"`
+	SecondaryField  string `json:"secondaryField,omitempty"`
+	SecondaryLabel  string `json:"secondaryLabel,omitempty"`
+	SecondaryFormat string `json:"secondaryFormat,omitempty"`
+	SecondaryValue  any    `json:"secondaryValue,omitempty"`
+	BodyMarkdown    string `json:"bodyMarkdown,omitempty"`
+}
+
+type CollectionContent struct {
+	Title       string                  `json:"title"`
+	Description string                  `json:"description,omitempty"`
+	EmptyLabel  string                  `json:"emptyLabel,omitempty"`
+	Layout      string                  `json:"layout"`
+	Columns     int                     `json:"columns"`
+	RowCount    int                     `json:"rowCount"`
+	RowLimit    int                     `json:"rowLimit"`
+	Items       []CollectionItemContent `json:"items"`
+}
+
+type SectionContent struct {
+	Title           string `json:"title"`
+	Subtitle        string `json:"subtitle,omitempty"`
+	Description     string `json:"description,omitempty"`
+	NavigationLabel string `json:"navigationLabel"`
+}
+
+type CompositeContent struct {
+	Title         string   `json:"title"`
+	Description   string   `json:"description,omitempty"`
+	ChildBlockIDs []string `json:"childBlockIds"`
+}
+
+type TabGroupTab struct {
+	ID              string `json:"id"`
+	Title           string `json:"title"`
+	NavigationLabel string `json:"navigationLabel"`
+}
+
+type TabGroupContent struct {
+	Title            string        `json:"title"`
+	SectionIDs       []string      `json:"sectionIds"`
+	DefaultSectionID string        `json:"defaultSectionId,omitempty"`
+	Tabs             []TabGroupTab `json:"tabs"`
+}
+
+type StepperContent struct {
+	Title       string                   `json:"title"`
+	Description string                   `json:"description,omitempty"`
+	Steps       []reportspec.StepperStep `json:"steps"`
+}
+
+type InfoPanelContent struct {
+	Title       string `json:"title"`
+	Eyebrow     string `json:"eyebrow,omitempty"`
+	Description string `json:"description,omitempty"`
+	Tone        string `json:"tone,omitempty"`
+	BodyFormat  string `json:"bodyFormat,omitempty"`
+	Body        string `json:"body"`
+}
+
+type CalloutContent struct {
+	Title       string   `json:"title"`
+	Icon        string   `json:"icon,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Tone        string   `json:"tone,omitempty"`
+	Badges      []string `json:"badges,omitempty"`
+	BodyFormat  string   `json:"bodyFormat,omitempty"`
+	Body        string   `json:"body"`
+}
+
+type KanbanContent struct {
+	Title       string                    `json:"title"`
+	Description string                    `json:"description,omitempty"`
+	Columns     []reportspec.KanbanColumn `json:"columns"`
+}
+
+type TimelineContent struct {
+	Title       string                     `json:"title"`
+	Description string                     `json:"description,omitempty"`
+	Events      []reportspec.TimelineEvent `json:"events"`
 }
 
 type FilterBarContent struct {
-	Title  string                   `json:"title"`
-	Params []FilterBarContentParams `json:"params"`
+	Title           string                   `json:"title"`
+	Mode            string                   `json:"mode,omitempty"`
+	Placement       string                   `json:"placement,omitempty"`
+	GroupOrder      []string                 `json:"groupOrder,omitempty"`
+	VisibleGroups   []string                 `json:"visibleGroups,omitempty"`
+	CollapsedGroups []string                 `json:"collapsedGroups,omitempty"`
+	Params          []FilterBarContentParams `json:"params"`
 }
 
 type FilterBarContentParamOption struct {
@@ -222,6 +369,7 @@ type FilterBarContentParamOption struct {
 
 type FilterBarContentParams struct {
 	ID           string                        `json:"id"`
+	GroupID      string                        `json:"groupId,omitempty"`
 	Label        string                        `json:"label,omitempty"`
 	Description  string                        `json:"description,omitempty"`
 	Type         string                        `json:"type,omitempty"`
@@ -293,27 +441,39 @@ type rawChartBlock struct {
 }
 
 type rawKPIBlock struct {
-	ID                  string     `json:"id"`
-	Kind                string     `json:"kind"`
-	Title               string     `json:"title"`
-	DatasetRef          string     `json:"datasetRef"`
-	ValueField          string     `json:"valueField"`
-	ValueLabel          string     `json:"valueLabel"`
-	SecondaryField      string     `json:"secondaryField,omitempty"`
-	SecondaryLabel      string     `json:"secondaryLabel,omitempty"`
-	SecondaryDisplayKey string     `json:"secondaryDisplayKey,omitempty"`
-	Description         string     `json:"description,omitempty"`
-	EmptyLabel          string     `json:"emptyLabel,omitempty"`
-	Content             KPIContent `json:"content"`
+	ID                       string         `json:"id"`
+	Kind                     string         `json:"kind"`
+	Title                    string         `json:"title"`
+	DatasetRef               string         `json:"datasetRef"`
+	ValueField               string         `json:"valueField"`
+	ValueLabel               string         `json:"valueLabel"`
+	ValueFormat              string         `json:"valueFormat,omitempty"`
+	SecondaryField           string         `json:"secondaryField,omitempty"`
+	SecondaryLabel           string         `json:"secondaryLabel,omitempty"`
+	SecondaryFormat          string         `json:"secondaryFormat,omitempty"`
+	SecondaryDisplayKey      string         `json:"secondaryDisplayKey,omitempty"`
+	SecondaryDisplayValueMap map[string]any `json:"secondaryDisplayValueMap,omitempty"`
+	Description              string         `json:"description,omitempty"`
+	EmptyLabel               string         `json:"emptyLabel,omitempty"`
+	RowSelector              string         `json:"rowSelector,omitempty"`
+	PresentationMode         string         `json:"presentationMode,omitempty"`
+	BodyFormat               string         `json:"bodyFormat,omitempty"`
+	BodyTemplate             string         `json:"bodyTemplate,omitempty"`
+	Content                  KPIContent     `json:"content"`
 }
 
 type rawFilterBarBlock struct {
-	ID         string           `json:"id"`
-	Kind       string           `json:"kind"`
-	Title      string           `json:"title,omitempty"`
-	DatasetRef string           `json:"datasetRef,omitempty"`
-	ParamIDs   []string         `json:"paramIds,omitempty"`
-	Content    FilterBarContent `json:"content"`
+	ID              string           `json:"id"`
+	Kind            string           `json:"kind"`
+	Title           string           `json:"title,omitempty"`
+	DatasetRef      string           `json:"datasetRef,omitempty"`
+	ParamIDs        []string         `json:"paramIds,omitempty"`
+	Mode            string           `json:"mode,omitempty"`
+	Placement       string           `json:"placement,omitempty"`
+	GroupOrder      []string         `json:"groupOrder,omitempty"`
+	VisibleGroups   []string         `json:"visibleGroups,omitempty"`
+	CollapsedGroups []string         `json:"collapsedGroups,omitempty"`
+	Content         FilterBarContent `json:"content"`
 }
 
 type rawRefinementBarBlock struct {
@@ -340,6 +500,109 @@ type rawGeoMapBlock struct {
 	DatasetRef string         `json:"datasetRef"`
 	Geo        map[string]any `json:"geo"`
 	Content    GeoContent     `json:"content"`
+}
+
+type rawCollectionBlock struct {
+	ID              string            `json:"id"`
+	Kind            string            `json:"kind"`
+	Title           string            `json:"title"`
+	DatasetRef      string            `json:"datasetRef"`
+	Description     string            `json:"description,omitempty"`
+	ItemTitleField  string            `json:"itemTitleField"`
+	ItemTitleLabel  string            `json:"itemTitleLabel,omitempty"`
+	ValueField      string            `json:"valueField,omitempty"`
+	ValueLabel      string            `json:"valueLabel,omitempty"`
+	ValueFormat     string            `json:"valueFormat,omitempty"`
+	SecondaryField  string            `json:"secondaryField,omitempty"`
+	SecondaryLabel  string            `json:"secondaryLabel,omitempty"`
+	SecondaryFormat string            `json:"secondaryFormat,omitempty"`
+	Layout          string            `json:"layout"`
+	Columns         int               `json:"columns,omitempty"`
+	RowLimit        int               `json:"rowLimit"`
+	BodyFormat      string            `json:"bodyFormat,omitempty"`
+	BodyTemplate    string            `json:"bodyTemplate,omitempty"`
+	EmptyLabel      string            `json:"emptyLabel,omitempty"`
+	Content         CollectionContent `json:"content"`
+}
+
+type rawSectionBlock struct {
+	ID              string         `json:"id"`
+	Kind            string         `json:"kind"`
+	Title           string         `json:"title"`
+	Subtitle        string         `json:"subtitle,omitempty"`
+	Description     string         `json:"description,omitempty"`
+	NavigationLabel string         `json:"navigationLabel,omitempty"`
+	Content         SectionContent `json:"content"`
+}
+
+type rawCompositeBlock struct {
+	ID            string           `json:"id"`
+	Kind          string           `json:"kind"`
+	Title         string           `json:"title"`
+	Description   string           `json:"description,omitempty"`
+	ChildBlockIDs []string         `json:"childBlockIds"`
+	Content       CompositeContent `json:"content"`
+}
+
+type rawTabGroupBlock struct {
+	ID               string          `json:"id"`
+	Kind             string          `json:"kind"`
+	Title            string          `json:"title,omitempty"`
+	SectionIDs       []string        `json:"sectionIds"`
+	DefaultSectionID string          `json:"defaultSectionId,omitempty"`
+	Content          TabGroupContent `json:"content"`
+}
+
+type rawStepperBlock struct {
+	ID          string                   `json:"id"`
+	Kind        string                   `json:"kind"`
+	Title       string                   `json:"title"`
+	Description string                   `json:"description,omitempty"`
+	Steps       []reportspec.StepperStep `json:"steps,omitempty"`
+	Content     StepperContent           `json:"content"`
+}
+
+type rawInfoPanelBlock struct {
+	ID          string           `json:"id"`
+	Kind        string           `json:"kind"`
+	Title       string           `json:"title"`
+	Eyebrow     string           `json:"eyebrow,omitempty"`
+	Description string           `json:"description,omitempty"`
+	Tone        string           `json:"tone,omitempty"`
+	BodyFormat  string           `json:"bodyFormat,omitempty"`
+	Body        string           `json:"body,omitempty"`
+	Content     InfoPanelContent `json:"content"`
+}
+
+type rawCalloutBlock struct {
+	ID          string         `json:"id"`
+	Kind        string         `json:"kind"`
+	Title       string         `json:"title"`
+	Icon        string         `json:"icon,omitempty"`
+	Description string         `json:"description,omitempty"`
+	Tone        string         `json:"tone,omitempty"`
+	Badges      []string       `json:"badges,omitempty"`
+	BodyFormat  string         `json:"bodyFormat,omitempty"`
+	Body        string         `json:"body,omitempty"`
+	Content     CalloutContent `json:"content"`
+}
+
+type rawKanbanBlock struct {
+	ID          string                    `json:"id"`
+	Kind        string                    `json:"kind"`
+	Title       string                    `json:"title"`
+	Description string                    `json:"description,omitempty"`
+	Columns     []reportspec.KanbanColumn `json:"columns,omitempty"`
+	Content     KanbanContent             `json:"content"`
+}
+
+type rawTimelineBlock struct {
+	ID          string                     `json:"id"`
+	Kind        string                     `json:"kind"`
+	Title       string                     `json:"title"`
+	Description string                     `json:"description,omitempty"`
+	Events      []reportspec.TimelineEvent `json:"events,omitempty"`
+	Content     TimelineContent            `json:"content"`
 }
 
 func DecodeJSON(data []byte) (*ReportFill, error) {
@@ -424,18 +687,169 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				return nil, fmt.Errorf("decode reportFill.blocks[%d] kpiBlock: %w", index, err)
 			}
 			fill.Blocks = append(fill.Blocks, Block{
-				ID:                  kpiBlock.ID,
-				Kind:                kpiBlock.Kind,
-				Title:               kpiBlock.Title,
-				DatasetRef:          kpiBlock.DatasetRef,
-				ValueField:          kpiBlock.ValueField,
-				ValueLabel:          kpiBlock.ValueLabel,
-				SecondaryField:      kpiBlock.SecondaryField,
-				SecondaryLabel:      kpiBlock.SecondaryLabel,
-				SecondaryDisplayKey: kpiBlock.SecondaryDisplayKey,
-				Description:         kpiBlock.Description,
-				EmptyLabel:          kpiBlock.EmptyLabel,
-				KPIContent:          &kpiBlock.Content,
+				ID:                       kpiBlock.ID,
+				Kind:                     kpiBlock.Kind,
+				Title:                    kpiBlock.Title,
+				DatasetRef:               kpiBlock.DatasetRef,
+				ValueField:               kpiBlock.ValueField,
+				ValueLabel:               kpiBlock.ValueLabel,
+				ValueFormat:              kpiBlock.ValueFormat,
+				SecondaryField:           kpiBlock.SecondaryField,
+				SecondaryLabel:           kpiBlock.SecondaryLabel,
+				SecondaryFormat:          kpiBlock.SecondaryFormat,
+				SecondaryDisplayKey:      kpiBlock.SecondaryDisplayKey,
+				SecondaryDisplayValueMap: kpiBlock.SecondaryDisplayValueMap,
+				Description:              kpiBlock.Description,
+				EmptyLabel:               kpiBlock.EmptyLabel,
+				RowSelector:              kpiBlock.RowSelector,
+				PresentationMode:         kpiBlock.PresentationMode,
+				BodyFormat:               kpiBlock.BodyFormat,
+				BodyTemplate:             kpiBlock.BodyTemplate,
+				KPIContent:               &kpiBlock.Content,
+			})
+		case "collectionBlock":
+			collectionBlock := rawCollectionBlock{}
+			decoder := json.NewDecoder(bytes.NewReader(block))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&collectionBlock); err != nil {
+				return nil, fmt.Errorf("decode reportFill.blocks[%d] collectionBlock: %w", index, err)
+			}
+			fill.Blocks = append(fill.Blocks, Block{
+				ID:                collectionBlock.ID,
+				Kind:              collectionBlock.Kind,
+				Title:             collectionBlock.Title,
+				DatasetRef:        collectionBlock.DatasetRef,
+				Description:       collectionBlock.Description,
+				ValueField:        collectionBlock.ValueField,
+				ValueLabel:        collectionBlock.ValueLabel,
+				ValueFormat:       collectionBlock.ValueFormat,
+				SecondaryField:    collectionBlock.SecondaryField,
+				SecondaryLabel:    collectionBlock.SecondaryLabel,
+				SecondaryFormat:   collectionBlock.SecondaryFormat,
+				ItemTitleField:    collectionBlock.ItemTitleField,
+				ItemTitleLabel:    collectionBlock.ItemTitleLabel,
+				Layout:            collectionBlock.Layout,
+				BodyFormat:        collectionBlock.BodyFormat,
+				BodyTemplate:      collectionBlock.BodyTemplate,
+				EmptyLabel:        collectionBlock.EmptyLabel,
+				CollectionContent: &collectionBlock.Content,
+			})
+		case "sectionBlock":
+			sectionBlock := rawSectionBlock{}
+			decoder := json.NewDecoder(bytes.NewReader(block))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&sectionBlock); err != nil {
+				return nil, fmt.Errorf("decode reportFill.blocks[%d] sectionBlock: %w", index, err)
+			}
+			fill.Blocks = append(fill.Blocks, Block{
+				ID:             sectionBlock.ID,
+				Kind:           sectionBlock.Kind,
+				Title:          sectionBlock.Title,
+				Description:    sectionBlock.Description,
+				SectionContent: &sectionBlock.Content,
+			})
+		case "compositeBlock":
+			compositeBlock := rawCompositeBlock{}
+			decoder := json.NewDecoder(bytes.NewReader(block))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&compositeBlock); err != nil {
+				return nil, fmt.Errorf("decode reportFill.blocks[%d] compositeBlock: %w", index, err)
+			}
+			fill.Blocks = append(fill.Blocks, Block{
+				ID:               compositeBlock.ID,
+				Kind:             compositeBlock.Kind,
+				Title:            compositeBlock.Title,
+				Description:      compositeBlock.Description,
+				ChildBlockIDs:    compositeBlock.ChildBlockIDs,
+				CompositeContent: &compositeBlock.Content,
+			})
+		case "tabGroupBlock":
+			tabGroupBlock := rawTabGroupBlock{}
+			decoder := json.NewDecoder(bytes.NewReader(block))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&tabGroupBlock); err != nil {
+				return nil, fmt.Errorf("decode reportFill.blocks[%d] tabGroupBlock: %w", index, err)
+			}
+			fill.Blocks = append(fill.Blocks, Block{
+				ID:               tabGroupBlock.ID,
+				Kind:             tabGroupBlock.Kind,
+				Title:            tabGroupBlock.Title,
+				SectionIDs:       tabGroupBlock.SectionIDs,
+				DefaultSectionID: tabGroupBlock.DefaultSectionID,
+				TabGroupContent:  &tabGroupBlock.Content,
+			})
+		case "stepperBlock":
+			stepperBlock := rawStepperBlock{}
+			decoder := json.NewDecoder(bytes.NewReader(block))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&stepperBlock); err != nil {
+				return nil, fmt.Errorf("decode reportFill.blocks[%d] stepperBlock: %w", index, err)
+			}
+			fill.Blocks = append(fill.Blocks, Block{
+				ID:             stepperBlock.ID,
+				Kind:           stepperBlock.Kind,
+				Title:          stepperBlock.Title,
+				Description:    stepperBlock.Description,
+				StepperContent: &stepperBlock.Content,
+			})
+		case "infoPanelBlock":
+			infoPanelBlock := rawInfoPanelBlock{}
+			decoder := json.NewDecoder(bytes.NewReader(block))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&infoPanelBlock); err != nil {
+				return nil, fmt.Errorf("decode reportFill.blocks[%d] infoPanelBlock: %w", index, err)
+			}
+			fill.Blocks = append(fill.Blocks, Block{
+				ID:               infoPanelBlock.ID,
+				Kind:             infoPanelBlock.Kind,
+				Title:            infoPanelBlock.Title,
+				Description:      infoPanelBlock.Description,
+				InfoPanelContent: &infoPanelBlock.Content,
+			})
+		case "calloutBlock":
+			calloutBlock := rawCalloutBlock{}
+			decoder := json.NewDecoder(bytes.NewReader(block))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&calloutBlock); err != nil {
+				return nil, fmt.Errorf("decode reportFill.blocks[%d] calloutBlock: %w", index, err)
+			}
+			fill.Blocks = append(fill.Blocks, Block{
+				ID:             calloutBlock.ID,
+				Kind:           calloutBlock.Kind,
+				Title:          calloutBlock.Title,
+				Icon:           calloutBlock.Icon,
+				Description:    calloutBlock.Description,
+				Tone:           calloutBlock.Tone,
+				Badges:         calloutBlock.Badges,
+				CalloutContent: &calloutBlock.Content,
+			})
+		case "kanbanBlock":
+			kanbanBlock := rawKanbanBlock{}
+			decoder := json.NewDecoder(bytes.NewReader(block))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&kanbanBlock); err != nil {
+				return nil, fmt.Errorf("decode reportFill.blocks[%d] kanbanBlock: %w", index, err)
+			}
+			fill.Blocks = append(fill.Blocks, Block{
+				ID:            kanbanBlock.ID,
+				Kind:          kanbanBlock.Kind,
+				Title:         kanbanBlock.Title,
+				Description:   kanbanBlock.Description,
+				KanbanContent: &kanbanBlock.Content,
+			})
+		case "timelineBlock":
+			timelineBlock := rawTimelineBlock{}
+			decoder := json.NewDecoder(bytes.NewReader(block))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&timelineBlock); err != nil {
+				return nil, fmt.Errorf("decode reportFill.blocks[%d] timelineBlock: %w", index, err)
+			}
+			fill.Blocks = append(fill.Blocks, Block{
+				ID:              timelineBlock.ID,
+				Kind:            timelineBlock.Kind,
+				Title:           timelineBlock.Title,
+				Description:     timelineBlock.Description,
+				TimelineContent: &timelineBlock.Content,
 			})
 		case "filterBarBlock":
 			filterBarBlock := rawFilterBarBlock{}
@@ -449,6 +863,12 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				Kind:             filterBarBlock.Kind,
 				Title:            filterBarBlock.Title,
 				DatasetRef:       filterBarBlock.DatasetRef,
+				ParamIDs:         filterBarBlock.ParamIDs,
+				Mode:             filterBarBlock.Mode,
+				Placement:        filterBarBlock.Placement,
+				GroupOrder:       filterBarBlock.GroupOrder,
+				VisibleGroups:    filterBarBlock.VisibleGroups,
+				CollapsedGroups:  filterBarBlock.CollapsedGroups,
 				FilterBarContent: &filterBarBlock.Content,
 			})
 		case "refinementBarBlock":
@@ -640,17 +1060,29 @@ func (r *ReportFill) Validate() error {
 						continue
 					}
 					switch strings.TrimSpace(cell.VisualState.Kind) {
-					case "dataBar":
+					case "dataBar", "progressBar", "sparkBar":
 						if cell.VisualState.Value == nil {
-							return fmt.Errorf("reportFill.blocks[%d].content.resolvedRows[%d].cells[%d].visualState.value is required for dataBar", index, rowIndex, cellIndex)
+							return fmt.Errorf("reportFill.blocks[%d].content.resolvedRows[%d].cells[%d].visualState.value is required for %s", index, rowIndex, cellIndex, strings.TrimSpace(cell.VisualState.Kind))
 						}
 						if cell.VisualState.Percent == nil {
-							return fmt.Errorf("reportFill.blocks[%d].content.resolvedRows[%d].cells[%d].visualState.percent is required for dataBar", index, rowIndex, cellIndex)
+							return fmt.Errorf("reportFill.blocks[%d].content.resolvedRows[%d].cells[%d].visualState.percent is required for %s", index, rowIndex, cellIndex, strings.TrimSpace(cell.VisualState.Kind))
 						}
 						if cell.VisualState.Palette == nil {
-							return fmt.Errorf("reportFill.blocks[%d].content.resolvedRows[%d].cells[%d].visualState.palette is required for dataBar", index, rowIndex, cellIndex)
+							return fmt.Errorf("reportFill.blocks[%d].content.resolvedRows[%d].cells[%d].visualState.palette is required for %s", index, rowIndex, cellIndex, strings.TrimSpace(cell.VisualState.Kind))
 						}
-					case "badge", "tone":
+					case "shareBar":
+						if len(cell.VisualState.Segments) == 0 {
+							return fmt.Errorf("reportFill.blocks[%d].content.resolvedRows[%d].cells[%d].visualState.segments is required for shareBar", index, rowIndex, cellIndex)
+						}
+						for segmentIndex, segment := range cell.VisualState.Segments {
+							if strings.TrimSpace(segment.Label) == "" {
+								return fmt.Errorf("reportFill.blocks[%d].content.resolvedRows[%d].cells[%d].visualState.segments[%d].label is required for shareBar", index, rowIndex, cellIndex, segmentIndex)
+							}
+							if strings.TrimSpace(segment.Color) == "" {
+								return fmt.Errorf("reportFill.blocks[%d].content.resolvedRows[%d].cells[%d].visualState.segments[%d].color is required for shareBar", index, rowIndex, cellIndex, segmentIndex)
+							}
+						}
+					case "badge", "tone", "delta", "rank":
 						if strings.TrimSpace(cell.VisualState.Tone) == "" {
 							return fmt.Errorf("reportFill.blocks[%d].content.resolvedRows[%d].cells[%d].visualState.tone is required for %s", index, rowIndex, cellIndex, strings.TrimSpace(cell.VisualState.Kind))
 						}
@@ -747,6 +1179,21 @@ func (r *ReportFill) Validate() error {
 			if strings.TrimSpace(block.ValueLabel) == "" {
 				return fmt.Errorf("reportFill.blocks[%d].valueLabel is required for kpiBlock", index)
 			}
+			if !isAllowedReportValueFormat(block.ValueFormat) {
+				return fmt.Errorf("reportFill.blocks[%d].valueFormat %q is not supported for kpiBlock", index, block.ValueFormat)
+			}
+			if !isAllowedReportValueFormat(block.SecondaryFormat) {
+				return fmt.Errorf("reportFill.blocks[%d].secondaryFormat %q is not supported for kpiBlock", index, block.SecondaryFormat)
+			}
+			if !isAllowedReportRowSelector(block.RowSelector) {
+				return fmt.Errorf("reportFill.blocks[%d].rowSelector %q is not supported for kpiBlock", index, block.RowSelector)
+			}
+			if !isAllowedReportPresentationMode(block.PresentationMode) {
+				return fmt.Errorf("reportFill.blocks[%d].presentationMode %q is not supported for kpiBlock", index, block.PresentationMode)
+			}
+			if !isAllowedReportBodyFormat(block.BodyFormat) {
+				return fmt.Errorf("reportFill.blocks[%d].bodyFormat %q is not supported for kpiBlock", index, block.BodyFormat)
+			}
 			if block.KPIContent == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content is required for kpiBlock", index)
 			}
@@ -759,8 +1206,161 @@ func (r *ReportFill) Validate() error {
 			if strings.TrimSpace(block.KPIContent.ValueLabel) == "" {
 				return fmt.Errorf("reportFill.blocks[%d].content.valueLabel is required for kpiBlock", index)
 			}
+			if !isAllowedReportValueFormat(block.KPIContent.ValueFormat) {
+				return fmt.Errorf("reportFill.blocks[%d].content.valueFormat %q is not supported for kpiBlock", index, block.KPIContent.ValueFormat)
+			}
+			if !isAllowedReportValueFormat(block.KPIContent.SecondaryFormat) {
+				return fmt.Errorf("reportFill.blocks[%d].content.secondaryFormat %q is not supported for kpiBlock", index, block.KPIContent.SecondaryFormat)
+			}
+			if !isAllowedReportRowSelector(block.KPIContent.RowSelector) {
+				return fmt.Errorf("reportFill.blocks[%d].content.rowSelector %q is not supported for kpiBlock", index, block.KPIContent.RowSelector)
+			}
+			if !isAllowedReportPresentationMode(block.KPIContent.PresentationMode) {
+				return fmt.Errorf("reportFill.blocks[%d].content.presentationMode %q is not supported for kpiBlock", index, block.KPIContent.PresentationMode)
+			}
+			if !isAllowedReportBodyFormat(block.KPIContent.BodyFormat) {
+				return fmt.Errorf("reportFill.blocks[%d].content.bodyFormat %q is not supported for kpiBlock", index, block.KPIContent.BodyFormat)
+			}
 			if block.KPIContent.RowCount == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.rowCount is required for kpiBlock", index)
+			}
+		}
+		if strings.TrimSpace(block.Kind) == "collectionBlock" {
+			if strings.TrimSpace(block.DatasetRef) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].datasetRef is required for collectionBlock", index)
+			}
+			if block.CollectionContent == nil {
+				return fmt.Errorf("reportFill.blocks[%d].content is required for collectionBlock", index)
+			}
+			if strings.TrimSpace(block.CollectionContent.Title) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].content.title is required for collectionBlock", index)
+			}
+			if strings.TrimSpace(block.CollectionContent.Layout) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].content.layout is required for collectionBlock", index)
+			}
+			if !isAllowedCollectionLayout(block.Layout) && strings.TrimSpace(block.Layout) != "" {
+				return fmt.Errorf("reportFill.blocks[%d].layout %q is not supported for collectionBlock", index, block.Layout)
+			}
+			if !isAllowedCollectionLayout(block.CollectionContent.Layout) {
+				return fmt.Errorf("reportFill.blocks[%d].content.layout %q is not supported for collectionBlock", index, block.CollectionContent.Layout)
+			}
+			if !isAllowedReportValueFormat(block.ValueFormat) {
+				return fmt.Errorf("reportFill.blocks[%d].valueFormat %q is not supported for collectionBlock", index, block.ValueFormat)
+			}
+			if !isAllowedReportValueFormat(block.SecondaryFormat) {
+				return fmt.Errorf("reportFill.blocks[%d].secondaryFormat %q is not supported for collectionBlock", index, block.SecondaryFormat)
+			}
+			if !isAllowedReportBodyFormat(block.BodyFormat) {
+				return fmt.Errorf("reportFill.blocks[%d].bodyFormat %q is not supported for collectionBlock", index, block.BodyFormat)
+			}
+			if block.CollectionContent.Columns < 1 {
+				return fmt.Errorf("reportFill.blocks[%d].content.columns must be >= 1 for collectionBlock", index)
+			}
+			if block.CollectionContent.Columns > 4 {
+				return fmt.Errorf("reportFill.blocks[%d].content.columns must be <= 4 for collectionBlock", index)
+			}
+			if block.CollectionContent.RowLimit < 1 {
+				return fmt.Errorf("reportFill.blocks[%d].content.rowLimit must be >= 1 for collectionBlock", index)
+			}
+			if block.CollectionContent.Items == nil {
+				return fmt.Errorf("reportFill.blocks[%d].content.items is required for collectionBlock", index)
+			}
+		}
+		if strings.TrimSpace(block.Kind) == "sectionBlock" {
+			if block.SectionContent == nil {
+				return fmt.Errorf("reportFill.blocks[%d].content is required for sectionBlock", index)
+			}
+			if strings.TrimSpace(block.SectionContent.Title) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].content.title is required for sectionBlock", index)
+			}
+			if strings.TrimSpace(block.SectionContent.NavigationLabel) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].content.navigationLabel is required for sectionBlock", index)
+			}
+		}
+		if strings.TrimSpace(block.Kind) == "compositeBlock" {
+			if len(block.ChildBlockIDs) == 0 {
+				return fmt.Errorf("reportFill.blocks[%d].childBlockIds must not be empty for compositeBlock", index)
+			}
+			if block.CompositeContent == nil {
+				return fmt.Errorf("reportFill.blocks[%d].content is required for compositeBlock", index)
+			}
+			if strings.TrimSpace(block.CompositeContent.Title) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].content.title is required for compositeBlock", index)
+			}
+			if block.CompositeContent.ChildBlockIDs == nil || len(block.CompositeContent.ChildBlockIDs) == 0 {
+				return fmt.Errorf("reportFill.blocks[%d].content.childBlockIds must not be empty for compositeBlock", index)
+			}
+		}
+		if strings.TrimSpace(block.Kind) == "tabGroupBlock" {
+			if len(block.SectionIDs) == 0 {
+				return fmt.Errorf("reportFill.blocks[%d].sectionIds must not be empty for tabGroupBlock", index)
+			}
+			if block.TabGroupContent == nil {
+				return fmt.Errorf("reportFill.blocks[%d].content is required for tabGroupBlock", index)
+			}
+			if strings.TrimSpace(block.TabGroupContent.Title) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].content.title is required for tabGroupBlock", index)
+			}
+			if block.TabGroupContent.SectionIDs == nil || len(block.TabGroupContent.SectionIDs) == 0 {
+				return fmt.Errorf("reportFill.blocks[%d].content.sectionIds must not be empty for tabGroupBlock", index)
+			}
+			if block.TabGroupContent.Tabs == nil {
+				return fmt.Errorf("reportFill.blocks[%d].content.tabs is required for tabGroupBlock", index)
+			}
+		}
+		if strings.TrimSpace(block.Kind) == "stepperBlock" {
+			if block.StepperContent == nil {
+				return fmt.Errorf("reportFill.blocks[%d].content is required for stepperBlock", index)
+			}
+			if strings.TrimSpace(block.StepperContent.Title) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].content.title is required for stepperBlock", index)
+			}
+			if block.StepperContent.Steps == nil || len(block.StepperContent.Steps) == 0 {
+				return fmt.Errorf("reportFill.blocks[%d].content.steps must not be empty for stepperBlock", index)
+			}
+		}
+		if strings.TrimSpace(block.Kind) == "infoPanelBlock" {
+			if block.InfoPanelContent == nil {
+				return fmt.Errorf("reportFill.blocks[%d].content is required for infoPanelBlock", index)
+			}
+			if strings.TrimSpace(block.InfoPanelContent.Title) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].content.title is required for infoPanelBlock", index)
+			}
+			if strings.TrimSpace(block.InfoPanelContent.Body) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].content.body is required for infoPanelBlock", index)
+			}
+		}
+		if strings.TrimSpace(block.Kind) == "calloutBlock" {
+			if block.CalloutContent == nil {
+				return fmt.Errorf("reportFill.blocks[%d].content is required for calloutBlock", index)
+			}
+			if strings.TrimSpace(block.CalloutContent.Title) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].content.title is required for calloutBlock", index)
+			}
+			if strings.TrimSpace(block.CalloutContent.Body) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].content.body is required for calloutBlock", index)
+			}
+		}
+		if strings.TrimSpace(block.Kind) == "kanbanBlock" {
+			if block.KanbanContent == nil {
+				return fmt.Errorf("reportFill.blocks[%d].content is required for kanbanBlock", index)
+			}
+			if strings.TrimSpace(block.KanbanContent.Title) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].content.title is required for kanbanBlock", index)
+			}
+			if block.KanbanContent.Columns == nil || len(block.KanbanContent.Columns) == 0 {
+				return fmt.Errorf("reportFill.blocks[%d].content.columns must not be empty for kanbanBlock", index)
+			}
+		}
+		if strings.TrimSpace(block.Kind) == "timelineBlock" {
+			if block.TimelineContent == nil {
+				return fmt.Errorf("reportFill.blocks[%d].content is required for timelineBlock", index)
+			}
+			if strings.TrimSpace(block.TimelineContent.Title) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].content.title is required for timelineBlock", index)
+			}
+			if block.TimelineContent.Events == nil || len(block.TimelineContent.Events) == 0 {
+				return fmt.Errorf("reportFill.blocks[%d].content.events must not be empty for timelineBlock", index)
 			}
 		}
 		if strings.TrimSpace(block.Kind) == "filterBarBlock" {
@@ -943,22 +1543,104 @@ func rejectTrailingJSON(decoder *json.Decoder, label string) error {
 }
 
 func computeJSONFNV1aHash(value any) (string, error) {
-	data, err := json.Marshal(value)
+	canonicalJSON, err := marshalCanonicalJSON(value)
 	if err != nil {
-		return "", fmt.Errorf("marshal json: %w", err)
+		return "", err
 	}
 	var hash uint32 = 2166136261
-	for _, codeUnit := range utf16.Encode([]rune(string(data))) {
+	for _, codeUnit := range utf16.Encode([]rune(canonicalJSON)) {
 		hash ^= uint32(codeUnit)
 		hash *= 16777619
 	}
 	return fmt.Sprintf("fnv1a:%08x", hash), nil
 }
 
-func computeRequestHash(dataset Dataset) (string, error) {
-	if len(dataset.requestPayload) > 0 {
-		return computeJSONFNV1aRawHash(dataset.requestPayload)
+func marshalCanonicalJSON(value any) (string, error) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return "", fmt.Errorf("marshal json: %w", err)
 	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	var normalized any
+	if err := decoder.Decode(&normalized); err != nil {
+		return "", fmt.Errorf("decode canonical json: %w", err)
+	}
+	buffer := new(bytes.Buffer)
+	if err := writeCanonicalJSON(buffer, normalized); err != nil {
+		return "", err
+	}
+	return buffer.String(), nil
+}
+
+func writeCanonicalJSON(buffer *bytes.Buffer, value any) error {
+	switch actual := value.(type) {
+	case nil:
+		buffer.WriteString("null")
+	case bool:
+		if actual {
+			buffer.WriteString("true")
+		} else {
+			buffer.WriteString("false")
+		}
+	case string:
+		data, err := json.Marshal(actual)
+		if err != nil {
+			return fmt.Errorf("marshal canonical string: %w", err)
+		}
+		buffer.Write(data)
+	case json.Number:
+		buffer.WriteString(actual.String())
+	case float64, float32, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		data, err := json.Marshal(actual)
+		if err != nil {
+			return fmt.Errorf("marshal canonical number: %w", err)
+		}
+		buffer.Write(data)
+	case []any:
+		buffer.WriteByte('[')
+		for index, entry := range actual {
+			if index > 0 {
+				buffer.WriteByte(',')
+			}
+			if err := writeCanonicalJSON(buffer, entry); err != nil {
+				return err
+			}
+		}
+		buffer.WriteByte(']')
+	case map[string]any:
+		keys := make([]string, 0, len(actual))
+		for key := range actual {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		buffer.WriteByte('{')
+		for index, key := range keys {
+			if index > 0 {
+				buffer.WriteByte(',')
+			}
+			keyJSON, err := json.Marshal(key)
+			if err != nil {
+				return fmt.Errorf("marshal canonical key: %w", err)
+			}
+			buffer.Write(keyJSON)
+			buffer.WriteByte(':')
+			if err := writeCanonicalJSON(buffer, actual[key]); err != nil {
+				return err
+			}
+		}
+		buffer.WriteByte('}')
+	default:
+		data, err := json.Marshal(actual)
+		if err != nil {
+			return fmt.Errorf("marshal canonical value: %w", err)
+		}
+		buffer.Write(data)
+	}
+	return nil
+}
+
+func computeRequestHash(dataset Dataset) (string, error) {
 	return computeJSONFNV1aHash(dataset.Request)
 }
 
@@ -994,4 +1676,49 @@ func decodeRequestPayload(payload json.RawMessage, index int) (reportspec.Reques
 		return reportspec.RequestPayload{}, err
 	}
 	return request, nil
+}
+
+func isAllowedReportValueFormat(value string) bool {
+	switch strings.TrimSpace(value) {
+	case "", "currency", "number", "percent", "percentFraction", "compact", "compactNumber":
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedReportRowSelector(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "firstrow", "maxbyvalue", "minbyvalue":
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedReportPresentationMode(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "card", "body", "both":
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedReportBodyFormat(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "markdown":
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedCollectionLayout(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "grid", "list":
+		return true
+	default:
+		return false
+	}
 }

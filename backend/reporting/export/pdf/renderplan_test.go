@@ -612,6 +612,59 @@ func TestBuildRenderPlan_CompilesSVGDashPattern(t *testing.T) {
 	require.Empty(t, plan.diagnostics)
 }
 
+func TestBuildRenderPlan_CompilesFilledPolygonDonutSVGPaths(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "polygonDonutBuilder",
+			StateKey:      "polygonDonutBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "Polygon Donut SVG",
+		PageGeometry: reportprint.PageGeometry{
+			Width:  612,
+			Height: 792,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "polygon_donut_svg",
+						Kind: "svg",
+						Box:  reportprint.Box{X: 36, Y: 84, Width: 220, Height: 120},
+						SVG: `<svg viewBox="0 0 220 120" width="220" height="120">
+						  <path d="M110,18 L132,24 L150,38 L160,58 L162,76 L152,92 L136,104 L118,110 L102,102 L94,86 L96,72 L106,58 L120,50 L130,40 L122,28 Z" fill="#137cbd" />
+						  <path d="M94,86 L86,102 L68,110 L50,104 L34,92 L24,76 L26,58 L36,38 L54,24 L76,18 L98,22 L88,40 L74,48 L64,60 L62,74 L70,88 Z" fill="#f97316" />
+						  <circle cx="110" cy="64" r="22" fill="#ffffff" />
+						  <text x="110" y="116" text-anchor="middle" font-size="11" fill="#344054">Gender</text>
+						</svg>`,
+					},
+				},
+			},
+		},
+	}
+
+	plan := buildRenderPlan(buildDocumentProgram(report))
+	require.NotNil(t, plan)
+	require.Len(t, plan.pages, 1)
+	require.Len(t, plan.pages[0].operations, 1)
+	require.Equal(t, "svg", plan.pages[0].operations[0].kind)
+	require.NotNil(t, plan.pages[0].operations[0].svg)
+	require.Len(t, plan.pages[0].operations[0].svg.operations, 4)
+	require.Equal(t, "path", plan.pages[0].operations[0].svg.operations[0].kind)
+	require.Equal(t, "path", plan.pages[0].operations[0].svg.operations[1].kind)
+	require.Equal(t, "circle", plan.pages[0].operations[0].svg.operations[2].kind)
+	require.Equal(t, "text", plan.pages[0].operations[0].svg.operations[3].kind)
+	require.Empty(t, plan.diagnostics)
+}
+
 func TestBuildRenderPlan_ReportsUnsupportedSVGStyleAttributeDiagnostic(t *testing.T) {
 	report := &reportprint.ReportPrint{
 		Version:     1,

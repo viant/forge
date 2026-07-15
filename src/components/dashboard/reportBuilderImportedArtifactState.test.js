@@ -639,6 +639,7 @@ assert.deepEqual(normalizeImportedLocalSavedReportRecords([
     },
 ]), [
     {
+        id: "reportBuilder.savedReportPayload::rbreport_capacity_q3_kpi_blend_by_date::capacity_q3_kpi_blend_by_date::capacityKpiBlendByDateQ3",
         reportId: "capacityKpiBlendByDateQ3",
         title: "Capacity KPI Blend Q3",
         documentVersion: 9,
@@ -750,6 +751,7 @@ assert.deepEqual(resolveReportBuilderImportedLocalSavedReportRecordsAfterImport(
     },
 }), [
     {
+        id: "reportBuilder.savedReportPayload::rbreport_capacity_q3_kpi_blend_by_date::capacity_q3_kpi_blend_by_date::capacityKpiBlendByDateQ3",
         reportId: "capacityKpiBlendByDateQ3",
         title: "Capacity KPI Blend Q3",
         documentVersion: 9,
@@ -816,6 +818,7 @@ assert.deepEqual(resolveReportBuilderImportedLocalSavedReportRecordsAfterImport(
     },
 }), [
     {
+        id: "reportBuilder.savedReportPayload::rbreport_imported_exploration_capacity_q3::imported_exploration_capacity_q3::capacityExplorationQ3",
         reportId: "capacityExplorationQ3",
         title: "Capacity Exploration Q3",
         documentVersion: 0,
@@ -1114,6 +1117,7 @@ assert.deepEqual(resolveReportBuilderImportedLocalSavedReportRecordByIdentity([
         },
     },
 ], "reportBuilder.savedReportPayload::rbreport_capacity_q3_kpi_blend_by_date::capacity_q3_kpi_blend_by_date::capacityKpiBlendByDateQ3"), {
+    id: "reportBuilder.savedReportPayload::rbreport_capacity_q3_kpi_blend_by_date::capacity_q3_kpi_blend_by_date::capacityKpiBlendByDateQ3",
     reportId: "capacityKpiBlendByDateQ3",
     title: "Capacity KPI Blend Q3",
     documentVersion: 9,
@@ -1228,6 +1232,7 @@ assert.deepEqual(resolveReportBuilderImportedLocalSavedReportRecordsAfterRemoval
     },
 ], "reportBuilder.savedReportPayload::rbreport_capacity_q3_kpi_blend_by_date::capacity_q3_kpi_blend_by_date::capacityKpiBlendByDateQ3"), [
     {
+        id: "reportBuilder.savedReportPayload::rbreport_capacity_q3_trend::capacity_q3_trend::capacityTrendQ3",
         reportId: "capacityTrendQ3",
         title: "Capacity Trend Q3",
         documentVersion: 6,
@@ -1373,6 +1378,7 @@ assert.deepEqual(resolveReportBuilderImportedLocalSavedRecordForGetResponse([
         sourceArtifactId: "capacity_q3_kpi_blend_by_date",
     },
 }), {
+    id: "reportBuilder.savedReportPayload::rbreport_capacity_q3_kpi_blend_by_date::capacity_q3_kpi_blend_by_date::capacityKpiBlendByDateQ3",
     reportId: "capacityKpiBlendByDateQ3",
     title: "Capacity KPI Blend Q3",
     documentVersion: 9,

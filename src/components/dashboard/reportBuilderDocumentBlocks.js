@@ -2,11 +2,20 @@ import {
     resolveReportDocumentBuilderContext,
     buildReportDocumentBadgesBlock,
     buildReportDocumentChartBlock,
+    buildReportDocumentCollectionBlock,
+    buildReportDocumentCompositeBlock,
     buildReportDocumentFilterBarBlock,
     buildReportDocumentGeoMapBlock,
     buildReportDocumentKpiBlock,
     buildReportDocumentMarkdownBlock,
     buildReportDocumentRefinementBarBlock,
+    buildReportDocumentSectionBlock,
+    buildReportDocumentTabGroupBlock,
+    buildReportDocumentStepperBlock,
+    buildReportDocumentInfoPanelBlock,
+    buildReportDocumentCalloutBlock,
+    buildReportDocumentKanbanBlock,
+    buildReportDocumentTimelineBlock,
     buildReportDocumentTableBlock,
     normalizeReportBuilderDocumentBlocks,
 } from "../../reporting/reportDocumentModel.js";
@@ -122,6 +131,114 @@ function normalizeFilterBarBlockMode(value = "") {
 function normalizeFilterBarBlockPlacement(value = "") {
     const normalized = normalizeString(value).toLowerCase();
     return ["inherit", "inline", "rail-left", "hidden"].includes(normalized) ? normalized : "inherit";
+}
+
+function normalizeCollectionBlockLayout(value = "") {
+    return normalizeString(value).toLowerCase() === "list" ? "list" : "grid";
+}
+
+function normalizeCollectionBlockColumns(value = 0) {
+    const normalized = Math.trunc(Number(value));
+    return Number.isInteger(normalized) && normalized >= 1 && normalized <= 4 ? normalized : 2;
+}
+
+function normalizeCollectionBlockRowLimit(value = 0) {
+    const normalized = Math.trunc(Number(value));
+    return Number.isInteger(normalized) && normalized > 0 ? normalized : 6;
+}
+
+function normalizeStepperDraftSteps(steps = []) {
+    return (Array.isArray(steps) ? steps : [])
+        .map((step, index) => {
+            if (!step || typeof step !== "object" || Array.isArray(step)) {
+                return null;
+            }
+            const title = normalizeString(step?.title);
+            const body = String(step?.body || "");
+            const tone = normalizeString(step?.tone).toLowerCase();
+            if (!title && !body.trim()) {
+                return null;
+            }
+            return {
+                id: normalizeString(step?.id || `step_${index + 1}`) || `step_${index + 1}`,
+                title,
+                body,
+                tone,
+            };
+        })
+        .filter(Boolean);
+}
+
+function normalizeKanbanDraftCards(cards = []) {
+    return (Array.isArray(cards) ? cards : [])
+        .map((card, index) => {
+            if (!card || typeof card !== "object" || Array.isArray(card)) {
+                return null;
+            }
+            const title = normalizeString(card?.title);
+            const body = String(card?.body || "");
+            const badge = normalizeString(card?.badge);
+            const tone = normalizeString(card?.tone).toLowerCase();
+            if (!title && !body.trim() && !badge) {
+                return null;
+            }
+            return {
+                id: normalizeString(card?.id || `card_${index + 1}`) || `card_${index + 1}`,
+                title,
+                body,
+                badge,
+                tone,
+            };
+        })
+        .filter(Boolean);
+}
+
+function normalizeKanbanDraftColumns(columns = []) {
+    return (Array.isArray(columns) ? columns : [])
+        .map((column, index) => {
+            if (!column || typeof column !== "object" || Array.isArray(column)) {
+                return null;
+            }
+            const title = normalizeString(column?.title);
+            const tone = normalizeString(column?.tone).toLowerCase();
+            const cards = normalizeKanbanDraftCards(column?.cards);
+            if (!title && cards.length === 0) {
+                return null;
+            }
+            return {
+                id: normalizeString(column?.id || `column_${index + 1}`) || `column_${index + 1}`,
+                title,
+                tone,
+                cards,
+            };
+        })
+        .filter(Boolean);
+}
+
+function normalizeTimelineDraftEvents(events = []) {
+    return (Array.isArray(events) ? events : [])
+        .map((event, index) => {
+            if (!event || typeof event !== "object" || Array.isArray(event)) {
+                return null;
+            }
+            const title = normalizeString(event?.title);
+            const body = String(event?.body || "");
+            const date = normalizeString(event?.date);
+            const badge = normalizeString(event?.badge);
+            const tone = normalizeString(event?.tone).toLowerCase();
+            if (!title && !body.trim() && !date && !badge) {
+                return null;
+            }
+            return {
+                id: normalizeString(event?.id || `event_${index + 1}`) || `event_${index + 1}`,
+                date,
+                title,
+                body,
+                badge,
+                tone,
+            };
+        })
+        .filter(Boolean);
 }
 
 function resolveDatasetOptionValues(datasetOptions = []) {
@@ -364,6 +481,15 @@ function normalizeColumnVisualRuleTexts(value = {}) {
 
 function buildVisualRulesText(kind = "", column = {}) {
     const normalizedKind = normalizeString(kind);
+    if (normalizedKind === "shareBar") {
+        const normalized = normalizeReportTableCellVisual({
+            kind: normalizedKind,
+            segments: Array.isArray(column?.cellVisual?.segments) ? column.cellVisual.segments : [],
+        });
+        return Array.isArray(normalized?.segments) && normalized.segments.length > 0
+            ? JSON.stringify(normalized.segments, null, 2)
+            : "";
+    }
     const normalized = normalizeReportTableCellVisual({
         kind: normalizedKind,
         rules: Array.isArray(column?.cellVisual?.rules) ? column.cellVisual.rules : [],
@@ -383,7 +509,8 @@ function parseVisualRulesText(kind = "", rulesText = "") {
         return {
             valid: false,
             rules: [],
-            error: `Define at least one ${normalizedKind || "visual"} rule for the selected column.`,
+            segments: [],
+            error: `Define at least one ${normalizedKind || "visual"} ${normalizedKind === "shareBar" ? "segment" : "rule"} for the selected column.`,
         };
     }
     let parsed = null;
@@ -393,30 +520,40 @@ function parseVisualRulesText(kind = "", rulesText = "") {
         return {
             valid: false,
             rules: [],
-            error: `${visualLabel} rules must be valid JSON.`,
+            segments: [],
+            error: `${visualLabel} ${normalizedKind === "shareBar" ? "segments" : "rules"} must be valid JSON.`,
         };
     }
-    const normalized = normalizeReportTableCellVisual({
-        kind: normalizedKind,
-        rules: parsed,
-    });
-    if (!Array.isArray(normalized?.rules) || normalized.rules.length === 0) {
+    const normalized = normalizedKind === "shareBar"
+        ? normalizeReportTableCellVisual({
+            kind: normalizedKind,
+            segments: parsed,
+        })
+        : normalizeReportTableCellVisual({
+            kind: normalizedKind,
+            rules: parsed,
+        });
+    const validItems = normalizedKind === "shareBar" ? normalized?.segments : normalized?.rules;
+    if (!Array.isArray(validItems) || validItems.length === 0) {
         return {
             valid: false,
             rules: [],
-            error: `${visualLabel} rules must be a non-empty JSON array of rule objects.`,
+            segments: [],
+            error: `${visualLabel} ${normalizedKind === "shareBar" ? "segments" : "rules"} must be a non-empty JSON array of objects.`,
         };
     }
-    if (normalized.rules.some((rule) => !Object.prototype.hasOwnProperty.call(rule, "value"))) {
+    if (normalizedKind !== "shareBar" && normalized.rules.some((rule) => !Object.prototype.hasOwnProperty.call(rule, "value"))) {
         return {
             valid: false,
             rules: [],
+            segments: [],
             error: `Each ${normalizedKind || "visual"} rule must define a value.`,
         };
     }
     return {
         valid: true,
-        rules: normalized.rules,
+        rules: Array.isArray(normalized?.rules) ? normalized.rules : [],
+        segments: Array.isArray(normalized?.segments) ? normalized.segments : [],
         error: "",
     };
 }
@@ -973,6 +1110,7 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
     valueFieldOptions = [],
     secondaryFieldOptions = [],
     tableColumnOptions = [],
+    childBlockOptions = [],
     scopeParamOptions = [],
     filterBarGroupOptions = [],
     datasetOptions = [],
@@ -1152,6 +1290,160 @@ export function buildReportBuilderDocumentBlockDraft(kind = "markdownBlock", see
                 : "firstRow",
             bodyFormat: "markdown",
             bodyTemplate: String(seed?.bodyTemplate || ""),
+        };
+    }
+    if (normalizedKind === "collectionBlock") {
+        const normalizedDatasetRef = resolveDefaultDocumentBlockDatasetRef(seed?.datasetRef, normalizedDatasetOptions);
+        const datasetOption = (Array.isArray(datasetOptions) ? datasetOptions : [])
+            .find((option) => normalizeString(option?.value ?? option?.id) === normalizedDatasetRef) || null;
+        const normalizedValueOptions = Array.isArray(datasetOption?.valueFieldOptions) && datasetOption.valueFieldOptions.length > 0
+            ? normalizeFieldOptions(datasetOption.valueFieldOptions)
+            : normalizeFieldOptions(valueFieldOptions);
+        const normalizedSecondaryOptions = Array.isArray(datasetOption?.secondaryFieldOptions) && datasetOption.secondaryFieldOptions.length > 0
+            ? normalizeFieldOptions(datasetOption.secondaryFieldOptions)
+            : normalizeFieldOptions(secondaryFieldOptions);
+        const valueField = normalizeString(seed?.valueField || normalizedValueOptions[0]?.value);
+        const itemTitleField = normalizeString(seed?.itemTitleField || normalizedSecondaryOptions[0]?.value);
+        const secondaryField = normalizeString(seed?.secondaryField || "");
+        return {
+            kind: "collectionBlock",
+            id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "collectionBlock")),
+            title: normalizeString(seed?.title || "Collection") || "Collection",
+            datasetRef: normalizedDatasetRef,
+            itemTitleField,
+            itemTitleLabel: normalizeString(
+                itemTitleField
+                    ? (seed?.itemTitleLabel || resolveOptionLabel(normalizedSecondaryOptions, itemTitleField) || itemTitleField)
+                    : "",
+            ),
+            valueField,
+            valueLabel: normalizeString(
+                valueField
+                    ? (seed?.valueLabel || resolveOptionLabel(normalizedValueOptions, valueField) || "Value")
+                    : "",
+            ),
+            secondaryField,
+            secondaryLabel: normalizeString(
+                secondaryField
+                    ? (seed?.secondaryLabel || resolveOptionLabel(normalizedSecondaryOptions, secondaryField))
+                    : "",
+            ),
+            description: normalizeString(seed?.description),
+            emptyLabel: normalizeString(seed?.emptyLabel || "No collection items available."),
+            layout: normalizeCollectionBlockLayout(seed?.layout),
+            columns: normalizeCollectionBlockColumns(seed?.columns),
+            rowLimit: normalizeCollectionBlockRowLimit(seed?.rowLimit),
+            bodyFormat: "markdown",
+            bodyTemplate: String(seed?.bodyTemplate || ""),
+        };
+    }
+    if (normalizedKind === "sectionBlock") {
+        return {
+            kind: "sectionBlock",
+            id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "sectionBlock")),
+            title: normalizeString(seed?.title || "Section") || "Section",
+            subtitle: normalizeString(seed?.subtitle),
+            description: normalizeString(seed?.description),
+            navigationLabel: normalizeString(seed?.navigationLabel || seed?.title || "Section") || "Section",
+        };
+    }
+    if (normalizedKind === "compositeBlock") {
+        const normalizedChildBlockOptions = normalizeFieldOptions(childBlockOptions);
+        return {
+            kind: "compositeBlock",
+            id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "compositeBlock")),
+            title: normalizeString(seed?.title || "Grouped Panel") || "Grouped Panel",
+            description: normalizeString(seed?.description),
+            childBlockIds: normalizeStringArray(seed?.childBlockIds).filter((blockId) => (
+                normalizedChildBlockOptions.length === 0
+                    ? true
+                    : normalizedChildBlockOptions.some((option) => option.value === blockId)
+            )),
+        };
+    }
+    if (normalizedKind === "tabGroupBlock") {
+        const sectionIds = normalizeStringArray(seed?.sectionIds).length > 0
+            ? normalizeStringArray(seed.sectionIds)
+            : existingBlocks
+                .filter((block) => normalizeString(block?.kind) === "sectionBlock")
+                .map((block) => normalizeString(block?.id))
+                .filter(Boolean);
+        return {
+            kind: "tabGroupBlock",
+            id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "tabGroupBlock")),
+            title: normalizeString(seed?.title || "Sections") || "Sections",
+            sectionIds,
+            defaultSectionId: normalizeString(seed?.defaultSectionId || sectionIds[0] || ""),
+        };
+    }
+    if (normalizedKind === "stepperBlock") {
+        return {
+            kind: "stepperBlock",
+            id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "stepperBlock")),
+            title: normalizeString(seed?.title || "Process") || "Process",
+            description: normalizeString(seed?.description),
+            steps: normalizeStepperDraftSteps(seed?.steps).length > 0
+                ? normalizeStepperDraftSteps(seed?.steps)
+                : [
+                    { id: "step_1", title: "", body: "", tone: "" },
+            ],
+        };
+    }
+    if (normalizedKind === "infoPanelBlock") {
+        return {
+            kind: "infoPanelBlock",
+            id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "infoPanelBlock")),
+            title: normalizeString(seed?.title || "Info Panel") || "Info Panel",
+            eyebrow: normalizeString(seed?.eyebrow),
+            description: normalizeString(seed?.description),
+            tone: normalizeString(seed?.tone).toLowerCase(),
+            bodyFormat: "markdown",
+            body: String(seed?.body || ""),
+        };
+    }
+    if (normalizedKind === "calloutBlock") {
+        const badgesText = Array.isArray(seed?.badges)
+            ? seed.badges.map((badge) => normalizeString(badge)).filter(Boolean).join(", ")
+            : String(seed?.badgesText || "");
+        return {
+            kind: "calloutBlock",
+            id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "calloutBlock")),
+            title: normalizeString(seed?.title || "Callout") || "Callout",
+            icon: normalizeString(seed?.icon),
+            description: normalizeString(seed?.description),
+            tone: normalizeString(seed?.tone).toLowerCase(),
+            badgesText,
+            bodyFormat: "markdown",
+            body: String(seed?.body || ""),
+        };
+    }
+    if (normalizedKind === "kanbanBlock") {
+        return {
+            kind: "kanbanBlock",
+            id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "kanbanBlock")),
+            title: normalizeString(seed?.title || "Pipeline") || "Pipeline",
+            description: normalizeString(seed?.description),
+            columns: normalizeKanbanDraftColumns(seed?.columns).length > 0
+                ? normalizeKanbanDraftColumns(seed?.columns)
+                : [
+                    {
+                        id: "column_1",
+                        title: "",
+                        tone: "",
+                        cards: [{ id: "card_1", title: "", body: "", badge: "", tone: "" }],
+                    },
+            ],
+        };
+    }
+    if (normalizedKind === "timelineBlock") {
+        return {
+            kind: "timelineBlock",
+            id: normalizeString(seed?.id || resolveUniqueDocumentBlockId(existingBlocks, "timelineBlock")),
+            title: normalizeString(seed?.title || "Timeline") || "Timeline",
+            description: normalizeString(seed?.description),
+            events: normalizeTimelineDraftEvents(seed?.events).length > 0
+                ? normalizeTimelineDraftEvents(seed?.events)
+                : [{ id: "event_1", date: "", title: "", body: "", badge: "", tone: "" }],
         };
     }
     if (normalizedKind === "markdownBlock") {
@@ -1420,6 +1712,98 @@ export function rebindReportBuilderDocumentBlockDraft(draft = null, {
         return normalizedDraft;
     }
 
+    if (normalizedKind === "collectionBlock") {
+        const currentValueField = normalizeString(normalizedDraft?.valueField);
+        const nextValueField = normalizedValueOptions.some((option) => option.value === currentValueField)
+            ? currentValueField
+            : normalizeString(normalizedValueOptions[0]?.value);
+        const currentItemTitleField = normalizeString(normalizedDraft?.itemTitleField);
+        const nextItemTitleField = normalizedSecondaryOptions.some((option) => option.value === currentItemTitleField)
+            ? currentItemTitleField
+            : normalizeString(normalizedSecondaryOptions[0]?.value);
+        const currentSecondaryField = normalizeString(normalizedDraft?.secondaryField);
+        const nextSecondaryField = normalizedSecondaryOptions.some((option) => option.value === currentSecondaryField)
+            ? currentSecondaryField
+            : "";
+        normalizedDraft.valueField = nextValueField;
+        normalizedDraft.valueLabel = normalizeString(
+            nextValueField
+                ? (normalizedValueOptions.find((option) => option.value === nextValueField)?.label || normalizedDraft?.valueLabel || nextValueField)
+                : "",
+        );
+        normalizedDraft.itemTitleField = nextItemTitleField;
+        normalizedDraft.itemTitleLabel = normalizeString(
+            nextItemTitleField
+                ? (normalizedSecondaryOptions.find((option) => option.value === nextItemTitleField)?.label || normalizedDraft?.itemTitleLabel || nextItemTitleField)
+                : "",
+        );
+        normalizedDraft.secondaryField = nextSecondaryField;
+        normalizedDraft.secondaryLabel = normalizeString(
+            nextSecondaryField
+                ? (normalizedSecondaryOptions.find((option) => option.value === nextSecondaryField)?.label || normalizedDraft?.secondaryLabel || nextSecondaryField)
+                : "",
+        );
+        normalizedDraft.layout = normalizeCollectionBlockLayout(normalizedDraft?.layout);
+        normalizedDraft.columns = normalizeCollectionBlockColumns(normalizedDraft?.columns);
+        normalizedDraft.rowLimit = normalizeCollectionBlockRowLimit(normalizedDraft?.rowLimit);
+        normalizedDraft.bodyFormat = "markdown";
+        return normalizedDraft;
+    }
+
+    if (normalizedKind === "sectionBlock") {
+        normalizedDraft.navigationLabel = normalizeString(normalizedDraft?.navigationLabel || normalizedDraft?.title || "Section") || "Section";
+        return normalizedDraft;
+    }
+
+    if (normalizedKind === "compositeBlock") {
+        normalizedDraft.childBlockIds = normalizeStringArray(normalizedDraft?.childBlockIds);
+        return normalizedDraft;
+    }
+
+    if (normalizedKind === "tabGroupBlock") {
+        normalizedDraft.sectionIds = normalizeStringArray(normalizedDraft?.sectionIds);
+        const defaultSectionId = normalizeString(normalizedDraft?.defaultSectionId);
+        normalizedDraft.defaultSectionId = defaultSectionId && normalizedDraft.sectionIds.includes(defaultSectionId)
+            ? defaultSectionId
+            : normalizeString(normalizedDraft.sectionIds[0] || "");
+        return normalizedDraft;
+    }
+
+    if (normalizedKind === "stepperBlock") {
+        normalizedDraft.steps = normalizeStepperDraftSteps(normalizedDraft?.steps).length > 0
+            ? normalizeStepperDraftSteps(normalizedDraft.steps)
+            : [{ id: "step_1", title: "", body: "", tone: "" }];
+        return normalizedDraft;
+    }
+
+    if (normalizedKind === "infoPanelBlock") {
+        normalizedDraft.tone = normalizeString(normalizedDraft?.tone).toLowerCase();
+        normalizedDraft.bodyFormat = "markdown";
+        return normalizedDraft;
+    }
+
+    if (normalizedKind === "calloutBlock") {
+        normalizedDraft.icon = normalizeString(normalizedDraft?.icon);
+        normalizedDraft.tone = normalizeString(normalizedDraft?.tone).toLowerCase();
+        normalizedDraft.badgesText = String(normalizedDraft?.badgesText || "");
+        normalizedDraft.bodyFormat = "markdown";
+        return normalizedDraft;
+    }
+
+    if (normalizedKind === "kanbanBlock") {
+        normalizedDraft.columns = normalizeKanbanDraftColumns(normalizedDraft?.columns).length > 0
+            ? normalizeKanbanDraftColumns(normalizedDraft.columns)
+            : [{ id: "column_1", title: "", tone: "", cards: [{ id: "card_1", title: "", body: "", badge: "", tone: "" }] }];
+        return normalizedDraft;
+    }
+
+    if (normalizedKind === "timelineBlock") {
+        normalizedDraft.events = normalizeTimelineDraftEvents(normalizedDraft?.events).length > 0
+            ? normalizeTimelineDraftEvents(normalizedDraft.events)
+            : [{ id: "event_1", date: "", title: "", body: "", badge: "", tone: "" }];
+        return normalizedDraft;
+    }
+
     if (normalizedKind === "chartBlock") {
         const datasetOption = (Array.isArray(datasetOptions) ? datasetOptions : [])
             .find((option) => normalizeString(option?.value ?? option?.id) === nextDatasetRef) || null;
@@ -1518,6 +1902,7 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
     valueFieldOptions = [],
     secondaryFieldOptions = [],
     tableColumnOptions = [],
+    childBlockOptions = [],
     scopeParamOptions = [],
     filterBarGroupOptions = [],
     datasetOptions = [],
@@ -1752,6 +2137,123 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
                 message: "The selected KPI secondary field is not available in the current builder.",
             });
         }
+    } else if (normalizedKind === "collectionBlock") {
+        const normalizedValueOptions = normalizeFieldOptions(valueFieldOptions);
+        const normalizedSecondaryOptions = normalizeFieldOptions(secondaryFieldOptions);
+        const valueField = normalizeString(draft?.valueField);
+        const itemTitleField = normalizeString(draft?.itemTitleField);
+        const secondaryField = normalizeString(draft?.secondaryField);
+        if (!itemTitleField) {
+            errors.push({
+                field: "itemTitleField",
+                code: "required",
+                message: "Select a title field for the collection block.",
+            });
+        } else if (normalizedSecondaryOptions.length > 0 && !normalizedSecondaryOptions.some((option) => option.value === itemTitleField)) {
+            errors.push({
+                field: "itemTitleField",
+                code: "unknown",
+                message: "The selected collection title field is not available in the current builder.",
+            });
+        }
+        if (valueField && normalizedValueOptions.length > 0 && !normalizedValueOptions.some((option) => option.value === valueField)) {
+            errors.push({
+                field: "valueField",
+                code: "unknown",
+                message: "The selected collection value field is not available in the current builder.",
+            });
+        }
+        if (secondaryField && normalizedSecondaryOptions.length > 0 && !normalizedSecondaryOptions.some((option) => option.value === secondaryField)) {
+            errors.push({
+                field: "secondaryField",
+                code: "unknown",
+                message: "The selected collection secondary field is not available in the current builder.",
+            });
+        }
+    } else if (normalizedKind === "sectionBlock") {
+        if (!normalizeString(draft?.title)) {
+            errors.push({
+                field: "title",
+                code: "required",
+                message: "Section title is required.",
+            });
+        }
+    } else if (normalizedKind === "compositeBlock") {
+        const childBlockIds = normalizeStringArray(draft?.childBlockIds);
+        const normalizedChildBlockOptions = normalizeFieldOptions(childBlockOptions);
+        if (childBlockIds.length === 0) {
+            errors.push({
+                field: "childBlockIds",
+                code: "required",
+                message: "Select at least one child block for the grouped panel.",
+            });
+        }
+        if (normalizeString(draft?.id) && childBlockIds.includes(normalizeString(draft.id))) {
+            errors.push({
+                field: "childBlockIds",
+                code: "selfReference",
+                message: "A grouped panel cannot include itself as a child block.",
+            });
+        }
+        if (normalizedChildBlockOptions.length > 0 && childBlockIds.some((blockId) => !normalizedChildBlockOptions.some((option) => option.value === blockId))) {
+            errors.push({
+                field: "childBlockIds",
+                code: "unknown",
+                message: "One or more selected child blocks are no longer available in the report document.",
+            });
+        }
+    } else if (normalizedKind === "tabGroupBlock") {
+        const sectionIds = normalizeStringArray(draft?.sectionIds);
+        if (sectionIds.length === 0) {
+            errors.push({
+                field: "sectionIds",
+                code: "required",
+                message: "Select at least one section for the tab group.",
+            });
+        }
+    } else if (normalizedKind === "stepperBlock") {
+        const steps = normalizeStepperDraftSteps(draft?.steps);
+        if (steps.length === 0) {
+            errors.push({
+                field: "steps",
+                code: "required",
+                message: "Add at least one step to the process block.",
+            });
+        }
+    } else if (normalizedKind === "infoPanelBlock") {
+        if (!String(draft?.body || "").trim()) {
+            errors.push({
+                field: "body",
+                code: "required",
+                message: "Info panel body is required.",
+            });
+        }
+    } else if (normalizedKind === "calloutBlock") {
+        if (!String(draft?.body || "").trim()) {
+            errors.push({
+                field: "body",
+                code: "required",
+                message: "Callout body is required.",
+            });
+        }
+    } else if (normalizedKind === "kanbanBlock") {
+        const columns = normalizeKanbanDraftColumns(draft?.columns);
+        if (columns.length === 0) {
+            errors.push({
+                field: "columns",
+                code: "required",
+                message: "Add at least one lane to the kanban block.",
+            });
+        }
+    } else if (normalizedKind === "timelineBlock") {
+        const events = normalizeTimelineDraftEvents(draft?.events);
+        if (events.length === 0) {
+            errors.push({
+                field: "events",
+                code: "required",
+                message: "Add at least one event to the timeline block.",
+            });
+        }
     } else if (normalizedKind === "badgesBlock") {
         const items = normalizeReportBuilderBadgeItems(draft?.items);
         if (items.length === 0) {
@@ -1806,7 +2308,7 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
             if (!visualKind) {
                 return;
             }
-            if (visualKind !== "dataBar") {
+            if (visualKind !== "dataBar" && visualKind !== "progressBar" && visualKind !== "sparkBar" && visualKind !== "shareBar" && visualKind !== "delta" && visualKind !== "rank") {
                 if (visualKind !== "badge" && visualKind !== "tone") {
                     errors.push({
                         field: "columnVisualKinds",
@@ -1825,6 +2327,46 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
                 });
                 return;
             }
+            if (visualKind === "progressBar" && normalizeString(option?.kind) !== "measure") {
+                errors.push({
+                    field: "columnVisualKinds",
+                    code: "unsupported",
+                    message: `${columnKey} does not support progress bars in the authored table block.`,
+                });
+                return;
+            }
+            if (visualKind === "sparkBar" && normalizeString(option?.kind) !== "measure") {
+                errors.push({
+                    field: "columnVisualKinds",
+                    code: "unsupported",
+                    message: `${columnKey} does not support spark bars in the authored table block.`,
+                });
+                return;
+            }
+            if (visualKind === "shareBar" && normalizeString(option?.kind) !== "measure") {
+                errors.push({
+                    field: "columnVisualKinds",
+                    code: "unsupported",
+                    message: `${columnKey} does not support share bars in the authored table block.`,
+                });
+                return;
+            }
+            if (visualKind === "delta" && normalizeString(option?.kind) !== "measure") {
+                errors.push({
+                    field: "columnVisualKinds",
+                    code: "unsupported",
+                    message: `${columnKey} does not support delta chips in the authored table block.`,
+                });
+                return;
+            }
+            if (visualKind === "rank" && normalizeString(option?.kind) !== "measure") {
+                errors.push({
+                    field: "columnVisualKinds",
+                    code: "unsupported",
+                    message: `${columnKey} does not support rank chips in the authored table block.`,
+                });
+                return;
+            }
             if (visualKind === "badge") {
                 if (normalizeString(option?.kind) !== "dimension") {
                     errors.push({
@@ -1835,6 +2377,17 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
                     return;
                 }
                 const parsed = parseVisualRulesText("badge", columnVisualRuleTexts[columnKey] || "");
+                if (!parsed.valid) {
+                    errors.push({
+                        field: "columnVisualRuleTexts",
+                        code: "invalidRules",
+                        message: `${columnKey}: ${parsed.error}`,
+                    });
+                }
+                return;
+            }
+            if (visualKind === "shareBar") {
+                const parsed = parseVisualRulesText("shareBar", columnVisualRuleTexts[columnKey] || "");
                 if (!parsed.valid) {
                     errors.push({
                         field: "columnVisualRuleTexts",
@@ -1867,7 +2420,7 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
         errors.push({
             field: "kind",
             code: "unsupported",
-            message: "Only narrative, pills, filter bar, refinement bar, geo map, KPI, chart, and table authored blocks are supported in this builder slice.",
+            message: "Only narrative, collection, pills, filter bar, refinement bar, geo map, KPI, chart, and table authored blocks are supported in this builder slice.",
         });
     }
     return {
@@ -2090,6 +2643,45 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
                     path: `reportDocument.blocks.${blockId}.secondaryField`,
                     message: `${blockTitle} references unavailable KPI secondary field '${secondaryField}'.`,
                     suggestedFix: "Edit the KPI block to use one of the current available breakdowns or restore the missing field in the builder.",
+                });
+            }
+            return;
+        }
+        if (normalizedKind === "collectionBlock") {
+            const itemTitleField = normalizeString(block?.itemTitleField);
+            const valueField = normalizeString(block?.valueField);
+            const secondaryField = normalizeString(block?.secondaryField);
+            if (itemTitleField && !effectiveSecondaryOptionIds.has(itemTitleField)) {
+                diagnostics.push({
+                    id: `documentBlockCollectionTitleFieldUnavailable:${blockId}`,
+                    code: "documentBlockCollectionTitleFieldUnavailable",
+                    severity: "error",
+                    blockId,
+                    path: `reportDocument.blocks.${blockId}.itemTitleField`,
+                    message: `${blockTitle} references unavailable collection title field '${itemTitleField}'.`,
+                    suggestedFix: "Edit the collection block to use one of the current available breakdowns or restore the missing field in the builder.",
+                });
+            }
+            if (valueField && !effectiveValueOptionIds.has(valueField)) {
+                diagnostics.push({
+                    id: `documentBlockCollectionValueFieldUnavailable:${blockId}`,
+                    code: "documentBlockCollectionValueFieldUnavailable",
+                    severity: "error",
+                    blockId,
+                    path: `reportDocument.blocks.${blockId}.valueField`,
+                    message: `${blockTitle} references unavailable collection value field '${valueField}'.`,
+                    suggestedFix: "Edit the collection block to use one of the current available measures or clear the value field.",
+                });
+            }
+            if (secondaryField && !effectiveSecondaryOptionIds.has(secondaryField)) {
+                diagnostics.push({
+                    id: `documentBlockCollectionSecondaryFieldUnavailable:${blockId}`,
+                    code: "documentBlockCollectionSecondaryFieldUnavailable",
+                    severity: "error",
+                    blockId,
+                    path: `reportDocument.blocks.${blockId}.secondaryField`,
+                    message: `${blockTitle} references unavailable collection secondary field '${secondaryField}'.`,
+                    suggestedFix: "Edit the collection block to use one of the current available breakdowns or clear the secondary field.",
                 });
             }
             return;
@@ -2407,6 +2999,7 @@ export function upsertReportBuilderDocumentBlockState(state = {}, draft = null, 
     valueFieldOptions = [],
     secondaryFieldOptions = [],
     tableColumnOptions = [],
+    childBlockOptions = [],
     scopeParamOptions = [],
     chartConfig = null,
     chartFieldOptions = [],
@@ -2415,6 +3008,7 @@ export function upsertReportBuilderDocumentBlockState(state = {}, draft = null, 
         valueFieldOptions,
         secondaryFieldOptions,
         tableColumnOptions,
+        childBlockOptions,
         scopeParamOptions,
         chartConfig,
         chartFieldOptions,
@@ -2454,6 +3048,24 @@ export function upsertReportBuilderDocumentBlockState(state = {}, draft = null, 
         normalizedBlock = buildReportDocumentGeoMapBlock(draft);
     } else if (normalizedKind === "kpiBlock") {
         normalizedBlock = buildReportDocumentKpiBlock(draft);
+    } else if (normalizedKind === "collectionBlock") {
+        normalizedBlock = buildReportDocumentCollectionBlock(draft);
+    } else if (normalizedKind === "sectionBlock") {
+        normalizedBlock = buildReportDocumentSectionBlock(draft);
+    } else if (normalizedKind === "compositeBlock") {
+        normalizedBlock = buildReportDocumentCompositeBlock(draft);
+    } else if (normalizedKind === "tabGroupBlock") {
+        normalizedBlock = buildReportDocumentTabGroupBlock(draft);
+    } else if (normalizedKind === "stepperBlock") {
+        normalizedBlock = buildReportDocumentStepperBlock(draft);
+    } else if (normalizedKind === "infoPanelBlock") {
+        normalizedBlock = buildReportDocumentInfoPanelBlock(draft);
+    } else if (normalizedKind === "calloutBlock") {
+        normalizedBlock = buildReportDocumentCalloutBlock(draft);
+    } else if (normalizedKind === "kanbanBlock") {
+        normalizedBlock = buildReportDocumentKanbanBlock(draft);
+    } else if (normalizedKind === "timelineBlock") {
+        normalizedBlock = buildReportDocumentTimelineBlock(draft);
     } else if (normalizedKind === "badgesBlock") {
         normalizedBlock = buildReportDocumentBadgesBlock({
             ...draft,
@@ -2502,6 +3114,64 @@ export function upsertReportBuilderDocumentBlockState(state = {}, draft = null, 
                                 valueField: columnKey,
                                 range: { mode: "columnMax" },
                                 palette: ["#dbeafe", "#2563eb"],
+                            },
+                        };
+                    }
+                    if (visualKind === "progressBar") {
+                        return {
+                            ...baseColumn,
+                            cellVisual: {
+                                kind: "progressBar",
+                                valueField: columnKey,
+                                range: { mode: "columnMax" },
+                                palette: ["#e5edf5", "#2f6de1"],
+                            },
+                        };
+                    }
+                    if (visualKind === "sparkBar") {
+                        return {
+                            ...baseColumn,
+                            cellVisual: {
+                                kind: "sparkBar",
+                                valueField: columnKey,
+                                range: { mode: "columnMax" },
+                                palette: ["#eef2f6", "#4c6fff"],
+                            },
+                        };
+                    }
+                    if (visualKind === "shareBar") {
+                        const parsed = parseVisualRulesText("shareBar", columnVisualRuleTexts[columnKey] || "");
+                        if (parsed.valid) {
+                            return {
+                                ...baseColumn,
+                                cellVisual: {
+                                    kind: "shareBar",
+                                    segments: parsed.segments,
+                                },
+                            };
+                        }
+                        if (baseColumn?.cellVisual) {
+                            const nextColumn = cloneValue(baseColumn);
+                            delete nextColumn.cellVisual;
+                            return nextColumn;
+                        }
+                        return baseColumn;
+                    }
+                    if (visualKind === "delta") {
+                        return {
+                            ...baseColumn,
+                            cellVisual: {
+                                kind: "delta",
+                                valueField: columnKey,
+                            },
+                        };
+                    }
+                    if (visualKind === "rank") {
+                        return {
+                            ...baseColumn,
+                            cellVisual: {
+                                kind: "rank",
+                                valueField: columnKey,
                             },
                         };
                     }
@@ -2634,7 +3304,7 @@ export function duplicateReportBuilderDocumentBlockState(state = {}, blockId = "
     }
     const sourceBlock = currentBlocks[currentIndex];
     const normalizedKind = normalizeString(sourceBlock?.kind);
-    if (!["filterBarBlock", "refinementBarBlock", "chartBlock", "geoMapBlock", "kpiBlock", "badgesBlock", "markdownBlock", "tableBlock"].includes(normalizedKind)) {
+    if (!["filterBarBlock", "refinementBarBlock", "chartBlock", "geoMapBlock", "kpiBlock", "collectionBlock", "sectionBlock", "compositeBlock", "tabGroupBlock", "stepperBlock", "infoPanelBlock", "calloutBlock", "kanbanBlock", "timelineBlock", "badgesBlock", "markdownBlock", "tableBlock"].includes(normalizedKind)) {
         return {
             valid: false,
             nextState: cloneValue(state),
@@ -2656,10 +3326,24 @@ export function duplicateReportBuilderDocumentBlockState(state = {}, blockId = "
             ? buildReportDocumentRefinementBarBlock(duplicatedSeed)
             : normalizedKind === "chartBlock"
                 ? buildReportDocumentChartBlock(duplicatedSeed)
-                : normalizedKind === "geoMapBlock"
+            : normalizedKind === "geoMapBlock"
                     ? buildReportDocumentGeoMapBlock(duplicatedSeed)
             : normalizedKind === "kpiBlock"
                 ? buildReportDocumentKpiBlock(duplicatedSeed)
+                : normalizedKind === "collectionBlock"
+                    ? buildReportDocumentCollectionBlock(duplicatedSeed)
+                : normalizedKind === "sectionBlock"
+                    ? buildReportDocumentSectionBlock(duplicatedSeed)
+                : normalizedKind === "stepperBlock"
+                    ? buildReportDocumentStepperBlock(duplicatedSeed)
+                : normalizedKind === "infoPanelBlock"
+                    ? buildReportDocumentInfoPanelBlock(duplicatedSeed)
+                : normalizedKind === "calloutBlock"
+                    ? buildReportDocumentCalloutBlock(duplicatedSeed)
+                : normalizedKind === "kanbanBlock"
+                    ? buildReportDocumentKanbanBlock(duplicatedSeed)
+                : normalizedKind === "timelineBlock"
+                    ? buildReportDocumentTimelineBlock(duplicatedSeed)
                 : normalizedKind === "badgesBlock"
                     ? buildReportDocumentBadgesBlock(duplicatedSeed)
                 : normalizedKind === "tableBlock"

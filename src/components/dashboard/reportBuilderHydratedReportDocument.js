@@ -663,6 +663,8 @@ export function buildHydratedReportBuilderDocument(getResponse = null, {
             ...(normalizeString(document?.title) ? { reportDocumentTitle: normalizeString(document.title) } : {}),
             ...(normalizeString(document?.subtitle) ? { reportDocumentSubtitle: normalizeString(document.subtitle) } : {}),
             ...(normalizeString(document?.description) ? { reportDocumentDescription: normalizeString(document.description) } : {}),
+            ...(normalizeString(document?.theme?.accentTone) ? { reportDocumentThemeAccent: normalizeString(document.theme.accentTone) } : {}),
+            ...(normalizeString(document?.theme?.badgePalette) ? { reportDocumentBadgePalette: normalizeString(document.theme.badgePalette) } : {}),
             ...(templateIdentity?.templateId ? { reportDocumentTemplateId: templateIdentity.templateId } : {}),
             ...(templateIdentity?.templateLabel ? { reportDocumentTemplateLabel: templateIdentity.templateLabel } : {}),
             ...(additionalBlocks.length > 0 ? { reportDocumentBlocks: additionalBlocks } : {}),

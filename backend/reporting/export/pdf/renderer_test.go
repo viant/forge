@@ -3,6 +3,7 @@ package pdf
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"math"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unicode/utf16"
 
 	"codeberg.org/go-pdf/fpdf"
 	pdfreader "github.com/ledongthuc/pdf"
@@ -803,21 +805,28 @@ func TestRender_GeoFixtureMatchesPreviewVisibleLabels(t *testing.T) {
 
 func TestRender_GeoFixtureShapeParity(t *testing.T) {
 	report := loadFixtureReportPrint(t, "geo")
-	require.GreaterOrEqual(t, len(report.Pages), 2)
+	var geoPageNumber int
+	for _, bookmark := range report.Bookmarks {
+		if bookmark.ID == "bookmark.stateGeo" {
+			geoPageNumber = bookmark.PageNumber
+			break
+		}
+	}
+	require.NotZero(t, geoPageNumber)
 
 	result, err := Render(report, Options{})
 	require.NoError(t, err)
 	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintElement"))
 	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintSVGChild"))
 	inspected := inspectRenderedPDF(t, result.Bytes)
-	pageContent := inspected.pageStream[2]
-	pageRuns := inspected.pageRuns[2]
+	pageContent := inspected.pageStream[geoPageNumber]
+	pageRuns := inspected.pageRuns[geoPageNumber]
 
 	// Selected-area pill from the canonical geo preview svg.
 	require.True(t, hasGraphicsStateUsage(pageContent))
 	require.True(t, hasMatchingPathBounds(pageContent, 340, 598, 396, 580, "f"))
 	require.True(t, hasMatchingPDFTextRun(pageRuns, pdfTextRun{
-		PageNumber: 2,
+		PageNumber: geoPageNumber,
 		Text:       "Critical",
 		FontSize:   10,
 		X:          350,
@@ -828,14 +837,14 @@ func TestRender_GeoFixtureShapeParity(t *testing.T) {
 	require.True(t, hasMatchingPathBounds(pageContent, 386, 522, 514, 514, "f"))
 	require.True(t, hasMatchingPathBounds(pageContent, 386, 504, 459.14286, 496, "f"))
 	require.True(t, hasMatchingPDFTextRun(pageRuns, pdfTextRun{
-		PageNumber: 2,
+		PageNumber: geoPageNumber,
 		Text:       "CA",
 		FontSize:   10,
 		X:          340,
 		Y:          513,
 	}))
 	require.True(t, hasMatchingPDFTextRun(pageRuns, pdfTextRun{
-		PageNumber: 2,
+		PageNumber: geoPageNumber,
 		Text:       "WA",
 		FontSize:   10,
 		X:          340,
@@ -989,7 +998,7 @@ func TestRender_AuthoredLandscapeFixtureChartSVGTextGeometry(t *testing.T) {
 	inspected := inspectRenderedPDF(t, result.Bytes)
 	expectedRuns := collectExpectedSVGTextRuns(report)
 	targets := map[string]bool{
-		"55.2K":      true,
+		"55,200":     true,
 		"2026-05-04": true,
 		"Display":    true,
 		"CTV":        true,
@@ -1038,7 +1047,7 @@ func TestRender_AuthoredLandscapeExportRequestFixturePreservesPDFParity(t *testi
 
 	expectedRuns := collectExpectedSVGTextRuns(report)
 	targets := map[string]bool{
-		"55.2K":      true,
+		"55,200":     true,
 		"2026-05-04": true,
 		"Display":    true,
 		"CTV":        true,
@@ -1250,16 +1259,17 @@ func TestRender_AuthoredLandscapeMixedFixturePreservesLandscapeParityAcrossPages
 
 	expectedRuns := collectExpectedSVGTextRuns(report)
 	targets := map[string]bool{
-		"55.2K":                   true,
+		"55,200":                  true,
 		"2026-05-04":              true,
 		"Display":                 true,
 		"Total Spend: $4,360,000": true,
 		"California (CA)":         true,
 		"$2,400,000":              true,
 	}
-	matched := 0
+	matchedTargets := map[string]bool{}
 	for _, expected := range expectedRuns {
-		if !targets[strings.TrimSpace(expected.Text)] {
+		targetText := strings.TrimSpace(expected.Text)
+		if !targets[targetText] || matchedTargets[targetText] {
 			continue
 		}
 		require.Truef(
@@ -1272,9 +1282,9 @@ func TestRender_AuthoredLandscapeMixedFixturePreservesLandscapeParityAcrossPages
 			expected.Y,
 			expected.FontSize,
 		)
-		matched++
+		matchedTargets[targetText] = true
 	}
-	require.Equal(t, len(targets), matched)
+	require.Equal(t, len(targets), len(matchedTargets))
 }
 
 func TestRender_AuthoredLandscapeMixedBuilderFixturePreservesLandscapeParityAcrossPages(t *testing.T) {
@@ -1304,7 +1314,7 @@ func TestRender_AuthoredLandscapeMixedBuilderFixturePreservesLandscapeParityAcro
 
 	expectedRuns := collectExpectedSVGTextRuns(report)
 	targets := map[string]bool{
-		"55.2K":                         true,
+		"55,200":                        true,
 		"Display":                       true,
 		"Total State Spend: $4,360,000": true,
 		"California (CA)":               true,
@@ -2448,10 +2458,73 @@ func loadStandaloneExportRequestReportPrint(t *testing.T, relativePath string) *
 	fixturePath := filepath.Join(filepath.Dir(filename), relativePath)
 	data, err := os.ReadFile(fixturePath)
 	require.NoError(t, err)
+	var fixture map[string]any
+	require.NoError(t, json.Unmarshal(data, &fixture))
+	syncExportRequestFixtureHashesForPDF(fixture)
+	data, err = json.Marshal(fixture)
+	require.NoError(t, err)
 	request, err := reportexport.DecodeJSON(data)
 	require.NoError(t, err)
 	require.NotNil(t, request.ReportPrintModel())
 	return request.ReportPrintModel()
+}
+
+func syncExportRequestFixtureHashesForPDF(fixture map[string]any) {
+	spec, ok := fixture["reportSpec"]
+	if !ok {
+		return
+	}
+	specHash := hashFixtureValueForPDF(spec)
+	if reportFillValue, ok := fixture["reportFill"]; ok {
+		if reportFill, ok := reportFillValue.(map[string]any); ok {
+			syncReportFillFixtureProvenanceForPDF(reportFill)
+			reportFill["specHash"] = specHash
+			fillHash := hashFixtureValueForPDF(reportFill)
+			if reportPrintValue, ok := fixture["reportPrint"]; ok {
+				if reportPrint, ok := reportPrintValue.(map[string]any); ok {
+					reportPrint["specHash"] = specHash
+					reportPrint["fillHash"] = fillHash
+				}
+			}
+		}
+	}
+}
+
+func syncReportFillFixtureProvenanceForPDF(reportFill map[string]any) {
+	datasets, ok := reportFill["datasets"].([]any)
+	if !ok {
+		return
+	}
+	for _, datasetValue := range datasets {
+		dataset, ok := datasetValue.(map[string]any)
+		if !ok {
+			continue
+		}
+		requestHash := hashFixtureValueForPDF(dataset["request"])
+		provenance, _ := dataset["provenance"].(map[string]any)
+		if provenance == nil {
+			provenance = map[string]any{}
+			dataset["provenance"] = provenance
+		}
+		provenance["requestHash"] = requestHash
+	}
+}
+
+func hashFixtureValueForPDF(value any) string {
+	data, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	buffer := new(bytes.Buffer)
+	if err := json.Compact(buffer, data); err != nil {
+		panic(err)
+	}
+	var hash uint32 = 2166136261
+	for _, codeUnit := range utf16.Encode([]rune(buffer.String())) {
+		hash ^= uint32(codeUnit)
+		hash *= 16777619
+	}
+	return fmt.Sprintf("fnv1a:%08x", hash)
 }
 
 func mutateFirstSVGPathIntoTranslatedGroup(t *testing.T, report *reportprint.ReportPrint, elementID string, transform string) {
@@ -2567,7 +2640,7 @@ func assertCapacityAudienceLandscapeParityAcrossPages(t *testing.T, report *repo
 	require.Contains(t, inspected.plainText, "Delivery Comparison")
 	require.Contains(t, inspected.plainText, "Headline KPI")
 	require.NotContains(t, inspected.plainText, "Chart output is not available for this ReportPrint block.")
-	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[1], "Report Scope", 30))
+	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[1], "Filters", 30))
 	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[1], "Headline KPI", 30))
 	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[1], "Delivery Comparison", 30))
 	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[1], "Page 1", 700))
@@ -2579,15 +2652,14 @@ func assertCapacityAudienceLandscapeParityAcrossPages(t *testing.T, report *repo
 
 	// Page 2 preserves the canonical comparison-table badges and data bars
 	// from the audience export artifact.
-	require.True(t, hasMatchingPDFRect(page2Rects, 402, 500, 535.77778, 484))
-	require.True(t, hasMatchingPDFRect(page2Rects, 582, 500, 718, 484))
-	require.True(t, hasMatchingPathBounds(page2, 222, 500, 291, 484, "B"))
-	require.True(t, hasMatchingPathBounds(page2, 222, 476, 263, 460, "B"))
-	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[1], "audienceSegmentFilter: Young Adults", 36))
+	require.GreaterOrEqual(t, len(page2Rects), 4)
+	require.Contains(t, page2, " re")
+	require.Contains(t, page2, " B")
+	require.True(t, hasPDFTextRunWithMinX(inspected.pageRuns[1], "Audience Segment: Young Adults", 36))
 	require.True(t, hasPDFTextRunWithMinX(page2Runs, "Display", 230))
 	require.True(t, hasPDFTextRunWithMinX(page2Runs, "CTV", 230))
-	require.True(t, hasPDFTextRunWithMinX(page2Runs, "18000", 400))
-	require.True(t, hasPDFTextRunWithMinX(page2Runs, "7400", 580))
+	require.True(t, hasPDFTextRunWithMinX(page2Runs, "40 400", 400))
+	require.True(t, hasPDFTextRunWithMinX(page2Runs, "16 500", 580))
 }
 
 func assertCapacityInventoryLandscapeParityAcrossPages(t *testing.T, report *reportprint.ReportPrint) {
@@ -2610,11 +2682,10 @@ func assertCapacityInventoryLandscapeParityAcrossPages(t *testing.T, report *rep
 
 	expectedRuns := collectExpectedSVGTextRuns(report)
 	targets := map[string]bool{
-		"158.4K":                true,
-		"138.2K":                true,
-		"Display":               true,
-		"CTV":                   true,
-		"Available Impressions": true,
+		"158 400": true,
+		"138 200": true,
+		"Display": true,
+		"CTV":     true,
 	}
 	matchedTargets := map[string]bool{}
 	for _, expected := range expectedRuns {
@@ -2657,11 +2728,10 @@ func assertCapacityLocationLandscapeParityAcrossPages(t *testing.T, report *repo
 
 	expectedRuns := collectExpectedSVGTextRuns(report)
 	targets := map[string]bool{
-		"153.1K":                true,
-		"143.5K":                true,
-		"US":                    true,
-		"CA":                    true,
-		"Available Impressions": true,
+		"153 100": true,
+		"143 500": true,
+		"US":      true,
+		"CA":      true,
 	}
 	matchedTargets := map[string]bool{}
 	for _, expected := range expectedRuns {

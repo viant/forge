@@ -105,6 +105,10 @@ func TestDecodeJSON_RejectsInvalidOrderDir(t *testing.T) {
 
 func TestDecodeJSON_RejectsTableBlockWithoutColumns(t *testing.T) {
 	fixture := loadReportSpecFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	fixture["theme"] = map[string]any{
+		"accentTone":   "green",
+		"badgePalette": "bold",
+	}
 	blocks := fixture["blocks"].([]any)
 	for _, blockValue := range blocks {
 		block := blockValue.(map[string]any)
@@ -185,6 +189,203 @@ func TestDecodeJSON_RejectsChartBlockWithoutChartSpec(t *testing.T) {
 	_, err = DecodeJSON(data)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "chartSpec")
+}
+
+func TestDecodeJSON_AcceptsExtendedDashboardBlocks(t *testing.T) {
+	fixture := loadReportSpecFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	fixture["theme"] = map[string]any{
+		"accentTone":   "green",
+		"badgePalette": "bold",
+	}
+	blocks := fixture["blocks"].([]any)
+	blocks = append(blocks,
+		map[string]any{
+			"id":              "overviewSection",
+			"kind":            "sectionBlock",
+			"title":           "Overview",
+			"subtitle":        "Supply outlook",
+			"description":     "Starts with the high-level executive view.",
+			"navigationLabel": "Overview",
+		},
+		map[string]any{
+			"id":            "summaryPanel",
+			"kind":          "compositeBlock",
+			"title":         "Summary panel",
+			"description":   "Groups the opening narrative and KPI.",
+			"childBlockIds": []any{"narrativeIntro", "headlineKpi"},
+		},
+		map[string]any{
+			"id":               "sectionTabs",
+			"kind":             "tabGroupBlock",
+			"title":            "Forecast views",
+			"sectionIds":       []any{"overviewSection"},
+			"defaultSectionId": "overviewSection",
+		},
+		map[string]any{
+			"id":          "integrationFlow",
+			"kind":        "stepperBlock",
+			"title":       "Direct Integration Path",
+			"description": "Three stages to define a direct path.",
+			"steps": []any{
+				map[string]any{"id": "step_1", "title": "Bid directly", "body": "Connect bidding directly to the publisher ad server."},
+			},
+		},
+		map[string]any{
+			"id":          "directIntro",
+			"kind":        "infoPanelBlock",
+			"title":       "What is a Direct Integration Path?",
+			"eyebrow":     "What is it?",
+			"description": "Explains the direct path concept.",
+			"tone":        "info",
+			"bodyFormat":  "markdown",
+			"body":        "A direct integration connects bidding directly into the publisher ad server.",
+		},
+		map[string]any{
+			"id":          "launchCallout",
+			"kind":        "calloutBlock",
+			"title":       "Launch update",
+			"icon":        "warning-sign",
+			"description": "Important rollout note.",
+			"tone":        "warning",
+			"badges":      []any{"Executive", "Launch Ready"},
+			"bodyFormat":  "markdown",
+			"body":        "Publisher activation is staged for Friday.",
+		},
+		map[string]any{
+			"id":             "topChannels",
+			"kind":           "collectionBlock",
+			"title":          "Top Channels",
+			"datasetRef":     "primary",
+			"itemTitleField": "channelV2",
+			"itemTitleLabel": "Channel",
+			"valueField":     "avails",
+			"valueLabel":     "Avails",
+			"layout":         "grid",
+			"columns":        2,
+			"rowLimit":       2,
+		},
+		map[string]any{
+			"id":          "publisherPipeline",
+			"kind":        "kanbanBlock",
+			"title":       "Publisher Pipeline",
+			"description": "Track publisher activations by stage.",
+			"columns": []any{
+				map[string]any{
+					"id":    "signed",
+					"title": "Signed",
+					"cards": []any{
+						map[string]any{"id": "tubi", "title": "Tubi", "body": "SpringServe integration live.", "badge": "Live"},
+					},
+				},
+			},
+		},
+		map[string]any{
+			"id":          "integrationTimeline",
+			"kind":        "timelineBlock",
+			"title":       "Integration Timeline",
+			"description": "Track the rollout milestones.",
+			"events": []any{
+				map[string]any{"id": "event_1", "date": "2026-07-15", "badge": "Target", "title": "Roku signed", "body": "Expected signature date."},
+			},
+		},
+	)
+	fixture["blocks"] = blocks
+
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+
+	spec, err := DecodeJSON(data)
+	require.NoError(t, err)
+	require.True(t, len(spec.Blocks) >= 15)
+	require.Equal(t, "sectionBlock", spec.Blocks[6].Kind)
+	require.Equal(t, "compositeBlock", spec.Blocks[7].Kind)
+	require.Equal(t, "tabGroupBlock", spec.Blocks[8].Kind)
+	require.Equal(t, "stepperBlock", spec.Blocks[9].Kind)
+	require.Equal(t, "infoPanelBlock", spec.Blocks[10].Kind)
+	require.Equal(t, "calloutBlock", spec.Blocks[11].Kind)
+	require.Equal(t, "collectionBlock", spec.Blocks[12].Kind)
+	require.Equal(t, "kanbanBlock", spec.Blocks[13].Kind)
+	require.Equal(t, "timelineBlock", spec.Blocks[14].Kind)
+	require.Equal(t, "Overview", spec.Blocks[6].NavigationLabel)
+	require.Equal(t, []string{"narrativeIntro", "headlineKpi"}, spec.Blocks[7].ChildBlockIDs)
+	require.Equal(t, []string{"overviewSection"}, spec.Blocks[8].SectionIDs)
+	require.Equal(t, "overviewSection", spec.Blocks[8].DefaultSectionID)
+	require.Equal(t, "warning-sign", spec.Blocks[11].Icon)
+	require.Equal(t, []string{"Executive", "Launch Ready"}, spec.Blocks[11].Badges)
+	require.Equal(t, "green", spec.Theme["accentTone"])
+	require.Equal(t, "bold", spec.Theme["badgePalette"])
+	require.Equal(t, 2, *spec.Blocks[12].RowLimit)
+	require.Equal(t, 2, spec.Blocks[12].CollectionCols)
+	require.Len(t, spec.Blocks[13].ColumnsLayout, 1)
+	require.Len(t, spec.Blocks[14].Events, 1)
+}
+
+func TestDecodeJSON_AcceptsHybridKPIBlockFields(t *testing.T) {
+	fixture := loadReportSpecFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	blocks := fixture["blocks"].([]any)
+	for _, blockValue := range blocks {
+		block := blockValue.(map[string]any)
+		if block["kind"] != "kpiBlock" {
+			continue
+		}
+		block["valueFormat"] = "compact"
+		block["secondaryField"] = "channelV2"
+		block["secondaryLabel"] = "Channel"
+		block["secondaryFormat"] = "compactNumber"
+		block["secondaryDisplayKey"] = "channelLabel"
+		block["secondaryDisplayValueMap"] = map[string]any{
+			"ctv": "CTV",
+		}
+		block["rowSelector"] = "maxbyvalue"
+		block["presentationMode"] = "both"
+		block["bodyFormat"] = "markdown"
+		block["bodyTemplate"] = "### Leading inventory\n**${valueLabel}:** ${value}"
+		break
+	}
+
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+
+	spec, err := DecodeJSON(data)
+	require.NoError(t, err)
+
+	var kpi Block
+	found := false
+	for _, block := range spec.Blocks {
+		if block.Kind == "kpiBlock" {
+			kpi = block
+			found = true
+			break
+		}
+	}
+	require.True(t, found)
+	require.Equal(t, "compact", kpi.ValueFormat)
+	require.Equal(t, "compactNumber", kpi.SecondaryFormat)
+	require.Equal(t, "channelLabel", kpi.SecondaryDisplayKey)
+	require.Equal(t, map[string]any{"ctv": "CTV"}, kpi.SecondaryDisplayValueMap)
+	require.Equal(t, "maxbyvalue", kpi.RowSelector)
+	require.Equal(t, "both", kpi.PresentationMode)
+	require.Equal(t, "markdown", kpi.BodyFormat)
+	require.Equal(t, "### Leading inventory\n**${valueLabel}:** ${value}", kpi.BodyTemplate)
+}
+
+func TestDecodeJSON_RejectsUnsupportedKPIPresentationMode(t *testing.T) {
+	fixture := loadReportSpecFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	blocks := fixture["blocks"].([]any)
+	for _, blockValue := range blocks {
+		block := blockValue.(map[string]any)
+		if block["kind"] == "kpiBlock" {
+			block["presentationMode"] = "floating"
+			break
+		}
+	}
+
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+
+	_, err = DecodeJSON(data)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), `presentationMode "floating" is not supported for kpiBlock`)
 }
 
 func TestDecodeJSON_RejectsTrailingContent(t *testing.T) {

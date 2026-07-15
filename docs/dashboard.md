@@ -854,7 +854,16 @@ Implementation:
 - internally call the current `Chart` path -- the dashboard timeline block passes its `container.chart` config through to `Chart.jsx`
 - for bar/area chart types, extend `Chart.jsx` with the Recharts rendering extracted from agently per Option C
 
-Deferred to post-v1: **timeline annotations** (event markers overlaid on the chart). Annotations require defining an annotation record schema, a data source contract for annotation data, and a rendering layer on top of Recharts. These are not needed for the initial dashboard implementation and would add complexity to the chart path without a clear consumer in the first use case.
+Current status:
+
+- generic report-builder chart annotations are now supported through the canonical chart model:
+  - `annotations.verticalMarkers`
+  - `annotations.referenceLines`
+  - `annotations.bands`
+  - `annotations.notes`
+- the same authored annotation model lowers through both the runtime chart surface and ReportPrint SVG export
+
+Still deferred to post-v1: **timeline-sourced annotations** where markers are backed by a separate annotation dataset or a timeline-specific annotation contract. That richer variant still needs an annotation record schema, source binding, and block-level authoring UX beyond the generic chart annotation model.
 
 
 ### 3. `dashboard.dimensions`

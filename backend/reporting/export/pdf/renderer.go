@@ -391,7 +391,11 @@ func fontStyle(weight string) string {
 }
 
 func sanitizePDFText(value string) string {
-	return pdfCoreFontTextSanitizer.Replace(value)
+	normalized := pdfCoreFontTextSanitizer.Replace(value)
+	normalized = strings.ReplaceAll(normalized, "  -  ", " - ")
+	normalized = strings.ReplaceAll(normalized, " -  ", " - ")
+	normalized = strings.ReplaceAll(normalized, "  - ", " - ")
+	return normalized
 }
 
 func resolveLineHeight(size float64, fallback float64) float64 {

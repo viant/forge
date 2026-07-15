@@ -224,6 +224,7 @@ import {
     buildLookupHydrationJobs,
     hydrateReportBuilderLookupLabels,
     prefillSignature,
+    shouldMarkReportBuilderPrefillApplied,
     shouldDeferReportBuilderRequestForPrefill,
     resolveReportBuilderHookHandler,
     resolveReportBuilderLookupDescriptor,
@@ -654,6 +655,14 @@ function getBuilderStateKey(container = {}) {
 
 function normalizeString(value = "") {
     return String(value || "").trim();
+}
+
+function normalizeBooleanFlag(value = false) {
+    if (value === true || value === false) {
+        return value;
+    }
+    const normalized = String(value || "").trim().toLowerCase();
+    return normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on";
 }
 
 const REPORT_BUILDER_DOCUMENT_BLOCK_DND_MIME = "application/x-forge-report-builder-document-block";
@@ -1394,6 +1403,24 @@ function reportBuilderDocumentBlockIcon(kind = "") {
             return "timeline-line-chart";
         case "kpiBlock":
             return "dashboard";
+        case "sectionBlock":
+            return "layout-auto";
+        case "compositeBlock":
+            return "widget";
+        case "tabGroupBlock":
+            return "properties";
+        case "stepperBlock":
+            return "flows";
+        case "infoPanelBlock":
+            return "info-sign";
+        case "calloutBlock":
+            return "warning-sign";
+        case "kanbanBlock":
+            return "projects";
+        case "timelineBlock":
+            return "time";
+        case "collectionBlock":
+            return "widget";
         case "badgesBlock":
             return "properties";
         case "tableBlock":
@@ -2077,16 +2104,23 @@ export default function ReportBuilder({ container, context }) {
         setPreparedApiArtifactOrigins(buildEmptyPreparedApiArtifactOrigins());
     }, []);
     const [builderWidth, setBuilderWidth] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 0));
-    const [workspaceMode, setWorkspaceMode] = useState(() => (
-        loadStoredReportBuilderWorkspaceMode(
+    const hostedExecuteOnOpen = normalizeBooleanFlag(container?.parameters?.executeOnOpen);
+    const requestedWorkspaceMode = normalizeString(container?.parameters?.workspaceMode)
+        || (hostedExecuteOnOpen ? "report" : "");
+    const [workspaceMode, setWorkspaceMode] = useState(() => {
+        const initialCompactMode = resolveReportBuilderCompactMode({
+            viewportWidth: typeof window !== "undefined" ? Number(window.innerWidth || 0) || 0 : 0,
+            compactBreakpoint: resolveReportBuilderCompactBreakpoint(config),
+        });
+        if (requestedWorkspaceMode) {
+            return normalizeReportBuilderWorkspaceMode(requestedWorkspaceMode, { compactMode: initialCompactMode });
+        }
+        return loadStoredReportBuilderWorkspaceMode(
             stateStorageScope,
-            resolveReportBuilderCompactMode({
-                viewportWidth: typeof window !== "undefined" ? Number(window.innerWidth || 0) || 0 : 0,
-                compactBreakpoint: resolveReportBuilderCompactBreakpoint(config),
-            }),
+            initialCompactMode,
             legacyStateStorageScopes,
-        )
-    ));
+        );
+    });
     const workspaceModeStorageContextKeyRef = useRef("");
     const workspaceModeStorageLoadedValueRef = useRef("");
     const workspaceModeStorageReadyRef = useRef(false);
@@ -2135,6 +2169,7 @@ export default function ReportBuilder({ container, context }) {
     const [compactSemanticSheetOpen, setCompactSemanticSheetOpen] = useState(false);
     const reportBuilderMountedRef = useRef(true);
     const appliedReportStarterIdRef = useRef("");
+    const executeOnOpenRunKeyRef = useRef("");
     const documentBlockResizeCleanupRef = useRef(null);
 
     useEffect(() => {
@@ -2346,16 +2381,18 @@ export default function ReportBuilder({ container, context }) {
     }, []);
 
     useEffect(() => {
-        const loadedMode = loadStoredReportBuilderWorkspaceMode(
-            stateStorageScope,
-            compactMode,
-            legacyStateStorageScopes,
-        );
+        const loadedMode = requestedWorkspaceMode
+            ? normalizeReportBuilderWorkspaceMode(requestedWorkspaceMode, { compactMode })
+            : loadStoredReportBuilderWorkspaceMode(
+                stateStorageScope,
+                compactMode,
+                legacyStateStorageScopes,
+            );
         workspaceModeStorageContextKeyRef.current = `${stateStorageScope}::${compactMode ? "compact" : "desktop"}`;
         workspaceModeStorageLoadedValueRef.current = loadedMode;
         workspaceModeStorageReadyRef.current = false;
         setWorkspaceMode(loadedMode);
-    }, [compactMode, legacyStateStorageScopes, stateStorageScope]);
+    }, [compactMode, legacyStateStorageScopes, requestedWorkspaceMode, stateStorageScope]);
 
     useEffect(() => {
         const contextKey = `${stateStorageScope}::${compactMode ? "compact" : "desktop"}`;
@@ -2363,6 +2400,9 @@ export default function ReportBuilder({ container, context }) {
             return;
         }
         const normalizedMode = normalizeReportBuilderWorkspaceMode(workspaceMode, { compactMode });
+        if (requestedWorkspaceMode) {
+            return;
+        }
         if (!workspaceModeStorageReadyRef.current) {
             if (normalizedMode !== workspaceModeStorageLoadedValueRef.current) {
                 return;
@@ -2376,7 +2416,7 @@ export default function ReportBuilder({ container, context }) {
             compactMode,
             legacyStateStorageScopes,
         );
-    }, [compactMode, legacyStateStorageScopes, stateStorageScope, workspaceMode]);
+    }, [compactMode, legacyStateStorageScopes, requestedWorkspaceMode, stateStorageScope, workspaceMode]);
 
     useEffect(() => {
         if (compactMode) {
@@ -2898,7 +2938,12 @@ export default function ReportBuilder({ container, context }) {
                 windowFormValue,
             ),
         );
-        if (JSON.stringify(next) === JSON.stringify(state)) {
+        if (shouldMarkReportBuilderPrefillApplied({
+            currentPrefillSignature,
+            appliedPrefillSignature: appliedPrefillSignatureRef.current,
+            currentState: state,
+            nextState: next,
+        })) {
             appliedPrefillSignatureRef.current = currentPrefillSignature;
             return;
         }
@@ -3482,18 +3527,36 @@ export default function ReportBuilder({ container, context }) {
     const semanticProviderMeasureDiagnosticsById = semanticDiagnosticTargets.measureDiagnosticsById || {};
     const semanticProviderDimensionDiagnosticsById = semanticDiagnosticTargets.dimensionDiagnosticsById || {};
     const semanticProviderParameterDiagnosticsById = semanticDiagnosticTargets.parameterDiagnosticsById || {};
+    const authoredCompositeChildBlockOptions = useMemo(
+        () => authoredDocumentBlocks
+            .filter((block) => {
+                const normalizedKind = String(block?.kind || "").trim();
+                const normalizedId = String(block?.id || "").trim();
+                if (!normalizedId || normalizedId === String(documentBlockDraft?.id || "").trim()) {
+                    return false;
+                }
+                return !["sectionBlock", "compositeBlock", "tabGroupBlock", "filterBarBlock", "refinementBarBlock"].includes(normalizedKind);
+            })
+            .map((block) => ({
+                value: String(block?.id || "").trim(),
+                label: String(block?.title || block?.id || "").trim(),
+            }))
+            .filter((option) => option.value && option.label),
+        [authoredDocumentBlocks, documentBlockDraft],
+    );
     const documentBlockDraftValidation = useMemo(
         () => validateReportBuilderDocumentBlockDraft(documentBlockDraft, {
             valueFieldOptions: documentBlockDraftValueFieldOptions,
             secondaryFieldOptions: documentBlockDraftSecondaryFieldOptions,
             tableColumnOptions: documentBlockDraftTableColumnOptions,
+            childBlockOptions: authoredCompositeChildBlockOptions,
             datasetOptions: authoredDatasetOptions,
             scopeParamOptions: authoredScopeParamOptions,
             filterBarGroupOptions: authoredFilterBarGroupOptions,
             chartConfig: authoredChartConfig,
             chartFieldOptions: authoredChartFieldOptions,
         }),
-        [authoredChartConfig, authoredChartFieldOptions, authoredDatasetOptions, authoredFilterBarGroupOptions, authoredScopeParamOptions, documentBlockDraft, documentBlockDraftSecondaryFieldOptions, documentBlockDraftTableColumnOptions, documentBlockDraftValueFieldOptions],
+        [authoredChartConfig, authoredChartFieldOptions, authoredCompositeChildBlockOptions, authoredDatasetOptions, authoredFilterBarGroupOptions, authoredScopeParamOptions, documentBlockDraft, documentBlockDraftSecondaryFieldOptions, documentBlockDraftTableColumnOptions, documentBlockDraftValueFieldOptions],
     );
     const authoredChartBlockDraftValidation = useMemo(
         () => validateReportBuilderDocumentBlockDraft(authoredChartBlockDraft, {
@@ -3928,6 +3991,7 @@ export default function ReportBuilder({ container, context }) {
                 : (Array.isArray(datasetOption?.columnOptions) && datasetOption.columnOptions.length > 0);
             const canAddChart = Array.isArray(datasetOption?.chartFieldOptions) && datasetOption.chartFieldOptions.length > 0;
             const canAddKpi = Array.isArray(datasetOption?.valueFieldOptions) && datasetOption.valueFieldOptions.length > 0;
+            const canAddCollection = Array.isArray(datasetOption?.secondaryFieldOptions) && datasetOption.secondaryFieldOptions.length > 0;
             const canEditSource = !!datasetOption && normalizeString(datasetOption?.value) !== "primary";
             return {
                 ...entry,
@@ -3936,6 +4000,7 @@ export default function ReportBuilder({ container, context }) {
                 canAddTable,
                 canAddChart,
                 canAddKpi,
+                canAddCollection,
                 canEditSource,
                 editableDatasetOption: datasetOption ? cloneReportBuilderValue(datasetOption) : null,
                 active: entry.dataSourceRef === currentSourceRef,
@@ -5850,6 +5915,33 @@ export default function ReportBuilder({ container, context }) {
                     rows={3}
                 />
             </label>
+            <label className="forge-report-builder__chart-field">
+                <span>Accent theme</span>
+                <select
+                    aria-label="Report document accent theme"
+                    className="forge-report-builder-select"
+                    value={String(state?.reportDocumentThemeAccent || "")}
+                    onChange={(event) => updateReportDocumentMetadata("reportDocumentThemeAccent", event.target.value)}
+                >
+                    <option value="">Default blue</option>
+                    <option value="green">Green</option>
+                    <option value="amber">Amber</option>
+                    <option value="rose">Rose</option>
+                    <option value="slate">Slate</option>
+                </select>
+            </label>
+            <label className="forge-report-builder__chart-field">
+                <span>Badge palette</span>
+                <select
+                    aria-label="Report document badge palette"
+                    className="forge-report-builder-select"
+                    value={String(state?.reportDocumentBadgePalette || "")}
+                    onChange={(event) => updateReportDocumentMetadata("reportDocumentBadgePalette", event.target.value)}
+                >
+                    <option value="">Soft</option>
+                    <option value="bold">Bold</option>
+                </select>
+            </label>
             {state.reportDocumentTemplateLabel ? (
                 <div style={{ fontSize: 11, lineHeight: 1.5, color: "#486579" }}>
                     Seeded from template: {state.reportDocumentTemplateLabel}
@@ -5970,27 +6062,39 @@ export default function ReportBuilder({ container, context }) {
                                 {semanticWorkspaceActivationState.entries.map((entry) => {
                                     const actions = [];
                                     if (entry.kind === "reopenable") {
-                                        actions.push({
-                                            id: `${entry.id}:activate`,
-                                            label: entry.activateLabel || "Use",
-                                            onClick: () => activateImportedLocalReopenable(entry.targetIdentity || entry.id, entry.title),
-                                        });
-                                        actions.push({
-                                            id: `${entry.id}:remove`,
-                                            label: entry.removeLabel || "Remove",
-                                            onClick: () => removeImportedLocalReopenable(entry.targetIdentity || entry.id, entry.title),
-                                        });
+                                        if (entry.activateLabel) {
+                                            actions.push({
+                                                id: `${entry.id}:activate`,
+                                                label: entry.activateLabel,
+                                                ariaLabel: `Use ${entry.title}`,
+                                                onClick: () => activateImportedLocalReopenable(entry.targetIdentity || entry.id, entry.title),
+                                            });
+                                        }
+                                        if (entry.removeLabel) {
+                                            actions.push({
+                                                id: `${entry.id}:remove`,
+                                                label: entry.removeLabel,
+                                                ariaLabel: `Remove ${entry.title}`,
+                                                onClick: () => removeImportedLocalReopenable(entry.targetIdentity || entry.id, entry.title),
+                                            });
+                                        }
                                     } else if (entry.kind === "savedRecord") {
-                                        actions.push({
-                                            id: `${entry.id}:activate`,
-                                            label: entry.activateLabel || "Use",
-                                            onClick: () => activateImportedLocalSavedRecord(entry.targetIdentity || entry.id, entry.title),
-                                        });
-                                        actions.push({
-                                            id: `${entry.id}:remove`,
-                                            label: entry.removeLabel || "Remove",
-                                            onClick: () => removeImportedLocalSavedRecord(entry.targetIdentity || entry.id, entry.title),
-                                        });
+                                        if (entry.activateLabel) {
+                                            actions.push({
+                                                id: `${entry.id}:activate`,
+                                                label: entry.activateLabel,
+                                                ariaLabel: `Use ${entry.title}`,
+                                                onClick: () => activateImportedLocalSavedRecord(entry.targetIdentity || entry.id, entry.title),
+                                            });
+                                        }
+                                        if (entry.removeLabel) {
+                                            actions.push({
+                                                id: `${entry.id}:remove`,
+                                                label: entry.removeLabel,
+                                                ariaLabel: `Remove ${entry.title}`,
+                                                onClick: () => removeImportedLocalSavedRecord(entry.targetIdentity || entry.id, entry.title),
+                                            });
+                                        }
                                     }
                                     return (
                                         <ReportBuilderPreparedArtifactCard
@@ -6274,6 +6378,64 @@ export default function ReportBuilder({ container, context }) {
                             block?.valueLabel || block?.valueField || "Value",
                             block?.secondaryField ? `Secondary ${block.secondaryLabel || block.secondaryField}` : "",
                         ].filter(Boolean).join(" • ")
+                        : normalizedKind === "sectionBlock"
+                            ? [
+                                block?.navigationLabel || "",
+                                block?.subtitle || "",
+                                block?.description || "",
+                            ].filter(Boolean).join(" • ") || "Section"
+                        : normalizedKind === "compositeBlock"
+                            ? (() => {
+                                const childBlockIds = Array.isArray(block?.childBlockIds) ? block.childBlockIds.filter(Boolean) : [];
+                                return [
+                                    `${childBlockIds.length} child block${childBlockIds.length === 1 ? "" : "s"}`,
+                                    block?.description || "",
+                                ].filter(Boolean).join(" • ") || "Grouped panel";
+                            })()
+                        : normalizedKind === "tabGroupBlock"
+                            ? (() => {
+                                const sectionIds = Array.isArray(block?.sectionIds) ? block.sectionIds.filter(Boolean) : [];
+                                const defaultSectionId = String(block?.defaultSectionId || "").trim();
+                                return [
+                                    `${sectionIds.length} tab${sectionIds.length === 1 ? "" : "s"}`,
+                                    defaultSectionId ? `Default ${defaultSectionId}` : "",
+                                ].filter(Boolean).join(" • ") || "Section tabs";
+                            })()
+                        : normalizedKind === "stepperBlock"
+                            ? (() => {
+                                const steps = Array.isArray(block?.steps) ? block.steps : [];
+                                return `${steps.length} step${steps.length === 1 ? "" : "s"}${block?.description ? ` • ${block.description}` : ""}`;
+                            })()
+                        : normalizedKind === "infoPanelBlock"
+                            ? [
+                                block?.eyebrow || "",
+                                block?.description || "",
+                            ].filter(Boolean).join(" • ") || "Info panel"
+                        : normalizedKind === "calloutBlock"
+                            ? [
+                                block?.icon || "",
+                                block?.tone || "",
+                                Array.isArray(block?.badges) && block.badges.length > 0 ? block.badges.join(" • ") : "",
+                            ].filter(Boolean).join(" • ") || "Callout"
+                        : normalizedKind === "kanbanBlock"
+                            ? (() => {
+                                const columns = Array.isArray(block?.columns) ? block.columns : [];
+                                const cardCount = columns.reduce((total, column) => total + (Array.isArray(column?.cards) ? column.cards.length : 0), 0);
+                                return `${columns.length} lane${columns.length === 1 ? "" : "s"} • ${cardCount} card${cardCount === 1 ? "" : "s"}`;
+                            })()
+                        : normalizedKind === "timelineBlock"
+                            ? (() => {
+                                const events = Array.isArray(block?.events) ? block.events : [];
+                                return `${events.length} event${events.length === 1 ? "" : "s"}${block?.description ? ` • ${block.description}` : ""}`;
+                            })()
+                        : normalizedKind === "collectionBlock"
+                            ? [
+                                block?.itemTitleLabel || block?.itemTitleField || "Title",
+                                block?.valueField ? (block?.valueLabel || block?.valueField || "Value") : "",
+                                block?.secondaryField ? `Secondary ${block.secondaryLabel || block.secondaryField}` : "",
+                                block?.layout ? `Layout ${block.layout}` : "",
+                                block?.rowLimit ? `${block.rowLimit} rows` : "",
+                            ].filter(Boolean).join(" • ")
                         : normalizedKind === "badgesBlock"
                             ? (() => {
                                 const labels = (Array.isArray(block?.items) ? block.items : [])
@@ -6377,6 +6539,24 @@ export default function ReportBuilder({ container, context }) {
                                 ? "Chart"
                             : normalizedKind === "kpiBlock"
                                 ? "KPI"
+                            : normalizedKind === "sectionBlock"
+                                ? "Section"
+                            : normalizedKind === "compositeBlock"
+                                ? "Grouped Panel"
+                            : normalizedKind === "tabGroupBlock"
+                                ? "Section Tabs"
+                            : normalizedKind === "stepperBlock"
+                                ? "Process"
+                            : normalizedKind === "infoPanelBlock"
+                                ? "Info Panel"
+                            : normalizedKind === "calloutBlock"
+                                ? "Callout"
+                            : normalizedKind === "kanbanBlock"
+                                ? "Pipeline"
+                            : normalizedKind === "timelineBlock"
+                                ? "Timeline"
+                            : normalizedKind === "collectionBlock"
+                                ? "Collection"
                             : normalizedKind === "badgesBlock"
                                 ? "Pills"
                                 : normalizedKind === "tableBlock"
@@ -6533,7 +6713,7 @@ export default function ReportBuilder({ container, context }) {
     );
 
     const renderDesignModeControl = () => {
-        if (compactMode) {
+        if (compactMode || hostedExecuteOnOpen) {
             return null;
         }
         const targetMode = designWorkspaceMode ? "report" : "design";
@@ -6796,27 +6976,39 @@ export default function ReportBuilder({ container, context }) {
                                         {semanticWorkspaceActivationState.entries.map((entry) => {
                                             const actions = [];
                                             if (entry.kind === "reopenable") {
-                                                actions.push({
-                                                    id: `${entry.id}:activate`,
-                                                    label: entry.activateLabel || "Use",
-                                                    onClick: () => activateImportedLocalReopenable(entry.targetIdentity || entry.id, entry.title),
-                                                });
-                                                actions.push({
-                                                    id: `${entry.id}:remove`,
-                                                    label: entry.removeLabel || "Remove",
-                                                    onClick: () => removeImportedLocalReopenable(entry.targetIdentity || entry.id, entry.title),
-                                                });
+                                                if (entry.activateLabel) {
+                                                    actions.push({
+                                                        id: `${entry.id}:activate`,
+                                                        label: entry.activateLabel,
+                                                        ariaLabel: `Use ${entry.title}`,
+                                                        onClick: () => activateImportedLocalReopenable(entry.targetIdentity || entry.id, entry.title),
+                                                    });
+                                                }
+                                                if (entry.removeLabel) {
+                                                    actions.push({
+                                                        id: `${entry.id}:remove`,
+                                                        label: entry.removeLabel,
+                                                        ariaLabel: `Remove ${entry.title}`,
+                                                        onClick: () => removeImportedLocalReopenable(entry.targetIdentity || entry.id, entry.title),
+                                                    });
+                                                }
                                             } else if (entry.kind === "savedRecord") {
-                                                actions.push({
-                                                    id: `${entry.id}:activate`,
-                                                    label: entry.activateLabel || "Use",
-                                                    onClick: () => activateImportedLocalSavedRecord(entry.targetIdentity || entry.id, entry.title),
-                                                });
-                                                actions.push({
-                                                    id: `${entry.id}:remove`,
-                                                    label: entry.removeLabel || "Remove",
-                                                    onClick: () => removeImportedLocalSavedRecord(entry.targetIdentity || entry.id, entry.title),
-                                                });
+                                                if (entry.activateLabel) {
+                                                    actions.push({
+                                                        id: `${entry.id}:activate`,
+                                                        label: entry.activateLabel,
+                                                        ariaLabel: `Use ${entry.title}`,
+                                                        onClick: () => activateImportedLocalSavedRecord(entry.targetIdentity || entry.id, entry.title),
+                                                    });
+                                                }
+                                                if (entry.removeLabel) {
+                                                    actions.push({
+                                                        id: `${entry.id}:remove`,
+                                                        label: entry.removeLabel,
+                                                        ariaLabel: `Remove ${entry.title}`,
+                                                        onClick: () => removeImportedLocalSavedRecord(entry.targetIdentity || entry.id, entry.title),
+                                                    });
+                                                }
                                             }
                                             return (
                                                 <ReportBuilderPreparedArtifactCard
@@ -10049,6 +10241,7 @@ export default function ReportBuilder({ container, context }) {
             valueFieldOptions: authoredKpiValueFieldOptions,
             secondaryFieldOptions: authoredKpiSecondaryFieldOptions,
             tableColumnOptions: authoredTableColumnOptions,
+            childBlockOptions: authoredCompositeChildBlockOptions,
             datasetOptions: authoredDatasetOptions,
             scopeParamOptions: authoredScopeParamOptions,
             filterBarGroupOptions: authoredFilterBarGroupOptions,
@@ -10056,7 +10249,7 @@ export default function ReportBuilder({ container, context }) {
             chartState: authoredChartState,
         }));
         setDocumentBlockDialogOpen(true);
-    }, [authoredChartConfig, authoredChartState, authoredDatasetOptions, authoredDocumentBlocks, authoredFilterBarGroupOptions, authoredKpiSecondaryFieldOptions, authoredKpiValueFieldOptions, authoredScopeParamOptions, authoredTableColumnOptions]);
+    }, [authoredChartConfig, authoredChartState, authoredCompositeChildBlockOptions, authoredDatasetOptions, authoredDocumentBlocks, authoredFilterBarGroupOptions, authoredKpiSecondaryFieldOptions, authoredKpiValueFieldOptions, authoredScopeParamOptions, authoredTableColumnOptions]);
     const openAuthoredChartBlockDialog = React.useCallback((seed = null, options = {}) => {
         const nextDraft = buildReportBuilderDocumentBlockDraft("chartBlock", seed, {
             existingBlocks: authoredDocumentBlocks,
@@ -10366,6 +10559,7 @@ export default function ReportBuilder({ container, context }) {
             valueFieldOptions: documentBlockDraftValueFieldOptions,
             secondaryFieldOptions: documentBlockDraftSecondaryFieldOptions,
             tableColumnOptions: documentBlockDraftTableColumnOptions,
+            childBlockOptions: authoredCompositeChildBlockOptions,
             scopeParamOptions: authoredScopeParamOptions,
             chartConfig: authoredChartConfig,
             chartFieldOptions: authoredChartFieldOptions,
@@ -10394,7 +10588,7 @@ export default function ReportBuilder({ container, context }) {
             autoClearMs: result.created ? 1200 : 800,
         });
         return true;
-    }, [authoredChartConfig, authoredChartFieldOptions, authoredDocumentBlocks, authoredScopeParamOptions, closeDocumentBlockDialog, documentBlockDraft, documentBlockDraftSecondaryFieldOptions, documentBlockDraftTableColumnOptions, documentBlockDraftValueFieldOptions, editingDocumentBlockId, pendingDocumentInsertionAfterId, pendingDocumentInsertionPlacement, persistExplorationMutation, state]);
+    }, [authoredChartConfig, authoredChartFieldOptions, authoredCompositeChildBlockOptions, authoredDocumentBlocks, authoredScopeParamOptions, closeDocumentBlockDialog, documentBlockDraft, documentBlockDraftSecondaryFieldOptions, documentBlockDraftTableColumnOptions, documentBlockDraftValueFieldOptions, editingDocumentBlockId, pendingDocumentInsertionAfterId, pendingDocumentInsertionPlacement, persistExplorationMutation, state]);
     const closeReportDocumentShellPanels = React.useCallback(() => {
         setDocumentDataViewOpen(false);
         setAuthoredDiagnosticsExpanded(false);
@@ -10588,6 +10782,10 @@ export default function ReportBuilder({ container, context }) {
             sourceContext: {
                 label: normalizedField === "reportDocumentSubtitle"
                     ? "Report subtitle"
+                    : normalizedField === "reportDocumentThemeAccent"
+                        ? "Report accent theme"
+                        : normalizedField === "reportDocumentBadgePalette"
+                            ? "Report badge palette"
                     : "Report description",
             },
         });
@@ -11730,9 +11928,19 @@ export default function ReportBuilder({ container, context }) {
         semanticWorkspacePanelState,
         importedLocalReopenablePanelState,
         importedLocalSavedRecordPanelState,
+        activeReportId: activeImportedSemanticSessionMatchesCurrentArtifact
+            && normalizeString(semanticBinding?.mode).toLowerCase() === "semantic"
+            ? normalizeString(hydratedReportDocumentSession?.reportId)
+            : "",
+        // Import tracking is not activation. A card is active only after the
+        // canonical hydration path has applied a compatible semantic report.
+        useExplicitActivationState: true,
     }), [
+        activeImportedSemanticSessionMatchesCurrentArtifact,
+        hydratedReportDocumentSession?.reportId,
         importedLocalReopenablePanelState,
         importedLocalSavedRecordPanelState,
+        semanticBinding?.mode,
         semanticWorkspacePanelState,
     ]);
     const compactSemanticActionLabel = useMemo(() => resolveCompactSemanticActionLabel({
@@ -14936,7 +15144,7 @@ export default function ReportBuilder({ container, context }) {
                                         ) : null}
                                     </div>
                                 <div className="forge-report-builder__design-source-grid-cell forge-report-builder__design-source-grid-cell--actions" role="cell">
-                                    {card.datasetRef && (card.canAddTable || card.canAddChart || card.canAddKpi) ? (
+                                    {card.datasetRef && (card.canAddTable || card.canAddChart || card.canAddKpi || card.canAddCollection) ? (
                                         <Tooltip content={describeSourceAddAction("Add block", card.label)} placement="top">
                                             <Popover
                                                 isOpen={designSourceAddMenuRef === normalizeString(card.dataSourceRef)}
@@ -14978,6 +15186,19 @@ export default function ReportBuilder({ container, context }) {
                                                                 text="KPI"
                                                                 onClick={() => queueDesignSourceAddAction(() => openDocumentBlockDialog({
                                                                         kind: "kpiBlock",
+                                                                        datasetRef: card.datasetRef,
+                                                                    }, {
+                                                                        insertionAfterId: selectedDocumentInsertionTarget.insertionAfterId,
+                                                                        insertionPlacement: pendingDocumentInsertionPlacement,
+                                                                    }))}
+                                                            />
+                                                        ) : null}
+                                                        {card.canAddCollection ? (
+                                                            <MenuItem
+                                                                icon="widget"
+                                                                text="Collection"
+                                                                onClick={() => queueDesignSourceAddAction(() => openDocumentBlockDialog({
+                                                                        kind: "collectionBlock",
                                                                         datasetRef: card.datasetRef,
                                                                     }, {
                                                                         insertionAfterId: selectedDocumentInsertionTarget.insertionAfterId,
@@ -17135,6 +17356,54 @@ export default function ReportBuilder({ container, context }) {
         reportWorkspaceMode,
         showAuthoredReportSurface,
         state,
+    ]);
+
+    useEffect(() => {
+        if (!hostedExecuteOnOpen) {
+            return;
+        }
+        if (designWorkspaceMode) {
+            setWorkspaceMode("report");
+            return;
+        }
+        if (shouldDeferReportBuilderRequestForPrefill({
+            currentPrefillSignature,
+            appliedPrefillSignature: appliedPrefillSignatureRef.current,
+        })) {
+            return;
+        }
+        if (!showAuthoredReportSurface || !canRunReport || loading || error || hasRows || hasCompletedCurrentRun) {
+            return;
+        }
+        const authoredBlockCount = Array.isArray(state?.reportDocumentBlocks) ? state.reportDocumentBlocks.length : 0;
+        const executeRunKey = [
+            normalizeString(state?.reportDocumentTemplateId),
+            currentRequestFingerprint,
+            String(authoredBlockCount),
+        ].join("::");
+        if (!normalizeString(state?.reportDocumentTemplateId) || authoredBlockCount === 0) {
+            return;
+        }
+        if (!executeRunKey || executeOnOpenRunKeyRef.current === executeRunKey) {
+            return;
+        }
+        executeOnOpenRunKeyRef.current = executeRunKey;
+        dispatchReportRequest(currentBuilderStateRef.current || state, { forceFetch: true, markManual: true });
+    }, [
+        canRunReport,
+        currentPrefillSignature,
+        currentRequestFingerprint,
+        designWorkspaceMode,
+        dispatchReportRequest,
+        error,
+        hasCompletedCurrentRun,
+        hasRows,
+        hostedExecuteOnOpen,
+        loading,
+        showAuthoredReportSurface,
+        state,
+        state?.reportDocumentBlocks,
+        state?.reportDocumentTemplateId,
     ]);
 
     return (
@@ -20051,6 +20320,14 @@ export default function ReportBuilder({ container, context }) {
                 projectionOptions={authoredProjectionOptions}
                 scopeParamOptions={authoredScopeParamOptions}
                 filterBarGroupOptions={authoredFilterBarGroupOptions}
+                childBlockOptions={authoredCompositeChildBlockOptions}
+                sectionOptions={authoredDocumentBlocks
+                    .filter((block) => String(block?.kind || "").trim() === "sectionBlock")
+                    .map((block) => ({
+                        value: String(block?.id || "").trim(),
+                        label: String(block?.navigationLabel || block?.title || block?.id || "").trim(),
+                    }))
+                    .filter((option) => option.value && option.label)}
                 isEditing={!!editingDocumentBlockId}
                 dataViewLabel={activeAuthoringProjectionLabel}
                 dataViewDescription={activeAuthoringProjectionDescription}

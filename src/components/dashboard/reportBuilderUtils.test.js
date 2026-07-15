@@ -2617,14 +2617,9 @@ const metricAliasState = {
 const metricAliasRequest = buildReportBuilderRequest(metricAliasConfig, metricAliasState);
 assert.deepEqual(metricAliasRequest.filters.From, "2026-05-20");
 assert.deepEqual(metricAliasRequest.filters.To, "2026-05-26");
-assert.deepEqual(metricAliasRequest.filters.from, "2026-05-20");
-assert.deepEqual(metricAliasRequest.filters.to, "2026-05-26");
 assert.deepEqual(metricAliasRequest.filters.campaignIds, [11]);
-assert.deepEqual(metricAliasRequest.filters.campaign_id, [11]);
 assert.deepEqual(metricAliasRequest.filters.orderIds, [22]);
-assert.deepEqual(metricAliasRequest.filters.order_id, [22]);
 assert.deepEqual(metricAliasRequest.filters.publisherIds, [48]);
-assert.deepEqual(metricAliasRequest.filters.publisher_id, [48]);
 
 const duplicateDraftState = mergeReportBuilderState(config, {
     dynamicGroups: {

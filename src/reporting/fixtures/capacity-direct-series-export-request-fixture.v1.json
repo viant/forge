@@ -1,1 +1,3845 @@
-{"version":1,"kind":"reportExportRequest","target":{"format":"pdf"},"source":{"from":"savedPayload","artifactKind":"reportBuilder.savedReportPayload","artifactRef":"reportBuilder.savedReportPayload://rbreport_capacity_q3_kpi_blend_by_date","title":"Capacity KPI Blend Q3","reportId":"capacityKpiBlendByDateQ3","payloadId":"rbreport_capacity_q3_kpi_blend_by_date","sourceArtifactId":"capacity_q3_kpi_blend_by_date","documentVersion":9},"reportSpec":{"version":1,"kind":"reportSpec","source":{"kind":"dashboard.reportBuilder","containerId":"demoReportBuilder","stateKey":"demoReportBuilder","dataSourceRef":"demoReportSource"},"title":"Capacity KPI Blend Q3","binding":{"mode":"semantic","modelRef":"model://example/performance/delivery@v1","entity":"line_delivery","selectedDimensions":["event_date","channel","country_code"],"selectedMeasures":["available_impressions"]},"semanticSummary":{"kind":"semantic","modelRef":"model://example/performance/delivery@v1","modelLabel":"Ad Delivery","entity":"line_delivery","entityLabel":"Line Delivery","selectedDimensions":[{"id":"event_date","rawId":"eventDate","label":"Event Date","format":"date"}],"selectedMeasures":[{"id":"available_impressions","rawId":"avails","label":"Available Impressions","format":"compactNumber"},{"id":"household_uniques","rawId":"hhUniqs","label":"Household Uniques","format":"compactNumber"}]},"parameters":{"viewMode":"chart","groupBy":"","pageSize":50,"orderField":"eventDate","orderDir":"asc"},"layoutIntent":{"kind":"single","resultPanePosition":"right","blockOrder":["sharedFilters","activeRefinements","primaryTable","primaryChart","headlineKpi","comparisonTable"],"items":[{"blockId":"sharedFilters"},{"blockId":"activeRefinements"},{"blockId":"primaryTable"},{"blockId":"primaryChart"},{"blockId":"headlineKpi"},{"blockId":"comparisonTable"}]},"drillMetadata":{"hierarchies":[{"id":"capacity_inventory","label":"Capacity Inventory","levels":[{"id":"channelV2","field":"channelV2","label":"Channel"},{"id":"publisher","field":"publisher","label":"Publisher"},{"id":"siteType","field":"siteType","label":"Site Type"}]},{"id":"capacity_location","label":"Capacity Location","levels":[{"id":"country","field":"country","label":"Market"},{"id":"region","field":"region","label":"Region"},{"id":"metrocode","field":"metrocode","label":"Metro Area"}]}],"detailTargets":[{"targetRef":"target://example/performance/channel-detail","navigationMode":"hostRoute","parameters":{"channel":"$value","campaign":"$row.campaign"}},{"targetRef":"target://example/performance/market-detail","navigationMode":"hostRoute","parameters":{"country":"$value"}},{"targetRef":"target://example/performance/date-detail","navigationMode":"hostRoute","parameters":{"eventDate":"$value","country":"$row.country"}}],"fieldActions":[{"fieldRef":"eventDate","actions":[{"id":"detail_date","label":"Show date details","kind":"detail","targetRef":"target://example/performance/date-detail"}]},{"fieldRef":"channelV2","actions":[{"id":"drill_market","label":"Drill to Market","kind":"drill","nextFieldRef":"country"},{"id":"detail_channel","label":"Show channel details","kind":"detail","targetRef":"target://example/performance/channel-detail"}]},{"fieldRef":"country","actions":[{"id":"detail_market","label":"Show market details","kind":"detail","targetRef":"target://example/performance/market-detail"}]}]},"refinements":[],"calculatedFields":[],"datasets":[{"id":"primary","dataSourceRef":"demoReportSource","request":{"measures":{"avails":true,"hhUniqs":true},"dimensions":{"eventDate":true,"channelV2":true},"filters":{"From":"2026-05-01","To":"2026-05-04","from":"2026-05-01","to":"2026-05-04"},"semanticSelection":{"modelRef":"model://example/performance/delivery@v1","entity":"line_delivery","selection":{"dimensions":["event_date"],"measures":["available_impressions","household_uniques"]},"refinements":[],"parameters":{}},"limit":50,"offset":0,"orderBy":["eventDate asc"]}}],"blocks":[{"id":"sharedFilters","kind":"filterBarBlock","title":"Filters","paramIds":["dateRange","channelsFilter"]},{"id":"activeRefinements","kind":"refinementBarBlock","title":"Active Refinements","actionKinds":["remove","clearAll"],"emptyLabel":"No active refinements"},{"id":"primaryTable","kind":"tableBlock","datasetRef":"primary","columns":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","label":"Event Date","kind":"dimension","format":"date"},{"key":"avails","sourceKey":"avails","displayKey":"avails","label":"Available Impressions","kind":"measure","format":"compactNumber","align":"right"},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","label":"Household Uniques","kind":"measure","format":"compactNumber","align":"right"}]},{"id":"primaryChart","kind":"chartBlock","datasetRef":"primary","chartSpec":{"title":"Avails + HH Uniques by Date","eyebrow":"KPI Blend","accentTone":"household","highlights":["Dual Axis","Reach + Volume","Full Query"],"type":"bar","xField":"eventDate","yFields":["avails","hhUniqs"],"seriesOptions":{"avails":{"type":"bar","axis":"left","stackId":"reach"},"hhUniqs":{"type":"line","axis":"right"}}},"chartModel":{"type":"bar","xAxis":{"dataKey":"eventDate"},"yAxis":{"format":"compactNumber"},"series":{"values":[{"value":"avails","label":"Available Impressions","color":"#1f77b4","format":"compactNumber","type":"bar","axis":"left","stackId":"reach"},{"value":"hhUniqs","label":"Household Uniques","color":"#ff7f0e","format":"compactNumber","type":"line","axis":"right"}],"palette":["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf"]}}},{"id":"headlineKpi","kind":"kpiBlock","title":"Headline KPI","datasetRef":"primary","valueField":"avails","valueLabel":"Available Impressions","secondaryField":"channelV2","secondaryLabel":"Channel","description":"Generic KPI block resolved from the first authored runtime row.","emptyLabel":"No headline KPI value available."},{"id":"comparisonTable","kind":"tableBlock","title":"Delivery Comparison","datasetRef":"primary","columns":[{"key":"eventDate","label":"Date","format":"date","sourceKey":"eventDate","displayKey":"eventDate"},{"key":"channelV2","label":"Channel","cellVisual":{"kind":"badge","rules":[{"value":"Display","tone":"info","label":"Display"},{"value":"CTV","tone":"success","label":"CTV"}]},"sourceKey":"channelV2","displayKey":"channelV2","runtimeFilterable":true},{"key":"avails","label":"Avails","format":"compactNumber","cellVisual":{"kind":"dataBar","valueField":"avails","range":{"mode":"columnMax"},"palette":["#dbeafe","#2563eb"]},"sourceKey":"avails","displayKey":"avails"},{"key":"hhUniqs","label":"HH Uniques","format":"compactNumber","cellVisual":{"kind":"dataBar","valueField":"hhUniqs","range":{"mode":"columnMax"},"palette":["#dcfce7","#16a34a"]},"sourceKey":"hhUniqs","displayKey":"hhUniqs"}]}],"scope":{"params":[{"id":"dateRange","kind":"dateRange","label":"dateRange","required":true,"value":{"start":"2026-05-01","end":"2026-05-04"}},{"id":"channelsFilter","kind":"multiSelect","label":"Channels","required":false,"value":null}],"dataSourceRef":"demoReportSource"}},"reportFill":{"version":1,"kind":"reportFill","specVersion":1,"specHash":"fnv1a:5e469d10","source":{"kind":"dashboard.reportBuilder","containerId":"demoReportBuilder","stateKey":"demoReportBuilder","dataSourceRef":"demoReportSource"},"parameters":{"viewMode":"chart","groupBy":"","pageSize":50,"orderField":"eventDate","orderDir":"asc"},"refinements":[],"calculatedFields":[],"datasets":[{"id":"primary","dataSourceRef":"demoReportSource","request":{"measures":{"avails":true,"hhUniqs":true},"dimensions":{"eventDate":true,"channelV2":true},"filters":{"From":"2026-05-01","To":"2026-05-04","from":"2026-05-01","to":"2026-05-04"},"semanticSelection":{"modelRef":"model://example/performance/delivery@v1","entity":"line_delivery","selection":{"dimensions":["event_date"],"measures":["available_impressions","household_uniques"]},"refinements":[],"parameters":{}},"limit":50,"offset":0,"orderBy":["eventDate asc"]},"provenance":{"requestHash":"fnv1a:86371e25","rowCount":8,"truncated":false,"hasMore":false,"diagnostics":[]},"rows":[{"eventDate":"2026-05-01","channelV2":"Display","avails":40000,"hhUniqs":16000},{"eventDate":"2026-05-01","channelV2":"CTV","avails":34700,"hhUniqs":15200},{"eventDate":"2026-05-02","channelV2":"Display","avails":42000,"hhUniqs":17000},{"eventDate":"2026-05-02","channelV2":"CTV","avails":36400,"hhUniqs":15600},{"eventDate":"2026-05-03","channelV2":"Display","avails":36000,"hhUniqs":14800},{"eventDate":"2026-05-03","channelV2":"CTV","avails":33700,"hhUniqs":14200},{"eventDate":"2026-05-04","channelV2":"Display","avails":38000,"hhUniqs":15500},{"eventDate":"2026-05-04","channelV2":"CTV","avails":35800,"hhUniqs":14900}]}],"blocks":[{"id":"sharedFilters","kind":"filterBarBlock","title":"Filters","paramIds":["dateRange","channelsFilter"],"content":{"title":"Filters","params":[{"id":"dateRange","value":{"start":"2026-05-01","end":"2026-05-04"}},{"id":"channelsFilter","value":null}]}},{"id":"activeRefinements","kind":"refinementBarBlock","title":"Active Refinements","actionKinds":["remove","clearAll"],"emptyLabel":"No active refinements","content":{"refinements":[],"title":"Active Refinements","actionKinds":["remove","clearAll"],"emptyLabel":"No active refinements"}},{"id":"primaryTable","kind":"tableBlock","datasetRef":"primary","columns":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","label":"Event Date","kind":"dimension","format":"date"},{"key":"avails","sourceKey":"avails","displayKey":"avails","label":"Available Impressions","kind":"measure","format":"compactNumber","align":"right"},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","label":"Household Uniques","kind":"measure","format":"compactNumber","align":"right"}],"content":{"columns":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","label":"Event Date","kind":"dimension","format":"date"},{"key":"avails","sourceKey":"avails","displayKey":"avails","label":"Available Impressions","kind":"measure","format":"compactNumber","align":"right"},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","label":"Household Uniques","kind":"measure","format":"compactNumber","align":"right"}],"rowCount":8,"resolvedRows":[{"rowIndex":0,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-01","displayValue":"2026-05-01","visualState":null},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":40000,"displayValue":40000,"visualState":null},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":16000,"displayValue":16000,"visualState":null}]},{"rowIndex":1,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-01","displayValue":"2026-05-01","visualState":null},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":34700,"displayValue":34700,"visualState":null},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":15200,"displayValue":15200,"visualState":null}]},{"rowIndex":2,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-02","displayValue":"2026-05-02","visualState":null},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":42000,"displayValue":42000,"visualState":null},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":17000,"displayValue":17000,"visualState":null}]},{"rowIndex":3,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-02","displayValue":"2026-05-02","visualState":null},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":36400,"displayValue":36400,"visualState":null},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":15600,"displayValue":15600,"visualState":null}]},{"rowIndex":4,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-03","displayValue":"2026-05-03","visualState":null},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":36000,"displayValue":36000,"visualState":null},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":14800,"displayValue":14800,"visualState":null}]},{"rowIndex":5,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-03","displayValue":"2026-05-03","visualState":null},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":33700,"displayValue":33700,"visualState":null},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":14200,"displayValue":14200,"visualState":null}]},{"rowIndex":6,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-04","displayValue":"2026-05-04","visualState":null},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":38000,"displayValue":38000,"visualState":null},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":15500,"displayValue":15500,"visualState":null}]},{"rowIndex":7,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-04","displayValue":"2026-05-04","visualState":null},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":35800,"displayValue":35800,"visualState":null},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":14900,"displayValue":14900,"visualState":null}]}]}},{"id":"primaryChart","kind":"chartBlock","datasetRef":"primary","chartSpec":{"title":"Avails + HH Uniques by Date","eyebrow":"KPI Blend","accentTone":"household","highlights":["Dual Axis","Reach + Volume","Full Query"],"type":"bar","xField":"eventDate","yFields":["avails","hhUniqs"],"seriesOptions":{"avails":{"type":"bar","axis":"left","stackId":"reach"},"hhUniqs":{"type":"line","axis":"right"}}},"chartModel":{"type":"bar","xAxis":{"dataKey":"eventDate"},"yAxis":{"format":"compactNumber"},"series":{"values":[{"value":"avails","label":"Available Impressions","color":"#1f77b4","format":"compactNumber","type":"bar","axis":"left","stackId":"reach"},{"value":"hhUniqs","label":"Household Uniques","color":"#ff7f0e","format":"compactNumber","type":"line","axis":"right"}],"palette":["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf"]}},"content":{"chartSpec":{"title":"Avails + HH Uniques by Date","eyebrow":"KPI Blend","accentTone":"household","highlights":["Dual Axis","Reach + Volume","Full Query"],"type":"bar","xField":"eventDate","yFields":["avails","hhUniqs"],"seriesOptions":{"avails":{"type":"bar","axis":"left","stackId":"reach"},"hhUniqs":{"type":"line","axis":"right"}}},"chartModel":{"type":"bar","xAxis":{"dataKey":"eventDate"},"yAxis":{"format":"compactNumber"},"series":{"values":[{"value":"avails","label":"Available Impressions","color":"#1f77b4","format":"compactNumber","type":"bar","axis":"left","stackId":"reach"},{"value":"hhUniqs","label":"Household Uniques","color":"#ff7f0e","format":"compactNumber","type":"line","axis":"right"}],"palette":["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf"]}},"rowCount":8,"resolvedChart":{"kind":"directSeries","type":"bar","xAxisKey":"eventDate","seriesKeys":["avails","hhUniqs"],"rows":[{"eventDate":"2026-05-01","avails":74700,"hhUniqs":31200},{"eventDate":"2026-05-02","avails":78400,"hhUniqs":32600},{"eventDate":"2026-05-03","avails":69700,"hhUniqs":29000},{"eventDate":"2026-05-04","avails":73800,"hhUniqs":30400}]}}},{"id":"headlineKpi","kind":"kpiBlock","title":"Headline KPI","datasetRef":"primary","valueField":"avails","valueLabel":"Available Impressions","secondaryField":"channelV2","secondaryLabel":"Channel","description":"Generic KPI block resolved from the first authored runtime row.","emptyLabel":"No headline KPI value available.","content":{"title":"Headline KPI","description":"Generic KPI block resolved from the first authored runtime row.","valueField":"avails","valueLabel":"Available Impressions","value":40000,"rowCount":8,"secondaryField":"channelV2","secondaryLabel":"Channel","secondaryValue":"Display","emptyLabel":"No headline KPI value available."}},{"id":"comparisonTable","kind":"tableBlock","title":"Delivery Comparison","datasetRef":"primary","columns":[{"key":"eventDate","label":"Date","format":"date","sourceKey":"eventDate","displayKey":"eventDate"},{"key":"channelV2","label":"Channel","cellVisual":{"kind":"badge","rules":[{"value":"Display","tone":"info","label":"Display"},{"value":"CTV","tone":"success","label":"CTV"}]},"sourceKey":"channelV2","displayKey":"channelV2","runtimeFilterable":true},{"key":"avails","label":"Avails","format":"compactNumber","cellVisual":{"kind":"dataBar","valueField":"avails","range":{"mode":"columnMax"},"palette":["#dbeafe","#2563eb"]},"sourceKey":"avails","displayKey":"avails"},{"key":"hhUniqs","label":"HH Uniques","format":"compactNumber","cellVisual":{"kind":"dataBar","valueField":"hhUniqs","range":{"mode":"columnMax"},"palette":["#dcfce7","#16a34a"]},"sourceKey":"hhUniqs","displayKey":"hhUniqs"}],"content":{"columns":[{"key":"eventDate","label":"Date","format":"date","sourceKey":"eventDate","displayKey":"eventDate"},{"key":"channelV2","label":"Channel","cellVisual":{"kind":"badge","rules":[{"value":"Display","tone":"info","label":"Display"},{"value":"CTV","tone":"success","label":"CTV"}]},"sourceKey":"channelV2","displayKey":"channelV2","runtimeFilterable":true},{"key":"avails","label":"Avails","format":"compactNumber","cellVisual":{"kind":"dataBar","valueField":"avails","range":{"mode":"columnMax"},"palette":["#dbeafe","#2563eb"]},"sourceKey":"avails","displayKey":"avails"},{"key":"hhUniqs","label":"HH Uniques","format":"compactNumber","cellVisual":{"kind":"dataBar","valueField":"hhUniqs","range":{"mode":"columnMax"},"palette":["#dcfce7","#16a34a"]},"sourceKey":"hhUniqs","displayKey":"hhUniqs"}],"rowCount":8,"resolvedRows":[{"rowIndex":0,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-01","displayValue":"2026-05-01","visualState":null},{"key":"channelV2","sourceKey":"channelV2","displayKey":"channelV2","value":"Display","displayValue":"Display","visualState":{"kind":"badge","tone":"info","label":"Display"}},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":40000,"displayValue":40000,"visualState":{"kind":"dataBar","value":40000,"percent":0.7590361445783133,"palette":["#dbeafe","#2563eb"]}},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":16000,"displayValue":16000,"visualState":{"kind":"dataBar","value":16000,"percent":0.6428571428571429,"palette":["#dcfce7","#16a34a"]}}]},{"rowIndex":1,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-01","displayValue":"2026-05-01","visualState":null},{"key":"channelV2","sourceKey":"channelV2","displayKey":"channelV2","value":"CTV","displayValue":"CTV","visualState":{"kind":"badge","tone":"success","label":"CTV"}},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":34700,"displayValue":34700,"visualState":{"kind":"dataBar","value":34700,"percent":0.12048192771084337,"palette":["#dbeafe","#2563eb"]}},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":15200,"displayValue":15200,"visualState":{"kind":"dataBar","value":15200,"percent":0.35714285714285715,"palette":["#dcfce7","#16a34a"]}}]},{"rowIndex":2,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-02","displayValue":"2026-05-02","visualState":null},{"key":"channelV2","sourceKey":"channelV2","displayKey":"channelV2","value":"Display","displayValue":"Display","visualState":{"kind":"badge","tone":"info","label":"Display"}},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":42000,"displayValue":42000,"visualState":{"kind":"dataBar","value":42000,"percent":1,"palette":["#dbeafe","#2563eb"]}},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":17000,"displayValue":17000,"visualState":{"kind":"dataBar","value":17000,"percent":1,"palette":["#dcfce7","#16a34a"]}}]},{"rowIndex":3,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-02","displayValue":"2026-05-02","visualState":null},{"key":"channelV2","sourceKey":"channelV2","displayKey":"channelV2","value":"CTV","displayValue":"CTV","visualState":{"kind":"badge","tone":"success","label":"CTV"}},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":36400,"displayValue":36400,"visualState":{"kind":"dataBar","value":36400,"percent":0.3253012048192771,"palette":["#dbeafe","#2563eb"]}},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":15600,"displayValue":15600,"visualState":{"kind":"dataBar","value":15600,"percent":0.5,"palette":["#dcfce7","#16a34a"]}}]},{"rowIndex":4,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-03","displayValue":"2026-05-03","visualState":null},{"key":"channelV2","sourceKey":"channelV2","displayKey":"channelV2","value":"Display","displayValue":"Display","visualState":{"kind":"badge","tone":"info","label":"Display"}},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":36000,"displayValue":36000,"visualState":{"kind":"dataBar","value":36000,"percent":0.27710843373493976,"palette":["#dbeafe","#2563eb"]}},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":14800,"displayValue":14800,"visualState":{"kind":"dataBar","value":14800,"percent":0.21428571428571427,"palette":["#dcfce7","#16a34a"]}}]},{"rowIndex":5,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-03","displayValue":"2026-05-03","visualState":null},{"key":"channelV2","sourceKey":"channelV2","displayKey":"channelV2","value":"CTV","displayValue":"CTV","visualState":{"kind":"badge","tone":"success","label":"CTV"}},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":33700,"displayValue":33700,"visualState":{"kind":"dataBar","value":33700,"percent":0,"palette":["#dbeafe","#2563eb"]}},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":14200,"displayValue":14200,"visualState":{"kind":"dataBar","value":14200,"percent":0,"palette":["#dcfce7","#16a34a"]}}]},{"rowIndex":6,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-04","displayValue":"2026-05-04","visualState":null},{"key":"channelV2","sourceKey":"channelV2","displayKey":"channelV2","value":"Display","displayValue":"Display","visualState":{"kind":"badge","tone":"info","label":"Display"}},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":38000,"displayValue":38000,"visualState":{"kind":"dataBar","value":38000,"percent":0.5180722891566265,"palette":["#dbeafe","#2563eb"]}},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":15500,"displayValue":15500,"visualState":{"kind":"dataBar","value":15500,"percent":0.4642857142857143,"palette":["#dcfce7","#16a34a"]}}]},{"rowIndex":7,"cells":[{"key":"eventDate","sourceKey":"eventDate","displayKey":"eventDate","value":"2026-05-04","displayValue":"2026-05-04","visualState":null},{"key":"channelV2","sourceKey":"channelV2","displayKey":"channelV2","value":"CTV","displayValue":"CTV","visualState":{"kind":"badge","tone":"success","label":"CTV"}},{"key":"avails","sourceKey":"avails","displayKey":"avails","value":35800,"displayValue":35800,"visualState":{"kind":"dataBar","value":35800,"percent":0.25301204819277107,"palette":["#dbeafe","#2563eb"]}},{"key":"hhUniqs","sourceKey":"hhUniqs","displayKey":"hhUniqs","value":14900,"displayValue":14900,"visualState":{"kind":"dataBar","value":14900,"percent":0.25,"palette":["#dcfce7","#16a34a"]}}]}]}}],"diagnostics":[]},"reportPrint":{"version":1,"kind":"reportPrint","specVersion":1,"specHash":"fnv1a:5e469d10","fillVersion":1,"fillHash":"fnv1a:833b5514","source":{"kind":"dashboard.reportBuilder","containerId":"demoReportBuilder","stateKey":"demoReportBuilder","dataSourceRef":"demoReportSource"},"title":"Capacity KPI Blend Q3","pageGeometry":{"width":792,"height":612,"marginTop":36,"marginRight":36,"marginBottom":36,"marginLeft":36,"headerHeight":36,"footerHeight":24},"pages":[{"number":1,"elements":[{"id":"sharedFilters__title_0","kind":"text","box":{"x":36,"y":84,"width":720,"height":20},"text":"Filters","fontSize":14,"fontWeight":"600","color":"#101828"},{"id":"sharedFilters__line_0","kind":"text","box":{"x":36,"y":108,"width":720,"height":16},"text":"dateRange: 2026-05-01 to 2026-05-04","fontSize":12,"color":"#344054"},{"id":"sharedFilters__line_1","kind":"text","box":{"x":36,"y":124,"width":720,"height":16},"text":"channelsFilter: —","fontSize":12,"color":"#344054"},{"id":"primaryTable__title_0","kind":"text","box":{"x":36,"y":156,"width":720,"height":20},"text":"Table","fontSize":14,"fontWeight":"600","color":"#101828"},{"id":"primaryTable__header_bg__page_1","kind":"rect","box":{"x":36,"y":180,"width":720,"height":24},"fillColor":"#f8fafc","strokeColor":"#d0d5dd","strokeWidth":1},{"id":"primaryTable__header__eventDate__page_1","kind":"text","box":{"x":42,"y":184,"width":228,"height":16},"text":"Event Date","fontSize":11,"fontWeight":"600","color":"#101828","align":"left"},{"id":"primaryTable__header__avails__page_1","kind":"text","box":{"x":282,"y":184,"width":228,"height":16},"text":"Available Impressions","fontSize":11,"fontWeight":"600","color":"#101828","align":"right"},{"id":"primaryTable__header__hhUniqs__page_1","kind":"text","box":{"x":522,"y":184,"width":228,"height":16},"text":"Household Uniques","fontSize":11,"fontWeight":"600","color":"#101828","align":"right"},{"id":"primaryTable__row_rule_0","kind":"line","box":{"x":36,"y":228,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"primaryTable__row_1__eventDate__text","kind":"tableCellText","box":{"x":42,"y":208,"width":228,"height":16},"rowKey":"row_1","columnKey":"eventDate","text":"2026-05-01","format":"date","align":"left"},{"id":"primaryTable__row_1__avails__text","kind":"tableCellText","box":{"x":282,"y":208,"width":228,"height":16},"rowKey":"row_1","columnKey":"avails","text":"40000","format":"compactNumber","align":"right"},{"id":"primaryTable__row_1__hhUniqs__text","kind":"tableCellText","box":{"x":522,"y":208,"width":228,"height":16},"rowKey":"row_1","columnKey":"hhUniqs","text":"16000","format":"compactNumber","align":"right"},{"id":"primaryTable__row_rule_1","kind":"line","box":{"x":36,"y":252,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"primaryTable__row_2__eventDate__text","kind":"tableCellText","box":{"x":42,"y":232,"width":228,"height":16},"rowKey":"row_2","columnKey":"eventDate","text":"2026-05-01","format":"date","align":"left"},{"id":"primaryTable__row_2__avails__text","kind":"tableCellText","box":{"x":282,"y":232,"width":228,"height":16},"rowKey":"row_2","columnKey":"avails","text":"34700","format":"compactNumber","align":"right"},{"id":"primaryTable__row_2__hhUniqs__text","kind":"tableCellText","box":{"x":522,"y":232,"width":228,"height":16},"rowKey":"row_2","columnKey":"hhUniqs","text":"15200","format":"compactNumber","align":"right"},{"id":"primaryTable__row_rule_2","kind":"line","box":{"x":36,"y":276,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"primaryTable__row_3__eventDate__text","kind":"tableCellText","box":{"x":42,"y":256,"width":228,"height":16},"rowKey":"row_3","columnKey":"eventDate","text":"2026-05-02","format":"date","align":"left"},{"id":"primaryTable__row_3__avails__text","kind":"tableCellText","box":{"x":282,"y":256,"width":228,"height":16},"rowKey":"row_3","columnKey":"avails","text":"42000","format":"compactNumber","align":"right"},{"id":"primaryTable__row_3__hhUniqs__text","kind":"tableCellText","box":{"x":522,"y":256,"width":228,"height":16},"rowKey":"row_3","columnKey":"hhUniqs","text":"17000","format":"compactNumber","align":"right"},{"id":"primaryTable__row_rule_3","kind":"line","box":{"x":36,"y":300,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"primaryTable__row_4__eventDate__text","kind":"tableCellText","box":{"x":42,"y":280,"width":228,"height":16},"rowKey":"row_4","columnKey":"eventDate","text":"2026-05-02","format":"date","align":"left"},{"id":"primaryTable__row_4__avails__text","kind":"tableCellText","box":{"x":282,"y":280,"width":228,"height":16},"rowKey":"row_4","columnKey":"avails","text":"36400","format":"compactNumber","align":"right"},{"id":"primaryTable__row_4__hhUniqs__text","kind":"tableCellText","box":{"x":522,"y":280,"width":228,"height":16},"rowKey":"row_4","columnKey":"hhUniqs","text":"15600","format":"compactNumber","align":"right"},{"id":"primaryTable__row_rule_4","kind":"line","box":{"x":36,"y":324,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"primaryTable__row_5__eventDate__text","kind":"tableCellText","box":{"x":42,"y":304,"width":228,"height":16},"rowKey":"row_5","columnKey":"eventDate","text":"2026-05-03","format":"date","align":"left"},{"id":"primaryTable__row_5__avails__text","kind":"tableCellText","box":{"x":282,"y":304,"width":228,"height":16},"rowKey":"row_5","columnKey":"avails","text":"36000","format":"compactNumber","align":"right"},{"id":"primaryTable__row_5__hhUniqs__text","kind":"tableCellText","box":{"x":522,"y":304,"width":228,"height":16},"rowKey":"row_5","columnKey":"hhUniqs","text":"14800","format":"compactNumber","align":"right"},{"id":"primaryTable__row_rule_5","kind":"line","box":{"x":36,"y":348,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"primaryTable__row_6__eventDate__text","kind":"tableCellText","box":{"x":42,"y":328,"width":228,"height":16},"rowKey":"row_6","columnKey":"eventDate","text":"2026-05-03","format":"date","align":"left"},{"id":"primaryTable__row_6__avails__text","kind":"tableCellText","box":{"x":282,"y":328,"width":228,"height":16},"rowKey":"row_6","columnKey":"avails","text":"33700","format":"compactNumber","align":"right"},{"id":"primaryTable__row_6__hhUniqs__text","kind":"tableCellText","box":{"x":522,"y":328,"width":228,"height":16},"rowKey":"row_6","columnKey":"hhUniqs","text":"14200","format":"compactNumber","align":"right"},{"id":"primaryTable__row_rule_6","kind":"line","box":{"x":36,"y":372,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"primaryTable__row_7__eventDate__text","kind":"tableCellText","box":{"x":42,"y":352,"width":228,"height":16},"rowKey":"row_7","columnKey":"eventDate","text":"2026-05-04","format":"date","align":"left"},{"id":"primaryTable__row_7__avails__text","kind":"tableCellText","box":{"x":282,"y":352,"width":228,"height":16},"rowKey":"row_7","columnKey":"avails","text":"38000","format":"compactNumber","align":"right"},{"id":"primaryTable__row_7__hhUniqs__text","kind":"tableCellText","box":{"x":522,"y":352,"width":228,"height":16},"rowKey":"row_7","columnKey":"hhUniqs","text":"15500","format":"compactNumber","align":"right"},{"id":"primaryTable__row_rule_7","kind":"line","box":{"x":36,"y":396,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"primaryTable__row_8__eventDate__text","kind":"tableCellText","box":{"x":42,"y":376,"width":228,"height":16},"rowKey":"row_8","columnKey":"eventDate","text":"2026-05-04","format":"date","align":"left"},{"id":"primaryTable__row_8__avails__text","kind":"tableCellText","box":{"x":282,"y":376,"width":228,"height":16},"rowKey":"row_8","columnKey":"avails","text":"35800","format":"compactNumber","align":"right"},{"id":"primaryTable__row_8__hhUniqs__text","kind":"tableCellText","box":{"x":522,"y":376,"width":228,"height":16},"rowKey":"row_8","columnKey":"hhUniqs","text":"14900","format":"compactNumber","align":"right"}],"headerElements":[{"id":"page_1__header_title","kind":"text","box":{"x":36,"y":36,"width":720,"height":28},"text":"Capacity KPI Blend Q3","fontSize":18,"fontWeight":"700","color":"#101828"},{"id":"page_1__header_rule","kind":"line","box":{"x":36,"y":70,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1}],"footerElements":[{"id":"page_1__footer_rule","kind":"line","box":{"x":36,"y":554,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"page_1__footer_page_number","kind":"text","box":{"x":36,"y":558,"width":720,"height":16},"text":"Page 1","fontSize":11,"color":"#667085","align":"right"}]},{"number":2,"elements":[{"id":"primaryChart__title_0","kind":"text","box":{"x":36,"y":84,"width":720,"height":20},"text":"Avails + HH Uniques by Date","fontSize":14,"fontWeight":"600","color":"#101828"},{"id":"primaryChart__svg_page_2","kind":"svg","box":{"x":36,"y":108,"width":720,"height":264},"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 264\" width=\"720\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"704\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">78.4K</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"704\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">52.3K</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"704\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">26.1K</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n          <rect x=\"28\" y=\"24.494897959183675\" width=\"47\" height=\"171.50510204081633\" rx=\"2\" fill=\"#1f77b4\" />\n        \n\n          <rect x=\"245.33333333333337\" y=\"16\" width=\"47\" height=\"180\" rx=\"2\" fill=\"#1f77b4\" />\n        \n\n          <rect x=\"462.6666666666667\" y=\"35.974489795918366\" width=\"47\" height=\"160.02551020408163\" rx=\"2\" fill=\"#1f77b4\" />\n        \n\n          <rect x=\"680\" y=\"26.56122448979592\" width=\"47\" height=\"169.4387755102041\" rx=\"2\" fill=\"#1f77b4\" />\n        \n\n      <path d=\"M52,124.36734693877551 L269.33333333333337,121.15306122448979 L486.6666666666667,129.41836734693877 L704,126.20408163265306\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"124.36734693877551\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"269.33333333333337\" cy=\"121.15306122448979\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"486.6666666666667\" cy=\"129.41836734693877\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"704\" cy=\"126.20408163265306\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n    \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n\n      <text x=\"269.33333333333337\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-02</text>\n    \n\n      <text x=\"486.6666666666667\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-03</text>\n    \n\n      <text x=\"704\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-04</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n\n      <rect x=\"172\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"232\" font-size=\"11\" fill=\"#344054\">Household Uniques</text>\n    \n    </svg>"},{"id":"headlineKpi__title_0","kind":"text","box":{"x":36,"y":388,"width":720,"height":20},"text":"Headline KPI","fontSize":14,"fontWeight":"600","color":"#101828"},{"id":"headlineKpi__value_0","kind":"text","box":{"x":36,"y":412,"width":720,"height":24},"text":"Available Impressions: 40000","fontSize":20,"fontWeight":"700","color":"#101828"},{"id":"headlineKpi__detail_0","kind":"text","box":{"x":36,"y":436,"width":720,"height":16},"text":"Channel: Display","fontSize":12,"color":"#344054"},{"id":"headlineKpi__detail_1","kind":"text","box":{"x":36,"y":452,"width":720,"height":16},"text":"Generic KPI block resolved from the first authored runtime row.","fontSize":12,"color":"#344054"},{"id":"comparisonTable__title_0","kind":"text","box":{"x":36,"y":484,"width":720,"height":20},"text":"Delivery Comparison","fontSize":14,"fontWeight":"600","color":"#101828"}],"headerElements":[{"id":"page_2__header_title","kind":"text","box":{"x":36,"y":36,"width":720,"height":28},"text":"Capacity KPI Blend Q3","fontSize":18,"fontWeight":"700","color":"#101828"},{"id":"page_2__header_rule","kind":"line","box":{"x":36,"y":70,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1}],"footerElements":[{"id":"page_2__footer_rule","kind":"line","box":{"x":36,"y":554,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"page_2__footer_page_number","kind":"text","box":{"x":36,"y":558,"width":720,"height":16},"text":"Page 2","fontSize":11,"color":"#667085","align":"right"}]},{"number":3,"elements":[{"id":"comparisonTable__header_bg__page_3","kind":"rect","box":{"x":36,"y":84,"width":720,"height":24},"fillColor":"#f8fafc","strokeColor":"#d0d5dd","strokeWidth":1},{"id":"comparisonTable__header__eventDate__page_3","kind":"text","box":{"x":42,"y":88,"width":168,"height":16},"text":"Date","fontSize":11,"fontWeight":"600","color":"#101828","align":"left"},{"id":"comparisonTable__header__channelV2__page_3","kind":"text","box":{"x":222,"y":88,"width":168,"height":16},"text":"Channel","fontSize":11,"fontWeight":"600","color":"#101828","align":"left"},{"id":"comparisonTable__header__avails__page_3","kind":"text","box":{"x":402,"y":88,"width":168,"height":16},"text":"Avails","fontSize":11,"fontWeight":"600","color":"#101828","align":"left"},{"id":"comparisonTable__header__hhUniqs__page_3","kind":"text","box":{"x":582,"y":88,"width":168,"height":16},"text":"HH Uniques","fontSize":11,"fontWeight":"600","color":"#101828","align":"left"},{"id":"comparisonTable__row_rule_0","kind":"line","box":{"x":36,"y":132,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"comparisonTable__row_1__eventDate__text","kind":"tableCellText","box":{"x":42,"y":112,"width":168,"height":16},"rowKey":"row_1","columnKey":"eventDate","text":"2026-05-01","format":"date","align":"left"},{"id":"comparisonTable__row_1__channelV2__badge","kind":"tableCellBadge","box":{"x":222,"y":112,"width":69,"height":16},"rowKey":"row_1","columnKey":"channelV2","label":"Display","tone":"info","backgroundColor":"#ebf1f5","borderColor":"#ced9e0","textColor":"#30404d"},{"id":"comparisonTable__row_1__avails__bar_track","kind":"rect","box":{"x":402,"y":112,"width":168,"height":16},"fillColor":"#dbeafe","radius":8},{"id":"comparisonTable__row_1__avails__bar","kind":"tableCellDataBar","box":{"x":402,"y":112,"width":127.51807228915662,"height":16},"rowKey":"row_1","columnKey":"avails","value":40000,"min":33700,"max":42000,"fillColor":"#2563eb","backgroundColor":"#dbeafe"},{"id":"comparisonTable__row_1__avails__text","kind":"tableCellText","box":{"x":402,"y":112,"width":168,"height":16},"rowKey":"row_1","columnKey":"avails","text":"40000","format":"compactNumber","align":"right"},{"id":"comparisonTable__row_1__hhUniqs__bar_track","kind":"rect","box":{"x":582,"y":112,"width":168,"height":16},"fillColor":"#dcfce7","radius":8},{"id":"comparisonTable__row_1__hhUniqs__bar","kind":"tableCellDataBar","box":{"x":582,"y":112,"width":108.00000000000001,"height":16},"rowKey":"row_1","columnKey":"hhUniqs","value":16000,"min":14200,"max":17000,"fillColor":"#16a34a","backgroundColor":"#dcfce7"},{"id":"comparisonTable__row_1__hhUniqs__text","kind":"tableCellText","box":{"x":582,"y":112,"width":168,"height":16},"rowKey":"row_1","columnKey":"hhUniqs","text":"16000","format":"compactNumber","align":"right"},{"id":"comparisonTable__row_rule_1","kind":"line","box":{"x":36,"y":156,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"comparisonTable__row_2__eventDate__text","kind":"tableCellText","box":{"x":42,"y":136,"width":168,"height":16},"rowKey":"row_2","columnKey":"eventDate","text":"2026-05-01","format":"date","align":"left"},{"id":"comparisonTable__row_2__channelV2__badge","kind":"tableCellBadge","box":{"x":222,"y":136,"width":41,"height":16},"rowKey":"row_2","columnKey":"channelV2","label":"CTV","tone":"success","backgroundColor":"#eef8f0","borderColor":"#0f9960","textColor":"#0a6640"},{"id":"comparisonTable__row_2__avails__bar_track","kind":"rect","box":{"x":402,"y":136,"width":168,"height":16},"fillColor":"#dbeafe","radius":8},{"id":"comparisonTable__row_2__avails__bar","kind":"tableCellDataBar","box":{"x":402,"y":136,"width":20.240963855421686,"height":16},"rowKey":"row_2","columnKey":"avails","value":34700,"min":33700,"max":42000,"fillColor":"#2563eb","backgroundColor":"#dbeafe"},{"id":"comparisonTable__row_2__avails__text","kind":"tableCellText","box":{"x":402,"y":136,"width":168,"height":16},"rowKey":"row_2","columnKey":"avails","text":"34700","format":"compactNumber","align":"right"},{"id":"comparisonTable__row_2__hhUniqs__bar_track","kind":"rect","box":{"x":582,"y":136,"width":168,"height":16},"fillColor":"#dcfce7","radius":8},{"id":"comparisonTable__row_2__hhUniqs__bar","kind":"tableCellDataBar","box":{"x":582,"y":136,"width":60,"height":16},"rowKey":"row_2","columnKey":"hhUniqs","value":15200,"min":14200,"max":17000,"fillColor":"#16a34a","backgroundColor":"#dcfce7"},{"id":"comparisonTable__row_2__hhUniqs__text","kind":"tableCellText","box":{"x":582,"y":136,"width":168,"height":16},"rowKey":"row_2","columnKey":"hhUniqs","text":"15200","format":"compactNumber","align":"right"},{"id":"comparisonTable__row_rule_2","kind":"line","box":{"x":36,"y":180,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"comparisonTable__row_3__eventDate__text","kind":"tableCellText","box":{"x":42,"y":160,"width":168,"height":16},"rowKey":"row_3","columnKey":"eventDate","text":"2026-05-02","format":"date","align":"left"},{"id":"comparisonTable__row_3__channelV2__badge","kind":"tableCellBadge","box":{"x":222,"y":160,"width":69,"height":16},"rowKey":"row_3","columnKey":"channelV2","label":"Display","tone":"info","backgroundColor":"#ebf1f5","borderColor":"#ced9e0","textColor":"#30404d"},{"id":"comparisonTable__row_3__avails__bar_track","kind":"rect","box":{"x":402,"y":160,"width":168,"height":16},"fillColor":"#dbeafe","radius":8},{"id":"comparisonTable__row_3__avails__bar","kind":"tableCellDataBar","box":{"x":402,"y":160,"width":168,"height":16},"rowKey":"row_3","columnKey":"avails","value":42000,"min":33700,"max":42000,"fillColor":"#2563eb","backgroundColor":"#dbeafe"},{"id":"comparisonTable__row_3__avails__text","kind":"tableCellText","box":{"x":402,"y":160,"width":168,"height":16},"rowKey":"row_3","columnKey":"avails","text":"42000","format":"compactNumber","align":"right"},{"id":"comparisonTable__row_3__hhUniqs__bar_track","kind":"rect","box":{"x":582,"y":160,"width":168,"height":16},"fillColor":"#dcfce7","radius":8},{"id":"comparisonTable__row_3__hhUniqs__bar","kind":"tableCellDataBar","box":{"x":582,"y":160,"width":168,"height":16},"rowKey":"row_3","columnKey":"hhUniqs","value":17000,"min":14200,"max":17000,"fillColor":"#16a34a","backgroundColor":"#dcfce7"},{"id":"comparisonTable__row_3__hhUniqs__text","kind":"tableCellText","box":{"x":582,"y":160,"width":168,"height":16},"rowKey":"row_3","columnKey":"hhUniqs","text":"17000","format":"compactNumber","align":"right"},{"id":"comparisonTable__row_rule_3","kind":"line","box":{"x":36,"y":204,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"comparisonTable__row_4__eventDate__text","kind":"tableCellText","box":{"x":42,"y":184,"width":168,"height":16},"rowKey":"row_4","columnKey":"eventDate","text":"2026-05-02","format":"date","align":"left"},{"id":"comparisonTable__row_4__channelV2__badge","kind":"tableCellBadge","box":{"x":222,"y":184,"width":41,"height":16},"rowKey":"row_4","columnKey":"channelV2","label":"CTV","tone":"success","backgroundColor":"#eef8f0","borderColor":"#0f9960","textColor":"#0a6640"},{"id":"comparisonTable__row_4__avails__bar_track","kind":"rect","box":{"x":402,"y":184,"width":168,"height":16},"fillColor":"#dbeafe","radius":8},{"id":"comparisonTable__row_4__avails__bar","kind":"tableCellDataBar","box":{"x":402,"y":184,"width":54.65060240963855,"height":16},"rowKey":"row_4","columnKey":"avails","value":36400,"min":33700,"max":42000,"fillColor":"#2563eb","backgroundColor":"#dbeafe"},{"id":"comparisonTable__row_4__avails__text","kind":"tableCellText","box":{"x":402,"y":184,"width":168,"height":16},"rowKey":"row_4","columnKey":"avails","text":"36400","format":"compactNumber","align":"right"},{"id":"comparisonTable__row_4__hhUniqs__bar_track","kind":"rect","box":{"x":582,"y":184,"width":168,"height":16},"fillColor":"#dcfce7","radius":8},{"id":"comparisonTable__row_4__hhUniqs__bar","kind":"tableCellDataBar","box":{"x":582,"y":184,"width":84,"height":16},"rowKey":"row_4","columnKey":"hhUniqs","value":15600,"min":14200,"max":17000,"fillColor":"#16a34a","backgroundColor":"#dcfce7"},{"id":"comparisonTable__row_4__hhUniqs__text","kind":"tableCellText","box":{"x":582,"y":184,"width":168,"height":16},"rowKey":"row_4","columnKey":"hhUniqs","text":"15600","format":"compactNumber","align":"right"},{"id":"comparisonTable__row_rule_4","kind":"line","box":{"x":36,"y":228,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"comparisonTable__row_5__eventDate__text","kind":"tableCellText","box":{"x":42,"y":208,"width":168,"height":16},"rowKey":"row_5","columnKey":"eventDate","text":"2026-05-03","format":"date","align":"left"},{"id":"comparisonTable__row_5__channelV2__badge","kind":"tableCellBadge","box":{"x":222,"y":208,"width":69,"height":16},"rowKey":"row_5","columnKey":"channelV2","label":"Display","tone":"info","backgroundColor":"#ebf1f5","borderColor":"#ced9e0","textColor":"#30404d"},{"id":"comparisonTable__row_5__avails__bar_track","kind":"rect","box":{"x":402,"y":208,"width":168,"height":16},"fillColor":"#dbeafe","radius":8},{"id":"comparisonTable__row_5__avails__bar","kind":"tableCellDataBar","box":{"x":402,"y":208,"width":46.55421686746988,"height":16},"rowKey":"row_5","columnKey":"avails","value":36000,"min":33700,"max":42000,"fillColor":"#2563eb","backgroundColor":"#dbeafe"},{"id":"comparisonTable__row_5__avails__text","kind":"tableCellText","box":{"x":402,"y":208,"width":168,"height":16},"rowKey":"row_5","columnKey":"avails","text":"36000","format":"compactNumber","align":"right"},{"id":"comparisonTable__row_5__hhUniqs__bar_track","kind":"rect","box":{"x":582,"y":208,"width":168,"height":16},"fillColor":"#dcfce7","radius":8},{"id":"comparisonTable__row_5__hhUniqs__bar","kind":"tableCellDataBar","box":{"x":582,"y":208,"width":36,"height":16},"rowKey":"row_5","columnKey":"hhUniqs","value":14800,"min":14200,"max":17000,"fillColor":"#16a34a","backgroundColor":"#dcfce7"},{"id":"comparisonTable__row_5__hhUniqs__text","kind":"tableCellText","box":{"x":582,"y":208,"width":168,"height":16},"rowKey":"row_5","columnKey":"hhUniqs","text":"14800","format":"compactNumber","align":"right"},{"id":"comparisonTable__row_rule_5","kind":"line","box":{"x":36,"y":252,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"comparisonTable__row_6__eventDate__text","kind":"tableCellText","box":{"x":42,"y":232,"width":168,"height":16},"rowKey":"row_6","columnKey":"eventDate","text":"2026-05-03","format":"date","align":"left"},{"id":"comparisonTable__row_6__channelV2__badge","kind":"tableCellBadge","box":{"x":222,"y":232,"width":41,"height":16},"rowKey":"row_6","columnKey":"channelV2","label":"CTV","tone":"success","backgroundColor":"#eef8f0","borderColor":"#0f9960","textColor":"#0a6640"},{"id":"comparisonTable__row_6__avails__bar_track","kind":"rect","box":{"x":402,"y":232,"width":168,"height":16},"fillColor":"#dbeafe","radius":8},{"id":"comparisonTable__row_6__avails__bar","kind":"tableCellDataBar","box":{"x":402,"y":232,"width":0,"height":16},"rowKey":"row_6","columnKey":"avails","value":33700,"min":33700,"max":42000,"fillColor":"#2563eb","backgroundColor":"#dbeafe"},{"id":"comparisonTable__row_6__avails__text","kind":"tableCellText","box":{"x":402,"y":232,"width":168,"height":16},"rowKey":"row_6","columnKey":"avails","text":"33700","format":"compactNumber","align":"right"},{"id":"comparisonTable__row_6__hhUniqs__bar_track","kind":"rect","box":{"x":582,"y":232,"width":168,"height":16},"fillColor":"#dcfce7","radius":8},{"id":"comparisonTable__row_6__hhUniqs__bar","kind":"tableCellDataBar","box":{"x":582,"y":232,"width":0,"height":16},"rowKey":"row_6","columnKey":"hhUniqs","value":14200,"min":14200,"max":17000,"fillColor":"#16a34a","backgroundColor":"#dcfce7"},{"id":"comparisonTable__row_6__hhUniqs__text","kind":"tableCellText","box":{"x":582,"y":232,"width":168,"height":16},"rowKey":"row_6","columnKey":"hhUniqs","text":"14200","format":"compactNumber","align":"right"},{"id":"comparisonTable__row_rule_6","kind":"line","box":{"x":36,"y":276,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"comparisonTable__row_7__eventDate__text","kind":"tableCellText","box":{"x":42,"y":256,"width":168,"height":16},"rowKey":"row_7","columnKey":"eventDate","text":"2026-05-04","format":"date","align":"left"},{"id":"comparisonTable__row_7__channelV2__badge","kind":"tableCellBadge","box":{"x":222,"y":256,"width":69,"height":16},"rowKey":"row_7","columnKey":"channelV2","label":"Display","tone":"info","backgroundColor":"#ebf1f5","borderColor":"#ced9e0","textColor":"#30404d"},{"id":"comparisonTable__row_7__avails__bar_track","kind":"rect","box":{"x":402,"y":256,"width":168,"height":16},"fillColor":"#dbeafe","radius":8},{"id":"comparisonTable__row_7__avails__bar","kind":"tableCellDataBar","box":{"x":402,"y":256,"width":87.03614457831326,"height":16},"rowKey":"row_7","columnKey":"avails","value":38000,"min":33700,"max":42000,"fillColor":"#2563eb","backgroundColor":"#dbeafe"},{"id":"comparisonTable__row_7__avails__text","kind":"tableCellText","box":{"x":402,"y":256,"width":168,"height":16},"rowKey":"row_7","columnKey":"avails","text":"38000","format":"compactNumber","align":"right"},{"id":"comparisonTable__row_7__hhUniqs__bar_track","kind":"rect","box":{"x":582,"y":256,"width":168,"height":16},"fillColor":"#dcfce7","radius":8},{"id":"comparisonTable__row_7__hhUniqs__bar","kind":"tableCellDataBar","box":{"x":582,"y":256,"width":78,"height":16},"rowKey":"row_7","columnKey":"hhUniqs","value":15500,"min":14200,"max":17000,"fillColor":"#16a34a","backgroundColor":"#dcfce7"},{"id":"comparisonTable__row_7__hhUniqs__text","kind":"tableCellText","box":{"x":582,"y":256,"width":168,"height":16},"rowKey":"row_7","columnKey":"hhUniqs","text":"15500","format":"compactNumber","align":"right"},{"id":"comparisonTable__row_rule_7","kind":"line","box":{"x":36,"y":300,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"comparisonTable__row_8__eventDate__text","kind":"tableCellText","box":{"x":42,"y":280,"width":168,"height":16},"rowKey":"row_8","columnKey":"eventDate","text":"2026-05-04","format":"date","align":"left"},{"id":"comparisonTable__row_8__channelV2__badge","kind":"tableCellBadge","box":{"x":222,"y":280,"width":41,"height":16},"rowKey":"row_8","columnKey":"channelV2","label":"CTV","tone":"success","backgroundColor":"#eef8f0","borderColor":"#0f9960","textColor":"#0a6640"},{"id":"comparisonTable__row_8__avails__bar_track","kind":"rect","box":{"x":402,"y":280,"width":168,"height":16},"fillColor":"#dbeafe","radius":8},{"id":"comparisonTable__row_8__avails__bar","kind":"tableCellDataBar","box":{"x":402,"y":280,"width":42.50602409638554,"height":16},"rowKey":"row_8","columnKey":"avails","value":35800,"min":33700,"max":42000,"fillColor":"#2563eb","backgroundColor":"#dbeafe"},{"id":"comparisonTable__row_8__avails__text","kind":"tableCellText","box":{"x":402,"y":280,"width":168,"height":16},"rowKey":"row_8","columnKey":"avails","text":"35800","format":"compactNumber","align":"right"},{"id":"comparisonTable__row_8__hhUniqs__bar_track","kind":"rect","box":{"x":582,"y":280,"width":168,"height":16},"fillColor":"#dcfce7","radius":8},{"id":"comparisonTable__row_8__hhUniqs__bar","kind":"tableCellDataBar","box":{"x":582,"y":280,"width":42,"height":16},"rowKey":"row_8","columnKey":"hhUniqs","value":14900,"min":14200,"max":17000,"fillColor":"#16a34a","backgroundColor":"#dcfce7"},{"id":"comparisonTable__row_8__hhUniqs__text","kind":"tableCellText","box":{"x":582,"y":280,"width":168,"height":16},"rowKey":"row_8","columnKey":"hhUniqs","text":"14900","format":"compactNumber","align":"right"}],"headerElements":[{"id":"page_3__header_title","kind":"text","box":{"x":36,"y":36,"width":720,"height":28},"text":"Capacity KPI Blend Q3","fontSize":18,"fontWeight":"700","color":"#101828"},{"id":"page_3__header_rule","kind":"line","box":{"x":36,"y":70,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1}],"footerElements":[{"id":"page_3__footer_rule","kind":"line","box":{"x":36,"y":554,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"page_3__footer_page_number","kind":"text","box":{"x":36,"y":558,"width":720,"height":16},"text":"Page 3","fontSize":11,"color":"#667085","align":"right"}]}],"bookmarks":[{"id":"bookmark.sharedFilters","title":"Filters","pageNumber":1,"level":1,"elementId":"sharedFilters__title_0","y":84},{"id":"bookmark.primaryTable","title":"Table","pageNumber":1,"level":1,"elementId":"primaryTable__title_0","y":156},{"id":"bookmark.primaryChart","title":"Avails + HH Uniques by Date","pageNumber":2,"level":1,"elementId":"primaryChart__title_0","y":84},{"id":"bookmark.headlineKpi","title":"Headline KPI","pageNumber":2,"level":1,"elementId":"headlineKpi__title_0","y":388},{"id":"bookmark.comparisonTable","title":"Delivery Comparison","pageNumber":2,"level":1,"elementId":"comparisonTable__title_0","y":484}],"diagnostics":[]}}
+{
+  "version": 1,
+  "kind": "reportExportRequest",
+  "target": {
+    "format": "pdf"
+  },
+  "source": {
+    "from": "savedPayload",
+    "artifactKind": "reportBuilder.savedReportPayload",
+    "artifactRef": "reportBuilder.savedReportPayload://rbreport_capacity_q3_kpi_blend_by_date",
+    "title": "Capacity KPI Blend Q3",
+    "reportId": "capacityKpiBlendByDateQ3",
+    "payloadId": "rbreport_capacity_q3_kpi_blend_by_date",
+    "sourceArtifactId": "capacity_q3_kpi_blend_by_date",
+    "documentVersion": 9
+  },
+  "reportSpec": {
+    "version": 1,
+    "kind": "reportSpec",
+    "source": {
+      "kind": "dashboard.reportBuilder",
+      "containerId": "demoReportBuilder",
+      "stateKey": "demoReportBuilder",
+      "dataSourceRef": "demoReportSource"
+    },
+    "title": "Capacity KPI Blend Q3",
+    "binding": {
+      "mode": "semantic",
+      "modelRef": "model://example/performance/delivery@v1",
+      "entity": "line_delivery",
+      "selectedDimensions": [
+        "event_date",
+        "channel",
+        "country_code"
+      ],
+      "selectedMeasures": [
+        "available_impressions"
+      ]
+    },
+    "semanticSummary": {
+      "kind": "semantic",
+      "modelRef": "model://example/performance/delivery@v1",
+      "modelLabel": "Ad Delivery",
+      "entity": "line_delivery",
+      "entityLabel": "Line Delivery",
+      "selectedDimensions": [
+        {
+          "id": "event_date",
+          "rawId": "eventDate",
+          "label": "Event Date",
+          "format": "date"
+        }
+      ],
+      "selectedMeasures": [
+        {
+          "id": "available_impressions",
+          "rawId": "avails",
+          "label": "Available Impressions",
+          "format": "compactNumber"
+        },
+        {
+          "id": "household_uniques",
+          "rawId": "hhUniqs",
+          "label": "Household Uniques",
+          "format": "compactNumber"
+        }
+      ]
+    },
+    "parameters": {
+      "viewMode": "chart",
+      "groupBy": "",
+      "pageSize": 50,
+      "orderField": "eventDate",
+      "orderDir": "asc"
+    },
+    "layoutIntent": {
+      "kind": "single",
+      "resultPanePosition": "right",
+      "blockOrder": [
+        "sharedFilters",
+        "activeRefinements",
+        "primaryTable",
+        "primaryChart",
+        "headlineKpi",
+        "comparisonTable"
+      ],
+      "items": [
+        {
+          "blockId": "sharedFilters"
+        },
+        {
+          "blockId": "activeRefinements"
+        },
+        {
+          "blockId": "primaryTable"
+        },
+        {
+          "blockId": "primaryChart"
+        },
+        {
+          "blockId": "headlineKpi"
+        },
+        {
+          "blockId": "comparisonTable"
+        }
+      ]
+    },
+    "drillMetadata": {
+      "hierarchies": [
+        {
+          "id": "capacity_inventory",
+          "label": "Capacity Inventory",
+          "levels": [
+            {
+              "id": "channelV2",
+              "field": "channelV2",
+              "label": "Channel"
+            },
+            {
+              "id": "publisher",
+              "field": "publisher",
+              "label": "Publisher"
+            },
+            {
+              "id": "siteType",
+              "field": "siteType",
+              "label": "Site Type"
+            }
+          ]
+        },
+        {
+          "id": "capacity_location",
+          "label": "Capacity Location",
+          "levels": [
+            {
+              "id": "country",
+              "field": "country",
+              "label": "Market"
+            },
+            {
+              "id": "region",
+              "field": "region",
+              "label": "Region"
+            },
+            {
+              "id": "metrocode",
+              "field": "metrocode",
+              "label": "Metro Area"
+            }
+          ]
+        }
+      ],
+      "detailTargets": [
+        {
+          "targetRef": "target://example/performance/channel-detail",
+          "navigationMode": "hostRoute",
+          "parameters": {
+            "channel": "$value",
+            "campaign": "$row.campaign"
+          }
+        },
+        {
+          "targetRef": "target://example/performance/market-detail",
+          "navigationMode": "hostRoute",
+          "parameters": {
+            "country": "$value"
+          }
+        },
+        {
+          "targetRef": "target://example/performance/date-detail",
+          "navigationMode": "hostRoute",
+          "parameters": {
+            "eventDate": "$value",
+            "country": "$row.country"
+          }
+        }
+      ],
+      "fieldActions": [
+        {
+          "fieldRef": "eventDate",
+          "actions": [
+            {
+              "id": "detail_date",
+              "label": "Show date details",
+              "kind": "detail",
+              "targetRef": "target://example/performance/date-detail"
+            }
+          ]
+        },
+        {
+          "fieldRef": "channelV2",
+          "actions": [
+            {
+              "id": "drill_market",
+              "label": "Drill to Market",
+              "kind": "drill",
+              "nextFieldRef": "country"
+            },
+            {
+              "id": "detail_channel",
+              "label": "Show channel details",
+              "kind": "detail",
+              "targetRef": "target://example/performance/channel-detail"
+            }
+          ]
+        },
+        {
+          "fieldRef": "country",
+          "actions": [
+            {
+              "id": "detail_market",
+              "label": "Show market details",
+              "kind": "detail",
+              "targetRef": "target://example/performance/market-detail"
+            }
+          ]
+        }
+      ]
+    },
+    "refinements": [],
+    "calculatedFields": [],
+    "scope": {
+      "params": [
+        {
+          "id": "dateRange",
+          "kind": "dateRange",
+          "label": "dateRange",
+          "required": true,
+          "value": {
+            "start": "2026-05-01",
+            "end": "2026-05-04"
+          }
+        },
+        {
+          "id": "channelsFilter",
+          "kind": "multiSelect",
+          "label": "Channels",
+          "required": false,
+          "multiple": true,
+          "options": [
+            {
+              "label": "Display",
+              "value": "Display"
+            },
+            {
+              "label": "CTV",
+              "value": "CTV"
+            }
+          ],
+          "value": null
+        }
+      ],
+      "dataSourceRef": "demoReportSource"
+    },
+    "datasets": [
+      {
+        "id": "primary",
+        "dataSourceRef": "demoReportSource",
+        "request": {
+          "measures": {
+            "avails": true,
+            "hhUniqs": true
+          },
+          "dimensions": {
+            "eventDate": true,
+            "channelV2": true
+          },
+          "filters": {
+            "From": "2026-05-01",
+            "To": "2026-05-04"
+          },
+          "semanticSelection": {
+            "modelRef": "model://example/performance/delivery@v1",
+            "entity": "line_delivery",
+            "selection": {
+              "dimensions": [
+                "event_date"
+              ],
+              "measures": [
+                "available_impressions",
+                "household_uniques"
+              ]
+            },
+            "refinements": [],
+            "parameters": {}
+          },
+          "limit": 50,
+          "offset": 0,
+          "orderBy": [
+            "eventDate asc"
+          ]
+        }
+      }
+    ],
+    "blocks": [
+      {
+        "id": "sharedFilters",
+        "kind": "filterBarBlock",
+        "title": "Filters",
+        "datasetRef": "primary",
+        "paramIds": [
+          "dateRange",
+          "channelsFilter"
+        ]
+      },
+      {
+        "id": "activeRefinements",
+        "kind": "refinementBarBlock",
+        "title": "Active Refinements",
+        "actionKinds": [
+          "remove",
+          "clearAll"
+        ],
+        "emptyLabel": "No active refinements"
+      },
+      {
+        "id": "primaryTable",
+        "kind": "tableBlock",
+        "datasetRef": "primary",
+        "columns": [
+          {
+            "key": "eventDate",
+            "sourceKey": "eventDate",
+            "displayKey": "eventDate",
+            "label": "Event Date",
+            "kind": "dimension",
+            "format": "date"
+          },
+          {
+            "key": "avails",
+            "sourceKey": "avails",
+            "displayKey": "avails",
+            "label": "Available Impressions",
+            "kind": "measure",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "key": "hhUniqs",
+            "sourceKey": "hhUniqs",
+            "displayKey": "hhUniqs",
+            "label": "Household Uniques",
+            "kind": "measure",
+            "format": "compactNumber",
+            "align": "right"
+          }
+        ]
+      },
+      {
+        "id": "primaryChart",
+        "kind": "chartBlock",
+        "datasetRef": "primary",
+        "chartSpec": {
+          "title": "Avails + HH Uniques by Date",
+          "eyebrow": "KPI Blend",
+          "accentTone": "household",
+          "highlights": [
+            "Dual Axis",
+            "Reach + Volume",
+            "Full Query"
+          ],
+          "type": "bar",
+          "xField": "eventDate",
+          "yFields": [
+            "avails",
+            "hhUniqs"
+          ],
+          "seriesOptions": {
+            "avails": {
+              "type": "bar",
+              "axis": "left",
+              "stackId": "reach"
+            },
+            "hhUniqs": {
+              "type": "line",
+              "axis": "right"
+            }
+          }
+        },
+        "chartModel": {
+          "type": "bar",
+          "xAxis": {
+            "dataKey": "eventDate"
+          },
+          "yAxis": {
+            "format": "compactNumber"
+          },
+          "series": {
+            "values": [
+              {
+                "value": "avails",
+                "label": "Available Impressions",
+                "color": "#1f77b4",
+                "format": "compactNumber",
+                "type": "bar",
+                "axis": "left",
+                "stackId": "reach"
+              },
+              {
+                "value": "hhUniqs",
+                "label": "Household Uniques",
+                "color": "#ff7f0e",
+                "format": "compactNumber",
+                "type": "line",
+                "axis": "right"
+              }
+            ],
+            "palette": [
+              "#1f77b4",
+              "#ff7f0e",
+              "#2ca02c",
+              "#d62728",
+              "#9467bd",
+              "#8c564b",
+              "#e377c2",
+              "#7f7f7f",
+              "#bcbd22",
+              "#17becf"
+            ]
+          }
+        }
+      },
+      {
+        "id": "headlineKpi",
+        "kind": "kpiBlock",
+        "title": "Headline KPI",
+        "datasetRef": "primary",
+        "valueField": "avails",
+        "valueLabel": "Available Impressions",
+        "secondaryField": "channelV2",
+        "secondaryLabel": "Channel",
+        "description": "Generic KPI block resolved from the first authored runtime row.",
+        "emptyLabel": "No headline KPI value available.",
+        "valueFormat": "compactNumber"
+      },
+      {
+        "id": "comparisonTable",
+        "kind": "tableBlock",
+        "title": "Delivery Comparison",
+        "datasetRef": "primary",
+        "columns": [
+          {
+            "key": "eventDate",
+            "label": "Date",
+            "format": "date",
+            "sourceKey": "eventDate",
+            "displayKey": "eventDate"
+          },
+          {
+            "key": "channelV2",
+            "label": "Channel",
+            "cellVisual": {
+              "kind": "badge",
+              "rules": [
+                {
+                  "value": "Display",
+                  "tone": "info",
+                  "label": "Display"
+                },
+                {
+                  "value": "CTV",
+                  "tone": "success",
+                  "label": "CTV"
+                }
+              ]
+            },
+            "sourceKey": "channelV2",
+            "displayKey": "channelV2",
+            "runtimeFilterable": true
+          },
+          {
+            "key": "avails",
+            "label": "Avails",
+            "format": "compactNumber",
+            "cellVisual": {
+              "kind": "dataBar",
+              "valueField": "avails",
+              "range": {
+                "mode": "columnMax"
+              },
+              "palette": [
+                "#dbeafe",
+                "#2563eb"
+              ]
+            },
+            "sourceKey": "avails",
+            "displayKey": "avails"
+          },
+          {
+            "key": "hhUniqs",
+            "label": "HH Uniques",
+            "format": "compactNumber",
+            "cellVisual": {
+              "kind": "dataBar",
+              "valueField": "hhUniqs",
+              "range": {
+                "mode": "columnMax"
+              },
+              "palette": [
+                "#dcfce7",
+                "#16a34a"
+              ]
+            },
+            "sourceKey": "hhUniqs",
+            "displayKey": "hhUniqs"
+          }
+        ]
+      }
+    ]
+  },
+  "reportFill": {
+    "version": 1,
+    "kind": "reportFill",
+    "specVersion": 1,
+    "specHash": "fnv1a:9341070a",
+    "source": {
+      "kind": "dashboard.reportBuilder",
+      "containerId": "demoReportBuilder",
+      "stateKey": "demoReportBuilder",
+      "dataSourceRef": "demoReportSource"
+    },
+    "parameters": {
+      "viewMode": "chart",
+      "groupBy": "",
+      "pageSize": 50,
+      "orderField": "eventDate",
+      "orderDir": "asc"
+    },
+    "refinements": [],
+    "calculatedFields": [],
+    "datasets": [
+      {
+        "id": "primary",
+        "dataSourceRef": "demoReportSource",
+        "request": {
+          "measures": {
+            "avails": true,
+            "hhUniqs": true
+          },
+          "dimensions": {
+            "eventDate": true,
+            "channelV2": true
+          },
+          "filters": {
+            "From": "2026-05-01",
+            "To": "2026-05-04"
+          },
+          "semanticSelection": {
+            "modelRef": "model://example/performance/delivery@v1",
+            "entity": "line_delivery",
+            "selection": {
+              "dimensions": [
+                "event_date"
+              ],
+              "measures": [
+                "available_impressions",
+                "household_uniques"
+              ]
+            },
+            "refinements": [],
+            "parameters": {}
+          },
+          "limit": 50,
+          "offset": 0,
+          "orderBy": [
+            "eventDate asc"
+          ]
+        },
+        "provenance": {
+          "requestHash": "fnv1a:e97f4b2d",
+          "rowCount": 8,
+          "truncated": false,
+          "hasMore": false,
+          "diagnostics": []
+        },
+        "rows": [
+          {
+            "eventDate": "2026-05-01",
+            "channelV2": "Display",
+            "avails": 40000,
+            "hhUniqs": 16000
+          },
+          {
+            "eventDate": "2026-05-01",
+            "channelV2": "CTV",
+            "avails": 34700,
+            "hhUniqs": 15200
+          },
+          {
+            "eventDate": "2026-05-02",
+            "channelV2": "Display",
+            "avails": 42000,
+            "hhUniqs": 17000
+          },
+          {
+            "eventDate": "2026-05-02",
+            "channelV2": "CTV",
+            "avails": 36400,
+            "hhUniqs": 15600
+          },
+          {
+            "eventDate": "2026-05-03",
+            "channelV2": "Display",
+            "avails": 36000,
+            "hhUniqs": 14800
+          },
+          {
+            "eventDate": "2026-05-03",
+            "channelV2": "CTV",
+            "avails": 33700,
+            "hhUniqs": 14200
+          },
+          {
+            "eventDate": "2026-05-04",
+            "channelV2": "Display",
+            "avails": 38000,
+            "hhUniqs": 15500
+          },
+          {
+            "eventDate": "2026-05-04",
+            "channelV2": "CTV",
+            "avails": 35800,
+            "hhUniqs": 14900
+          }
+        ]
+      }
+    ],
+    "blocks": [
+      {
+        "id": "sharedFilters",
+        "kind": "filterBarBlock",
+        "title": "Filters",
+        "datasetRef": "primary",
+        "paramIds": [
+          "dateRange",
+          "channelsFilter"
+        ],
+        "content": {
+          "title": "Filters",
+          "mode": "baseline",
+          "placement": "inherit",
+          "groupOrder": [],
+          "visibleGroups": [],
+          "collapsedGroups": [],
+          "params": [
+            {
+              "id": "dateRange",
+              "groupId": "dateRange",
+              "label": "dateRange",
+              "type": "dateRange",
+              "required": true,
+              "value": {
+                "start": "2026-05-01",
+                "end": "2026-05-04"
+              }
+            },
+            {
+              "id": "channelsFilter",
+              "groupId": "channelsFilter",
+              "label": "Channels",
+              "type": "multiSelect",
+              "multiple": true,
+              "options": [
+                {
+                  "label": "Display",
+                  "value": "Display"
+                },
+                {
+                  "label": "CTV",
+                  "value": "CTV"
+                }
+              ],
+              "value": null
+            }
+          ]
+        }
+      },
+      {
+        "id": "activeRefinements",
+        "kind": "refinementBarBlock",
+        "title": "Active Refinements",
+        "actionKinds": [
+          "remove",
+          "clearAll"
+        ],
+        "emptyLabel": "No active refinements",
+        "content": {
+          "refinements": [],
+          "title": "Active Refinements",
+          "actionKinds": [
+            "remove",
+            "clearAll"
+          ],
+          "emptyLabel": "No active refinements"
+        }
+      },
+      {
+        "id": "primaryTable",
+        "kind": "tableBlock",
+        "datasetRef": "primary",
+        "columns": [
+          {
+            "key": "eventDate",
+            "sourceKey": "eventDate",
+            "displayKey": "eventDate",
+            "label": "Event Date",
+            "kind": "dimension",
+            "format": "date"
+          },
+          {
+            "key": "avails",
+            "sourceKey": "avails",
+            "displayKey": "avails",
+            "label": "Available Impressions",
+            "kind": "measure",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "key": "hhUniqs",
+            "sourceKey": "hhUniqs",
+            "displayKey": "hhUniqs",
+            "label": "Household Uniques",
+            "kind": "measure",
+            "format": "compactNumber",
+            "align": "right"
+          }
+        ],
+        "content": {
+          "columns": [
+            {
+              "key": "eventDate",
+              "sourceKey": "eventDate",
+              "displayKey": "eventDate",
+              "label": "Event Date",
+              "kind": "dimension",
+              "format": "date"
+            },
+            {
+              "key": "avails",
+              "sourceKey": "avails",
+              "displayKey": "avails",
+              "label": "Available Impressions",
+              "kind": "measure",
+              "format": "compactNumber",
+              "align": "right"
+            },
+            {
+              "key": "hhUniqs",
+              "sourceKey": "hhUniqs",
+              "displayKey": "hhUniqs",
+              "label": "Household Uniques",
+              "kind": "measure",
+              "format": "compactNumber",
+              "align": "right"
+            }
+          ],
+          "rowCount": 8,
+          "resolvedRows": [
+            {
+              "rowIndex": 0,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-01",
+                  "displayValue": "2026-05-01",
+                  "visualState": null
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 40000,
+                  "displayValue": 40000,
+                  "visualState": null
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 16000,
+                  "displayValue": 16000,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 1,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-01",
+                  "displayValue": "2026-05-01",
+                  "visualState": null
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 34700,
+                  "displayValue": 34700,
+                  "visualState": null
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 15200,
+                  "displayValue": 15200,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 2,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-02",
+                  "displayValue": "2026-05-02",
+                  "visualState": null
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 42000,
+                  "displayValue": 42000,
+                  "visualState": null
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 17000,
+                  "displayValue": 17000,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 3,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-02",
+                  "displayValue": "2026-05-02",
+                  "visualState": null
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 36400,
+                  "displayValue": 36400,
+                  "visualState": null
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 15600,
+                  "displayValue": 15600,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 4,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-03",
+                  "displayValue": "2026-05-03",
+                  "visualState": null
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 36000,
+                  "displayValue": 36000,
+                  "visualState": null
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 14800,
+                  "displayValue": 14800,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 5,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-03",
+                  "displayValue": "2026-05-03",
+                  "visualState": null
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 33700,
+                  "displayValue": 33700,
+                  "visualState": null
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 14200,
+                  "displayValue": 14200,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 6,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-04",
+                  "displayValue": "2026-05-04",
+                  "visualState": null
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 38000,
+                  "displayValue": 38000,
+                  "visualState": null
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 15500,
+                  "displayValue": 15500,
+                  "visualState": null
+                }
+              ]
+            },
+            {
+              "rowIndex": 7,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-04",
+                  "displayValue": "2026-05-04",
+                  "visualState": null
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 35800,
+                  "displayValue": 35800,
+                  "visualState": null
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 14900,
+                  "displayValue": 14900,
+                  "visualState": null
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "id": "primaryChart",
+        "kind": "chartBlock",
+        "datasetRef": "primary",
+        "chartSpec": {
+          "title": "Avails + HH Uniques by Date",
+          "eyebrow": "KPI Blend",
+          "accentTone": "household",
+          "highlights": [
+            "Dual Axis",
+            "Reach + Volume",
+            "Full Query"
+          ],
+          "type": "bar",
+          "xField": "eventDate",
+          "yFields": [
+            "avails",
+            "hhUniqs"
+          ],
+          "seriesOptions": {
+            "avails": {
+              "type": "bar",
+              "axis": "left",
+              "stackId": "reach"
+            },
+            "hhUniqs": {
+              "type": "line",
+              "axis": "right"
+            }
+          }
+        },
+        "chartModel": {
+          "type": "bar",
+          "xAxis": {
+            "dataKey": "eventDate"
+          },
+          "yAxis": {
+            "format": "compactNumber"
+          },
+          "series": {
+            "values": [
+              {
+                "value": "avails",
+                "label": "Available Impressions",
+                "color": "#1f77b4",
+                "format": "compactNumber",
+                "type": "bar",
+                "axis": "left",
+                "stackId": "reach"
+              },
+              {
+                "value": "hhUniqs",
+                "label": "Household Uniques",
+                "color": "#ff7f0e",
+                "format": "compactNumber",
+                "type": "line",
+                "axis": "right"
+              }
+            ],
+            "palette": [
+              "#1f77b4",
+              "#ff7f0e",
+              "#2ca02c",
+              "#d62728",
+              "#9467bd",
+              "#8c564b",
+              "#e377c2",
+              "#7f7f7f",
+              "#bcbd22",
+              "#17becf"
+            ]
+          }
+        },
+        "content": {
+          "chartSpec": {
+            "title": "Avails + HH Uniques by Date",
+            "eyebrow": "KPI Blend",
+            "accentTone": "household",
+            "highlights": [
+              "Dual Axis",
+              "Reach + Volume",
+              "Full Query"
+            ],
+            "type": "bar",
+            "xField": "eventDate",
+            "yFields": [
+              "avails",
+              "hhUniqs"
+            ],
+            "seriesOptions": {
+              "avails": {
+                "type": "bar",
+                "axis": "left",
+                "stackId": "reach"
+              },
+              "hhUniqs": {
+                "type": "line",
+                "axis": "right"
+              }
+            }
+          },
+          "chartModel": {
+            "type": "bar",
+            "xAxis": {
+              "dataKey": "eventDate"
+            },
+            "yAxis": {
+              "format": "compactNumber"
+            },
+            "series": {
+              "values": [
+                {
+                  "value": "avails",
+                  "label": "Available Impressions",
+                  "color": "#1f77b4",
+                  "format": "compactNumber",
+                  "type": "bar",
+                  "axis": "left",
+                  "stackId": "reach"
+                },
+                {
+                  "value": "hhUniqs",
+                  "label": "Household Uniques",
+                  "color": "#ff7f0e",
+                  "format": "compactNumber",
+                  "type": "line",
+                  "axis": "right"
+                }
+              ],
+              "palette": [
+                "#1f77b4",
+                "#ff7f0e",
+                "#2ca02c",
+                "#d62728",
+                "#9467bd",
+                "#8c564b",
+                "#e377c2",
+                "#7f7f7f",
+                "#bcbd22",
+                "#17becf"
+              ]
+            }
+          },
+          "rowCount": 8,
+          "resolvedChart": {
+            "kind": "directSeries",
+            "type": "bar",
+            "xAxisKey": "eventDate",
+            "seriesKeys": [
+              "avails",
+              "hhUniqs"
+            ],
+            "rows": [
+              {
+                "eventDate": "2026-05-01",
+                "avails": 74700,
+                "hhUniqs": 31200
+              },
+              {
+                "eventDate": "2026-05-02",
+                "avails": 78400,
+                "hhUniqs": 32600
+              },
+              {
+                "eventDate": "2026-05-03",
+                "avails": 69700,
+                "hhUniqs": 29000
+              },
+              {
+                "eventDate": "2026-05-04",
+                "avails": 73800,
+                "hhUniqs": 30400
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "headlineKpi",
+        "kind": "kpiBlock",
+        "title": "Headline KPI",
+        "datasetRef": "primary",
+        "valueField": "avails",
+        "valueLabel": "Available Impressions",
+        "secondaryField": "channelV2",
+        "secondaryLabel": "Channel",
+        "description": "Generic KPI block resolved from the first authored runtime row.",
+        "emptyLabel": "No headline KPI value available.",
+        "valueFormat": "compactNumber",
+        "content": {
+          "title": "Headline KPI",
+          "description": "Generic KPI block resolved from the first authored runtime row.",
+          "valueField": "avails",
+          "valueLabel": "Available Impressions",
+          "valueFormat": "compactNumber",
+          "value": 40000,
+          "rowCount": 8,
+          "secondaryField": "channelV2",
+          "secondaryLabel": "Channel",
+          "secondaryValue": "Display",
+          "emptyLabel": "No headline KPI value available."
+        }
+      },
+      {
+        "id": "comparisonTable",
+        "kind": "tableBlock",
+        "title": "Delivery Comparison",
+        "datasetRef": "primary",
+        "columns": [
+          {
+            "key": "eventDate",
+            "label": "Date",
+            "format": "date",
+            "sourceKey": "eventDate",
+            "displayKey": "eventDate"
+          },
+          {
+            "key": "channelV2",
+            "label": "Channel",
+            "cellVisual": {
+              "kind": "badge",
+              "rules": [
+                {
+                  "value": "Display",
+                  "tone": "info",
+                  "label": "Display"
+                },
+                {
+                  "value": "CTV",
+                  "tone": "success",
+                  "label": "CTV"
+                }
+              ]
+            },
+            "sourceKey": "channelV2",
+            "displayKey": "channelV2",
+            "runtimeFilterable": true
+          },
+          {
+            "key": "avails",
+            "label": "Avails",
+            "format": "compactNumber",
+            "cellVisual": {
+              "kind": "dataBar",
+              "valueField": "avails",
+              "range": {
+                "mode": "columnMax"
+              },
+              "palette": [
+                "#dbeafe",
+                "#2563eb"
+              ]
+            },
+            "sourceKey": "avails",
+            "displayKey": "avails"
+          },
+          {
+            "key": "hhUniqs",
+            "label": "HH Uniques",
+            "format": "compactNumber",
+            "cellVisual": {
+              "kind": "dataBar",
+              "valueField": "hhUniqs",
+              "range": {
+                "mode": "columnMax"
+              },
+              "palette": [
+                "#dcfce7",
+                "#16a34a"
+              ]
+            },
+            "sourceKey": "hhUniqs",
+            "displayKey": "hhUniqs"
+          }
+        ],
+        "content": {
+          "columns": [
+            {
+              "key": "eventDate",
+              "label": "Date",
+              "format": "date",
+              "sourceKey": "eventDate",
+              "displayKey": "eventDate"
+            },
+            {
+              "key": "channelV2",
+              "label": "Channel",
+              "cellVisual": {
+                "kind": "badge",
+                "rules": [
+                  {
+                    "value": "Display",
+                    "tone": "info",
+                    "label": "Display"
+                  },
+                  {
+                    "value": "CTV",
+                    "tone": "success",
+                    "label": "CTV"
+                  }
+                ]
+              },
+              "sourceKey": "channelV2",
+              "displayKey": "channelV2",
+              "runtimeFilterable": true
+            },
+            {
+              "key": "avails",
+              "label": "Avails",
+              "format": "compactNumber",
+              "cellVisual": {
+                "kind": "dataBar",
+                "valueField": "avails",
+                "range": {
+                  "mode": "columnMax"
+                },
+                "palette": [
+                  "#dbeafe",
+                  "#2563eb"
+                ]
+              },
+              "sourceKey": "avails",
+              "displayKey": "avails"
+            },
+            {
+              "key": "hhUniqs",
+              "label": "HH Uniques",
+              "format": "compactNumber",
+              "cellVisual": {
+                "kind": "dataBar",
+                "valueField": "hhUniqs",
+                "range": {
+                  "mode": "columnMax"
+                },
+                "palette": [
+                  "#dcfce7",
+                  "#16a34a"
+                ]
+              },
+              "sourceKey": "hhUniqs",
+              "displayKey": "hhUniqs"
+            }
+          ],
+          "rowCount": 8,
+          "resolvedRows": [
+            {
+              "rowIndex": 0,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-01",
+                  "displayValue": "2026-05-01",
+                  "visualState": null
+                },
+                {
+                  "key": "channelV2",
+                  "sourceKey": "channelV2",
+                  "displayKey": "channelV2",
+                  "value": "Display",
+                  "displayValue": "Display",
+                  "visualState": {
+                    "kind": "badge",
+                    "tone": "info",
+                    "label": "Display"
+                  }
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 40000,
+                  "displayValue": 40000,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 40000,
+                    "percent": 0.7590361445783133,
+                    "palette": [
+                      "#dbeafe",
+                      "#2563eb"
+                    ]
+                  }
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 16000,
+                  "displayValue": 16000,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 16000,
+                    "percent": 0.6428571428571429,
+                    "palette": [
+                      "#dcfce7",
+                      "#16a34a"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "rowIndex": 1,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-01",
+                  "displayValue": "2026-05-01",
+                  "visualState": null
+                },
+                {
+                  "key": "channelV2",
+                  "sourceKey": "channelV2",
+                  "displayKey": "channelV2",
+                  "value": "CTV",
+                  "displayValue": "CTV",
+                  "visualState": {
+                    "kind": "badge",
+                    "tone": "success",
+                    "label": "CTV"
+                  }
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 34700,
+                  "displayValue": 34700,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 34700,
+                    "percent": 0.12048192771084337,
+                    "palette": [
+                      "#dbeafe",
+                      "#2563eb"
+                    ]
+                  }
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 15200,
+                  "displayValue": 15200,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 15200,
+                    "percent": 0.35714285714285715,
+                    "palette": [
+                      "#dcfce7",
+                      "#16a34a"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "rowIndex": 2,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-02",
+                  "displayValue": "2026-05-02",
+                  "visualState": null
+                },
+                {
+                  "key": "channelV2",
+                  "sourceKey": "channelV2",
+                  "displayKey": "channelV2",
+                  "value": "Display",
+                  "displayValue": "Display",
+                  "visualState": {
+                    "kind": "badge",
+                    "tone": "info",
+                    "label": "Display"
+                  }
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 42000,
+                  "displayValue": 42000,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 42000,
+                    "percent": 1,
+                    "palette": [
+                      "#dbeafe",
+                      "#2563eb"
+                    ]
+                  }
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 17000,
+                  "displayValue": 17000,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 17000,
+                    "percent": 1,
+                    "palette": [
+                      "#dcfce7",
+                      "#16a34a"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "rowIndex": 3,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-02",
+                  "displayValue": "2026-05-02",
+                  "visualState": null
+                },
+                {
+                  "key": "channelV2",
+                  "sourceKey": "channelV2",
+                  "displayKey": "channelV2",
+                  "value": "CTV",
+                  "displayValue": "CTV",
+                  "visualState": {
+                    "kind": "badge",
+                    "tone": "success",
+                    "label": "CTV"
+                  }
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 36400,
+                  "displayValue": 36400,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 36400,
+                    "percent": 0.3253012048192771,
+                    "palette": [
+                      "#dbeafe",
+                      "#2563eb"
+                    ]
+                  }
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 15600,
+                  "displayValue": 15600,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 15600,
+                    "percent": 0.5,
+                    "palette": [
+                      "#dcfce7",
+                      "#16a34a"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "rowIndex": 4,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-03",
+                  "displayValue": "2026-05-03",
+                  "visualState": null
+                },
+                {
+                  "key": "channelV2",
+                  "sourceKey": "channelV2",
+                  "displayKey": "channelV2",
+                  "value": "Display",
+                  "displayValue": "Display",
+                  "visualState": {
+                    "kind": "badge",
+                    "tone": "info",
+                    "label": "Display"
+                  }
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 36000,
+                  "displayValue": 36000,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 36000,
+                    "percent": 0.27710843373493976,
+                    "palette": [
+                      "#dbeafe",
+                      "#2563eb"
+                    ]
+                  }
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 14800,
+                  "displayValue": 14800,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 14800,
+                    "percent": 0.21428571428571427,
+                    "palette": [
+                      "#dcfce7",
+                      "#16a34a"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "rowIndex": 5,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-03",
+                  "displayValue": "2026-05-03",
+                  "visualState": null
+                },
+                {
+                  "key": "channelV2",
+                  "sourceKey": "channelV2",
+                  "displayKey": "channelV2",
+                  "value": "CTV",
+                  "displayValue": "CTV",
+                  "visualState": {
+                    "kind": "badge",
+                    "tone": "success",
+                    "label": "CTV"
+                  }
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 33700,
+                  "displayValue": 33700,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 33700,
+                    "percent": 0,
+                    "palette": [
+                      "#dbeafe",
+                      "#2563eb"
+                    ]
+                  }
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 14200,
+                  "displayValue": 14200,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 14200,
+                    "percent": 0,
+                    "palette": [
+                      "#dcfce7",
+                      "#16a34a"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "rowIndex": 6,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-04",
+                  "displayValue": "2026-05-04",
+                  "visualState": null
+                },
+                {
+                  "key": "channelV2",
+                  "sourceKey": "channelV2",
+                  "displayKey": "channelV2",
+                  "value": "Display",
+                  "displayValue": "Display",
+                  "visualState": {
+                    "kind": "badge",
+                    "tone": "info",
+                    "label": "Display"
+                  }
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 38000,
+                  "displayValue": 38000,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 38000,
+                    "percent": 0.5180722891566265,
+                    "palette": [
+                      "#dbeafe",
+                      "#2563eb"
+                    ]
+                  }
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 15500,
+                  "displayValue": 15500,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 15500,
+                    "percent": 0.4642857142857143,
+                    "palette": [
+                      "#dcfce7",
+                      "#16a34a"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "rowIndex": 7,
+              "cells": [
+                {
+                  "key": "eventDate",
+                  "sourceKey": "eventDate",
+                  "displayKey": "eventDate",
+                  "value": "2026-05-04",
+                  "displayValue": "2026-05-04",
+                  "visualState": null
+                },
+                {
+                  "key": "channelV2",
+                  "sourceKey": "channelV2",
+                  "displayKey": "channelV2",
+                  "value": "CTV",
+                  "displayValue": "CTV",
+                  "visualState": {
+                    "kind": "badge",
+                    "tone": "success",
+                    "label": "CTV"
+                  }
+                },
+                {
+                  "key": "avails",
+                  "sourceKey": "avails",
+                  "displayKey": "avails",
+                  "value": 35800,
+                  "displayValue": 35800,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 35800,
+                    "percent": 0.25301204819277107,
+                    "palette": [
+                      "#dbeafe",
+                      "#2563eb"
+                    ]
+                  }
+                },
+                {
+                  "key": "hhUniqs",
+                  "sourceKey": "hhUniqs",
+                  "displayKey": "hhUniqs",
+                  "value": 14900,
+                  "displayValue": 14900,
+                  "visualState": {
+                    "kind": "dataBar",
+                    "value": 14900,
+                    "percent": 0.25,
+                    "palette": [
+                      "#dcfce7",
+                      "#16a34a"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "diagnostics": []
+  },
+  "reportPrint": {
+    "version": 1,
+    "kind": "reportPrint",
+    "specVersion": 1,
+    "specHash": "fnv1a:9341070a",
+    "fillVersion": 1,
+    "fillHash": "fnv1a:3172cab9",
+    "source": {
+      "kind": "dashboard.reportBuilder",
+      "containerId": "demoReportBuilder",
+      "stateKey": "demoReportBuilder",
+      "dataSourceRef": "demoReportSource"
+    },
+    "title": "Capacity KPI Blend Q3",
+    "pageGeometry": {
+      "width": 792,
+      "height": 612,
+      "marginTop": 36,
+      "marginRight": 36,
+      "marginBottom": 36,
+      "marginLeft": 36,
+      "headerHeight": 36,
+      "footerHeight": 24
+    },
+    "pages": [
+      {
+        "number": 1,
+        "elements": [
+          {
+            "id": "sharedFilters__title_0",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 84,
+              "width": 720,
+              "height": 20
+            },
+            "text": "Filters",
+            "fontSize": 14,
+            "fontWeight": "600",
+            "color": "#101828"
+          },
+          {
+            "id": "sharedFilters__line_0",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 108,
+              "width": 720,
+              "height": 16
+            },
+            "text": "dateRange: 2026-05-01 to 2026-05-04",
+            "fontSize": 12,
+            "color": "#344054"
+          },
+          {
+            "id": "sharedFilters__line_1",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 124,
+              "width": 720,
+              "height": 16
+            },
+            "text": "Channels: —",
+            "fontSize": 12,
+            "color": "#344054"
+          },
+          {
+            "id": "primaryTable__title_0",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 156,
+              "width": 720,
+              "height": 20
+            },
+            "text": "Table",
+            "fontSize": 14,
+            "fontWeight": "600",
+            "color": "#101828"
+          },
+          {
+            "id": "primaryTable__header_bg__page_1",
+            "kind": "rect",
+            "box": {
+              "x": 36,
+              "y": 180,
+              "width": 720,
+              "height": 24
+            },
+            "fillColor": "#f8fafc",
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "primaryTable__header__eventDate__page_1",
+            "kind": "text",
+            "box": {
+              "x": 42,
+              "y": 184,
+              "width": 228,
+              "height": 16
+            },
+            "text": "Event Date",
+            "fontSize": 11,
+            "fontWeight": "600",
+            "color": "#101828",
+            "align": "left"
+          },
+          {
+            "id": "primaryTable__header__avails__page_1",
+            "kind": "text",
+            "box": {
+              "x": 282,
+              "y": 184,
+              "width": 228,
+              "height": 16
+            },
+            "text": "Available Impressions",
+            "fontSize": 11,
+            "fontWeight": "600",
+            "color": "#101828",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__header__hhUniqs__page_1",
+            "kind": "text",
+            "box": {
+              "x": 522,
+              "y": 184,
+              "width": 228,
+              "height": 16
+            },
+            "text": "Household Uniques",
+            "fontSize": 11,
+            "fontWeight": "600",
+            "color": "#101828",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_rule_0",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 228,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "primaryTable__row_1__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 208,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_1",
+            "columnKey": "eventDate",
+            "text": "2026-05-01",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "primaryTable__row_1__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 282,
+              "y": 208,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_1",
+            "columnKey": "avails",
+            "text": "40 000",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_1__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 522,
+              "y": 208,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_1",
+            "columnKey": "hhUniqs",
+            "text": "16 000",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_rule_1",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 252,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "primaryTable__row_2__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 232,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_2",
+            "columnKey": "eventDate",
+            "text": "2026-05-01",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "primaryTable__row_2__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 282,
+              "y": 232,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_2",
+            "columnKey": "avails",
+            "text": "34 700",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_2__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 522,
+              "y": 232,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_2",
+            "columnKey": "hhUniqs",
+            "text": "15 200",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_rule_2",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 276,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "primaryTable__row_3__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 256,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_3",
+            "columnKey": "eventDate",
+            "text": "2026-05-02",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "primaryTable__row_3__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 282,
+              "y": 256,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_3",
+            "columnKey": "avails",
+            "text": "42 000",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_3__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 522,
+              "y": 256,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_3",
+            "columnKey": "hhUniqs",
+            "text": "17 000",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_rule_3",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 300,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "primaryTable__row_4__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 280,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_4",
+            "columnKey": "eventDate",
+            "text": "2026-05-02",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "primaryTable__row_4__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 282,
+              "y": 280,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_4",
+            "columnKey": "avails",
+            "text": "36 400",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_4__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 522,
+              "y": 280,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_4",
+            "columnKey": "hhUniqs",
+            "text": "15 600",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_rule_4",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 324,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "primaryTable__row_5__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 304,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_5",
+            "columnKey": "eventDate",
+            "text": "2026-05-03",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "primaryTable__row_5__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 282,
+              "y": 304,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_5",
+            "columnKey": "avails",
+            "text": "36 000",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_5__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 522,
+              "y": 304,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_5",
+            "columnKey": "hhUniqs",
+            "text": "14 800",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_rule_5",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 348,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "primaryTable__row_6__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 328,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_6",
+            "columnKey": "eventDate",
+            "text": "2026-05-03",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "primaryTable__row_6__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 282,
+              "y": 328,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_6",
+            "columnKey": "avails",
+            "text": "33 700",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_6__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 522,
+              "y": 328,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_6",
+            "columnKey": "hhUniqs",
+            "text": "14 200",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_rule_6",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 372,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "primaryTable__row_7__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 352,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_7",
+            "columnKey": "eventDate",
+            "text": "2026-05-04",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "primaryTable__row_7__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 282,
+              "y": 352,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_7",
+            "columnKey": "avails",
+            "text": "38 000",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_7__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 522,
+              "y": 352,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_7",
+            "columnKey": "hhUniqs",
+            "text": "15 500",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_rule_7",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 396,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "primaryTable__row_8__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 376,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_8",
+            "columnKey": "eventDate",
+            "text": "2026-05-04",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "primaryTable__row_8__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 282,
+              "y": 376,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_8",
+            "columnKey": "avails",
+            "text": "35 800",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "primaryTable__row_8__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 522,
+              "y": 376,
+              "width": 228,
+              "height": 16
+            },
+            "rowKey": "row_8",
+            "columnKey": "hhUniqs",
+            "text": "14 900",
+            "format": "compactNumber",
+            "align": "right"
+          }
+        ],
+        "headerElements": [
+          {
+            "id": "page_1__header_title",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 36,
+              "width": 720,
+              "height": 28
+            },
+            "text": "Capacity KPI Blend Q3",
+            "fontSize": 18,
+            "fontWeight": "700",
+            "color": "#101828"
+          },
+          {
+            "id": "page_1__header_rule",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 70,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          }
+        ],
+        "footerElements": [
+          {
+            "id": "page_1__footer_rule",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 554,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "page_1__footer_page_number",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 558,
+              "width": 720,
+              "height": 16
+            },
+            "text": "Page 1",
+            "fontSize": 11,
+            "color": "#667085",
+            "align": "right"
+          }
+        ]
+      },
+      {
+        "number": 2,
+        "elements": [
+          {
+            "id": "primaryChart__title_0",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 84,
+              "width": 720,
+              "height": 20
+            },
+            "text": "Avails + HH Uniques by Date",
+            "fontSize": 14,
+            "fontWeight": "600",
+            "color": "#101828"
+          },
+          {
+            "id": "primaryChart__svg_page_2",
+            "kind": "svg",
+            "box": {
+              "x": 36,
+              "y": 108,
+              "width": 720,
+              "height": 264
+            },
+            "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 264\" width=\"720\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"704\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">78.4K</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"704\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">52.3K</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"704\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">26.1K</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      \n      <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n          <rect x=\"28\" y=\"24.494897959183675\" width=\"47\" height=\"171.50510204081633\" rx=\"2\" fill=\"#1f77b4\" />\n          \n        \n\n          <rect x=\"245.33333333333337\" y=\"16\" width=\"47\" height=\"180\" rx=\"2\" fill=\"#1f77b4\" />\n          \n        \n\n          <rect x=\"462.6666666666667\" y=\"35.974489795918366\" width=\"47\" height=\"160.02551020408163\" rx=\"2\" fill=\"#1f77b4\" />\n          \n        \n\n          <rect x=\"680\" y=\"26.56122448979592\" width=\"47\" height=\"169.4387755102041\" rx=\"2\" fill=\"#1f77b4\" />\n          \n        \n\n      <path d=\"M52,124.36734693877551 L269.33333333333337,121.15306122448979 L486.6666666666667,129.41836734693877 L704,126.20408163265306\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"124.36734693877551\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"269.33333333333337\" cy=\"121.15306122448979\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"486.6666666666667\" cy=\"129.41836734693877\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"704\" cy=\"126.20408163265306\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n      \n    \n      \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n\n      <text x=\"269.33333333333337\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-02</text>\n    \n\n      <text x=\"486.6666666666667\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-03</text>\n    \n\n      <text x=\"704\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-04</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n\n      <rect x=\"172\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"232\" font-size=\"11\" fill=\"#344054\">Household Uniques</text>\n    \n    </svg>"
+          },
+          {
+            "id": "headlineKpi__title_0",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 388,
+              "width": 720,
+              "height": 20
+            },
+            "text": "Headline KPI",
+            "fontSize": 14,
+            "fontWeight": "600",
+            "color": "#101828"
+          },
+          {
+            "id": "headlineKpi__value_0",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 412,
+              "width": 720,
+              "height": 24
+            },
+            "text": "Available Impressions: 40 000",
+            "fontSize": 20,
+            "fontWeight": "700",
+            "color": "#101828"
+          },
+          {
+            "id": "headlineKpi__detail_0",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 436,
+              "width": 720,
+              "height": 16
+            },
+            "text": "Channel: Display",
+            "fontSize": 12,
+            "color": "#344054"
+          },
+          {
+            "id": "headlineKpi__detail_1",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 452,
+              "width": 720,
+              "height": 16
+            },
+            "text": "Generic KPI block resolved from the first authored runtime row.",
+            "fontSize": 12,
+            "color": "#344054"
+          },
+          {
+            "id": "comparisonTable__title_0",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 484,
+              "width": 720,
+              "height": 20
+            },
+            "text": "Delivery Comparison",
+            "fontSize": 14,
+            "fontWeight": "600",
+            "color": "#101828"
+          }
+        ],
+        "headerElements": [
+          {
+            "id": "page_2__header_title",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 36,
+              "width": 720,
+              "height": 28
+            },
+            "text": "Capacity KPI Blend Q3",
+            "fontSize": 18,
+            "fontWeight": "700",
+            "color": "#101828"
+          },
+          {
+            "id": "page_2__header_rule",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 70,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          }
+        ],
+        "footerElements": [
+          {
+            "id": "page_2__footer_rule",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 554,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "page_2__footer_page_number",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 558,
+              "width": 720,
+              "height": 16
+            },
+            "text": "Page 2",
+            "fontSize": 11,
+            "color": "#667085",
+            "align": "right"
+          }
+        ]
+      },
+      {
+        "number": 3,
+        "elements": [
+          {
+            "id": "comparisonTable__header_bg__page_3",
+            "kind": "rect",
+            "box": {
+              "x": 36,
+              "y": 84,
+              "width": 720,
+              "height": 24
+            },
+            "fillColor": "#f8fafc",
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "comparisonTable__header__eventDate__page_3",
+            "kind": "text",
+            "box": {
+              "x": 42,
+              "y": 88,
+              "width": 168,
+              "height": 16
+            },
+            "text": "Date",
+            "fontSize": 11,
+            "fontWeight": "600",
+            "color": "#101828",
+            "align": "left"
+          },
+          {
+            "id": "comparisonTable__header__channelV2__page_3",
+            "kind": "text",
+            "box": {
+              "x": 222,
+              "y": 88,
+              "width": 168,
+              "height": 16
+            },
+            "text": "Channel",
+            "fontSize": 11,
+            "fontWeight": "600",
+            "color": "#101828",
+            "align": "left"
+          },
+          {
+            "id": "comparisonTable__header__avails__page_3",
+            "kind": "text",
+            "box": {
+              "x": 402,
+              "y": 88,
+              "width": 168,
+              "height": 16
+            },
+            "text": "Avails",
+            "fontSize": 11,
+            "fontWeight": "600",
+            "color": "#101828",
+            "align": "left"
+          },
+          {
+            "id": "comparisonTable__header__hhUniqs__page_3",
+            "kind": "text",
+            "box": {
+              "x": 582,
+              "y": 88,
+              "width": 168,
+              "height": 16
+            },
+            "text": "HH Uniques",
+            "fontSize": 11,
+            "fontWeight": "600",
+            "color": "#101828",
+            "align": "left"
+          },
+          {
+            "id": "comparisonTable__row_rule_0",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 132,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "comparisonTable__row_1__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 112,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_1",
+            "columnKey": "eventDate",
+            "text": "2026-05-01",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "comparisonTable__row_1__channelV2__badge",
+            "kind": "tableCellBadge",
+            "box": {
+              "x": 222,
+              "y": 112,
+              "width": 69,
+              "height": 16
+            },
+            "rowKey": "row_1",
+            "columnKey": "channelV2",
+            "label": "Display",
+            "tone": "info",
+            "backgroundColor": "#eef4ff",
+            "borderColor": "#2f6de1",
+            "textColor": "#2457b8"
+          },
+          {
+            "id": "comparisonTable__row_1__avails__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 402,
+              "y": 112,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dbeafe",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_1__avails__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 402,
+              "y": 112,
+              "width": 127.51807228915662,
+              "height": 16
+            },
+            "rowKey": "row_1",
+            "columnKey": "avails",
+            "value": 40000,
+            "min": 33700,
+            "max": 42000,
+            "fillColor": "#2563eb",
+            "backgroundColor": "#dbeafe"
+          },
+          {
+            "id": "comparisonTable__row_1__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 402,
+              "y": 112,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_1",
+            "columnKey": "avails",
+            "text": "40 000",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "comparisonTable__row_1__hhUniqs__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 582,
+              "y": 112,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dcfce7",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_1__hhUniqs__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 582,
+              "y": 112,
+              "width": 108.00000000000001,
+              "height": 16
+            },
+            "rowKey": "row_1",
+            "columnKey": "hhUniqs",
+            "value": 16000,
+            "min": 14200,
+            "max": 17000,
+            "fillColor": "#16a34a",
+            "backgroundColor": "#dcfce7"
+          },
+          {
+            "id": "comparisonTable__row_1__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 582,
+              "y": 112,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_1",
+            "columnKey": "hhUniqs",
+            "text": "16 000",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "comparisonTable__row_rule_1",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 156,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "comparisonTable__row_2__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 136,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_2",
+            "columnKey": "eventDate",
+            "text": "2026-05-01",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "comparisonTable__row_2__channelV2__badge",
+            "kind": "tableCellBadge",
+            "box": {
+              "x": 222,
+              "y": 136,
+              "width": 41,
+              "height": 16
+            },
+            "rowKey": "row_2",
+            "columnKey": "channelV2",
+            "label": "CTV",
+            "tone": "success",
+            "backgroundColor": "#eef8f0",
+            "borderColor": "#0f9960",
+            "textColor": "#0a6640"
+          },
+          {
+            "id": "comparisonTable__row_2__avails__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 402,
+              "y": 136,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dbeafe",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_2__avails__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 402,
+              "y": 136,
+              "width": 20.240963855421686,
+              "height": 16
+            },
+            "rowKey": "row_2",
+            "columnKey": "avails",
+            "value": 34700,
+            "min": 33700,
+            "max": 42000,
+            "fillColor": "#2563eb",
+            "backgroundColor": "#dbeafe"
+          },
+          {
+            "id": "comparisonTable__row_2__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 402,
+              "y": 136,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_2",
+            "columnKey": "avails",
+            "text": "34 700",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "comparisonTable__row_2__hhUniqs__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 582,
+              "y": 136,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dcfce7",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_2__hhUniqs__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 582,
+              "y": 136,
+              "width": 60,
+              "height": 16
+            },
+            "rowKey": "row_2",
+            "columnKey": "hhUniqs",
+            "value": 15200,
+            "min": 14200,
+            "max": 17000,
+            "fillColor": "#16a34a",
+            "backgroundColor": "#dcfce7"
+          },
+          {
+            "id": "comparisonTable__row_2__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 582,
+              "y": 136,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_2",
+            "columnKey": "hhUniqs",
+            "text": "15 200",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "comparisonTable__row_rule_2",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 180,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "comparisonTable__row_3__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 160,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_3",
+            "columnKey": "eventDate",
+            "text": "2026-05-02",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "comparisonTable__row_3__channelV2__badge",
+            "kind": "tableCellBadge",
+            "box": {
+              "x": 222,
+              "y": 160,
+              "width": 69,
+              "height": 16
+            },
+            "rowKey": "row_3",
+            "columnKey": "channelV2",
+            "label": "Display",
+            "tone": "info",
+            "backgroundColor": "#eef4ff",
+            "borderColor": "#2f6de1",
+            "textColor": "#2457b8"
+          },
+          {
+            "id": "comparisonTable__row_3__avails__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 402,
+              "y": 160,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dbeafe",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_3__avails__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 402,
+              "y": 160,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_3",
+            "columnKey": "avails",
+            "value": 42000,
+            "min": 33700,
+            "max": 42000,
+            "fillColor": "#2563eb",
+            "backgroundColor": "#dbeafe"
+          },
+          {
+            "id": "comparisonTable__row_3__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 402,
+              "y": 160,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_3",
+            "columnKey": "avails",
+            "text": "42 000",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "comparisonTable__row_3__hhUniqs__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 582,
+              "y": 160,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dcfce7",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_3__hhUniqs__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 582,
+              "y": 160,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_3",
+            "columnKey": "hhUniqs",
+            "value": 17000,
+            "min": 14200,
+            "max": 17000,
+            "fillColor": "#16a34a",
+            "backgroundColor": "#dcfce7"
+          },
+          {
+            "id": "comparisonTable__row_3__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 582,
+              "y": 160,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_3",
+            "columnKey": "hhUniqs",
+            "text": "17 000",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "comparisonTable__row_rule_3",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 204,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "comparisonTable__row_4__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 184,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_4",
+            "columnKey": "eventDate",
+            "text": "2026-05-02",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "comparisonTable__row_4__channelV2__badge",
+            "kind": "tableCellBadge",
+            "box": {
+              "x": 222,
+              "y": 184,
+              "width": 41,
+              "height": 16
+            },
+            "rowKey": "row_4",
+            "columnKey": "channelV2",
+            "label": "CTV",
+            "tone": "success",
+            "backgroundColor": "#eef8f0",
+            "borderColor": "#0f9960",
+            "textColor": "#0a6640"
+          },
+          {
+            "id": "comparisonTable__row_4__avails__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 402,
+              "y": 184,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dbeafe",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_4__avails__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 402,
+              "y": 184,
+              "width": 54.65060240963855,
+              "height": 16
+            },
+            "rowKey": "row_4",
+            "columnKey": "avails",
+            "value": 36400,
+            "min": 33700,
+            "max": 42000,
+            "fillColor": "#2563eb",
+            "backgroundColor": "#dbeafe"
+          },
+          {
+            "id": "comparisonTable__row_4__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 402,
+              "y": 184,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_4",
+            "columnKey": "avails",
+            "text": "36 400",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "comparisonTable__row_4__hhUniqs__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 582,
+              "y": 184,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dcfce7",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_4__hhUniqs__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 582,
+              "y": 184,
+              "width": 84,
+              "height": 16
+            },
+            "rowKey": "row_4",
+            "columnKey": "hhUniqs",
+            "value": 15600,
+            "min": 14200,
+            "max": 17000,
+            "fillColor": "#16a34a",
+            "backgroundColor": "#dcfce7"
+          },
+          {
+            "id": "comparisonTable__row_4__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 582,
+              "y": 184,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_4",
+            "columnKey": "hhUniqs",
+            "text": "15 600",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "comparisonTable__row_rule_4",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 228,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "comparisonTable__row_5__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 208,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_5",
+            "columnKey": "eventDate",
+            "text": "2026-05-03",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "comparisonTable__row_5__channelV2__badge",
+            "kind": "tableCellBadge",
+            "box": {
+              "x": 222,
+              "y": 208,
+              "width": 69,
+              "height": 16
+            },
+            "rowKey": "row_5",
+            "columnKey": "channelV2",
+            "label": "Display",
+            "tone": "info",
+            "backgroundColor": "#eef4ff",
+            "borderColor": "#2f6de1",
+            "textColor": "#2457b8"
+          },
+          {
+            "id": "comparisonTable__row_5__avails__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 402,
+              "y": 208,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dbeafe",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_5__avails__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 402,
+              "y": 208,
+              "width": 46.55421686746988,
+              "height": 16
+            },
+            "rowKey": "row_5",
+            "columnKey": "avails",
+            "value": 36000,
+            "min": 33700,
+            "max": 42000,
+            "fillColor": "#2563eb",
+            "backgroundColor": "#dbeafe"
+          },
+          {
+            "id": "comparisonTable__row_5__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 402,
+              "y": 208,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_5",
+            "columnKey": "avails",
+            "text": "36 000",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "comparisonTable__row_5__hhUniqs__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 582,
+              "y": 208,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dcfce7",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_5__hhUniqs__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 582,
+              "y": 208,
+              "width": 36,
+              "height": 16
+            },
+            "rowKey": "row_5",
+            "columnKey": "hhUniqs",
+            "value": 14800,
+            "min": 14200,
+            "max": 17000,
+            "fillColor": "#16a34a",
+            "backgroundColor": "#dcfce7"
+          },
+          {
+            "id": "comparisonTable__row_5__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 582,
+              "y": 208,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_5",
+            "columnKey": "hhUniqs",
+            "text": "14 800",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "comparisonTable__row_rule_5",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 252,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "comparisonTable__row_6__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 232,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_6",
+            "columnKey": "eventDate",
+            "text": "2026-05-03",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "comparisonTable__row_6__channelV2__badge",
+            "kind": "tableCellBadge",
+            "box": {
+              "x": 222,
+              "y": 232,
+              "width": 41,
+              "height": 16
+            },
+            "rowKey": "row_6",
+            "columnKey": "channelV2",
+            "label": "CTV",
+            "tone": "success",
+            "backgroundColor": "#eef8f0",
+            "borderColor": "#0f9960",
+            "textColor": "#0a6640"
+          },
+          {
+            "id": "comparisonTable__row_6__avails__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 402,
+              "y": 232,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dbeafe",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_6__avails__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 402,
+              "y": 232,
+              "width": 0,
+              "height": 16
+            },
+            "rowKey": "row_6",
+            "columnKey": "avails",
+            "value": 33700,
+            "min": 33700,
+            "max": 42000,
+            "fillColor": "#2563eb",
+            "backgroundColor": "#dbeafe"
+          },
+          {
+            "id": "comparisonTable__row_6__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 402,
+              "y": 232,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_6",
+            "columnKey": "avails",
+            "text": "33 700",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "comparisonTable__row_6__hhUniqs__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 582,
+              "y": 232,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dcfce7",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_6__hhUniqs__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 582,
+              "y": 232,
+              "width": 0,
+              "height": 16
+            },
+            "rowKey": "row_6",
+            "columnKey": "hhUniqs",
+            "value": 14200,
+            "min": 14200,
+            "max": 17000,
+            "fillColor": "#16a34a",
+            "backgroundColor": "#dcfce7"
+          },
+          {
+            "id": "comparisonTable__row_6__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 582,
+              "y": 232,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_6",
+            "columnKey": "hhUniqs",
+            "text": "14 200",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "comparisonTable__row_rule_6",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 276,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "comparisonTable__row_7__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 256,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_7",
+            "columnKey": "eventDate",
+            "text": "2026-05-04",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "comparisonTable__row_7__channelV2__badge",
+            "kind": "tableCellBadge",
+            "box": {
+              "x": 222,
+              "y": 256,
+              "width": 69,
+              "height": 16
+            },
+            "rowKey": "row_7",
+            "columnKey": "channelV2",
+            "label": "Display",
+            "tone": "info",
+            "backgroundColor": "#eef4ff",
+            "borderColor": "#2f6de1",
+            "textColor": "#2457b8"
+          },
+          {
+            "id": "comparisonTable__row_7__avails__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 402,
+              "y": 256,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dbeafe",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_7__avails__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 402,
+              "y": 256,
+              "width": 87.03614457831326,
+              "height": 16
+            },
+            "rowKey": "row_7",
+            "columnKey": "avails",
+            "value": 38000,
+            "min": 33700,
+            "max": 42000,
+            "fillColor": "#2563eb",
+            "backgroundColor": "#dbeafe"
+          },
+          {
+            "id": "comparisonTable__row_7__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 402,
+              "y": 256,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_7",
+            "columnKey": "avails",
+            "text": "38 000",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "comparisonTable__row_7__hhUniqs__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 582,
+              "y": 256,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dcfce7",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_7__hhUniqs__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 582,
+              "y": 256,
+              "width": 78,
+              "height": 16
+            },
+            "rowKey": "row_7",
+            "columnKey": "hhUniqs",
+            "value": 15500,
+            "min": 14200,
+            "max": 17000,
+            "fillColor": "#16a34a",
+            "backgroundColor": "#dcfce7"
+          },
+          {
+            "id": "comparisonTable__row_7__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 582,
+              "y": 256,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_7",
+            "columnKey": "hhUniqs",
+            "text": "15 500",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "comparisonTable__row_rule_7",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 300,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "comparisonTable__row_8__eventDate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 280,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_8",
+            "columnKey": "eventDate",
+            "text": "2026-05-04",
+            "format": "date",
+            "align": "left"
+          },
+          {
+            "id": "comparisonTable__row_8__channelV2__badge",
+            "kind": "tableCellBadge",
+            "box": {
+              "x": 222,
+              "y": 280,
+              "width": 41,
+              "height": 16
+            },
+            "rowKey": "row_8",
+            "columnKey": "channelV2",
+            "label": "CTV",
+            "tone": "success",
+            "backgroundColor": "#eef8f0",
+            "borderColor": "#0f9960",
+            "textColor": "#0a6640"
+          },
+          {
+            "id": "comparisonTable__row_8__avails__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 402,
+              "y": 280,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dbeafe",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_8__avails__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 402,
+              "y": 280,
+              "width": 42.50602409638554,
+              "height": 16
+            },
+            "rowKey": "row_8",
+            "columnKey": "avails",
+            "value": 35800,
+            "min": 33700,
+            "max": 42000,
+            "fillColor": "#2563eb",
+            "backgroundColor": "#dbeafe"
+          },
+          {
+            "id": "comparisonTable__row_8__avails__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 402,
+              "y": 280,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_8",
+            "columnKey": "avails",
+            "text": "35 800",
+            "format": "compactNumber",
+            "align": "right"
+          },
+          {
+            "id": "comparisonTable__row_8__hhUniqs__bar_track",
+            "kind": "rect",
+            "box": {
+              "x": 582,
+              "y": 280,
+              "width": 168,
+              "height": 16
+            },
+            "fillColor": "#dcfce7",
+            "radius": 8
+          },
+          {
+            "id": "comparisonTable__row_8__hhUniqs__bar",
+            "kind": "tableCellDataBar",
+            "box": {
+              "x": 582,
+              "y": 280,
+              "width": 42,
+              "height": 16
+            },
+            "rowKey": "row_8",
+            "columnKey": "hhUniqs",
+            "value": 14900,
+            "min": 14200,
+            "max": 17000,
+            "fillColor": "#16a34a",
+            "backgroundColor": "#dcfce7"
+          },
+          {
+            "id": "comparisonTable__row_8__hhUniqs__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 582,
+              "y": 280,
+              "width": 168,
+              "height": 16
+            },
+            "rowKey": "row_8",
+            "columnKey": "hhUniqs",
+            "text": "14 900",
+            "format": "compactNumber",
+            "align": "right"
+          }
+        ],
+        "headerElements": [
+          {
+            "id": "page_3__header_title",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 36,
+              "width": 720,
+              "height": 28
+            },
+            "text": "Capacity KPI Blend Q3",
+            "fontSize": 18,
+            "fontWeight": "700",
+            "color": "#101828"
+          },
+          {
+            "id": "page_3__header_rule",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 70,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          }
+        ],
+        "footerElements": [
+          {
+            "id": "page_3__footer_rule",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 554,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "page_3__footer_page_number",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 558,
+              "width": 720,
+              "height": 16
+            },
+            "text": "Page 3",
+            "fontSize": 11,
+            "color": "#667085",
+            "align": "right"
+          }
+        ]
+      }
+    ],
+    "bookmarks": [
+      {
+        "id": "bookmark.sharedFilters",
+        "title": "Filters",
+        "pageNumber": 1,
+        "level": 1,
+        "elementId": "sharedFilters__title_0",
+        "y": 84
+      },
+      {
+        "id": "bookmark.primaryTable",
+        "title": "Table",
+        "pageNumber": 1,
+        "level": 1,
+        "elementId": "primaryTable__title_0",
+        "y": 156
+      },
+      {
+        "id": "bookmark.primaryChart",
+        "title": "Avails + HH Uniques by Date",
+        "pageNumber": 2,
+        "level": 1,
+        "elementId": "primaryChart__title_0",
+        "y": 84
+      },
+      {
+        "id": "bookmark.headlineKpi",
+        "title": "Headline KPI",
+        "pageNumber": 2,
+        "level": 1,
+        "elementId": "headlineKpi__title_0",
+        "y": 388
+      },
+      {
+        "id": "bookmark.comparisonTable",
+        "title": "Delivery Comparison",
+        "pageNumber": 2,
+        "level": 1,
+        "elementId": "comparisonTable__title_0",
+        "y": 484
+      }
+    ],
+    "diagnostics": []
+  }
+}

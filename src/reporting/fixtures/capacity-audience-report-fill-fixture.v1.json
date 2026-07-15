@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "reportFill",
   "specVersion": 1,
-  "specHash": "fnv1a:6c7cc6f9",
+  "specHash": "fnv1a:b1e2e4cd",
   "source": {
     "kind": "dashboard.reportBuilder",
     "containerId": "demoReportBuilder",
@@ -38,11 +38,6 @@
           "To": "2026-05-04",
           "audienceSegmentFilter": [
             "Young Adults"
-          ],
-          "from": "2026-05-01",
-          "to": "2026-05-04",
-          "audience_segment_filter": [
-            "Young Adults"
           ]
         },
         "semanticSelection": {
@@ -74,7 +69,7 @@
         ]
       },
       "provenance": {
-        "requestHash": "fnv1a:6480cc09",
+        "requestHash": "fnv1a:ac693af7",
         "rowCount": 8,
         "truncated": false,
         "hasMore": false,
@@ -85,65 +80,65 @@
           "country": "US",
           "channelV2": "Display",
           "eventDate": "2026-05-01",
-          "audienceIndex": 118,
-          "avails": 18000,
-          "hhUniqs": 7400
+          "audienceIndex": 0,
+          "avails": 40400,
+          "hhUniqs": 16500
         },
         {
           "country": "US",
           "channelV2": "CTV",
           "eventDate": "2026-05-01",
-          "audienceIndex": 118,
-          "avails": 14200,
-          "hhUniqs": 6100
+          "audienceIndex": 0,
+          "avails": 34300,
+          "hhUniqs": 14700
         },
         {
           "country": "US",
           "channelV2": "Display",
           "eventDate": "2026-05-02",
-          "audienceIndex": 118,
-          "avails": 19100,
-          "hhUniqs": 7800
+          "audienceIndex": 0,
+          "avails": 42400,
+          "hhUniqs": 17300
         },
         {
           "country": "US",
           "channelV2": "CTV",
           "eventDate": "2026-05-02",
-          "audienceIndex": 118,
-          "avails": 15100,
-          "hhUniqs": 6400
+          "audienceIndex": 0,
+          "avails": 36000,
+          "hhUniqs": 15300
         },
         {
           "country": "CA",
           "channelV2": "Display",
           "eventDate": "2026-05-03",
-          "audienceIndex": 112,
-          "avails": 16200,
-          "hhUniqs": 6800
+          "audienceIndex": 0,
+          "avails": 36600,
+          "hhUniqs": 15200
         },
         {
           "country": "CA",
           "channelV2": "CTV",
           "eventDate": "2026-05-03",
-          "audienceIndex": 112,
-          "avails": 13700,
-          "hhUniqs": 5700
+          "audienceIndex": 0,
+          "avails": 33100,
+          "hhUniqs": 13800
         },
         {
           "country": "CA",
           "channelV2": "Display",
           "eventDate": "2026-05-04",
-          "audienceIndex": 112,
-          "avails": 17500,
-          "hhUniqs": 7100
+          "audienceIndex": 0,
+          "avails": 39000,
+          "hhUniqs": 15900
         },
         {
           "country": "CA",
           "channelV2": "CTV",
           "eventDate": "2026-05-04",
-          "audienceIndex": 112,
-          "avails": 14500,
-          "hhUniqs": 6000
+          "audienceIndex": 0,
+          "avails": 34800,
+          "hhUniqs": 14500
         }
       ]
     }
@@ -153,6 +148,7 @@
       "id": "sharedFilters",
       "kind": "filterBarBlock",
       "title": "Filters",
+      "datasetRef": "primary",
       "paramIds": [
         "dateRange",
         "channelsFilter",
@@ -160,9 +156,18 @@
       ],
       "content": {
         "title": "Filters",
+        "mode": "baseline",
+        "placement": "inherit",
+        "groupOrder": [],
+        "visibleGroups": [],
+        "collapsedGroups": [],
         "params": [
           {
             "id": "dateRange",
+            "groupId": "dateRange",
+            "label": "Date Range",
+            "type": "dateRange",
+            "required": true,
             "value": {
               "start": "2026-05-01",
               "end": "2026-05-04"
@@ -170,10 +175,38 @@
           },
           {
             "id": "channelsFilter",
+            "groupId": "channelsFilter",
+            "label": "Channels",
+            "type": "multiSelect",
+            "multiple": true,
+            "options": [
+              {
+                "label": "Display",
+                "value": "Display"
+              },
+              {
+                "label": "CTV",
+                "value": "CTV"
+              }
+            ],
             "value": null
           },
           {
             "id": "audienceSegmentFilter",
+            "groupId": "audienceSegmentFilter",
+            "label": "Audience Segment",
+            "type": "multiSelect",
+            "multiple": true,
+            "options": [
+              {
+                "label": "Young Adults",
+                "value": "Young Adults"
+              },
+              {
+                "label": "Established Adults",
+                "value": "Established Adults"
+              }
+            ],
             "value": [
               "Young Adults"
             ]
@@ -260,8 +293,8 @@
                 "key": "audienceIndex",
                 "sourceKey": "audienceIndex",
                 "displayKey": "audienceIndex",
-                "value": 118,
-                "displayValue": 118,
+                "value": 0,
+                "displayValue": 0,
                 "visualState": null
               }
             ]
@@ -281,8 +314,8 @@
                 "key": "audienceIndex",
                 "sourceKey": "audienceIndex",
                 "displayKey": "audienceIndex",
-                "value": 118,
-                "displayValue": 118,
+                "value": 0,
+                "displayValue": 0,
                 "visualState": null
               }
             ]
@@ -302,8 +335,8 @@
                 "key": "audienceIndex",
                 "sourceKey": "audienceIndex",
                 "displayKey": "audienceIndex",
-                "value": 118,
-                "displayValue": 118,
+                "value": 0,
+                "displayValue": 0,
                 "visualState": null
               }
             ]
@@ -323,8 +356,8 @@
                 "key": "audienceIndex",
                 "sourceKey": "audienceIndex",
                 "displayKey": "audienceIndex",
-                "value": 118,
-                "displayValue": 118,
+                "value": 0,
+                "displayValue": 0,
                 "visualState": null
               }
             ]
@@ -344,8 +377,8 @@
                 "key": "audienceIndex",
                 "sourceKey": "audienceIndex",
                 "displayKey": "audienceIndex",
-                "value": 112,
-                "displayValue": 112,
+                "value": 0,
+                "displayValue": 0,
                 "visualState": null
               }
             ]
@@ -365,8 +398,8 @@
                 "key": "audienceIndex",
                 "sourceKey": "audienceIndex",
                 "displayKey": "audienceIndex",
-                "value": 112,
-                "displayValue": 112,
+                "value": 0,
+                "displayValue": 0,
                 "visualState": null
               }
             ]
@@ -386,8 +419,8 @@
                 "key": "audienceIndex",
                 "sourceKey": "audienceIndex",
                 "displayKey": "audienceIndex",
-                "value": 112,
-                "displayValue": 112,
+                "value": 0,
+                "displayValue": 0,
                 "visualState": null
               }
             ]
@@ -407,8 +440,8 @@
                 "key": "audienceIndex",
                 "sourceKey": "audienceIndex",
                 "displayKey": "audienceIndex",
-                "value": 112,
-                "displayValue": 112,
+                "value": 0,
+                "displayValue": 0,
                 "visualState": null
               }
             ]
@@ -427,12 +460,14 @@
       "secondaryLabel": "Channel",
       "description": "Generic KPI block resolved from the first authored runtime row.",
       "emptyLabel": "No headline KPI value available.",
+      "valueFormat": "compactNumber",
       "content": {
         "title": "Headline KPI",
         "description": "Generic KPI block resolved from the first authored runtime row.",
         "valueField": "avails",
         "valueLabel": "Available Impressions",
-        "value": 18000,
+        "valueFormat": "compactNumber",
+        "value": 40400,
         "rowCount": 8,
         "secondaryField": "channelV2",
         "secondaryLabel": "Channel",
@@ -609,12 +644,12 @@
                 "key": "avails",
                 "sourceKey": "avails",
                 "displayKey": "avails",
-                "value": 18000,
-                "displayValue": 18000,
+                "value": 40400,
+                "displayValue": 40400,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 18000,
-                  "percent": 0.7962962962962963,
+                  "value": 40400,
+                  "percent": 0.7849462365591398,
                   "palette": [
                     "#dbeafe",
                     "#2563eb"
@@ -625,12 +660,12 @@
                 "key": "hhUniqs",
                 "sourceKey": "hhUniqs",
                 "displayKey": "hhUniqs",
-                "value": 7400,
-                "displayValue": 7400,
+                "value": 16500,
+                "displayValue": 16500,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 7400,
-                  "percent": 0.8095238095238095,
+                  "value": 16500,
+                  "percent": 0.7714285714285715,
                   "palette": [
                     "#dcfce7",
                     "#16a34a"
@@ -666,12 +701,12 @@
                 "key": "avails",
                 "sourceKey": "avails",
                 "displayKey": "avails",
-                "value": 14200,
-                "displayValue": 14200,
+                "value": 34300,
+                "displayValue": 34300,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 14200,
-                  "percent": 0.09259259259259259,
+                  "value": 34300,
+                  "percent": 0.12903225806451613,
                   "palette": [
                     "#dbeafe",
                     "#2563eb"
@@ -682,12 +717,12 @@
                 "key": "hhUniqs",
                 "sourceKey": "hhUniqs",
                 "displayKey": "hhUniqs",
-                "value": 6100,
-                "displayValue": 6100,
+                "value": 14700,
+                "displayValue": 14700,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 6100,
-                  "percent": 0.19047619047619047,
+                  "value": 14700,
+                  "percent": 0.2571428571428571,
                   "palette": [
                     "#dcfce7",
                     "#16a34a"
@@ -723,11 +758,11 @@
                 "key": "avails",
                 "sourceKey": "avails",
                 "displayKey": "avails",
-                "value": 19100,
-                "displayValue": 19100,
+                "value": 42400,
+                "displayValue": 42400,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 19100,
+                  "value": 42400,
                   "percent": 1,
                   "palette": [
                     "#dbeafe",
@@ -739,11 +774,11 @@
                 "key": "hhUniqs",
                 "sourceKey": "hhUniqs",
                 "displayKey": "hhUniqs",
-                "value": 7800,
-                "displayValue": 7800,
+                "value": 17300,
+                "displayValue": 17300,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 7800,
+                  "value": 17300,
                   "percent": 1,
                   "palette": [
                     "#dcfce7",
@@ -780,12 +815,12 @@
                 "key": "avails",
                 "sourceKey": "avails",
                 "displayKey": "avails",
-                "value": 15100,
-                "displayValue": 15100,
+                "value": 36000,
+                "displayValue": 36000,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 15100,
-                  "percent": 0.25925925925925924,
+                  "value": 36000,
+                  "percent": 0.3118279569892473,
                   "palette": [
                     "#dbeafe",
                     "#2563eb"
@@ -796,12 +831,12 @@
                 "key": "hhUniqs",
                 "sourceKey": "hhUniqs",
                 "displayKey": "hhUniqs",
-                "value": 6400,
-                "displayValue": 6400,
+                "value": 15300,
+                "displayValue": 15300,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 6400,
-                  "percent": 0.3333333333333333,
+                  "value": 15300,
+                  "percent": 0.42857142857142855,
                   "palette": [
                     "#dcfce7",
                     "#16a34a"
@@ -837,12 +872,12 @@
                 "key": "avails",
                 "sourceKey": "avails",
                 "displayKey": "avails",
-                "value": 16200,
-                "displayValue": 16200,
+                "value": 36600,
+                "displayValue": 36600,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 16200,
-                  "percent": 0.46296296296296297,
+                  "value": 36600,
+                  "percent": 0.3763440860215054,
                   "palette": [
                     "#dbeafe",
                     "#2563eb"
@@ -853,12 +888,12 @@
                 "key": "hhUniqs",
                 "sourceKey": "hhUniqs",
                 "displayKey": "hhUniqs",
-                "value": 6800,
-                "displayValue": 6800,
+                "value": 15200,
+                "displayValue": 15200,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 6800,
-                  "percent": 0.5238095238095238,
+                  "value": 15200,
+                  "percent": 0.4,
                   "palette": [
                     "#dcfce7",
                     "#16a34a"
@@ -894,11 +929,11 @@
                 "key": "avails",
                 "sourceKey": "avails",
                 "displayKey": "avails",
-                "value": 13700,
-                "displayValue": 13700,
+                "value": 33100,
+                "displayValue": 33100,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 13700,
+                  "value": 33100,
                   "percent": 0,
                   "palette": [
                     "#dbeafe",
@@ -910,11 +945,11 @@
                 "key": "hhUniqs",
                 "sourceKey": "hhUniqs",
                 "displayKey": "hhUniqs",
-                "value": 5700,
-                "displayValue": 5700,
+                "value": 13800,
+                "displayValue": 13800,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 5700,
+                  "value": 13800,
                   "percent": 0,
                   "palette": [
                     "#dcfce7",
@@ -951,12 +986,12 @@
                 "key": "avails",
                 "sourceKey": "avails",
                 "displayKey": "avails",
-                "value": 17500,
-                "displayValue": 17500,
+                "value": 39000,
+                "displayValue": 39000,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 17500,
-                  "percent": 0.7037037037037037,
+                  "value": 39000,
+                  "percent": 0.6344086021505376,
                   "palette": [
                     "#dbeafe",
                     "#2563eb"
@@ -967,12 +1002,12 @@
                 "key": "hhUniqs",
                 "sourceKey": "hhUniqs",
                 "displayKey": "hhUniqs",
-                "value": 7100,
-                "displayValue": 7100,
+                "value": 15900,
+                "displayValue": 15900,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 7100,
-                  "percent": 0.6666666666666666,
+                  "value": 15900,
+                  "percent": 0.6,
                   "palette": [
                     "#dcfce7",
                     "#16a34a"
@@ -1008,12 +1043,12 @@
                 "key": "avails",
                 "sourceKey": "avails",
                 "displayKey": "avails",
-                "value": 14500,
-                "displayValue": 14500,
+                "value": 34800,
+                "displayValue": 34800,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 14500,
-                  "percent": 0.14814814814814814,
+                  "value": 34800,
+                  "percent": 0.1827956989247312,
                   "palette": [
                     "#dbeafe",
                     "#2563eb"
@@ -1024,12 +1059,12 @@
                 "key": "hhUniqs",
                 "sourceKey": "hhUniqs",
                 "displayKey": "hhUniqs",
-                "value": 6000,
-                "displayValue": 6000,
+                "value": 14500,
+                "displayValue": 14500,
                 "visualState": {
                   "kind": "dataBar",
-                  "value": 6000,
-                  "percent": 0.14285714285714285,
+                  "value": 14500,
+                  "percent": 0.2,
                   "palette": [
                     "#dcfce7",
                     "#16a34a"

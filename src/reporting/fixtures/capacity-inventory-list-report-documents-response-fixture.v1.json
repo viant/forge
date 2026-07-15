@@ -76,10 +76,58 @@
             "kind": "multiSelect",
             "label": "Channels",
             "required": false,
+            "multiple": true,
+            "options": [
+              {
+                "label": "Display",
+                "value": "Display"
+              },
+              {
+                "label": "CTV",
+                "value": "CTV"
+              }
+            ],
             "value": []
           }
         ],
         "dataSourceRef": "demoReportSource"
+      },
+      "artifactId": "reportBuilder.savedReportPayload::rbreport_capacity_q3_inventory_top_channels::capacity_q3_inventory_top_channels::capacityInventoryTopChannelsQ3",
+      "semanticBindingViewState": {
+        "title": "Semantic Binding",
+        "modelLabel": "Ad Delivery",
+        "entityLabel": "Line Delivery",
+        "chips": [
+          "Model Ad Delivery",
+          "Entity Line Delivery",
+          "Dimensions Channel",
+          "Measures Available Impressions"
+        ],
+        "fieldGroups": [
+          {
+            "id": "dimensions",
+            "title": "Selected dimensions (1)",
+            "fields": [
+              {
+                "id": "channel",
+                "label": "Channel",
+                "rawId": "channelV2"
+              }
+            ]
+          },
+          {
+            "id": "measures",
+            "title": "Selected measures (1)",
+            "fields": [
+              {
+                "id": "available_impressions",
+                "label": "Available Impressions",
+                "rawId": "avails",
+                "format": "compactNumber"
+              }
+            ]
+          }
+        ]
       }
     }
   ],

@@ -48,7 +48,7 @@ assert.deepEqual(multiSeries.viewModel, {
   kind: "selected",
   summary: "2026-05-01 • Display",
   actions: [
-    { id: "keep:primaryChart:eventDate", label: "Keep only", kind: "keep" },
+    { id: "keep:primaryChart:eventDate", label: "Keep Date", kind: "keep" },
     { id: "detail_date", label: "Show date details", kind: "detail" },
     { id: "drill_market", label: "Drill to Market", kind: "drill" },
     { id: "detail_channel", label: "Show channel details", kind: "detail" },
@@ -117,7 +117,7 @@ assert.deepEqual(authoredDerived.viewModel, {
   kind: "selected",
   summary: "US • Display",
   actions: [
-    { id: "keep:reachRateTrend:country", label: "Keep only", kind: "keep" },
+    { id: "keep:reachRateTrend:country", label: "Keep Market", kind: "keep" },
     { id: "drill_region", label: "Drill to Region", kind: "drill" },
     { id: "detail_channel", label: "Show channel details", kind: "detail" },
   ],
@@ -128,7 +128,7 @@ assert.deepEqual(authoredDerived.executions.map((entry) => ({
   kind: entry.kind,
   label: entry.label,
 })), [
-  { id: "keep:reachRateTrend:country", kind: "keep", label: "Keep only" },
+  { id: "keep:reachRateTrend:country", kind: "keep", label: "Keep Market" },
   { id: "drill_region", kind: "drill", label: "Drill to Region" },
   { id: "detail_channel", kind: "detail", label: "Show channel details" },
 ]);

@@ -37,6 +37,7 @@ import { resolveParameters } from '../hooks/parameters.js';
 import { resolveSelector } from '../utils/selector.js';
 import { getLogger } from '../utils/logger.js';
 import { runWindowLifecycleHandlers } from './windowLifecycle.js';
+import { buildReportBuilderHostServices } from './dashboard/reportBuilderHostServices.js';
 
 function collectInitialWindowFormItemValues(node, initial) {
     if (!node || typeof node !== 'object') return;
@@ -102,6 +103,39 @@ function normalizeTargetKey(targetContext = {}) {
 
 export function resolveWindowMetadataForTarget(metadata, targetContext = {}) {
     return resolveMetadataForTarget(metadata, targetContext) || metadata;
+}
+
+export function resolveWindowRootContainer(content = null, parameters = {}) {
+    if (!content || typeof content !== 'object' || Array.isArray(content)) {
+        return content;
+    }
+    const normalizedParameters = parameters && typeof parameters === 'object' && !Array.isArray(parameters)
+        ? parameters
+        : {};
+    if (Object.keys(normalizedParameters).length === 0) {
+        return content;
+    }
+    const baseParameters = content.parameters && typeof content.parameters === 'object' && !Array.isArray(content.parameters)
+        ? content.parameters
+        : {};
+    const next = {
+        ...content,
+        parameters: {
+            ...baseParameters,
+            ...normalizedParameters,
+        },
+    };
+    const reportBuilder = next.reportBuilder && typeof next.reportBuilder === 'object' && !Array.isArray(next.reportBuilder)
+        ? next.reportBuilder
+        : null;
+    const requestedStarterId = String(normalizedParameters.reportStarterId || '').trim();
+    if (reportBuilder && requestedStarterId && !String(reportBuilder.prefillReportStarterId || '').trim()) {
+        next.reportBuilder = {
+            ...reportBuilder,
+            prefillReportStarterId: requestedStarterId,
+        };
+    }
+    return next;
 }
 
 function collectRequiredDataSourceRefs(node, scope, refs) {
@@ -376,6 +410,10 @@ function WindowContentInner({window, metadata, services}) {
     const existingContext = getWindowContext(windowId);
     const context = existingContext?.metadata === metadata ? existingContext : hookContext;
     const initializedDashboardKeyRef = useRef('');
+    const rootContainer = useMemo(
+        () => resolveWindowRootContainer(metadata?.view?.content || null, parameters),
+        [metadata?.view?.content, parameters],
+    );
 
     const liveWindowForm = windowFormSignal?.value || {};
     const windowFormSnapshot = useMemo(() => ({
@@ -560,7 +598,6 @@ function WindowContentInner({window, metadata, services}) {
     }, [windowId]);
 
     useEffect(() => {
-        const rootContainer = metadata?.view?.content || null;
         if (!rootContainer || rootContainer.kind !== 'dashboard') return;
         if (!windowId || !rootContainer.id) return;
         if (!shouldResetWindowDashboardState(initializedDashboardKeyRef.current, windowId, rootContainer.id)) {
@@ -575,7 +612,7 @@ function WindowContentInner({window, metadata, services}) {
         } catch (err) {
             console.error('window dashboard init failed', err);
         }
-    }, [context, metadata, windowId]);
+    }, [context, rootContainer, windowId]);
 
     const dataSources = metadata.dataSource || {};
     const dialogs     = metadata.dialogs   || [];
@@ -807,6 +844,7 @@ function WindowContentInner({window, metadata, services}) {
             <WindowLayout
                 title={`${windowKey.toUpperCase()}${windowData ? ` (${windowData})` : ''}`}
                 context={context}
+                contentOverride={rootContainer}
                 onClose={() => {
                     removeWindow(windowId);
                 }}
@@ -844,8 +882,21 @@ export default function WindowContent({window, isInTab = false}) {
             })
             : undefined
     ), [services, window]);
+    if (!connectorConfig.window) {
+        throw new Error('No connectorConfig.window found');
+    }
+
+    const {service} = connectorConfig.window;
+    const reportBuilderServices = useMemo(() => buildReportBuilderHostServices({
+        services,
+        endpoints,
+        auth,
+        endpointName: service?.endpoint,
+        conversationId: window?.conversationId,
+        prepareRequest: prepareConnectorRequest,
+    }), [services, endpoints, auth, service?.endpoint, window?.conversationId, prepareConnectorRequest]);
     const resolvedServices = useMemo(() => ({
-        ...(services || {}),
+        ...reportBuilderServices,
         windowState: window,
         __connectorRuntime: {
             endpoints,
@@ -853,12 +904,7 @@ export default function WindowContent({window, isInTab = false}) {
             auth,
             prepareRequest: prepareConnectorRequest,
         },
-    }), [services, endpoints, targetContext, auth, prepareConnectorRequest]);
-    if (!connectorConfig.window) {
-        throw new Error('No connectorConfig.window found');
-    }
-
-    const {service} = connectorConfig.window;
+    }), [reportBuilderServices, window, endpoints, targetContext, auth, prepareConnectorRequest]);
     const config  = {service: {...service, uri: `${service.uri}/${baseKey}`, includeTargetContext: true}};
     const connector = useDataConnector(config);
 

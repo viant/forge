@@ -18,13 +18,13 @@ assert.equal(
 );
 
 assert.equal(
-    reportBuilderSource.includes("recordReportBuilderLifecycleAuditEvent(request"),
+    reportBuilderSource.includes("recordReportBuilderLifecycleAuditEvent(lifecycleRequest"),
     true,
     "ReportBuilder should emit lifecycle/share audit events after successful saved-artifact and catalog-entry actions.",
 );
 
 assert.equal(
-    reportBuilderSource.includes("recordReportBuilderViewCreationAuditEvent(result, request"),
+    reportBuilderSource.includes("recordReportBuilderViewCreationAuditEvent(result, lifecycleRequest"),
     true,
     "ReportBuilder should emit view-creation audit events when lifecycle handlers return newly created shared artifacts.",
 );

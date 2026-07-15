@@ -27,14 +27,70 @@ assert.deepEqual(normalizeReportTableCellVisual({
   kind: "tone",
   rules: [
     { value: "healthy", tone: "success" },
-    { value: "critical", tone: "danger", label: "Critical" },
+    { value: "critical", tone: "danger", label: "Critical", color: "#7a271a", background: "#fdecea" },
   ],
 }), {
   kind: "tone",
   rules: [
     { value: "healthy", tone: "success" },
-    { value: "critical", tone: "danger", label: "Critical" },
+    { value: "critical", tone: "danger", label: "Critical", color: "#7a271a", background: "#fdecea" },
   ],
+});
+
+assert.deepEqual(normalizeReportTableCellVisual({
+  kind: "progressBar",
+  valueField: " progress ",
+  range: { mode: "columnMax" },
+  palette: ["#e5edf5", "#2f6de1"],
+}), {
+  kind: "progressBar",
+  valueField: "progress",
+  range: { mode: "columnMax" },
+  palette: ["#e5edf5", "#2f6de1"],
+});
+
+assert.deepEqual(normalizeReportTableCellVisual({
+  kind: "sparkBar",
+  valueField: " sparkValue ",
+  range: { mode: "columnMax" },
+  palette: ["#eef2f6", "#4c6fff"],
+}), {
+  kind: "sparkBar",
+  valueField: "sparkValue",
+  range: { mode: "columnMax" },
+  palette: ["#eef2f6", "#4c6fff"],
+});
+
+assert.deepEqual(normalizeReportTableCellVisual({
+  kind: "shareBar",
+  segments: [
+    { valueField: "ctvShare", label: "CTV", color: "#137cbd" },
+    { valueField: "displayShare", label: "Display", color: "#0f9960" },
+  ],
+}), {
+  kind: "shareBar",
+  segments: [
+    { valueField: "ctvShare", label: "CTV", color: "#137cbd" },
+    { valueField: "displayShare", label: "Display", color: "#0f9960" },
+  ],
+});
+
+assert.deepEqual(normalizeReportTableCellVisual({
+  kind: "delta",
+  valueField: " wowDelta ",
+  positiveIsGood: false,
+}), {
+  kind: "delta",
+  valueField: "wowDelta",
+  positiveIsGood: false,
+});
+
+assert.deepEqual(normalizeReportTableCellVisual({
+  kind: "rank",
+  valueField: " spendRank ",
+}), {
+  kind: "rank",
+  valueField: "spendRank",
 });
 
 assert.deepEqual(normalizeReportTableBlockColumn({
@@ -91,6 +147,54 @@ assert.deepEqual(normalizeReportDocumentTableBlock({
         ],
       },
     },
+    {
+      key: "wowDelta",
+      label: "WoW Delta",
+      format: "percentFraction",
+      cellVisual: {
+        kind: "delta",
+        valueField: "wowDelta",
+      },
+    },
+    {
+      key: "progress",
+      label: "Progress",
+      cellVisual: {
+        kind: "progressBar",
+        valueField: "progress",
+        range: { mode: "columnMax" },
+        palette: ["#e5edf5", "#2f6de1"],
+      },
+    },
+    {
+      key: "sparkValue",
+      label: "Spark",
+      cellVisual: {
+        kind: "sparkBar",
+        valueField: "sparkValue",
+        range: { mode: "columnMax" },
+        palette: ["#eef2f6", "#4c6fff"],
+      },
+    },
+    {
+      key: "shareMix",
+      label: "Share Mix",
+      cellVisual: {
+        kind: "shareBar",
+        segments: [
+          { valueField: "ctvShare", label: "CTV", color: "#137cbd" },
+          { valueField: "displayShare", label: "Display", color: "#0f9960" },
+        ],
+      },
+    },
+    {
+      key: "spendRank",
+      label: "Rank",
+      cellVisual: {
+        kind: "rank",
+        valueField: "spendRank",
+      },
+    },
   ],
 }), {
   id: "comparisonTable",
@@ -117,6 +221,54 @@ assert.deepEqual(normalizeReportDocumentTableBlock({
           { value: "healthy", tone: "success" },
           { value: "critical", tone: "danger" },
         ],
+      },
+    },
+    {
+      key: "wowDelta",
+      label: "WoW Delta",
+      format: "percentFraction",
+      cellVisual: {
+        kind: "delta",
+        valueField: "wowDelta",
+      },
+    },
+    {
+      key: "progress",
+      label: "Progress",
+      cellVisual: {
+        kind: "progressBar",
+        valueField: "progress",
+        range: { mode: "columnMax" },
+        palette: ["#e5edf5", "#2f6de1"],
+      },
+    },
+    {
+      key: "sparkValue",
+      label: "Spark",
+      cellVisual: {
+        kind: "sparkBar",
+        valueField: "sparkValue",
+        range: { mode: "columnMax" },
+        palette: ["#eef2f6", "#4c6fff"],
+      },
+    },
+    {
+      key: "shareMix",
+      label: "Share Mix",
+      cellVisual: {
+        kind: "shareBar",
+        segments: [
+          { valueField: "ctvShare", label: "CTV", color: "#137cbd" },
+          { valueField: "displayShare", label: "Display", color: "#0f9960" },
+        ],
+      },
+    },
+    {
+      key: "spendRank",
+      label: "Rank",
+      cellVisual: {
+        kind: "rank",
+        valueField: "spendRank",
       },
     },
   ],

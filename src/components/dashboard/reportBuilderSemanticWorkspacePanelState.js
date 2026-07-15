@@ -16,11 +16,9 @@ export function buildReportBuilderSemanticWorkspacePanelState({
     semanticStatus = null,
     semanticDiagnosticsNotice = null,
     semanticGovernanceNotice = null,
-    providerAvailable = false,
     modelLoading = false,
     modelError = "",
     modelRef = "",
-    model = null,
 } = {}) {
     const bindingViewState = buildReportBuilderSemanticBindingViewState({
         semanticSummary,
@@ -42,11 +40,8 @@ export function buildReportBuilderSemanticWorkspacePanelState({
                 tone: "info",
                 eyebrow: "Data model",
                 title: "No data model configured",
-                description: "This report is not using a data model yet.",
-                metaChips: [
-                    "No data model",
-                    ...(providerAvailable || model ? ["Data model source available"] : ["Data model source unavailable"]),
-                ],
+                description: "Use a data model to keep fields and filters consistent.",
+                metaChips: [],
                 semanticBindingTitle: "",
                 semanticBindingChips: [],
                 semanticBindingFieldGroups: [],

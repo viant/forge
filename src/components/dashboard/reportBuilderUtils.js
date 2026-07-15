@@ -463,6 +463,10 @@ function normalizeChartSeriesOption(option) {
             result.stackId = rawStackId;
         }
     }
+    const dataLabels = String(option.dataLabels || "").trim().toLowerCase();
+    if (dataLabels) result.dataLabels = dataLabels;
+    const pointColorMode = String(option.pointColorMode || "").trim().toLowerCase();
+    if (pointColorMode) result.pointColorMode = pointColorMode === "bysign" ? "bySign" : pointColorMode;
     return Object.keys(result).length > 0 ? result : null;
 }
 
@@ -599,6 +603,12 @@ function sanitizeChartSpecAgainstConfig(config = {}, chartSpec = null) {
                         next.stackId = option.stackId;
                         if (!prior) stackAxis.set(option.stackId, axis);
                     }
+                }
+                if (["auto", "always", "none"].includes(option.dataLabels)) {
+                    next.dataLabels = option.dataLabels;
+                }
+                if (["series", "bysign"].includes(option.pointColorMode)) {
+                    next.pointColorMode = option.pointColorMode === "bysign" ? "bySign" : option.pointColorMode;
                 }
                 if (Object.keys(next).length > 0) cleaned[key] = next;
             });
@@ -868,6 +878,12 @@ export function validateReportBuilderChartSpec(config = {}, chartSpec = null, co
                 errors.push({ field: `seriesOptions.${key}.stackId`, code: "invalidStackId" });
             } else if (typeof option.stackId === "string" && option.stackId && !supportsStackIdForSeries(normalized.type, option.type)) {
                 errors.push({ field: `seriesOptions.${key}.stackId`, code: "notAllowed" });
+            }
+            if (option.dataLabels && !["auto", "always", "none"].includes(option.dataLabels)) {
+                errors.push({ field: `seriesOptions.${key}.dataLabels`, code: "invalidDataLabels" });
+            }
+            if (option.pointColorMode && !["series", "bySign", "bysign"].includes(option.pointColorMode)) {
+                errors.push({ field: `seriesOptions.${key}.pointColorMode`, code: "invalidPointColorMode" });
             }
             if (typeof option.stackId === "string" && option.stackId
                 && family === "cartesian") {
@@ -2358,6 +2374,8 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
         };
         if (option.axis) entry.axis = option.axis;
         if (option.stackId) entry.stackId = option.stackId;
+        if (option.dataLabels) entry.dataLabels = option.dataLabels;
+        if (option.pointColorMode) entry.pointColorMode = option.pointColorMode;
         return entry;
     });
 

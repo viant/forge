@@ -55,8 +55,12 @@ assert.equal(
   true,
 );
 
-const saveArtifactIndex = findStepIndex((step) => step?.type === "clickRole" && step?.name === "Save artifact");
+const beginDraftIndex = findStepIndex((step) => step?.type === "eval" && String(step.expression || "").includes("beginStandaloneDraft"));
+const localDraftIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Local Draft"));
+const saveArtifactIndex = findStepIndex((step) => step?.type === "eval" && String(step.expression || "").includes("Save report file button not found."));
+const savedArtifactIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Saved exploration artifact: Report Builder Demo"));
 const preparePayloadIndex = findStepIndex((step) => step?.type === "clickRole" && step?.name === "Prepare report payload");
+const savedPayloadIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Saved report payload: Report Builder Demo"));
 const prepareListIndex = findStepIndex((step) => step?.type === "clickRole" && step?.name === "Prepare list response");
 const listSummaryIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("List ReportDocuments response: 7 entries"));
 const selectEntryIndex = findStepIndex((step) => step?.type === "selectSelector" && step?.value === "capacityQ3");
@@ -67,8 +71,12 @@ const inspectedSummaryIndex = findStepIndex((step) => step?.type === "waitForEva
 const hideListIndex = findStepIndex((step) => step?.type === "clickRole" && step?.name === "Hide list response");
 const hiddenAfterHideIndex = findStepIndex((step, index) => index > hideListIndex && step?.type === "waitForEval" && String(step.expression || "").includes("!document.querySelector('[aria-label=\"List ReportDocuments response summary\"]')"));
 
+assert.notEqual(beginDraftIndex, -1);
+assert.notEqual(localDraftIndex, -1);
 assert.notEqual(saveArtifactIndex, -1);
+assert.notEqual(savedArtifactIndex, -1);
 assert.notEqual(preparePayloadIndex, -1);
+assert.notEqual(savedPayloadIndex, -1);
 assert.notEqual(prepareListIndex, -1);
 assert.notEqual(listSummaryIndex, -1);
 assert.notEqual(selectEntryIndex, -1);
@@ -79,8 +87,12 @@ assert.notEqual(inspectedSummaryIndex, -1);
 assert.notEqual(hideListIndex, -1);
 assert.notEqual(hiddenAfterHideIndex, -1);
 
-assert.equal(saveArtifactIndex < preparePayloadIndex, true);
-assert.equal(preparePayloadIndex < prepareListIndex, true);
+assert.equal(beginDraftIndex < localDraftIndex, true);
+assert.equal(localDraftIndex < saveArtifactIndex, true);
+assert.equal(saveArtifactIndex < savedArtifactIndex, true);
+assert.equal(savedArtifactIndex < preparePayloadIndex, true);
+assert.equal(preparePayloadIndex < savedPayloadIndex, true);
+assert.equal(savedPayloadIndex < prepareListIndex, true);
 assert.equal(prepareListIndex < listSummaryIndex, true);
 assert.equal(listSummaryIndex < selectEntryIndex, true);
 assert.equal(selectEntryIndex < selectedEntryIndex, true);

@@ -266,7 +266,7 @@ assert.deepEqual(importedLocalReopenablePanelState, {
             reportId: "capacityTrendImported",
             importedArtifactKind: "reportBuilder.explorationArtifact",
             active: true,
-            metaChips: ["capacityTrendImported", "local-only", "draft-snapshot artifact"],
+            metaChips: ["capacityTrendImported", "Local file", "draft-snapshot artifact"],
             semanticBindingTitle: "Semantic Binding",
             semanticBindingChips: [
                 "Model Ad Delivery",
@@ -395,7 +395,7 @@ const importedLocalSavedRecordPanelState = buildImportedLocalSavedRecordPanelSta
 assert.deepEqual(importedLocalSavedRecordPanelState, {
     title: "Imported report files",
     description: "These imported local report files keep richer reopen and export context available without server persistence.",
-    metaChips: ["2 records", "current report file tracked", "export-ready available", "imported draft-snapshot"],
+    metaChips: ["2 records", "current report file tracked", "Ready to export", "imported draft-snapshot"],
     entries: [
         {
             id: "reportBuilder.savedReportPayload::rbreport_capacity_q3_kpi_blend_by_date::capacity_q3_kpi_blend_by_date::capacityKpiBlendByDateQ3",
@@ -403,7 +403,7 @@ assert.deepEqual(importedLocalSavedRecordPanelState, {
             reportId: "capacityKpiBlendByDateQ3",
             importedArtifactKind: "reportBuilder.savedReportRecord",
             active: true,
-            metaChips: ["capacityKpiBlendByDateQ3", "v9", "export-ready", "report-record artifact"],
+            metaChips: ["capacityKpiBlendByDateQ3", "v9", "Ready to export", "report-record artifact"],
             scopeSummaryTitle: "Filters",
             scopeSummaryText: "Reporting Window",
             scopeSummaryItems: [
@@ -422,7 +422,7 @@ assert.deepEqual(importedLocalSavedRecordPanelState, {
             reportId: "capacityTrendQ3",
             importedArtifactKind: "reportBuilder.explorationArtifact",
             active: false,
-            metaChips: ["capacityTrendQ3", "v6", "reopen-ready", "draft-snapshot artifact"],
+            metaChips: ["capacityTrendQ3", "v6", "Ready to reopen", "draft-snapshot artifact"],
             semanticBindingTitle: "Semantic Binding",
             semanticBindingChips: [
                 "Model Ad Delivery",
@@ -821,7 +821,7 @@ assert.equal(structurallyThinAudienceSavedRecordPanelState.entries[0].semanticBi
 assert.equal(structurallyThinAudienceSavedRecordPanelState.entries[0].semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
 assert.equal(
     structurallyThinAudienceSavedRecordPanelState.entries[0].semanticBindingFieldGroups[2].fields.some((field) => field.definitionRef === "harmonizer://feature/user.segment"),
-    true,
+    false,
 );
 assert.equal(structurallyThinAudienceSavedRecordPanelState.entries[0].scopeSummaryText, "Date Range • Channels • Audience Segment");
 assert.equal(structurallyThinAudienceSavedRecordPanelState.entries[0].authoredBlockCount, 4);

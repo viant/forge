@@ -108,6 +108,36 @@ func TestDecodeJSON_RejectsSavedPayloadWithoutPayloadID(t *testing.T) {
 	require.Contains(t, err.Error(), "reportExportRequest.source.payloadId is required for savedPayload sources")
 }
 
+func TestDecodeJSON_AllowsPresetSourceContract(t *testing.T) {
+	fixture := loadExportRequestFixtureMap(
+		t,
+		"capacity-direct-series-export-request-fixture.v1.json",
+	)
+	source := fixture["source"].(map[string]any)
+	source["from"] = "preset"
+	delete(source, "payloadId")
+	delete(source, "reportId")
+	delete(source, "documentVersion")
+	source["sourceArtifactId"] = "performance_inventory_brief"
+	source["artifactKind"] = "reportBuilder.reportTemplate"
+	source["artifactRef"] = "reportBuilder.reportTemplate://metricReportBuilder:performance_inventory_brief"
+	source["windowKey"] = "metricReportBuilder"
+	source["templateLabel"] = "Performance Inventory Brief"
+	source["title"] = "Performance Inventory Brief"
+	syncExportRequestFixtureHashes(fixture)
+
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+
+	request, err := DecodeJSON(data)
+	require.NoError(t, err)
+	require.Equal(t, "preset", request.Source.From)
+	require.Equal(t, "reportBuilder.reportTemplate", request.Source.ArtifactKind)
+	require.Equal(t, "performance_inventory_brief", request.Source.SourceArtifactID)
+	require.Equal(t, "metricReportBuilder", request.Source.WindowKey)
+	require.Equal(t, "Performance Inventory Brief", request.Source.TemplateLabel)
+}
+
 func TestDecodeJSON_RejectsSavedViewWithWrongArtifactKind(t *testing.T) {
 	fixture := loadExportRequestFixtureMap(
 		t,
@@ -126,6 +156,32 @@ func TestDecodeJSON_RejectsSavedViewWithWrongArtifactKind(t *testing.T) {
 	_, err = DecodeJSON(data)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "reportExportRequest.source.artifactKind must be reportBuilder.savedView for savedView sources")
+}
+
+func TestDecodeJSON_RejectsPresetWithoutSourceArtifactID(t *testing.T) {
+	fixture := loadExportRequestFixtureMap(
+		t,
+		"capacity-direct-series-export-request-fixture.v1.json",
+	)
+	source := fixture["source"].(map[string]any)
+	source["from"] = "preset"
+	delete(source, "payloadId")
+	delete(source, "reportId")
+	delete(source, "documentVersion")
+	delete(source, "sourceArtifactId")
+	source["artifactKind"] = "reportBuilder.reportTemplate"
+	source["artifactRef"] = "reportBuilder.reportTemplate://metricReportBuilder:performance_inventory_brief"
+	source["windowKey"] = "metricReportBuilder"
+	source["templateLabel"] = "Performance Inventory Brief"
+	source["title"] = "Performance Inventory Brief"
+	syncExportRequestFixtureHashes(fixture)
+
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+
+	_, err = DecodeJSON(data)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "reportExportRequest.source.sourceArtifactId is required for preset sources")
 }
 
 func TestDecodeJSON_AllowsSavedViewWithoutReportPrintForCSV(t *testing.T) {

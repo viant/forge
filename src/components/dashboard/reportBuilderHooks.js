@@ -130,6 +130,22 @@ export function shouldDeferReportBuilderRequestForPrefill({
     return String(appliedPrefillSignature || "").trim() !== current;
 }
 
+// A signature is acknowledged only after the prefilled state is visible to the
+// next effect pass. This keeps starter-template and request effects from using
+// the stale state captured before the prefill write commits.
+export function shouldMarkReportBuilderPrefillApplied({
+    currentPrefillSignature = "",
+    appliedPrefillSignature = "",
+    currentState = {},
+    nextState = {},
+} = {}) {
+    const current = String(currentPrefillSignature || "").trim();
+    if (!current || String(appliedPrefillSignature || "").trim() === current) {
+        return false;
+    }
+    return JSON.stringify(nextState) === JSON.stringify(currentState);
+}
+
 function findDialogDefinition(builderContext, dialogId = "") {
     const id = String(dialogId || "").trim();
     if (!id) return null;

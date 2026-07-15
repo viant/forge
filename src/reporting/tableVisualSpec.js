@@ -47,12 +47,32 @@ function normalizeRules(rules = []) {
     .filter(Boolean);
 }
 
+function normalizeSegments(segments = []) {
+  return (Array.isArray(segments) ? segments : [])
+    .map((segment) => {
+      if (!segment || typeof segment !== "object" || Array.isArray(segment)) {
+        return null;
+      }
+      const valueField = normalizeString(segment.valueField);
+      if (!valueField) {
+        return null;
+      }
+      const next = {
+        valueField,
+        ...(normalizeString(segment.label) ? { label: normalizeString(segment.label) } : {}),
+        ...(normalizeString(segment.color) ? { color: normalizeString(segment.color) } : {}),
+      };
+      return next;
+    })
+    .filter(Boolean);
+}
+
 export function normalizeReportTableCellVisual(cellVisual = {}) {
   if (!cellVisual || typeof cellVisual !== "object" || Array.isArray(cellVisual)) {
     return null;
   }
   const kind = normalizeString(cellVisual.kind);
-  if (!["dataBar", "tone", "badge"].includes(kind)) {
+  if (!["dataBar", "progressBar", "sparkBar", "shareBar", "tone", "badge", "delta", "rank"].includes(kind)) {
     return null;
   }
   const next = {
@@ -60,8 +80,10 @@ export function normalizeReportTableCellVisual(cellVisual = {}) {
     ...(normalizeString(cellVisual.valueField) ? { valueField: normalizeString(cellVisual.valueField) } : {}),
     ...(normalizeRange(cellVisual.range) ? { range: normalizeRange(cellVisual.range) } : {}),
     ...(normalizeStringArray(cellVisual.palette).length > 0 ? { palette: normalizeStringArray(cellVisual.palette) } : {}),
+    ...(normalizeSegments(cellVisual.segments).length > 0 ? { segments: normalizeSegments(cellVisual.segments) } : {}),
     ...(normalizeString(cellVisual.nullBehavior) ? { nullBehavior: normalizeString(cellVisual.nullBehavior) } : {}),
     ...(normalizeRules(cellVisual.rules).length > 0 ? { rules: normalizeRules(cellVisual.rules) } : {}),
+    ...(cellVisual?.positiveIsGood === false ? { positiveIsGood: false } : {}),
   };
   return next;
 }

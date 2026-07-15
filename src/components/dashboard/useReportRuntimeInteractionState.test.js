@@ -169,6 +169,7 @@ assert.deepEqual(recordedHistory.historyState, {
     {
       refinements: keepOnlyState.refinements,
       drillTransitions: [],
+      datasetScopeParams: {},
     },
   ],
   future: [],
@@ -204,12 +205,14 @@ assert.deepEqual(undoneHistory.historyState, {
     {
       refinements: drillAndKeepState.refinements,
       drillTransitions: drillAndKeepState.drillTransitions,
+      datasetScopeParams: {},
     },
   ],
 });
 assert.deepEqual(undoneHistory.nextState, {
   refinements: keepOnlyState.refinements,
   drillTransitions: [],
+  datasetScopeParams: {},
   hostIntent: null,
   detailDiagnostic: null,
 });
@@ -224,6 +227,7 @@ assert.deepEqual(redoneHistory.historyState, {
     {
       refinements: keepOnlyState.refinements,
       drillTransitions: [],
+      datasetScopeParams: {},
     },
   ],
   future: [],
@@ -231,6 +235,7 @@ assert.deepEqual(redoneHistory.historyState, {
 assert.deepEqual(redoneHistory.nextState, {
   refinements: drillAndKeepState.refinements,
   drillTransitions: drillAndKeepState.drillTransitions,
+  datasetScopeParams: {},
   hostIntent: null,
   detailDiagnostic: null,
 });

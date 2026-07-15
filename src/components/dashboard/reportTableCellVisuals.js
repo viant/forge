@@ -22,6 +22,17 @@ function resolveCellVisualRules(column = {}) {
   return Array.isArray(column?.cellVisual?.rules) ? column.cellVisual.rules : [];
 }
 
+function resolveCellVisualSegments(column = {}) {
+  return Array.isArray(column?.cellVisual?.segments) ? column.cellVisual.segments : [];
+}
+
+function resolveDeltaTone(value = 0, positiveIsGood = true) {
+  if (value === 0) {
+    return "info";
+  }
+  return (value > 0) === positiveIsGood ? "success" : "danger";
+}
+
 function resolveRuleMatch(value, rules = []) {
   return rules.find((rule) => equal(rule?.value, value)) || null;
 }
@@ -53,6 +64,32 @@ function resolveColumnRange(column = {}, rows = []) {
   };
 }
 
+function resolveColumnRankMap(column = {}, rows = []) {
+  if (normalizeString(column?.cellVisual?.kind) !== "rank") {
+    return null;
+  }
+  const values = (Array.isArray(rows) ? rows : [])
+    .map((row) => normalizeNumber(resolveCellVisualValue(row, column)))
+    .filter((value) => value != null)
+    .sort((left, right) => right - left);
+  if (values.length === 0) {
+    return null;
+  }
+  const ranks = new Map();
+  let currentRank = 0;
+  let lastValue = null;
+  values.forEach((value) => {
+    if (lastValue === null || value !== lastValue) {
+      currentRank += 1;
+      lastValue = value;
+    }
+    if (!ranks.has(value)) {
+      ranks.set(value, currentRank);
+    }
+  });
+  return ranks;
+}
+
 function buildDataBarPercent(value, range) {
   if (value == null || !range) {
     return 0;
@@ -65,14 +102,22 @@ function buildDataBarPercent(value, range) {
 
 export function buildReportTableRuntimeColumns(columns = [], rows = []) {
   return (Array.isArray(columns) ? columns : []).map((column) => {
-    if (normalizeString(column?.cellVisual?.kind) !== "dataBar") {
-      return column;
+    const kind = normalizeString(column?.cellVisual?.kind);
+    if (kind === "dataBar" || kind === "progressBar" || kind === "sparkBar") {
+      const range = resolveColumnRange(column, rows);
+      return {
+        ...column,
+        cellVisualRuntime: range ? { range } : null,
+      };
     }
-    const range = resolveColumnRange(column, rows);
-    return {
-      ...column,
-      cellVisualRuntime: range ? { range } : null,
-    };
+    if (kind === "rank") {
+      const ranks = resolveColumnRankMap(column, rows);
+      return {
+        ...column,
+        cellVisualRuntime: ranks ? { ranks } : null,
+      };
+    }
+    return column;
   });
 }
 
@@ -82,7 +127,7 @@ export function resolveReportTableCellVisualState(row = {}, column = {}) {
     return null;
   }
   const rawValue = resolveCellVisualValue(row, column);
-  if (kind === "dataBar") {
+  if (kind === "dataBar" || kind === "progressBar" || kind === "sparkBar") {
     const numericValue = normalizeNumber(rawValue);
     if (numericValue == null) {
       return null;
@@ -96,6 +141,65 @@ export function resolveReportTableCellVisualState(row = {}, column = {}) {
       palette,
     };
   }
+  if (kind === "shareBar") {
+    const segments = resolveCellVisualSegments(column)
+      .map((segment, index) => {
+        const valueField = normalizeString(segment?.valueField);
+        if (!valueField) {
+          return null;
+        }
+        const numericValue = normalizeNumber(row?.[valueField]);
+        if (numericValue == null || numericValue < 0) {
+          return null;
+        }
+        return {
+          label: normalizeString(segment?.label || valueField) || valueField,
+          color: normalizeString(segment?.color) || (Array.isArray(column?.cellVisual?.palette) ? column.cellVisual.palette[index] : "") || "#137cbd",
+          value: numericValue,
+        };
+      })
+      .filter(Boolean);
+    if (segments.length === 0) {
+      return null;
+    }
+    const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+    return {
+      kind,
+      segments: segments.map((segment) => ({
+        label: segment.label,
+        color: segment.color,
+        value: segment.value,
+        percent: total > 0 ? clamp(segment.value / total, 0, 1) : 0,
+      })),
+    };
+  }
+  if (kind === "delta") {
+    const numericValue = normalizeNumber(rawValue);
+    if (numericValue == null) {
+      return null;
+    }
+    return {
+      kind,
+      value: numericValue,
+      tone: resolveDeltaTone(numericValue, column?.cellVisual?.positiveIsGood !== false),
+    };
+  }
+  if (kind === "rank") {
+    const numericValue = normalizeNumber(rawValue);
+    if (numericValue == null) {
+      return null;
+    }
+    const rank = column?.cellVisualRuntime?.ranks?.get?.(numericValue);
+    if (!Number.isFinite(rank)) {
+      return null;
+    }
+    return {
+      kind,
+      value: rank,
+      tone: "info",
+      label: `#${rank}`,
+    };
+  }
   const rule = resolveRuleMatch(rawValue, resolveCellVisualRules(column));
   if (!rule) {
     return null;
@@ -104,5 +208,7 @@ export function resolveReportTableCellVisualState(row = {}, column = {}) {
     kind,
     tone: normalizeString(rule?.tone || "info") || "info",
     label: normalizeString(rule?.label) || String(rawValue ?? ""),
+    ...(normalizeString(rule?.background) ? { backgroundColor: normalizeString(rule.background) } : {}),
+    ...(normalizeString(rule?.color) ? { textColor: normalizeString(rule.color), borderColor: normalizeString(rule.color) } : {}),
   };
 }

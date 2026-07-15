@@ -1215,8 +1215,8 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         "Dimensions Market",
         "Measures Audience Index",
         "Parameters Date Range, Audience Segment",
-        "Categories Location, Audience +1",
-        "Lineage harmonizer://feature/location +2",
+        "Categories Location, Audience",
+        "Lineage harmonizer://feature/location +1",
     ],
     semanticBindingFieldGroups: [
         {
@@ -1263,18 +1263,11 @@ assert.deepEqual(buildReportBuilderImportFeedback({
                     id: "reporting_window",
                     rawId: "dateRange",
                     label: "Date Range",
-                    category: "Scope",
                 },
                 {
                     id: "audience_segment",
                     rawId: "audienceSegmentFilter",
                     label: "Audience Segment",
-                    category: "Audience",
-                    definitionRef: "harmonizer://feature/user.segment",
-                    governance: {
-                        status: "approved",
-                        classification: "harmonizer.audience",
-                    },
                 },
             ],
         },

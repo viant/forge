@@ -1,4 +1,5 @@
 import { formatExportNumericValue } from "./reportExportValueFormatter.js";
+import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "./reportChartAnnotations.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -71,6 +72,8 @@ function resolveCartesianSeriesDescriptors(chartModel = {}, resolvedChart = {}) 
           type: normalizeString(matched?.type || chartType) || chartType,
           color: normalizeString(matched?.color || palette[index % palette.length]) || palette[index % palette.length],
           format: normalizeString(matched?.format),
+          dataLabels: normalizeString(matched?.dataLabels).toLowerCase(),
+          pointColorMode: normalizeString(matched?.pointColorMode),
         };
       })
       .filter(Boolean);
@@ -88,6 +91,8 @@ function resolveCartesianSeriesDescriptors(chartModel = {}, resolvedChart = {}) 
           type: chartType,
           color: palette[index % palette.length],
           format: "",
+          dataLabels: "",
+          pointColorMode: "",
         };
       })
       .filter(Boolean);
@@ -122,6 +127,66 @@ function formatAxisTick(value, format = "") {
   return formatExportNumericValue(value, format, { axis: true });
 }
 
+function formatSeriesDataLabel(value, format = "") {
+  const normalizedFormat = normalizeString(format);
+  if (!normalizedFormat) {
+    const numeric = normalizeNumber(value);
+    if (numeric != null) {
+      if (Number.isInteger(numeric)) {
+        return numeric.toLocaleString("en-US");
+      }
+      return numeric.toLocaleString("en-US", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      });
+    }
+  }
+  return formatExportNumericValue(value, normalizedFormat || "number", { axis: false });
+}
+
+function resolveSeriesPointColor(series = {}, value, fallbackColor = "") {
+  const mode = normalizeString(series?.pointColorMode);
+  if (mode !== "bySign") {
+    return fallbackColor || series?.color || "#137cbd";
+  }
+  const numericValue = normalizeNumber(value);
+  if (numericValue == null) {
+    return fallbackColor || series?.color || "#137cbd";
+  }
+  if (numericValue > 0) {
+    return "#0f9960";
+  }
+  if (numericValue < 0) {
+    return "#db3737";
+  }
+  return "#98a2b3";
+}
+
+function shouldRenderReportPrintSeriesDataLabels(series = {}, chartType = "", rowCount = 0, {
+  defaultHorizontal = false,
+} = {}) {
+  const mode = normalizeString(series?.dataLabels).toLowerCase();
+  if (mode === "none") {
+    return false;
+  }
+  if (mode === "always") {
+    return true;
+  }
+  if (mode === "auto") {
+    if (chartType === "horizontal_bar" || chartType === "funnel_bar") {
+      return rowCount <= 12;
+    }
+    if (chartType === "bar") {
+      return rowCount <= 10;
+    }
+    if (chartType === "line" || chartType === "area") {
+      return rowCount <= 8;
+    }
+    return false;
+  }
+  return defaultHorizontal && (chartType === "horizontal_bar" || chartType === "funnel_bar");
+}
+
 function computeCartesianValueBounds(rows = [], seriesDescriptors = []) {
   const values = [];
   rows.forEach((row) => {
@@ -140,6 +205,334 @@ function computeCartesianValueBounds(rows = [], seriesDescriptors = []) {
   return {
     minValue,
     maxValue: maxValue === minValue ? maxValue + 1 : maxValue,
+  };
+}
+
+function normalizeComparableValue(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  const normalized = normalizeString(value);
+  if (!normalized) {
+    return null;
+  }
+  const numeric = Number(normalized);
+  if (Number.isFinite(numeric) && /^-?\d+(\.\d+)?$/.test(normalized)) {
+    return numeric;
+  }
+  return normalized;
+}
+
+function escapeStrokeDasharray(value = "") {
+  const normalized = normalizeString(value);
+  return normalized ? ` stroke-dasharray="${escapeXml(normalized)}"` : "";
+}
+
+function buildAnnotationTextSvg({
+  label = "",
+  x = 0,
+  y = 0,
+  anchor = "start",
+  color = "#475467",
+} = {}) {
+  const normalizedLabel = normalizeString(label);
+  if (!normalizedLabel) {
+    return "";
+  }
+  return `<text x="${x}" y="${y}" text-anchor="${anchor}" font-size="10" font-weight="600" fill="${escapeXml(color)}">${escapeXml(normalizedLabel)}</text>`;
+}
+
+function resolveCategoricalIndex(rows = [], fieldKey = "", value) {
+  const normalizedFieldKey = normalizeString(fieldKey);
+  const comparableValue = normalizeComparableValue(value);
+  if (!normalizedFieldKey || comparableValue == null) {
+    return -1;
+  }
+  return rows.findIndex((row) => normalizeComparableValue(row?.[normalizedFieldKey]) === comparableValue);
+}
+
+function resolveCartesianCategoryXPosition(rows = [], xAxisKey = "", xPositions = [], value) {
+  const index = resolveCategoricalIndex(rows, xAxisKey, value);
+  return index >= 0 ? xPositions[index] ?? null : null;
+}
+
+function renderCartesianAnnotationsSvg({
+  chartModel = {},
+  rows = [],
+  xAxisKey = "",
+  xPositions = [],
+  leftPad = 0,
+  plotWidth = 0,
+  topPad = 0,
+  plotHeight = 0,
+  bounds = null,
+} = {}) {
+  const annotations = normalizeChartAnnotations(chartModel);
+  if (annotations.length === 0 || !bounds) {
+    return {
+      background: "",
+      foreground: "",
+    };
+  }
+
+  const valueRange = bounds.maxValue - bounds.minValue || 1;
+  const categoryHalfStep = rows.length > 1
+    ? Math.abs((xPositions[1] || leftPad) - (xPositions[0] || leftPad)) / 2
+    : Math.max(18, plotWidth * 0.08);
+  const resolveY = (value) => {
+    const numeric = normalizeNumber(value);
+    if (numeric == null) {
+      return null;
+    }
+    return topPad + (((bounds.maxValue - numeric) / valueRange) * plotHeight);
+  };
+
+  const background = [];
+  const foreground = [];
+
+  annotations.forEach((annotation) => {
+    if (annotation?.kind === "band") {
+      if (annotation.axis === "y") {
+        const y1 = resolveY(annotation.from);
+        const y2 = resolveY(annotation.to);
+        if (y1 == null || y2 == null) {
+          return;
+        }
+        const y = Math.min(y1, y2);
+        const height = Math.max(1, Math.abs(y2 - y1));
+        background.push(
+          `<rect x="${leftPad}" y="${y}" width="${plotWidth}" height="${height}" fill="${escapeXml(annotation.color)}" fill-opacity="${annotation.opacity ?? 0.12}" />`,
+        );
+        if (annotation.label) {
+          background.push(buildAnnotationTextSvg({
+            label: annotation.label,
+            x: leftPad + 8,
+            y: y + 12,
+            color: annotation.color,
+          }));
+        }
+        return;
+      }
+      const x1 = resolveCartesianCategoryXPosition(rows, xAxisKey, xPositions, annotation.from);
+      const x2 = resolveCartesianCategoryXPosition(rows, xAxisKey, xPositions, annotation.to);
+      if (x1 == null || x2 == null) {
+        return;
+      }
+      const x = Math.min(x1, x2) - categoryHalfStep;
+      const width = Math.max(2, Math.abs(x2 - x1) + (categoryHalfStep * 2));
+      background.push(
+        `<rect x="${x}" y="${topPad}" width="${width}" height="${plotHeight}" fill="${escapeXml(annotation.color)}" fill-opacity="${annotation.opacity ?? 0.12}" />`,
+      );
+      if (annotation.label) {
+        background.push(buildAnnotationTextSvg({
+          label: annotation.label,
+          x: x + 8,
+          y: topPad + 12,
+          color: annotation.color,
+        }));
+      }
+      return;
+    }
+
+    if (annotation?.kind === "note") {
+      const x = resolveCartesianCategoryXPosition(rows, xAxisKey, xPositions, annotation.x);
+      const y = resolveY(annotation.y);
+      if (x == null || y == null) {
+        return;
+      }
+      foreground.push(`<circle cx="${x}" cy="${y}" r="4" fill="${escapeXml(annotation.color)}" />`);
+      foreground.push(buildAnnotationTextSvg({
+        label: annotation.label,
+        x: x + 8,
+        y: y - 8,
+        color: annotation.color,
+      }));
+      return;
+    }
+
+    const dash = escapeStrokeDasharray(resolveChartAnnotationStrokeDasharray(annotation?.lineStyle));
+    if (annotation?.kind === "verticalMarker" || (annotation?.kind === "referenceLine" && annotation?.axis === "x")) {
+      const x = resolveCartesianCategoryXPosition(rows, xAxisKey, xPositions, annotation.value);
+      if (x == null) {
+        return;
+      }
+      foreground.push(`<line x1="${x}" y1="${topPad}" x2="${x}" y2="${topPad + plotHeight}" stroke="${escapeXml(annotation.color)}" stroke-width="2"${dash} />`);
+      if (annotation.label) {
+        foreground.push(buildAnnotationTextSvg({
+          label: annotation.label,
+          x: x + 6,
+          y: topPad + 12,
+          color: annotation.color,
+        }));
+      }
+      return;
+    }
+
+    if (annotation?.kind === "referenceLine" && annotation?.axis === "y") {
+      const y = resolveY(annotation.value);
+      if (y == null) {
+        return;
+      }
+      foreground.push(`<line x1="${leftPad}" y1="${y}" x2="${leftPad + plotWidth}" y2="${y}" stroke="${escapeXml(annotation.color)}" stroke-width="2"${dash} />`);
+      if (annotation.label) {
+        foreground.push(buildAnnotationTextSvg({
+          label: annotation.label,
+          x: leftPad + plotWidth - 6,
+          y: y - 6,
+          anchor: "end",
+          color: annotation.color,
+        }));
+      }
+    }
+  });
+
+  return {
+    background: background.join("\n"),
+    foreground: foreground.join("\n"),
+  };
+}
+
+function renderHorizontalBarAnnotationsSvg({
+  chartModel = {},
+  rows = [],
+  xAxisKey = "",
+  leftPad = 0,
+  plotWidth = 0,
+  topPad = 0,
+  plotHeight = 0,
+  rowHeight = 0,
+  groupGap = 0,
+  bounds = null,
+} = {}) {
+  const annotations = normalizeChartAnnotations(chartModel);
+  if (annotations.length === 0 || !bounds) {
+    return {
+      background: "",
+      foreground: "",
+    };
+  }
+
+  const valueRange = bounds.maxValue - bounds.minValue || 1;
+  const resolveX = (value) => {
+    const numeric = normalizeNumber(value);
+    if (numeric == null) {
+      return null;
+    }
+    return leftPad + (((numeric - bounds.minValue) / valueRange) * plotWidth);
+  };
+  const resolveCategoryCenterY = (value) => {
+    const rowIndex = resolveCategoricalIndex(rows, xAxisKey, value);
+    if (rowIndex < 0) {
+      return null;
+    }
+    const groupTop = topPad + (rowIndex * (rowHeight + groupGap));
+    return groupTop + (rowHeight / 2);
+  };
+  const categoryHalfStep = rowHeight / 2;
+  const background = [];
+  const foreground = [];
+
+  annotations.forEach((annotation) => {
+    if (annotation?.kind === "band") {
+      if (annotation.axis === "y") {
+        const y1 = resolveCategoryCenterY(annotation.from);
+        const y2 = resolveCategoryCenterY(annotation.to);
+        if (y1 == null || y2 == null) {
+          return;
+        }
+        const y = Math.min(y1, y2) - categoryHalfStep;
+        const height = Math.max(2, Math.abs(y2 - y1) + (categoryHalfStep * 2));
+        background.push(
+          `<rect x="${leftPad}" y="${y}" width="${plotWidth}" height="${height}" fill="${escapeXml(annotation.color)}" fill-opacity="${annotation.opacity ?? 0.12}" />`,
+        );
+        if (annotation.label) {
+          background.push(buildAnnotationTextSvg({
+            label: annotation.label,
+            x: leftPad + 8,
+            y: y + 12,
+            color: annotation.color,
+          }));
+        }
+        return;
+      }
+      const x1 = resolveX(annotation.from);
+      const x2 = resolveX(annotation.to);
+      if (x1 == null || x2 == null) {
+        return;
+      }
+      const x = Math.min(x1, x2);
+      const width = Math.max(2, Math.abs(x2 - x1));
+      background.push(
+        `<rect x="${x}" y="${topPad}" width="${width}" height="${plotHeight}" fill="${escapeXml(annotation.color)}" fill-opacity="${annotation.opacity ?? 0.12}" />`,
+      );
+      if (annotation.label) {
+        background.push(buildAnnotationTextSvg({
+          label: annotation.label,
+          x: x + 8,
+          y: topPad + 12,
+          color: annotation.color,
+        }));
+      }
+      return;
+    }
+
+    if (annotation?.kind === "note") {
+      const x = resolveX(annotation.x);
+      const y = typeof annotation.y === "string"
+        ? resolveCategoryCenterY(annotation.y)
+        : null;
+      if (x == null || y == null) {
+        return;
+      }
+      foreground.push(`<circle cx="${x}" cy="${y}" r="4" fill="${escapeXml(annotation.color)}" />`);
+      foreground.push(buildAnnotationTextSvg({
+        label: annotation.label,
+        x: x + 8,
+        y: y - 8,
+        color: annotation.color,
+      }));
+      return;
+    }
+
+    const dash = escapeStrokeDasharray(resolveChartAnnotationStrokeDasharray(annotation?.lineStyle));
+    if (annotation?.kind === "verticalMarker" || (annotation?.kind === "referenceLine" && annotation?.axis === "x")) {
+      const x = resolveX(annotation.value);
+      if (x == null) {
+        return;
+      }
+      foreground.push(`<line x1="${x}" y1="${topPad}" x2="${x}" y2="${topPad + plotHeight}" stroke="${escapeXml(annotation.color)}" stroke-width="2"${dash} />`);
+      if (annotation.label) {
+        foreground.push(buildAnnotationTextSvg({
+          label: annotation.label,
+          x: x + 6,
+          y: topPad + 12,
+          color: annotation.color,
+        }));
+      }
+      return;
+    }
+
+    if (annotation?.kind === "referenceLine" && annotation?.axis === "y") {
+      const y = resolveCategoryCenterY(annotation.value);
+      if (y == null) {
+        return;
+      }
+      foreground.push(`<line x1="${leftPad}" y1="${y}" x2="${leftPad + plotWidth}" y2="${y}" stroke="${escapeXml(annotation.color)}" stroke-width="2"${dash} />`);
+      if (annotation.label) {
+        foreground.push(buildAnnotationTextSvg({
+          label: annotation.label,
+          x: leftPad + plotWidth - 6,
+          y: y - 6,
+          anchor: "end",
+          color: annotation.color,
+        }));
+      }
+    }
+  });
+
+  return {
+    background: background.join("\n"),
+    foreground: foreground.join("\n"),
   };
 }
 
@@ -185,6 +578,41 @@ function buildAreaPath(points = [], baselineY = 0) {
   return `${line} ${closing}`;
 }
 
+function resolveArcSegmentCount(angle = 0) {
+  const fraction = Math.max(0, Math.abs(angle) / (Math.PI * 2));
+  return Math.max(6, Math.ceil(fraction * 48));
+}
+
+function buildArcPoints({
+  cx = 0,
+  cy = 0,
+  radius = 0,
+  startAngle = 0,
+  endAngle = 0,
+  segmentCount = 12,
+} = {}) {
+  if (radius <= 0 || segmentCount < 1) {
+    return [];
+  }
+  return Array.from({ length: segmentCount + 1 }, (_, index) => {
+    const t = index / segmentCount;
+    const angle = startAngle + ((endAngle - startAngle) * t);
+    return {
+      x: cx + (radius * Math.cos(angle)),
+      y: cy + (radius * Math.sin(angle)),
+    };
+  });
+}
+
+function buildClosedPath(points = []) {
+  if (points.length === 0) {
+    return "";
+  }
+  return points.map((point, index) => (
+    `${index === 0 ? "M" : "L"}${point.x},${point.y}`
+  )).join(" ") + " Z";
+}
+
 function renderCategoryChartSvg({
   chartModel = {},
   resolvedChart = {},
@@ -222,15 +650,33 @@ function renderCategoryChartSvg({
     const fraction = slice.value / total;
     const angle = fraction * 2 * Math.PI;
     const endAngle = startAngle + angle;
-    const largeArc = angle > Math.PI ? 1 : 0;
-    const x1 = cx + r * Math.cos(startAngle);
-    const y1 = cy + r * Math.sin(startAngle);
-    const x2 = cx + r * Math.cos(endAngle);
-    const y2 = cy + r * Math.sin(endAngle);
     const fill = palette[index % palette.length];
-    const outerPath = slices.length === 1
-      ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${escapeXml(fill)}" />`
-      : `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} Z" fill="${escapeXml(fill)}" />`;
+    const outerPath = (() => {
+      if (slices.length === 1) {
+        return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${escapeXml(fill)}" />`;
+      }
+      const segmentCount = resolveArcSegmentCount(angle);
+      const outerArcPoints = buildArcPoints({
+        cx,
+        cy,
+        radius: r,
+        startAngle,
+        endAngle,
+        segmentCount,
+      });
+      if (innerRadius > 0) {
+        const innerArcPoints = buildArcPoints({
+          cx,
+          cy,
+          radius: innerRadius,
+          startAngle: endAngle,
+          endAngle: startAngle,
+          segmentCount,
+        });
+        return `<path d="${buildClosedPath([...outerArcPoints, ...innerArcPoints])}" fill="${escapeXml(fill)}" />`;
+      }
+      return `<path d="${buildClosedPath([{ x: cx, y: cy }, ...outerArcPoints])}" fill="${escapeXml(fill)}" />`;
+    })();
     startAngle = endAngle;
     return outerPath;
   }).join("\n");
@@ -318,6 +764,17 @@ function renderCartesianChartSvg({
   const labelStep = Math.max(1, Math.ceil(rows.length / 6));
   const legend = buildLegendSvg(seriesDescriptors, width, plotHeight + bottomPad + 4);
   const height = topPad + plotHeight + bottomPad + legend.height + 12;
+  const annotations = renderCartesianAnnotationsSvg({
+    chartModel,
+    rows,
+    xAxisKey,
+    xPositions,
+    leftPad,
+    plotWidth,
+    topPad,
+    plotHeight,
+    bounds,
+  });
 
   const yTicks = Array.from({ length: 4 }, (_, index) => {
     const fraction = index / 3;
@@ -366,8 +823,13 @@ function renderCartesianChartSvg({
         const x = point.x - (groupWidth / 2) + (barOffset * barWidth);
         const y = Math.min(point.y, baselineY);
         const barHeight = Math.max(1, Math.abs(baselineY - point.y));
+        const fillColor = resolveSeriesPointColor(series, point.value, series.color);
+        const label = shouldRenderReportPrintSeriesDataLabels(series, supportedType, rows.length)
+          ? `<text x="${x + ((barWidth - 1) / 2)}" y="${y - 4}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(point.value, series.format))}</text>`
+          : "";
         return `
-          <rect x="${x}" y="${y}" width="${barWidth - 1}" height="${barHeight}" rx="2" fill="${escapeXml(series.color)}" />
+          <rect x="${x}" y="${y}" width="${barWidth - 1}" height="${barHeight}" rx="2" fill="${escapeXml(fillColor)}" />
+          ${label}
         `;
       }).join("\n");
       return bars;
@@ -375,27 +837,36 @@ function renderCartesianChartSvg({
 
     const path = buildPolylinePath(points);
     const markers = points.map((point) => `
-      <circle cx="${point.x}" cy="${point.y}" r="2.5" fill="${escapeXml(series.color)}" />
+      <circle cx="${point.x}" cy="${point.y}" r="2.5" fill="${escapeXml(resolveSeriesPointColor(series, point.value, series.color))}" />
     `).join("\n");
+    const labels = shouldRenderReportPrintSeriesDataLabels(series, supportedType, rows.length)
+      ? points.map((point) => `
+      <text x="${point.x}" y="${point.y - 6}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(point.value, series.format))}</text>
+    `).join("\n")
+      : "";
     if (supportedType === "area") {
       return `
         <path d="${buildAreaPath(points, baselineY)}" fill="${escapeXml(series.color)}" fill-opacity="0.18" stroke="none" />
         <path d="${path}" fill="none" stroke="${escapeXml(series.color)}" stroke-width="2" />
         ${markers}
+        ${labels}
       `;
     }
     return `
       <path d="${path}" fill="none" stroke="${escapeXml(series.color)}" stroke-width="2" />
       ${markers}
+      ${labels}
     `;
   }).join("\n");
 
   return {
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
       ${gridLines}
+      ${annotations.background}
       <line x1="${leftPad}" y1="${baselineY}" x2="${leftPad + plotWidth}" y2="${baselineY}" stroke="#98a2b3" stroke-width="1" />
       <line x1="${leftPad}" y1="${topPad}" x2="${leftPad}" y2="${topPad + plotHeight}" stroke="#98a2b3" stroke-width="1" />
       ${renderedSeries}
+      ${annotations.foreground}
       ${xAxisLabels}
       ${legend.svg}
     </svg>`,
@@ -458,6 +929,18 @@ function renderHorizontalBarChartSvg({
   const plotHeight = Math.max(80, (rows.length * rowHeight) + (Math.max(0, rows.length - 1) * groupGap));
   const legend = buildLegendSvg(seriesDescriptors, width, topPad + plotHeight + bottomPad + 4);
   const height = topPad + plotHeight + bottomPad + legend.height + 12;
+  const annotations = renderHorizontalBarAnnotationsSvg({
+    chartModel,
+    rows,
+    xAxisKey,
+    leftPad,
+    plotWidth,
+    topPad,
+    plotHeight,
+    rowHeight,
+    groupGap,
+    bounds,
+  });
 
   const xTicks = Array.from({ length: 4 }, (_, index) => {
     const fraction = index / 3;
@@ -495,9 +978,13 @@ function renderHorizontalBarChartSvg({
       const barWidth = Math.max(1, Math.abs(valueX - baselineX));
       const labelX = value >= 0 ? valueX + 6 : valueX - 6;
       const labelAnchor = value >= 0 ? "start" : "end";
+      const fillColor = resolveSeriesPointColor(series, value, series.color);
+      const valueLabel = shouldRenderReportPrintSeriesDataLabels(series, "horizontal_bar", rows.length, { defaultHorizontal: true })
+        ? `<text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(value, series.format))}</text>`
+        : "";
       return `
-        <rect x="${x}" y="${barY}" width="${barWidth}" height="${perSeriesHeight}" rx="2" fill="${escapeXml(series.color)}" />
-        <text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="10" fill="#667085">${escapeXml(formatExportNumericValue(value, series.format, { axis: false }))}</text>
+        <rect x="${x}" y="${barY}" width="${barWidth}" height="${perSeriesHeight}" rx="2" fill="${escapeXml(fillColor)}" />
+        ${valueLabel}
       `;
     }).join("\n")
   )).join("\n");
@@ -505,9 +992,11 @@ function renderHorizontalBarChartSvg({
   return {
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
       ${gridLines}
+      ${annotations.background}
       <line x1="${baselineX}" y1="${topPad}" x2="${baselineX}" y2="${topPad + plotHeight}" stroke="#98a2b3" stroke-width="1" />
       ${categoryLabels}
       ${renderedSeries}
+      ${annotations.foreground}
       ${legend.svg}
     </svg>`,
     height,

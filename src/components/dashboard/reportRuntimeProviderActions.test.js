@@ -261,7 +261,7 @@ assert.deepEqual(buildReportRuntimeTableActionDescriptors({
     id: "keep:channelV2",
     kind: "keep",
     fieldValueKey: "channelV2",
-    label: "Keep only",
+    label: "Keep Channel",
   },
 ]);
 
@@ -288,7 +288,7 @@ assert.deepEqual(buildReportRuntimeChartActionDescriptors({
     id: "keep:primaryChart:country",
     kind: "keep",
     fieldValueKey: "country",
-    label: "Keep only",
+    label: "Keep Market",
     value: "US",
     displayValue: "US",
   },

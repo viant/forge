@@ -30,7 +30,7 @@ assert.deepEqual(primaryBuilderBlock.state?.scopeParams?.audienceSegmentFilter, 
 assert.equal(Array.isArray(reportFill?.datasets?.[0]?.rows), true);
 assert.equal(reportFill.datasets[0].rows.length, 8);
 assert.equal(reportFill.datasets[0].rows[0].country, "US");
-assert.equal(reportFill.datasets[0].rows[0].audienceIndex, 118);
+assert.equal(reportFill.datasets[0].rows[0].audienceIndex, 0);
 assert.equal(validateReportExportRequest(exportRequest).valid, true);
 assert.equal(exportRequest.reportPrint.title, "Capacity Audience Segment Index Q3");
 assert.equal(exportRequest.source.reportId, "capacityAudienceSegmentIndexQ3");

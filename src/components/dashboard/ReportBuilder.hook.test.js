@@ -9,6 +9,7 @@ import {
     resolveReportBuilderHookHandler,
     resolveReportBuilderLookupDescriptor,
     resolveReportBuilderNotices,
+    shouldMarkReportBuilderPrefillApplied,
     shouldDeferReportBuilderRequestForPrefill,
 } from "./reportBuilderHooks.js";
 
@@ -41,6 +42,34 @@ assert.equal(
     shouldDeferReportBuilderRequestForPrefill({
         currentPrefillSignature: "prefill::1",
         appliedPrefillSignature: "prefill::1",
+    }),
+    false,
+);
+assert.equal(
+    shouldMarkReportBuilderPrefillApplied({
+        currentPrefillSignature: "prefill::1",
+        appliedPrefillSignature: "",
+        currentState: { dynamicGroups: { include: [] } },
+        nextState: { dynamicGroups: { include: [{ filterId: "includeViantSegment" }] } },
+    }),
+    false,
+    "prefill stays pending until its state write has committed",
+);
+assert.equal(
+    shouldMarkReportBuilderPrefillApplied({
+        currentPrefillSignature: "prefill::1",
+        appliedPrefillSignature: "",
+        currentState: { dynamicGroups: { include: [{ filterId: "includeViantSegment" }] } },
+        nextState: { dynamicGroups: { include: [{ filterId: "includeViantSegment" }] } },
+    }),
+    true,
+    "prefill is acknowledged only after the committed state is re-observed",
+);
+assert.equal(
+    shouldMarkReportBuilderPrefillApplied({
+        currentPrefillSignature: "",
+        currentState: {},
+        nextState: {},
     }),
     false,
 );

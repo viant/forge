@@ -104,6 +104,17 @@
             "kind": "multiSelect",
             "label": "Channels",
             "required": false,
+            "multiple": true,
+            "options": [
+              {
+                "label": "Display",
+                "value": "Display"
+              },
+              {
+                "label": "CTV",
+                "value": "CTV"
+              }
+            ],
             "value": null
           },
           {
@@ -111,12 +122,99 @@
             "kind": "multiSelect",
             "label": "Audience Segment",
             "required": false,
+            "multiple": true,
+            "options": [
+              {
+                "label": "Young Adults",
+                "value": "Young Adults"
+              },
+              {
+                "label": "Established Adults",
+                "value": "Established Adults"
+              }
+            ],
             "value": [
               "Young Adults"
             ]
           }
         ],
         "dataSourceRef": "demoReportSource"
+      },
+      "artifactId": "reportBuilder.savedReportPayload::rbreport_capacity_audience_segment_index_q3::capacity_audience_segment_index_q3::capacityAudienceSegmentIndexQ3",
+      "semanticBindingViewState": {
+        "title": "Semantic Binding",
+        "modelLabel": "Ad Delivery",
+        "entityLabel": "Line Delivery",
+        "chips": [
+          "Model Ad Delivery",
+          "Entity Line Delivery",
+          "Dimensions Market",
+          "Measures Audience Index",
+          "Parameters Date Range, Audience Segment",
+          "Categories Location, Audience +1",
+          "Lineage harmonizer://feature/location +2"
+        ],
+        "fieldGroups": [
+          {
+            "id": "dimensions",
+            "title": "Selected dimensions (1)",
+            "fields": [
+              {
+                "id": "country_code",
+                "label": "Market",
+                "rawId": "country",
+                "category": "Location",
+                "definitionRef": "harmonizer://feature/location",
+                "governance": {
+                  "status": "approved",
+                  "classification": "harmonizer.audience"
+                }
+              }
+            ]
+          },
+          {
+            "id": "measures",
+            "title": "Selected measures (1)",
+            "fields": [
+              {
+                "id": "audience_index",
+                "label": "Audience Index",
+                "rawId": "audienceIndex",
+                "format": "number",
+                "category": "Audience",
+                "definitionRef": "harmonizer://feature/user.segment.index",
+                "governance": {
+                  "status": "approved",
+                  "certification": "reviewed",
+                  "classification": "harmonizer.audience"
+                }
+              }
+            ]
+          },
+          {
+            "id": "parameters",
+            "title": "Selected parameters (2)",
+            "fields": [
+              {
+                "id": "reporting_window",
+                "label": "Date Range",
+                "rawId": "dateRange",
+                "category": "Scope"
+              },
+              {
+                "id": "audience_segment",
+                "label": "Audience Segment",
+                "rawId": "audienceSegmentFilter",
+                "category": "Audience",
+                "definitionRef": "harmonizer://feature/user.segment",
+                "governance": {
+                  "status": "approved",
+                  "classification": "harmonizer.audience"
+                }
+              }
+            ]
+          }
+        ]
       }
     }
   ],

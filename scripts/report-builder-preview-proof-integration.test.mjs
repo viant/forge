@@ -34,8 +34,8 @@ const requiredRuntimeProofFiles = [
   "scripts/report-builder-preview-empty-table-apply-current-fields-save-reopen-scenario-assets.test.mjs",
   "src/components/dashboard/reportBuilderLeftRailLayout.test.js",
   "src/components/dashboard/reportBuilderRuntimePreviewRecoveryCoverage.test.js",
-  "src/demos/reportBuilder/previewFetchErrorEvent.test.js",
-  "src/demos/reportBuilder/previewSemanticRecovery.test.js",
+  "scripts/report-builder-preview-semantic-recovery-scenario-assets.test.mjs",
+  "scripts/report-builder-preview-runtime-preview-retry-scenario-assets.test.mjs",
 ];
 
 for (const file of requiredRuntimeProofFiles) {

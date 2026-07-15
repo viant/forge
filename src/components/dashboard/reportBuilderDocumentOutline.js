@@ -18,6 +18,15 @@ export function shouldShowReportBuilderSelectedSemanticBinding(entryKind = "") {
         "chartBlock",
         "tableBlock",
         "kpiBlock",
+        "collectionBlock",
+        "sectionBlock",
+        "compositeBlock",
+        "tabGroupBlock",
+        "stepperBlock",
+        "infoPanelBlock",
+        "calloutBlock",
+        "kanbanBlock",
+        "timelineBlock",
         "badgesBlock",
         "geoMapBlock",
         "filterBarBlock",
@@ -48,7 +57,7 @@ export function resolveReportBuilderSelectedInsertionGroupIds(entryKind = "") {
     if (new Set(["drillHierarchy", "drillPlaceholder", "filterBarBlock", "refinementBarBlock", "geoMapBlock"]).has(normalizedKind)) {
         return ["runtime"];
     }
-    if (new Set(["markdownBlock", "chartBlock", "tableBlock", "kpiBlock", "badgesBlock"]).has(normalizedKind)) {
+    if (new Set(["markdownBlock", "chartBlock", "tableBlock", "kpiBlock", "collectionBlock", "sectionBlock", "compositeBlock", "tabGroupBlock", "stepperBlock", "infoPanelBlock", "calloutBlock", "kanbanBlock", "timelineBlock", "badgesBlock"]).has(normalizedKind)) {
         return ["document"];
     }
     return ["document"];

@@ -360,7 +360,7 @@ export function buildReportBuilderAuthoredRuntimePreviewState({
                 animated: true,
             }
             : null,
-        updatingNotice: !reportPresentation && isLoadingWithRetainedRuntimeRows
+        updatingNotice: isLoadingWithRetainedRuntimeRows
             ? {
                 level: "info",
                 message: reportPresentation

@@ -1,1 +1,503 @@
-{"version":1,"kind":"reportPrint","specVersion":1,"specHash":"fnv1a:56b0ded3","fillVersion":1,"fillHash":"fnv1a:431d7391","source":{"kind":"dashboard.reportBuilder","containerId":"authoredLandscapeBuilder","stateKey":"authoredLandscapeBuilder","dataSourceRef":"demoReportSource"},"title":"Authored Landscape Report","pageGeometry":{"width":792,"height":612,"marginTop":36,"marginRight":36,"marginBottom":36,"marginLeft":36,"headerHeight":36,"footerHeight":24},"pages":[{"number":1,"elements":[{"id":"primaryTable__title_0","kind":"text","box":{"x":36,"y":84,"width":720,"height":20},"text":"Table","fontSize":14,"fontWeight":"600","color":"#101828"},{"id":"primaryTable__header_bg__page_1","kind":"rect","box":{"x":36,"y":108,"width":720,"height":24},"fillColor":"#f8fafc","strokeColor":"#d0d5dd","strokeWidth":1},{"id":"primaryTable__header__eventDate__page_1","kind":"text","box":{"x":42,"y":112,"width":168,"height":16},"text":"Date","fontSize":11,"fontWeight":"600","color":"#101828","align":"left"},{"id":"primaryTable__header__channelId__page_1","kind":"text","box":{"x":222,"y":112,"width":168,"height":16},"text":"Channel","fontSize":11,"fontWeight":"600","color":"#101828","align":"left"},{"id":"primaryTable__header__totalSpend__page_1","kind":"text","box":{"x":402,"y":112,"width":168,"height":16},"text":"Spend","fontSize":11,"fontWeight":"600","color":"#101828","align":"right"},{"id":"primaryTable__header__impressions__page_1","kind":"text","box":{"x":582,"y":112,"width":168,"height":16},"text":"Impressions","fontSize":11,"fontWeight":"600","color":"#101828","align":"right"},{"id":"primaryTable__row_rule_0","kind":"line","box":{"x":36,"y":156,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"primaryTable__row_1__eventDate__text","kind":"tableCellText","box":{"x":42,"y":136,"width":168,"height":16},"rowKey":"row_1","columnKey":"eventDate","text":"2026-05-01","format":"date","align":"left"},{"id":"primaryTable__row_1__channelId__text","kind":"tableCellText","box":{"x":222,"y":136,"width":168,"height":16},"rowKey":"row_1","columnKey":"channelId","text":"Display","align":"left"},{"id":"primaryTable__row_1__totalSpend__text","kind":"tableCellText","box":{"x":402,"y":136,"width":168,"height":16},"rowKey":"row_1","columnKey":"totalSpend","text":"40400","format":"currency","align":"right"},{"id":"primaryTable__row_1__impressions__text","kind":"tableCellText","box":{"x":582,"y":136,"width":168,"height":16},"rowKey":"row_1","columnKey":"impressions","text":"16500","format":"compactNumber","align":"right"},{"id":"primaryTable__row_rule_1","kind":"line","box":{"x":36,"y":180,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"primaryTable__row_2__eventDate__text","kind":"tableCellText","box":{"x":42,"y":160,"width":168,"height":16},"rowKey":"row_2","columnKey":"eventDate","text":"2026-05-02","format":"date","align":"left"},{"id":"primaryTable__row_2__channelId__text","kind":"tableCellText","box":{"x":222,"y":160,"width":168,"height":16},"rowKey":"row_2","columnKey":"channelId","text":"CTV","align":"left"},{"id":"primaryTable__row_2__totalSpend__text","kind":"tableCellText","box":{"x":402,"y":160,"width":168,"height":16},"rowKey":"row_2","columnKey":"totalSpend","text":"34300","format":"currency","align":"right"},{"id":"primaryTable__row_2__impressions__text","kind":"tableCellText","box":{"x":582,"y":160,"width":168,"height":16},"rowKey":"row_2","columnKey":"impressions","text":"14700","format":"compactNumber","align":"right"},{"id":"primaryTable__row_rule_2","kind":"line","box":{"x":36,"y":204,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"primaryTable__row_3__eventDate__text","kind":"tableCellText","box":{"x":42,"y":184,"width":168,"height":16},"rowKey":"row_3","columnKey":"eventDate","text":"2026-05-03","format":"date","align":"left"},{"id":"primaryTable__row_3__channelId__text","kind":"tableCellText","box":{"x":222,"y":184,"width":168,"height":16},"rowKey":"row_3","columnKey":"channelId","text":"Display","align":"left"},{"id":"primaryTable__row_3__totalSpend__text","kind":"tableCellText","box":{"x":402,"y":184,"width":168,"height":16},"rowKey":"row_3","columnKey":"totalSpend","text":"55200","format":"currency","align":"right"},{"id":"primaryTable__row_3__impressions__text","kind":"tableCellText","box":{"x":582,"y":184,"width":168,"height":16},"rowKey":"row_3","columnKey":"impressions","text":"23100","format":"compactNumber","align":"right"},{"id":"primaryTable__row_rule_3","kind":"line","box":{"x":36,"y":228,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"primaryTable__row_4__eventDate__text","kind":"tableCellText","box":{"x":42,"y":208,"width":168,"height":16},"rowKey":"row_4","columnKey":"eventDate","text":"2026-05-04","format":"date","align":"left"},{"id":"primaryTable__row_4__channelId__text","kind":"tableCellText","box":{"x":222,"y":208,"width":168,"height":16},"rowKey":"row_4","columnKey":"channelId","text":"CTV","align":"left"},{"id":"primaryTable__row_4__totalSpend__text","kind":"tableCellText","box":{"x":402,"y":208,"width":168,"height":16},"rowKey":"row_4","columnKey":"totalSpend","text":"48800","format":"currency","align":"right"},{"id":"primaryTable__row_4__impressions__text","kind":"tableCellText","box":{"x":582,"y":208,"width":168,"height":16},"rowKey":"row_4","columnKey":"impressions","text":"20800","format":"compactNumber","align":"right"},{"id":"channelTrend__title_0","kind":"text","box":{"x":36,"y":244,"width":720,"height":20},"text":"Channel Trend","fontSize":14,"fontWeight":"600","color":"#101828"},{"id":"channelTrend__svg_page_1","kind":"svg","box":{"x":36,"y":268,"width":720,"height":264},"svg":"<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 264\" width=\"720\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"704\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">55.2K</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"704\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">36.8K</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"704\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">18.4K</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M52,64.2608695652174 L486.6666666666667,16\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"64.2608695652174\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"486.6666666666667\" cy=\"16\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n    \n\n      <path d=\"M269.33333333333337,84.15217391304348 L704,36.869565217391305\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" />\n      \n      <circle cx=\"269.33333333333337\" cy=\"84.15217391304348\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"704\" cy=\"36.869565217391305\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n    \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n\n      <text x=\"269.33333333333337\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-02</text>\n    \n\n      <text x=\"486.6666666666667\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-03</text>\n    \n\n      <text x=\"704\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-04</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"172\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"232\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"}],"headerElements":[{"id":"page_1__header_title","kind":"text","box":{"x":36,"y":36,"width":720,"height":28},"text":"Authored Landscape Report","fontSize":18,"fontWeight":"700","color":"#101828"},{"id":"page_1__header_rule","kind":"line","box":{"x":36,"y":70,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1}],"footerElements":[{"id":"page_1__footer_rule","kind":"line","box":{"x":36,"y":554,"width":720,"height":0},"strokeColor":"#d0d5dd","strokeWidth":1},{"id":"page_1__footer_page_number","kind":"text","box":{"x":36,"y":558,"width":720,"height":16},"text":"Page 1","fontSize":11,"color":"#667085","align":"right"}]}],"bookmarks":[{"id":"bookmark.primaryTable","title":"Table","pageNumber":1,"level":1,"elementId":"primaryTable__title_0","y":84},{"id":"bookmark.channelTrend","title":"Channel Trend","pageNumber":1,"level":1,"elementId":"channelTrend__title_0","y":244}],"diagnostics":[]}
+{
+  "version": 1,
+  "kind": "reportPrint",
+  "specVersion": 1,
+  "specHash": "fnv1a:02067797",
+  "fillVersion": 1,
+  "fillHash": "fnv1a:88a32830",
+  "source": {
+    "kind": "dashboard.reportBuilder",
+    "containerId": "authoredLandscapeBuilder",
+    "stateKey": "authoredLandscapeBuilder",
+    "dataSourceRef": "demoReportSource"
+  },
+  "title": "Authored Landscape Report",
+  "pageGeometry": {
+    "width": 792,
+    "height": 612,
+    "marginTop": 36,
+    "marginRight": 36,
+    "marginBottom": 36,
+    "marginLeft": 36,
+    "headerHeight": 36,
+    "footerHeight": 24
+  },
+  "pages": [
+    {
+      "number": 1,
+      "elements": [
+        {
+          "id": "primaryTable__title_0",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 84,
+            "width": 720,
+            "height": 20
+          },
+          "text": "Table",
+          "fontSize": 14,
+          "fontWeight": "600",
+          "color": "#101828"
+        },
+        {
+          "id": "primaryTable__header_bg__page_1",
+          "kind": "rect",
+          "box": {
+            "x": 36,
+            "y": 108,
+            "width": 720,
+            "height": 24
+          },
+          "fillColor": "#f8fafc",
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "primaryTable__header__eventDate__page_1",
+          "kind": "text",
+          "box": {
+            "x": 42,
+            "y": 112,
+            "width": 168,
+            "height": 16
+          },
+          "text": "Date",
+          "fontSize": 11,
+          "fontWeight": "600",
+          "color": "#101828",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__header__channelId__page_1",
+          "kind": "text",
+          "box": {
+            "x": 222,
+            "y": 112,
+            "width": 168,
+            "height": 16
+          },
+          "text": "Channel",
+          "fontSize": 11,
+          "fontWeight": "600",
+          "color": "#101828",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__header__totalSpend__page_1",
+          "kind": "text",
+          "box": {
+            "x": 402,
+            "y": 112,
+            "width": 168,
+            "height": 16
+          },
+          "text": "Spend",
+          "fontSize": 11,
+          "fontWeight": "600",
+          "color": "#101828",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__header__impressions__page_1",
+          "kind": "text",
+          "box": {
+            "x": 582,
+            "y": 112,
+            "width": 168,
+            "height": 16
+          },
+          "text": "Impressions",
+          "fontSize": 11,
+          "fontWeight": "600",
+          "color": "#101828",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_rule_0",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 156,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "primaryTable__row_1__eventDate__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 136,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_1",
+          "columnKey": "eventDate",
+          "text": "2026-05-01",
+          "format": "date",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_1__channelId__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 222,
+            "y": 136,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_1",
+          "columnKey": "channelId",
+          "text": "Display",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_1__totalSpend__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 136,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_1",
+          "columnKey": "totalSpend",
+          "text": "$40,400.00",
+          "format": "currency",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_1__impressions__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 582,
+            "y": 136,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_1",
+          "columnKey": "impressions",
+          "text": "16 500",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_rule_1",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 180,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "primaryTable__row_2__eventDate__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 160,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_2",
+          "columnKey": "eventDate",
+          "text": "2026-05-02",
+          "format": "date",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_2__channelId__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 222,
+            "y": 160,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_2",
+          "columnKey": "channelId",
+          "text": "CTV",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_2__totalSpend__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 160,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_2",
+          "columnKey": "totalSpend",
+          "text": "$34,300.00",
+          "format": "currency",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_2__impressions__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 582,
+            "y": 160,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_2",
+          "columnKey": "impressions",
+          "text": "14 700",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_rule_2",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 204,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "primaryTable__row_3__eventDate__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 184,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_3",
+          "columnKey": "eventDate",
+          "text": "2026-05-03",
+          "format": "date",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_3__channelId__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 222,
+            "y": 184,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_3",
+          "columnKey": "channelId",
+          "text": "Display",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_3__totalSpend__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 184,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_3",
+          "columnKey": "totalSpend",
+          "text": "$55,200.00",
+          "format": "currency",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_3__impressions__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 582,
+            "y": 184,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_3",
+          "columnKey": "impressions",
+          "text": "23 100",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_rule_3",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 228,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "primaryTable__row_4__eventDate__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 208,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_4",
+          "columnKey": "eventDate",
+          "text": "2026-05-04",
+          "format": "date",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_4__channelId__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 222,
+            "y": 208,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_4",
+          "columnKey": "channelId",
+          "text": "CTV",
+          "align": "left"
+        },
+        {
+          "id": "primaryTable__row_4__totalSpend__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 402,
+            "y": 208,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_4",
+          "columnKey": "totalSpend",
+          "text": "$48,800.00",
+          "format": "currency",
+          "align": "right"
+        },
+        {
+          "id": "primaryTable__row_4__impressions__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 582,
+            "y": 208,
+            "width": 168,
+            "height": 16
+          },
+          "rowKey": "row_4",
+          "columnKey": "impressions",
+          "text": "20 800",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "id": "channelTrend__title_0",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 244,
+            "width": 720,
+            "height": 20
+          },
+          "text": "Channel Trend",
+          "fontSize": 14,
+          "fontWeight": "600",
+          "color": "#101828"
+        },
+        {
+          "id": "channelTrend__svg_page_1",
+          "kind": "svg",
+          "box": {
+            "x": 36,
+            "y": 268,
+            "width": 720,
+            "height": 264
+          },
+          "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 264\" width=\"720\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"704\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">55,200</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"704\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">36,800</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"704\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">18,400</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      \n      <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M52,64.2608695652174 L486.6666666666667,16\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"64.2608695652174\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"486.6666666666667\" cy=\"16\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n      \n    \n\n      <path d=\"M269.33333333333337,84.15217391304348 L704,36.869565217391305\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" />\n      \n      <circle cx=\"269.33333333333337\" cy=\"84.15217391304348\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"704\" cy=\"36.869565217391305\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n      \n    \n      \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n\n      <text x=\"269.33333333333337\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-02</text>\n    \n\n      <text x=\"486.6666666666667\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-03</text>\n    \n\n      <text x=\"704\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-04</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"172\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"232\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
+        }
+      ],
+      "headerElements": [
+        {
+          "id": "page_1__header_title",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 36,
+            "width": 720,
+            "height": 28
+          },
+          "text": "Authored Landscape Report",
+          "fontSize": 18,
+          "fontWeight": "700",
+          "color": "#101828"
+        },
+        {
+          "id": "page_1__header_rule",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 70,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        }
+      ],
+      "footerElements": [
+        {
+          "id": "page_1__footer_rule",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 554,
+            "width": 720,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "page_1__footer_page_number",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 558,
+            "width": 720,
+            "height": 16
+          },
+          "text": "Page 1",
+          "fontSize": 11,
+          "color": "#667085",
+          "align": "right"
+        }
+      ]
+    }
+  ],
+  "bookmarks": [
+    {
+      "id": "bookmark.primaryTable",
+      "title": "Table",
+      "pageNumber": 1,
+      "level": 1,
+      "elementId": "primaryTable__title_0",
+      "y": 84
+    },
+    {
+      "id": "bookmark.channelTrend",
+      "title": "Channel Trend",
+      "pageNumber": 1,
+      "level": 1,
+      "elementId": "channelTrend__title_0",
+      "y": 244
+    }
+  ],
+  "diagnostics": []
+}

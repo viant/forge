@@ -1,4 +1,5 @@
 import { validateReportExportRequest } from "./schema/reportSchemas.js";
+import { extractReportDocumentTemplateIdentity } from "./reportDocumentModel.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -20,7 +21,7 @@ function normalizeEnumValue(value = "", allowed = []) {
 }
 
 export const REPORT_EXPORT_FORMATS = Object.freeze(["pdf", "csv", "xlsx", "html"]);
-export const REPORT_EXPORT_SOURCE_KINDS = Object.freeze(["draft", "savedPayload", "savedView", "publishedSnapshot"]);
+export const REPORT_EXPORT_SOURCE_KINDS = Object.freeze(["draft", "preset", "savedPayload", "savedView", "publishedSnapshot"]);
 
 export function buildReportExportArtifactRef({
   artifactKind = "",
@@ -47,6 +48,8 @@ export function buildReportExportSource(source = {}) {
   const from = normalizeEnumValue(source?.from, REPORT_EXPORT_SOURCE_KINDS);
   const artifactKind = normalizeString(source?.artifactKind);
   const title = normalizeString(source?.title);
+  const windowKey = normalizeString(source?.windowKey);
+  const templateLabel = normalizeString(source?.templateLabel);
   const artifactRef = buildReportExportArtifactRef({
     artifactKind,
     artifactRef: source?.artifactRef,
@@ -80,6 +83,12 @@ export function buildReportExportSource(source = {}) {
   }
   if (documentVersion != null) {
     next.documentVersion = documentVersion;
+  }
+  if (windowKey) {
+    next.windowKey = windowKey;
+  }
+  if (templateLabel) {
+    next.templateLabel = templateLabel;
   }
   return next;
 }
@@ -131,6 +140,36 @@ export function buildDraftReportExportRequest({
   const source = reportSpec?.source && typeof reportSpec.source === "object" && !Array.isArray(reportSpec.source)
     ? reportSpec.source
     : {};
+  const templateIdentity = extractReportDocumentTemplateIdentity(reportDocument);
+  const templateId = normalizeString(templateIdentity?.templateId);
+  const templateLabel = normalizeString(templateIdentity?.templateLabel);
+  const windowKey = normalizeString(source?.containerId || source?.stateKey);
+  if (templateId) {
+    const artifactKind = "reportBuilder.reportTemplate";
+    const artifactRef = windowKey
+      ? `${artifactKind}://${windowKey}:${templateId}`
+      : buildReportExportArtifactRef({
+        artifactKind,
+        sourceArtifactId: templateId,
+      });
+    return buildReportExportRequest({
+      format,
+      source: {
+        from: "preset",
+        artifactKind,
+        artifactRef,
+        sourceArtifactId: templateId,
+        ...(windowKey ? { windowKey } : {}),
+        ...(templateLabel ? { templateLabel } : {}),
+        reportId: normalizeString(reportDocument?.id),
+        title: normalizeString(reportDocument?.title || reportSpec?.title || templateLabel || "Report") || "Report",
+      },
+      reportSpec,
+      reportFill,
+      reportPrint,
+      metadata,
+    });
+  }
   return buildReportExportRequest({
     format,
     source: {

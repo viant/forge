@@ -23,6 +23,10 @@ import {
     CartesianGrid,
     Tooltip,
     Legend,
+    LabelList,
+    ReferenceArea,
+    ReferenceDot,
+    ReferenceLine,
     ResponsiveContainer,
 } from "recharts";
 import { useDataSourceState } from "../hooks/useDataSourceState.js";
@@ -62,6 +66,7 @@ import { SoftBlock } from "./SoftSkeleton.jsx";
 import { resolveSelector } from "../utils/selector.js";
 import { getLogger } from "../utils/logger.js";
 import { normalizeServiceErrorText } from "../utils/errorText.js";
+import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "../reporting/reportChartAnnotations.js";
 
 function ChartActionButton({
     children,
@@ -159,6 +164,7 @@ function getSeriesDefinitions(chart = {}) {
         type: entry?.type || chart?.type || "line",
         axis: entry?.axis || "left",
         color: entry?.color || palette[index % Math.max(palette.length, 1)] || "#137cbd",
+        dataLabels: entry?.dataLabels,
     })).filter((entry) => !!entry.value);
 }
 
@@ -179,6 +185,54 @@ function formatValueByFormat(value, formatType) {
         default:
             return formatLargeNumber(numeric);
     }
+}
+
+function shouldRenderSeriesDataLabels(series = {}, chartType = "", rowCount = 0, embedded = false) {
+    if (embedded) {
+        return false;
+    }
+    const mode = String(series?.dataLabels || "").trim().toLowerCase();
+    if (mode === "none") {
+        return false;
+    }
+    if (mode === "always") {
+        return true;
+    }
+    if (mode !== "auto") {
+        return false;
+    }
+    if (chartType === "horizontal_bar" || chartType === "funnel_bar") {
+        return rowCount <= 12;
+    }
+    if (chartType === "bar") {
+        return rowCount <= 10;
+    }
+    if (chartType === "line" || chartType === "area") {
+        return rowCount <= 8;
+    }
+    return false;
+}
+
+function buildDataLabelFormatter(formatType = "") {
+    return (value) => formatValueByFormat(value, formatType);
+}
+
+export function resolveConditionalSeriesColor(series = {}, value, fallbackColor = "") {
+    const mode = String(series?.pointColorMode || "").trim();
+    if (mode !== "bySign") {
+        return fallbackColor || series?.color || "#137cbd";
+    }
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+        return fallbackColor || series?.color || "#137cbd";
+    }
+    if (numericValue > 0) {
+        return "#0f9960";
+    }
+    if (numericValue < 0) {
+        return "#db3737";
+    }
+    return "#98a2b3";
 }
 
 function createAxisTickFormatter(formatType) {
@@ -222,6 +276,89 @@ function resolveMappedConfigValue(baseContext, entry = {}, valueKey = "", defaul
         return entry?.[valueKey];
     }
     return mapping[key] ?? entry?.[valueKey];
+}
+
+function buildAnnotationLabel(label = "", color = "", embedded = false, position = "end") {
+    const normalizedLabel = String(label || "").trim();
+    if (!normalizedLabel) {
+        return undefined;
+    }
+    return {
+        value: normalizedLabel,
+        position,
+        fill: color || "#41566d",
+        fontSize: embedded ? 10 : 11,
+        fontWeight: 600,
+    };
+}
+
+function buildRuntimeChartAnnotationElements(annotations = [], { embedded = false } = {}) {
+    const background = [];
+    const foreground = [];
+
+    annotations.forEach((annotation, index) => {
+        const color = annotation?.color || "#5f6b7c";
+        const dash = resolveChartAnnotationStrokeDasharray(annotation?.lineStyle);
+        const key = annotation?.id || `${annotation?.kind || "annotation"}-${index}`;
+
+        if (annotation?.kind === "band") {
+            const commonProps = {
+                key,
+                ifOverflow: "extendDomain",
+                fill: color,
+                fillOpacity: annotation?.opacity ?? 0.12,
+                stroke: color,
+                strokeOpacity: 0.25,
+                label: buildAnnotationLabel(annotation?.label, color, embedded, "insideTop"),
+            };
+            background.push(
+                annotation?.axis === "y"
+                    ? <ReferenceArea {...commonProps} y1={annotation.from} y2={annotation.to} />
+                    : <ReferenceArea {...commonProps} x1={annotation.from} x2={annotation.to} />,
+            );
+            return;
+        }
+
+        if (annotation?.kind === "note") {
+            foreground.push(
+                <ReferenceDot
+                    key={key}
+                    ifOverflow="extendDomain"
+                    x={annotation.x}
+                    y={annotation.y}
+                    r={embedded ? 4 : 5}
+                    fill={color}
+                    stroke={color}
+                    strokeWidth={2}
+                    label={buildAnnotationLabel(annotation?.label, color, embedded, "top")}
+                />,
+            );
+            return;
+        }
+
+        const label = buildAnnotationLabel(annotation?.label, color, embedded, annotation?.position || "end");
+        const commonLineProps = {
+            key,
+            ifOverflow: "extendDomain",
+            stroke: color,
+            strokeWidth: embedded ? 1.5 : 2,
+            strokeDasharray: dash || undefined,
+            position: annotation?.position || "end",
+            label,
+        };
+        if (annotation?.kind === "verticalMarker" || (annotation?.kind === "referenceLine" && annotation?.axis === "x")) {
+            foreground.push(<ReferenceLine {...commonLineProps} x={annotation?.value} />);
+            return;
+        }
+        if (annotation?.kind === "referenceLine" && annotation?.axis === "y") {
+            foreground.push(<ReferenceLine {...commonLineProps} y={annotation?.value} />);
+        }
+    });
+
+    return {
+        background,
+        foreground,
+    };
 }
 
 // Function to format large numbers with commas
@@ -632,9 +769,104 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         );
     }) : null;
 
+    const denseChartData = fillMissingTemporalBuckets(
+        chartData,
+        xAxis?.dataKey || "name",
+        selectedSeriesDefinitions,
+        chart?.fillMissingTemporalBuckets,
+    );
+
+    const normalizedChartData = (isHorizontalBar
+        ? [...denseChartData].sort((a, b) => {
+            const primaryKey = selectedSeriesDefinitions[0]?.value;
+            return Number(b?.[primaryKey] || 0) - Number(a?.[primaryKey] || 0);
+        })
+        : denseChartData
+    ).map((row) => ({
+        ...row,
+        __seriesFormats: Object.fromEntries(selectedSeriesDefinitions.map((entry) => [entry.value, entry.format || leftAxis.format])),
+        __seriesAxes: Object.fromEntries(selectedSeriesDefinitions.map((entry) => [entry.value, entry.axis === "right" ? rightAxis?.format : leftAxis.format])),
+    }));
+
+    const resolvedChartAnnotations = React.useMemo(() => (
+        buildRuntimeChartAnnotationElements(normalizeChartAnnotations(chart), { embedded })
+    ), [chart, embedded]);
+
+    const cartesianSeriesElements = selectedSeriesDefinitions.map((entry) => {
+        const commonProps = {
+            dataKey: entry.value,
+            name: entry.name || entry.label,
+            yAxisId: entry.axis || "left",
+            stroke: entry.color,
+            fill: entry.color,
+            strokeWidth: entry.strokeWidth || (embedded ? 3 : 2),
+            strokeDasharray: entry.strokeDasharray,
+            fillOpacity: entry.fillOpacity ?? (entry.type === "area" ? 0.22 : 1),
+            opacity: entry.opacity,
+        };
+        const showSeriesDataLabels = shouldRenderSeriesDataLabels(entry, type, normalizedChartData.length, embedded);
+        const dataLabelFormatter = buildDataLabelFormatter(entry.format || leftAxis.format);
+
+        if (entry.type === "bar") {
+            return (
+                <Bar key={entry.value} {...commonProps} stackId={entry.stackId} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
+                    {entry.pointColorMode === "bySign"
+                        ? normalizedChartData.map((row, index) => (
+                            <Cell key={`${entry.value}-cell-${index}`} fill={resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color)} />
+                        ))
+                        : null}
+                    {showSeriesDataLabels ? (
+                        <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="#5f6b7c" fontSize={11} />
+                    ) : null}
+                </Bar>
+            );
+        }
+        if (entry.type === "area") {
+            const dotRenderer = embedded || interactiveDatumSelection || entry.pointColorMode === "bySign"
+                ? ((props = {}) => (
+                    <circle
+                        cx={props.cx}
+                        cy={props.cy}
+                        r={embedded || interactiveDatumSelection ? 4 : 3}
+                        strokeWidth={1}
+                        stroke="#ffffff"
+                        fill={resolveConditionalSeriesColor(entry, props?.payload?.[entry.value], entry.color)}
+                    />
+                ))
+                : false;
+            return (
+                <Area key={entry.value} {...commonProps} type="monotone" connectNulls={true} dot={dotRenderer} activeDot={embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
+                    {showSeriesDataLabels ? (
+                        <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="#5f6b7c" fontSize={11} />
+                    ) : null}
+                </Area>
+            );
+        }
+        const lineDotRenderer = embedded || interactiveDatumSelection || entry.pointColorMode === "bySign"
+            ? ((props = {}) => (
+                <circle
+                    cx={props.cx}
+                    cy={props.cy}
+                    r={embedded || interactiveDatumSelection ? 4 : 3}
+                    strokeWidth={1}
+                    stroke="#ffffff"
+                    fill={resolveConditionalSeriesColor(entry, props?.payload?.[entry.value], entry.color)}
+                />
+            ))
+            : false;
+        return (
+            <Line key={entry.value} {...commonProps} type="monotone" connectNulls={true} strokeLinecap="round" strokeLinejoin="round" dot={lineDotRenderer} activeDot={embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
+                {showSeriesDataLabels ? (
+                    <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="#5f6b7c" fontSize={11} />
+                ) : null}
+            </Line>
+        );
+    });
+
     const sharedChartChildren = (
         <>
             <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={gridStroke}/>
+            {resolvedChartAnnotations.background}
             <XAxis
                 dataKey={xAxis?.dataKey || "name"}
                 tickFormatter={(val) => formatTimestamp(val, resolvedTickFormat)}
@@ -691,48 +923,10 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 contentStyle={embedded ? {fontSize: "11px", borderRadius: "8px", border: "1px solid #d8e1e8"} : undefined}
             />
             {showChartLegend ? <Legend {...legendProps} {...(interactiveLegendContent ? { content: interactiveLegendContent } : {})}/> : null}
-            {selectedSeriesDefinitions.map((entry, index) => {
-                const commonProps = {
-                    dataKey: entry.value,
-                    name: entry.name || entry.label,
-                    yAxisId: entry.axis || "left",
-                    stroke: entry.color,
-                    fill: entry.color,
-                    strokeWidth: entry.strokeWidth || (embedded ? 3 : 2),
-                    strokeDasharray: entry.strokeDasharray,
-                    fillOpacity: entry.fillOpacity ?? (entry.type === "area" ? 0.22 : 1),
-                    opacity: entry.opacity,
-                };
-
-                if (entry.type === "bar") {
-                    return <Bar key={entry.value} {...commonProps} stackId={entry.stackId} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})} />;
-                }
-                if (entry.type === "area") {
-                    return <Area key={entry.value} {...commonProps} type="monotone" connectNulls={true} dot={embedded || interactiveDatumSelection ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})} />;
-                }
-                return <Line key={entry.value} {...commonProps} type="monotone" connectNulls={true} strokeLinecap="round" strokeLinejoin="round" dot={embedded || interactiveDatumSelection ? { r: 4, strokeWidth: 1, fill: "#ffffff" } : false} activeDot={embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})} />;
-            })}
+            {cartesianSeriesElements}
+            {resolvedChartAnnotations.foreground}
         </>
     );
-
-    const denseChartData = fillMissingTemporalBuckets(
-        chartData,
-        xAxis?.dataKey || "name",
-        selectedSeriesDefinitions,
-        chart?.fillMissingTemporalBuckets,
-    );
-
-    const normalizedChartData = (isHorizontalBar
-        ? [...denseChartData].sort((a, b) => {
-            const primaryKey = selectedSeriesDefinitions[0]?.value;
-            return Number(b?.[primaryKey] || 0) - Number(a?.[primaryKey] || 0);
-        })
-        : denseChartData
-    ).map((row) => ({
-        ...row,
-        __seriesFormats: Object.fromEntries(selectedSeriesDefinitions.map((entry) => [entry.value, entry.format || leftAxis.format])),
-        __seriesAxes: Object.fromEntries(selectedSeriesDefinitions.map((entry) => [entry.value, entry.axis === "right" ? rightAxis?.format : leftAxis.format])),
-    }));
 
     const composedChart = (
         <ComposedChart data={normalizedChartData} margin={chartMargin}>
@@ -766,10 +960,12 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             )
         );
         const barSize = embedded ? 10 : 12;
+        const showHorizontalDataLabels = shouldRenderSeriesDataLabels(primarySeries, type, normalizedChartData.length, embedded);
 
         return (
             <BarChart data={normalizedChartData} margin={chartMargin} layout="vertical">
                 <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={embedded ? "rgba(95,107,124,0.18)" : undefined}/>
+                {resolvedChartAnnotations.background}
                 <XAxis
                     type="number"
                     tickFormatter={createAxisTickFormatter(primarySeries.format || leftAxis.format)}
@@ -800,8 +996,16 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         barSize={barSize}
                         {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(primarySeries.value, payload) } : {})}
                     >
-                        {normalizedChartData.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={activePalette[index % activePalette.length]} />
+                        {showHorizontalDataLabels ? (
+                            <LabelList dataKey={primarySeries.value} position="right" formatter={buildDataLabelFormatter(primarySeries.format || leftAxis.format)} fill="#5f6b7c" fontSize={11} />
+                        ) : null}
+                        {normalizedChartData.map((row, index) => (
+                            <Cell
+                                key={`cell-${index}`}
+                                fill={primarySeries.pointColorMode === "bySign"
+                                    ? resolveConditionalSeriesColor(primarySeries, row?.[primarySeries.value], activePalette[index % activePalette.length])
+                                    : activePalette[index % activePalette.length]}
+                            />
                         ))}
                     </Bar>
                 ) : (
@@ -814,9 +1018,19 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                             barSize={barSize}
                             stackId={type === "funnel_bar" ? undefined : entry.stackId}
                             {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}
-                        />
+                        >
+                            {entry.pointColorMode === "bySign"
+                                ? normalizedChartData.map((row, index) => (
+                                    <Cell key={`${entry.value}-cell-${index}`} fill={resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color)} />
+                                ))
+                                : null}
+                            {shouldRenderSeriesDataLabels(entry, type, normalizedChartData.length, embedded) ? (
+                                <LabelList dataKey={entry.value} position="right" formatter={buildDataLabelFormatter(entry.format || leftAxis.format)} fill="#5f6b7c" fontSize={11} />
+                            ) : null}
+                        </Bar>
                     ))
                 )}
+                {resolvedChartAnnotations.foreground}
             </BarChart>
         );
     })();

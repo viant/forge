@@ -333,6 +333,27 @@ assert.deepEqual(hydrated, {
     },
 });
 
+const hydratedWithTheme = buildHydratedReportBuilderDocument({
+    ...getResponse,
+    document: {
+        ...getResponse.document,
+        theme: {
+            accentTone: "green",
+            badgePalette: "bold",
+        },
+    },
+}, {
+    container: {
+        id: "demoReportBuilder",
+        stateKey: "demoReportBuilder",
+        dataSourceRef: "demoReportSource",
+    },
+    builderIdentity,
+});
+assert.equal(hydratedWithTheme.valid, true);
+assert.equal(hydratedWithTheme.state.reportDocumentThemeAccent, "green");
+assert.equal(hydratedWithTheme.state.reportDocumentBadgePalette, "bold");
+
 // scope-native scopeParams.* binding targets hydrate the same builder slot as
 // the legacy staticFilters.* convention
 const hydratedWithScopeParamBindings = buildHydratedReportBuilderDocument({
@@ -549,6 +570,10 @@ assert.deepEqual(hydratedWithDocumentStaticDataset.state.reportStaticDatasets, [
         ],
         secondaryFieldOptions: [
             { value: "segment", label: "Segment" },
+        ],
+        chartFieldOptions: [
+            { key: "segment", label: "Segment", kind: "dimension" },
+            { key: "score", label: "Score", kind: "measure" },
         ],
     },
 ]);

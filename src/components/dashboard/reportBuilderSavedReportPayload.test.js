@@ -2032,12 +2032,58 @@ const payloadWithAuthoredBlocks = buildReportBuilderSavedReportPayloadFromBuilde
         primaryMeasure: "avails",
         selectedDimensions: ["eventDate"],
         viewMode: "table",
+        reportDocumentThemeAccent: "green",
+        reportDocumentBadgePalette: "bold",
         reportDocumentBlocks: [
+            {
+                id: "overviewSection",
+                kind: "sectionBlock",
+                title: "Overview",
+                navigationLabel: "Overview",
+            },
+            {
+                id: "summaryPanel",
+                kind: "compositeBlock",
+                title: "Summary panel",
+                description: "Groups the intro and process blocks.",
+                childBlockIds: ["directIntro", "integrationFlow"],
+            },
+            {
+                id: "launchCallout",
+                kind: "calloutBlock",
+                title: "Launch update",
+                icon: "warning-sign",
+                description: "Important rollout note.",
+                tone: "warning",
+                badges: ["Executive", "Launch Ready"],
+                body: "Publisher activation is staged for Friday.",
+            },
+            {
+                id: "sectionTabs",
+                kind: "tabGroupBlock",
+                title: "Forecast views",
+                sectionIds: ["overviewSection"],
+                defaultSectionId: "overviewSection",
+            },
+            {
+                id: "directIntro",
+                kind: "infoPanelBlock",
+                title: "What is a Direct Integration Path?",
+                body: "Authored explainer.",
+            },
             {
                 id: "narrativeIntro",
                 kind: "markdownBlock",
                 title: "Narrative",
                 markdown: "## Narrative\nAuthored context.",
+            },
+            {
+                id: "integrationFlow",
+                kind: "stepperBlock",
+                title: "Direct Integration Path",
+                steps: [
+                    { id: "step_1", title: "Bid directly", body: "Connect bidding directly to the publisher ad server." },
+                ],
             },
             {
                 id: "headlineKpi",
@@ -2047,13 +2093,37 @@ const payloadWithAuthoredBlocks = buildReportBuilderSavedReportPayloadFromBuilde
                 valueField: "avails",
                 valueLabel: "Avails",
             },
+            {
+                id: "publisherPipeline",
+                kind: "kanbanBlock",
+                title: "Publisher Pipeline",
+                columns: [
+                    { id: "signed", title: "Signed", cards: [{ id: "tubi", title: "Tubi" }] },
+                ],
+            },
+            {
+                id: "integrationTimeline",
+                kind: "timelineBlock",
+                title: "Integration Timeline",
+                events: [
+                    { id: "event_1", date: "2026-07-15", title: "Roku signed" },
+                ],
+            },
         ],
         reportDocumentLayout: {
             type: "stack",
             items: [
+                { blockId: "overviewSection" },
+                { blockId: "summaryPanel" },
+                { blockId: "launchCallout" },
+                { blockId: "sectionTabs" },
+                { blockId: "directIntro" },
                 { blockId: "narrativeIntro" },
+                { blockId: "integrationFlow" },
                 { blockId: "primaryBuilder" },
                 { blockId: "headlineKpi" },
+                { blockId: "publisherPipeline" },
+                { blockId: "integrationTimeline" },
             ],
         },
     },
@@ -2062,13 +2132,37 @@ const payloadWithAuthoredBlocks = buildReportBuilderSavedReportPayloadFromBuilde
 assert.deepEqual(payloadWithAuthoredBlocks.reportDocument.layout, {
     type: "stack",
     items: [
+        { blockId: "overviewSection" },
+        { blockId: "summaryPanel" },
+        { blockId: "launchCallout" },
+        { blockId: "sectionTabs" },
+        { blockId: "directIntro" },
         { blockId: "narrativeIntro" },
+        { blockId: "integrationFlow" },
         { blockId: "primaryBuilder" },
         { blockId: "headlineKpi" },
+        { blockId: "publisherPipeline" },
+        { blockId: "integrationTimeline" },
     ],
 });
+assert.equal(payloadWithAuthoredBlocks.reportDocument.blocks.find((block) => block.id === "overviewSection")?.kind, "sectionBlock");
+assert.equal(payloadWithAuthoredBlocks.reportDocument.blocks.find((block) => block.id === "summaryPanel")?.kind, "compositeBlock");
+assert.equal(payloadWithAuthoredBlocks.reportDocument.blocks.find((block) => block.id === "launchCallout")?.kind, "calloutBlock");
+assert.equal(payloadWithAuthoredBlocks.reportDocument.blocks.find((block) => block.id === "sectionTabs")?.kind, "tabGroupBlock");
+assert.deepEqual(payloadWithAuthoredBlocks.reportDocument.theme, {
+    accentTone: "green",
+    badgePalette: "bold",
+});
+assert.deepEqual(payloadWithAuthoredBlocks.reportSpec.theme, {
+    accentTone: "green",
+    badgePalette: "bold",
+});
+assert.equal(payloadWithAuthoredBlocks.reportDocument.blocks.find((block) => block.id === "directIntro")?.kind, "infoPanelBlock");
 assert.equal(payloadWithAuthoredBlocks.reportDocument.blocks.find((block) => block.id === "narrativeIntro")?.kind, "markdownBlock");
+assert.equal(payloadWithAuthoredBlocks.reportDocument.blocks.find((block) => block.id === "integrationFlow")?.kind, "stepperBlock");
 assert.equal(payloadWithAuthoredBlocks.reportDocument.blocks.find((block) => block.id === "headlineKpi")?.kind, "kpiBlock");
+assert.equal(payloadWithAuthoredBlocks.reportDocument.blocks.find((block) => block.id === "publisherPipeline")?.kind, "kanbanBlock");
+assert.equal(payloadWithAuthoredBlocks.reportDocument.blocks.find((block) => block.id === "integrationTimeline")?.kind, "timelineBlock");
 assert.equal(
     Object.prototype.hasOwnProperty.call(
         payloadWithAuthoredBlocks.reportDocument.blocks.find((block) => block.id === "primaryBuilder")?.state || {},
@@ -2077,9 +2171,17 @@ assert.equal(
     false,
 );
 assert.deepEqual(payloadWithAuthoredBlocks.reportSpec.layoutIntent.blockOrder, [
+    "overviewSection",
+    "summaryPanel",
+    "launchCallout",
+    "sectionTabs",
+    "directIntro",
     "narrativeIntro",
+    "integrationFlow",
     "primaryTable",
     "headlineKpi",
+    "publisherPipeline",
+    "integrationTimeline",
 ]);
 
 const reopenedPayloadFromResponse = buildReportBuilderSavedReportPayloadFromBuilderState({

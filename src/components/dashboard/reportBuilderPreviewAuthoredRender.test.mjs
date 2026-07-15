@@ -206,7 +206,7 @@ assert.ok(html.includes('aria-label="Authored report"'));
 assert.ok(!html.includes('aria-label="Authored runtime preview"'));
 assert.ok(html.includes("Narrative"));
 assert.ok(html.includes("Detail Table"));
-assert.ok(html.includes("Semantic binding: Ad Delivery • Entity: Line Delivery"));
+assert.ok(!html.includes("Semantic binding: Ad Delivery • Entity: Line Delivery"));
 assert.ok(html.includes("Filters"));
 assert.ok(html.includes("Date Range"));
 assert.ok(html.includes("Date Range"));
@@ -232,9 +232,9 @@ const reportHtml = renderToStaticMarkup(
 assert.ok(reportHtml.includes('aria-label="Authored report"'));
 assert.ok(reportHtml.includes("Detail Table"));
 assert.ok(reportHtml.includes("Narrative"));
-assert.ok(reportHtml.includes("Semantic binding: Ad Delivery • Entity: Line Delivery"));
-assert.ok(reportHtml.includes("report-builder-filters-panel-heading"));
-assert.ok(reportHtml.includes("Refine scope and targeting for this report."));
+assert.ok(!reportHtml.includes("Semantic binding: Ad Delivery • Entity: Line Delivery"));
+assert.ok(reportHtml.includes("Filters"));
+assert.ok(!reportHtml.includes("Refine scope and targeting for this report."));
 assert.ok(!reportHtml.includes("Change these report filters here."));
 assert.ok(!reportHtml.includes("forge-report-builder__toolbar-group--scope"));
 assert.ok(!reportHtml.includes('aria-label="Semantic context summary"'));
@@ -386,7 +386,7 @@ const providerBackedPreviewHtml = renderToStaticMarkup(
 );
 
 // Without a persisted mode the builder now defaults to the primary Report surface.
-assert.ok(providerBackedPreviewHtml.includes("Semantic binding: Canonical Ad Delivery • Entity: Canonical Line Delivery"));
+assert.ok(!providerBackedPreviewHtml.includes("Semantic binding: Canonical Ad Delivery • Entity: Canonical Line Delivery"));
 assert.ok(providerBackedPreviewHtml.includes("Semantic validation: Loading semantic model metadata…"));
 assert.ok(!providerBackedPreviewHtml.includes('aria-label="Semantic context summary"'));
 
@@ -411,7 +411,7 @@ const providerBackedReportHtml = renderToStaticMarkup(
   }),
 );
 
-assert.ok(providerBackedReportHtml.includes("Semantic binding: Canonical Ad Delivery • Entity: Canonical Line Delivery"));
+assert.ok(!providerBackedReportHtml.includes("Semantic binding: Canonical Ad Delivery • Entity: Canonical Line Delivery"));
 assert.ok(providerBackedReportHtml.includes("Semantic validation: Loading semantic model metadata…"));
 assert.ok(!providerBackedReportHtml.includes('aria-label="Semantic context summary"'));
 

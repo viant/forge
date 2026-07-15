@@ -364,6 +364,10 @@ function validateReportExportSourceContract(source = null) {
   };
 
   switch (from) {
+    case "preset":
+      requireArtifactKind("reportBuilder.reportTemplate");
+      requireField("$.source.sourceArtifactId", !!sourceArtifactId, "Preset export sources require a sourceArtifactId.");
+      break;
     case "savedPayload":
       requireArtifactKind("reportBuilder.savedReportPayload");
       requireField("$.source.payloadId", !!payloadId, "Saved payload export sources require a payloadId.");

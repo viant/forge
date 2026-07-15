@@ -1,1 +1,520 @@
-{"version":1,"kind":"reportFill","specVersion":1,"specHash":"fnv1a:6544b833","source":{"kind":"dashboard.reportBuilder","containerId":"authoredDerivedCompactBuilder","stateKey":"authoredDerivedCompactBuilder","dataSourceRef":"demoReportSource"},"parameters":{"viewMode":"table","groupBy":"","pageSize":1,"orderField":"","orderDir":"asc"},"refinements":[],"calculatedFields":[{"id":"reachRate","key":"reachRate","kind":"rowCalc","label":"Reach Rate","dataType":"number","format":"percent","datasetRef":"primary","dependencies":["hhUniqs","totalSpend"],"expr":"if(totalSpend = 0, null, round((hhUniqs / totalSpend) * 100, 2))"}],"datasets":[{"id":"primary","dataSourceRef":"demoReportSource","request":{"measures":{"totalSpend":true,"hhUniqs":true},"dimensions":{"country":true,"channelId":true},"filters":{"From":"2026-05-01","To":"2026-05-04","from":"2026-05-01","to":"2026-05-04"},"limit":50,"offset":0},"provenance":{"requestHash":"fnv1a:fc5ea01d","rowCount":4,"truncated":false,"hasMore":false,"diagnostics":[]},"rows":[{"country":"US","channelId":"Display","totalSpend":82800,"hhUniqs":33800,"reachRate":40.82},{"country":"US","channelId":"CTV","totalSpend":70300,"hhUniqs":30100,"reachRate":42.82},{"country":"CA","channelId":"Display","totalSpend":75800,"hhUniqs":31100,"reachRate":41.03},{"country":"CA","channelId":"CTV","totalSpend":67700,"hhUniqs":28300,"reachRate":41.8}]}],"blocks":[{"id":"primaryTable","kind":"tableBlock","datasetRef":"primary","columns":[{"key":"country","sourceKey":"country","displayKey":"country","label":"Market","kind":"dimension","runtimeFilterable":true},{"key":"totalSpend","sourceKey":"totalSpend","displayKey":"totalSpend","label":"Spend","kind":"measure","format":"currency","align":"right"}],"content":{"columns":[{"key":"country","sourceKey":"country","displayKey":"country","label":"Market","kind":"dimension","runtimeFilterable":true},{"key":"totalSpend","sourceKey":"totalSpend","displayKey":"totalSpend","label":"Spend","kind":"measure","format":"currency","align":"right"}],"rowCount":4,"resolvedRows":[{"rowIndex":0,"cells":[{"key":"country","sourceKey":"country","displayKey":"country","value":"US","displayValue":"US","visualState":null},{"key":"totalSpend","sourceKey":"totalSpend","displayKey":"totalSpend","value":82800,"displayValue":82800,"visualState":null}]},{"rowIndex":1,"cells":[{"key":"country","sourceKey":"country","displayKey":"country","value":"US","displayValue":"US","visualState":null},{"key":"totalSpend","sourceKey":"totalSpend","displayKey":"totalSpend","value":70300,"displayValue":70300,"visualState":null}]},{"rowIndex":2,"cells":[{"key":"country","sourceKey":"country","displayKey":"country","value":"CA","displayValue":"CA","visualState":null},{"key":"totalSpend","sourceKey":"totalSpend","displayKey":"totalSpend","value":75800,"displayValue":75800,"visualState":null}]},{"rowIndex":3,"cells":[{"key":"country","sourceKey":"country","displayKey":"country","value":"CA","displayValue":"CA","visualState":null},{"key":"totalSpend","sourceKey":"totalSpend","displayKey":"totalSpend","value":67700,"displayValue":67700,"visualState":null}]}]}},{"id":"reachRateTrend","kind":"chartBlock","datasetRef":"primary","chartSpec":{"title":"Reach Rate by Market","type":"line","xField":"country","yFields":["reachRate"],"seriesField":"channelId"},"chartModel":{"type":"line","xAxis":{"dataKey":"country"},"yAxis":{"format":"percent"},"series":{"nameKey":"channelId","valueKey":"reachRate","values":[{"value":"reachRate","label":"Reach Rate","color":"#1f77b4","format":"percent","type":"line"}],"palette":["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf"]}},"content":{"chartSpec":{"title":"Reach Rate by Market","type":"line","xField":"country","yFields":["reachRate"],"seriesField":"channelId"},"chartModel":{"type":"line","xAxis":{"dataKey":"country"},"yAxis":{"format":"percent"},"series":{"nameKey":"channelId","valueKey":"reachRate","values":[{"value":"reachRate","label":"Reach Rate","color":"#1f77b4","format":"percent","type":"line"}],"palette":["#1f77b4","#ff7f0e","#2ca02c","#d62728","#9467bd","#8c564b","#e377c2","#7f7f7f","#bcbd22","#17becf"]}},"rowCount":4,"resolvedChart":{"kind":"groupedSeries","type":"line","xAxisKey":"country","nameKey":"channelId","valueKey":"reachRate","rows":[{"country":"US","Display":40.82,"CTV":42.82},{"country":"CA","Display":41.03,"CTV":41.8}],"seriesKeys":["Display","CTV"]}}},{"id":"reachRateTable","kind":"tableBlock","title":"Reach Rate Table","datasetRef":"primary","columns":[{"key":"country","label":"Market","sourceKey":"country","displayKey":"country","runtimeFilterable":true},{"key":"channelId","label":"Channel","sourceKey":"channelId","displayKey":"channelId","runtimeFilterable":true},{"key":"reachRate","label":"Reach Rate","format":"percent","sourceKey":"reachRate","displayKey":"reachRate"}],"content":{"columns":[{"key":"country","label":"Market","sourceKey":"country","displayKey":"country","runtimeFilterable":true},{"key":"channelId","label":"Channel","sourceKey":"channelId","displayKey":"channelId","runtimeFilterable":true},{"key":"reachRate","label":"Reach Rate","format":"percent","sourceKey":"reachRate","displayKey":"reachRate"}],"rowCount":4,"resolvedRows":[{"rowIndex":0,"cells":[{"key":"country","sourceKey":"country","displayKey":"country","value":"US","displayValue":"US","visualState":null},{"key":"channelId","sourceKey":"channelId","displayKey":"channelId","value":"Display","displayValue":"Display","visualState":null},{"key":"reachRate","sourceKey":"reachRate","displayKey":"reachRate","value":40.82,"displayValue":40.82,"visualState":null}]},{"rowIndex":1,"cells":[{"key":"country","sourceKey":"country","displayKey":"country","value":"US","displayValue":"US","visualState":null},{"key":"channelId","sourceKey":"channelId","displayKey":"channelId","value":"CTV","displayValue":"CTV","visualState":null},{"key":"reachRate","sourceKey":"reachRate","displayKey":"reachRate","value":42.82,"displayValue":42.82,"visualState":null}]},{"rowIndex":2,"cells":[{"key":"country","sourceKey":"country","displayKey":"country","value":"CA","displayValue":"CA","visualState":null},{"key":"channelId","sourceKey":"channelId","displayKey":"channelId","value":"Display","displayValue":"Display","visualState":null},{"key":"reachRate","sourceKey":"reachRate","displayKey":"reachRate","value":41.03,"displayValue":41.03,"visualState":null}]},{"rowIndex":3,"cells":[{"key":"country","sourceKey":"country","displayKey":"country","value":"CA","displayValue":"CA","visualState":null},{"key":"channelId","sourceKey":"channelId","displayKey":"channelId","value":"CTV","displayValue":"CTV","visualState":null},{"key":"reachRate","sourceKey":"reachRate","displayKey":"reachRate","value":41.8,"displayValue":41.8,"visualState":null}]}]}}],"diagnostics":[]}
+{
+  "version": 1,
+  "kind": "reportFill",
+  "specVersion": 1,
+  "specHash": "fnv1a:22422e2f",
+  "source": {
+    "kind": "dashboard.reportBuilder",
+    "containerId": "authoredDerivedCompactBuilder",
+    "stateKey": "authoredDerivedCompactBuilder",
+    "dataSourceRef": "demoReportSource"
+  },
+  "parameters": {
+    "viewMode": "table",
+    "groupBy": "",
+    "pageSize": 1,
+    "orderField": "",
+    "orderDir": "asc"
+  },
+  "refinements": [],
+  "calculatedFields": [
+    {
+      "id": "reachRate",
+      "key": "reachRate",
+      "kind": "rowCalc",
+      "label": "Reach Rate",
+      "dataType": "number",
+      "format": "percent",
+      "datasetRef": "primary",
+      "dependencies": [
+        "hhUniqs",
+        "totalSpend"
+      ],
+      "expr": "if(totalSpend = 0, null, round((hhUniqs / totalSpend) * 100, 2))"
+    }
+  ],
+  "datasets": [
+    {
+      "id": "primary",
+      "dataSourceRef": "demoReportSource",
+      "request": {
+        "measures": {
+          "totalSpend": true,
+          "hhUniqs": true
+        },
+        "dimensions": {
+          "country": true,
+          "channelId": true
+        },
+        "filters": {
+          "From": "2026-05-01",
+          "To": "2026-05-04"
+        },
+        "limit": 50,
+        "offset": 0
+      },
+      "provenance": {
+        "requestHash": "fnv1a:973f9459",
+        "rowCount": 4,
+        "truncated": false,
+        "hasMore": false,
+        "diagnostics": []
+      },
+      "rows": [
+        {
+          "country": "US",
+          "channelId": "Display",
+          "totalSpend": 82800,
+          "hhUniqs": 33800,
+          "reachRate": 40.82
+        },
+        {
+          "country": "US",
+          "channelId": "CTV",
+          "totalSpend": 70300,
+          "hhUniqs": 30100,
+          "reachRate": 42.82
+        },
+        {
+          "country": "CA",
+          "channelId": "Display",
+          "totalSpend": 75800,
+          "hhUniqs": 31100,
+          "reachRate": 41.03
+        },
+        {
+          "country": "CA",
+          "channelId": "CTV",
+          "totalSpend": 67700,
+          "hhUniqs": 28300,
+          "reachRate": 41.8
+        }
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "id": "primaryTable",
+      "kind": "tableBlock",
+      "datasetRef": "primary",
+      "columns": [
+        {
+          "key": "country",
+          "sourceKey": "country",
+          "displayKey": "country",
+          "label": "Market",
+          "kind": "dimension",
+          "runtimeFilterable": true
+        },
+        {
+          "key": "totalSpend",
+          "sourceKey": "totalSpend",
+          "displayKey": "totalSpend",
+          "label": "Spend",
+          "kind": "measure",
+          "format": "currency",
+          "align": "right"
+        }
+      ],
+      "content": {
+        "columns": [
+          {
+            "key": "country",
+            "sourceKey": "country",
+            "displayKey": "country",
+            "label": "Market",
+            "kind": "dimension",
+            "runtimeFilterable": true
+          },
+          {
+            "key": "totalSpend",
+            "sourceKey": "totalSpend",
+            "displayKey": "totalSpend",
+            "label": "Spend",
+            "kind": "measure",
+            "format": "currency",
+            "align": "right"
+          }
+        ],
+        "rowCount": 4,
+        "resolvedRows": [
+          {
+            "rowIndex": 0,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "US",
+                "displayValue": "US",
+                "visualState": null
+              },
+              {
+                "key": "totalSpend",
+                "sourceKey": "totalSpend",
+                "displayKey": "totalSpend",
+                "value": 82800,
+                "displayValue": 82800,
+                "visualState": null
+              }
+            ]
+          },
+          {
+            "rowIndex": 1,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "US",
+                "displayValue": "US",
+                "visualState": null
+              },
+              {
+                "key": "totalSpend",
+                "sourceKey": "totalSpend",
+                "displayKey": "totalSpend",
+                "value": 70300,
+                "displayValue": 70300,
+                "visualState": null
+              }
+            ]
+          },
+          {
+            "rowIndex": 2,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "CA",
+                "displayValue": "CA",
+                "visualState": null
+              },
+              {
+                "key": "totalSpend",
+                "sourceKey": "totalSpend",
+                "displayKey": "totalSpend",
+                "value": 75800,
+                "displayValue": 75800,
+                "visualState": null
+              }
+            ]
+          },
+          {
+            "rowIndex": 3,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "CA",
+                "displayValue": "CA",
+                "visualState": null
+              },
+              {
+                "key": "totalSpend",
+                "sourceKey": "totalSpend",
+                "displayKey": "totalSpend",
+                "value": 67700,
+                "displayValue": 67700,
+                "visualState": null
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "reachRateTrend",
+      "kind": "chartBlock",
+      "datasetRef": "primary",
+      "chartSpec": {
+        "title": "Reach Rate by Market",
+        "type": "line",
+        "xField": "country",
+        "yFields": [
+          "reachRate"
+        ],
+        "seriesField": "channelId"
+      },
+      "chartModel": {
+        "type": "line",
+        "xAxis": {
+          "dataKey": "country"
+        },
+        "yAxis": {
+          "format": "percent"
+        },
+        "series": {
+          "nameKey": "channelId",
+          "valueKey": "reachRate",
+          "values": [
+            {
+              "value": "reachRate",
+              "label": "Reach Rate",
+              "color": "#1f77b4",
+              "format": "percent",
+              "type": "line"
+            }
+          ],
+          "palette": [
+            "#1f77b4",
+            "#ff7f0e",
+            "#2ca02c",
+            "#d62728",
+            "#9467bd",
+            "#8c564b",
+            "#e377c2",
+            "#7f7f7f",
+            "#bcbd22",
+            "#17becf"
+          ]
+        }
+      },
+      "content": {
+        "chartSpec": {
+          "title": "Reach Rate by Market",
+          "type": "line",
+          "xField": "country",
+          "yFields": [
+            "reachRate"
+          ],
+          "seriesField": "channelId"
+        },
+        "chartModel": {
+          "type": "line",
+          "xAxis": {
+            "dataKey": "country"
+          },
+          "yAxis": {
+            "format": "percent"
+          },
+          "series": {
+            "nameKey": "channelId",
+            "valueKey": "reachRate",
+            "values": [
+              {
+                "value": "reachRate",
+                "label": "Reach Rate",
+                "color": "#1f77b4",
+                "format": "percent",
+                "type": "line"
+              }
+            ],
+            "palette": [
+              "#1f77b4",
+              "#ff7f0e",
+              "#2ca02c",
+              "#d62728",
+              "#9467bd",
+              "#8c564b",
+              "#e377c2",
+              "#7f7f7f",
+              "#bcbd22",
+              "#17becf"
+            ]
+          }
+        },
+        "rowCount": 4,
+        "resolvedChart": {
+          "kind": "groupedSeries",
+          "type": "line",
+          "xAxisKey": "country",
+          "nameKey": "channelId",
+          "valueKey": "reachRate",
+          "rows": [
+            {
+              "country": "US",
+              "Display": 40.82,
+              "CTV": 42.82
+            },
+            {
+              "country": "CA",
+              "Display": 41.03,
+              "CTV": 41.8
+            }
+          ],
+          "seriesKeys": [
+            "Display",
+            "CTV"
+          ]
+        }
+      }
+    },
+    {
+      "id": "reachRateTable",
+      "kind": "tableBlock",
+      "title": "Reach Rate Table",
+      "datasetRef": "primary",
+      "columns": [
+        {
+          "key": "country",
+          "label": "Market",
+          "sourceKey": "country",
+          "displayKey": "country",
+          "runtimeFilterable": true
+        },
+        {
+          "key": "channelId",
+          "label": "Channel",
+          "sourceKey": "channelId",
+          "displayKey": "channelId",
+          "runtimeFilterable": true
+        },
+        {
+          "key": "reachRate",
+          "label": "Reach Rate",
+          "format": "percent",
+          "sourceKey": "reachRate",
+          "displayKey": "reachRate"
+        }
+      ],
+      "content": {
+        "columns": [
+          {
+            "key": "country",
+            "label": "Market",
+            "sourceKey": "country",
+            "displayKey": "country",
+            "runtimeFilterable": true
+          },
+          {
+            "key": "channelId",
+            "label": "Channel",
+            "sourceKey": "channelId",
+            "displayKey": "channelId",
+            "runtimeFilterable": true
+          },
+          {
+            "key": "reachRate",
+            "label": "Reach Rate",
+            "format": "percent",
+            "sourceKey": "reachRate",
+            "displayKey": "reachRate"
+          }
+        ],
+        "rowCount": 4,
+        "resolvedRows": [
+          {
+            "rowIndex": 0,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "US",
+                "displayValue": "US",
+                "visualState": null
+              },
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "value": "Display",
+                "displayValue": "Display",
+                "visualState": null
+              },
+              {
+                "key": "reachRate",
+                "sourceKey": "reachRate",
+                "displayKey": "reachRate",
+                "value": 40.82,
+                "displayValue": 40.82,
+                "visualState": null
+              }
+            ]
+          },
+          {
+            "rowIndex": 1,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "US",
+                "displayValue": "US",
+                "visualState": null
+              },
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "value": "CTV",
+                "displayValue": "CTV",
+                "visualState": null
+              },
+              {
+                "key": "reachRate",
+                "sourceKey": "reachRate",
+                "displayKey": "reachRate",
+                "value": 42.82,
+                "displayValue": 42.82,
+                "visualState": null
+              }
+            ]
+          },
+          {
+            "rowIndex": 2,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "CA",
+                "displayValue": "CA",
+                "visualState": null
+              },
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "value": "Display",
+                "displayValue": "Display",
+                "visualState": null
+              },
+              {
+                "key": "reachRate",
+                "sourceKey": "reachRate",
+                "displayKey": "reachRate",
+                "value": 41.03,
+                "displayValue": 41.03,
+                "visualState": null
+              }
+            ]
+          },
+          {
+            "rowIndex": 3,
+            "cells": [
+              {
+                "key": "country",
+                "sourceKey": "country",
+                "displayKey": "country",
+                "value": "CA",
+                "displayValue": "CA",
+                "visualState": null
+              },
+              {
+                "key": "channelId",
+                "sourceKey": "channelId",
+                "displayKey": "channelId",
+                "value": "CTV",
+                "displayValue": "CTV",
+                "visualState": null
+              },
+              {
+                "key": "reachRate",
+                "sourceKey": "reachRate",
+                "displayKey": "reachRate",
+                "value": 41.8,
+                "displayValue": 41.8,
+                "visualState": null
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "diagnostics": []
+}

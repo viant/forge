@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowMetadataForTarget, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
+import { resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowMetadataForTarget, resolveWindowRootContainer, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
 
 describe('resolveInitialWindowFormValues', () => {
   it('collects explicit windowForm item values alongside onInit constants', () => {
@@ -124,6 +124,43 @@ describe('resolveWindowMetadataForTarget', () => {
     expect(resolveWindowMetadataForTarget(metadata, { platform: 'ios', formFactor: 'tablet' }).view.content.containers).toEqual([
       { id: 'mobileTabs' },
     ]);
+  });
+});
+
+describe('resolveWindowRootContainer', () => {
+  it('merges hosted window parameters into the root view container without mutating metadata', () => {
+    const content = {
+      id: 'root',
+      kind: 'dashboard',
+      reportBuilder: {
+        title: 'Builder',
+      },
+      parameters: {
+        reportStarterId: '__blank__',
+        theme: 'light',
+      },
+    };
+
+    const resolved = resolveWindowRootContainer(content, {
+      reportStarterId: 'performance_inventory_brief',
+      prefill: { orderIds: [2680567] },
+    });
+
+    expect(resolved).toEqual({
+      id: 'root',
+      kind: 'dashboard',
+      reportBuilder: {
+        title: 'Builder',
+        prefillReportStarterId: 'performance_inventory_brief',
+      },
+      parameters: {
+        reportStarterId: 'performance_inventory_brief',
+        theme: 'light',
+        prefill: { orderIds: [2680567] },
+      },
+    });
+    expect(content.parameters.reportStarterId).toBe('__blank__');
+    expect(content.reportBuilder.prefillReportStarterId).toBeUndefined();
   });
 });
 

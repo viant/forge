@@ -305,6 +305,10 @@ const badgesBlockHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
     reportSpec: {
       title: "Badges Runtime",
+      theme: {
+        accentTone: "green",
+        badgePalette: "bold",
+      },
       layoutIntent: {
         blockOrder: ["statusPills"],
         items: [{ blockId: "statusPills" }],
@@ -347,6 +351,411 @@ assert.ok(badgesBlockHtml.includes("Setup: Live"));
 assert.ok(badgesBlockHtml.includes("Pacing: 2.7%"));
 assert.ok(badgesBlockHtml.includes('data-report-runtime-badge-tone="success"'));
 assert.ok(badgesBlockHtml.includes('data-report-runtime-badge-tone="warning"'));
+assert.ok(badgesBlockHtml.includes("#d5f0dc"));
+assert.ok(badgesBlockHtml.includes("#16a34a"));
+
+const themedKpiHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Themed KPI Runtime",
+      theme: {
+        accentTone: "green",
+      },
+      layoutIntent: {
+        blockOrder: ["headlineKpi"],
+        items: [{ blockId: "headlineKpi" }],
+      },
+      blocks: [],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "headlineKpi",
+          kind: "kpiBlock",
+          title: "Headline KPI",
+          content: {
+            title: "Headline KPI",
+            tone: "info",
+            valueField: "avails",
+            valueLabel: "Avails",
+            value: 100,
+            rowCount: 1,
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(themedKpiHtml.includes("#16a34a"));
+
+const collectionBlockHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Collection Runtime",
+      layoutIntent: {
+        blockOrder: ["topChannels"],
+        items: [{ blockId: "topChannels" }],
+      },
+      blocks: [
+        {
+          id: "topChannels",
+          kind: "collectionBlock",
+          title: "Top Channels",
+          datasetRef: "primary",
+          itemTitleField: "channelId",
+          valueField: "totalSpend",
+          valueLabel: "Spend",
+          secondaryField: "eventDate",
+          secondaryLabel: "Date",
+        },
+      ],
+      datasets: [{ id: "primary", request: {} }],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [{ id: "primary", rows: [], provenance: { diagnostics: [] } }],
+      blocks: [
+        {
+          id: "topChannels",
+          kind: "collectionBlock",
+          title: "Top Channels",
+          datasetRef: "primary",
+          content: {
+            title: "Top Channels",
+            layout: "grid",
+            columns: 2,
+            rowCount: 2,
+            rowLimit: 2,
+            items: [
+              {
+                title: "Display",
+                valueField: "totalSpend",
+                valueLabel: "Spend",
+                valueFormat: "currency",
+                value: 40400,
+                secondaryField: "eventDate",
+                secondaryLabel: "Date",
+                secondaryValue: "2026-05-01",
+                bodyMarkdown: "**Lead channel**",
+              },
+              {
+                title: "CTV",
+                valueField: "totalSpend",
+                valueLabel: "Spend",
+                valueFormat: "currency",
+                value: 34300,
+                secondaryField: "eventDate",
+                secondaryLabel: "Date",
+                secondaryValue: "2026-05-02",
+              },
+            ],
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(collectionBlockHtml.includes("Top Channels"));
+assert.ok(collectionBlockHtml.includes("Display"));
+assert.ok(collectionBlockHtml.includes("CTV"));
+assert.ok(collectionBlockHtml.includes("Spend"));
+assert.ok(collectionBlockHtml.includes("40,400"));
+
+const sectionRuntimeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Section Runtime",
+      layoutIntent: {
+        blockOrder: ["overviewSection", "topChannels", "detailsSection", "statusPills"],
+        items: [
+          { blockId: "overviewSection" },
+          { blockId: "topChannels" },
+          { blockId: "detailsSection" },
+          { blockId: "statusPills" },
+        ],
+      },
+      blocks: [
+        {
+          id: "overviewSection",
+          kind: "sectionBlock",
+          title: "Overview",
+          navigationLabel: "Overview",
+          subtitle: "Supply outlook",
+        },
+        {
+          id: "topChannels",
+          kind: "collectionBlock",
+          title: "Top Channels",
+          datasetRef: "primary",
+          itemTitleField: "channelId",
+        },
+        {
+          id: "detailsSection",
+          kind: "sectionBlock",
+          title: "Details",
+          navigationLabel: "Details",
+          description: "Detailed diagnostics and pills.",
+        },
+        {
+          id: "statusPills",
+          kind: "badgesBlock",
+          title: "Status Pills",
+          items: [{ id: "setup", label: "Setup", value: "Live", tone: "success" }],
+        },
+      ],
+      datasets: [{ id: "primary", request: {} }],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [{ id: "primary", rows: [], provenance: { diagnostics: [] } }],
+      blocks: [
+        {
+          id: "overviewSection",
+          kind: "sectionBlock",
+          title: "Overview",
+          content: {
+            title: "Overview",
+            navigationLabel: "Overview",
+            subtitle: "Supply outlook",
+          },
+        },
+        {
+          id: "topChannels",
+          kind: "collectionBlock",
+          title: "Top Channels",
+          content: {
+            title: "Top Channels",
+            layout: "grid",
+            columns: 2,
+            rowCount: 0,
+            rowLimit: 2,
+            items: [],
+            emptyLabel: "No collection items available.",
+          },
+        },
+        {
+          id: "detailsSection",
+          kind: "sectionBlock",
+          title: "Details",
+          content: {
+            title: "Details",
+            navigationLabel: "Details",
+            description: "Detailed diagnostics and pills.",
+          },
+        },
+        {
+          id: "statusPills",
+          kind: "badgesBlock",
+          title: "Status Pills",
+          content: {
+            title: "Status Pills",
+            items: [{ id: "setup", label: "Setup", value: "Live", tone: "success" }],
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(sectionRuntimeHtml.includes("Overview"));
+assert.ok(sectionRuntimeHtml.includes("Details"));
+assert.ok(sectionRuntimeHtml.includes("Supply outlook"));
+
+const stepperRuntimeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Stepper Runtime",
+      layoutIntent: {
+        blockOrder: ["integrationFlow"],
+        items: [{ blockId: "integrationFlow" }],
+      },
+      blocks: [
+        {
+          id: "integrationFlow",
+          kind: "stepperBlock",
+          title: "Direct Integration Path",
+          description: "Three stages to define a direct path.",
+          steps: [
+            { id: "step_1", title: "Bid directly", body: "Connect bidding directly to the publisher ad server." },
+            { id: "step_2", title: "Uncap QPS", body: "Enable access to the full inventory set." },
+          ],
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "integrationFlow",
+          kind: "stepperBlock",
+          title: "Direct Integration Path",
+          content: {
+            title: "Direct Integration Path",
+            description: "Three stages to define a direct path.",
+            steps: [
+              { id: "step_1", title: "Bid directly", body: "Connect bidding directly to the publisher ad server." },
+              { id: "step_2", title: "Uncap QPS", body: "Enable access to the full inventory set." },
+            ],
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(stepperRuntimeHtml.includes("Direct Integration Path"));
+assert.ok(stepperRuntimeHtml.includes("Bid directly"));
+assert.ok(stepperRuntimeHtml.includes("Uncap QPS"));
+
+const infoPanelRuntimeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Info Panel Runtime",
+      layoutIntent: {
+        blockOrder: ["directIntro"],
+        items: [{ blockId: "directIntro" }],
+      },
+      blocks: [
+        {
+          id: "directIntro",
+          kind: "infoPanelBlock",
+          title: "What is a Direct Integration Path?",
+          eyebrow: "What is it?",
+          description: "Explains the direct path concept.",
+          tone: "info",
+          body: "A direct integration connects bidding directly into the publisher ad server.",
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "directIntro",
+          kind: "infoPanelBlock",
+          title: "What is a Direct Integration Path?",
+          content: {
+            title: "What is a Direct Integration Path?",
+            eyebrow: "What is it?",
+            description: "Explains the direct path concept.",
+            tone: "info",
+            body: "A direct integration connects bidding directly into the publisher ad server.",
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(infoPanelRuntimeHtml.includes("What is it?"));
+assert.ok(infoPanelRuntimeHtml.includes("What is a Direct Integration Path?"));
+assert.ok(infoPanelRuntimeHtml.includes("Explains the direct path concept."));
+
+const kanbanRuntimeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Kanban Runtime",
+      layoutIntent: {
+        blockOrder: ["publisherPipeline"],
+        items: [{ blockId: "publisherPipeline" }],
+      },
+      blocks: [
+        {
+          id: "publisherPipeline",
+          kind: "kanbanBlock",
+          title: "Publisher Pipeline",
+          description: "Track publisher activations by stage.",
+          columns: [
+            {
+              id: "signed",
+              title: "Signed",
+              cards: [
+                { id: "tubi", title: "Tubi", body: "SpringServe integration live.", badge: "Live" },
+              ],
+            },
+          ],
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "publisherPipeline",
+          kind: "kanbanBlock",
+          title: "Publisher Pipeline",
+          content: {
+            title: "Publisher Pipeline",
+            description: "Track publisher activations by stage.",
+            columns: [
+              {
+                id: "signed",
+                title: "Signed",
+                cards: [
+                  { id: "tubi", title: "Tubi", body: "SpringServe integration live.", badge: "Live" },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(kanbanRuntimeHtml.includes("Publisher Pipeline"));
+assert.ok(kanbanRuntimeHtml.includes("Signed"));
+assert.ok(kanbanRuntimeHtml.includes("Tubi"));
+
+const timelineRuntimeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Timeline Runtime",
+      layoutIntent: {
+        blockOrder: ["integrationTimeline"],
+        items: [{ blockId: "integrationTimeline" }],
+      },
+      blocks: [
+        {
+          id: "integrationTimeline",
+          kind: "timelineBlock",
+          title: "Integration Timeline",
+          description: "Track the rollout milestones.",
+          events: [
+            { id: "event_1", date: "2026-07-15", badge: "Target", title: "Roku signed", body: "Expected signature date." },
+          ],
+        },
+      ],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "integrationTimeline",
+          kind: "timelineBlock",
+          title: "Integration Timeline",
+          content: {
+            title: "Integration Timeline",
+            description: "Track the rollout milestones.",
+            events: [
+              { id: "event_1", date: "2026-07-15", badge: "Target", title: "Roku signed", body: "Expected signature date." },
+            ],
+          },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(timelineRuntimeHtml.includes("Integration Timeline"));
+assert.ok(timelineRuntimeHtml.includes("2026-07-15"));
+assert.ok(timelineRuntimeHtml.includes("Roku signed"));
 
 const zeroBadgeHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
@@ -2526,6 +2935,199 @@ assert.ok(!authoredReportHtml.includes("Chart actions are unavailable because th
 assert.ok(!authoredReportHtml.includes('aria-label="Chart series selector"'));
 assert.ok(authoredReportHtml.includes("Filters"));
 assert.ok(!authoredReportHtml.includes("Baseline filters authored for this report. Live keep, exclude, and drill changes appear in Active refinements."));
+
+const sectionTabsRuntimeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Sectioned Runtime Spec",
+      layoutIntent: {
+        blockOrder: ["overviewSection", "sectionTabs", "summaryMarkdown", "detailsSection", "detailsMarkdown"],
+        items: [
+          { blockId: "overviewSection" },
+          { blockId: "sectionTabs" },
+          { blockId: "summaryMarkdown" },
+          { blockId: "detailsSection" },
+          { blockId: "detailsMarkdown" },
+        ],
+      },
+      blocks: [],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "overviewSection",
+          kind: "sectionBlock",
+          title: "Overview",
+          content: {
+            title: "Overview",
+            navigationLabel: "Overview",
+          },
+        },
+        {
+          id: "sectionTabs",
+          kind: "tabGroupBlock",
+          title: "Forecast views",
+          sectionIds: ["detailsSection", "overviewSection"],
+          defaultSectionId: "detailsSection",
+          content: {
+            title: "Forecast views",
+            sectionIds: ["detailsSection", "overviewSection"],
+            defaultSectionId: "detailsSection",
+            tabs: [
+              { id: "detailsSection", title: "Details", navigationLabel: "Details" },
+              { id: "overviewSection", title: "Overview", navigationLabel: "Overview" },
+            ],
+          },
+        },
+        {
+          id: "summaryMarkdown",
+          kind: "markdownBlock",
+          title: "Summary",
+          content: {
+            title: "Summary",
+            markdown: "Overview content",
+          },
+        },
+        {
+          id: "detailsSection",
+          kind: "sectionBlock",
+          title: "Details",
+          content: {
+            title: "Details",
+            navigationLabel: "Details",
+          },
+        },
+        {
+          id: "detailsMarkdown",
+          kind: "markdownBlock",
+          title: "Details body",
+          content: {
+            title: "Details body",
+            markdown: "Detailed content",
+          },
+        },
+      ],
+    },
+    title: "Audience Report",
+    presentationMode: "report",
+  }),
+);
+assert.ok(sectionTabsRuntimeHtml.includes("Forecast views"));
+assert.ok(sectionTabsRuntimeHtml.includes(">Details<"));
+assert.ok(sectionTabsRuntimeHtml.includes(">Overview<"));
+assert.ok(!sectionTabsRuntimeHtml.includes("Unsupported Block"));
+
+const compositeRuntimeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Composite Runtime Spec",
+      layoutIntent: {
+        blockOrder: ["summaryPanel", "summaryMarkdown", "headlineKpi"],
+        items: [
+          { blockId: "summaryPanel" },
+          { blockId: "summaryMarkdown", span: 6 },
+          { blockId: "headlineKpi", span: 6 },
+        ],
+      },
+      blocks: [],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [
+        {
+          id: "primary",
+          dataSourceRef: "demoSource",
+          rows: [{ totalSpend: 40400 }],
+        },
+      ],
+      blocks: [
+        {
+          id: "summaryPanel",
+          kind: "compositeBlock",
+          title: "Summary panel",
+          content: {
+            title: "Summary panel",
+            description: "Groups the opening narrative and KPI.",
+            childBlockIds: ["summaryMarkdown", "headlineKpi"],
+          },
+        },
+        {
+          id: "summaryMarkdown",
+          kind: "markdownBlock",
+          title: "Summary child",
+          content: {
+            title: "Summary child",
+            markdown: "Overview context",
+          },
+        },
+        {
+          id: "headlineKpi",
+          kind: "kpiBlock",
+          title: "Headline child KPI",
+          datasetRef: "primary",
+          content: {
+            title: "Headline child KPI",
+            valueField: "totalSpend",
+            valueLabel: "Spend",
+            value: 40400,
+            rowCount: 1,
+          },
+        },
+      ],
+    },
+    title: "Audience Report",
+    presentationMode: "report",
+  }),
+);
+assert.ok(compositeRuntimeHtml.includes("Summary panel"));
+assert.ok(compositeRuntimeHtml.includes("Summary child"));
+assert.ok(compositeRuntimeHtml.includes("Headline child KPI"));
+assert.equal((compositeRuntimeHtml.match(/Summary child/g) || []).length, 1);
+assert.equal((compositeRuntimeHtml.match(/Headline child KPI/g) || []).length, 1);
+assert.ok(!compositeRuntimeHtml.includes("Unsupported Block"));
+
+const calloutRuntimeHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Callout Runtime Spec",
+      layoutIntent: {
+        blockOrder: ["launchCallout"],
+        items: [{ blockId: "launchCallout" }],
+      },
+      blocks: [],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "launchCallout",
+          kind: "calloutBlock",
+          title: "Launch update",
+          content: {
+            title: "Launch update",
+            icon: "warning-sign",
+            description: "Important rollout note.",
+            tone: "warning",
+            badges: ["Executive", "Launch Ready"],
+            body: "Publisher activation is staged for Friday.",
+          },
+        },
+      ],
+    },
+    title: "Audience Report",
+    presentationMode: "report",
+  }),
+);
+assert.ok(calloutRuntimeHtml.includes("Launch update"));
+assert.ok(calloutRuntimeHtml.includes("Executive"));
+assert.ok(calloutRuntimeHtml.includes("Launch Ready"));
+assert.ok(calloutRuntimeHtml.includes("Publisher activation is staged for Friday."));
 
 const documentBackedRuntimeHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {

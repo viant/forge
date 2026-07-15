@@ -26,7 +26,7 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("buildReportRuntimePreviewRequestKey(runtimePreviewFingerprint, manualRunSequence, runtimePreviewRecoveryToken)"),
+  source.includes("requestKey: runtimePreviewRequestKey"),
   true,
   "Runtime preview request keys should include the recovery token so semantic retries trigger reruns.",
 );

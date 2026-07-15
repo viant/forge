@@ -218,7 +218,7 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("buildReportBuilderLifecycleActionState(reopenedSessionNoticeState"),
+  source.includes("buildReportBuilderLifecycleActionState(reopenedSessionLifecycleSummary"),
   true,
   "ReportBuilder should derive provider-driven lifecycle/share actions for reopened shared-artifact sessions.",
 );

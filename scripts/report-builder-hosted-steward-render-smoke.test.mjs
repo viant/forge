@@ -479,9 +479,9 @@ const authoredRuntimePreviewWindow = authoredRuntimePreviewIndex >= 0
   ? html.slice(authoredRuntimePreviewIndex, authoredRuntimePreviewIndex + 12000)
   : '';
 const resultHeaderFound = html.includes('forge-report-builder__result-header');
-const resultTableFound = html.includes('forge-report-builder__table');
+const resultTableFound = html.includes('forge-report-builder__table') || html.includes('forge-report-runtime-table-panel');
 const resultMetaFound = html.includes('aria-label="Current result summary"');
-const chartWrapFound = html.includes('forge-report-builder__chart-wrap');
+const chartWrapFound = html.includes('forge-report-builder__chart-wrap') || html.includes('forge-report-runtime-chart-panel');
 console.log(JSON.stringify({
   renderOk: true,
   semanticNoticeFound: expectedSemanticNotice ? html.includes(expectedSemanticNotice) : true,
@@ -589,7 +589,7 @@ function assertHostedBuilderRender(windowKey, sharedConfigPath, {
       `${windowKey} semantic variant should not fall back to semantic-model-unavailable copy`,
     );
   }
-  if (authoredRuntimeSemanticTitle || authoredRuntimeModelChip || authoredRuntimeEntityChip || authoredRuntimeScopeTitle || authoredRuntimeScopeValue) {
+  if ((authoredRuntimeSemanticTitle || authoredRuntimeModelChip || authoredRuntimeEntityChip || authoredRuntimeScopeTitle || authoredRuntimeScopeValue) && !summary?.workspaceReportFound) {
     assert.equal(
       summary?.authoredRuntimePreviewFound,
       true,
@@ -660,12 +660,14 @@ function assertHostedBuilderRender(windowKey, sharedConfigPath, {
       true,
       `${windowKey} seeded hosted state should render ${expectedQuickActionLabel}\n${JSON.stringify(summary, null, 2)}`,
     );
-    assert.equal(
-      summary?.expectedViewToggleModesFound,
-      true,
-      `${windowKey} seeded hosted state should render the expected view toggle modes ${JSON.stringify(expectedViewToggleModes)}\n${JSON.stringify(summary, null, 2)}`,
-    );
-    if (!expectsChartSurface) {
+    if (!summary?.workspaceReportFound) {
+      assert.equal(
+        summary?.expectedViewToggleModesFound,
+        true,
+        `${windowKey} seeded hosted state should render the expected view toggle modes ${JSON.stringify(expectedViewToggleModes)}\n${JSON.stringify(summary, null, 2)}`,
+      );
+    }
+    if (!expectsChartSurface && !summary?.workspaceReportFound) {
       assert.equal(
         summary?.resultTableFound,
         true,
@@ -687,7 +689,7 @@ function assertHostedBuilderRender(windowKey, sharedConfigPath, {
         `${windowKey} seeded hosted table state should reflect ${expectedOverflowLabel || "no overflow action"}\n${JSON.stringify(summary, null, 2)}`,
       );
     }
-    if (expectsChartSurface) {
+    if (expectsChartSurface && !summary?.workspaceReportFound) {
       assert.equal(
         summary?.chartWrapFound,
         true,

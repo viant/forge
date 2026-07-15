@@ -119,13 +119,13 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("!hideSavedPayloadHandoffGetResponseSummary ? renderInspectorNoticePanel(getReportDocumentResponseInspector"),
+  source.includes("!hideSavedPayloadHandoffGetResponseSummary && !hideImportedActivationGetResponseSummary ? renderInspectorNoticePanel(getReportDocumentResponseInspector"),
   true,
   "Standalone get response inspectors should only remain for non-handoff artifacts.",
 );
 
 assert.equal(
-  source.includes("!hideSavedPayloadHandoffUpdateConflictSummary ? renderInspectorNoticePanel(updateReportDocumentConflictDiagnosticInspector"),
+  source.includes("!hideSavedPayloadHandoffUpdateConflictSummary && !hideImportedActivationUpdatePayloadSummary ? renderInspectorNoticePanel(updateReportDocumentConflictDiagnosticInspector"),
   true,
   "Standalone update conflict inspectors should only remain for non-handoff artifacts.",
 );

@@ -30,7 +30,7 @@ export const reportExportRequestSchema = {
       required: ["from", "artifactKind", "artifactRef", "title"],
       properties: {
         from: {
-          enum: ["draft", "savedPayload", "savedView", "publishedSnapshot"],
+          enum: ["draft", "preset", "savedPayload", "savedView", "publishedSnapshot"],
         },
         artifactKind: { type: "string" },
         artifactRef: { type: "string" },
@@ -39,6 +39,8 @@ export const reportExportRequestSchema = {
         payloadId: { type: "string" },
         sourceArtifactId: { type: "string" },
         documentVersion: { type: "integer", minimum: 1 },
+        windowKey: { type: "string" },
+        templateLabel: { type: "string" },
       },
     },
     reportSpec: { type: "object" },
