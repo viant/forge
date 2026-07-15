@@ -315,6 +315,11 @@ function normalizeChartFieldOptions(options = []) {
             seen.add(key);
             return {
                 key,
+                aliases: Array.from(new Set(
+                    (Array.isArray(option?.aliases) ? option.aliases : [option?.aliases])
+                        .map((alias) => normalizeString(alias))
+                        .filter((alias) => alias && alias !== key),
+                )),
                 label: normalizeString(option?.label || key),
                 kind: normalizeString(option?.kind),
                 ...(normalizeString(option?.format) ? { format: normalizeString(option.format) } : {}),

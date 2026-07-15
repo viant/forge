@@ -166,7 +166,11 @@ export default function DashboardTableContent({
             ) : null}
             {sortedRows.length > 0 ? (
                 <div className="forge-dashboard-table-wrap">
-                    <table className={density === "compact" ? "forge-dashboard-table forge-dashboard-table--compact" : "forge-dashboard-table"}>
+                    <table className={[
+                        "forge-dashboard-table",
+                        density === "compact" ? "forge-dashboard-table--compact" : "",
+                        rowActions.length > 0 ? "forge-dashboard-table--has-actions" : "",
+                    ].filter(Boolean).join(" ")}>
                         <thead>
                         <tr>
                             {runtimeColumns.map((col) => {
