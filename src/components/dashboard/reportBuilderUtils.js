@@ -51,6 +51,7 @@ import {
     resolveReportBuilderDynamicFilterGroups,
     resolveReportBuilderScopeParamFilters,
 } from "./reportBuilderPredicates.js";
+import { resolveReportRelativeDateRange } from "../../reporting/reportRelativeDateRangeModel.js";
 
 export {
     normalizeDynamicGroupRows,
@@ -147,46 +148,8 @@ export function resolveReportBuilderRailFilterState({
     };
 }
 
-function formatDateISO(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-}
-
 function resolveRelativeDateRangeDefault(seed = {}) {
-    const preset = String(seed?.preset || "").trim().toLowerCase();
-    if (!preset) {
-        return null;
-    }
-    const now = new Date();
-    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const start = new Date(end);
-    switch (preset) {
-        case "last3days":
-        case "last_3_days":
-        case "3d":
-            start.setDate(end.getDate() - 2);
-            break;
-        case "last7days":
-        case "last_7_days":
-        case "7d":
-            start.setDate(end.getDate() - 6);
-            break;
-        case "last30days":
-        case "last_30_days":
-        case "30d":
-            start.setDate(end.getDate() - 29);
-            break;
-        case "today":
-            break;
-        default:
-            return null;
-    }
-    return {
-        start: formatDateISO(start),
-        end: formatDateISO(end),
-    };
+    return resolveReportRelativeDateRange(seed?.preset);
 }
 
 function defaultSelectedIds(items = [], fallbackCount = 1) {

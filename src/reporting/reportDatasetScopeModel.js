@@ -11,6 +11,7 @@ function isPlainObject(value) {
 }
 
 const DATASET_SCOPE_MODES = new Set(["inherit", "append", "override", "exclude"]);
+const RELATIVE_DATE_PRESETS = new Set(["today", "yesterday", "last3days", "last7days", "last30days", "3d", "7d", "30d"]);
 
 function normalizeDatasetScopeMode(value = "") {
   const normalized = normalizeString(value).toLowerCase();
@@ -60,6 +61,25 @@ export function normalizeReportDatasetScope(value = null) {
       delete next.exclude;
     }
   }
+  if (Object.prototype.hasOwnProperty.call(next, "relativeDateRange")) {
+    const relativeDateRange = isPlainObject(next.relativeDateRange) ? cloneValue(next.relativeDateRange) : null;
+    const preset = normalizeString(relativeDateRange?.preset).toLowerCase().replaceAll("_", "");
+    const startExpression = normalizeString(relativeDateRange?.startExpression);
+    const endExpression = normalizeString(relativeDateRange?.endExpression);
+    const startParamPath = normalizeString(relativeDateRange?.startParamPath);
+    const endParamPath = normalizeString(relativeDateRange?.endParamPath);
+    if ((!RELATIVE_DATE_PRESETS.has(preset) && (!startExpression || !endExpression)) || !startParamPath || !endParamPath) {
+      throw new Error("Dataset relativeDateRange requires a supported preset or start/end expressions, plus startParamPath and endParamPath.");
+    }
+    next.relativeDateRange = {
+      ...(preset ? { preset } : {}),
+      ...(startExpression ? { startExpression } : {}),
+      ...(endExpression ? { endExpression } : {}),
+      ...(normalizeString(relativeDateRange?.format) ? { format: normalizeString(relativeDateRange.format) } : {}),
+      startParamPath,
+      endParamPath,
+    };
+  }
   if (next.mode === "exclude" && (!Array.isArray(next.exclude) || next.exclude.length === 0)) {
     throw new Error("Dataset scope mode 'exclude' requires at least one excluded scope param id.");
   }
@@ -73,6 +93,7 @@ export function resolveReportDatasetScopePolicy(scope = null) {
       mode: "inherit",
       local: {},
       exclude: [],
+      relativeDateRange: null,
     };
   }
   const explicitMode = normalizeDatasetScopeMode(normalizedScope?.mode);
@@ -80,17 +101,22 @@ export function resolveReportDatasetScopePolicy(scope = null) {
     ? cloneValue(normalizedScope.local)
     : {};
   const normalizedExclude = normalizeStringArray(normalizedScope?.exclude);
+  const relativeDateRange = isPlainObject(normalizedScope?.relativeDateRange)
+    ? cloneValue(normalizedScope.relativeDateRange)
+    : null;
   if (explicitMode) {
     return {
       mode: explicitMode,
       local: normalizedLocal,
       exclude: normalizedExclude,
+      relativeDateRange,
     };
   }
   const legacyLocal = cloneValue(normalizedScope);
   delete legacyLocal.mode;
   delete legacyLocal.local;
   delete legacyLocal.exclude;
+  delete legacyLocal.relativeDateRange;
   const inheritContext = legacyLocal?.inheritContext;
   delete legacyLocal.inheritContext;
   const mergedLocal = {
@@ -106,6 +132,7 @@ export function resolveReportDatasetScopePolicy(scope = null) {
       mode: "exclude",
       local: mergedLocal,
       exclude: normalizedExclude,
+      relativeDateRange,
     };
   }
   if (inheritContext === false) {
@@ -113,11 +140,13 @@ export function resolveReportDatasetScopePolicy(scope = null) {
       mode: "override",
       local: mergedLocal,
       exclude: [],
+      relativeDateRange,
     };
   }
   return {
     mode: hasLocal ? "append" : "inherit",
     local: mergedLocal,
     exclude: [],
+    relativeDateRange,
   };
 }

@@ -25,6 +25,7 @@ assert.deepEqual(resolveReportDatasetScopePolicy(null), {
   mode: "inherit",
   local: {},
   exclude: [],
+  relativeDateRange: null,
 });
 
 assert.deepEqual(resolveReportDatasetScopePolicy({
@@ -33,6 +34,7 @@ assert.deepEqual(resolveReportDatasetScopePolicy({
   mode: "inherit",
   local: {},
   exclude: [],
+  relativeDateRange: null,
 });
 
 assert.deepEqual(resolveReportDatasetScopePolicy({
@@ -44,6 +46,7 @@ assert.deepEqual(resolveReportDatasetScopePolicy({
     grain: "day",
   },
   exclude: [],
+  relativeDateRange: null,
 });
 
 assert.deepEqual(resolveReportDatasetScopePolicy({
@@ -55,6 +58,7 @@ assert.deepEqual(resolveReportDatasetScopePolicy({
     reportingWindow: "last_7_days",
   },
   exclude: [],
+  relativeDateRange: null,
 });
 
 assert.deepEqual(resolveReportDatasetScopePolicy({
@@ -68,6 +72,7 @@ assert.deepEqual(resolveReportDatasetScopePolicy({
     grain: "day",
   },
   exclude: [],
+  relativeDateRange: null,
 });
 
 assert.deepEqual(resolveReportDatasetScopePolicy({
@@ -77,6 +82,7 @@ assert.deepEqual(resolveReportDatasetScopePolicy({
   mode: "exclude",
   local: {},
   exclude: ["audienceIds"],
+  relativeDateRange: null,
 });
 
 assert.deepEqual(resolveReportDatasetScopePolicy({
@@ -91,7 +97,34 @@ assert.deepEqual(resolveReportDatasetScopePolicy({
     grain: "day",
   },
   exclude: ["audienceIds", "campaignIds"],
+  relativeDateRange: null,
 });
+
+assert.deepEqual(resolveReportDatasetScopePolicy({
+  mode: "override",
+  relativeDateRange: {
+    preset: "LAST_7_DAYS",
+    startParamPath: "filters.From",
+    endParamPath: "filters.To",
+  },
+}), {
+  mode: "override",
+  local: {},
+  exclude: [],
+  relativeDateRange: {
+    preset: "last7days",
+    startParamPath: "filters.From",
+    endParamPath: "filters.To",
+  },
+});
+
+assert.throws(
+  () => normalizeReportDatasetScope({
+    mode: "override",
+    relativeDateRange: { preset: "quarter_to_date" },
+  }),
+  /Dataset relativeDateRange requires/,
+);
 
 assert.throws(
   () => normalizeReportDatasetScope({

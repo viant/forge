@@ -417,6 +417,20 @@ assert.deepEqual(buildReportBuilderDatasetOptions({
     },
 ]);
 
+const sameSourceScopedOptions = buildReportBuilderDatasetOptions({
+    currentSourceRef: "deliverySource",
+    configuredSources: [
+        { id: "primary", dataSourceRef: "deliverySource", label: "Delivery" },
+        { id: "delivery_today", dataSourceRef: "deliverySource", label: "Delivery Today" },
+        { id: "delivery_yesterday", dataSourceRef: "deliverySource", label: "Delivery Yesterday" },
+    ],
+});
+assert.deepEqual(
+    sameSourceScopedOptions.map((entry) => entry.value),
+    ["primary", "delivery_today", "delivery_yesterday"],
+    "dataset options must retain independently scoped aliases of the primary datasource",
+);
+
 const fieldOptionsWithDatasets = buildReportBuilderDocumentBlockFieldOptions({
     config: {
         dataSourceRef: "demoReportSource",

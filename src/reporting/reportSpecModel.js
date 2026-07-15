@@ -25,6 +25,7 @@ import { isReportDatasetBackedBlockKind } from "./reportBlockKindModel.js";
 import { resolveReportScopeContextPresetFromState } from "./reportContextPresetModel.js";
 import { normalizeReportDatasetScope } from "./reportDatasetScopeModel.js";
 import { resolveReportDatasetScopePolicy } from "./reportDatasetScopeModel.js";
+import { resolveReportRelativeDateRangeSpec } from "./reportRelativeDateRangeModel.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -277,9 +278,17 @@ function buildReportBuilderPublishedDatasetRequest(source = {}, state = {}, data
     setNestedValue(contextPatch, paramPath, cloneValue(rawValue));
   });
   const localPatch = isPlainObject(scopePolicy?.local) ? scopePolicy.local : {};
+  const relativeDateRangePatch = {};
+  const relativeDateRange = scopePolicy?.relativeDateRange;
+  const resolvedRelativeDateRange = resolveReportRelativeDateRangeSpec(relativeDateRange);
+  if (resolvedRelativeDateRange) {
+    setNestedValue(relativeDateRangePatch, relativeDateRange.startParamPath, resolvedRelativeDateRange.start);
+    setNestedValue(relativeDateRangePatch, relativeDateRange.endParamPath, resolvedRelativeDateRange.end);
+  }
+  const resolvedLocalPatch = mergeReportDatasetRequestValues(localPatch, relativeDateRangePatch, { patchWins: true });
   if (scopePolicy.mode === "append") {
     return mergeReportDatasetRequestValues(
-      mergeReportDatasetRequestValues(request, localPatch, { patchWins: true }),
+      mergeReportDatasetRequestValues(request, resolvedLocalPatch, { patchWins: true }),
       contextPatch,
       { patchWins: true },
     );
@@ -287,7 +296,7 @@ function buildReportBuilderPublishedDatasetRequest(source = {}, state = {}, data
   if (scopePolicy.mode === "override" || scopePolicy.mode === "exclude") {
     return mergeReportDatasetRequestValues(
       mergeReportDatasetRequestValues(request, contextPatch, { patchWins: true }),
-      localPatch,
+      resolvedLocalPatch,
       { patchWins: true },
     );
   }

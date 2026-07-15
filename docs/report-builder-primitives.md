@@ -754,6 +754,49 @@ That means request shape should be treated as metadata-driven:
 This avoids fallback alias behavior leaking into the canonical report-builder
 request contract.
 
+## Dataset Scope And Relative Windows
+
+Published datasets can reuse one datasource with independent local scope. The
+supported modes are `inherit`, `append`, `override`, and `exclude`. An
+`override` still carries inherited entity and categorical values, then replaces
+the configured local request paths.
+
+Use `relativeDateRange` for reusable calendar windows:
+
+```yaml
+scope:
+  mode: override
+  relativeDateRange:
+    preset: yesterday
+    startParamPath: filters.From
+    endParamPath: filters.To
+```
+
+Supported presets are `today`, `yesterday`, `last3Days`, `last7Days`, and
+`last30Days` (plus `3d`, `7d`, and `30d` aliases). Dates are resolved when the
+report request is compiled, so saved presets do not contain stale calendar
+dates. The explicit paths keep request casing and backend contracts entirely
+metadata-driven.
+
+For broader semantic time expressions, use `startExpression` and
+`endExpression` instead of `preset`:
+
+```yaml
+relativeDateRange:
+  startExpression: 6 days ago in UTC
+  endExpression: today in UTC
+  startParamPath: filters.From
+  endParamPath: filters.To
+```
+
+Narrative and KPI markdown also support dynamic time macros:
+
+- `${time.today}`
+- `${time.yesterday}`
+- `${time.last7Days.start}` / `${time.last7Days.end}`
+- `${timeAt("2 days ago in UTC")}`
+- `${timeAt("50 hours ahead", "dateTime")}`
+
 ## Markdown Rendering
 
 Runtime markdown rendering is intentionally lightweight.
