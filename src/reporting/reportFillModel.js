@@ -26,6 +26,7 @@ import { formatDashboardValue } from "../components/dashboard/dashboardUtils.js"
 import { resolveKey } from "../utils/selector.js";
 import equal from "fast-deep-equal";
 import { resolveReportDatasetRefResolution } from "./reportDatasetRefModel.js";
+import { formatReportRelativeTime, resolveReportRelativeDateRange } from "./reportRelativeDateRangeModel.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -336,6 +337,19 @@ function resolveReportFillTemplateToken(token = "", {
   const normalizedToken = normalizeString(token);
   if (!normalizedToken) {
     return "";
+  }
+  const timeAtMatch = normalizedToken.match(/^timeAt\(\s*["'](.+?)["'](?:\s*,\s*["'](date|dateTime)["'])?\s*\)$/i);
+  if (timeAtMatch) {
+    return formatReportRelativeTime(timeAtMatch[1], { format: timeAtMatch[2] || "date" });
+  }
+  const timeAliasMatch = normalizedToken.match(/^time\.(today|yesterday|tomorrow)$/i);
+  if (timeAliasMatch) {
+    return formatReportRelativeTime(timeAliasMatch[1]);
+  }
+  const timeRangeMatch = normalizedToken.match(/^time\.(last3Days|last7Days|last30Days)\.(start|end)$/i);
+  if (timeRangeMatch) {
+    const range = resolveReportRelativeDateRange(timeRangeMatch[1]);
+    return range?.[timeRangeMatch[2].toLowerCase()] || "";
   }
   const formatMatch = normalizedToken.match(/^format\(\s*([^,\s]+)\s*,\s*([^)]+?)\s*\)$/);
   if (formatMatch) {

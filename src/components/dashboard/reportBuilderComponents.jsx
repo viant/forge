@@ -4594,7 +4594,7 @@ export function ReportBuilderDocumentBlockDialog({
                                 }}
                             />
                             <span style={{ fontSize: 12, lineHeight: 1.45, color: "#5f6b7c", marginTop: 6 }}>
-                                Narrative blocks can use data macros like {"${primary.avails}"}, {"${forecasting_cube_report.avails}"}, {"${row.fieldName}"} when a data source is selected, and formatter helpers like {"${fmt.compact(primary.avails)}"}.
+                                Narrative blocks can use data macros like {"${primary.avails}"}, {"${forecasting_cube_report.avails}"}, {"${row.fieldName}"}, time macros like {"${time.today}"}, {"${time.last7Days.start}"}, {"${timeAt(\"2 days ago in UTC\")}"}, and formatter helpers like {"${fmt.compact(primary.avails)}"}.
                             </span>
                         </label>
                     )}

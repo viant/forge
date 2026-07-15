@@ -2260,7 +2260,7 @@ const markdownMacroFill = buildReportFillFromReportSpec({
       kind: "markdownBlock",
       title: "Narrative",
       datasetRef: "primary",
-      markdown: "## Inventory Outlook\\nLead channel is ${row.channelV2}.\\nAvails ${fmt.compact(primary.avails)}.",
+      markdown: "## Inventory Outlook\\nLead channel is ${row.channelV2}.\\nAvails ${fmt.compact(primary.avails)}.\\nToday ${time.today}; yesterday ${time.yesterday}; seven-day start ${time.last7Days.start}; UTC point ${timeAt(\"2 days ago in UTC\")}.",
     },
   ],
 }, {
@@ -2272,6 +2272,7 @@ const markdownMacroFill = buildReportFillFromReportSpec({
 });
 assert.equal(markdownMacroFill.blocks[0].content.markdown.includes("Lead channel is CTV."), true);
 assert.equal(markdownMacroFill.blocks[0].content.markdown.includes("Avails 169B."), true);
+assert.match(markdownMacroFill.blocks[0].content.markdown, /Today \d{4}-\d{2}-\d{2}; yesterday \d{4}-\d{2}-\d{2}; seven-day start \d{4}-\d{2}-\d{2}; UTC point \d{4}-\d{2}-\d{2}\./);
 
 const executionMetadataFill = buildReportFillFromReportSpec({
   version: 1,

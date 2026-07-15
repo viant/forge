@@ -381,7 +381,8 @@ export function buildReportBuilderDatasetOptions({
         .map((entry) => {
             const dataSourceRef = normalizeString(entry?.dataSourceRef || entry?.value || entry?.id);
             const value = normalizeString(entry?.id || dataSourceRef);
-            if (!dataSourceRef || !value || dataSourceRef === normalizedCurrentSourceRef) {
+            const configuredPrimaryId = normalizeString(configuredPrimarySource?.id || "primary") || "primary";
+            if (!dataSourceRef || !value || value === configuredPrimaryId) {
                 return null;
             }
             return {
