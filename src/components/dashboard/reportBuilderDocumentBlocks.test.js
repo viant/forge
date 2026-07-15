@@ -1616,6 +1616,31 @@ assert.deepEqual(buildReportBuilderDocumentBlockDiagnostics([
 
 assert.deepEqual(buildReportBuilderDocumentBlockDiagnostics([
     {
+        id: "channelMix",
+        kind: "chartBlock",
+        title: "Channel Mix",
+        datasetRef: "primary",
+        chartSpec: {
+            title: "Channel Mix",
+            type: "line",
+            xField: "channelId",
+            yFields: ["totalSpend"],
+        },
+    },
+], {
+    chartConfig: {
+        result: {
+            supportedChartTypes: ["line"],
+        },
+    },
+    chartFieldOptions: [
+        { key: "channelName", aliases: ["channelId"], label: "Channel", kind: "dimension" },
+        { key: "totalSpend", label: "Spend", kind: "measure" },
+    ],
+}), []);
+
+assert.deepEqual(buildReportBuilderDocumentBlockDiagnostics([
+    {
         id: "trendChart",
         kind: "chartBlock",
         title: "Trend Chart",

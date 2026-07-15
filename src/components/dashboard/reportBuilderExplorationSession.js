@@ -375,14 +375,16 @@ export function buildReportBuilderExplorationBannerState(state = {}, options = {
     const nowMs = resolveExplorationNow(options);
     const canUndo = session.historyIndex > 0;
     const canRedo = session.historyIndex < session.history.length - 1;
+    if (!session.dirty && !canUndo && !canRedo) {
+        return null;
+    }
+    const sourceLabel = normalizeString(session.sourceRef?.contextLabel) || "the current result";
     return {
         active: true,
         sessionId: session.sessionId,
-        title: "Local Draft",
-        description: session.dirty
-            ? `Working locally from ${normalizeString(session.sourceRef?.contextLabel) || "the current result state"}. Undo, redo, keep, or discard without changing the source report.`
-            : `No local changes are active for ${normalizeString(session.sourceRef?.contextLabel) || "the current result state"}. Edit the result to create a draft you can keep or save, or discard this empty draft.`,
-        hintItems: buildReportBuilderExplorationHintItems(session.sourceRef),
+        title: "Draft",
+        description: `Editing a local draft from ${sourceLabel}. Keep, export, save, or discard without changing the source report.`,
+        hintItems: [],
         dirty: session.dirty,
         canUndo,
         canRedo,
@@ -391,6 +393,6 @@ export function buildReportBuilderExplorationBannerState(state = {}, options = {
         sourceRef: session.sourceRef,
         ttlMs: session.ttlMs,
         expiresAt: session.expiresAt,
-        ttlLabel: formatExplorationTtlRemaining(session.expiresAt, nowMs),
+        ttlLabel: "",
     };
 }

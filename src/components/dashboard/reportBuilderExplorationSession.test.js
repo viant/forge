@@ -148,59 +148,38 @@ assert.deepEqual(
     baseState,
 );
 
-assert.deepEqual(buildReportBuilderExplorationBannerState(started, { nowMs: 1000 }), {
-    active: true,
-    sessionId: "rbexplore_1000",
-    title: "Local Draft",
-    description: "No local changes are active for the current result state. Edit the result to create a draft you can keep or save, or discard this empty draft.",
-    hintItems: [
-        "Change chart/table view without affecting the source report.",
-        "Adjust measures, breakdowns, or filters locally.",
-        "Keep the draft only if the result is worth saving.",
-    ],
-    dirty: false,
-    canUndo: false,
-    canRedo: false,
-    canKeep: false,
-    canSaveArtifact: false,
-    ttlMs: 5000,
-    expiresAt: 6000,
-    ttlLabel: "1m left",
-    sourceRef: {
-        kind: "reportBuilder.result",
-        containerId: "demoReportBuilder",
-        stateKey: "demoReportBuilder",
-        viewMode: "table",
-        primaryMeasure: "totalSpend",
-    },
-});
+assert.equal(buildReportBuilderExplorationBannerState(started, { nowMs: 1000 }), null);
 assert.equal(buildReportBuilderExplorationBannerState(withHistory)?.canKeep, true);
 assert.equal(buildReportBuilderExplorationBannerState(withHistory)?.canSaveArtifact, true);
 assert.equal(buildReportBuilderExplorationBannerState(undone)?.canKeep, false);
 assert.equal(buildReportBuilderExplorationBannerState(undone)?.canSaveArtifact, false);
-assert.equal(buildReportBuilderExplorationBannerState(withHistory, { nowMs: 5900 })?.ttlLabel, "1m left");
+assert.equal(buildReportBuilderExplorationBannerState(withHistory, { nowMs: 5900 })?.ttlLabel, "");
 assert.match(
-    buildReportBuilderExplorationBannerState(startedFromRow).description,
+    buildReportBuilderExplorationBannerState(recordReportBuilderExplorationHistory(startedFromRow, {
+        ...startedFromRow,
+        selectedMeasures: ["impressions"],
+        primaryMeasure: "impressions",
+    }, { nowMs: 1900 })).description,
     /2026-05-01 • Display/,
 );
-assert.deepEqual(buildReportBuilderExplorationBannerState(startedFromChartSelection, { nowMs: 1750 }), {
+assert.equal(buildReportBuilderExplorationBannerState(startedFromChartSelection, { nowMs: 1750 }), null);
+assert.deepEqual(buildReportBuilderExplorationBannerState(recordReportBuilderExplorationHistory(startedFromChartSelection, {
+    ...startedFromChartSelection,
+    viewMode: "chart",
+}, { nowMs: 1800 })), {
     active: true,
     sessionId: "rbexplore_1750",
-    title: "Local Draft",
-    description: "No local changes are active for Display. Edit the result to create a draft you can keep or save, or discard this empty draft.",
-    hintItems: [
-        "Use the selected chart value as a starting point.",
-        "Switch to the table to inspect matching rows locally.",
-        "Keep the draft only if the changes are worth saving.",
-    ],
-    dirty: false,
-    canUndo: false,
+    title: "Draft",
+    description: "Editing a local draft from Display. Keep, export, save, or discard without changing the source report.",
+    hintItems: [],
+    dirty: true,
+    canUndo: true,
     canRedo: false,
-    canKeep: false,
-    canSaveArtifact: false,
+    canKeep: true,
+    canSaveArtifact: true,
     ttlMs: 1000 * 60 * 60,
-    expiresAt: 1750 + (1000 * 60 * 60),
-    ttlLabel: "1h left",
+    expiresAt: 1800 + (1000 * 60 * 60),
+    ttlLabel: "",
     sourceRef: {
         kind: "reportBuilder.chartSelection",
         containerId: "demoReportBuilder",
@@ -232,11 +211,7 @@ const startedFromChartResult = beginReportBuilderExplorationSession({
     nowMs: 2000,
 });
 
-assert.deepEqual(buildReportBuilderExplorationBannerState(startedFromChartResult, { nowMs: 2000 })?.hintItems, [
-    "Swap presets or edit the current view locally.",
-    "Switch to the table to inspect the same result rows.",
-    "Keep the draft only if the changes are worth saving.",
-]);
+assert.equal(buildReportBuilderExplorationBannerState(startedFromChartResult, { nowMs: 2000 }), null);
 
 assert.deepEqual(
     buildReportBuilderExplorationSourceContextFromTableRow({

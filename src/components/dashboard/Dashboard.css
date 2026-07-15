@@ -399,6 +399,25 @@
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92);
 }
 
+@media (max-width: 700px) {
+    .forge-dashboard-table--has-actions {
+        width: max-content;
+        min-width: 760px;
+        table-layout: auto;
+    }
+
+    .forge-dashboard-table--has-actions th:not(.forge-dashboard-table__actions-head),
+    .forge-dashboard-table--has-actions td:not(.forge-dashboard-table__actions-cell) {
+        min-width: 112px;
+    }
+
+    .forge-dashboard-table--has-actions .forge-dashboard-table__actions-head,
+    .forge-dashboard-table--has-actions .forge-dashboard-table__actions-cell {
+        width: 300px;
+        min-width: 300px;
+    }
+}
+
 .forge-dashboard-row-action {
     min-height: 30px;
     padding: 0 11px;
