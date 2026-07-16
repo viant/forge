@@ -2184,6 +2184,83 @@ assert.deepEqual(payloadWithAuthoredBlocks.reportSpec.layoutIntent.blockOrder, [
     "integrationTimeline",
 ]);
 
+const displayMetadataState = {
+    selectedMeasures: ["avails"],
+    primaryMeasure: "avails",
+    selectedDimensions: ["channelV2"],
+    reportDocumentBlocks: [
+        {
+            id: "channelNarrative",
+            kind: "markdownBlock",
+            title: "Channel readout",
+            datasetRef: "lastSevenDays",
+            markdown: "Leader: **${row.channelV2}**.",
+        },
+    ],
+};
+const persistedDisplayMetadataConfig = {
+    dataSourceRef: "forecasting_cube_report",
+    measures: [{ id: "avails", key: "avails", label: "Avails", default: true, format: "compactNumber" }],
+    dimensions: [{ id: "channelV2", key: "channelV2", label: "Channel", default: true }],
+    datasets: [{
+        id: "lastSevenDays",
+        dataSourceRef: "forecasting_cube_report",
+        request: { dimensions: { channelV2: true }, measures: { avails: true } },
+        columnOptions: [
+            {
+                key: "channelV2",
+                sourceKey: "channelV2",
+                kind: "dimension",
+                label: "Channel",
+                displayKey: "channel.channel",
+                displayValueMap: { "6": "CTV" },
+            },
+            { key: "avails", kind: "measure", label: "Avails", format: "compactNumber" },
+        ],
+    }],
+};
+const persistedDisplayMetadataPayload = buildReportBuilderSavedReportPayloadFromBuilderState({
+    kind: "reportBuilder.savedReportPayload",
+    payloadId: "rbreport_display_metadata",
+    sourceArtifactId: "display_metadata",
+    title: "Display Metadata",
+    reportDocument: { id: "displayMetadata", kind: "reportDocument", version: 1 },
+}, {
+    container: { id: "displayMetadata", stateKey: "displayMetadata", dataSourceRef: "forecasting_cube_report" },
+    config: persistedDisplayMetadataConfig,
+    state: displayMetadataState,
+    savedAt: 9501,
+});
+const rebuiltDisplayMetadataPayload = buildReportBuilderSavedReportPayloadFromBuilderState(persistedDisplayMetadataPayload, {
+    container: { id: "displayMetadata", stateKey: "displayMetadata", dataSourceRef: "forecasting_cube_report" },
+    // A reopened runtime can have a thinner live source configuration. The
+    // saved document catalog remains authoritative for presentation metadata.
+    config: {
+        ...persistedDisplayMetadataConfig,
+        datasets: [{
+            id: "lastSevenDays",
+            dataSourceRef: "forecasting_cube_report",
+            request: { dimensions: { channelV2: true }, measures: { avails: true } },
+            columnOptions: [
+                { key: "channelV2", kind: "dimension", label: "Channel" },
+                { key: "avails", kind: "measure", label: "Avails", format: "compactNumber" },
+            ],
+        }],
+    },
+    state: displayMetadataState,
+    savedAt: 9502,
+});
+assert.deepEqual(
+    rebuiltDisplayMetadataPayload.reportSpec.blocks.find((block) => block.id === "channelNarrative")?.templateFieldDisplayMap,
+    {
+        channelV2: {
+            sourceKey: "channelV2",
+            displayKey: "channel.channel",
+            displayValueMap: { "6": "CTV" },
+        },
+    },
+);
+
 const reopenedPayloadFromResponse = buildReportBuilderSavedReportPayloadFromBuilderState({
     version: 1,
     kind: "getReportDocumentResponse",

@@ -85,6 +85,37 @@ assert.deepEqual(categoryPayload, {
   seriesKeys: ["Display", "CTV"],
 });
 
+const mappedCategoryPayload = buildReportFillChartPayload({
+  type: "horizontal_bar",
+  xAxis: {
+    dataKey: "channel.channel",
+    sourceDataKey: "channelV2",
+    displayValueMap: {
+      "1": "Display",
+      "6": "CTV",
+    },
+  },
+  series: {
+    values: [
+      { value: "avails", label: "Avails" },
+    ],
+  },
+}, [
+  { channelV2: 1, avails: 158400 },
+  { channelV2: 6, avails: 138200 },
+]);
+
+assert.deepEqual(mappedCategoryPayload, {
+  kind: "directSeries",
+  type: "horizontal_bar",
+  xAxisKey: "channel.channel",
+  seriesKeys: ["avails"],
+  rows: [
+    { channel: { channel: "Display" }, avails: 158400 },
+    { channel: { channel: "CTV" }, avails: 138200 },
+  ],
+});
+
 assert.equal(buildReportFillChartPayload({}, []), null);
 
 console.log("reportFillChartPayload ✓ builds grouped, direct, and category chart payloads for ReportFill");

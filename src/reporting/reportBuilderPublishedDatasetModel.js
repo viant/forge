@@ -138,6 +138,39 @@ function deriveChartFieldOptions(entry = {}) {
   }));
 }
 
+// A dataSourceRef names an endpoint, not a logical dataset: several
+// independently scoped datasets may share one endpoint. Dataset ids are the
+// canonical lookup keys; an endpoint ref may only resolve a dataset when it
+// identifies exactly one and does not collide with a declared id.
+export function buildReportBuilderPublishedDatasetRefIndex(sources = []) {
+  const normalizedSources = (Array.isArray(sources) ? sources : []).filter(isPlainObject);
+  const index = new Map();
+  normalizedSources.forEach((source) => {
+    const id = normalizeString(source?.id);
+    if (id && !index.has(id)) {
+      index.set(id, source);
+    }
+  });
+  const declaredIds = new Set(index.keys());
+  const sourcesByDataSourceRef = new Map();
+  normalizedSources.forEach((source) => {
+    const dataSourceRef = normalizeString(source?.dataSourceRef);
+    if (!dataSourceRef) {
+      return;
+    }
+    sourcesByDataSourceRef.set(dataSourceRef, [
+      ...(sourcesByDataSourceRef.get(dataSourceRef) || []),
+      source,
+    ]);
+  });
+  sourcesByDataSourceRef.forEach((group, dataSourceRef) => {
+    if (group.length === 1 && !declaredIds.has(dataSourceRef)) {
+      index.set(dataSourceRef, group[0]);
+    }
+  });
+  return index;
+}
+
 export function normalizeReportBuilderPublishedDataSources(config = {}) {
   const declared = [
     ...(Array.isArray(config?.datasets) ? config.datasets : []),

@@ -1582,6 +1582,75 @@ assert.deepEqual(
   },
 );
 
+const sharedEndpointWindows = {
+  delivery_today: { From: "2026-07-17", To: "2026-07-17" },
+  delivery_yesterday: { From: "2026-07-16", To: "2026-07-16" },
+  delivery_last_7_days: { From: "2026-07-11", To: "2026-07-17" },
+};
+const sharedEndpointDocument = buildReportBuilderReportDocument({
+  container,
+  config: {
+    ...config,
+    datasets: Object.entries(sharedEndpointWindows).map(([id, window]) => ({
+      id,
+      dataSourceRef: container.dataSourceRef,
+      scope: { mode: "override", local: { filters: window } },
+      scopeParamOptions: [{ value: "orderIds", kind: "multiSelect", paramPath: "filters.orderIds" }],
+      request: { measures: { totalSpend: true }, dimensions: { eventDate: true }, filters: {} },
+    })),
+  },
+  state,
+});
+assert.deepEqual(
+  sharedEndpointDocument.datasets
+    .filter((dataset) => dataset.id !== "primary")
+    .map((dataset) => dataset.id),
+  Object.keys(sharedEndpointWindows),
+  "saving must persist every logical dataset sharing one endpoint",
+);
+const loweredSharedEndpointSpec = lowerReportDocumentToReportSpec({
+  ...sharedEndpointDocument,
+  blocks: [
+    ...sharedEndpointDocument.blocks,
+    ...Object.keys(sharedEndpointWindows).map((datasetRef) => buildReportDocumentTableBlock({
+      id: `${datasetRef}Table`,
+      title: datasetRef,
+      datasetRef,
+      columns: [
+        { key: "eventDate", label: "Date" },
+        { key: "totalSpend", label: "Spend" },
+      ],
+    })),
+  ],
+}, {
+  runtimeDatasetScopeParams: {
+    delivery_today: { orderIds: [111] },
+    [container.dataSourceRef]: { orderIds: [999] },
+  },
+});
+const loweredSharedEndpointIds = loweredSharedEndpointSpec.datasets.map((dataset) => dataset.id);
+assert.equal(
+  new Set(loweredSharedEndpointIds).size,
+  loweredSharedEndpointIds.length,
+  "reopened dataset ids must stay unique",
+);
+assert.equal(
+  loweredSharedEndpointIds.includes(container.dataSourceRef),
+  false,
+  "reopening must not synthesize a dataset named after the shared endpoint",
+);
+Object.entries(sharedEndpointWindows).forEach(([id, window]) => {
+  const dataset = loweredSharedEndpointSpec.datasets.find((entry) => entry.id === id);
+  assert.equal(dataset?.dataSourceRef, container.dataSourceRef);
+  assert.equal(dataset?.request?.filters?.From, window.From, `${id} must keep its own window after reopen`);
+  assert.equal(dataset?.request?.filters?.To, window.To, `${id} must keep its own window after reopen`);
+  assert.deepEqual(
+    dataset?.request?.filters?.orderIds,
+    id === "delivery_today" ? [111] : undefined,
+    `${id} runtime scope values must stay dataset-specific after reopen`,
+  );
+});
+
 const loweredLegacyExplicitDatasetSpec = lowerReportDocumentToReportSpec({
   ...explicitDatasetDocument,
   datasets: explicitDatasetDocument.datasets.filter((dataset) => dataset.id !== "primary"),

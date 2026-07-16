@@ -35,7 +35,7 @@ import {
     buildPieSliceCellKey,
     buildPieChartData,
     fillMissingTemporalBuckets,
-    formatTimestamp,
+    formatChartXAxisValue,
     materializeChartDisplayRows,
     normalizeChartKey,
     readChartDataValue,
@@ -869,7 +869,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             {resolvedChartAnnotations.background}
             <XAxis
                 dataKey={xAxis?.dataKey || "name"}
-                tickFormatter={(val) => formatTimestamp(val, resolvedTickFormat)}
+                tickFormatter={(val) => formatChartXAxisValue(val, resolvedTickFormat)}
                 tick={axisTickStyle}
                 axisLine={false}
                 tickLine={false}
@@ -915,7 +915,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 />
             ) : null}
             <Tooltip
-                labelFormatter={(val) => formatTimestamp(val, resolvedTickFormat)}
+                labelFormatter={(val) => formatChartXAxisValue(val, resolvedTickFormat)}
                 formatter={(value, name, item) => {
                     const formatType = item?.payload?.__seriesFormats?.[item?.dataKey] || item?.payload?.__seriesAxes?.[item?.dataKey];
                     return [tooltipFormatterForFormat(formatType)(value), name];

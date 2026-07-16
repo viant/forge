@@ -375,8 +375,10 @@ export function buildReportBuilderDatasetOptions({
         datasets: Array.isArray(configuredDatasets) ? configuredDatasets : [],
         dataSources: Array.isArray(configuredSources) ? configuredSources : [],
     });
+    // A shared MCP endpoint can back several independently scoped datasets.
+    // Only the logical primary ID may supply the primary dataset contract.
     const configuredPrimarySource = normalizedConfiguredSources
-        .find((entry) => normalizeString(entry?.dataSourceRef) === normalizedCurrentSourceRef) || null;
+        .find((entry) => normalizeString(entry?.id) === "primary") || null;
     const configuredPublishedDatasetOptions = normalizedConfiguredSources
         .map((entry) => {
             const dataSourceRef = normalizeString(entry?.dataSourceRef || entry?.value || entry?.id);

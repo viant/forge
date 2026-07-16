@@ -274,6 +274,7 @@ function resolveReportFillTemplateRawValue(token = "", {
   dataset = null,
   datasetRef = "primary",
   datasetsByAlias = new Map(),
+  fieldDisplayMap = null,
 } = {}) {
   const normalizedToken = normalizeString(token);
   if (normalizedToken === "value") {
@@ -283,8 +284,14 @@ function resolveReportFillTemplateRawValue(token = "", {
     return content?.secondaryValue;
   }
   if (normalizedToken.startsWith("row.")) {
+    const field = normalizedToken.slice(4);
+    const display = fieldDisplayMap?.[field];
     return row && typeof row === "object" && !Array.isArray(row)
-      ? resolveKey(row, normalizedToken.slice(4))
+      ? resolveReportFillFieldDisplayValue(row, {
+        sourceField: display?.sourceKey || field,
+        displayKey: display?.displayKey,
+        displayValueMap: display?.displayValueMap,
+      })
       : undefined;
   }
   if (normalizedToken === "dataset.id") {
@@ -333,6 +340,7 @@ function resolveReportFillTemplateToken(token = "", {
   dataset = null,
   datasetRef = "primary",
   datasetsByAlias = new Map(),
+  fieldDisplayMap = null,
 } = {}) {
   const normalizedToken = normalizeString(token);
   if (!normalizedToken) {
@@ -359,6 +367,7 @@ function resolveReportFillTemplateToken(token = "", {
       dataset,
       datasetRef,
       datasetsByAlias,
+      fieldDisplayMap,
     });
     return formatReportFillKpiMacroValue(rawValue, resolveReportFillMacroFormat(formatMatch[2]));
   }
@@ -370,6 +379,7 @@ function resolveReportFillTemplateToken(token = "", {
       dataset,
       datasetRef,
       datasetsByAlias,
+      fieldDisplayMap,
     });
     return formatReportFillKpiMacroValue(rawValue, resolveReportFillMacroFormat(helperMatch[1]));
   }
@@ -400,6 +410,7 @@ function resolveReportFillTemplateToken(token = "", {
     dataset,
     datasetRef,
     datasetsByAlias,
+    fieldDisplayMap,
   });
   return resolved === undefined ? "" : formatReportFillKpiMacroValue(resolved);
 }
@@ -495,12 +506,20 @@ function buildReportFillCollectionItemContent(block = {}, row = null, rowIndex =
   const secondaryField = normalizeString(block?.secondaryField);
   const value = valueField && row ? row[valueField] ?? null : null;
   const secondaryValue = secondaryField && row
-    ? resolveReportFillFieldDisplayValue(row, { sourceField: secondaryField })
+    ? resolveReportFillFieldDisplayValue(row, {
+      sourceField: secondaryField,
+      displayKey: block?.secondaryDisplayKey,
+      displayValueMap: block?.secondaryDisplayValueMap,
+    })
     : null;
   const content = {
     index: rowIndex,
     title: itemTitleField && row
-      ? resolveReportFillFieldDisplayValue(row, { sourceField: itemTitleField })
+      ? resolveReportFillFieldDisplayValue(row, {
+        sourceField: itemTitleField,
+        displayKey: block?.itemTitleDisplayKey,
+        displayValueMap: block?.itemTitleDisplayValueMap,
+      })
       : `Item ${rowIndex + 1}`,
     ...(itemTitleField ? { itemTitleField } : {}),
     ...(normalizeString(block?.itemTitleLabel) ? { itemTitleLabel: normalizeString(block.itemTitleLabel) } : {}),
@@ -528,6 +547,7 @@ function buildReportFillCollectionItemContent(block = {}, row = null, rowIndex =
       dataset,
       datasetRef: block?.datasetRef,
       datasetsByAlias,
+      fieldDisplayMap: block?.templateFieldDisplayMap,
     })
     : "";
   return {
@@ -832,6 +852,7 @@ function buildReportFillMarkdownContent(block = {}, dataset = {}, {
     dataset,
     datasetRef: block?.datasetRef,
     datasetsByAlias,
+    fieldDisplayMap: block?.templateFieldDisplayMap,
   });
   return {
     title: normalizeString(block?.title),

@@ -5,6 +5,7 @@ import {
   buildReportSpecChartBlock,
   normalizeReportBuilderPublishedDataSources,
 } from "./reportSpecModel.js";
+import { buildReportBuilderPublishedDatasetRefIndex } from "./reportBuilderPublishedDatasetModel.js";
 import { resolveReportBuilderBlock } from "./reportBuilderBlockModel.js";
 import { normalizeReportCalculatedFields } from "./calculatedFieldModel.js";
 import { normalizeReportRefinements } from "./reportRefinementModel.js";
@@ -331,6 +332,68 @@ function buildAuthoredKpiBlock(block = {}, fieldCatalog = {}) {
     }
   }
   return nextBlock;
+}
+
+function resolveAuthoredFieldDisplayDescriptor(fieldCatalog = {}, field = "") {
+  const catalogEntry = resolveReportBuilderCatalogEntry(fieldCatalog, field);
+  const fieldId = resolveReportBuilderFieldId(catalogEntry?.entry);
+  if (!catalogEntry?.entry || !fieldId) {
+    return null;
+  }
+  const sourceKey = normalizeString(catalogEntry.entry.key || catalogEntry.entry.id || fieldId) || fieldId;
+  const displayKey = normalizeString(
+    catalogEntry.entry.displayKey
+    || catalogEntry.entry.displayPath
+    || sourceKey,
+  ) || sourceKey;
+  const displayValueMap = catalogEntry.entry.displayValueMap && typeof catalogEntry.entry.displayValueMap === "object" && !Array.isArray(catalogEntry.entry.displayValueMap)
+    ? cloneValue(catalogEntry.entry.displayValueMap)
+    : null;
+  if (displayKey === sourceKey && !displayValueMap) {
+    return null;
+  }
+  return {
+    sourceKey,
+    ...(displayKey !== sourceKey ? { displayKey } : {}),
+    ...(displayValueMap ? { displayValueMap } : {}),
+  };
+}
+
+function buildAuthoredTemplateFieldDisplayMap(template = "", fieldCatalog = {}) {
+  const mappings = {};
+  const matches = String(template || "").matchAll(/\brow\.([A-Za-z_][A-Za-z0-9_.]*)/g);
+  for (const match of matches) {
+    const field = normalizeString(match?.[1]);
+    const descriptor = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, field);
+    if (field && descriptor) {
+      mappings[field] = descriptor;
+    }
+  }
+  return Object.keys(mappings).length > 0 ? mappings : null;
+}
+
+function buildAuthoredMarkdownBlock(block = {}, fieldCatalog = {}) {
+  const normalizedBlock = buildReportDocumentMarkdownBlock(block);
+  const templateFieldDisplayMap = buildAuthoredTemplateFieldDisplayMap(normalizedBlock?.markdown, fieldCatalog);
+  return {
+    ...normalizedBlock,
+    ...(templateFieldDisplayMap ? { templateFieldDisplayMap } : {}),
+  };
+}
+
+function buildAuthoredCollectionBlock(block = {}, fieldCatalog = {}) {
+  const normalizedBlock = buildReportDocumentCollectionBlock(block);
+  const itemTitleDisplay = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, normalizedBlock?.itemTitleField);
+  const secondaryDisplay = resolveAuthoredFieldDisplayDescriptor(fieldCatalog, normalizedBlock?.secondaryField);
+  const templateFieldDisplayMap = buildAuthoredTemplateFieldDisplayMap(normalizedBlock?.bodyTemplate, fieldCatalog);
+  return {
+    ...normalizedBlock,
+    ...(itemTitleDisplay?.displayKey ? { itemTitleDisplayKey: itemTitleDisplay.displayKey } : {}),
+    ...(itemTitleDisplay?.displayValueMap ? { itemTitleDisplayValueMap: itemTitleDisplay.displayValueMap } : {}),
+    ...(secondaryDisplay?.displayKey ? { secondaryDisplayKey: secondaryDisplay.displayKey } : {}),
+    ...(secondaryDisplay?.displayValueMap ? { secondaryDisplayValueMap: secondaryDisplay.displayValueMap } : {}),
+    ...(templateFieldDisplayMap ? { templateFieldDisplayMap } : {}),
+  };
 }
 
 function buildAuthoredBadgesBlock(block = {}, fieldCatalog = {}) {
@@ -1051,6 +1114,52 @@ function resolveReportDocumentPrimaryDataset(document = null) {
     .find((dataset) => normalizeString(dataset?.id) === "primary" && !Array.isArray(dataset?.rows)) || null;
 }
 
+function buildPrimaryDatasetCatalogEntries(primaryDataset = {}, kind = "") {
+  const explicitEntries = kind === "dimension"
+    ? primaryDataset?.dimensions
+    : primaryDataset?.measures;
+  if (Array.isArray(explicitEntries) && explicitEntries.length > 0) {
+    return explicitEntries;
+  }
+  const columnOptions = Array.isArray(primaryDataset?.columnOptions) ? primaryDataset.columnOptions : [];
+  const matchingColumns = columnOptions.filter((entry) => normalizeString(entry?.kind) === kind);
+  if (matchingColumns.length > 0) {
+    return matchingColumns;
+  }
+  if (kind === "dimension") {
+    return [
+      ...(Array.isArray(primaryDataset?.secondaryFieldOptions) ? primaryDataset.secondaryFieldOptions : []),
+      ...(Array.isArray(primaryDataset?.chartFieldOptions) ? primaryDataset.chartFieldOptions : [])
+        .filter((entry) => normalizeString(entry?.kind) === "dimension"),
+    ];
+  }
+  return [
+    ...(Array.isArray(primaryDataset?.valueFieldOptions) ? primaryDataset.valueFieldOptions : []),
+    ...(Array.isArray(primaryDataset?.chartFieldOptions) ? primaryDataset.chartFieldOptions : [])
+      .filter((entry) => normalizeString(entry?.kind) === "measure"),
+  ];
+}
+
+function mergePrimaryDatasetCatalogEntries(entries = [], persistedEntries = []) {
+  const persistedByAlias = new Map();
+  (Array.isArray(persistedEntries) ? persistedEntries : []).forEach((entry) => {
+    [entry?.id, entry?.key, entry?.sourceKey, entry?.value, entry?.rawId]
+      .map((value) => normalizeString(value))
+      .filter(Boolean)
+      .forEach((alias) => persistedByAlias.set(alias, entry));
+  });
+  return (Array.isArray(entries) ? entries : []).map((entry) => {
+    const persisted = [entry?.id, entry?.key, entry?.sourceKey, entry?.value, entry?.rawId]
+      .map((value) => normalizeString(value))
+      .filter(Boolean)
+      .map((alias) => persistedByAlias.get(alias))
+      .find(Boolean);
+    // The document is the durable source of presentation metadata; live config
+    // values still win when they are present so current source contracts apply.
+    return persisted ? { ...cloneValue(persisted), ...entry } : entry;
+  });
+}
+
 export function applyPrimaryDatasetFallbackConfig(document = null, baseConfig = {}) {
   const primaryDataset = resolveReportDocumentPrimaryDataset(document);
   const normalizedBaseConfig = isPlainObject(baseConfig) ? cloneValue(baseConfig) : {};
@@ -1062,22 +1171,11 @@ export function applyPrimaryDatasetFallbackConfig(document = null, baseConfig = 
   const primaryDatasetCalculatedFields = Array.isArray(primaryDataset?.calculatedFields) ? cloneValue(primaryDataset.calculatedFields) : [];
   const primaryDatasetComputedMeasures = Array.isArray(primaryDataset?.computedMeasures) ? cloneValue(primaryDataset.computedMeasures) : [];
   const primaryDatasetTableCalculations = Array.isArray(primaryDataset?.tableCalculations) ? cloneValue(primaryDataset.tableCalculations) : [];
-  const columnOptions = Array.isArray(primaryDataset?.columnOptions) ? primaryDataset.columnOptions : [];
-  const valueFieldOptions = Array.isArray(primaryDataset?.valueFieldOptions) ? primaryDataset.valueFieldOptions : [];
-  const secondaryFieldOptions = Array.isArray(primaryDataset?.secondaryFieldOptions) ? primaryDataset.secondaryFieldOptions : [];
-  const chartFieldOptions = Array.isArray(primaryDataset?.chartFieldOptions) ? primaryDataset.chartFieldOptions : [];
+  const primaryDatasetDimensionCatalog = buildPrimaryDatasetCatalogEntries(primaryDataset, "dimension");
+  const primaryDatasetMeasureCatalog = buildPrimaryDatasetCatalogEntries(primaryDataset, "measure");
   const dimensionEntries = Array.isArray(normalizedBaseConfig?.dimensions) && normalizedBaseConfig.dimensions.length > 0
-    ? normalizedBaseConfig.dimensions
-    : (primaryDatasetDimensions.length > 0
-      ? primaryDatasetDimensions
-      : (columnOptions.length > 0
-        ? columnOptions.filter((entry) => normalizeString(entry?.kind) === "dimension")
-        : [
-          ...secondaryFieldOptions.map((entry) => ({ ...entry, kind: "dimension" })),
-          ...chartFieldOptions.filter((entry) => normalizeString(entry?.kind) === "dimension"),
-        ]
-      )
-    );
+    ? mergePrimaryDatasetCatalogEntries(normalizedBaseConfig.dimensions, primaryDatasetDimensionCatalog)
+    : primaryDatasetDimensionCatalog;
   const dimensions = dimensionEntries.map((entry) => {
       const key = normalizeString(entry?.key || entry?.value || entry?.sourceKey);
       if (!key) {
@@ -1096,17 +1194,8 @@ export function applyPrimaryDatasetFallbackConfig(document = null, baseConfig = 
       };
     }).filter(Boolean);
   const measureEntries = Array.isArray(normalizedBaseConfig?.measures) && normalizedBaseConfig.measures.length > 0
-    ? normalizedBaseConfig.measures
-    : (primaryDatasetMeasures.length > 0
-      ? primaryDatasetMeasures
-      : (columnOptions.length > 0
-        ? columnOptions.filter((entry) => normalizeString(entry?.kind) === "measure")
-        : [
-          ...valueFieldOptions.map((entry) => ({ ...entry, kind: "measure" })),
-          ...chartFieldOptions.filter((entry) => normalizeString(entry?.kind) === "measure"),
-        ]
-      )
-    );
+    ? mergePrimaryDatasetCatalogEntries(normalizedBaseConfig.measures, primaryDatasetMeasureCatalog)
+    : primaryDatasetMeasureCatalog;
   const measures = measureEntries.map((entry) => {
       const key = normalizeString(entry?.key || entry?.value || entry?.sourceKey);
       if (!key) {
@@ -1475,6 +1564,10 @@ export function buildReportDocumentCollectionBlock(block = {}) {
     datasetRef: normalizeString(block?.datasetRef || "primary"),
     ...(itemTitleField ? { itemTitleField } : {}),
     ...(normalizeString(block?.itemTitleLabel) ? { itemTitleLabel: normalizeString(block.itemTitleLabel) } : {}),
+    ...(normalizeString(block?.itemTitleDisplayKey) ? { itemTitleDisplayKey: normalizeString(block.itemTitleDisplayKey) } : {}),
+    ...(block?.itemTitleDisplayValueMap && typeof block.itemTitleDisplayValueMap === "object" && !Array.isArray(block.itemTitleDisplayValueMap)
+      ? { itemTitleDisplayValueMap: cloneValue(block.itemTitleDisplayValueMap) }
+      : {}),
     ...(valueField
       ? {
         valueField,
@@ -1487,6 +1580,10 @@ export function buildReportDocumentCollectionBlock(block = {}) {
         secondaryField,
         secondaryLabel: normalizeString(block?.secondaryLabel || secondaryField),
         ...(normalizeString(block?.secondaryFormat) ? { secondaryFormat: normalizeString(block.secondaryFormat) } : {}),
+        ...(normalizeString(block?.secondaryDisplayKey) ? { secondaryDisplayKey: normalizeString(block.secondaryDisplayKey) } : {}),
+        ...(block?.secondaryDisplayValueMap && typeof block.secondaryDisplayValueMap === "object" && !Array.isArray(block.secondaryDisplayValueMap)
+          ? { secondaryDisplayValueMap: cloneValue(block.secondaryDisplayValueMap) }
+          : {}),
       }
       : {}),
     layout: normalizeCollectionLayout(block?.layout),
@@ -1494,6 +1591,9 @@ export function buildReportDocumentCollectionBlock(block = {}) {
     rowLimit: normalizeCollectionRowLimit(block?.rowLimit),
     bodyFormat: "markdown",
     ...(bodyTemplate.trim() ? { bodyTemplate } : {}),
+    ...(block?.templateFieldDisplayMap && typeof block.templateFieldDisplayMap === "object" && !Array.isArray(block.templateFieldDisplayMap)
+      ? { templateFieldDisplayMap: cloneValue(block.templateFieldDisplayMap) }
+      : {}),
     ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
     ...(normalizeString(block?.emptyLabel) ? { emptyLabel: normalizeString(block.emptyLabel) } : {}),
   };
@@ -2181,15 +2281,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
       .filter(([datasetId]) => !!datasetId),
   );
   const publishedDatasetSources = resolveReportDocumentPublishedDatasets(document, effectiveScopedConfig);
-  const publishedDatasetIndex = new Map();
-  publishedDatasetSources.forEach((source) => {
-    if (normalizeString(source?.id)) {
-      publishedDatasetIndex.set(normalizeString(source.id), source);
-    }
-    if (normalizeString(source?.dataSourceRef)) {
-      publishedDatasetIndex.set(normalizeString(source.dataSourceRef), source);
-    }
-  });
+  const publishedDatasetIndex = buildReportBuilderPublishedDatasetRefIndex(publishedDatasetSources);
   const loweredContainer = {
     id: normalizeString(source.containerId || document?.id),
     stateKey: normalizeString(source.stateKey || source.containerId || document?.id),
@@ -2291,8 +2383,14 @@ export function lowerReportDocumentToReportSpec(document = {}, {
       if (normalizeString(normalizedBlock?.kind) === "tableBlock") {
         return buildAuthoredTableBlock(normalizedBlock, datasetContext.fieldCatalog);
       }
+      if (normalizeString(normalizedBlock?.kind) === "markdownBlock") {
+        return buildAuthoredMarkdownBlock(normalizedBlock, datasetContext.fieldCatalog);
+      }
       if (normalizeString(normalizedBlock?.kind) === "kpiBlock") {
         return buildAuthoredKpiBlock(normalizedBlock, datasetContext.fieldCatalog);
+      }
+      if (normalizeString(normalizedBlock?.kind) === "collectionBlock") {
+        return buildAuthoredCollectionBlock(normalizedBlock, datasetContext.fieldCatalog);
       }
       if (normalizeString(normalizedBlock?.kind) === "badgesBlock") {
         return buildAuthoredBadgesBlock(normalizedBlock, datasetContext.fieldCatalog);

@@ -4,6 +4,7 @@ import { buildReportBuilderHostServices } from "./reportBuilderHostServices.js";
 
 const calls = [];
 const originalFetch = global.fetch;
+let returnFailedStatus = false;
 
 global.fetch = async (url, init = {}) => {
   calls.push({
@@ -12,16 +13,23 @@ global.fetch = async (url, init = {}) => {
     headers: { ...(init.headers || {}) },
     body: init.body ? JSON.parse(String(init.body)) : null,
   });
+  const isStatusRequest = String(url).includes("reporting%3Aget_export_status");
   return {
-    ok: true,
-    status: 200,
-    statusText: "OK",
+    ok: !(returnFailedStatus && isStatusRequest),
+    status: returnFailedStatus && isStatusRequest ? 409 : 200,
+    statusText: returnFailedStatus && isStatusRequest ? "Conflict" : "OK",
     async text() {
       if (String(url).includes("reporting%3Asubmit_export")) {
-        return JSON.stringify({ jobId: "job-1", status: "queued" });
+        return JSON.stringify({ result: JSON.stringify({ jobId: "job-1", status: "queued" }) });
+      }
+      if (String(url).includes("reporting%3Aget_export_status")) {
+        if (returnFailedStatus) {
+          return JSON.stringify({ result: JSON.stringify({ jobId: "job-1", status: "failed", error: "Renderer rejected the report." }) });
+        }
+        return JSON.stringify({ result: JSON.stringify({ jobId: "job-1", status: "succeeded", artifactId: "artifact-1", format: "pdf" }) });
       }
       if (String(url).includes("reporting%3Alist_reports")) {
-        return JSON.stringify({ reports: [{ artifactId: "report-1", title: "Forecasting Q3" }] });
+        return JSON.stringify({ result: JSON.stringify({ reports: [{ artifactId: "report-1", title: "Forecasting Q3" }] }) });
       }
       return JSON.stringify({ ok: true });
     },
@@ -75,10 +83,27 @@ assert.equal(calls[0].method, "POST");
 assert.equal(calls[0].headers.Authorization, "Bearer token-123");
 assert.equal(calls[0].body.reportExportRequest.source.from, "preset");
 
+const completed = await synthesized.reportExport.getStatus({ jobId: "job-1" });
+assert.deepEqual(completed, { jobId: "job-1", status: "succeeded", artifactId: "artifact-1", format: "pdf" });
+assert.equal(calls[1].url, "http://localhost:9191/v1/tools/reporting%3Aget_export_status/execute?conversationId=conv-123");
+assert.deepEqual(calls[1].body, { jobId: "job-1" });
+
+returnFailedStatus = true;
+await assert.rejects(
+  () => synthesized.reportExport.getStatus({ jobId: "job-1" }),
+  (error) => {
+    assert.deepEqual(error.toolResult, { jobId: "job-1", status: "failed", error: "Renderer rejected the report." });
+    assert.deepEqual(error.responseEnvelope, { jobId: "job-1", status: "failed", error: "Renderer rejected the report." });
+    return true;
+  },
+);
+returnFailedStatus = false;
+
 const reports = await synthesized.reportStore.listReports({ limit: 10 });
 assert.deepEqual(reports, { reports: [{ artifactId: "report-1", title: "Forecasting Q3" }] });
-assert.equal(calls[1].url, "http://localhost:9191/v1/tools/reporting%3Alist_reports/execute?conversationId=conv-123");
-assert.deepEqual(calls[1].body, { limit: 10 });
+const listReportsCall = calls.find((call) => call.url.includes("reporting%3Alist_reports"));
+assert.equal(listReportsCall?.url, "http://localhost:9191/v1/tools/reporting%3Alist_reports/execute?conversationId=conv-123");
+assert.deepEqual(listReportsCall?.body, { limit: 10 });
 
 const explicitSubmit = async () => ({ ok: "explicit" });
 const explicit = buildReportBuilderHostServices({

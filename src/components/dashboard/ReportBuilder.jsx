@@ -662,6 +662,36 @@ function normalizeString(value = "") {
     return String(value || "").trim();
 }
 
+function reportBuilderSourceCardId(source = {}) {
+    return normalizeString(source?.id || source?.dataSourceRef);
+}
+
+function resolveReportBuilderDatasetOptionForSourceCard(datasetOptions = [], sourceCard = {}) {
+    const sourceCardId = reportBuilderSourceCardId(sourceCard);
+    const exactMatch = (Array.isArray(datasetOptions) ? datasetOptions : [])
+        .find((entry) => normalizeString(entry?.value) === sourceCardId) || null;
+    if (exactMatch) {
+        return exactMatch;
+    }
+    const dataSourceRef = normalizeString(sourceCard?.dataSourceRef);
+    const sourceMatches = (Array.isArray(datasetOptions) ? datasetOptions : [])
+        .filter((entry) => normalizeString(entry?.dataSourceRef) === dataSourceRef);
+    return sourceMatches.length === 1 ? sourceMatches[0] : null;
+}
+
+function resolveReportBuilderStaticDatasetForSourceCard(staticDatasets = [], sourceCard = {}) {
+    const sourceCardId = reportBuilderSourceCardId(sourceCard);
+    const exactMatch = (Array.isArray(staticDatasets) ? staticDatasets : [])
+        .find((entry) => normalizeString(entry?.id) === sourceCardId) || null;
+    if (exactMatch) {
+        return exactMatch;
+    }
+    const dataSourceRef = normalizeString(sourceCard?.dataSourceRef);
+    const sourceMatches = (Array.isArray(staticDatasets) ? staticDatasets : [])
+        .filter((entry) => normalizeString(entry?.dataSourceRef) === dataSourceRef);
+    return sourceMatches.length === 1 ? sourceMatches[0] : null;
+}
+
 function normalizeBooleanFlag(value = false) {
     if (value === true || value === false) {
         return value;
@@ -3968,14 +3998,20 @@ export default function ReportBuilder({ container, context }) {
                 };
             })
             .filter(Boolean);
+        const configuredPrimarySource = normalizedConfiguredSources.find((entry) => normalizeString(entry?.id) === "primary")
+            || normalizedConfiguredSources.find((entry) => normalizeString(entry?.dataSourceRef) === currentSourceRef)
+            || null;
+        const primarySourceCardId = reportBuilderSourceCardId(configuredPrimarySource);
         const sourceMap = new Map();
         normalizedConfiguredSources.forEach((entry) => {
-            if (!sourceMap.has(entry.dataSourceRef)) {
-                sourceMap.set(entry.dataSourceRef, entry);
+            const sourceCardId = reportBuilderSourceCardId(entry);
+            if (sourceCardId && !sourceMap.has(sourceCardId)) {
+                sourceMap.set(sourceCardId, entry);
             }
         });
-        if (currentSourceRef && !sourceMap.has(currentSourceRef)) {
-                sourceMap.set(currentSourceRef, {
+        if (currentSourceRef && !configuredPrimarySource) {
+                sourceMap.set("primary", {
+                    id: "primary",
                     dataSourceRef: currentSourceRef,
                     label: formatReportBuilderSourceLabel(currentSourceRef),
                     description: "",
@@ -3995,8 +4031,9 @@ export default function ReportBuilder({ container, context }) {
                 });
         }
         authoredStaticDatasets.forEach((dataset) => {
-            if (!sourceMap.has(dataset.dataSourceRef)) {
-                sourceMap.set(dataset.dataSourceRef, {
+            const sourceCardId = reportBuilderSourceCardId(dataset);
+            if (sourceCardId && !sourceMap.has(sourceCardId)) {
+                sourceMap.set(sourceCardId, {
                     id: dataset.id,
                     dataSourceRef: dataset.dataSourceRef,
                     label: dataset.label,
@@ -4006,14 +4043,9 @@ export default function ReportBuilder({ container, context }) {
             }
         });
         return Array.from(sourceMap.values()).map((entry) => {
-            const datasetOption = authoredDatasetOptions.find((option) => (
-                normalizeString(option?.value) === normalizeString(entry.id || "")
-                || normalizeString(option?.dataSourceRef) === normalizeString(entry.dataSourceRef)
-            )) || null;
-            const staticDataset = authoredStaticDatasets.find((dataset) => (
-                normalizeString(dataset?.dataSourceRef) === normalizeString(entry.dataSourceRef)
-                || normalizeString(dataset?.id) === normalizeString(entry.id)
-            )) || null;
+            const sourceCardId = reportBuilderSourceCardId(entry);
+            const datasetOption = resolveReportBuilderDatasetOptionForSourceCard(authoredDatasetOptions, entry);
+            const staticDataset = resolveReportBuilderStaticDatasetForSourceCard(authoredStaticDatasets, entry);
             const isStatic = !!staticDataset || normalizeString(entry.kindLabel).startsWith("static ");
             const datasetRef = normalizeString(datasetOption?.value || staticDataset?.id || entry.id || entry.dataSourceRef);
             const canAddTable = isStatic
@@ -4033,8 +4065,8 @@ export default function ReportBuilder({ container, context }) {
                 canAddCollection,
                 canEditSource,
                 editableDatasetOption: datasetOption ? cloneReportBuilderValue(datasetOption) : null,
-                active: entry.dataSourceRef === currentSourceRef,
-                inspected: normalizeString(entry.dataSourceRef) === normalizeString(inspectedDataSourceRef),
+                active: sourceCardId === primarySourceCardId || (!primarySourceCardId && sourceCardId === "primary"),
+                inspected: sourceCardId === normalizeString(inspectedDataSourceRef),
             };
         });
     }, [
@@ -4052,13 +4084,13 @@ export default function ReportBuilder({ container, context }) {
         if (!normalizedInspectedRef) {
             return;
         }
-        if (reportDataSourceCards.some((card) => normalizeString(card?.dataSourceRef) === normalizedInspectedRef)) {
+        if (reportDataSourceCards.some((card) => reportBuilderSourceCardId(card) === normalizedInspectedRef)) {
             return;
         }
         setInspectedDataSourceRef("");
     }, [inspectedDataSourceRef, reportDataSourceCards]);
     const inspectedReportDataSourceCard = useMemo(
-        () => reportDataSourceCards.find((card) => normalizeString(card?.dataSourceRef) === normalizeString(inspectedDataSourceRef)) || null,
+        () => reportDataSourceCards.find((card) => reportBuilderSourceCardId(card) === normalizeString(inspectedDataSourceRef)) || null,
         [inspectedDataSourceRef, reportDataSourceCards],
     );
     const activeReportDataSourceCard = useMemo(
@@ -4070,10 +4102,7 @@ export default function ReportBuilder({ container, context }) {
         if (!inspectedReportDataSourceCard || normalizeString(inspectedReportDataSourceCard.kindLabel).startsWith("static ") || inspectedReportDataSourceCard.active) {
             return null;
         }
-        const inspectedDatasetOption = authoredDatasetOptions.find((entry) => (
-            normalizeString(entry?.value) === normalizeString(inspectedReportDataSourceCard.id || "")
-            || normalizeString(entry?.dataSourceRef) === normalizeString(inspectedReportDataSourceCard.dataSourceRef)
-        )) || null;
+        const inspectedDatasetOption = resolveReportBuilderDatasetOptionForSourceCard(authoredDatasetOptions, inspectedReportDataSourceCard);
         if (!inspectedDatasetOption?.request || typeof inspectedDatasetOption.request !== "object" || Array.isArray(inspectedDatasetOption.request)) {
             return null;
         }
@@ -4145,14 +4174,9 @@ export default function ReportBuilder({ container, context }) {
         if (!inspectedReportDataSourceCard) {
             return null;
         }
-        const inspectedDatasetOption = authoredDatasetOptions.find((entry) => (
-            normalizeString(entry?.value) === normalizeString(inspectedReportDataSourceCard.id || "")
-            || normalizeString(entry?.dataSourceRef) === normalizeString(inspectedReportDataSourceCard.dataSourceRef)
-        )) || null;
+        const inspectedDatasetOption = resolveReportBuilderDatasetOptionForSourceCard(authoredDatasetOptions, inspectedReportDataSourceCard);
         if (normalizeString(inspectedReportDataSourceCard.kindLabel).startsWith("static ")) {
-            const dataset = authoredStaticDatasets.find((entry) => normalizeString(entry?.dataSourceRef) === normalizeString(inspectedReportDataSourceCard.dataSourceRef))
-                || authoredStaticDatasets.find((entry) => normalizeString(entry?.id) === normalizeString(inspectedReportDataSourceCard.id))
-                || null;
+            const dataset = resolveReportBuilderStaticDatasetForSourceCard(authoredStaticDatasets, inspectedReportDataSourceCard);
             const allColumns = Array.isArray(dataset?.columnOptions) ? dataset.columnOptions : [];
             const previewColumns = Array.isArray(dataset?.columnOptions) ? dataset.columnOptions.slice(0, 6) : [];
             const previewRows = Array.isArray(dataset?.rows) ? dataset.rows.slice(0, 5) : [];
@@ -15343,9 +15367,9 @@ export default function ReportBuilder({ container, context }) {
                                             className="forge-report-builder__design-source-action-icon"
                                             aria-label={card.inspected ? `Hide details for ${card.label}` : `View details for ${card.label}`}
                                             onClick={() => setInspectedDataSourceRef((current) => (
-                                                normalizeString(current) === normalizeString(card.dataSourceRef)
+                                                normalizeString(current) === reportBuilderSourceCardId(card)
                                                     ? ""
-                                                    : normalizeString(card.dataSourceRef)
+                                                    : reportBuilderSourceCardId(card)
                                             ))}
                                         />
                                     </Tooltip>

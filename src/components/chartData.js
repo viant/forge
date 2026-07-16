@@ -266,6 +266,14 @@ export function formatTimestamp(timestamp, fmt = "MM/dd") {
     return format(date, fmt);
 }
 
+export function formatChartXAxisValue(value, tickFormat = "") {
+    const normalizedTickFormat = String(tickFormat || "").trim();
+    if (!normalizedTickFormat) {
+        return value === null || value === undefined ? "" : String(value);
+    }
+    return formatTimestamp(value, normalizedTickFormat);
+}
+
 export function fillMissingTemporalBuckets(chartData = [], xAxisKey = "", seriesDefinitions = [], step = "") {
     const rows = Array.isArray(chartData) ? chartData : [];
     const key = normalizeChartKey(xAxisKey);

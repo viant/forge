@@ -114,7 +114,7 @@ const horizontalBar = buildReportPrintChartSvg({
     type: "horizontal_bar",
     series: {
       values: [
-        { value: "avails", label: "Available Impressions", color: "#137cbd", type: "horizontal_bar", format: "compactNumber" },
+        { value: "avails", label: "Available Impressions", color: "#137cbd", type: "horizontal_bar", format: "compactNumber", dataLabels: "always" },
       ],
     },
   },
@@ -165,12 +165,63 @@ const hiddenHorizontalLabels = buildReportPrintChartSvg({
 assert.equal(hiddenHorizontalLabels.diagnostics.length, 0);
 assert.doesNotMatch(hiddenHorizontalLabels.svg, /158 400/);
 
+const defaultHorizontalLabels = buildReportPrintChartSvg({
+  chartModel: {
+    type: "horizontal_bar",
+    series: {
+      values: [
+        { value: "avails", label: "Available Impressions", color: "#137cbd", type: "horizontal_bar", format: "compactNumber" },
+      ],
+    },
+  },
+  resolvedChart: {
+    kind: "directSeries",
+    type: "horizontal_bar",
+    xAxisKey: "channelV2",
+    seriesKeys: ["avails"],
+    rows: [
+      { channelV2: "Display", avails: 158400 },
+      { channelV2: "CTV", avails: 138200 },
+    ],
+  },
+  width: 640,
+});
+
+assert.equal(defaultHorizontalLabels.diagnostics.length, 0);
+assert.doesNotMatch(defaultHorizontalLabels.svg, /158 400/);
+
+const nestedCategoryHorizontal = buildReportPrintChartSvg({
+  chartModel: {
+    type: "horizontal_bar",
+    series: {
+      values: [
+        { value: "avails", label: "Available Impressions", color: "#137cbd", type: "horizontal_bar" },
+      ],
+    },
+  },
+  resolvedChart: {
+    kind: "directSeries",
+    type: "horizontal_bar",
+    xAxisKey: "channel.channel",
+    seriesKeys: ["avails"],
+    rows: [
+      { channel: { channel: "Display" }, avails: 158400 },
+      { channel: { channel: "CTV" }, avails: 138200 },
+    ],
+  },
+  width: 640,
+});
+
+assert.equal(nestedCategoryHorizontal.diagnostics.length, 0);
+assert.match(nestedCategoryHorizontal.svg, /Display/);
+assert.match(nestedCategoryHorizontal.svg, /CTV/);
+
 const funnelBar = buildReportPrintChartSvg({
   chartModel: {
     type: "funnel_bar",
     series: {
       values: [
-        { value: "avails", label: "Available Impressions", color: "#137cbd", type: "funnel_bar", format: "compactNumber" },
+        { value: "avails", label: "Available Impressions", color: "#137cbd", type: "funnel_bar", format: "compactNumber", dataLabels: "always" },
       ],
     },
   },
