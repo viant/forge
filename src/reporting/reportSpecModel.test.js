@@ -591,6 +591,67 @@ assert.deepEqual(
   },
 );
 
+const sameSourceScopedSpec = buildReportBuilderReportSpec({
+  container: {
+    id: "sameSourceScopedBuilder",
+    stateKey: "sameSourceScopedBuilder",
+    title: "Same-source scoped report",
+    dataSourceRef: "demoReportSource",
+  },
+  config: {
+    ...rawConfig,
+    staticFilters: [
+      ...rawConfig.staticFilters,
+      {
+        id: "orderIds",
+        label: "Ad Order",
+        multiple: true,
+        paramPath: "filters.orderIds",
+      },
+    ],
+    datasets: [
+      {
+        id: "delivery_today",
+        dataSourceRef: "demoReportSource",
+        scope: {
+          mode: "override",
+          local: {
+            filters: {
+              From: "2026-07-16",
+              To: "2026-07-16",
+            },
+          },
+        },
+        request: {
+          measures: { totalSpend: true },
+          dimensions: { eventDate: true },
+          filters: {},
+          limit: 100,
+        },
+      },
+    ],
+  },
+  state: {
+    ...rawState,
+    scopeParams: {
+      ...rawState.scopeParams,
+      orderIds: [2659519],
+    },
+    reportDocumentBlocks: [
+      { id: "todayTable", kind: "tableBlock", datasetRef: "delivery_today", columns: [{ key: "eventDate", label: "Date" }] },
+    ],
+  },
+});
+assert.deepEqual(
+  sameSourceScopedSpec.datasets.find((dataset) => dataset.id === "delivery_today")?.request.filters,
+  {
+    From: "2026-07-16",
+    To: "2026-07-16",
+    orderIds: [2659519],
+  },
+  "same-source local windows must retain the primary entity filters",
+);
+
 const tableOnlySpec = buildReportBuilderReportSpec({
   container: {
     id: "performanceBuilderTable",

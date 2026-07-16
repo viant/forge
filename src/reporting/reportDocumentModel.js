@@ -2204,6 +2204,10 @@ export function lowerReportDocumentToReportSpec(document = {}, {
     semanticSummary: document?.semanticSummary || null,
     includePrimaryBlocks,
   });
+  const primaryRequestContext = {
+    dataSourceRef: normalizeString(baseSpec?.source?.dataSourceRef || loweredContainer?.dataSourceRef),
+    request: cloneValue(buildReportBuilderRequest(effectiveScopedConfig, effectiveScopedState)),
+  };
   const datasetBackedBlocks = blocks
     .filter((block) => normalizeString(block?.kind) !== "reportBuilderBlock")
     .filter((block) => isReportDatasetBackedBlockKind(block?.kind));
@@ -2312,10 +2316,19 @@ export function lowerReportDocumentToReportSpec(document = {}, {
     effectiveScopedState,
     referencedDatasetRefs,
     runtimeDatasetScopeParams,
+    primaryRequestContext,
   );
+  const refreshedPublishedDatasetIndex = new Map(
+    additionalPublishedDatasets
+      .map((dataset) => [normalizeString(dataset?.id), dataset])
+      .filter(([datasetId]) => !!datasetId),
+  );
+  const baseDatasets = Array.isArray(baseSpec?.datasets) ? baseSpec.datasets : [];
   const mergedDatasets = [
-    ...(Array.isArray(baseSpec?.datasets) ? baseSpec.datasets : []),
-    ...additionalPublishedDatasets.filter((dataset) => !((Array.isArray(baseSpec?.datasets) ? baseSpec.datasets : []).some((entry) => normalizeString(entry?.id) === normalizeString(dataset?.id)))),
+    ...baseDatasets.map((dataset) => (
+      refreshedPublishedDatasetIndex.get(normalizeString(dataset?.id)) || dataset
+    )),
+    ...additionalPublishedDatasets.filter((dataset) => !baseDatasets.some((entry) => normalizeString(entry?.id) === normalizeString(dataset?.id))),
   ];
   const resolvedPrimaryDataset = shouldOmitPrimaryDataset
     ? null
