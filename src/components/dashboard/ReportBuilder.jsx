@@ -7287,6 +7287,7 @@ export default function ReportBuilder({ container, context }) {
         requestFingerprintRef.current = `${fingerprint}::${shouldFetch ? "fetch" : "hold"}`;
         if (markManual) {
             lastManualRunFingerprintRef.current = fingerprint;
+            setManualRunSequence((current) => current + 1);
         }
         const inputSignal = builderContext?.signals?.input;
         if (inputSignal) {
@@ -7307,7 +7308,6 @@ export default function ReportBuilder({ container, context }) {
 
     const runReport = React.useCallback(() => {
         const currentState = currentBuilderStateRef.current || state;
-        setManualRunSequence((current) => current + 1);
         setChartApplyFeedback(null);
         if (designWorkspaceMode || (!useFilterRail && !useFilterDrawer)) {
             setFilterPanels(collapseReportBuilderFilterBodyState);
@@ -8065,9 +8065,6 @@ export default function ReportBuilder({ container, context }) {
         : "";
 
     useEffect(() => {
-        if (!designWorkspaceMode && (useFilterRail || useFilterDrawer)) {
-            return;
-        }
         if (!shouldAutoCollapseReportBuilderFilters({
             canShowResults,
             hasCompletedCurrentRun,
@@ -8079,7 +8076,7 @@ export default function ReportBuilder({ container, context }) {
         lastAutoCollapsedRunSequenceRef.current = manualRunSequence;
         setFilterPanels(collapseReportBuilderFilterBodyState);
         setFiltersDrawerOpen(false);
-    }, [canShowResults, designWorkspaceMode, hasCompletedCurrentRun, manualRunSequence, useFilterDrawer, useFilterRail]);
+    }, [canShowResults, hasCompletedCurrentRun, manualRunSequence]);
 
     useEffect(() => {
         if (!designWorkspaceMode || !useFilterRail || !railFilterState.shouldAutoCollapseSeededPanel) {

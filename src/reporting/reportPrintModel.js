@@ -661,6 +661,8 @@ function resolveReportPrintBlockTitle(block = {}) {
       return "Refinements";
     case "kpiBlock":
       return normalizeString(block?.content?.valueLabel) || "KPI";
+    case "badgesBlock":
+      return "Signals";
     case "sectionBlock":
       return normalizeString(block?.content?.navigationLabel || block?.title) || "Section";
     case "compositeBlock":
@@ -1176,6 +1178,26 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
       lines: detailLines,
     });
   }
+  finishReportPrintBlock(state);
+}
+
+function renderReportPrintBadgesBlock(state = {}, block = {}, {
+  layoutNote = "",
+} = {}) {
+  renderReportPrintSectionTitle(state, block, { layoutNote });
+  const items = Array.isArray(block?.content?.items)
+    ? block.content.items
+    : (Array.isArray(block?.items) ? block.items : []);
+  const lines = items.map((item) => {
+    const label = normalizeString(item?.label || item?.valueField || item?.id || "Signal");
+    const displayValue = normalizeString(item?.displayValue)
+      || formatReportPrintValue(item?.value, normalizeString(item?.format));
+    return `${label}: ${displayValue || "-"}`;
+  });
+  renderReportPrintTextLines(state, {
+    idPrefix: `${normalizeString(block?.id || "badges")}__signal`,
+    lines: lines.length > 0 ? lines : ["No current signals available."],
+  });
   finishReportPrintBlock(state);
 }
 
@@ -1936,6 +1958,9 @@ function renderReportPrintBlock(state = {}, block = {}, options = {}) {
       return;
     case "kpiBlock":
       renderReportPrintKpiBlock(state, block, options);
+      return;
+    case "badgesBlock":
+      renderReportPrintBadgesBlock(state, block, options);
       return;
     case "sectionBlock":
       renderReportPrintSectionBlock(state, block, options);
