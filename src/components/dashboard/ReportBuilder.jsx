@@ -2114,6 +2114,7 @@ export default function ReportBuilder({ container, context }) {
     }, []);
     const [builderWidth, setBuilderWidth] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 0));
     const hostedExecuteOnOpen = normalizeBooleanFlag(container?.parameters?.executeOnOpen);
+    const hostedExportOnComplete = normalizeString(container?.parameters?.exportOnComplete).toLowerCase();
     const hostedReportId = resolveHostedReportId(container);
     const hostedReportStarterId = normalizeString(container?.parameters?.reportStarterId);
     const [hostedReportActivationState, setHostedReportActivationState] = useState(() => ({
@@ -2186,6 +2187,7 @@ export default function ReportBuilder({ container, context }) {
     const reportBuilderMountedRef = useRef(true);
     const appliedReportStarterIdRef = useRef("");
     const executeOnOpenRunKeyRef = useRef("");
+    const exportOnCompleteRunKeyRef = useRef("");
     const hostedReportActivationKeyRef = useRef("");
     const activateImportedResponseInBuilderRef = useRef(null);
     const documentBlockResizeCleanupRef = useRef(null);
@@ -17521,6 +17523,57 @@ export default function ReportBuilder({ container, context }) {
         state,
         state?.reportDocumentBlocks,
         state?.reportDocumentTemplateId,
+    ]);
+
+    useEffect(() => {
+        if (hostedExportOnComplete !== "pdf" && hostedExportOnComplete !== "xlsx") {
+            return;
+        }
+        if (designWorkspaceMode || loading || error || !hasCompletedCurrentRun) {
+            return;
+        }
+        if (runtimePreviewDatasetPayloadState.loading) {
+            return;
+        }
+        const isXlsx = hostedExportOnComplete === "xlsx";
+        const exportRequest = isXlsx ? draftXlsxExportRequest : draftExportRequest;
+        const exportSubmitting = isXlsx ? draftXlsxExportSubmitting : draftExportSubmitting;
+        const exportJob = isXlsx ? draftXlsxExportJob : draftExportJob;
+        const submitExport = isXlsx ? triggerDraftXlsxExport : triggerDraftExport;
+        if (!exportRequest || exportSubmitting || exportJob || typeof submitExport !== "function") {
+            return;
+        }
+        const exportIdentity = hostedReportId || normalizeString(state?.reportDocumentTemplateId);
+        const exportRunKey = [
+            exportIdentity,
+            currentRequestFingerprint,
+            String(manualRunSequence),
+            hostedExportOnComplete,
+        ].join("::");
+        if (!exportIdentity || exportOnCompleteRunKeyRef.current === exportRunKey) {
+            return;
+        }
+        exportOnCompleteRunKeyRef.current = exportRunKey;
+        submitExport();
+    }, [
+        currentRequestFingerprint,
+        designWorkspaceMode,
+        draftExportJob,
+        draftExportRequest,
+        draftExportSubmitting,
+        draftXlsxExportJob,
+        draftXlsxExportRequest,
+        draftXlsxExportSubmitting,
+        error,
+        hasCompletedCurrentRun,
+        hostedExportOnComplete,
+        hostedReportId,
+        loading,
+        manualRunSequence,
+        runtimePreviewDatasetPayloadState.loading,
+        state?.reportDocumentTemplateId,
+        triggerDraftExport,
+        triggerDraftXlsxExport,
     ]);
 
     return (
