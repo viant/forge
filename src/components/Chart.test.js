@@ -4,6 +4,7 @@ import {
     aggregateDirectSeriesData,
     buildPieChartData,
     buildPieSliceCellKey,
+    formatChartXAxisValue,
     formatTimestamp,
     materializeChartDisplayRows,
     resolveChartBodyState,
@@ -16,6 +17,9 @@ assert.equal(formatTimestamp('', 'MM/dd'), '');
 assert.equal(formatTimestamp(null, 'MM/dd'), '');
 assert.equal(formatTimestamp('not-a-date', 'MM/dd'), 'not-a-date');
 assert.equal(formatTimestamp('2026-05-14T12:00:00Z', 'MM/dd'), '05/14');
+assert.equal(formatChartXAxisValue(5), '5');
+assert.equal(formatChartXAxisValue('2026-05-14T12:00:00Z'), '2026-05-14T12:00:00Z');
+assert.equal(formatChartXAxisValue('2026-05-14T12:00:00Z', 'MM/dd'), '05/14');
 
 assert.deepEqual(resolveVisibleChartState({
     chartData: [],

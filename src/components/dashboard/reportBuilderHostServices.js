@@ -34,7 +34,20 @@ async function parseToolResponse(response) {
         return null;
     }
     try {
-        return JSON.parse(raw);
+        const payload = JSON.parse(raw);
+        // Agently's HTTP tool endpoint returns a result envelope. Reporting
+        // handlers expose the tool result itself to the Report Builder domain.
+        if (isPlainObject(payload) && Object.prototype.hasOwnProperty.call(payload, "result")) {
+            if (typeof payload.result !== "string") {
+                return payload.result;
+            }
+            try {
+                return JSON.parse(payload.result);
+            } catch (_) {
+                return payload.result;
+            }
+        }
+        return payload;
     } catch (_) {
         return raw;
     }
@@ -55,6 +68,12 @@ async function makeToolRequestError(response) {
     error.status = response.status;
     error.statusText = response.statusText;
     error.payload = payload;
+    // Keep failed HTTP tool calls on the same result contract as successful
+    // calls so lifecycle handlers can recognize a terminal export job.
+    error.responseEnvelope = payload;
+    if (isPlainObject(payload)) {
+        error.toolResult = payload;
+    }
     return error;
 }
 

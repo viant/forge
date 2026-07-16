@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
-import { buildReportBuilderReportSpec, normalizeReportBuilderPublishedDataSources } from "./reportSpecModel.js";
+import {
+  buildReportBuilderPublishedDatasetDeclarations,
+  buildReportBuilderReportSpec,
+  normalizeReportBuilderPublishedDataSources,
+} from "./reportSpecModel.js";
 import { applyReportBuilderSemanticConfig } from "../components/dashboard/reportBuilderSemantic.js";
 
 const rawConfig = {
@@ -651,6 +655,120 @@ assert.deepEqual(
   },
   "same-source local windows must retain the primary entity filters",
 );
+
+const sharedEndpointDatasets = [
+  {
+    id: "delivery_today",
+    dataSourceRef: "demoReportSource",
+    scope: { mode: "override", local: { filters: { From: "2026-07-17", To: "2026-07-17" } } },
+    scopeParamOptions: [{ value: "orderIds", kind: "multiSelect", paramPath: "filters.orderIds" }],
+    request: { measures: { totalSpend: true }, dimensions: { eventDate: true }, filters: {} },
+  },
+  {
+    id: "delivery_yesterday",
+    dataSourceRef: "demoReportSource",
+    scope: { mode: "override", local: { filters: { From: "2026-07-16", To: "2026-07-16" } } },
+    scopeParamOptions: [{ value: "orderIds", kind: "multiSelect", paramPath: "filters.orderIds" }],
+    request: { measures: { totalSpend: true }, dimensions: { eventDate: true }, filters: {} },
+  },
+  {
+    id: "delivery_last_7_days",
+    dataSourceRef: "demoReportSource",
+    scope: { mode: "override", local: { filters: { From: "2026-07-11", To: "2026-07-17" } } },
+    scopeParamOptions: [{ value: "orderIds", kind: "multiSelect", paramPath: "filters.orderIds" }],
+    request: { measures: { totalSpend: true }, dimensions: { eventDate: true }, filters: {} },
+  },
+];
+
+const sharedEndpointSpec = buildReportBuilderReportSpec({
+  container: {
+    id: "sharedEndpointBuilder",
+    stateKey: "sharedEndpointBuilder",
+    title: "Shared endpoint report",
+    dataSourceRef: "demoReportSource",
+  },
+  config: { ...rawConfig, datasets: sharedEndpointDatasets },
+  state: {
+    ...rawState,
+    reportDocumentBlocks: [
+      { id: "todayTable", kind: "tableBlock", datasetRef: "delivery_today", columns: [{ key: "eventDate", label: "Date" }] },
+      { id: "yesterdayTable", kind: "tableBlock", datasetRef: "delivery_yesterday", columns: [{ key: "eventDate", label: "Date" }] },
+      { id: "weekTable", kind: "tableBlock", datasetRef: "delivery_last_7_days", columns: [{ key: "eventDate", label: "Date" }] },
+    ],
+  },
+});
+assert.deepEqual(
+  sharedEndpointSpec.datasets.map((dataset) => dataset.id).sort(),
+  ["delivery_last_7_days", "delivery_today", "delivery_yesterday", "primary"],
+  "every logical dataset sharing one endpoint must be declared exactly once",
+);
+assert.deepEqual(
+  sharedEndpointSpec.datasets.find((dataset) => dataset.id === "delivery_today")?.request.filters,
+  { From: "2026-07-17", To: "2026-07-17" },
+);
+assert.deepEqual(
+  sharedEndpointSpec.datasets.find((dataset) => dataset.id === "delivery_yesterday")?.request.filters,
+  { From: "2026-07-16", To: "2026-07-16" },
+);
+assert.deepEqual(
+  sharedEndpointSpec.datasets.find((dataset) => dataset.id === "delivery_last_7_days")?.request.filters,
+  { From: "2026-07-11", To: "2026-07-17" },
+);
+
+const ambiguousEndpointDeclarations = buildReportBuilderPublishedDatasetDeclarations(
+  { datasets: sharedEndpointDatasets },
+  rawState,
+  new Set(["demoReportSource"]),
+);
+assert.deepEqual(
+  ambiguousEndpointDeclarations,
+  [],
+  "an endpoint shared by several logical datasets must not resolve a dataset reference",
+);
+
+const runtimeScopedDeclarations = buildReportBuilderPublishedDatasetDeclarations(
+  { datasets: sharedEndpointDatasets },
+  rawState,
+  new Set(["delivery_today", "delivery_yesterday", "delivery_last_7_days"]),
+  {
+    delivery_today: { orderIds: [111] },
+    demoReportSource: { orderIds: [999] },
+  },
+);
+assert.deepEqual(
+  runtimeScopedDeclarations.find((dataset) => dataset.id === "delivery_today")?.request.filters.orderIds,
+  [111],
+  "runtime dataset scope values keyed by logical id must reach that dataset",
+);
+assert.equal(
+  runtimeScopedDeclarations.some((dataset) => dataset.id !== "delivery_today" && dataset.request.filters.orderIds),
+  false,
+  "runtime dataset scope values keyed by a shared endpoint must not leak into sibling datasets",
+);
+
+const uniqueEndpointDeclarations = buildReportBuilderPublishedDatasetDeclarations(
+  {
+    datasets: [
+      ...sharedEndpointDatasets,
+      {
+        id: "reach_summary",
+        dataSourceRef: "reachSummarySource",
+        scopeParamOptions: [{ value: "orderIds", kind: "multiSelect", paramPath: "filters.orderIds" }],
+        request: { measures: { hhUniqs: true }, dimensions: { country: true }, filters: {} },
+      },
+    ],
+  },
+  rawState,
+  new Set(["reachSummarySource"]),
+  { reachSummarySource: { orderIds: [222] } },
+);
+assert.equal(uniqueEndpointDeclarations.length, 1);
+assert.equal(
+  uniqueEndpointDeclarations[0]?.id,
+  "reachSummarySource",
+  "an endpoint backing exactly one dataset must keep resolving references by endpoint name",
+);
+assert.deepEqual(uniqueEndpointDeclarations[0]?.request.filters.orderIds, [222]);
 
 const tableOnlySpec = buildReportBuilderReportSpec({
   container: {

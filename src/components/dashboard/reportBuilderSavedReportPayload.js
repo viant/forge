@@ -2,6 +2,7 @@ import {
     buildReportBuilderReportDocument,
     extractReportDocumentTemplateIdentity,
     lowerReportDocumentToReportSpec,
+    normalizeReportDocumentBuilderConfig,
 } from "../../reporting/reportDocumentModel.js";
 import {
     buildPublishedSnapshotReportExportRequest,
@@ -208,6 +209,7 @@ function resolveSavedReportPayloadSeed(seed = null) {
             : (source?.sourceSession && typeof source.sourceSession === "object" && !Array.isArray(source.sourceSession)
                 ? cloneValue(source.sourceSession)
                 : null),
+        ...(reportDocument ? { reportDocument: cloneValue(reportDocument) } : {}),
         reportId,
         title,
         savedAt: Number(seed?.savedAt || 0) || 0,
@@ -571,8 +573,15 @@ export function buildReportBuilderSavedReportPayloadFromBuilderState(savedReport
     }
     const authoredState = stripBuilderOnlyState(state);
     const runtimePreviewInteraction = resolveReportBuilderPersistedRuntimePreviewInteraction(state);
-    const semanticRuntimeState = resolveReportBuilderSemanticRuntimeState({
+    // Rehydrate the persisted source catalogs before applying semantic labels.
+    // Semantic decoration must never erase field presentation contracts.
+    const persistedCatalogBaseConfig = normalizeReportDocumentBuilderConfig(
+        seed.reportDocument || null,
         config,
+        authoredState,
+    );
+    const semanticRuntimeState = resolveReportBuilderSemanticRuntimeState({
+        config: persistedCatalogBaseConfig,
         state: authoredState,
         binding: authoredState?.binding || config?.binding || null,
         model: semanticModel,
@@ -582,6 +591,11 @@ export function buildReportBuilderSavedReportPayloadFromBuilderState(savedReport
         fallbackSummary: fallbackSemanticSummary,
         fallbackFingerprint: fallbackSemanticFingerprint,
     });
+    const persistedCatalogConfig = normalizeReportDocumentBuilderConfig(
+        seed.reportDocument || null,
+        semanticRuntimeState.semanticDisplayConfig,
+        authoredState,
+    );
     const implicitSemanticRuntimeDiagnostics = Array.isArray(semanticRuntimeDiagnostics) && semanticRuntimeDiagnostics.length > 0
         ? []
         : buildReportBuilderSemanticRuntimeDiagnosticsFromState({
@@ -595,7 +609,7 @@ export function buildReportBuilderSavedReportPayloadFromBuilderState(savedReport
         });
     const nextDocument = buildReportBuilderReportDocument({
         container,
-        config: semanticRuntimeState.semanticDisplayConfig,
+        config: persistedCatalogConfig,
         state: authoredState,
         semanticSummary: semanticSummary || semanticRuntimeState.resolvedSemanticSummary || semanticRuntimeState.semanticSummary,
         runtimeDatasetScopeParams: runtimePreviewInteraction?.datasetScopeParams || null,

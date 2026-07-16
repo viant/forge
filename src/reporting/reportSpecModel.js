@@ -13,7 +13,10 @@ import {
 import { buildReportBuilderCalculatedFieldConfig } from "../components/dashboard/reportBuilderCalculatedFieldAuthoring.js";
 import { resolveReportBuilderScopeParamFilters } from "../components/dashboard/reportBuilderPredicates.js";
 import { buildReportBuilderStaticDatasetDeclarations } from "../components/dashboard/reportBuilderStaticDatasets.js";
-import { normalizeReportBuilderPublishedDataSources as normalizePublishedDataSources } from "./reportBuilderPublishedDatasetModel.js";
+import {
+  buildReportBuilderPublishedDatasetRefIndex,
+  normalizeReportBuilderPublishedDataSources as normalizePublishedDataSources,
+} from "./reportBuilderPublishedDatasetModel.js";
 import { buildReportBuilderScopeParams } from "./reportBuilderScopeParamModel.js";
 import { getScopeParamValue, resolveScopeParamId } from "./scopeStateModel.js";
 import { normalizeReportRefinements } from "./reportRefinementModel.js";
@@ -343,16 +346,22 @@ export function buildReportBuilderPublishedDatasetDeclarations(
   if (sources.length === 0) {
     return [];
   }
+  const sourceRefIndex = buildReportBuilderPublishedDatasetRefIndex(sources);
+  const resolvesByDataSourceRef = (source) => sourceRefIndex.get(source.dataSourceRef) === source;
   return sources
-    .filter((source) => referencedDatasetRefs.has(source.id) || referencedDatasetRefs.has(source.dataSourceRef))
+    .filter((source) => referencedDatasetRefs.has(source.id)
+      || (referencedDatasetRefs.has(source.dataSourceRef) && resolvesByDataSourceRef(source)))
     .map((source) => {
       const matchedRef = referencedDatasetRefs.has(source.id) ? source.id : source.dataSourceRef;
-      const scopedValues = runtimeDatasetScopeParams
+      const runtimeScopeParamsByRef = runtimeDatasetScopeParams
         && typeof runtimeDatasetScopeParams === "object"
         && !Array.isArray(runtimeDatasetScopeParams)
+        ? runtimeDatasetScopeParams
+        : null;
+      const scopedValues = runtimeScopeParamsByRef
         ? (
-            runtimeDatasetScopeParams[source.id]
-            || runtimeDatasetScopeParams[source.dataSourceRef]
+            runtimeScopeParamsByRef[source.id]
+            || (resolvesByDataSourceRef(source) ? runtimeScopeParamsByRef[source.dataSourceRef] : null)
             || null
           )
         : null;

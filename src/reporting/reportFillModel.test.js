@@ -353,6 +353,41 @@ assert.equal(collectionFill.blocks[0].content.rowCount, 3);
 assert.equal(collectionFill.blocks[0].content.rowLimit, 2);
 assert.equal(collectionFill.blocks[0].content.items[0].bodyMarkdown.includes("Spend"), true);
 
+const mappedNarrativeAndCollectionFill = buildReportFillFromReportSpec({
+  title: "Mapped Display Runtime",
+  datasets: [{ id: "primary", request: {} }],
+  blocks: [
+    {
+      id: "mappedNarrative",
+      kind: "markdownBlock",
+      datasetRef: "primary",
+      markdown: "Leading channel: ${row.channelV2}",
+      templateFieldDisplayMap: {
+        channelV2: {
+          sourceKey: "channelV2",
+          displayKey: "channel.channel",
+          displayValueMap: { "6": "CTV" },
+        },
+      },
+    },
+    buildReportDocumentCollectionBlock({
+      id: "mappedCollection",
+      datasetRef: "primary",
+      itemTitleField: "channelV2",
+      itemTitleDisplayKey: "channel.channel",
+      itemTitleDisplayValueMap: { "6": "CTV" },
+      rowLimit: 1,
+    }),
+  ],
+}, {
+  primary: {
+    rows: [{ channelV2: 6 }],
+  },
+});
+
+assert.equal(mappedNarrativeAndCollectionFill.blocks[0].content.markdown, "Leading channel: CTV");
+assert.equal(mappedNarrativeAndCollectionFill.blocks[1].content.items[0].title, "CTV");
+
 const sectionFill = buildReportFillFromReportSpec({
   title: "Section Runtime",
   datasets: [{ id: "primary", request: {} }],

@@ -585,6 +585,12 @@ function buildLayoutSpanByBlockId(reportSpec = {}) {
 function normalizeMarkdownToPlainText(markdown = "") {
   return String(markdown || "")
     .replace(/\r\n/g, "\n")
+    // Print blocks are text-only; preserve the content without exposing Markdown markers.
+    .replace(/!?(?:\[([^\]]+)\])\([^\)]+\)/g, "$1")
+    .replace(/(\*\*|__)(.+?)\1/g, "$2")
+    .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, "$1")
+    .replace(/(?<!_)_([^_]+)_(?!_)/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
     .split("\n")
     .map((line) => line
       .replace(/^\s{0,3}#{1,6}\s*/, "")

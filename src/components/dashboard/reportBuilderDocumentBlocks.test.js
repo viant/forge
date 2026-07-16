@@ -431,6 +431,20 @@ assert.deepEqual(
     "dataset options must retain independently scoped aliases of the primary datasource",
 );
 
+const reopenedSameSourceScopedOptions = buildReportBuilderDatasetOptions({
+    currentSourceRef: "forecastSource",
+    configuredDatasets: [
+        { id: "forecast_today", dataSourceRef: "forecastSource", label: "Forecast Today" },
+        { id: "forecast_yesterday", dataSourceRef: "forecastSource", label: "Forecast Yesterday" },
+        { id: "forecast_last_7_days", dataSourceRef: "forecastSource", label: "Forecast Last 7 Days" },
+    ],
+});
+assert.deepEqual(
+    reopenedSameSourceScopedOptions.map((entry) => entry.value),
+    ["primary", "forecast_today", "forecast_yesterday", "forecast_last_7_days"],
+    "reopened catalogs must not reinterpret the first scoped dataset as primary when all datasets share an MCP endpoint",
+);
+
 const fieldOptionsWithDatasets = buildReportBuilderDocumentBlockFieldOptions({
     config: {
         dataSourceRef: "demoReportSource",

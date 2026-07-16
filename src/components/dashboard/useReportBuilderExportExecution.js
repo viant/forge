@@ -178,6 +178,7 @@ export function useReportBuilderExportExecution({
     const [historyJobs, setHistoryJobs] = React.useState([]);
     const [historyArtifacts, setHistoryArtifacts] = React.useState([]);
     const historyRequestVersionRef = React.useRef(0);
+    const statusRequestVersionRef = React.useRef(0);
     const statusPollTimerRef = React.useRef(null);
     const jobSummary = React.useMemo(
         () => buildReportBuilderExportJobSummary(job),
@@ -196,6 +197,7 @@ export function useReportBuilderExportExecution({
 
     React.useEffect(() => {
         historyRequestVersionRef.current += 1;
+        statusRequestVersionRef.current += 1;
         setRequestOpen(false);
         setSubmitting(false);
         setJob(null);
@@ -368,9 +370,14 @@ export function useReportBuilderExportExecution({
             }
             return null;
         }
+        const requestVersion = statusRequestVersionRef.current + 1;
+        statusRequestVersionRef.current = requestVersion;
         setStatusLoading(true);
         try {
             const nextJob = normalizeReportBuilderExportJob(await reportExportHandler.getStatus({ jobId }));
+            if (statusRequestVersionRef.current !== requestVersion) {
+                return null;
+            }
             if (nextJob) {
                 setJob(nextJob);
                 if (!normalizeString(nextJob.artifactId)) {
@@ -404,6 +411,9 @@ export function useReportBuilderExportExecution({
             }
             return nextJob;
         } catch (error) {
+            if (statusRequestVersionRef.current !== requestVersion) {
+                return null;
+            }
             const failure = resolveReportBuilderExportStatusFailure(error, { jobId });
             if (failure.job) {
                 setJob(failure.job);
@@ -425,9 +435,16 @@ export function useReportBuilderExportExecution({
             }
             return null;
         } finally {
-            setStatusLoading(false);
+            if (statusRequestVersionRef.current === requestVersion) {
+                setStatusLoading(false);
+            }
         }
     }, [historyAvailable, job, missingJobMessage, refreshHistory, reportExportHandler, request, setFeedback]);
+
+    const refreshStatusRef = React.useRef(refreshStatus);
+    React.useEffect(() => {
+        refreshStatusRef.current = refreshStatus;
+    }, [refreshStatus]);
 
     React.useEffect(() => {
         if (statusPollTimerRef.current != null) {
@@ -438,22 +455,31 @@ export function useReportBuilderExportExecution({
             return undefined;
         }
         const normalizedJob = normalizeReportBuilderExportJob(job);
-        statusPollTimerRef.current = globalThis.setTimeout(() => {
-            statusPollTimerRef.current = null;
-            if (normalizedJob?.jobId) {
-                refreshStatus({
+        let cancelled = false;
+        const scheduleNextPoll = () => {
+            statusPollTimerRef.current = globalThis.setTimeout(async () => {
+                statusPollTimerRef.current = null;
+                if (cancelled || !normalizedJob?.jobId) {
+                    return;
+                }
+                await refreshStatusRef.current({
                     jobId: normalizedJob.jobId,
                     silent: true,
                 });
-            }
-        }, REPORT_EXPORT_STATUS_POLL_INTERVAL_MS);
+                if (!cancelled) {
+                    scheduleNextPoll();
+                }
+            }, REPORT_EXPORT_STATUS_POLL_INTERVAL_MS);
+        };
+        scheduleNextPoll();
         return () => {
+            cancelled = true;
             if (statusPollTimerRef.current != null) {
                 globalThis.clearTimeout(statusPollTimerRef.current);
                 statusPollTimerRef.current = null;
             }
         };
-    }, [job, refreshStatus, reportExportHandler]);
+    }, [job?.jobId, jobSummary?.canRefresh, reportExportHandler?.getStatus]);
 
     const downloadArtifactByReference = React.useCallback(async ({
         artifactId = "",

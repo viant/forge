@@ -11,6 +11,22 @@ function normalizeFiniteNumber(value) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
+function formatExportDateValue(value, {
+  includeTime = false,
+} = {}) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    ...(includeTime ? { hour: "numeric", minute: "2-digit" } : {}),
+  }).format(date);
+}
+
 function formatGroupedNumberWithSpaces(value, {
   minimumFractionDigits = 0,
   maximumFractionDigits = 0,
@@ -105,6 +121,10 @@ export function formatExportValue(value, format = "", options = {}) {
       return start || end;
     }
     return JSON.stringify(value);
+  }
+  const normalizedFormat = normalizeString(format).toLowerCase();
+  if (normalizedFormat === "date" || normalizedFormat === "datetime") {
+    return formatExportDateValue(value, { includeTime: normalizedFormat === "datetime" });
   }
   const numeric = normalizeFiniteNumber(value);
   if (numeric != null) {

@@ -1,5 +1,6 @@
 import { formatExportNumericValue } from "./reportExportValueFormatter.js";
 import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "./reportChartAnnotations.js";
+import { readChartDataValue } from "../components/chartData.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -248,7 +249,7 @@ function resolveCategoricalIndex(rows = [], fieldKey = "", value) {
   if (!normalizedFieldKey || comparableValue == null) {
     return -1;
   }
-  return rows.findIndex((row) => normalizeComparableValue(row?.[normalizedFieldKey]) === comparableValue);
+  return rows.findIndex((row) => normalizeComparableValue(readChartDataValue(row, normalizedFieldKey)) === comparableValue);
 }
 
 function resolveCartesianCategoryXPosition(rows = [], xAxisKey = "", xPositions = [], value) {
@@ -795,7 +796,7 @@ function renderCartesianChartSvg({
     if (index % labelStep !== 0 && index !== rows.length - 1) {
       return "";
     }
-    const label = normalizeString(row?.[xAxisKey]).slice(0, 14);
+    const label = normalizeString(readChartDataValue(row, xAxisKey)).slice(0, 14);
     return `
       <text x="${xPositions[index]}" y="${topPad + plotHeight + 18}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(label)}</text>
     `;
@@ -959,7 +960,7 @@ function renderHorizontalBarChartSvg({
 
   const categoryLabels = rows.map((row, rowIndex) => {
     const groupTop = topPad + (rowIndex * (rowHeight + groupGap));
-    const label = normalizeString(row?.[xAxisKey]).slice(0, 18);
+    const label = normalizeString(readChartDataValue(row, xAxisKey)).slice(0, 18);
     return `
       <text x="${leftPad - 8}" y="${groupTop + (rowHeight / 2) + 4}" text-anchor="end" font-size="10" fill="#344054">${escapeXml(label)}</text>
     `;
@@ -979,7 +980,7 @@ function renderHorizontalBarChartSvg({
       const labelX = value >= 0 ? valueX + 6 : valueX - 6;
       const labelAnchor = value >= 0 ? "start" : "end";
       const fillColor = resolveSeriesPointColor(series, value, series.color);
-      const valueLabel = shouldRenderReportPrintSeriesDataLabels(series, "horizontal_bar", rows.length, { defaultHorizontal: true })
+      const valueLabel = shouldRenderReportPrintSeriesDataLabels(series, "horizontal_bar", rows.length)
         ? `<text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(value, series.format))}</text>`
         : "";
       return `
