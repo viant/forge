@@ -2436,6 +2436,7 @@ func TestRender_SVGCompactBlueprintIconPath(t *testing.T) {
 	require.Contains(t, contentStream, "0.75000 0.00000 0.00000 0.75000 44.25000 87.50000 cm")
 	require.Contains(t, contentStream, "192.00 348.00 m")
 	require.Contains(t, contentStream, "182.00 339.00 m")
+	require.Equal(t, 2, strings.Count(contentStream, "\nf\n"), "each compound icon must be filled once so inner subpaths remain cutouts")
 }
 
 func TestRender_SVGExplicitLengthUnitsNormalizeIntoViewportSpace(t *testing.T) {

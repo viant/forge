@@ -1517,6 +1517,71 @@ assert.deepEqual(
   },
 );
 
+const inheritedSameSourceDocument = buildReportBuilderReportDocument({
+  container,
+  config: {
+    ...config,
+    staticFilters: [
+      ...config.staticFilters,
+      {
+        id: "orderIds",
+        type: "multiSelect",
+        paramPath: "filters.orderIds",
+      },
+    ],
+    datasets: [
+      {
+        id: "delivery_today",
+        dataSourceRef: container.dataSourceRef,
+        scope: {
+          mode: "override",
+          local: {
+            filters: {
+              From: "2026-07-16",
+              To: "2026-07-16",
+            },
+          },
+        },
+        request: {
+          measures: { totalSpend: true },
+          dimensions: { eventDate: true },
+          filters: {},
+        },
+      },
+    ],
+  },
+  state: {
+    ...state,
+    scopeParams: {
+      ...state.scopeParams,
+      orderIds: [2659519],
+    },
+  },
+});
+const loweredInheritedSameSourceSpec = lowerReportDocumentToReportSpec({
+  ...inheritedSameSourceDocument,
+  blocks: [
+    ...inheritedSameSourceDocument.blocks,
+    buildReportDocumentTableBlock({
+      id: "todayTable",
+      title: "Today",
+      datasetRef: "delivery_today",
+      columns: [
+        { key: "eventDate", label: "Date" },
+        { key: "totalSpend", label: "Spend" },
+      ],
+    }),
+  ],
+});
+assert.deepEqual(
+  loweredInheritedSameSourceSpec.datasets.find((dataset) => dataset.id === "delivery_today")?.request?.filters,
+  {
+    From: "2026-07-16",
+    To: "2026-07-16",
+    orderIds: [2659519],
+  },
+);
+
 const loweredLegacyExplicitDatasetSpec = lowerReportDocumentToReportSpec({
   ...explicitDatasetDocument,
   datasets: explicitDatasetDocument.datasets.filter((dataset) => dataset.id !== "primary"),

@@ -64,6 +64,21 @@ function setNestedValue(target, path, value) {
   cursor[segments[segments.length - 1]] = value;
 }
 
+function deleteNestedValue(target, path) {
+  const segments = normalizeString(path).split(".").filter(Boolean);
+  if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
+    return;
+  }
+  let cursor = target;
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    cursor = isPlainObject(cursor?.[segments[index]]) ? cursor[segments[index]] : null;
+    if (!cursor) {
+      return;
+    }
+  }
+  delete cursor[segments[segments.length - 1]];
+}
+
 function mergeReportDatasetRequestValues(base = {}, patch = {}, {
   patchWins = true,
 } = {}) {
@@ -242,23 +257,32 @@ export function buildReportBuilderPublishedDatasetConfig(baseConfig = {}, source
   };
 }
 
-function buildReportBuilderPublishedDatasetRequest(source = {}, state = {}, datasetScopeParamValues = null) {
+function buildReportBuilderPublishedDatasetRequest(
+  source = {},
+  state = {},
+  datasetScopeParamValues = null,
+  inheritedRequestContext = null,
+) {
   const request = isPlainObject(source?.request) ? cloneValue(source.request) : null;
   if (!request) {
     return null;
   }
   const scopePolicy = resolveReportDatasetScopePolicy(source?.scope);
   const excludedParamIds = new Set(Array.isArray(scopePolicy?.exclude) ? scopePolicy.exclude : []);
-  const contextPatch = {};
+  let contextPatch = isPlainObject(inheritedRequestContext) ? cloneValue(inheritedRequestContext) : {};
   (Array.isArray(source?.scopeParamOptions) ? source.scopeParamOptions : []).forEach((option) => {
     const paramId = normalizeString(option?.id || option?.value);
     if (!paramId) {
       return;
     }
-    const hasDatasetScopedValue = datasetScopeParamValues && Object.prototype.hasOwnProperty.call(datasetScopeParamValues, paramId);
-    if (!hasDatasetScopedValue && excludedParamIds.has(paramId)) {
+    const paramPath = normalizeString(option?.paramPath);
+    if (excludedParamIds.has(paramId)) {
+      if (paramPath) {
+        deleteNestedValue(contextPatch, paramPath);
+      }
       return;
     }
+    const hasDatasetScopedValue = datasetScopeParamValues && Object.prototype.hasOwnProperty.call(datasetScopeParamValues, paramId);
     const rawValue = hasDatasetScopedValue
       ? datasetScopeParamValues[paramId]
       : getScopeParamValue(state, paramId);
@@ -277,7 +301,6 @@ function buildReportBuilderPublishedDatasetRequest(source = {}, state = {}, data
     if (rawValue == null || rawValue === "" || (Array.isArray(rawValue) && rawValue.length === 0)) {
       return;
     }
-    const paramPath = normalizeString(option?.paramPath);
     if (!paramPath) {
       return;
     }
@@ -309,7 +332,13 @@ function buildReportBuilderPublishedDatasetRequest(source = {}, state = {}, data
   return mergeReportDatasetRequestValues(request, contextPatch, { patchWins: true });
 }
 
-export function buildReportBuilderPublishedDatasetDeclarations(config = {}, state = {}, referencedDatasetRefs = new Set(), runtimeDatasetScopeParams = null) {
+export function buildReportBuilderPublishedDatasetDeclarations(
+  config = {},
+  state = {},
+  referencedDatasetRefs = new Set(),
+  runtimeDatasetScopeParams = null,
+  primaryRequestContext = null,
+) {
   const sources = normalizeReportBuilderPublishedDataSources(config);
   if (sources.length === 0) {
     return [];
@@ -327,7 +356,19 @@ export function buildReportBuilderPublishedDatasetDeclarations(config = {}, stat
             || null
           )
         : null;
-      const request = buildReportBuilderPublishedDatasetRequest(source, state, scopedValues);
+      const sameDataSource = normalizeString(source?.dataSourceRef)
+        && normalizeString(source?.dataSourceRef) === normalizeString(primaryRequestContext?.dataSourceRef);
+      const inheritedRequestContext = sameDataSource
+        ? {
+            ...(isPlainObject(primaryRequestContext?.request?.filters)
+              ? { filters: cloneValue(primaryRequestContext.request.filters) }
+              : {}),
+            ...(Array.isArray(primaryRequestContext?.request?.refinements)
+              ? { refinements: cloneValue(primaryRequestContext.request.refinements) }
+              : {}),
+          }
+        : null;
+      const request = buildReportBuilderPublishedDatasetRequest(source, state, scopedValues, inheritedRequestContext);
       if (!request) {
         return null;
       }
@@ -567,7 +608,17 @@ export function buildReportBuilderReportSpec({
   );
   const authoredDatasetBackedBlocks = (Array.isArray(normalizedState?.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : [])
     .filter((block) => isReportDatasetBackedBlockKind(block?.kind));
-  const publishedDatasets = buildReportBuilderPublishedDatasetDeclarations(effectiveConfig, normalizedState, referencedDatasetRefs);
+  const primaryDataSourceRef = resolveReportSpecDataSourceRef(container, config);
+  const publishedDatasets = buildReportBuilderPublishedDatasetDeclarations(
+    effectiveConfig,
+    normalizedState,
+    referencedDatasetRefs,
+    null,
+    {
+      dataSourceRef: primaryDataSourceRef,
+      request,
+    },
+  );
   const staticDatasets = buildReportBuilderStaticDatasetDeclarations(normalizedState?.reportStaticDatasets);
   const explicitDatasetRefs = authoredDatasetBackedBlocks
     .map((block) => normalizeString(block?.datasetRef))
@@ -607,7 +658,7 @@ export function buildReportBuilderReportSpec({
       kind: "dashboard.reportBuilder",
       containerId: resolveContainerIdentity(container),
       stateKey: normalizeString(container?.stateKey || resolveContainerIdentity(container)),
-      dataSourceRef: resolveReportSpecDataSourceRef(container, config),
+      dataSourceRef: primaryDataSourceRef,
     },
     title: resolveReportSpecTitle(container, config),
     ...(normalizedState?.binding ? { binding: cloneValue(normalizedState.binding) } : {}),
@@ -630,12 +681,12 @@ export function buildReportBuilderReportSpec({
     scope: {
       ...(contextPreset ? { contextPreset: cloneValue(contextPreset) } : {}),
       params: scopeParams,
-      dataSourceRef: resolveReportSpecDataSourceRef(container, config),
+      dataSourceRef: primaryDataSourceRef,
     },
     datasets: [
       ...(shouldIncludePrimaryDataset ? [{
         id: "primary",
-        dataSourceRef: resolveReportSpecDataSourceRef(container, config),
+        dataSourceRef: primaryDataSourceRef,
         ...(normalizeReportDatasetScope(config?.scope) ? { scope: normalizeReportDatasetScope(config?.scope) } : {}),
         ...(isPlainObject(config?.source) ? { source: cloneValue(config.source) } : {}),
         ...(isPlainObject(config?.resultContract) ? { resultContract: cloneValue(config.resultContract) } : {}),

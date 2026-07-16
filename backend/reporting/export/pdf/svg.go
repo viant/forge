@@ -1505,7 +1505,7 @@ func (r *renderer) renderSVGPathOperation(pathProgram svgPathPaintOperation) {
 			r.pdf.TransformBegin()
 			r.pdf.TransformScale(pathProgram.scaleX*100, pathProgram.scaleY*100, pathProgram.originX, pathProgram.originY)
 		}
-		r.pdf.SVGBasicDraw(&pathProgram.parsed, 1, style)
+		r.renderSVGCompoundPath(&pathProgram.parsed, 1, style)
 		if transformed {
 			r.pdf.TransformEnd()
 		}
@@ -1527,6 +1527,45 @@ func (r *renderer) renderSVGPathOperation(pathProgram svgPathPaintOperation) {
 			renderPath(pathProgram.style)
 		}
 	})
+}
+
+// SVGBasicDraw paints each closed subpath independently. SVG icons commonly
+// rely on compound-path winding for negative space, so paint all subpaths once.
+func (r *renderer) renderSVGCompoundPath(path *fpdf.SVGBasicType, scale float64, style string) {
+	if path == nil {
+		return
+	}
+	originX, originY := r.pdf.GetXY()
+	for _, subpath := range path.Segments {
+		for _, segment := range subpath {
+			x := func(index int) float64 { return originX + (scale * segment.Arg[index]) }
+			y := func(index int) float64 { return originY + (scale * segment.Arg[index]) }
+			switch segment.Cmd {
+			case 'M':
+				r.pdf.MoveTo(x(0), y(1))
+			case 'L':
+				r.pdf.LineTo(x(0), y(1))
+			case 'C':
+				r.pdf.CurveBezierCubicTo(x(0), y(1), x(2), y(3), x(4), y(5))
+			case 'Q':
+				r.pdf.CurveTo(x(0), y(1), x(2), y(3))
+			case 'H':
+				r.pdf.LineTo(x(0), r.pdf.GetY())
+			case 'V':
+				r.pdf.LineTo(r.pdf.GetX(), y(0))
+			case 'Z':
+				r.pdf.ClosePath()
+			}
+		}
+	}
+	switch style {
+	case "F":
+		r.pdf.DrawPath("f")
+	case "D":
+		r.pdf.DrawPath("S")
+	default:
+		r.pdf.DrawPath(style)
+	}
 }
 
 func svgX(viewport svgViewport, value float64) float64 {
