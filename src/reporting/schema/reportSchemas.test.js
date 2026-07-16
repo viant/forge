@@ -104,6 +104,59 @@ const reportPrint = buildReportPrintFromReportFill({
   reportFill,
 });
 
+const badgesReportSpec = {
+  ...reportSpec,
+  layoutIntent: {
+    ...reportSpec.layoutIntent,
+    blockOrder: [...reportSpec.layoutIntent.blockOrder, "currentSignals"],
+    ...(Array.isArray(reportSpec.layoutIntent.items)
+      ? { items: [...reportSpec.layoutIntent.items, { blockId: "currentSignals" }] }
+      : {}),
+  },
+  blocks: [
+    ...reportSpec.blocks,
+    {
+      id: "currentSignals",
+      kind: "badgesBlock",
+      title: "Current Signals",
+      datasetRef: "primary",
+      items: [
+        { id: "channel", label: "Top channel", valueField: "channelId" },
+        { id: "spend", label: "Spend", valueField: "totalSpend", format: "currency" },
+      ],
+    },
+  ],
+};
+const badgesReportFill = buildReportFillFromReportSpec(badgesReportSpec, {
+  primary: {
+    rows: [{ channelId: "CTV", totalSpend: 142791.35, impressions: 6268540 }],
+  },
+});
+const badgesReportPrint = buildReportPrintFromReportFill({
+  reportSpec: badgesReportSpec,
+  reportFill: badgesReportFill,
+});
+const badgesExportRequest = buildDraftReportExportRequest({
+  reportDocument: { id: "performanceBuilder", title: "Performance Report" },
+  reportSpec: badgesReportSpec,
+  reportFill: badgesReportFill,
+  reportPrint: badgesReportPrint,
+  format: "pdf",
+});
+
+assert.deepEqual(validateReportSpec(badgesReportSpec), { valid: true, errors: [] });
+assert.deepEqual(validateReportFill(badgesReportFill), { valid: true, errors: [] });
+assert.deepEqual(validateReportPrint(badgesReportPrint), { valid: true, errors: [] });
+assert.deepEqual(validateReportExportRequest(badgesExportRequest), { valid: true, errors: [] });
+assert.equal(
+  badgesReportPrint.pages.flatMap((page) => page.elements).some((element) => element.text === "Top channel: CTV"),
+  true,
+);
+assert.equal(
+  badgesReportPrint.diagnostics.some((diagnostic) => diagnostic.code === "unsupportedReportPrintBlock"),
+  false,
+);
+
 assert.deepEqual(validateReportSpec(reportSpec), {
   valid: true,
   errors: [],

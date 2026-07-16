@@ -1153,6 +1153,67 @@ export const reportFillSchema = {
         },
       },
     },
+    badgeRule: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        value: { $ref: "#/$defs/jsonValue" },
+        label: { type: "string" },
+        tone: { type: "string" },
+      },
+    },
+    badgeItem: {
+      type: "object",
+      additionalProperties: false,
+      required: ["id"],
+      properties: {
+        id: { type: "string" },
+        label: { type: "string" },
+        value: { $ref: "#/$defs/jsonValue" },
+        valueField: { type: "string" },
+        format: { type: "string" },
+        displayKey: { type: "string" },
+        displayValueMap: {
+          type: "object",
+          additionalProperties: { $ref: "#/$defs/jsonValue" },
+        },
+        labelMode: { enum: ["field", "manual"] },
+        rules: {
+          type: "array",
+          items: { $ref: "#/$defs/badgeRule" },
+        },
+        tone: { type: "string" },
+        displayValue: { type: "string" },
+      },
+    },
+    badgesBlock: {
+      type: "object",
+      additionalProperties: false,
+      required: ["id", "kind", "title", "datasetRef", "items", "content"],
+      properties: {
+        id: { type: "string" },
+        kind: { const: "badgesBlock" },
+        title: { type: "string" },
+        datasetRef: { type: "string" },
+        items: {
+          type: "array",
+          items: { $ref: "#/$defs/badgeItem" },
+        },
+        content: {
+          type: "object",
+          additionalProperties: false,
+          required: ["title", "rowCount", "items"],
+          properties: {
+            title: { type: "string" },
+            rowCount: { type: "integer", minimum: 0 },
+            items: {
+              type: "array",
+              items: { $ref: "#/$defs/badgeItem" },
+            },
+          },
+        },
+      },
+    },
     collectionBlock: {
       type: "object",
       additionalProperties: false,
@@ -1680,6 +1741,7 @@ export const reportFillSchema = {
         { $ref: "#/$defs/chartBlock" },
         { $ref: "#/$defs/geoMapBlock" },
         { $ref: "#/$defs/kpiBlock" },
+        { $ref: "#/$defs/badgesBlock" },
         { $ref: "#/$defs/collectionBlock" },
         { $ref: "#/$defs/sectionBlock" },
         { $ref: "#/$defs/compositeBlock" },
