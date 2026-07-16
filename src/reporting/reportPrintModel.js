@@ -2,6 +2,7 @@ import { buildReportSpecHash, buildReportFillHash } from "./reportFillModel.js";
 import { buildReportPrintChartSvg } from "./reportPrintChartSvg.js";
 import { buildReportPrintGeoSvg } from "./reportPrintGeoSvg.js";
 import { formatExportValue } from "./reportExportValueFormatter.js";
+import { getIconPaths } from "@blueprintjs/icons";
 import {
   REPORT_LAYOUT_GRID_COLUMNS,
   resolveReportLayoutSpan,
@@ -13,6 +14,14 @@ function normalizeString(value = "") {
 
 function cloneValue(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
+}
+
+function buildReportPrintMappedIconSvg(iconName = "", color = "#425a70") {
+  const paths = getIconPaths(normalizeString(iconName), 16);
+  if (!Array.isArray(paths) || paths.length === 0) {
+    return "";
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">${paths.map((path) => `<path d="${path}" fill="${color}"/>`).join("")}</svg>`;
 }
 
 function resolveReportPrintTheme(reportSpec = {}) {
@@ -1745,13 +1754,32 @@ function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {
       }));
       return;
     }
+    const mappedIcon = column?.displayIconMap && typeof column.displayIconMap === "object"
+      ? normalizeString(column.displayIconMap[String(cell?.value ?? "")])
+      : "";
+    const mappedIconSvg = mappedIcon ? buildReportPrintMappedIconSvg(mappedIcon) : "";
+    const iconWidth = mappedIconSvg ? 14 : 0;
+    if (mappedIconSvg) {
+      pushReportPrintElement(state, buildReportPrintSvgElement({
+        id: `${normalizeString(block?.id || "table")}__${rowKey}__${columnKey}__icon`,
+        kind: "svg",
+        zIndex: 3,
+        box: {
+          x: cellInnerX,
+          y: cellInnerY + Math.max(0, (cellInnerHeight - 12) / 2),
+          width: 12,
+          height: 12,
+        },
+        svg: mappedIconSvg,
+      }));
+    }
     pushReportPrintElement(state, buildReportPrintTableCellTextElement({
       id: `${normalizeString(block?.id || "table")}__${rowKey}__${columnKey}__text`,
       kind: "tableCellText",
       box: {
-        x: cellInnerX,
+        x: cellInnerX + iconWidth,
         y: cellInnerY,
-        width: cellInnerWidth,
+        width: Math.max(1, cellInnerWidth - iconWidth),
         height: cellInnerHeight,
       },
       rowKey,

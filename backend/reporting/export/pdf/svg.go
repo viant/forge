@@ -386,7 +386,7 @@ func buildSVGPathPaintOperations(pathNode svgPath, viewport svgViewport, path st
 		`<svg width="%spt" height="%spt"><path d="%s"/></svg>`,
 		formatSVGScalar(viewport.viewBox.width),
 		formatSVGScalar(viewport.viewBox.height),
-		escapeSVGAttribute(pathNode.d),
+		escapeSVGAttribute(normalizeSVGPathDataForBasicParser(pathNode.d)),
 	)
 	parsed, err := fpdf.SVGBasicParse([]byte(svgMarkup))
 	if err != nil {
@@ -438,6 +438,242 @@ func buildSVGPathPaintOperations(pathNode svgPath, viewport svgViewport, path st
 		})
 	}
 	return operations, nil
+}
+
+// SVG permits a sign to start the next number without whitespace (for example
+// "0-1"). fpdf's basic path parser requires an explicit separator.
+func normalizeSVGPathDataForBasicParser(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return value
+	}
+	var result strings.Builder
+	result.Grow(len(value) + 8)
+	inNumber := false
+	hasDecimal := false
+	inExponent := false
+	for index := 0; index < len(value); index++ {
+		current := value[index]
+		switch {
+		case current >= '0' && current <= '9':
+			inNumber = true
+		case current == '.':
+			if inNumber && hasDecimal && !inExponent {
+				result.WriteByte(' ')
+				inNumber = false
+			}
+			inNumber = true
+			hasDecimal = true
+			inExponent = false
+		case current == '-' || current == '+':
+			if inNumber && index > 0 && value[index-1] != 'e' && value[index-1] != 'E' {
+				result.WriteByte(' ')
+			}
+			inNumber = true
+			hasDecimal = false
+			inExponent = false
+		case (current == 'e' || current == 'E') && inNumber:
+			inExponent = true
+		default:
+			inNumber = false
+			hasDecimal = false
+			inExponent = false
+		}
+		result.WriteByte(current)
+	}
+	normalized := result.String()
+	expanded, err := expandSVGSmoothCurves(normalized)
+	if err != nil {
+		return normalized
+	}
+	return expanded
+}
+
+type svgPathSegment struct {
+	command byte
+	values  []float64
+}
+
+func expandSVGSmoothCurves(value string) (string, error) {
+	segments, err := parseSVGPathSegments(value)
+	if err != nil {
+		return "", err
+	}
+	var result strings.Builder
+	currentX, currentY := 0.0, 0.0
+	startX, startY := 0.0, 0.0
+	controlX, controlY := 0.0, 0.0
+	previousCubic := false
+	for _, segment := range segments {
+		command := segment.command
+		values := segment.values
+		argumentCount := svgPathCommandArgumentCount(command)
+		if argumentCount == 0 {
+			writeSVGPathCommand(&result, command, nil)
+			currentX, currentY = startX, startY
+			previousCubic = false
+			continue
+		}
+		if argumentCount < 0 || len(values) == 0 || len(values)%argumentCount != 0 {
+			return "", fmt.Errorf("invalid svg path command %c argument count", command)
+		}
+		for offset := 0; offset < len(values); offset += argumentCount {
+			group := values[offset : offset+argumentCount]
+			switch command {
+			case 'M', 'm':
+				outputCommand := command
+				if offset > 0 {
+					if command == 'M' {
+						outputCommand = 'L'
+					} else {
+						outputCommand = 'l'
+					}
+				}
+				writeSVGPathCommand(&result, outputCommand, group)
+				if command == 'm' {
+					currentX += group[0]
+					currentY += group[1]
+				} else {
+					currentX, currentY = group[0], group[1]
+				}
+				if offset == 0 {
+					startX, startY = currentX, currentY
+				}
+				previousCubic = false
+			case 'L', 'l':
+				writeSVGPathCommand(&result, command, group)
+				if command == 'l' {
+					currentX += group[0]
+					currentY += group[1]
+				} else {
+					currentX, currentY = group[0], group[1]
+				}
+				previousCubic = false
+			case 'H', 'h':
+				writeSVGPathCommand(&result, command, group)
+				if command == 'h' {
+					currentX += group[0]
+				} else {
+					currentX = group[0]
+				}
+				previousCubic = false
+			case 'V', 'v':
+				writeSVGPathCommand(&result, command, group)
+				if command == 'v' {
+					currentY += group[0]
+				} else {
+					currentY = group[0]
+				}
+				previousCubic = false
+			case 'C', 'c':
+				writeSVGPathCommand(&result, command, group)
+				if command == 'c' {
+					controlX, controlY = currentX+group[2], currentY+group[3]
+					currentX += group[4]
+					currentY += group[5]
+				} else {
+					controlX, controlY = group[2], group[3]
+					currentX, currentY = group[4], group[5]
+				}
+				previousCubic = true
+			case 'S', 's':
+				firstControlX, firstControlY := currentX, currentY
+				if previousCubic {
+					firstControlX = (2 * currentX) - controlX
+					firstControlY = (2 * currentY) - controlY
+				}
+				secondControlX, secondControlY := group[0], group[1]
+				endX, endY := group[2], group[3]
+				if command == 's' {
+					secondControlX += currentX
+					secondControlY += currentY
+					endX += currentX
+					endY += currentY
+				}
+				writeSVGPathCommand(&result, 'C', []float64{firstControlX, firstControlY, secondControlX, secondControlY, endX, endY})
+				controlX, controlY = secondControlX, secondControlY
+				currentX, currentY = endX, endY
+				previousCubic = true
+			case 'Q', 'q':
+				writeSVGPathCommand(&result, command, group)
+				if command == 'q' {
+					currentX += group[2]
+					currentY += group[3]
+				} else {
+					currentX, currentY = group[2], group[3]
+				}
+				previousCubic = false
+			}
+		}
+	}
+	return strings.TrimSpace(result.String()), nil
+}
+
+func parseSVGPathSegments(value string) ([]svgPathSegment, error) {
+	segments := make([]svgPathSegment, 0)
+	command := byte(0)
+	start := 0
+	flush := func(end int) error {
+		if command == 0 {
+			return nil
+		}
+		rawValues := strings.Fields(strings.ReplaceAll(value[start:end], ",", " "))
+		values := make([]float64, 0, len(rawValues))
+		for _, rawValue := range rawValues {
+			parsed, err := strconv.ParseFloat(rawValue, 64)
+			if err != nil {
+				return err
+			}
+			values = append(values, parsed)
+		}
+		segments = append(segments, svgPathSegment{command: command, values: values})
+		return nil
+	}
+	for index := 0; index < len(value); index++ {
+		if !isSVGPathCommand(value[index]) {
+			continue
+		}
+		if err := flush(index); err != nil {
+			return nil, err
+		}
+		command = value[index]
+		start = index + 1
+	}
+	if err := flush(len(value)); err != nil {
+		return nil, err
+	}
+	return segments, nil
+}
+
+func isSVGPathCommand(value byte) bool {
+	return strings.ContainsRune("MmLlHhVvCcSsQqZz", rune(value))
+}
+
+func svgPathCommandArgumentCount(command byte) int {
+	switch command {
+	case 'M', 'm', 'L', 'l':
+		return 2
+	case 'H', 'h', 'V', 'v':
+		return 1
+	case 'C', 'c':
+		return 6
+	case 'S', 's', 'Q', 'q':
+		return 4
+	case 'Z', 'z':
+		return 0
+	default:
+		return -1
+	}
+}
+
+func writeSVGPathCommand(result *strings.Builder, command byte, values []float64) {
+	if result.Len() > 0 {
+		result.WriteByte(' ')
+	}
+	result.WriteByte(command)
+	for _, value := range values {
+		result.WriteByte(' ')
+		result.WriteString(formatSVGScalar(value))
+	}
 }
 
 func scaleSVGDashPattern(pattern []float64, scale float64) []float64 {

@@ -99,6 +99,12 @@ function buildReportSpecColumns(columns = []) {
     key: normalizeString(column?.key),
     sourceKey: normalizeString(column?.sourceKey || column?.key),
     displayKey: normalizeString(column?.displayKey || column?.key),
+    ...(column?.displayValueMap && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap)
+      ? { displayValueMap: cloneValue(column.displayValueMap) }
+      : {}),
+    ...(column?.displayIconMap && typeof column.displayIconMap === "object" && !Array.isArray(column.displayIconMap)
+      ? { displayIconMap: cloneValue(column.displayIconMap) }
+      : {}),
     label: normalizeString(column?.label || column?.key),
     kind: normalizeString(column?.kind),
     ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),

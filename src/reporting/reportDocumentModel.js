@@ -260,6 +260,9 @@ function buildAuthoredTableBlock(block = {}, fieldCatalog = {}) {
       ...(normalizedColumn?.displayValueMap || catalogEntry?.entry?.displayValueMap
         ? { displayValueMap: cloneValue(normalizedColumn?.displayValueMap || catalogEntry?.entry?.displayValueMap) }
         : {}),
+      ...(normalizedColumn?.displayIconMap || catalogEntry?.entry?.displayIconMap
+        ? { displayIconMap: cloneValue(normalizedColumn?.displayIconMap || catalogEntry?.entry?.displayIconMap) }
+        : {}),
       ...(normalizeString(normalizedColumn?.label || catalogEntry?.entry?.label || fieldId)
         ? { label: normalizeString(normalizedColumn?.label || catalogEntry?.entry?.label || fieldId) }
         : {}),

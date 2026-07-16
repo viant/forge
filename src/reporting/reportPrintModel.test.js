@@ -1126,6 +1126,34 @@ assert.deepEqual(validateReportPrint(customBadgeTablePrint), {
 });
 assert.equal(customBadgeTablePrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "tableCellBadge" && element.backgroundColor === "#eef8f0" && element.borderColor === "#16a34a"), true);
 
+const mappedIconTableSpec = {
+  ...customBadgeTableSpec,
+  title: "Mapped Icon Table",
+  blocks: [{
+    id: "mappedIconTable",
+    kind: "tableBlock",
+    datasetRef: "primary",
+    columns: [{
+      key: "channelId",
+      sourceKey: "channelId",
+      displayKey: "channelName",
+      displayValueMap: { "1": "Display" },
+      displayIconMap: { "1": "media" },
+      label: "Channel",
+    }],
+  }],
+};
+const mappedIconTableFill = buildReportFillFromReportSpec(mappedIconTableSpec, {
+  primary: { rows: [{ channelId: 1 }] },
+});
+const mappedIconTablePrint = buildReportPrintFromReportFill({
+  reportSpec: mappedIconTableSpec,
+  reportFill: mappedIconTableFill,
+});
+assert.deepEqual(validateReportPrint(mappedIconTablePrint), { valid: true, errors: [] });
+assert.equal(mappedIconTablePrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "svg" && element.id.includes("channelId__icon") && element.zIndex === 3 && element.svg.includes('fill="#425a70"')), true);
+assert.equal(mappedIconTablePrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "tableCellText" && element.text === "Display"), true);
+
 const customToneTableSpec = {
   version: 1,
   kind: "reportSpec",
