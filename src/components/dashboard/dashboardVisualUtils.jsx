@@ -1,4 +1,5 @@
 import React from "react";
+import { Icon } from "@blueprintjs/core";
 
 import { resolveKey } from "../../utils/selector.js";
 import { resolveTableLink } from "../../utils/tableLink.js";
@@ -378,6 +379,18 @@ export function renderDashboardTableCell(cell, row, column, locale, context) {
         return (
             <span style={{fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: tone.text, background: tone.background, border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '2px 8px'}}>
                 {text.replace(/_/g, ' ')}
+            </span>
+        );
+    }
+    const rawValue = resolveDashboardTableColumnValue(row, column, {preferDisplay: false});
+    const icon = column?.displayIconMap && typeof column.displayIconMap === 'object'
+        ? column.displayIconMap[String(rawValue)]
+        : '';
+    if (icon) {
+        return (
+            <span className="forge-dashboard-table-cell-with-icon" title={text} style={{display: 'inline-flex', alignItems: 'center', gap: 7}}>
+                <Icon icon={icon} size={14} aria-hidden="true" />
+                <span>{text}</span>
             </span>
         );
     }

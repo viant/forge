@@ -104,6 +104,9 @@ export function normalizeReportTableBlockColumn(column = {}) {
     ...(column?.displayValueMap && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap)
       ? { displayValueMap: cloneValue(column.displayValueMap) }
       : {}),
+    ...(column?.displayIconMap && typeof column.displayIconMap === "object" && !Array.isArray(column.displayIconMap)
+      ? { displayIconMap: cloneValue(column.displayIconMap) }
+      : {}),
     ...(normalizeString(column.kind) ? { kind: normalizeString(column.kind) } : {}),
     ...(normalizeString(column.label) ? { label: normalizeString(column.label) } : {}),
     ...(normalizeString(column.format) ? { format: normalizeString(column.format) } : {}),

@@ -97,6 +97,9 @@ assert.deepEqual(normalizeReportTableBlockColumn({
   key: "status",
   sourceKey: "status",
   displayKey: "statusLabel",
+  displayIconMap: {
+    healthy: "endorsed",
+  },
   kind: "dimension",
   label: "Status",
   runtimeFilterable: true,
@@ -110,6 +113,9 @@ assert.deepEqual(normalizeReportTableBlockColumn({
   key: "status",
   sourceKey: "status",
   displayKey: "statusLabel",
+  displayIconMap: {
+    healthy: "endorsed",
+  },
   kind: "dimension",
   label: "Status",
   runtimeFilterable: true,

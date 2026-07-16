@@ -2387,6 +2387,57 @@ func TestRender_SVGDefaultFillStillRendersPathAndCircle(t *testing.T) {
 	require.True(t, hasMatchingPathBounds(contentStream, 116, 698, 136, 678, "f"))
 }
 
+func TestRender_SVGCompactBlueprintIconPath(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "svgIconBuilder",
+			StateKey:      "svgIconBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "SVG Compact Icon",
+		PageGeometry: reportprint.PageGeometry{
+			Width:  612,
+			Height: 792,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:   "channel_icon",
+						Kind: "svg",
+						Box:  reportprint.Box{X: 177, Y: 442, Width: 12, Height: 12},
+						SVG:  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><path d="M15 2H1c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h14c.55 0 1-.45 1-1V3c0-.55-.45-1-1-1zM5 11V5l6 3-6 3z" fill="#425a70"/></svg>`,
+					},
+					{
+						ID:   "channel_smooth_curve_icon",
+						Kind: "svg",
+						Box:  reportprint.Box{X: 210, Y: 442, Width: 12, Height: 12},
+						SVG:  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><path d="M11.99 6.99c.55 0 1-.45 1-1s-.45-1-1-1-1 .45-1 1 .45 1 1 1zm3-5h-14c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h14c.55 0 1-.45 1-1v-10c0-.55-.45-1-1-1zm-1 9l-5-3-1 2-3-4-3 5v-7h12v7z" fill="#425a70"/></svg>`,
+					},
+				},
+			},
+		},
+	}
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	require.Empty(t, result.Diagnostics)
+
+	contentStream := extractPDFContentStreams(t, result.Bytes)
+	require.Contains(t, contentStream, "0.259 0.353 0.439 rg")
+	require.Contains(t, contentStream, "0.75000 0.00000 0.00000 0.75000 44.25000 87.50000 cm")
+	require.Contains(t, contentStream, "192.00 348.00 m")
+	require.Contains(t, contentStream, "182.00 339.00 m")
+}
+
 func TestRender_SVGExplicitLengthUnitsNormalizeIntoViewportSpace(t *testing.T) {
 	report := &reportprint.ReportPrint{
 		Version:     1,

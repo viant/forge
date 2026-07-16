@@ -540,6 +540,10 @@ export const reportSpecSchema = {
           type: "object",
           additionalProperties: { $ref: "#/$defs/jsonValue" },
         },
+        displayIconMap: {
+          type: "object",
+          additionalProperties: { type: "string" },
+        },
         label: { type: "string" },
         kind: { type: "string" },
         format: { type: "string" },

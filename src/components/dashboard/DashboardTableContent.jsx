@@ -66,6 +66,12 @@ export default function DashboardTableContent({
             key,
             sourceKey: String(col?.sourceKey || key).trim() || key,
             displayKey: String(col?.displayKey || '').trim(),
+            displayValueMap: col?.displayValueMap && typeof col.displayValueMap === 'object' && !Array.isArray(col.displayValueMap)
+                ? col.displayValueMap
+                : undefined,
+            displayIconMap: col?.displayIconMap && typeof col.displayIconMap === 'object' && !Array.isArray(col.displayIconMap)
+                ? col.displayIconMap
+                : undefined,
             label: col?.label || titleizeDashboardKey(key),
             format: col?.format,
             align: col?.align,
