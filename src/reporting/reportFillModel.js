@@ -928,6 +928,14 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
   const datasetsByAlias = buildReportFillDatasetAliasMap(datasetsById);
   return (Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : []).map((block) => {
     const normalizedBlock = cloneValue(block);
+    // Display descriptors are consumed while resolving fill content. A
+    // ReportFill stores those resolved values, so it does not duplicate the
+    // ReportSpec's source-to-display presentation contract.
+    delete normalizedBlock.templateFieldDisplayMap;
+    delete normalizedBlock.itemTitleDisplayKey;
+    delete normalizedBlock.itemTitleDisplayValueMap;
+    delete normalizedBlock.secondaryDisplayKey;
+    delete normalizedBlock.secondaryDisplayValueMap;
     const datasetResolution = resolveReportDatasetRefResolution({
       preferredDatasetRef: normalizeString(block?.datasetRef),
       availableDatasetRefs,

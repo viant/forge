@@ -84,7 +84,7 @@ export default {
     }),
     {
       type: "waitForEval",
-      expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return text.includes('Validating the semantic selection against the provider.') || text.includes('Showing Inventory Ladder.'); })()",
+      expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return text.includes('Validating the semantic selection against the provider.') || (document.querySelector('.forge-report-builder__result-header h3')?.innerText || '').includes('Inventory Ladder'); })()",
       timeoutMs: 60000,
     },
     {
@@ -114,12 +114,12 @@ export default {
     },
     {
       type: "waitForEval",
-      expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return text.includes('Validating the semantic selection against the provider.') || text.includes('Showing Inventory Ladder.'); })()",
+      expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return text.includes('Validating the semantic selection against the provider.') || (document.querySelector('.forge-report-builder__result-header h3')?.innerText || '').includes('Inventory Ladder'); })()",
       timeoutMs: 60000,
     },
     {
       type: "waitForEval",
-      expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return !text.includes('Semantic validation: Semantic provider unavailable.') && !text.includes('Retry validation') && text.includes('Showing Inventory Ladder.'); })()",
+      expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return !text.includes('Semantic validation: Semantic provider unavailable.') && !text.includes('Retry validation') && (document.querySelector('.forge-report-builder__result-header h3')?.innerText || '').includes('Inventory Ladder'); })()",
       timeoutMs: 60000,
     },
     buildAuthoredRuntimeSemanticSurfaceWaitStep({

@@ -39,7 +39,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Table view for the active scope.")),
+  scenario.steps.some((step) => step?.type === "waitForEval" && String(step.expression || "").includes("forge-report-builder__table-wrap")),
   true,
 );
 assert.equal(

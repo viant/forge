@@ -86,8 +86,8 @@ export default {
       timeoutMs: 60000,
     },
     {
-      type: "waitForDomContains",
-      text: "Showing Location Ladder.",
+      type: "waitForEval",
+      expression: "(() => (document.querySelector('.forge-report-builder__result-header h3')?.innerText || '').includes('Location Ladder'))()",
       timeoutMs: 60000,
     },
     {

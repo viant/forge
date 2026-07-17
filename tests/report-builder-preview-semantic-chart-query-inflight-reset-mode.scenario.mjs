@@ -94,8 +94,8 @@ export default {
       },
     }),
     {
-      type: "waitForDomContains",
-      text: "Chart-first view for the active scope. Switch to the table when you need to inspect individual rows.",
+      type: "waitForEval",
+      expression: "(() => !!document.querySelector('.forge-report-builder__chart-wrap'))()",
       timeoutMs: 60000,
     },
     buildPreviewPatchBuilderConfigStep({
@@ -133,7 +133,7 @@ export default {
     },
     {
       type: "waitForEval",
-      expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; const chartWrap = document.querySelector('.forge-report-builder__chart-wrap'); const chartText = chartWrap?.innerText || chartWrap?.textContent || ''; return text.includes('Avails by Date and Channel') && text.includes('Chart-first view for the active scope using the full query result set.') && !text.includes('We couldn\\'t render these results') && chartText.includes('Gamma') && chartText.includes('Delta') && !chartText.includes('Alpha') && !chartText.includes('Beta'); })()",
+      expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; const chartWrap = document.querySelector('.forge-report-builder__chart-wrap'); const chartText = chartWrap?.innerText || chartWrap?.textContent || ''; return text.includes('Avails by Date and Channel') && !!document.querySelector('.forge-report-builder__chart-wrap') && !text.includes('We couldn\\'t render these results') && chartText.includes('Gamma') && chartText.includes('Delta') && !chartText.includes('Alpha') && !chartText.includes('Beta'); })()",
       timeoutMs: 60000,
     },
     {

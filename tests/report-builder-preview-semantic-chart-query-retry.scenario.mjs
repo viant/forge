@@ -34,8 +34,8 @@ export default {
       },
     }),
     {
-      type: "waitForDomContains",
-      text: "Chart-first view for the active scope using the full query result set.",
+      type: "waitForEval",
+      expression: "(() => !!document.querySelector('.forge-report-builder__chart-wrap'))()",
       timeoutMs: 60000,
     },
     {

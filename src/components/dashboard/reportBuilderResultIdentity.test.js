@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 
 import {
     buildReportBuilderDesktopResultState,
+    resolveReportBuilderActiveFilterSummary,
     resolveReportBuilderResultDescription,
-    resolveReportBuilderResultMetaItems,
     resolveReportBuilderResultTitle,
     resolveResultIdentityChip,
     resolveTablePresetTransitionText,
@@ -27,10 +27,30 @@ assert.equal(
 assert.equal(
     resolveResultIdentityChip({
         showingChartView: true,
-        canShowResults: true,
+        activeTablePresetTitle: "Delivery Grid",
     }),
-    "Chart view",
+    "",
 );
+
+assert.equal(
+    resolveResultIdentityChip({
+        activeTablePresetTitle: "Delivery Grid",
+    }),
+    "Delivery Grid",
+);
+
+assert.equal(
+    resolveResultIdentityChip({
+        modifiedTablePresetTitle: "Delivery Grid",
+    }),
+    "Modified from Delivery Grid",
+);
+
+assert.equal(resolveResultIdentityChip({}), "");
+
+assert.equal(resolveReportBuilderActiveFilterSummary({}), "");
+assert.equal(resolveReportBuilderActiveFilterSummary({ totalActiveFilterCount: 1 }), "1 active filter");
+assert.equal(resolveReportBuilderActiveFilterSummary({ totalActiveFilterCount: 3 }), "3 active filters");
 
 assert.equal(
     resolveReportBuilderResultTitle({
@@ -54,9 +74,8 @@ assert.equal(
     resolveReportBuilderResultDescription({
         canShowResults: true,
         activeTablePresetTitle: "Delivery Grid",
-        activeTablePresetDescription: "Table-first delivery preset.",
     }),
-    "Showing Delivery Grid. Table-first delivery preset. Use Presets to switch to a curated table and chart view for this scope.",
+    "",
 );
 
 assert.equal(
@@ -70,37 +89,12 @@ assert.equal(
     "Validating the semantic selection against the provider.",
 );
 
-assert.deepEqual(
-    resolveReportBuilderResultMetaItems({
-        showingChartView: false,
-        canShowResults: true,
+assert.equal(
+    resolveReportBuilderResultDescription({
+        canRunReport: true,
         activeTablePresetTitle: "Delivery Grid",
-        selectedMeasuresCount: 2,
-        selectedDimensionsCount: 3,
-        totalActiveFilterCount: 1,
-        pageRowCount: 8,
     }),
-    [
-        "Delivery Grid",
-        "2 measures",
-        "3 breakdowns",
-        "1 filter",
-        "8 page rows",
-    ],
-);
-
-assert.deepEqual(
-    resolveReportBuilderResultMetaItems({
-        showingChartView: true,
-        canShowResults: true,
-        chartIdentityLabel: "Line chart",
-        selectedMeasuresCount: 1,
-        selectedDimensionsCount: 1,
-    }),
-    [
-        "1 measure",
-        "1 breakdown",
-    ],
+    "",
 );
 
 assert.deepEqual(
@@ -108,54 +102,23 @@ assert.deepEqual(
         showingChartView: false,
         canShowResults: true,
         activeTablePresetTitle: "Delivery Grid",
-        activeTablePresetDescription: "Table-first delivery preset.",
-        activeTablePresetEyebrow: "Metrics Panel",
-        activeTablePresetAccentTone: "delivery",
-        activeTablePresetHighlights: ["Selected Dates", "Market Context", "Export Ready"],
-        selectedMeasuresCount: 2,
-        selectedDimensionsCount: 3,
-        totalActiveFilterCount: 1,
-        pageRowCount: 8,
+        totalActiveFilterCount: 2,
     }),
     {
         title: "Delivery Grid",
-        description: "Showing Delivery Grid. Table-first delivery preset. Use Presets to switch to a curated table and chart view for this scope.",
-        presetIdentity: {
-            eyebrow: "Metrics Panel",
-            title: "Delivery Grid",
-            accentTone: "delivery",
-            highlights: ["Selected Dates", "Market Context", "Export Ready"],
-        },
-        metaItems: [
-            "Delivery Grid",
-            "2 measures",
-            "3 breakdowns",
-            "1 filter",
-            "8 page rows",
-        ],
+        description: "",
+        activeFilterSummary: "2 active filters",
     },
 );
 
-assert.deepEqual(
+assert.equal(
     buildReportBuilderDesktopResultState({
         showingChartView: true,
         chartTitle: "Spend by Date",
         canShowResults: true,
         activeTablePresetTitle: "Delivery Grid",
-        activeChartPresetTitle: "Spend by Date",
-        activeChartPresetEyebrow: "Visual Story",
-        activeChartPresetAccentTone: "delivery",
-        activeChartPresetHighlights: ["Split by Site Type", "Trend View", "Full Query"],
-        chartIdentityLabel: "Line",
-        selectedMeasuresCount: 1,
-        selectedDimensionsCount: 2,
-    }).presetIdentity,
-    {
-        eyebrow: "Visual Story",
-        title: "Spend by Date",
-        accentTone: "delivery",
-        highlights: ["Split by Site Type", "Trend View", "Full Query"],
-    },
+    }).description,
+    "",
 );
 
 console.log("reportBuilderResultIdentity ✓ shared result copy and identity helpers");

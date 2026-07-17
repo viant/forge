@@ -87,7 +87,6 @@ export function resolveCompactSummaryItems({
     selectedDimensions = [],
     totalActiveFilterCount = 0,
     hasValidChartSpec = false,
-    canShowResults = false,
     viewMode = "",
     activeTablePresetTitle = "",
     modifiedTablePresetTitle = "",
@@ -96,7 +95,6 @@ export function resolveCompactSummaryItems({
     const items = [];
     const identityChip = resolveResultIdentityChip({
         showingChartView: hasValidChartSpec && viewMode === "chart",
-        canShowResults,
         activeTablePresetTitle,
         modifiedTablePresetTitle,
     });

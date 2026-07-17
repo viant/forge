@@ -51,7 +51,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  expressions.some((expression) => expression.includes("root?.getAttribute('data-report-builder-view-mode') === 'table'") && expression.includes("Table view for the active scope.") && expression.includes("Local Draft.")),
+  expressions.some((expression) => expression.includes("root?.getAttribute('data-report-builder-view-mode') === 'table'") && expression.includes("forge-report-builder__table-wrap") && expression.includes("Local Draft.")),
   true,
 );
 assert.equal(
@@ -85,7 +85,7 @@ const selectGroupedChartIndex = scenario.steps.findIndex((step, index) => index 
 const chartRecoveredIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("root?.getAttribute('data-report-builder-view-mode') === 'chart'") && String(step.expression || "").includes("Applied this preset's required measures and breakdowns."));
 const resetBaselineIndex = findStepIndex((step) => step?.type === "eval" && String(step.expression || "").includes("__explorationChartToggleResponseBaseline"));
 const switchToTableIndex = findStepIndex((step) => step?.type === "clickSelectorContains" && step?.selector === ".forge-report-builder__result-header .forge-report-builder__view-toggle button" && step?.text === "table");
-const stableTableIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("Table view for the active scope."));
+const stableTableIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("forge-report-builder__table-wrap"));
 const switchBackToChartIndex = findStepIndex((step) => step?.type === "clickSelectorContains" && step?.selector === ".forge-report-builder__result-header .forge-report-builder__view-toggle button" && step?.text === "chart");
 const stableChartIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("Click a chart mark or series legend to apply authored runtime actions."));
 const baselineStableIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("preview?.[\"__explorationChartToggleResponseBaseline\"]"));

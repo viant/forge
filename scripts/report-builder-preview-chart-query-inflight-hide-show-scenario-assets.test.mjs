@@ -67,7 +67,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  expressions.some((expression) => expression.includes("Chart-first view for the active scope using the full query result set.") && expression.includes("!text.includes('Refreshing report data')") && expression.includes("!text.includes('We couldn\\'t render these results')")),
+  expressions.some((expression) => expression.includes("forge-report-builder__chart-wrap") && expression.includes("!text.includes('Refreshing report data')") && expression.includes("!text.includes('We couldn\\'t render these results')")),
   true,
 );
 assert.equal(

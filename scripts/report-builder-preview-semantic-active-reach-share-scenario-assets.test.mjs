@@ -27,11 +27,15 @@ assert.equal(
   true,
 );
 assert.equal(
-  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Reach Grid")),
+  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("HOUSEHOLD METRICS")),
   true,
 );
 assert.equal(
-  expressions.some((expression) => expression.includes("Showing Reach Grid.") && expression.includes("HOUSEHOLD METRICS") && expression.includes("Reach Priority")),
+  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Reach Priority")),
+  true,
+);
+assert.equal(
+  expressions.some((expression) => expression.includes("forge-report-builder__result-header h3") && expression.includes("Reach Grid")),
   true,
 );
 assert.equal(
@@ -64,20 +68,23 @@ assert.equal(
 );
 
 const quickChartButtonIndex = findStepIndex((step) => step?.type === "clickSelector" && String(step.selector || "").includes("forge-report-builder__chart-action-button--quick"));
+const presetMetadataIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("HOUSEHOLD METRICS"));
 const presetSelectIndex = findStepIndex((step) => step?.type === "clickSelectorContains" && String(step.text || "").includes("Reach Grid"));
-const builderReachIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("Showing Reach Grid.") && String(step.expression || "").includes("Reach Priority"));
+const builderReachIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("forge-report-builder__result-header h3") && String(step.expression || "").includes("Reach Grid"));
 const reachShareValueIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("Reach Share") && String(step.expression || "").includes("13.4%"));
 const authoredRuntimeIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Authored Runtime"));
 const runtimeSemanticBindingIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("Compiled Report Runtime Preview") && String(step.expression || "").includes("Semantic Binding"));
 
 assert.notEqual(quickChartButtonIndex, -1);
+assert.notEqual(presetMetadataIndex, -1);
 assert.notEqual(presetSelectIndex, -1);
 assert.notEqual(builderReachIndex, -1);
 assert.notEqual(reachShareValueIndex, -1);
 assert.notEqual(authoredRuntimeIndex, -1);
 assert.notEqual(runtimeSemanticBindingIndex, -1);
 
-assert.equal(quickChartButtonIndex < presetSelectIndex, true);
+assert.equal(quickChartButtonIndex < presetMetadataIndex, true);
+assert.equal(presetMetadataIndex < presetSelectIndex, true);
 assert.equal(presetSelectIndex < builderReachIndex, true);
 assert.equal(builderReachIndex < reachShareValueIndex, true);
 assert.equal(reachShareValueIndex < authoredRuntimeIndex, true);
