@@ -78,7 +78,7 @@ export default {
     },
     {
       type: "waitForEval",
-      expression: "(() => { const root = document.querySelector('.forge-report-builder'); const text = document.body?.innerText || ''; return root?.getAttribute('data-report-builder-view-mode') === 'table' && !text.includes('Refreshing report data') && text.includes('Table view for the active scope.') && text.includes('Local Draft.'); })()",
+      expression: "(() => { const root = document.querySelector('.forge-report-builder'); const text = document.body?.innerText || ''; return root?.getAttribute('data-report-builder-view-mode') === 'table' && !text.includes('Refreshing report data') && !!document.querySelector('.forge-report-builder__table-wrap') && text.includes('Local Draft.'); })()",
       timeoutMs: 60000,
     },
     {

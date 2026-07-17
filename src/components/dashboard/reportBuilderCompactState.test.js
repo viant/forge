@@ -44,13 +44,12 @@ assert.equal(
 assert.equal(
     resolveResultIdentityChip({
         showingChartView: true,
-        canShowResults: true,
+        activeTablePresetTitle: "Delivery Grid",
     }),
-    "Chart view",
+    "",
 );
 assert.equal(
     resolveResultIdentityChip({
-        canShowResults: true,
         activeTablePresetTitle: "Delivery Grid",
     }),
     "Delivery Grid",
@@ -61,12 +60,7 @@ assert.equal(
     }),
     "Modified from Delivery Grid",
 );
-assert.equal(
-    resolveResultIdentityChip({
-        canShowResults: true,
-    }),
-    "Table view",
-);
+assert.equal(resolveResultIdentityChip({}), "");
 
 assert.equal(
     resolveCompactStatusText({
@@ -121,7 +115,6 @@ assert.deepEqual(
         viewMode: "chart",
     }),
     [
-        "Chart view",
         "2026-06-01 to 2026-06-07",
         "2 measures",
         "1 breakdown",
@@ -134,7 +127,6 @@ assert.deepEqual(
         activeTablePresetTitle: "Delivery Grid",
         selectedMeasures: ["avails"],
         selectedDimensions: ["eventDate"],
-        canShowResults: true,
         viewMode: "table",
     }),
     [

@@ -674,8 +674,9 @@ export function buildReportBuilderPresetApplyFeedback({
                     ? describePreparedReadiness(preparedReadiness, successPrefix)
                     : requiresManualRun
                         ? `${successPrefix} Run to refresh results.`
-                        : successPrefix,
+                    : successPrefix,
             action: requiresManualRun && preparedReadiness.canRun ? "runReport" : "",
+            ...(didFetchPreparedState ? { autoClearMs: 1200 } : {}),
         };
     }
     if (normalizedKind === "table") {
@@ -710,8 +711,9 @@ export function buildReportBuilderPresetApplyFeedback({
                 ? describePreparedReadiness(preparedReadiness, successPrefix)
                 : requiresManualRun
                     ? `${successPrefix} Run to refresh results.`
-                    : successPrefix,
+                : successPrefix,
         action: requiresManualRun && preparedReadiness.canRun ? "runReport" : "",
+        ...(didFetchPreparedState ? { autoClearMs: 1200 } : {}),
     };
 }
 

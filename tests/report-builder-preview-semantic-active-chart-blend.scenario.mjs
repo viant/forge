@@ -15,19 +15,34 @@ export default {
       selector: ".forge-report-builder__chart-action-button--quick",
     },
     {
+      type: "waitForDomContains",
+      text: "KPI BLEND",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Dual Axis",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Reach + Volume",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Full Query",
+      timeoutMs: 60000,
+    },
+    {
       type: "clickSelectorContains",
       selector: "[role=\"menuitem\"]",
       text: "Avails + HH Uniques by Date",
       index: 0,
     },
     {
-      type: "waitForDomContains",
-      text: "Avails + HH Uniques by Date",
-      timeoutMs: 60000,
-    },
-    {
       type: "waitForEval",
-      expression: "(() => { const header = document.querySelector('.forge-report-builder__result-header'); const text = (header?.innerText || header?.textContent || ''); return text.includes('Chart-first view for the active scope') && text.includes('KPI BLEND') && text.includes('Dual Axis') && text.includes('Reach + Volume') && text.includes('Full Query'); })()",
+      expression: "(() => !!document.querySelector('.forge-report-builder__chart-wrap') && (document.querySelector('.forge-report-builder__result-header h3')?.innerText || '').includes('Avails + HH Uniques by Date'))()",
       timeoutMs: 60000,
     },
     {

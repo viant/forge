@@ -19,8 +19,8 @@ export default {
       index: 0,
     },
     {
-      type: "waitForDomContains",
-      text: "Chart-first view for the active scope",
+      type: "waitForEval",
+      expression: "(() => !!document.querySelector('.forge-report-builder__chart-wrap'))()",
       timeoutMs: 60000,
     },
     {

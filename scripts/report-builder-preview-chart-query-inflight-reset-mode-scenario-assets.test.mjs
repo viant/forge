@@ -51,7 +51,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Chart-first view for the active scope. Switch to the table when you need to inspect individual rows.")),
+  scenario.steps.some((step) => step?.type === "waitForEval" && String(step.expression || "").includes("forge-report-builder__chart-wrap")),
   true,
 );
 assert.equal(
@@ -79,7 +79,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  expressions.some((expression) => expression.includes("Chart-first view for the active scope using the full query result set.") && expression.includes("chartText.includes('Gamma')") && expression.includes("chartText.includes('Delta')")),
+  expressions.some((expression) => expression.includes("forge-report-builder__chart-wrap") && expression.includes("chartText.includes('Gamma')") && expression.includes("chartText.includes('Delta')")),
   true,
 );
 assert.equal(
@@ -97,7 +97,7 @@ const chartPatchIndex = findStepIndex((step) => step?.type === "eval" && String(
 const inflightStartIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("entry.phase === 'start').length === 1"));
 const inflightPendingIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("entry.phase === 'success' || entry.phase === 'error')).length === 0"));
 const switchCurrentPageIndex = findStepIndex((step) => step?.type === "eval" && String(step.expression || "").includes("patchBuilderConfig") && String(step.expression || "").includes("currentPage"));
-const currentPageViewIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Switch to the table when you need to inspect individual rows."));
+const currentPageViewIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("forge-report-builder__chart-wrap"));
 const restoreFullQueryIndex = scenario.steps.findIndex((step, index) => index > currentPageViewIndex && step?.type === "eval" && String(step.expression || "").includes("patchBuilderConfig") && String(step.expression || "").includes("fullQuery"));
 const restartedFetchIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("entry.phase === 'start').length === 2") && String(step.expression || "").includes("preview.fetchBehaviors.length === 0"));
 const settledCountsIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("__chartResetSettledCounts"));

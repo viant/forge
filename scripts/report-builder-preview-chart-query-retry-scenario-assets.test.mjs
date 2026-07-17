@@ -23,7 +23,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Chart-first view for the active scope using the full query result set.")),
+  scenario.steps.some((step) => step?.type === "waitForEval" && String(step.expression || "").includes("forge-report-builder__chart-wrap")),
   true,
 );
 assert.equal(

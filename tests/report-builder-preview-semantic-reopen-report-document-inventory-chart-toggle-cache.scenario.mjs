@@ -64,8 +64,8 @@ export default {
       timeoutMs: 60000,
     },
     {
-      type: "waitForDomContains",
-      text: "Table view for the active scope.",
+      type: "waitForEval",
+      expression: "(() => !!document.querySelector('.forge-report-builder__table-wrap'))()",
       timeoutMs: 60000,
     },
     {

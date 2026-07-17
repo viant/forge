@@ -30,9 +30,6 @@ import {
 } from "./reportBuilderCompactState.js";
 import {
     buildReportBuilderDesktopResultState,
-    resolveReportBuilderResultDescription,
-    resolveReportBuilderResultMetaItems,
-    resolveReportBuilderResultTitle,
 } from "./reportBuilderResultIdentity.js";
 import {
     buildReportBuilderDesktopResultHeaderState,
@@ -8163,11 +8160,10 @@ export default function ReportBuilder({ container, context }) {
         selectedDimensions: state.selectedDimensions,
         totalActiveFilterCount,
         hasValidChartSpec,
-        canShowResults,
         viewMode: state.viewMode,
         activeTablePresetTitle: String(activeTablePreset?.title || "").trim(),
         modifiedTablePresetTitle: String(modifiedTablePreset?.title || "").trim(),
-    }), [activeTablePreset?.title, canShowResults, compactRequiredStaticFilters, hasValidChartSpec, modifiedTablePreset?.title, state.selectedDimensions, state.selectedMeasures, listScopeParamValues(state), state.viewMode, totalActiveFilterCount]);
+    }), [activeTablePreset?.title, compactRequiredStaticFilters, hasValidChartSpec, modifiedTablePreset?.title, state.selectedDimensions, state.selectedMeasures, listScopeParamValues(state), state.viewMode, totalActiveFilterCount]);
     const compactSemanticSummaryItems = useMemo(() => resolveCompactSemanticSummaryItems({
         semanticBindingChips: semanticWorkspacePanelState?.semanticBindingChips,
         semanticMetaChips: semanticWorkspacePanelState?.metaChips,
@@ -8228,7 +8224,6 @@ export default function ReportBuilder({ container, context }) {
             const typeLabel = chartTypeLabel(state.chartSpec?.type || "");
             return typeLabel ? `${typeLabel} chart` : "Chart results";
         })(),
-        chartUsesFullQuery: chartDataPolicy.mode === "fullQuery",
         canShowResults,
         canRunReport,
         loading,
@@ -8236,21 +8231,9 @@ export default function ReportBuilder({ container, context }) {
         readinessReason: readiness.reason,
         readinessMessage: readiness.message,
         activeTablePresetTitle: String(activeTablePreset?.title || "").trim(),
-        activeTablePresetDescription: String(activeTablePreset?.description || "").trim(),
-        activeTablePresetEyebrow: String(activeTablePreset?.eyebrow || "").trim(),
-        activeTablePresetAccentTone: String(activeTablePreset?.accentTone || "").trim(),
-        activeTablePresetHighlights: Array.isArray(activeTablePreset?.highlights) ? activeTablePreset.highlights : [],
-        activeChartPresetTitle: String(state.chartSpec?.title || "").trim(),
-        activeChartPresetEyebrow: String(state.chartSpec?.eyebrow || "").trim(),
-        activeChartPresetAccentTone: String(state.chartSpec?.accentTone || "").trim(),
-        activeChartPresetHighlights: Array.isArray(state.chartSpec?.highlights) ? state.chartSpec.highlights : [],
         modifiedTablePresetTitle: String(modifiedTablePreset?.title || "").trim(),
-        chartIdentityLabel: showingChartView ? chartTypeLabel(state.chartSpec?.type || "") : "",
-        selectedMeasuresCount: state.selectedMeasures.length,
-        selectedDimensionsCount: state.selectedDimensions.length,
         totalActiveFilterCount,
-        pageRowCount: canShowResults ? computedCollection.length : 0,
-    }), [activeTablePreset?.accentTone, activeTablePreset?.description, activeTablePreset?.eyebrow, activeTablePreset?.highlights, activeTablePreset?.title, canRunReport, canShowResults, chartDataPolicy.mode, computedCollection.length, error, loading, modifiedTablePreset?.title, readiness.message, readiness.reason, showingChartView, state.chartSpec, state.selectedDimensions.length, state.selectedMeasures.length, totalActiveFilterCount]);
+    }), [activeTablePreset?.title, canRunReport, canShowResults, error, loading, modifiedTablePreset?.title, readiness.message, readiness.reason, showingChartView, state.chartSpec, totalActiveFilterCount]);
 
     useEffect(() => {
         const deferForPrefill = shouldDeferReportBuilderRequestForPrefill({
@@ -17925,40 +17908,11 @@ export default function ReportBuilder({ container, context }) {
                     {!showAuthoredReportSurface && !designWorkspaceMode && !compactMode && config.showResultHeader !== false && config?.result?.showResultHeader !== false ? (
                         <div className="forge-report-builder__result-header">
                             <div className="forge-report-builder__result-header-copy">
-                                <div className="forge-report-builder__result-header-eyebrow">Results</div>
                                 <h3>{desktopResultState.title}</h3>
-                                <p>{desktopResultState.description}</p>
-                                {desktopResultState.presetIdentity ? (
-                                    <div
-                                        className={[
-                                            "forge-report-builder__preset-identity-card",
-                                            desktopResultState.presetIdentity.accentTone
-                                                ? `forge-report-builder__preset-identity-card--${desktopResultState.presetIdentity.accentTone}`
-                                                : "",
-                                        ].filter(Boolean).join(" ")}
-                                    >
-                                        {desktopResultState.presetIdentity.eyebrow ? (
-                                            <div className="forge-report-builder__preset-identity-eyebrow">
-                                                {desktopResultState.presetIdentity.eyebrow}
-                                            </div>
-                                        ) : null}
-                                        <div className="forge-report-builder__preset-identity-title">
-                                            {desktopResultState.presetIdentity.title}
-                                        </div>
-                                        {desktopResultState.presetIdentity.highlights.length > 0 ? (
-                                            <div className="forge-report-builder__preset-identity-highlights">
-                                                {desktopResultState.presetIdentity.highlights.map((item) => (
-                                                    <span key={item} className="forge-report-builder__preset-identity-highlight">{item}</span>
-                                                ))}
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                ) : null}
-                                {desktopResultState.metaItems.length > 0 ? (
-                                    <div className="forge-report-builder__result-meta" aria-label="Current result summary">
-                                        {desktopResultState.metaItems.map((item) => (
-                                            <span key={item} className="forge-report-builder__result-meta-chip">{item}</span>
-                                        ))}
+                                {desktopResultState.description ? <p>{desktopResultState.description}</p> : null}
+                                {desktopResultState.activeFilterSummary ? (
+                                    <div className="forge-report-builder__result-meta" aria-label="Active filters">
+                                        <span className="forge-report-builder__result-meta-chip">{desktopResultState.activeFilterSummary}</span>
                                     </div>
                                 ) : null}
                             </div>

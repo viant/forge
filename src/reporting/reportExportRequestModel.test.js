@@ -157,6 +157,41 @@ const hostedWindowDraftExportRequest = buildDraftReportExportRequest({
   format: "pdf",
 });
 
+const displayMappedSpec = JSON.parse(JSON.stringify(reportSpec));
+displayMappedSpec.blocks.push({
+  id: "channelNarrative",
+  kind: "markdownBlock",
+  title: "Channel readout",
+  datasetRef: "primary",
+  markdown: "Leader: **${row.channelId}**.",
+  templateFieldDisplayMap: {
+    channelId: {
+      sourceKey: "channelId",
+      displayKey: "channel.label",
+      displayValueMap: { "2": "CTV" },
+    },
+  },
+});
+displayMappedSpec.layoutIntent.blockOrder.push("channelNarrative");
+const displayMappedFill = buildReportFillFromReportSpec(displayMappedSpec, {
+  primary: {
+    rows: [{ eventDate: "2026-05-01", channelId: 2, totalSpend: 40400, impressions: 16500 }],
+  },
+});
+const displayMappedPrint = buildReportPrintFromReportFill({
+  reportSpec: displayMappedSpec,
+  reportFill: displayMappedFill,
+});
+const displayMappedDraftExportRequest = buildDraftReportExportRequest({
+  reportDocument: { id: "displayMappedReport", title: "Display Mapped Report" },
+  reportSpec: displayMappedSpec,
+  reportFill: displayMappedFill,
+  reportPrint: displayMappedPrint,
+  format: "pdf",
+});
+assert.ok(displayMappedDraftExportRequest);
+assert.equal(displayMappedDraftExportRequest.reportFill.blocks.find((block) => block.id === "channelNarrative")?.templateFieldDisplayMap, undefined);
+
 assert.ok(hostedWindowDraftExportRequest);
 assert.equal(hostedWindowDraftExportRequest.source.artifactRef, "dashboard.reportBuilder://forecastingCubeBuilder");
 

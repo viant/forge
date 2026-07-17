@@ -59,7 +59,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  expressions.some((expression) => expression.includes("Chart-first view for the active scope") && expression.includes("VISUAL STORY") && expression.includes("Split by Channel") && expression.includes("Trend View") && expression.includes("Full Query")),
+  expressions.some((expression) => expression.includes("forge-report-builder__chart-wrap") && expression.includes("forge-report-builder__result-header h3") && expression.includes("Avails by Date and Channel")),
   true,
 );
 assert.equal(
@@ -93,7 +93,7 @@ const blendsIndex = findStepIndex((step) => step?.type === "waitForDomContains" 
 const storyEntryIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Avails by Date and Channel"));
 const blendEntryIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Avails + HH Uniques by Date"));
 const applyStoryIndex = findStepIndex((step) => step?.type === "clickSelectorContains" && step?.selector === "[role=\"menuitem\"]" && String(step.text || "").includes("Avails by Date and Channel"));
-const activeStoryIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("VISUAL STORY") && String(step.expression || "").includes("Split by Channel"));
+const activeStoryIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("forge-report-builder__chart-wrap") && String(step.expression || "").includes("Avails by Date and Channel"));
 const runtimeBindingIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("Compiled Report Runtime Preview") && String(step.expression || "").includes("Semantic Binding"));
 
 assert.notEqual(openQuickViewIndex, -1);

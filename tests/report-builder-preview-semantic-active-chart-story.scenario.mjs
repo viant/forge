@@ -15,6 +15,26 @@ export default {
       selector: ".forge-report-builder__chart-action-button--quick",
     },
     {
+      type: "waitForDomContains",
+      text: "VISUAL STORY",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Split by Channel",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Trend View",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Full Query",
+      timeoutMs: 60000,
+    },
+    {
       type: "clickSelectorContains",
       selector: "[role=\"menuitem\"]",
       text: "Avails by Date and Channel",
@@ -22,7 +42,7 @@ export default {
     },
     {
       type: "waitForEval",
-      expression: "(() => { const header = document.querySelector('.forge-report-builder__result-header'); const text = (header?.innerText || header?.textContent || ''); return text.includes('Chart-first view for the active scope') && text.includes('VISUAL STORY') && text.includes('Split by Channel') && text.includes('Trend View') && text.includes('Full Query'); })()",
+      expression: "(() => !!document.querySelector('.forge-report-builder__chart-wrap') && (document.querySelector('.forge-report-builder__result-header h3')?.innerText || '').includes('Avails by Date and Channel'))()",
       timeoutMs: 60000,
     },
     {

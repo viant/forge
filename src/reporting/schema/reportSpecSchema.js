@@ -1058,6 +1058,32 @@ export const reportSpecSchema = {
         rowLimit: { type: "integer", minimum: 1 },
         bodyFormat: { enum: ["markdown"] },
         bodyTemplate: { type: "string" },
+        itemTitleDisplayKey: { type: "string" },
+        itemTitleDisplayValueMap: {
+          type: "object",
+          additionalProperties: { type: "string" },
+        },
+        secondaryDisplayKey: { type: "string" },
+        secondaryDisplayValueMap: {
+          type: "object",
+          additionalProperties: { type: "string" },
+        },
+        templateFieldDisplayMap: {
+          type: "object",
+          additionalProperties: {
+            type: "object",
+            additionalProperties: false,
+            required: ["sourceKey"],
+            properties: {
+              sourceKey: { type: "string" },
+              displayKey: { type: "string" },
+              displayValueMap: {
+                type: "object",
+                additionalProperties: { type: "string" },
+              },
+            },
+          },
+        },
         emptyLabel: { type: "string" },
       },
     },
@@ -1289,6 +1315,22 @@ export const reportSpecSchema = {
         title: { type: "string" },
         datasetRef: { type: "string" },
         markdown: { type: "string" },
+        templateFieldDisplayMap: {
+          type: "object",
+          additionalProperties: {
+            type: "object",
+            additionalProperties: false,
+            required: ["sourceKey"],
+            properties: {
+              sourceKey: { type: "string" },
+              displayKey: { type: "string" },
+              displayValueMap: {
+                type: "object",
+                additionalProperties: { type: "string" },
+              },
+            },
+          },
+        },
       },
     },
     drillHierarchy: {

@@ -45,8 +45,8 @@
       "timeoutMs": 60000
     },
     {
-      "type": "waitForDomContains",
-      "text": "Table view",
+      "type": "waitForEval",
+      "expression": "(() => !!document.querySelector('.forge-report-builder__table-wrap'))()",
       "timeoutMs": 60000
     },
     {

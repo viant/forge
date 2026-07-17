@@ -248,8 +248,6 @@ function buildHostedResultExpectationState(container = {}) {
   return {
     seededBuilderState,
     seededCollection: buildHostedSyntheticCollection(reportBuilder, seededBuilderState),
-    expectedMeasureCountLabel: `${selectedMeasures.length} ${selectedMeasures.length === 1 ? "measure" : "measures"}`,
-    expectedBreakdownCountLabel: `${selectedDimensions.length} ${selectedDimensions.length === 1 ? "breakdown" : "breakdowns"}`,
     expectedTableHeaders,
   };
 }
@@ -274,8 +272,6 @@ function buildHostedChartExpectationState(container = {}) {
   return {
     seededBuilderState,
     seededCollection: buildHostedSyntheticCollection(reportBuilder, seededBuilderState),
-    expectedMeasureCountLabel: `${Array.isArray(seededBuilderState?.selectedMeasures) ? seededBuilderState.selectedMeasures.length : 0} ${Array.isArray(seededBuilderState?.selectedMeasures) && seededBuilderState.selectedMeasures.length === 1 ? "measure" : "measures"}`,
-    expectedBreakdownCountLabel: `${Array.isArray(seededBuilderState?.selectedDimensions) ? seededBuilderState.selectedDimensions.length : 0} ${Array.isArray(seededBuilderState?.selectedDimensions) && seededBuilderState.selectedDimensions.length === 1 ? "breakdown" : "breakdowns"}`,
     expectedChartTitle: String(defaultChartSpec?.title || "").trim(),
     expectedChartTypeLabel: String(defaultChartSpec?.type || "").trim(),
   };
@@ -362,8 +358,6 @@ const expectedAuthoredRuntimeScopeTitle = ${JSON.stringify(String(expectations?.
 const expectedAuthoredRuntimeScopeValue = ${JSON.stringify(String(expectations?.authoredRuntimeScopeValue || "").trim())};
 const seedDefaultBuilderState = ${expectations?.seedDefaultBuilderState === true ? "true" : "false"};
 const seededCollection = ${JSON.stringify(Array.isArray(expectations?.seededCollection) ? expectations.seededCollection : [])};
-const expectedMeasureCountLabel = ${JSON.stringify(String(expectations?.expectedMeasureCountLabel || "").trim())};
-const expectedBreakdownCountLabel = ${JSON.stringify(String(expectations?.expectedBreakdownCountLabel || "").trim())};
 const expectedTableHeaders = ${JSON.stringify(Array.isArray(expectations?.expectedTableHeaders) ? expectations.expectedTableHeaders : [])};
 const expectedChartTitle = ${JSON.stringify(String(expectations?.expectedChartTitle || "").trim())};
 const expectedChartTypeLabel = ${JSON.stringify(String(expectations?.expectedChartTypeLabel || "").trim())};
@@ -480,7 +474,7 @@ const authoredRuntimePreviewWindow = authoredRuntimePreviewIndex >= 0
   : '';
 const resultHeaderFound = html.includes('forge-report-builder__result-header');
 const resultTableFound = html.includes('forge-report-builder__table') || html.includes('forge-report-runtime-table-panel');
-const resultMetaFound = html.includes('aria-label="Current result summary"');
+const legacyResultMetaFound = html.includes('aria-label="Current result summary"');
 const chartWrapFound = html.includes('forge-report-builder__chart-wrap') || html.includes('forge-report-runtime-chart-panel');
 console.log(JSON.stringify({
   renderOk: true,
@@ -494,10 +488,8 @@ console.log(JSON.stringify({
   authoredRuntimeScopeValueFound: expectedAuthoredRuntimeScopeValue ? authoredRuntimePreviewWindow.includes(expectedAuthoredRuntimeScopeValue) : true,
   resultHeaderFound,
   resultTableFound,
-  resultMetaFound,
+  legacyResultMetaFound,
   chartWrapFound,
-  expectedMeasureCountFound: expectedMeasureCountLabel ? html.includes(expectedMeasureCountLabel) : true,
-  expectedBreakdownCountFound: expectedBreakdownCountLabel ? html.includes(expectedBreakdownCountLabel) : true,
   expectedTableHeadersFound: expectedTableHeaders.every((entry) => html.includes(entry)),
   expectedChartTitleFound: expectedChartTitle ? html.includes(expectedChartTitle) : true,
   expectedChartTypeLabelFound: expectedChartTypeLabel ? html.toLowerCase().includes(expectedChartTypeLabel.toLowerCase()) : true,
@@ -528,8 +520,6 @@ function assertHostedBuilderRender(windowKey, sharedConfigPath, {
   seedDefaultBuilderState = false,
   seededCollection = [],
   seededBuilderState = null,
-  expectedMeasureCountLabel = "",
-  expectedBreakdownCountLabel = "",
   expectedTableHeaders = [],
   expectedChartTitle = "",
   expectedChartTypeLabel = "",
@@ -555,8 +545,6 @@ function assertHostedBuilderRender(windowKey, sharedConfigPath, {
     seedDefaultBuilderState,
     seededCollection,
     seededBuilderState,
-    expectedMeasureCountLabel,
-    expectedBreakdownCountLabel,
     expectedTableHeaders,
     expectedChartTitle,
     expectedChartTypeLabel,
@@ -641,19 +629,9 @@ function assertHostedBuilderRender(windowKey, sharedConfigPath, {
       `${windowKey} seeded hosted state should render the desktop result header\n${JSON.stringify(summary, null, 2)}`,
     );
     assert.equal(
-      summary?.resultMetaFound,
-      true,
-      `${windowKey} seeded hosted state should render result meta chips\n${JSON.stringify(summary, null, 2)}`,
-    );
-    assert.equal(
-      summary?.expectedMeasureCountFound,
-      true,
-      `${windowKey} seeded hosted state should render ${expectedMeasureCountLabel}\n${JSON.stringify(summary, null, 2)}`,
-    );
-    assert.equal(
-      summary?.expectedBreakdownCountFound,
-      true,
-      `${windowKey} seeded hosted state should render ${expectedBreakdownCountLabel}\n${JSON.stringify(summary, null, 2)}`,
+      summary?.legacyResultMetaFound,
+      false,
+      `${windowKey} seeded hosted state should not render legacy result meta chips\n${JSON.stringify(summary, null, 2)}`,
     );
     assert.equal(
       summary?.expectedQuickActionLabelFound,

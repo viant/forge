@@ -57,7 +57,7 @@ export default {
     }),
     {
       type: "waitForEval",
-      expression: "(() => { const root = document.querySelector('.forge-report-builder'); const text = document.body?.innerText || document.body?.textContent || ''; return root?.getAttribute('data-report-builder-view-mode') === 'table' && !text.includes('Refreshing report data') && text.includes('Table view for the active scope.'); })()",
+      expression: "(() => { const root = document.querySelector('.forge-report-builder'); const text = document.body?.innerText || document.body?.textContent || ''; return root?.getAttribute('data-report-builder-view-mode') === 'table' && !text.includes('Refreshing report data') && !!document.querySelector('.forge-report-builder__table-wrap'); })()",
       timeoutMs: 60000,
     },
     buildPreviewPatchBuilderStateStep({

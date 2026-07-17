@@ -39,7 +39,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  expressions.some((expression) => expression.includes("root?.getAttribute('data-report-builder-view-mode') === 'table'") && expression.includes("text.includes('Table view for the active scope.')")),
+  expressions.some((expression) => expression.includes("root?.getAttribute('data-report-builder-view-mode') === 'table'") && expression.includes("forge-report-builder__table-wrap")),
   true,
 );
 assert.equal(

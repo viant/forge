@@ -27,7 +27,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Reach Grid")),
+  scenario.steps.some((step) => step?.type === "waitForEval" && String(step.expression || "").includes("forge-report-builder__result-header h3") && String(step.expression || "").includes("Reach Grid")),
   true,
 );
 assert.equal(
@@ -72,20 +72,23 @@ assert.equal(
 );
 
 const quickChartButtonIndex = findStepIndex((step) => step?.type === "clickSelector" && String(step.selector || "").includes("forge-report-builder__chart-action-button--quick"));
-const presetSelectIndex = findStepIndex((step) => step?.type === "clickSelectorContains" && String(step.text || "").includes("Reach Grid"));
 const builderGridIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("HOUSEHOLD METRICS"));
+const presetSelectIndex = findStepIndex((step) => step?.type === "clickSelectorContains" && String(step.text || "").includes("Reach Grid"));
+const presetActiveIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("forge-report-builder__result-header h3") && String(step.expression || "").includes("Reach Grid"));
 const authoredRuntimeIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Authored Runtime"));
 const runtimeSemanticBindingIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step.expression || "").includes("Compiled Report Runtime Preview") && String(step.expression || "").includes("Semantic Binding"));
 
 assert.notEqual(quickChartButtonIndex, -1);
-assert.notEqual(presetSelectIndex, -1);
 assert.notEqual(builderGridIndex, -1);
+assert.notEqual(presetSelectIndex, -1);
+assert.notEqual(presetActiveIndex, -1);
 assert.notEqual(authoredRuntimeIndex, -1);
 assert.notEqual(runtimeSemanticBindingIndex, -1);
 
-assert.equal(quickChartButtonIndex < presetSelectIndex, true);
-assert.equal(presetSelectIndex < builderGridIndex, true);
-assert.equal(builderGridIndex < authoredRuntimeIndex, true);
+assert.equal(quickChartButtonIndex < builderGridIndex, true);
+assert.equal(builderGridIndex < presetSelectIndex, true);
+assert.equal(presetSelectIndex < presetActiveIndex, true);
+assert.equal(presetActiveIndex < authoredRuntimeIndex, true);
 assert.equal(authoredRuntimeIndex < runtimeSemanticBindingIndex, true);
 
 console.log("report-builder-preview-semantic-active-reach-grid-scenario-assets ✓ provider-backed reach-grid presets stay aligned with the compiled authored runtime semantic binding surface");

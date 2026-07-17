@@ -15,19 +15,24 @@ export default {
       selector: ".forge-report-builder__chart-action-button--quick",
     },
     {
+      type: "waitForDomContains",
+      text: "HOUSEHOLD METRICS",
+      timeoutMs: 60000,
+    },
+    {
+      type: "waitForDomContains",
+      text: "Reach Priority",
+      timeoutMs: 60000,
+    },
+    {
       type: "clickSelectorContains",
       selector: "[role=\"menuitem\"]",
       text: "Reach Grid",
       index: 0,
     },
     {
-      type: "waitForDomContains",
-      text: "Reach Grid",
-      timeoutMs: 60000,
-    },
-    {
       type: "waitForEval",
-      expression: "(() => { const header = document.querySelector('.forge-report-builder__result-header'); const text = (header?.innerText || header?.textContent || ''); return text.includes('Showing Reach Grid.') && text.includes('HOUSEHOLD METRICS') && text.includes('Reach Priority'); })()",
+      expression: "(() => (document.querySelector('.forge-report-builder__result-header h3')?.innerText || '').includes('Reach Grid'))()",
       timeoutMs: 60000,
     },
     {

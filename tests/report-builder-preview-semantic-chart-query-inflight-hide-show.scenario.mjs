@@ -66,8 +66,8 @@ export default {
       index: 0,
     },
     {
-      type: "waitForDomContains",
-      text: "Table view for the active scope.",
+      type: "waitForEval",
+      expression: "(() => !!document.querySelector('.forge-report-builder__table-wrap'))()",
       timeoutMs: 60000,
     },
     {
@@ -103,7 +103,7 @@ export default {
     },
     {
       type: "waitForEval",
-      expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return text.includes('Chart-first view for the active scope using the full query result set.') && !text.includes('Refreshing report data') && !text.includes('We couldn\\'t render these results'); })()",
+      expression: "(() => { const text = document.body?.innerText || document.body?.textContent || ''; return !!document.querySelector('.forge-report-builder__chart-wrap') && !text.includes('Refreshing report data') && !text.includes('We couldn\\'t render these results'); })()",
       timeoutMs: 60000,
     },
     {
