@@ -23,6 +23,54 @@ func TestDecodeJSON_ReportFillTableBlock(t *testing.T) {
 	require.Len(t, report.Blocks[0].Content.ResolvedRows, 2)
 }
 
+func TestDecodeJSON_ReportFillPreservesBlockRuntimeContract(t *testing.T) {
+	fixture := loadReportFillFromExportRequestFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	blocks := fixture["blocks"].([]any)
+	first := blocks[0].(map[string]any)
+	first["runtime"] = map[string]any{
+		"selectionBindings": map[string]any{"entityKey": "market"},
+	}
+	syncReportFillFixtureProvenance(fixture)
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+	fill, err := DecodeJSON(data)
+	require.NoError(t, err)
+	require.Equal(t, "market", fill.Blocks[0].Runtime["selectionBindings"].(map[string]any)["entityKey"])
+}
+
+func TestDecodeJSON_ReportFillBadgesBlock(t *testing.T) {
+	fixture := loadReportFillFromExportRequestFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	blocks := fixture["blocks"].([]any)
+	fixture["blocks"] = append(blocks, map[string]any{
+		"id":         "currentSignals",
+		"kind":       "badgesBlock",
+		"title":      "Current Signals",
+		"datasetRef": "primary",
+		"items": []any{
+			map[string]any{"id": "channel", "label": "Top channel", "valueField": "channelId"},
+		},
+		"content": map[string]any{
+			"title":    "Current Signals",
+			"rowCount": 1,
+			"items": []any{
+				map[string]any{"id": "channel", "label": "Top channel", "valueField": "channelId", "value": "CTV", "displayValue": "Connected TV", "tone": "success"},
+			},
+		},
+	})
+	syncReportFillFixtureProvenance(fixture)
+
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+	fill, err := DecodeJSON(data)
+	require.NoError(t, err)
+
+	badges := fill.Blocks[len(fill.Blocks)-1]
+	require.Equal(t, "badgesBlock", badges.Kind)
+	require.Len(t, badges.Items, 1)
+	require.NotNil(t, badges.BadgesContent)
+	require.Equal(t, "Connected TV", badges.BadgesContent.Items[0].DisplayValue)
+}
+
 func TestDecodeJSON_ReportFillRejectsInvalidTableBlock(t *testing.T) {
 	requestHash, err := computeJSONFNV1aRawHash(json.RawMessage(`{"limit":25,"offset":0}`))
 	require.NoError(t, err)

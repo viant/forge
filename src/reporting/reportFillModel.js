@@ -22,7 +22,11 @@ import {
   normalizeReportDatasetSource,
 } from "./reportDatasetSourceModel.js";
 import { normalizeReportDatasetScope } from "./reportDatasetScopeModel.js";
-import { formatDashboardValue } from "../components/dashboard/dashboardUtils.js";
+import {
+  applyDashboardFiltersToCollection,
+  applyDashboardSelectionToCollection,
+  formatDashboardValue,
+} from "../components/dashboard/dashboardUtils.js";
 import { resolveKey } from "../utils/selector.js";
 import equal from "fast-deep-equal";
 import { resolveReportDatasetRefResolution } from "./reportDatasetRefModel.js";
@@ -922,8 +926,14 @@ function orderFilterBarEntries(entries = [], ordering = {}) {
 
 function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
   unifiedFilterContent = null,
+  runtimeSelection = {},
 } = {}) {
   const scopeParams = Array.isArray(reportSpec?.scope?.params) ? reportSpec.scope.params : [];
+  const runtimeFilterValues = scopeParams.reduce((result, param) => {
+    const id = normalizeString(param?.id);
+    if (id) result[id] = cloneValue(param?.value);
+    return result;
+  }, {});
   const availableDatasetRefs = Array.from(datasetsById.keys());
   const datasetsByAlias = buildReportFillDatasetAliasMap(datasetsById);
   return (Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : []).map((block) => {
@@ -941,7 +951,30 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
       availableDatasetRefs,
       fallbackDatasetRef: "primary",
     });
-    const dataset = datasetsById.get(datasetResolution.datasetRef) || null;
+    const sourceDataset = datasetsById.get(datasetResolution.datasetRef) || null;
+    const runtimeFilterBindings = block?.runtime?.filterBindings && typeof block.runtime.filterBindings === "object" && !Array.isArray(block.runtime.filterBindings)
+      ? block.runtime.filterBindings
+      : {};
+    const runtimeSelectionBindings = block?.runtime?.selectionBindings && typeof block.runtime.selectionBindings === "object" && !Array.isArray(block.runtime.selectionBindings)
+      ? block.runtime.selectionBindings
+      : {};
+    const runtimeRows = sourceDataset
+      ? applyDashboardSelectionToCollection(
+        applyDashboardFiltersToCollection(sourceDataset?.rows || [], runtimeFilterBindings, runtimeFilterValues),
+        runtimeSelectionBindings,
+        runtimeSelection,
+      )
+      : [];
+    const dataset = sourceDataset && (Object.keys(runtimeFilterBindings).length > 0 || Object.keys(runtimeSelectionBindings).length > 0)
+      ? {
+        ...sourceDataset,
+        rows: runtimeRows,
+        provenance: {
+          ...(sourceDataset?.provenance || {}),
+          rowCount: runtimeRows.length,
+        },
+      }
+      : sourceDataset;
     if (normalizeString(block?.kind) === "tableBlock") {
       const columns = cloneValue(block?.columns || []);
       return {
@@ -1123,6 +1156,7 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
 
 export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads = {}, {
   unifiedFilterContent = null,
+  runtimeSelection = {},
 } = {}) {
   const normalizedReportSpec = cloneValue(reportSpec || {});
   // Fingerprint the spec as provided: consumers compare fill.specHash against
@@ -1154,6 +1188,7 @@ export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads =
     datasets,
     blocks: buildReportFillBlocks(normalizedReportSpec, datasetsById, {
       unifiedFilterContent,
+      runtimeSelection,
     }),
     diagnostics: datasets.flatMap((dataset) => dataset?.provenance?.diagnostics || []),
   };

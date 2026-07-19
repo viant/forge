@@ -1101,9 +1101,12 @@ public struct DashboardRenderer: View {
                         ))
                             .font(.body.weight(.semibold))
                         ForEach(Array(section.body.enumerated()), id: \.offset) { _, paragraph in
-                            Text(DashboardRuntime.interpolateDashboardTemplate(paragraph, metrics: metrics, filters: filterValues, selection: selection))
-                                .font(.subheadline)
-                                .foregroundStyle(.primary)
+                            MarkdownRenderer(markdown: DashboardRuntime.interpolateDashboardTemplate(
+                                paragraph,
+                                metrics: metrics,
+                                filters: filterValues,
+                                selection: selection
+                            ))
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1136,7 +1139,14 @@ public struct DashboardRenderer: View {
                 reportRuntimeDiagnosticsPreview(summaryDiagnostics)
             }
             ForEach(summary.blocks) { block in
-                reportRuntimeAuthoredBlock(block)
+                if DashboardRuntime.dashboardReportRuntimeBlockVisible(
+                    block,
+                    metrics: reportRuntimeBlockMetrics(block),
+                    filters: dashboardFilters.mapValues(dashboardJSONAny),
+                    selection: dashboardSelection
+                ) {
+                    reportRuntimeAuthoredBlock(block)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1149,6 +1159,11 @@ public struct DashboardRenderer: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)
         )
+    }
+
+    private func reportRuntimeBlockMetrics(_ block: DashboardReportRuntimeBlockSummary) -> [String: Any] {
+        let row = block.table?.rows.first ?? block.chart?.rows.first ?? [:]
+        return row.mapValues(dashboardJSONAny)
     }
 
     @ViewBuilder
@@ -1227,6 +1242,8 @@ public struct DashboardRenderer: View {
             )
         } else if block.kind == "geoMapBlock", let geoMap = block.geoMap {
             reportRuntimeGeoMapPreview(block: block, geoMap: geoMap)
+        } else if Self.reportRuntimePresentationKinds.contains(block.kind) {
+            reportRuntimePresentationBlock(block)
         } else {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(block.kind)
@@ -1237,6 +1254,89 @@ public struct DashboardRenderer: View {
                     .lineLimit(1)
                     .foregroundStyle(.primary)
             }
+        }
+    }
+
+    private static let reportRuntimePresentationKinds: Set<String> = [
+        "badgesBlock", "collectionBlock", "sectionBlock", "tabGroupBlock", "compositeBlock",
+        "stepperBlock", "infoPanelBlock", "calloutBlock", "kanbanBlock", "timelineBlock"
+    ]
+
+    private func reportRuntimePresentationBlock(_ block: DashboardReportRuntimeBlockSummary) -> some View {
+        let entries = reportRuntimePresentationEntries(kind: block.kind, content: block.content)
+        return VStack(alignment: .leading, spacing: 7) {
+            if let eyebrow = block.content["eyebrow"]?.stringValue, !eyebrow.isEmpty {
+                Text(eyebrow.uppercased())
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            Text(block.title)
+                .font(.caption.weight(.semibold))
+            if let subtitle = block.content["subtitle"]?.stringValue, !subtitle.isEmpty {
+                Text(subtitle).font(.caption).foregroundStyle(.secondary)
+            }
+            if let description = block.content["description"]?.stringValue, !description.isEmpty {
+                Text(description).font(.caption).foregroundStyle(.secondary)
+            }
+            if let body = block.content["body"]?.stringValue, !body.isEmpty {
+                MarkdownRenderer(markdown: body).font(.caption)
+            }
+            ForEach(Array(entries.enumerated()), id: \.offset) { _, entry in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(entry.title).font(.caption.weight(.semibold))
+                    if let body = entry.body, !body.isEmpty {
+                        MarkdownRenderer(markdown: body).font(.caption)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 9))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.06), lineWidth: 1))
+    }
+
+    private func reportRuntimePresentationEntries(
+        kind: String,
+        content: [String: JSONValue]
+    ) -> [(title: String, body: String?)] {
+        func objects(_ key: String) -> [[String: JSONValue]] {
+            content[key]?.arrayValue?.compactMap(\.objectValue) ?? []
+        }
+        switch kind {
+        case "badgesBlock":
+            return objects("items").map { item in
+                (
+                    item["label"]?.stringValue ?? item["id"]?.stringValue ?? "Value",
+                    item["displayValue"]?.stringValue ?? DashboardRuntime.dashboardReportRuntimeValueText(item["value"])
+                )
+            }
+        case "collectionBlock":
+            return objects("items").map { ($0["title"]?.stringValue ?? "Item", $0["bodyMarkdown"]?.stringValue) }
+        case "stepperBlock":
+            return objects("steps").enumerated().map { index, step in
+                (step["title"]?.stringValue ?? "Step \(index + 1)", step["body"]?.stringValue)
+            }
+        case "kanbanBlock":
+            return objects("columns").flatMap { column in
+                let columnTitle = column["title"]?.stringValue ?? "Column"
+                return (column["cards"]?.arrayValue?.compactMap(\.objectValue) ?? []).map { card in
+                    ("\(columnTitle) · \(card["title"]?.stringValue ?? "Card")", card["body"]?.stringValue)
+                }
+            }
+        case "timelineBlock":
+            return objects("events").map { event in
+                let title = [event["date"]?.stringValue, event["title"]?.stringValue]
+                    .compactMap { $0 }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " · ")
+                return (title, event["body"]?.stringValue)
+            }
+        default:
+            return []
         }
     }
 
@@ -1349,6 +1449,12 @@ public struct DashboardRenderer: View {
 
     private func executeReportRuntimeAction(_ execution: DashboardReportRuntimeActionExecution) {
         guard let runtime else { return }
+        if let selection = execution.selection, let window {
+            Task {
+                await runtime.setDashboardSelection(windowID: window.windowID, container: container, selection: selection)
+            }
+            return
+        }
         let context = window.map {
             ExecutionContext(windowID: $0.windowID, dataSourceRef: "")
         }

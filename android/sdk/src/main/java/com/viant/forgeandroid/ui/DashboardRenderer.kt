@@ -62,6 +62,7 @@ import com.viant.forgeandroid.runtime.dashboardFilterSignal
 import com.viant.forgeandroid.runtime.dashboardCompositionChart
 import com.viant.forgeandroid.runtime.dashboardReportRuntimeActionExecutionPayload
 import com.viant.forgeandroid.runtime.dashboardReportRuntimeSummary
+import com.viant.forgeandroid.runtime.dashboardReportRuntimeBlockVisible
 import com.viant.forgeandroid.runtime.dashboardReportRuntimeTableActionExecutions
 import com.viant.forgeandroid.runtime.dashboardSelectionSignal
 import com.viant.forgeandroid.runtime.dashboardSummaryMetrics
@@ -87,6 +88,11 @@ import com.viant.forgeandroid.runtime.setDashboardDateRangeFilter
 import com.viant.forgeandroid.runtime.visibleDashboardDetailChildren
 import kotlin.math.max
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import java.util.Locale
 
 @Composable
@@ -172,7 +178,7 @@ private fun DashboardRenderer(runtime: ForgeRuntime, window: WindowContext, cont
         }
         "dashboard.badges" -> DashboardPanel(runtime, window, container) { DashboardBadgesBlock(container, metrics, filters, selection) }
         "dashboard.report" -> DashboardPanel(runtime, window, container) { DashboardReportBlock(container, metrics, filters, selection) }
-        "dashboard.reportRuntime" -> DashboardPanel(runtime, window, container) { DashboardReportRuntimeBlock(runtime, window, container) }
+        "dashboard.reportRuntime" -> DashboardPanel(runtime, window, container) { DashboardReportRuntimeBlock(runtime, window, container, dashboardRoot, filters, selection) }
         "dashboard.table", "planner.table" -> DashboardPanel(runtime, window, container) {
             val table = container.table ?: container.columns.takeIf { it.isNotEmpty() }?.let {
                 TableDef(title = container.title, columns = it)
@@ -1369,10 +1375,8 @@ private fun DashboardReportBlock(
                     )
                 }
                 section.body.forEach { paragraph ->
-                    Text(
-                        text = interpolateDashboardTemplate(paragraph, metrics, filters, selection),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = tone.text
+                    MarkdownRenderer(
+                        markdown = interpolateDashboardTemplate(paragraph, metrics, filters, selection)
                     )
                 }
             }
@@ -1381,7 +1385,7 @@ private fun DashboardReportBlock(
 }
 
 @Composable
-private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowContext, container: ContainerDef) {
+private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowContext, container: ContainerDef, dashboardRoot: ContainerDef, filters: Map<String, Any?>, selection: DashboardSelectionState) {
     val summary = dashboardReportRuntimeSummary(container)
     Column(
         modifier = Modifier
@@ -1413,13 +1417,16 @@ private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowCon
             DashboardReportRuntimeDiagnosticsPreview(summaryDiagnostics)
         }
         summary.blocks.forEach { block ->
-            DashboardReportRuntimeAuthoredBlock(runtime, window, block)
+            val metrics = (block.table?.rows?.firstOrNull() ?: block.chart?.rows?.firstOrNull()).orEmpty()
+            if (dashboardReportRuntimeBlockVisible(block, metrics, filters, selection)) {
+                DashboardReportRuntimeAuthoredBlock(runtime, window, dashboardRoot, block)
+            }
         }
     }
 }
 
 @Composable
-private fun DashboardReportRuntimeAuthoredBlock(runtime: ForgeRuntime, window: WindowContext, block: DashboardReportRuntimeBlockSummary) {
+private fun DashboardReportRuntimeAuthoredBlock(runtime: ForgeRuntime, window: WindowContext, dashboardRoot: ContainerDef, block: DashboardReportRuntimeBlockSummary) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -1427,12 +1434,12 @@ private fun DashboardReportRuntimeAuthoredBlock(runtime: ForgeRuntime, window: W
         if (block.diagnostics.isNotEmpty()) {
             DashboardReportRuntimeDiagnosticsPreview(block.diagnostics)
         }
-        DashboardReportRuntimeAuthoredBlockBody(runtime, window, block)
+        DashboardReportRuntimeAuthoredBlockBody(runtime, window, dashboardRoot, block)
     }
 }
 
 @Composable
-private fun DashboardReportRuntimeAuthoredBlockBody(runtime: ForgeRuntime, window: WindowContext, block: DashboardReportRuntimeBlockSummary) {
+private fun DashboardReportRuntimeAuthoredBlockBody(runtime: ForgeRuntime, window: WindowContext, dashboardRoot: ContainerDef, block: DashboardReportRuntimeBlockSummary) {
     when {
         block.kind == "markdownBlock" && block.markdown != null -> Column(
             modifier = Modifier.fillMaxWidth(),
@@ -1495,7 +1502,7 @@ private fun DashboardReportRuntimeAuthoredBlockBody(runtime: ForgeRuntime, windo
 
         block.kind == "refinementBarBlock" && block.refinementBar != null -> DashboardReportRuntimeRefinementBarPreview(block)
 
-        block.kind == "tableBlock" && block.table != null -> DashboardReportRuntimeTablePreview(runtime, window, block)
+        block.kind == "tableBlock" && block.table != null -> DashboardReportRuntimeTablePreview(runtime, window, dashboardRoot, block)
 
         block.kind == "chartBlock" && block.chart != null -> ChartRenderer(
             rows = block.chart.rows,
@@ -1503,10 +1510,15 @@ private fun DashboardReportRuntimeAuthoredBlockBody(runtime: ForgeRuntime, windo
             reportRuntimeBlockId = block.id,
             reportRuntimeActionFields = block.chart.actionFields,
             reportRuntimeActionDescriptors = block.chart.actionDescriptors,
-            onReportRuntimeAction = { execution -> executeReportRuntimeAction(runtime, window, execution) }
+            onReportRuntimeAction = { execution -> executeReportRuntimeAction(runtime, window, dashboardRoot, execution) }
         )
 
         block.kind == "geoMapBlock" && block.geoMap != null -> DashboardReportRuntimeGeoMapPreview(block)
+
+        block.kind in setOf(
+            "badgesBlock", "collectionBlock", "sectionBlock", "tabGroupBlock", "compositeBlock",
+            "stepperBlock", "infoPanelBlock", "calloutBlock", "kanbanBlock", "timelineBlock"
+        ) -> DashboardReportRuntimePresentationBlock(block)
 
         else -> Row(
             modifier = Modifier.fillMaxWidth(),
@@ -1525,6 +1537,85 @@ private fun DashboardReportRuntimeAuthoredBlockBody(runtime: ForgeRuntime, windo
             )
         }
     }
+}
+
+@Composable
+private fun DashboardReportRuntimePresentationBlock(block: DashboardReportRuntimeBlockSummary) {
+    val content = block.content
+    val entries = reportRuntimePresentationEntries(block.kind, content)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
+            .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(12.dp))
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp)
+    ) {
+        reportRuntimeContentText(content["eyebrow"])?.let {
+            Text(it.uppercase(Locale.US), style = MaterialTheme.typography.labelSmall, color = Color(0xFF526A82))
+        }
+        Text(block.title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+        reportRuntimeContentText(content["subtitle"])?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF526A82))
+        }
+        reportRuntimeContentText(content["description"])?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF6A7280))
+        }
+        reportRuntimeContentText(content["body"])?.takeIf { it.isNotBlank() }?.let {
+            MarkdownRenderer(markdown = it, modifier = Modifier.fillMaxWidth())
+        }
+        entries.forEach { entry ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White, RoundedCornerShape(9.dp))
+                    .padding(horizontal = 9.dp, vertical = 7.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(entry.first, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                entry.second?.takeIf { it.isNotBlank() }?.let {
+                    MarkdownRenderer(markdown = it, modifier = Modifier.fillMaxWidth())
+                }
+            }
+        }
+    }
+}
+
+private fun reportRuntimePresentationEntries(
+    kind: String,
+    content: Map<String, JsonElement>
+): List<Pair<String, String?>> {
+    fun objects(key: String): List<JsonObject> = (content[key] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+    return when (kind) {
+        "badgesBlock" -> objects("items").map { item ->
+            val label = reportRuntimeContentText(item["label"]) ?: reportRuntimeContentText(item["id"]) ?: "Value"
+            label to (reportRuntimeContentText(item["displayValue"]) ?: reportRuntimeContentText(item["value"]))
+        }
+        "collectionBlock" -> objects("items").map { item ->
+            (reportRuntimeContentText(item["title"]) ?: "Item") to reportRuntimeContentText(item["bodyMarkdown"])
+        }
+        "stepperBlock" -> objects("steps").mapIndexed { index, item ->
+            (reportRuntimeContentText(item["title"]) ?: "Step ${index + 1}") to reportRuntimeContentText(item["body"])
+        }
+        "kanbanBlock" -> objects("columns").flatMap { column ->
+            val columnTitle = reportRuntimeContentText(column["title"]) ?: "Column"
+            ((column["cards"] as? JsonArray).orEmpty()).mapNotNull { it as? JsonObject }.map { card ->
+                "$columnTitle · ${reportRuntimeContentText(card["title"]) ?: "Card"}" to reportRuntimeContentText(card["body"])
+            }
+        }
+        "timelineBlock" -> objects("events").map { event ->
+            listOfNotNull(reportRuntimeContentText(event["date"]), reportRuntimeContentText(event["title"])).joinToString(" · ") to
+                reportRuntimeContentText(event["body"])
+        }
+        else -> emptyList()
+    }
+}
+
+private fun reportRuntimeContentText(value: JsonElement?): String? = when (value) {
+    null -> null
+    is JsonPrimitive -> value.contentOrNull
+    is JsonArray -> value.mapNotNull(::reportRuntimeContentText).joinToString(", ").takeIf { it.isNotBlank() }
+    else -> value.toString()
 }
 
 @Composable
@@ -1705,6 +1796,7 @@ private fun DashboardReportRuntimeGeoMapPreview(block: DashboardReportRuntimeBlo
 private fun DashboardReportRuntimeTablePreview(
     runtime: ForgeRuntime,
     window: WindowContext,
+    dashboardRoot: ContainerDef,
     block: DashboardReportRuntimeBlockSummary
 ) {
     val table = block.table ?: return
@@ -1771,7 +1863,7 @@ private fun DashboardReportRuntimeTablePreview(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        DashboardReportRuntimeTableActionStrip(runtime, window, block, table)
+        DashboardReportRuntimeTableActionStrip(runtime, window, dashboardRoot, block, table)
     }
 }
 
@@ -1779,6 +1871,7 @@ private fun DashboardReportRuntimeTablePreview(
 private fun DashboardReportRuntimeTableActionStrip(
     runtime: ForgeRuntime,
     window: WindowContext,
+    dashboardRoot: ContainerDef,
     block: DashboardReportRuntimeBlockSummary,
     table: DashboardReportRuntimeTableValue
 ) {
@@ -1825,7 +1918,7 @@ private fun DashboardReportRuntimeTableActionStrip(
                 ) {
                     executions.forEach { execution ->
                         AssistChip(
-                            onClick = { executeReportRuntimeAction(runtime, window, execution) },
+                            onClick = { executeReportRuntimeAction(runtime, window, dashboardRoot, execution) },
                             label = { Text(execution.label) },
                             colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFFE9EEF9))
                         )
@@ -1861,8 +1954,13 @@ private fun reportRuntimeTableRowLabel(row: Map<String, Any?>, columns: List<Col
 private fun executeReportRuntimeAction(
     runtime: ForgeRuntime,
     window: WindowContext,
+    dashboardRoot: ContainerDef,
     execution: DashboardReportRuntimeActionExecution
 ) {
+    execution.selection?.let {
+        window.dashboardSelectionSignal(dashboardRoot).set(it)
+        return
+    }
     runtime.execute(
         ExecutionDef(handler = "reportRuntime.executeAction"),
         context = null,

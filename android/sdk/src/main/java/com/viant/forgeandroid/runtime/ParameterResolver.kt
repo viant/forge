@@ -22,7 +22,8 @@ class ParameterResolver {
             val dstDs = if (dstDsRaw.isBlank()) context.dataSourceRef else dstDsRaw
             val srcStore = expandStore(srcStoreRaw)
             val dstStore = expandStore(dstStoreRaw)
-            val srcValue = readStore(context, srcDs, srcStore, p.location ?: p.name) ?: return@forEach
+            val sourcePath = if (p.name == "...") p.location else p.location ?: p.name
+            val srcValue = readStore(context, srcDs, srcStore, sourcePath) ?: return@forEach
             val dstMap = ensure(dstDs)
             writeStore(dstMap, dstStore, p.name, srcValue)
         }
@@ -69,7 +70,7 @@ class ParameterResolver {
             "filter" -> readObjectValue(ctx.peekFilter(), key)
             "metrics" -> SelectorUtil.resolve(ctx.metrics.peek(), key)
                 ?: SelectorUtil.resolve(ctx.collection.peek().firstOrNull().orEmpty(), key)
-            "input" -> SelectorUtil.resolve(ctx.input.peek(), key)
+            "input" -> SelectorUtil.resolve(inputObject(ctx.input.peek()), key)
             "windowform" -> SelectorUtil.resolve(context.window.peekWindowForm(), key)
             else -> null
         }
@@ -117,7 +118,7 @@ class ParameterResolver {
                     ?: SelectorUtil.resolve(sourceContext.collection.peek().firstOrNull().orEmpty(), it)
             }
             "filter" -> location?.let { SelectorUtil.resolve(sourceContext.peekFilter(), it) }
-            "input" -> location?.let { SelectorUtil.resolve(sourceContext.input.peek(), it) }
+            "input" -> location?.let { SelectorUtil.resolve(inputObject(sourceContext.input.peek()), it) }
             "metadata" -> sourceContext.window.metadata.peek()?.let { it } // full metadata if needed
             "const" -> p.locationAny()
             else -> {

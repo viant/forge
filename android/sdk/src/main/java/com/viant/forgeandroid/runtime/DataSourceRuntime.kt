@@ -25,6 +25,7 @@ class DataSourceRuntime(
     )
 
     private val jobs = mutableMapOf<String, Job>()
+    private val parameterResolver = ParameterResolver()
     private var executor: ((ExecutionDef, DataSourceContext, Map<String, Any?>) -> Unit)? = null
     private var collectionLoader: (suspend (DataSourceContext) -> LoaderResult?)? = null
 
@@ -270,6 +271,9 @@ class DataSourceRuntime(
         }
 
         ctx.dataSource.parameters.forEach { parameter ->
+            if (isCompactParameter(parameter)) {
+                return@forEach
+            }
             val target = parameter.to ?: return@forEach
             if (!(target.endsWith(":query") || target == "query" || target.endsWith(":input.query"))) {
                 return@forEach
@@ -277,6 +281,9 @@ class DataSourceRuntime(
             val name = parameter.name ?: return@forEach
             val value = resolveParameterValue(ctx, parameter) ?: return@forEach
             query[name] = value.toString()
+        }
+        compactInputValues(ctx, "query").forEach { (key, value) ->
+            if (value != null) query[key] = value.toString()
         }
 
         ctx.input.peek().filter.forEach { (key, value) ->
@@ -325,6 +332,9 @@ class DataSourceRuntime(
         val inputs = linkedMapOf<String, Any?>()
         ctx.dataSource.params.forEach { (key, value) -> inputs[key] = value }
         ctx.dataSource.parameters.forEach { parameter ->
+            if (isCompactParameter(parameter)) {
+                return@forEach
+            }
             val target = parameter.to ?: return@forEach
             if (!(target.endsWith(":query") || target == "query" || target.endsWith(":input.query"))) {
                 return@forEach
@@ -332,6 +342,7 @@ class DataSourceRuntime(
             val name = parameter.name ?: return@forEach
             inputs[name] = resolveParameterValue(ctx, parameter) ?: return@forEach
         }
+        inputs.putAll(compactInputValues(ctx, "query"))
         val paging = ctx.dataSource.paging
         if (paging?.enabled != false) {
             val pageParameters = paging?.parameters.orEmpty()
@@ -356,6 +367,9 @@ class DataSourceRuntime(
     private fun buildBodyParameters(ctx: DataSourceContext): Map<String, Any?> {
         val body = linkedMapOf<String, Any?>()
         ctx.dataSource.parameters.forEach { parameter ->
+            if (isCompactParameter(parameter)) {
+                return@forEach
+            }
             val target = parameter.to ?: return@forEach
             if (!(target.endsWith(":body") || target == "body" || target.endsWith(":input.body"))) {
                 return@forEach
@@ -363,7 +377,17 @@ class DataSourceRuntime(
             val name = parameter.name ?: return@forEach
             body[name] = resolveParameterValue(ctx, parameter) ?: return@forEach
         }
+        body.putAll(compactInputValues(ctx, "body"))
         return body
+    }
+
+    private fun isCompactParameter(parameter: ParameterDef): Boolean =
+        parameter.from?.contains(":") == true && parameter.to?.contains(":") == true
+
+    private fun compactInputValues(ctx: DataSourceContext, store: String): Map<String, Any?> {
+        val resolved = parameterResolver.resolve(ctx.dataSource.parameters, ctx)
+        val dataSourceValues = resolved.inbound[ctx.dataSourceRef].orEmpty()
+        return JsonUtil.asStringMap(JsonUtil.asStringMap(dataSourceValues["input"])[store])
     }
 
     private fun resolvedPageValue(pageParamName: String, pageValue: Int, pageSize: Int?): Int =
@@ -389,7 +413,7 @@ class DataSourceRuntime(
                     ?: SelectorUtil.resolve(sourceContext.collection.peek().firstOrNull().orEmpty(), it)
             }
             "filter", "input.query", "query" -> location?.let { SelectorUtil.resolve(sourceContext.peekFilter(), it) }
-            "input" -> location?.let { SelectorUtil.resolve(sourceContext.input.peek(), it) }
+            "input" -> location?.let { SelectorUtil.resolve(inputObject(sourceContext.input.peek()), it) }
             "selection" -> location?.let { SelectorUtil.resolve(sourceContext.peekSelection().selected ?: emptyMap<String, Any?>(), it) }
             "windowform" -> location?.let { SelectorUtil.resolve(ctx.window.peekWindowForm(), it) }
             else -> {

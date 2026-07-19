@@ -43,6 +43,21 @@ func TestDecodeJSON_CapacityDirectSeriesReportSpec(t *testing.T) {
 	require.Len(t, spec.Blocks[len(spec.Blocks)-1].Columns, 4)
 }
 
+func TestDecodeJSON_PreservesBlockRuntimeContract(t *testing.T) {
+	fixture := loadReportSpecFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	blocks := fixture["blocks"].([]any)
+	first := blocks[0].(map[string]any)
+	first["runtime"] = map[string]any{
+		"visibleWhen":    map[string]any{"source": "selection", "selector": "entityKey", "notEmpty": true},
+		"filterBindings": map[string]any{"region": "region"},
+	}
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+	spec, err := DecodeJSON(data)
+	require.NoError(t, err)
+	require.Equal(t, "region", spec.Blocks[0].Runtime["filterBindings"].(map[string]any)["region"])
+}
+
 func TestDecodeJSON_CapacityAudienceReportSpecPreservesCellVisualColumns(t *testing.T) {
 	spec := loadReportSpecFixture(t, "capacity-audience-export-request-fixture.v1.json")
 
@@ -64,6 +79,32 @@ func TestDecodeJSON_CapacityAudienceReportSpecPreservesCellVisualColumns(t *test
 	require.NotNil(t, spec.Datasets[0].Request.SemanticSelection)
 	require.NotNil(t, spec.Datasets[0].Request.SemanticSelection.Parameters)
 	require.Equal(t, []string{"country_code"}, spec.Datasets[0].Request.SemanticSelection.Selection.Dimensions)
+}
+
+func TestDecodeJSON_BadgesBlock(t *testing.T) {
+	fixture := loadReportSpecFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	blocks := fixture["blocks"].([]any)
+	fixture["blocks"] = append(blocks, map[string]any{
+		"id":         "currentSignals",
+		"kind":       "badgesBlock",
+		"title":      "Current Signals",
+		"datasetRef": "primary",
+		"items": []any{
+			map[string]any{"id": "channel", "label": "Top channel", "valueField": "channelId"},
+			map[string]any{"id": "spend", "label": "Spend", "valueField": "totalSpend", "format": "currency"},
+		},
+	})
+
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+	spec, err := DecodeJSON(data)
+	require.NoError(t, err)
+
+	badges := spec.Blocks[len(spec.Blocks)-1]
+	require.Equal(t, "badgesBlock", badges.Kind)
+	require.Equal(t, "primary", badges.DatasetRef)
+	require.Len(t, badges.Items, 2)
+	require.Equal(t, "channelId", badges.Items[0].ValueField)
 }
 
 func TestDecodeJSON_RejectsUnknownTopLevelField(t *testing.T) {

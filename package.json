@@ -38,6 +38,7 @@
     "smoke:report-builder-preview:runtime": "node --no-warnings scripts/smoke-report-builder-preview.mjs semantic-runtime-multiseries-drill semantic-runtime-table-drill semantic-runtime-table-unsupported-warning semantic-runtime-chart-unsupported-warning",
     "smoke:report-builder-preview:ci": "node --no-warnings scripts/smoke-report-builder-preview.mjs all --continue-on-error --summary-file output/playwright/report-builder-preview-suite/summary.json",
     "test:authored-runtime": "node --no-warnings scripts/run-authored-runtime-unit-tests.mjs",
+    "test:dashboard-report-adapter": "node --no-warnings src/components/dashboard/reportBuilderForgeUiStarter.test.js",
     "verify:semantic-preview:phase1": "node --no-warnings scripts/verify-semantic-preview-phase1.mjs",
     "verify:semantic-preview:phase1:structural": "node --no-warnings scripts/verify-semantic-preview-phase1.mjs --skip-browser-smoke",
     "verify:reporting-model:phase2": "node --no-warnings scripts/verify-reporting-model-phase2.mjs",

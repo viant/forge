@@ -3987,6 +3987,25 @@
     min-width: 112px;
 }
 
+.forge-report-builder__control-cluster--data-view {
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid #d8e2eb;
+    border-radius: 14px;
+    background: linear-gradient(180deg, #f8fbff 0%, #f3f7fb 100%);
+}
+
+.forge-report-builder__runtime-field-group {
+    display: grid;
+    gap: 7px;
+}
+
+.forge-report-builder__runtime-field-label {
+    color: #344b63;
+    font-size: 12px;
+    font-weight: 700;
+}
+
 .forge-report-builder__control-cluster.is-semantic-provider-invalid label {
     color: #9b2c2c;
 }

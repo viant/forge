@@ -29,6 +29,56 @@ changing `dashboard.filters` semantics while still reusing:
 - existing window/dialog lookup infrastructure
 - existing window snapshot / `windowForm` state persistence
 
+## Dashboard adapter
+
+Forge provides `adaptDashboardToReportDocument()` for converting an authored
+dashboard into editable report-builder content. The adapter is a migration
+boundary, not a second rendering system: it emits only canonical ReportDocument
+primitives so the same adapted document renders inline on web, iOS, Android,
+and through PDF export.
+
+The adapter covers every dashboard primitive accepted by the dashboard schema:
+
+- `dashboard.summary`
+- `dashboard.kpiTable`
+- `dashboard.compare`
+- `dashboard.timeline`
+- `dashboard.composition`
+- `dashboard.dimensions`
+- `dashboard.geoMap`
+- `dashboard.status`
+- `dashboard.filters`
+- `dashboard.feed`
+- `dashboard.table`
+- `dashboard.report`
+- `dashboard.detail`, including recursive child conversion
+- `dashboard.messages`
+- `dashboard.badges`
+
+Conversion preserves:
+
+- source order and the shared 12-column `columnSpan` layout
+- datasource references and inferred dimension/measure field roles
+- dashboard filter definitions
+- filter bindings, selection bindings, visibility conditions, and actions as
+  canonical block runtime metadata
+- nested detail grouping through canonical composite blocks
+
+The report runtime executes this metadata consistently: filters and selections
+re-resolve every dataset-backed primitive, visibility conditions react to the
+same state, `dashboardSelect` publishes a report selection, and other authored
+handlers cross an explicit `executeHostAction` boundary. The adapter never
+contains Steward-specific handlers or datasource logic.
+
+Workspace datasource declarations remain workspace-owned. A `forge-ui` file
+can therefore be imported without embedded data and will retain its live
+datasource references. When companion `forge-data` blocks are present, they are
+imported as static report datasets and receive the adapter's field-role hints.
+
+Unknown future dashboard kinds are never silently discarded. The adapter emits
+structured diagnostics and the report-builder import surface reports that the
+diagnostics were retained with the report state.
+
 ## Config shape
 
 ```yaml

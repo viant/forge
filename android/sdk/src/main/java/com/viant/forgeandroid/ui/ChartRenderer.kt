@@ -189,7 +189,8 @@ fun ChartRenderer(
                         type = type,
                         selection = selection,
                         onSelect = { selection = it },
-                        chartHeight = chartHeight
+                        chartHeight = chartHeight,
+                        maximumAxisLabels = if (regularWidth) 6 else 4
                     )
                 }
             }
@@ -210,13 +211,6 @@ private fun ChartDataStateMessage(feedback: ChartDataStateFeedback) {
             color = if (feedback.isError) MaterialTheme.colorScheme.error else ChartMutedText,
             fontWeight = if (feedback.isError) FontWeight.SemiBold else FontWeight.Normal
         )
-        feedback.detail?.let {
-            Text(
-                it,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (feedback.isError) MaterialTheme.colorScheme.error else ChartMutedText
-            )
-        }
     }
 }
 
@@ -405,7 +399,8 @@ private fun MultiSeriesCartesianChart(
     type: String,
     selection: ChartSelection?,
     onSelect: (ChartSelection?) -> Unit,
-    chartHeight: androidx.compose.ui.unit.Dp
+    chartHeight: androidx.compose.ui.unit.Dp,
+    maximumAxisLabels: Int
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Canvas(
@@ -469,9 +464,9 @@ private fun MultiSeriesCartesianChart(
             }
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            prepared.points.forEach { point ->
+            sampledChartAxisLabels(prepared.points.map { it.label }, maximumAxisLabels).forEach { label ->
                 Text(
-                    text = point.label,
+                    text = label,
                     style = MaterialTheme.typography.labelSmall,
                     color = ChartMutedText,
                     modifier = Modifier.weight(1f),
@@ -687,7 +682,6 @@ internal data class ChartAccessibleDataRow(
 
 internal data class ChartDataStateFeedback(
     val message: String,
-    val detail: String? = null,
     val isError: Boolean = false
 )
 
@@ -737,6 +731,25 @@ internal fun prepareChartData(rows: List<Map<String, Any?>>, chart: ChartDef): P
         else -> points.maxOfOrNull { point -> point.values.maxOfOrNull { it.value } ?: 0.0 }
     } ?: 0.0
     return PreparedChartData(points = points, series = seriesDefs, maxValue = maxValue.coerceAtLeast(1.0))
+}
+
+internal fun sampledChartAxisLabels(labels: List<String>, maximum: Int): List<String> {
+    val orderedLabels = labels
+        .filter { it.trim().isNotEmpty() }
+        .distinct()
+    if (maximum <= 0 || orderedLabels.size <= maximum) {
+        return orderedLabels
+    }
+    if (maximum == 1) {
+        return listOf(orderedLabels.first())
+    }
+    val lastIndex = orderedLabels.lastIndex
+    return (0 until maximum).map { position ->
+        val index = kotlin.math.round(
+            position.toDouble() * lastIndex.toDouble() / (maximum - 1).toDouble()
+        ).toInt()
+        orderedLabels[index]
+    }
 }
 
 internal fun buildPieSlices(prepared: PreparedChartData): List<PieSlice> {
@@ -807,11 +820,9 @@ internal fun chartDataStateFeedback(
     if (loading || !hasResolvedRows) {
         return ChartDataStateFeedback("Loading chart")
     }
-    val detail = error?.trim()?.takeIf { it.isNotEmpty() }
-    if (detail != null) {
+    if (!error.isNullOrBlank()) {
         return ChartDataStateFeedback(
             message = "Unable to load chart data",
-            detail = detail,
             isError = true
         )
     }

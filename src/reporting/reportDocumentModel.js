@@ -948,6 +948,10 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
         .filter(Boolean),
     }
     : null;
+  const staticDatasets = normalizeReportBuilderStaticDatasets(state?.reportStaticDatasets);
+  const staticDatasetIds = new Set(
+    staticDatasets.map((dataset) => normalizeString(dataset?.id)).filter(Boolean),
+  );
   const publishedDatasets = normalizeReportBuilderPublishedDataSources(config).map((dataset) => ({
     id: normalizeString(dataset?.id),
     dataSourceRef: normalizeString(dataset?.dataSourceRef),
@@ -966,8 +970,12 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
     secondaryFieldOptions: Array.isArray(dataset?.secondaryFieldOptions) ? cloneValue(dataset.secondaryFieldOptions) : [],
     chartFieldOptions: Array.isArray(dataset?.chartFieldOptions) ? cloneValue(dataset.chartFieldOptions) : [],
     scopeParamOptions: Array.isArray(dataset?.scopeParamOptions) ? cloneValue(dataset.scopeParamOptions) : [],
-  })).filter((dataset) => dataset.id && dataset.dataSourceRef);
-  const staticDatasets = normalizeReportBuilderStaticDatasets(state?.reportStaticDatasets);
+  })).filter((dataset) => (
+    dataset.id
+    && dataset.dataSourceRef
+    && dataset.id !== "primary"
+    && !staticDatasetIds.has(dataset.id)
+  ));
   return [...(primaryDataset ? [primaryDataset] : []), ...publishedDatasets, ...staticDatasets];
 }
 
@@ -1930,7 +1938,38 @@ export function buildReportDocumentGeoMapBlock(block = {}) {
   };
 }
 
-function normalizeReportBuilderDocumentBlock(block = {}) {
+export function normalizeReportBlockRuntime(runtime = null, block = {}) {
+  const source = isPlainObject(runtime) ? runtime : {};
+  const visibleWhen = isPlainObject(source?.visibleWhen)
+    ? cloneValue(source.visibleWhen)
+    : (isPlainObject(block?.visibleWhen) ? cloneValue(block.visibleWhen) : null);
+  const filterBindings = isPlainObject(source?.filterBindings)
+    ? cloneValue(source.filterBindings)
+    : (isPlainObject(block?.filterBindings) ? cloneValue(block.filterBindings) : null);
+  const selectionBindings = isPlainObject(source?.selectionBindings)
+    ? cloneValue(source.selectionBindings)
+    : (isPlainObject(block?.selectionBindings) ? cloneValue(block.selectionBindings) : null);
+  const actions = Array.isArray(source?.actions)
+    ? cloneValue(source.actions)
+    : (Array.isArray(block?.actions) ? cloneValue(block.actions) : []);
+  const normalized = {
+    ...(visibleWhen ? { visibleWhen } : {}),
+    ...(filterBindings && Object.keys(filterBindings).length > 0 ? { filterBindings } : {}),
+    ...(selectionBindings && Object.keys(selectionBindings).length > 0 ? { selectionBindings } : {}),
+    ...(actions.length > 0 ? { actions } : {}),
+  };
+  return Object.keys(normalized).length > 0 ? normalized : null;
+}
+
+function withReportBlockRuntime(normalizedBlock = null, sourceBlock = {}) {
+  if (!normalizedBlock) {
+    return normalizedBlock;
+  }
+  const runtime = normalizeReportBlockRuntime(sourceBlock?.runtime, sourceBlock);
+  return runtime ? { ...normalizedBlock, runtime } : normalizedBlock;
+}
+
+function normalizeReportBuilderDocumentBlockContent(block = {}) {
   if (!isPlainObject(block)) {
     return null;
   }
@@ -1996,6 +2035,10 @@ function normalizeReportBuilderDocumentBlock(block = {}) {
     return buildReportDocumentGeoMapBlock(block);
   }
   return cloneValue(block);
+}
+
+function normalizeReportBuilderDocumentBlock(block = {}) {
+  return withReportBlockRuntime(normalizeReportBuilderDocumentBlockContent(block), block);
 }
 
 export function normalizeReportBuilderDocumentBlocks(blocks = []) {
@@ -2370,7 +2413,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
           primaryMeasure: "",
           groupBy: "",
         }, normalizedBlock?.chartSpec || {}, datasetContext.fieldCatalog);
-        return buildReportSpecChartBlock({
+        return withReportBlockRuntime(buildReportSpecChartBlock({
           container: datasetContext.container,
           config: datasetContext.config,
           state: chartState,
@@ -2378,22 +2421,22 @@ export function lowerReportDocumentToReportSpec(document = {}, {
           blockId: normalizedBlock?.id,
           datasetRef: normalizedBlock?.datasetRef,
           title: normalizedBlock?.title,
-        });
+        }), normalizedBlock);
       }
       if (normalizeString(normalizedBlock?.kind) === "tableBlock") {
-        return buildAuthoredTableBlock(normalizedBlock, datasetContext.fieldCatalog);
+        return withReportBlockRuntime(buildAuthoredTableBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
       }
       if (normalizeString(normalizedBlock?.kind) === "markdownBlock") {
-        return buildAuthoredMarkdownBlock(normalizedBlock, datasetContext.fieldCatalog);
+        return withReportBlockRuntime(buildAuthoredMarkdownBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
       }
       if (normalizeString(normalizedBlock?.kind) === "kpiBlock") {
-        return buildAuthoredKpiBlock(normalizedBlock, datasetContext.fieldCatalog);
+        return withReportBlockRuntime(buildAuthoredKpiBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
       }
       if (normalizeString(normalizedBlock?.kind) === "collectionBlock") {
-        return buildAuthoredCollectionBlock(normalizedBlock, datasetContext.fieldCatalog);
+        return withReportBlockRuntime(buildAuthoredCollectionBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
       }
       if (normalizeString(normalizedBlock?.kind) === "badgesBlock") {
-        return buildAuthoredBadgesBlock(normalizedBlock, datasetContext.fieldCatalog);
+        return withReportBlockRuntime(buildAuthoredBadgesBlock(normalizedBlock, datasetContext.fieldCatalog), normalizedBlock);
       }
       return normalizedBlock;
     })

@@ -3,7 +3,7 @@ package com.viant.forgeandroid.runtime
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.content
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
@@ -12,6 +12,26 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class DashboardRuntimeTest {
+
+    @Test
+    fun dashboardReportRuntimeBlocksPreserveResolvedPresentationContent() {
+        val presentationKinds = listOf(
+            "badgesBlock", "collectionBlock", "sectionBlock", "tabGroupBlock", "compositeBlock",
+            "stepperBlock", "infoPanelBlock", "calloutBlock", "kanbanBlock", "timelineBlock"
+        )
+        val blocks = dashboardReportRuntimeBlocks(values = presentationKinds.mapIndexed { index, kind ->
+            JsonObject(
+                mapOf(
+                    "id" to JsonPrimitive("block-${index + 1}"),
+                    "kind" to JsonPrimitive(kind),
+                    "content" to JsonObject(mapOf("marker" to JsonPrimitive(kind)))
+                )
+            )
+        })
+
+        assertEquals(presentationKinds, blocks.map { it.kind })
+        assertEquals(presentationKinds, blocks.map { it.content["marker"]?.jsonPrimitive?.contentOrNull })
+    }
 
     @Test
     fun evaluateDashboardConditionSupportsThresholdsAndSelection() {
@@ -740,7 +760,7 @@ class DashboardRuntimeTest {
             )
         )
 
-        assertEquals("Runtime Report", dashboardReportRuntimeConfig(direct)?.get("title")?.jsonPrimitive?.content)
+        assertEquals("Runtime Report", dashboardReportRuntimeConfig(direct)?.get("title")?.jsonPrimitive?.contentOrNull)
         assertEquals(
             DashboardReportRuntimeSummary(
                 title = "Runtime Report",
@@ -1086,6 +1106,42 @@ class DashboardRuntimeTest {
                 )
             ),
             executions
+        )
+    }
+
+    @Test
+    fun dashboardReportRuntimeExecutesAuthoredSelectionAction() {
+        val field = DashboardReportRuntimeActionField(
+            id = "market",
+            valueKey = "market",
+            displayValueKey = "market",
+            label = "Market",
+            runtimeFilterable = false
+        )
+        val block = JsonObject(mapOf(
+            "runtime" to JsonObject(mapOf(
+                "actions" to JsonArray(listOf(JsonObject(mapOf(
+                    "id" to JsonPrimitive("selectMarket"),
+                    "kind" to JsonPrimitive("select"),
+                    "dimension" to JsonPrimitive("market")
+                ))))
+            ))
+        ))
+        val descriptors = dashboardReportRuntimeAuthoredSelectionDescriptors(block, listOf(field))
+        val executions = dashboardReportRuntimeTableActionExecutions(
+            blockId = "marketTable",
+            descriptors = descriptors,
+            field = field,
+            item = mapOf("market" to "US", "spend" to 10)
+        )
+        assertEquals(
+            DashboardSelectionState(
+                dimension = "market",
+                entityKey = "US",
+                selected = mapOf("market" to "US", "spend" to 10),
+                sourceBlockId = "marketTable"
+            ),
+            executions.first().selection
         )
     }
 

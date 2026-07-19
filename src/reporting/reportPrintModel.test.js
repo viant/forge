@@ -55,6 +55,16 @@ const config = {
       endParamPath: "filters.To",
       default: { start: "2026-05-01", end: "2026-05-04" },
     },
+    {
+      id: "channel",
+      label: "Channel",
+      type: "multiSelect",
+      multiple: true,
+      options: [
+        { label: "CTV", value: 1 },
+        { label: "Display", value: 2 },
+      ],
+    },
   ],
   result: {
     defaultMode: "table",
@@ -415,7 +425,7 @@ const authoredDocument = buildReportBuilderReportDocument({
     buildReportDocumentFilterBarBlock({
       id: "sharedFilters",
       title: "Shared Filters",
-      paramIds: ["dateRange"],
+      paramIds: ["dateRange", "channel"],
     }),
     buildReportDocumentRefinementBarBlock({
       id: "activeRefinements",
@@ -633,6 +643,10 @@ assert.ok(printElements.some((element) => (
 assert.ok(printElements.some((element) => (
   element.kind === "text"
   && /dateRange: 2026-05-01 to 2026-05-04/.test(element.text)
+)));
+assert.ok(printElements.some((element) => (
+  element.kind === "text"
+  && /Channel: All \(CTV, Display\)/.test(element.text)
 )));
 assert.ok(printElements.some((element) => (
   element.kind === "text"

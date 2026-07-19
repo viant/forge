@@ -216,6 +216,7 @@ public struct DashboardReportRuntimeActionDescriptor: Sendable, Equatable, Ident
     public let label: String
     public let nextFieldRef: String?
     public let targetRef: String?
+    public let selectionDimension: String?
 
     public init(
         id: String,
@@ -223,7 +224,8 @@ public struct DashboardReportRuntimeActionDescriptor: Sendable, Equatable, Ident
         fieldValueKey: String,
         label: String,
         nextFieldRef: String? = nil,
-        targetRef: String? = nil
+        targetRef: String? = nil,
+        selectionDimension: String? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -231,6 +233,7 @@ public struct DashboardReportRuntimeActionDescriptor: Sendable, Equatable, Ident
         self.label = label
         self.nextFieldRef = nextFieldRef
         self.targetRef = targetRef
+        self.selectionDimension = selectionDimension
     }
 }
 
@@ -314,6 +317,7 @@ public struct DashboardReportRuntimeActionExecution: Sendable, Equatable, Identi
     public let refinement: DashboardReportRuntimeActionRefinement?
     public let transition: DashboardReportRuntimeActionTransition?
     public let detailRequest: DashboardReportRuntimeDetailRequest?
+    public let selection: DashboardSelectionState?
 
     public init(
         id: String,
@@ -321,7 +325,8 @@ public struct DashboardReportRuntimeActionExecution: Sendable, Equatable, Identi
         kind: String,
         refinement: DashboardReportRuntimeActionRefinement? = nil,
         transition: DashboardReportRuntimeActionTransition? = nil,
-        detailRequest: DashboardReportRuntimeDetailRequest? = nil
+        detailRequest: DashboardReportRuntimeDetailRequest? = nil,
+        selection: DashboardSelectionState? = nil
     ) {
         self.id = id
         self.label = label
@@ -329,6 +334,7 @@ public struct DashboardReportRuntimeActionExecution: Sendable, Equatable, Identi
         self.refinement = refinement
         self.transition = transition
         self.detailRequest = detailRequest
+        self.selection = selection
     }
 }
 
@@ -468,6 +474,8 @@ public struct DashboardReportRuntimeBlockSummary: Sendable, Equatable, Identifia
     public let kind: String
     public let title: String
     public let diagnostics: [DashboardReportRuntimeDiagnostic]
+    public let content: [String: JSONValue]
+    public let runtime: [String: JSONValue]
     public let markdown: String?
     public let kpi: DashboardReportRuntimeKPIValue?
     public let filterBar: DashboardReportRuntimeFilterBarValue?
@@ -481,6 +489,8 @@ public struct DashboardReportRuntimeBlockSummary: Sendable, Equatable, Identifia
         kind: String,
         title: String,
         diagnostics: [DashboardReportRuntimeDiagnostic] = [],
+        content: [String: JSONValue] = [:],
+        runtime: [String: JSONValue] = [:],
         markdown: String? = nil,
         kpi: DashboardReportRuntimeKPIValue? = nil,
         filterBar: DashboardReportRuntimeFilterBarValue? = nil,
@@ -493,6 +503,8 @@ public struct DashboardReportRuntimeBlockSummary: Sendable, Equatable, Identifia
         self.kind = kind
         self.title = title
         self.diagnostics = diagnostics
+        self.content = content
+        self.runtime = runtime
         self.markdown = markdown
         self.kpi = kpi
         self.filterBar = filterBar
@@ -668,11 +680,17 @@ public enum DashboardRuntime {
             let datasetRef = nonBlank(block["datasetRef"]?.stringValue)
             let blockDiagnostics = diagnostics.filter { $0.blockID == id }
                 + (datasetRef.flatMap { datasetDiagnostics[$0] } ?? [])
+            let presentationKinds: Set<String> = [
+                "badgesBlock", "collectionBlock", "sectionBlock", "tabGroupBlock", "compositeBlock",
+                "stepperBlock", "infoPanelBlock", "calloutBlock", "kanbanBlock", "timelineBlock"
+            ]
             return DashboardReportRuntimeBlockSummary(
                 id: id,
                 kind: kind,
                 title: title,
                 diagnostics: blockDiagnostics,
+                content: presentationKinds.contains(kind) ? content : [:],
+                runtime: block["runtime"]?.objectValue ?? [:],
                 markdown: markdown,
                 kpi: kpi,
                 filterBar: filterBar,
@@ -695,6 +713,57 @@ public enum DashboardRuntime {
         }
         ordered.append(contentsOf: blocks.filter { !seen.contains($0.id) })
         return ordered
+    }
+
+    public static func dashboardReportRuntimeBlockVisible(
+        _ block: DashboardReportRuntimeBlockSummary,
+        metrics: [String: Any] = [:],
+        filters: [String: Any] = [:],
+        selection: DashboardSelectionState = DashboardSelectionState()
+    ) -> Bool {
+        guard let conditionValue = block.runtime["visibleWhen"],
+              let data = try? JSONEncoder().encode(conditionValue),
+              var condition = try? JSONDecoder().decode(DashboardConditionDef.self, from: data) else {
+            return true
+        }
+        if let selector = condition.selector?.trimmingCharacters(in: .whitespacesAndNewlines) {
+            if selector.hasPrefix("dashboard.selection.") {
+                condition = DashboardConditionDef(
+                    source: "selection",
+                    dataSourceRef: condition.dataSourceRef,
+                    field: String(selector.dropFirst("dashboard.selection.".count)),
+                    key: condition.key,
+                    whenValue: condition.whenValue,
+                    equals: condition.equals,
+                    notEquals: condition.notEquals,
+                    inValues: condition.inValues,
+                    gt: condition.gt,
+                    gte: condition.gte,
+                    lt: condition.lt,
+                    lte: condition.lte,
+                    empty: condition.empty,
+                    notEmpty: condition.notEmpty
+                )
+            } else if selector.hasPrefix("filters.") {
+                condition = DashboardConditionDef(
+                    source: "filters",
+                    dataSourceRef: condition.dataSourceRef,
+                    field: String(selector.dropFirst("filters.".count)),
+                    key: condition.key,
+                    whenValue: condition.whenValue,
+                    equals: condition.equals,
+                    notEquals: condition.notEquals,
+                    inValues: condition.inValues,
+                    gt: condition.gt,
+                    gte: condition.gte,
+                    lt: condition.lt,
+                    lte: condition.lte,
+                    empty: condition.empty,
+                    notEmpty: condition.notEmpty
+                )
+            }
+        }
+        return evaluateDashboardCondition(condition, metrics: metrics, filters: filters, selection: selection)
     }
 
     public static func dashboardReportRuntimeDatasets(_ values: [JSONValue]) -> [String: [String: JSONValue]] {
@@ -747,7 +816,7 @@ public enum DashboardRuntime {
         let actionFields = dashboardReportRuntimeTableActionFields(reportSpec: reportSpec, block: block, content: content)
         let actionDescriptors = actionFields.flatMap {
             dashboardReportRuntimeActionDescriptors(reportSpec: reportSpec, blockID: nonBlank(block["id"]?.stringValue), field: $0, includeBlockIDInGeneratedID: false)
-        }
+        } + dashboardReportRuntimeAuthoredSelectionDescriptors(block: block, fields: actionFields)
         let rowCount = dashboardReportRuntimeInt(dataset["provenance"]?.objectValue?["rowCount"])
         let limit = max(1, rowCount ?? pageSize)
         return DashboardReportRuntimeTableValue(
@@ -879,7 +948,7 @@ public enum DashboardRuntime {
         let actionFields = dashboardReportRuntimeChartActionFields(reportSpec: reportSpec, block: block, content: content)
         let actionDescriptors = actionFields.flatMap {
             dashboardReportRuntimeActionDescriptors(reportSpec: reportSpec, blockID: nonBlank(block["id"]?.stringValue), field: $0, includeBlockIDInGeneratedID: true)
-        }
+        } + dashboardReportRuntimeAuthoredSelectionDescriptors(block: block, fields: actionFields)
         return DashboardReportRuntimeChartValue(
             dataSourceRef: nonBlank(dataset["dataSourceRef"]?.stringValue) ?? datasetRef,
             chart: chart,
@@ -1047,6 +1116,28 @@ public enum DashboardRuntime {
         return descriptors
     }
 
+    public static func dashboardReportRuntimeAuthoredSelectionDescriptors(
+        block: [String: JSONValue],
+        fields: [DashboardReportRuntimeActionField]
+    ) -> [DashboardReportRuntimeActionDescriptor] {
+        let actions = block["runtime"]?.objectValue?["actions"]?.arrayValue ?? []
+        return actions.compactMap { value in
+            guard let action = value.objectValue,
+                  nonBlank(action["kind"]?.stringValue)?.lowercased() == "select",
+                  let dimension = nonBlank(action["dimension"]?.stringValue),
+                  let field = fields.first(where: { $0.valueKey == dimension }) else {
+                return nil
+            }
+            return DashboardReportRuntimeActionDescriptor(
+                id: nonBlank(action["id"]?.stringValue) ?? "select_\(dimension)",
+                kind: "select",
+                fieldValueKey: field.valueKey,
+                label: nonBlank(action["label"]?.stringValue) ?? "Select \(field.label)",
+                selectionDimension: dimension
+            )
+        }
+    }
+
     public static func dashboardReportRuntimeTableActionExecutions(
         blockID: String?,
         descriptors: [DashboardReportRuntimeActionDescriptor],
@@ -1119,6 +1210,21 @@ public enum DashboardRuntime {
                 "sourceBlockId": refinement.sourceBlockID.map(JSONValue.string) ?? .null,
                 "fieldLabel": refinement.fieldLabel.map(JSONValue.string) ?? .null,
                 "label": .string(refinement.label)
+            ])
+        }
+        if let selection = execution.selection {
+            object["selection"] = .object([
+                "dimension": selection.dimension.map(JSONValue.string) ?? .null,
+                "entityKey": selection.entityKey.map(JSONValue.string) ?? .null,
+                "selected": .object(selection.selected.mapValues { primitive in
+                    switch primitive {
+                    case .string(let value): return .string(value)
+                    case .number(let value): return .number(value)
+                    case .bool(let value): return .bool(value)
+                    case .null: return .null
+                    }
+                }),
+                "sourceBlockId": selection.sourceBlockID.map(JSONValue.string) ?? .null
             ])
         }
         if let transition = execution.transition {
@@ -1219,6 +1325,18 @@ public enum DashboardRuntime {
                     item: item,
                     value: value,
                     field: field,
+                    sourceBlockID: sourceBlockID
+                )
+            )
+        case "select":
+            return DashboardReportRuntimeActionExecution(
+                id: descriptor.id,
+                label: descriptor.label,
+                kind: "select",
+                selection: DashboardSelectionState(
+                    dimension: descriptor.selectionDimension ?? descriptor.fieldValueKey,
+                    entityKey: dashboardReportRuntimeExecutionValueText(value),
+                    selected: dashboardSelectionPayload(from: item),
                     sourceBlockID: sourceBlockID
                 )
             )

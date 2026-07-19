@@ -605,6 +605,20 @@ function formatReportPrintValue(value, format = "") {
   return formatExportValue(value, format);
 }
 
+function formatReportPrintFilterParamValue(param = {}) {
+  const value = param?.value;
+  const unset = value == null
+    || (Array.isArray(value) && value.length === 0)
+    || (typeof value === "string" && !value.trim());
+  if (unset && param?.multiple === true) {
+    const optionLabels = (Array.isArray(param?.options) ? param.options : [])
+      .map((option) => normalizeString(option?.label || option?.value))
+      .filter(Boolean);
+    return optionLabels.length > 0 ? `All (${optionLabels.join(", ")})` : "All";
+  }
+  return formatReportPrintValue(value);
+}
+
 function inferReportPrintNumericFormat(value, format = "") {
   const explicit = normalizeString(format);
   if (explicit) {
@@ -1066,7 +1080,7 @@ function buildFilterBarLines(block = {}) {
     const label = normalizeString(param?.label || param?.id) || "param";
     const description = normalizeString(param?.description);
     pushLines(param?.groupId || param?.id, [
-      `${label}: ${formatReportPrintValue(param?.value)}`,
+      `${label}: ${formatReportPrintFilterParamValue(param)}`,
       ...(description ? [description] : []),
     ]);
   });

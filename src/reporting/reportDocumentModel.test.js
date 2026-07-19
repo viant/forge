@@ -1281,6 +1281,42 @@ assert.equal(explicitDatasetDocument.datasets.some((dataset) => dataset.id === "
 assert.equal(explicitDatasetDocument.datasets.some((dataset) => dataset.id === "primary"), true);
 assert.equal(Array.isArray(resolveBuilderBlock(explicitDatasetDocument).config?.datasets), false);
 assert.equal(Array.isArray(resolveBuilderBlock(explicitDatasetDocument).config?.dataSources), false);
+
+const deduplicatedDatasetDocument = buildReportBuilderReportDocument({
+  container,
+  config: {
+    ...config,
+    staticFilters: [{
+      id: "channelId",
+      field: "channelId",
+      label: "Channel",
+      type: "multiSelect",
+      multiple: true,
+      options: [{ label: "CTV", value: 1 }],
+    }],
+    dataSources: [
+      { id: "primary", dataSourceRef: "duplicatePrimary" },
+      { id: "adapter_rows", dataSourceRef: "adapter_rows" },
+    ],
+  },
+  state: {
+    ...state,
+    reportStaticDatasets: [{
+      id: "adapter_rows",
+      dataSourceRef: "static_json_adapter_rows",
+      label: "Adapter rows",
+      rows: [{ channelId: 1 }],
+      columnOptions: [{ key: "channelId", label: "Channel", kind: "dimension" }],
+    }],
+  },
+});
+assert.equal(deduplicatedDatasetDocument.datasets.filter((dataset) => dataset.id === "primary").length, 1);
+assert.equal(deduplicatedDatasetDocument.datasets.filter((dataset) => dataset.id === "adapter_rows").length, 1);
+assert.equal(deduplicatedDatasetDocument.datasets.find((dataset) => dataset.id === "adapter_rows")?.rows?.length, 1);
+assert.equal(
+  deduplicatedDatasetDocument.datasets.find((dataset) => dataset.id === "primary")?.scopeParamOptions?.some((option) => option.value === "channelId"),
+  true,
+);
 assert.deepEqual(
   explicitDatasetDocument.datasets.find((dataset) => dataset.id === "reach_summary"),
   {

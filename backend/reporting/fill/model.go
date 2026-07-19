@@ -95,6 +95,7 @@ type Block struct {
 	Icon                     string                `json:"icon,omitempty"`
 	Tone                     string                `json:"tone,omitempty"`
 	Badges                   []string              `json:"badges,omitempty"`
+	Items                    []BadgeItem           `json:"items,omitempty"`
 	ChildBlockIDs            []string              `json:"childBlockIds,omitempty"`
 	SectionIDs               []string              `json:"sectionIds,omitempty"`
 	DefaultSectionID         string                `json:"defaultSectionId,omitempty"`
@@ -113,9 +114,11 @@ type Block struct {
 	CalloutContent           *CalloutContent       `json:"-"`
 	KanbanContent            *KanbanContent        `json:"-"`
 	TimelineContent          *TimelineContent      `json:"-"`
+	BadgesContent            *BadgesContent        `json:"-"`
 	FilterBarContent         *FilterBarContent     `json:"-"`
 	RefinementBarContent     *RefinementBarContent `json:"-"`
 	MarkdownContent          *MarkdownContent      `json:"-"`
+	Runtime                  map[string]any        `json:"runtime,omitempty"`
 }
 
 type TableColumn struct {
@@ -257,6 +260,26 @@ type KPIContent struct {
 	BodyFormat               string         `json:"bodyFormat,omitempty"`
 	BodyTemplate             string         `json:"bodyTemplate,omitempty"`
 	BodyMarkdown             string         `json:"bodyMarkdown,omitempty"`
+}
+
+type BadgeItem struct {
+	ID              string                 `json:"id"`
+	Label           string                 `json:"label,omitempty"`
+	Value           any                    `json:"value,omitempty"`
+	ValueField      string                 `json:"valueField,omitempty"`
+	Format          string                 `json:"format,omitempty"`
+	DisplayKey      string                 `json:"displayKey,omitempty"`
+	DisplayValueMap map[string]any         `json:"displayValueMap,omitempty"`
+	LabelMode       string                 `json:"labelMode,omitempty"`
+	Rules           []reportspec.BadgeRule `json:"rules,omitempty"`
+	Tone            string                 `json:"tone,omitempty"`
+	DisplayValue    string                 `json:"displayValue,omitempty"`
+}
+
+type BadgesContent struct {
+	Title    string      `json:"title"`
+	RowCount *int        `json:"rowCount"`
+	Items    []BadgeItem `json:"items"`
 }
 
 type CollectionItemContent struct {
@@ -462,6 +485,15 @@ type rawKPIBlock struct {
 	Content                  KPIContent     `json:"content"`
 }
 
+type rawBadgesBlock struct {
+	ID         string        `json:"id"`
+	Kind       string        `json:"kind"`
+	Title      string        `json:"title"`
+	DatasetRef string        `json:"datasetRef"`
+	Items      []BadgeItem   `json:"items"`
+	Content    BadgesContent `json:"content"`
+}
+
 type rawFilterBarBlock struct {
 	ID              string           `json:"id"`
 	Kind            string           `json:"kind"`
@@ -643,6 +675,12 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 		})
 	}
 	for index, block := range raw.Blocks {
+		runtime, sanitizedBlock, err := extractFillBlockRuntime(block, fmt.Sprintf("reportFill.blocks[%d]", index))
+		if err != nil {
+			return nil, err
+		}
+		block = sanitizedBlock
+		blockCountBefore := len(fill.Blocks)
 		header := rawBlockHeader{}
 		if err := json.Unmarshal(block, &header); err != nil {
 			return nil, fmt.Errorf("decode reportFill.blocks[%d]: %w", index, err)
@@ -706,6 +744,21 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				BodyFormat:               kpiBlock.BodyFormat,
 				BodyTemplate:             kpiBlock.BodyTemplate,
 				KPIContent:               &kpiBlock.Content,
+			})
+		case "badgesBlock":
+			badgesBlock := rawBadgesBlock{}
+			decoder := json.NewDecoder(bytes.NewReader(block))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&badgesBlock); err != nil {
+				return nil, fmt.Errorf("decode reportFill.blocks[%d] badgesBlock: %w", index, err)
+			}
+			fill.Blocks = append(fill.Blocks, Block{
+				ID:            badgesBlock.ID,
+				Kind:          badgesBlock.Kind,
+				Title:         badgesBlock.Title,
+				DatasetRef:    badgesBlock.DatasetRef,
+				Items:         badgesBlock.Items,
+				BadgesContent: &badgesBlock.Content,
 			})
 		case "collectionBlock":
 			collectionBlock := rawCollectionBlock{}
@@ -921,11 +974,33 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				DatasetRef: header.DatasetRef,
 			})
 		}
+		if len(fill.Blocks) > blockCountBefore && len(runtime) > 0 {
+			fill.Blocks[len(fill.Blocks)-1].Runtime = runtime
+		}
 	}
 	if err := fill.Validate(); err != nil {
 		return nil, err
 	}
 	return fill, nil
+}
+
+func extractFillBlockRuntime(payload json.RawMessage, label string) (map[string]any, json.RawMessage, error) {
+	fields := map[string]json.RawMessage{}
+	if err := json.Unmarshal(payload, &fields); err != nil {
+		return nil, nil, fmt.Errorf("decode %s: %w", label, err)
+	}
+	runtime := map[string]any{}
+	if rawRuntime, ok := fields["runtime"]; ok {
+		if err := json.Unmarshal(rawRuntime, &runtime); err != nil {
+			return nil, nil, fmt.Errorf("decode %s.runtime: %w", label, err)
+		}
+		delete(fields, "runtime")
+	}
+	sanitized, err := json.Marshal(fields)
+	if err != nil {
+		return nil, nil, fmt.Errorf("normalize %s: %w", label, err)
+	}
+	return runtime, sanitized, nil
 }
 
 func (r *ReportFill) Validate() error {
@@ -961,16 +1036,23 @@ func (r *ReportFill) Validate() error {
 		if err != nil {
 			return fmt.Errorf("reportFill.datasets[%d].request: %w", index, err)
 		}
-		if dataset.Request.Limit == nil {
+		if dataset.Request.Kind == "staticCsv" || dataset.Request.Kind == "staticJson" {
+			if strings.TrimSpace(dataset.Request.Format) == "" {
+				return fmt.Errorf("reportFill.datasets[%d].request.format is required", index)
+			}
+			if dataset.Request.RowCount == nil || *dataset.Request.RowCount < 0 {
+				return fmt.Errorf("reportFill.datasets[%d].request.rowCount must be >= 0", index)
+			}
+			if dataset.Request.ColumnKeys == nil {
+				return fmt.Errorf("reportFill.datasets[%d].request.columnKeys is required", index)
+			}
+		} else if dataset.Request.Limit == nil {
 			return fmt.Errorf("reportFill.datasets[%d].request.limit is required", index)
-		}
-		if *dataset.Request.Limit < 1 {
+		} else if *dataset.Request.Limit < 1 {
 			return fmt.Errorf("reportFill.datasets[%d].request.limit must be >= 1", index)
-		}
-		if dataset.Request.Offset == nil {
+		} else if dataset.Request.Offset == nil {
 			return fmt.Errorf("reportFill.datasets[%d].request.offset is required", index)
-		}
-		if *dataset.Request.Offset < 0 {
+		} else if *dataset.Request.Offset < 0 {
 			return fmt.Errorf("reportFill.datasets[%d].request.offset must be >= 0", index)
 		}
 		if dataset.Request.TimeoutMs != nil && *dataset.Request.TimeoutMs < 0 {
@@ -1264,6 +1346,34 @@ func (r *ReportFill) Validate() error {
 			}
 			if block.CollectionContent.Items == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.items is required for collectionBlock", index)
+			}
+		}
+		if strings.TrimSpace(block.Kind) == "badgesBlock" {
+			if strings.TrimSpace(block.DatasetRef) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].datasetRef is required for badgesBlock", index)
+			}
+			if block.Items == nil {
+				return fmt.Errorf("reportFill.blocks[%d].items is required for badgesBlock", index)
+			}
+			if block.BadgesContent == nil {
+				return fmt.Errorf("reportFill.blocks[%d].content is required for badgesBlock", index)
+			}
+			if strings.TrimSpace(block.BadgesContent.Title) == "" {
+				return fmt.Errorf("reportFill.blocks[%d].content.title is required for badgesBlock", index)
+			}
+			if block.BadgesContent.RowCount == nil {
+				return fmt.Errorf("reportFill.blocks[%d].content.rowCount is required for badgesBlock", index)
+			}
+			if *block.BadgesContent.RowCount < 0 {
+				return fmt.Errorf("reportFill.blocks[%d].content.rowCount must be >= 0 for badgesBlock", index)
+			}
+			if block.BadgesContent.Items == nil {
+				return fmt.Errorf("reportFill.blocks[%d].content.items is required for badgesBlock", index)
+			}
+			for itemIndex, item := range block.BadgesContent.Items {
+				if strings.TrimSpace(item.ID) == "" {
+					return fmt.Errorf("reportFill.blocks[%d].content.items[%d].id is required for badgesBlock", index, itemIndex)
+				}
 			}
 		}
 		if strings.TrimSpace(block.Kind) == "sectionBlock" {

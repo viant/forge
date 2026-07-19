@@ -392,7 +392,7 @@ class WindowFormRuntimeTest {
             dataSourceRuntime = runtime
         )
         val context = runtime.attach(window, "runs")
-        signals.selection(WindowIdentity("recordWindow").dataSourceId("schedules")).set(
+        signals.selection(WindowIdentity("recordWindow").dataSourceId("schedules"), SelectionState()).set(
             SelectionState(selected = mapOf("id" to "sched-1"))
         )
         signals.form(WindowIdentity("recordWindow").windowFormId()).set(
@@ -451,7 +451,7 @@ class WindowFormRuntimeTest {
         )
         val context = runtime.attach(window, "orders")
         val identity = WindowIdentity("recordWindow")
-        signals.selection(identity.dataSourceId("orders")).set(
+        signals.selection(identity.dataSourceId("orders"), SelectionState()).set(
             SelectionState(selected = mapOf("orderId" to 201, "name" to "Selected order"))
         )
         signals.form(identity.dataSourceId("orders")).set(
@@ -576,7 +576,10 @@ class WindowFormRuntimeTest {
                 "granularity" to "hour"
             )
         )
-        signals.selection(identity.dataSourceId("items")).set(
+        signals.input(identity.dataSourceId("report")).set(
+            InputState(parameters = mapOf("pageSize" to 25))
+        )
+        signals.selection(identity.dataSourceId("items"), SelectionState(selection = emptyList())).set(
             SelectionState(
                 selection = listOf(
                     mapOf("id" to "item-1", "name" to "One"),
@@ -589,6 +592,7 @@ class WindowFormRuntimeTest {
             listOf(
                 ParameterDef(name = "...", from = ":windowForm", to = ":query"),
                 ParameterDef(name = "[]itemIds", location = "id", from = "items:selection", to = ":query"),
+                ParameterDef(name = "pageSize", location = "parameters.pageSize", from = ":input", to = ":query"),
                 ParameterDef(name = "request.options.mode", location = "granularity", from = ":windowForm", to = ":body")
             ),
             context
@@ -602,6 +606,7 @@ class WindowFormRuntimeTest {
         assertEquals("today", query["period"])
         assertEquals("hour", query["granularity"])
         assertEquals(listOf("item-1", "item-2"), query["itemIds"])
+        assertEquals(25, query["pageSize"])
         assertEquals("hour", options["mode"])
     }
 }

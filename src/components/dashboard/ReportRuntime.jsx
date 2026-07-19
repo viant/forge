@@ -53,6 +53,16 @@ import { formatDashboardValue } from "./dashboardUtils.js";
 import { resolveDashboardRowActionIdentity } from "./dashboardRowActionPresentation.js";
 import { InlineStaticFilterControl } from "./reportBuilderComponents.jsx";
 import { resolveReportDatasetRefResolution } from "../../reporting/reportDatasetRefModel.js";
+import { buildReportFillFromReportSpec } from "../../reporting/reportFillModel.js";
+import {
+  buildReportRuntimeHostExecution,
+  buildReportRuntimeSelection,
+  isReportRuntimeBlockVisible,
+  resolveReportRuntimeBlockRows,
+  resolveReportRuntimeFilterValues,
+  resolveReportRuntimeHostActions,
+  resolveReportRuntimeSelectionActions,
+} from "../../reporting/reportBlockRuntimeModel.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -91,6 +101,9 @@ function supportsReportRuntimeExecution(execution = null, runtimeHandlers = null
   }
   if (kind === "detail") {
     return typeof runtimeHandlers?.openDetailTarget === "function";
+  }
+  if (kind === "host") {
+    return typeof runtimeHandlers?.executeHostAction === "function";
   }
   if (kind === "removeRefinement") {
     return typeof runtimeHandlers?.removeRefinement === "function";
@@ -1947,7 +1960,7 @@ function resolveRuntimeCompositeConfig(blocks = []) {
   };
 }
 
-function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false }) {
+function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null }) {
   const invalidDiagnostic = (Array.isArray(diagnostics) ? diagnostics : [])
     .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
     || null;
@@ -1981,6 +1994,29 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
       executeReportRuntimeAction(execution, runtimeHandlers);
     },
   }));
+  resolveReportRuntimeSelectionActions(block).forEach((action) => {
+    rowActions.push({
+      id: action.id,
+      kind: "select",
+      label: action.label || "Select",
+      dimension: action.dimension,
+      field: action.dimension,
+      publishSelection: false,
+      onExecute: ({ item }) => onRuntimeSelection?.(buildReportRuntimeSelection(action, item, block.id)),
+    });
+  });
+  resolveReportRuntimeHostActions(block).forEach((action) => {
+    rowActions.push({
+      id: action.id,
+      kind: "host",
+      label: action.label || "Action",
+      publishSelection: false,
+      onExecute: ({ item }) => executeReportRuntimeAction(
+        buildReportRuntimeHostExecution(action, item, block.id),
+        runtimeHandlers,
+      ),
+    });
+  });
   return (
     <RuntimePanel
       className="forge-report-runtime-table-panel"
@@ -2550,6 +2586,8 @@ export default function ReportRuntime({
   suppressFilterBarBlockDatasetRefs = [],
 }) {
   const reportPresentation = normalizeString(presentationMode).toLowerCase() === "report";
+  const [selectedChartSelectionsByBlock, setSelectedChartSelectionsByBlock] = useState({});
+  const [runtimeSelection, setRuntimeSelection] = useState({});
   const [runtimeViewportWidth, setRuntimeViewportWidth] = useState(() => (
     typeof window !== "undefined" ? Number(window.innerWidth || 0) || 0 : 0
   ));
@@ -2575,11 +2613,26 @@ export default function ReportRuntime({
     ),
     [suppressFilterBarBlockDatasetRefs],
   );
+  const effectiveReportFill = useMemo(() => {
+    if (!runtimeSelection || Object.keys(runtimeSelection).length === 0) {
+      return reportFill;
+    }
+    const payloads = Object.fromEntries(
+      (Array.isArray(reportFill?.datasets) ? reportFill.datasets : [])
+        .map((dataset) => [normalizeString(dataset?.id), {
+          rows: cloneValue(dataset?.rows || []),
+          hasMore: dataset?.provenance?.hasMore === true,
+          diagnostics: cloneValue(dataset?.provenance?.diagnostics || []),
+        }])
+        .filter(([id]) => !!id),
+    );
+    return buildReportFillFromReportSpec(reportSpec, payloads, { runtimeSelection });
+  }, [reportFill, reportSpec, runtimeSelection]);
   const datasetIndex = useMemo(() => new Map(
-    (Array.isArray(reportFill?.datasets) ? reportFill.datasets : [])
+    (Array.isArray(effectiveReportFill?.datasets) ? effectiveReportFill.datasets : [])
       .map((dataset) => [normalizeString(dataset?.id), dataset])
       .filter(([id]) => !!id),
-  ), [reportFill]);
+  ), [effectiveReportFill]);
   const availableDatasetRefs = useMemo(
     () => Array.from(datasetIndex.keys()),
     [datasetIndex],
@@ -2610,8 +2663,8 @@ export default function ReportRuntime({
     [reportSpec, reportDocument, title],
   );
   const allRuntimeBlocks = useMemo(
-    () => resolveReportRuntimeBlocks(reportSpec, reportFill),
-    [reportSpec, reportFill],
+    () => resolveReportRuntimeBlocks(reportSpec, effectiveReportFill),
+    [reportSpec, effectiveReportFill],
   );
   const hasTopLevelFilterBarBlock = useMemo(
     () => allRuntimeBlocks.some((block) => normalizeString(block?.kind) === "filterBarBlock"),
@@ -2633,7 +2686,6 @@ export default function ReportRuntime({
     () => allRuntimeBlocks.some((block) => normalizeString(block?.kind) === "refinementBarBlock"),
     [allRuntimeBlocks],
   );
-  const [selectedChartSelectionsByBlock, setSelectedChartSelectionsByBlock] = useState({});
   const [activeSectionId, setActiveSectionId] = useState("");
   const [providerActionState, setProviderActionState] = useState(() => buildIdleReportRuntimeProviderActionsState());
   const [providerReloadSequence, setProviderReloadSequence] = useState(0);
@@ -2644,9 +2696,43 @@ export default function ReportRuntime({
   const retryProviderActions = () => {
     setProviderReloadSequence((current) => current + 1);
   };
+  const runtimeFilterValues = useMemo(
+    () => resolveReportRuntimeFilterValues(scopeParamIndex),
+    [scopeParamIndex],
+  );
+  const resolveRuntimeDataset = (block = {}) => {
+    const resolvedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;
+    const dataset = datasetIndex.get(resolvedDatasetRef) || { id: resolvedDatasetRef || block?.datasetRef, rows: [] };
+    const rows = resolveReportRuntimeBlockRows(block, dataset?.rows || [], {
+      filters: runtimeFilterValues,
+      selection: runtimeSelection,
+    });
+    return {
+      ...dataset,
+      rows,
+      provenance: {
+        ...(dataset?.provenance || {}),
+        rowCount: rows.length,
+      },
+    };
+  };
+  const applyAuthoredSelectionActions = (block = {}, selection = null) => {
+    const item = selection?.row && typeof selection.row === "object" ? selection.row : selection;
+    const actions = resolveReportRuntimeSelectionActions(block);
+    actions.forEach((action) => {
+      setRuntimeSelection(buildReportRuntimeSelection(action, item, block?.id));
+    });
+    resolveReportRuntimeHostActions(block).forEach((action) => {
+      executeReportRuntimeAction(
+        buildReportRuntimeHostExecution(action, item, block?.id),
+        runtimeHandlers,
+      );
+    });
+  };
 
   useEffect(() => {
     setSelectedChartSelectionsByBlock({});
+    setRuntimeSelection({});
   }, [reportFill?.specHash]);
 
   useEffect(() => {
@@ -2734,6 +2820,14 @@ export default function ReportRuntime({
   );
 
   const renderBlock = (block) => {
+    const visibilityDataset = resolveRuntimeDataset(block);
+    if (!isReportRuntimeBlockVisible(block, {
+      metrics: visibilityDataset?.rows?.[0] || {},
+      filters: runtimeFilterValues,
+      selection: runtimeSelection,
+    })) {
+      return null;
+    }
     const kind = normalizeString(block?.kind);
     if (kind === "tabGroupBlock") {
       return null;
@@ -2784,8 +2878,7 @@ export default function ReportRuntime({
       return <RefinementBarBlock key={block.id} block={block} runtimeHandlers={runtimeHandlers} />;
     }
     if (kind === "tableBlock") {
-      const resolvedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;
-      const dataset = datasetIndex.get(resolvedDatasetRef) || { id: resolvedDatasetRef || block?.datasetRef, rows: [] };
+      const dataset = resolveRuntimeDataset(block);
       return (
         <TableBlock
           key={block.id}
@@ -2798,12 +2891,12 @@ export default function ReportRuntime({
           locale={locale}
           onRetryProviderActions={retryProviderActions}
           providerActionsLoading={providerActionsLoading}
+          onRuntimeSelection={setRuntimeSelection}
         />
       );
     }
     if (kind === "chartBlock") {
-      const resolvedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;
-      const dataset = datasetIndex.get(resolvedDatasetRef) || { id: resolvedDatasetRef || block?.datasetRef, rows: [] };
+      const dataset = resolveRuntimeDataset(block);
       const diagnostics = resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset);
       const invalidDiagnostic = diagnostics
         .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
@@ -2825,6 +2918,7 @@ export default function ReportRuntime({
       const chartSpec = block?.content?.chartSpec || block?.chartSpec || {};
       const chartModel = block?.content?.chartModel || block?.chartModel || null;
       const chartInteractionSupport = resolveReportRuntimeChartInteractionSupport(chartSpec);
+      const authoredSelectionActions = resolveReportRuntimeSelectionActions(block);
       const chartInteractionState = buildReportRuntimeChartInteractionState({
         blockId: block?.id,
         blockTitle: block?.title,
@@ -2844,7 +2938,7 @@ export default function ReportRuntime({
           legendEnabled: false,
         }
         : chartInteractionSupport;
-      const chartInteractionEnabled = effectiveChartInteractionSupport.enabled;
+      const chartInteractionEnabled = effectiveChartInteractionSupport.enabled || authoredSelectionActions.length > 0;
       const supportedChartActions = supportedChartExecutions.map((execution) => ({
         id: execution.id,
         label: execution.label,
@@ -2880,7 +2974,10 @@ export default function ReportRuntime({
               isActive
               embedded={false}
               showControls={!reportPresentation}
-              onDatumSelect={!reportPresentation && chartInteractionEnabled ? ((selection) => setSelectedChartSelection(block.id, selection)) : null}
+              onDatumSelect={chartInteractionEnabled ? ((selection) => {
+                setSelectedChartSelection(block.id, selection);
+                applyAuthoredSelectionActions(block, selection);
+              }) : null}
               onLegendItemSelect={!reportPresentation && chartInteractionSupport.legendEnabled ? ((selection) => setSelectedChartSelection(block.id, selection)) : null}
             />
           ) : (

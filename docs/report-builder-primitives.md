@@ -31,6 +31,29 @@ This keeps:
 Text templates are a presentation layer over already-resolved content, not the
 source of truth for data selection.
 
+## Dashboard conversion
+
+Dashboard conversion lowers dashboard metadata to the primitives in this
+document before runtime rendering. No dashboard-only visual block is embedded
+inside a ReportDocument. This guarantees that adapted reports use the same
+resolved content model on web, iOS, Android, and PDF.
+
+The adapter also returns conversion metadata alongside the authored blocks:
+
+- `dataSourceRefs`: live workspace sources required by the report
+- `datasetFieldHints`: inferred dimension and measure roles for static imports
+- `filterDefinitions`: dashboard-authored filter control definitions
+- `interactionBindings`: filter, selection, visibility, and action provenance
+- `diagnostics`: structured conversion errors for unknown or rejected content
+
+Each adapted block also carries a normalized `runtime` contract. Forge applies
+its `filterBindings`, `selectionBindings`, and `visibleWhen` generically on web,
+iOS, Android, and while resolving export content. A `dashboardSelect` action
+becomes a generic `select` action; any other workspace-authored handler becomes
+a `host` action dispatched through the host runtime. These contracts preserve
+the source dashboard behavior without making Forge own workspace datasource
+configuration, handler implementations, or persistence.
+
 ## Report Persistence Boundary
 
 Forge does not own database or workspace bootstrapping.

@@ -199,7 +199,7 @@ export const reportSpecSchema = {
     scopeParam: {
       type: "object",
       additionalProperties: false,
-      required: ["id", "kind", "label", "required", "value"],
+      required: ["id", "kind", "label", "required"],
       properties: {
         id: { type: "string" },
         kind: { type: "string" },
@@ -500,8 +500,11 @@ export const reportSpecSchema = {
     requestPayload: {
       type: "object",
       additionalProperties: false,
-      required: ["limit", "offset"],
       properties: {
+        kind: { enum: ["staticCsv", "staticJson"] },
+        format: { enum: ["csv", "json"] },
+        rowCount: { type: "integer", minimum: 0 },
+        columnKeys: { type: "array", items: { type: "string" } },
         measures: {
           type: "object",
           additionalProperties: { type: "boolean" },
@@ -697,6 +700,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "chartBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         datasetRef: { type: "string" },
         chartSpec: { $ref: "#/$defs/chartSpec" },
@@ -710,6 +714,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "geoMapBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         datasetRef: { type: "string" },
         geo: { $ref: "#/$defs/geoConfig" },
@@ -952,6 +957,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "tableBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         datasetRef: { type: "string" },
         columns: {
@@ -967,6 +973,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "kpiBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         datasetRef: { type: "string" },
         valueField: { type: "string" },
@@ -1027,6 +1034,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "badgesBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         datasetRef: { type: "string" },
         items: {
@@ -1042,6 +1050,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "collectionBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         description: { type: "string" },
         datasetRef: { type: "string" },
@@ -1094,6 +1103,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "sectionBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         subtitle: { type: "string" },
         description: { type: "string" },
@@ -1107,6 +1117,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "compositeBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         description: { type: "string" },
         childBlockIds: {
@@ -1123,6 +1134,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "tabGroupBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         sectionIds: {
           type: "array",
@@ -1150,6 +1162,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "stepperBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         description: { type: "string" },
         steps: {
@@ -1165,6 +1178,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "infoPanelBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         eyebrow: { type: "string" },
         description: { type: "string" },
@@ -1180,6 +1194,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "calloutBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         icon: { type: "string" },
         description: { type: "string" },
@@ -1225,6 +1240,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "kanbanBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         description: { type: "string" },
         columns: {
@@ -1253,6 +1269,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "timelineBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         description: { type: "string" },
         events: {
@@ -1268,6 +1285,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "filterBarBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         datasetRef: { type: "string" },
         mode: { enum: ["baseline", "unified"] },
@@ -1297,6 +1315,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "refinementBarBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         actionKinds: {
           type: "array",
@@ -1312,6 +1331,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "markdownBlock" },
+        runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         datasetRef: { type: "string" },
         markdown: { type: "string" },

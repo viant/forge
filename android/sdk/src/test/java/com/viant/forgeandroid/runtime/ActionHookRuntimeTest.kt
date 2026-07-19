@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.content
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CoroutineScope
@@ -304,10 +304,10 @@ class ActionHookRuntimeTest {
         assertEquals("path", dialog.content?.treeBrowser?.pathField)
         assertEquals("value", dialog.content?.treeBrowser?.valueField)
         assertEquals(false, dialog.content?.treeBrowser?.lazyExpand)
-        assertEquals("dialog", dialog.content?.treeBrowser?.target?.jsonObject?.get("kind")?.jsonPrimitive?.content)
+        assertEquals("dialog", dialog.content?.treeBrowser?.target?.jsonObject?.get("kind")?.jsonPrimitive?.contentOrNull)
         assertEquals(
             "Choose",
-            dialog.content?.treeBrowser?.targetOverrides?.get("android:phone")?.jsonObject?.get("title")?.jsonPrimitive?.content
+            dialog.content?.treeBrowser?.targetOverrides?.get("android:phone")?.jsonObject?.get("title")?.jsonPrimitive?.contentOrNull
         )
         assertTrue(dialog.properties.containsKey("quickFilters"))
     }

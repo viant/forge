@@ -50,6 +50,27 @@ assert.equal(
     summarizeReportBuilderDocumentMarkdown(""),
     "Narrative block",
 );
+
+const adapterFilterFieldOptions = buildReportBuilderDocumentBlockFieldOptions({
+    config: { dataSourceRef: "source" },
+    state: {
+        reportDashboardAdapter: {
+            filterDefinitions: [{
+                id: "channelId",
+                field: "channelId",
+                label: "Channel",
+                type: "multiSelect",
+                multiple: true,
+            }],
+        },
+    },
+});
+assert.deepEqual(adapterFilterFieldOptions.scopeParamOptions, [{
+    value: "channelId",
+    label: "Channel",
+    kind: "multiSelect",
+    required: false,
+}]);
 assert.deepEqual(resolveReportBuilderDocumentWidthLabels(""), {
     span: 12,
     nextSpan: 8,
@@ -1773,6 +1794,23 @@ assert.deepEqual(normalizeReportBuilderDocumentLayoutState({
         { blockId: "primaryBuilder" },
     ],
 });
+
+assert.deepEqual(buildReportBuilderDocumentBlockDiagnostics([
+    {
+        id: "adapterFilters",
+        kind: "filterBarBlock",
+        title: "Filters",
+        datasetRef: "adapter_rows",
+        paramIds: ["channelId"],
+    },
+], {
+    scopeParamOptions: [{ value: "channelId", label: "Channel" }],
+    datasetOptions: [{
+        value: "adapter_rows",
+        label: "Adapter rows",
+        scopeParamOptions: [],
+    }],
+}), []);
 
 assert.deepEqual(normalizeReportBuilderDocumentLayoutState({
     type: "stack",

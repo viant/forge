@@ -36,6 +36,19 @@ export function executeReportRuntimeAction(execution = null, runtimeHandlers = n
       result,
     };
   }
+  if (execution.kind === "host" && typeof runtimeHandlers?.executeHostAction === "function") {
+    const result = runtimeHandlers.executeHostAction({
+      handler: execution.handler,
+      arguments: execution.arguments || {},
+      item: execution.item ?? null,
+      sourceBlockId: execution.sourceBlockId || null,
+    });
+    return {
+      executed: true,
+      branch: "host",
+      result,
+    };
+  }
   if (execution.kind === "removeRefinement") {
     const refinementId = String(execution?.refinementId || "").trim();
     if (!refinementId) {
