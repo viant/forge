@@ -118,6 +118,10 @@ type Dataset struct {
 }
 
 type RequestPayload struct {
+	Kind              string             `json:"kind,omitempty"`
+	Format            string             `json:"format,omitempty"`
+	RowCount          *int               `json:"rowCount,omitempty"`
+	ColumnKeys        []string           `json:"columnKeys,omitempty"`
 	Measures          map[string]bool    `json:"measures,omitempty"`
 	Dimensions        map[string]bool    `json:"dimensions,omitempty"`
 	Filters           map[string]any     `json:"filters,omitempty"`
@@ -127,6 +131,11 @@ type RequestPayload struct {
 	Offset            *int               `json:"offset"`
 	TimeoutMs         *int               `json:"timeoutMs,omitempty"`
 	OrderBy           []string           `json:"orderBy,omitempty"`
+}
+
+func (r RequestPayload) isStatic() bool {
+	kind := strings.TrimSpace(r.Kind)
+	return kind == "staticCsv" || kind == "staticJson"
 }
 
 type SemanticSelection struct {
@@ -186,6 +195,25 @@ type TimelineEvent struct {
 	Tone  string `json:"tone,omitempty"`
 }
 
+type BadgeRule struct {
+	Value any    `json:"value,omitempty"`
+	Label string `json:"label,omitempty"`
+	Tone  string `json:"tone,omitempty"`
+}
+
+type BadgeItem struct {
+	ID              string         `json:"id"`
+	Label           string         `json:"label,omitempty"`
+	Value           any            `json:"value,omitempty"`
+	ValueField      string         `json:"valueField,omitempty"`
+	Format          string         `json:"format,omitempty"`
+	DisplayKey      string         `json:"displayKey,omitempty"`
+	DisplayValueMap map[string]any `json:"displayValueMap,omitempty"`
+	LabelMode       string         `json:"labelMode,omitempty"`
+	Rules           []BadgeRule    `json:"rules,omitempty"`
+	Tone            string         `json:"tone,omitempty"`
+}
+
 type Block struct {
 	ID                       string          `json:"id"`
 	Kind                     string          `json:"kind"`
@@ -229,12 +257,14 @@ type Block struct {
 	Body                     string          `json:"body,omitempty"`
 	ColumnsLayout            []KanbanColumn  `json:"columns,omitempty"`
 	Events                   []TimelineEvent `json:"events,omitempty"`
+	Items                    []BadgeItem     `json:"items,omitempty"`
 	CollectionCols           int             `json:"columnsCount,omitempty"`
 	ItemTitleField           string          `json:"itemTitleField,omitempty"`
 	ItemTitleLabel           string          `json:"itemTitleLabel,omitempty"`
 	Layout                   string          `json:"layout,omitempty"`
 	RowLimit                 *int            `json:"rowLimit,omitempty"`
 	BodyTemplate             string          `json:"bodyTemplate,omitempty"`
+	Runtime                  map[string]any  `json:"runtime,omitempty"`
 }
 
 type rawReportSpec struct {
@@ -298,6 +328,14 @@ type rawKPIBlock struct {
 	PresentationMode         string         `json:"presentationMode,omitempty"`
 	BodyFormat               string         `json:"bodyFormat,omitempty"`
 	BodyTemplate             string         `json:"bodyTemplate,omitempty"`
+}
+
+type rawBadgesBlock struct {
+	ID         string      `json:"id"`
+	Kind       string      `json:"kind"`
+	Title      string      `json:"title"`
+	DatasetRef string      `json:"datasetRef"`
+	Items      []BadgeItem `json:"items"`
 }
 
 type rawFilterBarBlock struct {
@@ -528,16 +566,23 @@ func (r *ReportSpec) Validate() error {
 		if strings.TrimSpace(dataset.DataSourceRef) == "" {
 			return fmt.Errorf("reportSpec.datasets[%d].dataSourceRef is required", index)
 		}
-		if dataset.Request.Limit == nil {
+		if dataset.Request.isStatic() {
+			if strings.TrimSpace(dataset.Request.Format) == "" {
+				return fmt.Errorf("reportSpec.datasets[%d].request.format is required", index)
+			}
+			if dataset.Request.RowCount == nil || *dataset.Request.RowCount < 0 {
+				return fmt.Errorf("reportSpec.datasets[%d].request.rowCount must be >= 0", index)
+			}
+			if dataset.Request.ColumnKeys == nil {
+				return fmt.Errorf("reportSpec.datasets[%d].request.columnKeys is required", index)
+			}
+		} else if dataset.Request.Limit == nil {
 			return fmt.Errorf("reportSpec.datasets[%d].request.limit is required", index)
-		}
-		if *dataset.Request.Limit < 1 {
+		} else if *dataset.Request.Limit < 1 {
 			return fmt.Errorf("reportSpec.datasets[%d].request.limit must be >= 1", index)
-		}
-		if dataset.Request.Offset == nil {
+		} else if dataset.Request.Offset == nil {
 			return fmt.Errorf("reportSpec.datasets[%d].request.offset is required", index)
-		}
-		if *dataset.Request.Offset < 0 {
+		} else if *dataset.Request.Offset < 0 {
 			return fmt.Errorf("reportSpec.datasets[%d].request.offset must be >= 0", index)
 		}
 		if dataset.Request.TimeoutMs != nil && *dataset.Request.TimeoutMs < 0 {
@@ -634,6 +679,25 @@ func (r *ReportSpec) Validate() error {
 			}
 			if !isAllowedReportBodyFormat(block.BodyFormat) {
 				return fmt.Errorf("reportSpec.blocks[%d].bodyFormat %q is not supported for kpiBlock", index, block.BodyFormat)
+			}
+		case "badgesBlock":
+			if strings.TrimSpace(block.Title) == "" {
+				return fmt.Errorf("reportSpec.blocks[%d].title is required for badgesBlock", index)
+			}
+			if strings.TrimSpace(block.DatasetRef) == "" {
+				return fmt.Errorf("reportSpec.blocks[%d].datasetRef is required for badgesBlock", index)
+			}
+			if block.Items == nil {
+				return fmt.Errorf("reportSpec.blocks[%d].items is required for badgesBlock", index)
+			}
+			for itemIndex, item := range block.Items {
+				if strings.TrimSpace(item.ID) == "" {
+					return fmt.Errorf("reportSpec.blocks[%d].items[%d].id is required for badgesBlock", index, itemIndex)
+				}
+				labelMode := strings.TrimSpace(item.LabelMode)
+				if labelMode != "" && labelMode != "field" && labelMode != "manual" {
+					return fmt.Errorf("reportSpec.blocks[%d].items[%d].labelMode %q is not supported for badgesBlock", index, itemIndex, item.LabelMode)
+				}
 			}
 		case "collectionBlock":
 			if strings.TrimSpace(block.Title) == "" {
@@ -788,7 +852,17 @@ func (r *ReportSpec) Validate() error {
 	return nil
 }
 
-func decodeBlock(payload json.RawMessage, index int) (Block, error) {
+func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr error) {
+	runtime, sanitizedPayload, err := extractBlockRuntime(payload, fmt.Sprintf("reportSpec.blocks[%d]", index))
+	if err != nil {
+		return Block{}, err
+	}
+	payload = sanitizedPayload
+	defer func() {
+		if resultErr == nil && len(runtime) > 0 {
+			result.Runtime = runtime
+		}
+	}()
 	header := rawBlockHeader{}
 	if err := json.Unmarshal(payload, &header); err != nil {
 		return Block{}, err
@@ -843,6 +917,18 @@ func decodeBlock(payload json.RawMessage, index int) (Block, error) {
 			PresentationMode:         block.PresentationMode,
 			BodyFormat:               block.BodyFormat,
 			BodyTemplate:             block.BodyTemplate,
+		}, nil
+	case "badgesBlock":
+		block := rawBadgesBlock{}
+		if err := decodeStrictJSON(payload, &block, fmt.Sprintf("reportSpec.blocks[%d] badgesBlock", index)); err != nil {
+			return Block{}, err
+		}
+		return Block{
+			ID:         block.ID,
+			Kind:       block.Kind,
+			Title:      block.Title,
+			DatasetRef: block.DatasetRef,
+			Items:      block.Items,
 		}, nil
 	case "collectionBlock":
 		block := rawCollectionBlock{}
@@ -1034,6 +1120,25 @@ func decodeBlock(payload json.RawMessage, index int) (Block, error) {
 			DatasetRef: header.DatasetRef,
 		}, nil
 	}
+}
+
+func extractBlockRuntime(payload json.RawMessage, label string) (map[string]any, json.RawMessage, error) {
+	fields := map[string]json.RawMessage{}
+	if err := json.Unmarshal(payload, &fields); err != nil {
+		return nil, nil, fmt.Errorf("decode %s: %w", label, err)
+	}
+	runtime := map[string]any{}
+	if rawRuntime, ok := fields["runtime"]; ok {
+		if err := json.Unmarshal(rawRuntime, &runtime); err != nil {
+			return nil, nil, fmt.Errorf("decode %s.runtime: %w", label, err)
+		}
+		delete(fields, "runtime")
+	}
+	sanitized, err := json.Marshal(fields)
+	if err != nil {
+		return nil, nil, fmt.Errorf("normalize %s: %w", label, err)
+	}
+	return runtime, sanitized, nil
 }
 
 func decodeStrictJSON[T any](payload json.RawMessage, destination *T, label string) error {

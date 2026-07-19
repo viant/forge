@@ -770,6 +770,18 @@ assert.equal(
 );
 
 assert.equal(
+  source.includes("renderRuntimeDataViewControls"),
+  true,
+  "Report-mode settings should expose runtime measure and breakdown selection without entering Design mode.",
+);
+
+assert.equal(
+  source.includes('aria-label="Table measures"') && source.includes('aria-label="Add table breakdown"'),
+  true,
+  "The web table settings dialog should expose accessible measure and breakdown controls.",
+);
+
+assert.equal(
   source.includes("designRailHasCollapsiblePanels"),
   true,
   "ReportBuilder should avoid misleading left-rail panel counts when only the runtime filter launcher is visible.",

@@ -352,13 +352,30 @@ assert.equal(buildPublishedSnapshotReportExportRequest({
   reportPrint,
 }), null);
 
-assert.equal(buildDraftReportExportRequest({
+const sourceLessReportSpec = buildReportBuilderReportSpec({
+  container: { title: "Performance Report" },
+  config,
+  state,
+});
+const sourceLessReportFill = buildReportFillFromReportSpec(sourceLessReportSpec, {
+  primary: { rows: [] },
+});
+const sourceLessReportPrint = buildReportPrintFromReportFill({
+  reportSpec: sourceLessReportSpec,
+  reportFill: sourceLessReportFill,
+});
+const sourceLessDraftExportRequest = buildDraftReportExportRequest({
   reportDocument: { id: "performanceReport", title: "Performance Report" },
-  reportSpec,
-  reportFill,
-  reportPrint: null,
+  reportSpec: sourceLessReportSpec,
+  reportFill: sourceLessReportFill,
+  reportPrint: sourceLessReportPrint,
   format: "pdf",
-}), null);
+});
+assert.equal(sourceLessDraftExportRequest, null);
+assert.equal(buildReportExportArtifactRef({
+  artifactKind: "dashboard.reportBuilder",
+  reportId: "performanceReport",
+}), "dashboard.reportBuilder://performanceReport");
 
 const {
   reportSpec: authoredDerivedSpec,

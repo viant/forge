@@ -2517,7 +2517,7 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
                 : [];
             const effectiveScopeParamOptions = datasetScopedOptions.length > 0
                 ? datasetScopedOptions
-                : ((normalizedDatasetRef === "primary" || datasetResolution.source === "singleAvailable") ? normalizedScopeParamOptions : []);
+                : normalizedScopeParamOptions;
             const effectiveScopeParamOptionIds = new Set(effectiveScopeParamOptions.map((option) => option.value));
             (Array.isArray(block?.paramIds) ? block.paramIds : []).forEach((paramId, paramIndex) => {
                 const normalizedParamId = normalizeString(paramId);
@@ -2793,6 +2793,9 @@ export function buildReportBuilderDocumentBlockFieldOptions({
     const normalizedState = builderContext?.state && typeof builderContext.state === "object" && !Array.isArray(builderContext.state)
         ? builderContext.state
         : {};
+    if (effectiveState?.reportDashboardAdapter && !normalizedState.reportDashboardAdapter) {
+        normalizedState.reportDashboardAdapter = cloneValue(effectiveState.reportDashboardAdapter);
+    }
     const calculatedFieldConfig = buildReportBuilderCalculatedFieldConfig(resolvedConfig, normalizedState);
     return buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
         config: calculatedFieldConfig,
@@ -2826,7 +2829,20 @@ export function buildReportBuilderDocumentBlockFieldOptionsFromPreparedConfig({
             chartState: null,
         };
     }
-    const scopeParamOptions = resolveReportBuilderScopeParamFilters(preparedConfig)
+    const configuredScopeFilters = resolveReportBuilderScopeParamFilters(preparedConfig);
+    const configuredScopeFilterIds = new Set(
+        configuredScopeFilters.map((filter) => normalizeString(filter?.id || filter?.field)).filter(Boolean),
+    );
+    const adapterScopeFilters = (Array.isArray(normalizedState?.reportDashboardAdapter?.filterDefinitions)
+        ? normalizedState.reportDashboardAdapter.filterDefinitions
+        : [])
+        .filter((filter) => {
+            const id = normalizeString(filter?.id || filter?.field);
+            if (!id || configuredScopeFilterIds.has(id)) return false;
+            configuredScopeFilterIds.add(id);
+            return true;
+        });
+    const scopeParamOptions = [...configuredScopeFilters, ...adapterScopeFilters]
         .map((filter) => {
             const value = normalizeString(filter?.id || filter?.field);
             if (!value) {

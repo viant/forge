@@ -1,0 +1,87 @@
+```forge-ui
+{
+  "version": 1,
+  "title": "Adapter Runtime Proof",
+  "subtitle": "Imported dashboard behavior rendered as one canonical report",
+  "blocks": [
+    {
+      "id": "filters",
+      "kind": "dashboard.filters",
+      "title": "Scope",
+      "items": [
+        { "id": "channelId", "field": "channelId", "label": "Channel", "type": "multiSelect", "multiple": true, "options": [
+          { "label": "CTV", "value": 1 },
+          { "label": "Display", "value": 2 }
+        ] }
+      ]
+    },
+    {
+      "id": "marketSummary",
+      "kind": "dashboard.summary",
+      "title": "Selected Market",
+      "dataSourceRef": "adapter_rows",
+      "selectionBindings": { "entityKey": "market" },
+      "metrics": [
+        { "id": "spend", "field": "spend", "label": "Spend", "format": "currency" },
+        { "id": "impressions", "field": "impressions", "label": "Impressions", "format": "compactNumber" }
+      ]
+    },
+    {
+      "id": "marketChart",
+      "kind": "dashboard.dimensions",
+      "title": "Spend by Market",
+      "dataSourceRef": "adapter_rows",
+      "filterBindings": { "channelId": "channelId" },
+      "dimension": { "key": "market", "label": "Market" },
+      "metric": { "key": "spend", "label": "Spend", "format": "currency" },
+      "on": [
+        { "id": "selectMarket", "event": "onSelect", "handler": "dashboardSelect", "label": "Select Market", "arguments": { "dimension": "market" } }
+      ]
+    },
+    {
+      "id": "marketTable",
+      "kind": "dashboard.table",
+      "title": "Market Detail",
+      "dataSourceRef": "adapter_rows",
+      "filterBindings": { "channelId": "channelId" },
+      "columns": [
+        { "key": "market", "label": "Market" },
+        { "key": "channel", "label": "Channel" },
+        { "key": "spend", "label": "Spend", "format": "currency" },
+        { "key": "impressions", "label": "Impressions", "format": "compactNumber" }
+      ],
+      "on": [
+        { "id": "selectMarketRow", "event": "onSelect", "handler": "dashboardSelect", "label": "Select Market", "arguments": { "dimension": "market" } }
+      ]
+    },
+    {
+      "id": "selectedDetail",
+      "kind": "dashboard.detail",
+      "title": "Selected Market Detail",
+      "visibleWhen": { "selector": "dashboard.selection.entityKey", "notEmpty": true },
+      "containers": [
+        {
+          "id": "selectedNarrative",
+          "kind": "dashboard.report",
+          "title": "Selection",
+          "sections": [
+            { "id": "selectionBody", "title": "Active selection", "body": ["The selected market is now applied across bound report blocks."] }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+```forge-data
+{
+  "id": "adapter_rows",
+  "data": [
+    { "market": "New York", "channelId": 1, "channel": "CTV", "spend": 120000, "impressions": 8400000 },
+    { "market": "Chicago", "channelId": 1, "channel": "CTV", "spend": 84000, "impressions": 5900000 },
+    { "market": "New York", "channelId": 2, "channel": "Display", "spend": 46000, "impressions": 12100000 },
+    { "market": "Chicago", "channelId": 2, "channel": "Display", "spend": 31000, "impressions": 8700000 }
+  ]
+}
+```

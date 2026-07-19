@@ -14,6 +14,24 @@ import kotlin.test.assertTrue
 class ChartRendererTest {
 
     @Test
+    fun `sampled chart axis labels preserve boundaries and deduplicate categories`() {
+        assertEquals(
+            listOf("Jan", "Mar", "May", "Jul"),
+            sampledChartAxisLabels(listOf("Jan", "Feb", "Feb", "Mar", "Apr", "May", "Jun", "Jul"), 4)
+        )
+        assertEquals(listOf("Jan", "Feb"), sampledChartAxisLabels(listOf("Jan", "Feb"), 4))
+        assertEquals(listOf("Jan"), sampledChartAxisLabels(listOf("Jan", "Feb"), 1))
+    }
+
+    @Test
+    fun `sampled chart axis labels preserve raw category identity`() {
+        assertEquals(
+            listOf(" Q1 ", "Q1", "Q2"),
+            sampledChartAxisLabels(listOf(" Q1 ", "Q1", "Q2"), 4)
+        )
+    }
+
+    @Test
     fun `chartDisplayTitle trims blanks and suppresses duplicate container titles`() {
         assertEquals("Capacity Trend", chartDisplayTitle("  Capacity Trend  "))
         assertNull(chartDisplayTitle("   "))
@@ -279,7 +297,7 @@ class ChartRendererTest {
             chartDataStateFeedback(loading = false, error = null, hasResolvedRows = false, hasChartValues = false)
         )
         assertEquals(
-            ChartDataStateFeedback("Unable to load chart data", detail = "Timeout", isError = true),
+            ChartDataStateFeedback("Unable to load chart data", isError = true),
             chartDataStateFeedback(loading = false, error = "  Timeout  ", hasChartValues = false)
         )
         assertEquals(

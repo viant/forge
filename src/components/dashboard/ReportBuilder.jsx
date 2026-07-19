@@ -379,7 +379,10 @@ import {
     instantiateReportBuilderDocumentTemplate,
     normalizeReportBuilderDocumentTemplates,
 } from "./reportBuilderDocumentTemplates.js";
-import { buildReportBuilderImportedStarterFromJsonFile } from "./reportBuilderForgeUiStarter.js";
+import {
+    applyDashboardReportAdapterConfig,
+    buildReportBuilderImportedStarterFromJsonFile,
+} from "./reportBuilderForgeUiStarter.js";
 import {
     applyReportBuilderStaticDatasetFieldHints,
     buildReportBuilderStaticDatasetsFromJsonFile,
@@ -1786,8 +1789,11 @@ export default function ReportBuilder({ container, context }) {
         fallbackFingerprint: hydratedReportDocumentSession?.reopenedSemanticFingerprint || "",
     });
     const displayConfig = useMemo(
-        () => buildReportBuilderCalculatedFieldConfig(semanticDisplayConfig, state),
-        [semanticDisplayConfig, state?.localCalculatedFields, state?.localTableCalculations],
+        () => applyDashboardReportAdapterConfig(
+            buildReportBuilderCalculatedFieldConfig(semanticDisplayConfig, state),
+            state,
+        ),
+        [semanticDisplayConfig, state?.localCalculatedFields, state?.localTableCalculations, state?.reportDashboardAdapter?.dataSources, state?.reportDashboardAdapter?.filterDefinitions],
     );
     const configuredLeftRailWidthPercent = useMemo(
         () => resolveReportBuilderConfiguredLeftRailWidthPercent(displayConfig),
@@ -2896,8 +2902,10 @@ export default function ReportBuilder({ container, context }) {
     ]);
     const authoredRuntimeSurfaceEnabled = (runtimePreviewEnabled || reportWorkspaceMode)
         && authoredReportBlocksConfigured;
+    const authoredStaticDatasetsConfigured = Array.isArray(state?.reportStaticDatasets)
+        && state.reportStaticDatasets.length > 0;
     const shouldCompileRuntimePreview = (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
-        && (canRunReport || readiness.reason === "semantic");
+        && (canRunReport || readiness.reason === "semantic" || authoredStaticDatasetsConfigured);
 
     useEffect(() => {
         const jobs = buildLookupHydrationJobs(builderContext, config, state, resolveLookup);
@@ -3465,6 +3473,30 @@ export default function ReportBuilder({ container, context }) {
         compileValidation: authoredDocumentCompileValidation,
         title: "Authored Block Validation",
     }), [authoredDocumentCompileValidation]);
+    const dashboardAdapterDiagnosticsNotice = useMemo(() => {
+        const diagnostics = Array.isArray(state?.reportDashboardAdapter?.diagnostics)
+            ? state.reportDashboardAdapter.diagnostics.filter(Boolean)
+            : [];
+        if (diagnostics.length === 0) {
+            return null;
+        }
+        return {
+            level: diagnostics.some((diagnostic) => normalizeString(diagnostic?.severity).toLowerCase() === "error")
+                ? "danger"
+                : "warning",
+            title: "Dashboard Adapter Diagnostics",
+            description: "Review source dashboard behavior that could not be represented exactly in the adapted report contract.",
+            diagnostics: diagnostics.map((diagnostic, index) => ({
+                id: normalizeString(diagnostic?.id || `${diagnostic?.code || "dashboardAdapter"}_${index + 1}`),
+                severity: normalizeString(diagnostic?.severity || "warning"),
+                code: normalizeString(diagnostic?.code || "dashboardAdapterDiagnostic"),
+                blockId: normalizeString(diagnostic?.sourceBlockId || diagnostic?.blockId),
+                path: normalizeString(diagnostic?.sourceKind || diagnostic?.path),
+                message: normalizeString(diagnostic?.message || "Dashboard adaptation requires review."),
+                suggestedFix: normalizeString(diagnostic?.suggestedFix),
+            })),
+        };
+    }, [state?.reportDashboardAdapter?.diagnostics]);
     const authoredDocumentBlockCount = Number(authoredDocumentSummary?.totalCount || 0) || 0;
     const designWorkspaceOverviewState = useMemo(() => {
         const hasDrillStructure = Number(authoredDrillSummary?.hierarchyCount || 0) > 0
@@ -5076,6 +5108,90 @@ export default function ReportBuilder({ container, context }) {
         );
     };
 
+    const renderRuntimeDataViewControls = () => (
+        <div className="forge-report-builder__control-cluster forge-report-builder__control-cluster--data-view">
+            <div>
+                <label>Table data view</label>
+                <div className="forge-report-builder__control-cluster-help">
+                    Choose the measures and breakdowns shown in this result without changing the report design.
+                </div>
+            </div>
+            <div className="forge-report-builder__runtime-field-group">
+                <span className="forge-report-builder__runtime-field-label">Measures</span>
+                <div className="forge-report-builder__measure-row" aria-label="Table measures">
+                    {measureSections.flatMap((section) => section.measures).map((measure) => {
+                        const measureId = String(measure?.id || "").trim();
+                        const active = state.selectedMeasures.includes(measureId);
+                        const issue = semanticMeasureIssuesById[measureId] || null;
+                        return (
+                            <button
+                                key={measureId}
+                                type="button"
+                                className={[
+                                    "forge-report-builder__measure-pill",
+                                    active ? "is-active" : "",
+                                    issue ? "is-semantic-invalid" : "",
+                                ].filter(Boolean).join(" ")}
+                                aria-pressed={active}
+                                disabled={!active && !!issue}
+                                onClick={() => !issue && toggleMeasure(measureId)}
+                                title={issue?.message || semanticFieldTitle(measure) || undefined}
+                            >
+                                <span className={active ? "forge-report-builder__selector-box is-active" : "forge-report-builder__selector-box"}>
+                                    {active ? "✓" : ""}
+                                </span>
+                                <span className="forge-report-builder__pill-text">{measure.label || measureId}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+            <div className="forge-report-builder__runtime-field-group">
+                <span className="forge-report-builder__runtime-field-label">Breakdowns</span>
+                <div className="forge-report-builder__dimension-picker">
+                    <select
+                        className="forge-report-builder-select forge-report-builder-select--add"
+                        aria-label="Add table breakdown"
+                        value=""
+                        onChange={(event) => {
+                            addDimension(event.target.value);
+                            event.target.value = "";
+                        }}
+                        disabled={availableDimensionDefs.length === 0}
+                    >
+                        <option value="">{availableDimensionDefs.length === 0 ? "All breakdowns added" : "Add breakdown..."}</option>
+                        {availableDimensionDefs.map((dimension) => {
+                            const issue = semanticDimensionIssuesById[String(dimension?.id || "").trim()] || null;
+                            return (
+                                <option key={dimension.id} value={dimension.id} disabled={!!issue}>
+                                    {issue ? `${dimension.label || dimension.id} (Unavailable)` : dimension.label || dimension.id}
+                                </option>
+                            );
+                        })}
+                    </select>
+                    <div className="forge-report-builder__dimension-selected" aria-label="Table breakdowns">
+                        {selectedDimensionDefs.map((dimension) => {
+                            const removable = selectedDimensionDefs.length > 1;
+                            return (
+                                <button
+                                    key={dimension.id}
+                                    type="button"
+                                    className="forge-report-builder__dimension-pill"
+                                    onClick={() => removeDimension(dimension.id)}
+                                    disabled={!removable}
+                                    title={removable ? `Remove ${dimension.label || dimension.id}` : "At least one breakdown is required"}
+                                >
+                                    <span className="forge-report-builder__pill-text">{dimension.label || dimension.id}</span>
+                                    {removable ? <span aria-hidden="true">×</span> : null}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
     const renderSettingsControls = () => (
         <>
             {designWorkspaceMode ? (
@@ -5192,6 +5308,7 @@ export default function ReportBuilder({ container, context }) {
                     </div>
                 </div>
             ) : null}
+            {!designWorkspaceMode ? renderRuntimeDataViewControls() : null}
             {!designWorkspaceMode && displayConfig.groupBy?.options?.length ? (
                 <div className={[
                     "forge-report-builder__control-cluster",
@@ -12582,27 +12699,36 @@ export default function ReportBuilder({ container, context }) {
             const fileText = await file.text();
             const normalizedFileName = normalizeString(file.name);
             const isJsonFile = /\.json$/i.test(normalizedFileName) || normalizeString(file.type).toLowerCase().includes("json");
-            const importedDatasets = isJsonFile
-                ? buildReportBuilderStaticDatasetsFromJsonFile({
-                    fileName: file.name,
-                    json: fileText,
-                    id: targetDatasetId || "",
-                })
-                : [buildReportBuilderStaticDatasetFromCsvFile({
-                    fileName: file.name,
-                    csv: fileText,
-                    id: targetDatasetId || `static_${normalizeString(file.name).replace(/\.[^.]+$/, "") || "csv_source"}`,
-                })].filter(Boolean);
             const importedStarter = isJsonFile
                 ? buildReportBuilderImportedStarterFromJsonFile({
                     fileName: file.name,
                     json: fileText,
                 })
                 : null;
+            const importedDatasets = isJsonFile
+                ? (() => {
+                    try {
+                        return buildReportBuilderStaticDatasetsFromJsonFile({
+                            fileName: file.name,
+                            json: fileText,
+                            id: targetDatasetId || "",
+                        });
+                    } catch (error) {
+                        if (importedStarter && !targetDatasetId) {
+                            return [];
+                        }
+                        throw error;
+                    }
+                })()
+                : [buildReportBuilderStaticDatasetFromCsvFile({
+                    fileName: file.name,
+                    csv: fileText,
+                    id: targetDatasetId || `static_${normalizeString(file.name).replace(/\.[^.]+$/, "") || "csv_source"}`,
+                })].filter(Boolean);
             const normalizedImportedDatasets = importedStarter?.datasetFieldHints
                 ? applyReportBuilderStaticDatasetFieldHints(importedDatasets, importedStarter.datasetFieldHints)
                 : importedDatasets;
-            if (importedDatasets.length === 0) {
+            if (importedDatasets.length === 0 && !importedStarter) {
                 throw new Error(`Could not create a static dataset from the selected ${isJsonFile ? "JSON" : "CSV"} file.`);
             }
             const existingDatasets = normalizeReportBuilderStaticDatasets(state?.reportStaticDatasets);
@@ -12638,6 +12764,14 @@ export default function ReportBuilder({ container, context }) {
                     ...(normalizeString(importedStarter.description) ? { reportDocumentDescription: importedStarter.description } : {}),
                     reportDocumentBlocks: importedStarter.blocks,
                     reportDocumentLayout: importedStarter.layout,
+                    reportDashboardAdapter: {
+                        source: importedStarter.source,
+                        dataSourceRefs: importedStarter.dataSourceRefs,
+                        dataSources: importedStarter.dataSources,
+                        filterDefinitions: importedStarter.filterDefinitions,
+                        interactionBindings: importedStarter.interactionBindings,
+                        diagnostics: importedStarter.diagnostics,
+                    },
                 };
             })();
             persistExplorationMutation(nextState, {
@@ -12654,12 +12788,15 @@ export default function ReportBuilder({ container, context }) {
                 setPendingDocumentInsertionPlacement("after");
                 closeReportDocumentShellPanels();
             }
+            const adapterIssueCount = Array.isArray(importedStarter?.diagnostics)
+                ? importedStarter.diagnostics.length
+                : 0;
             setChartApplyFeedback({
-                level: "success",
+                level: adapterIssueCount > 0 ? "warning" : "success",
                 message: targetDatasetId
                     ? `${importedDatasets[0]?.label || existingDataset?.label || "Static dataset"} updated.`
                     : canApplyImportedStarter
-                        ? `${importedDatasets.length} static datasets added from ${normalizedFileName || "the selected file"} and ${importedStarter?.label || "the imported starter"} applied.`
+                        ? `${importedStarter?.label || "Dashboard"} adapted with ${importedStarter.blocks.length} report blocks${importedDatasets.length > 0 ? ` and ${importedDatasets.length} static datasets` : " using its workspace datasource references"}.${adapterIssueCount > 0 ? ` Review ${adapterIssueCount} adapter diagnostics retained with the report.` : ""}`
                         : importedStarter
                             ? `${importedDatasets.length} static datasets added from ${normalizedFileName || "the selected file"}. The imported report starter was detected but not auto-applied because the current report already contains authored blocks.`
                             : importedDatasets.length === 1
@@ -17770,6 +17907,7 @@ export default function ReportBuilder({ container, context }) {
                 actionForDiagnostic: handleDocumentBlockDiagnosticAction,
                 actionLabel: resolveDocumentBlockDiagnosticActionLabel,
             }) : null}
+            {!designWorkspaceMode ? renderCompileDiagnosticsNotice(dashboardAdapterDiagnosticsNotice) : null}
             <div className="forge-report-builder__body">
                 {showLeftRail ? (
                     <aside className="forge-report-builder__left">
@@ -17905,6 +18043,7 @@ export default function ReportBuilder({ container, context }) {
                         actionForDiagnostic: handleDocumentBlockDiagnosticAction,
                         actionLabel: resolveDocumentBlockDiagnosticActionLabel,
                     }) : null}
+                    {designWorkspaceMode ? renderCompileDiagnosticsNotice(dashboardAdapterDiagnosticsNotice) : null}
                     {!showAuthoredReportSurface && !designWorkspaceMode && !compactMode && config.showResultHeader !== false && config?.result?.showResultHeader !== false ? (
                         <div className="forge-report-builder__result-header">
                             <div className="forge-report-builder__result-header-copy">

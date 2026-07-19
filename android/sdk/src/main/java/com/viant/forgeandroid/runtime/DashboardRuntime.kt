@@ -12,6 +12,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
@@ -108,7 +109,8 @@ data class DashboardReportRuntimeActionDescriptor(
     val fieldValueKey: String,
     val label: String,
     val nextFieldRef: String? = null,
-    val targetRef: String? = null
+    val targetRef: String? = null,
+    val selectionDimension: String? = null
 )
 
 data class DashboardReportRuntimeActionRefinement(
@@ -147,7 +149,8 @@ data class DashboardReportRuntimeActionExecution(
     val kind: String,
     val refinement: DashboardReportRuntimeActionRefinement? = null,
     val transition: DashboardReportRuntimeActionTransition? = null,
-    val detailRequest: DashboardReportRuntimeDetailRequest? = null
+    val detailRequest: DashboardReportRuntimeDetailRequest? = null,
+    val selection: DashboardSelectionState? = null
 )
 
 data class DashboardReportRuntimeChartSelection(
@@ -187,6 +190,8 @@ data class DashboardReportRuntimeBlockSummary(
     val kind: String,
     val title: String,
     val diagnostics: List<DashboardReportRuntimeDiagnostic> = emptyList(),
+    val content: Map<String, JsonElement> = emptyMap(),
+    val runtime: JsonObject = JsonObject(emptyMap()),
     val markdown: String? = null,
     val kpi: DashboardReportRuntimeKpiValue? = null,
     val filterBar: DashboardReportRuntimeFilterBarValue? = null,
@@ -342,6 +347,11 @@ fun dashboardReportRuntimeBlocks(
             kind = kind,
             title = title,
             diagnostics = diagnostics.filter { it.blockId == id } + datasetDiagnostics[jsonString(block["datasetRef"])].orEmpty(),
+            content = if (kind in setOf(
+                    "badgesBlock", "collectionBlock", "sectionBlock", "tabGroupBlock", "compositeBlock",
+                    "stepperBlock", "infoPanelBlock", "calloutBlock", "kanbanBlock", "timelineBlock"
+                )) content.orEmpty() else emptyMap(),
+            runtime = block["runtime"] as? JsonObject ?: JsonObject(emptyMap()),
             markdown = markdown,
             kpi = kpi,
             filterBar = filterBar,
@@ -365,6 +375,33 @@ fun dashboardReportRuntimeBlocks(
     }
     ordered += blocks.filter { it.id !in seen }
     return ordered
+}
+
+fun dashboardReportRuntimeBlockVisible(
+    block: DashboardReportRuntimeBlockSummary,
+    metrics: Map<String, Any?> = emptyMap(),
+    filters: Map<String, Any?> = emptyMap(),
+    selection: DashboardSelectionState = DashboardSelectionState()
+): Boolean {
+    val conditionValue = block.runtime["visibleWhen"] ?: return true
+    val decoded = runCatching {
+        Json { ignoreUnknownKeys = true }.decodeFromJsonElement<DashboardConditionDef>(conditionValue)
+    }.getOrNull() ?: return true
+    val selector = decoded.selector?.trim().orEmpty()
+    val condition = when {
+        selector.startsWith("dashboard.selection.") -> decoded.copy(
+            source = "selection",
+            selector = null,
+            field = selector.removePrefix("dashboard.selection.")
+        )
+        selector.startsWith("filters.") -> decoded.copy(
+            source = "filters",
+            selector = null,
+            field = selector.removePrefix("filters.")
+        )
+        else -> decoded
+    }
+    return evaluateDashboardCondition(condition, metrics, filters, selection)
 }
 
 fun dashboardReportRuntimeDiagnostics(values: List<JsonElement>): List<DashboardReportRuntimeDiagnostic> {
@@ -431,7 +468,7 @@ fun dashboardReportRuntimeTable(
             field = it,
             includeBlockIdInGeneratedId = false
         )
-    }
+    } + dashboardReportRuntimeAuthoredSelectionDescriptors(block, actionFields)
     val rowCount = dashboardReportRuntimeInt((dataset?.get("provenance") as? JsonObject)?.get("rowCount"))
     val limit = maxOf(1, rowCount ?: pageSize)
     return DashboardReportRuntimeTableValue(
@@ -528,7 +565,7 @@ fun dashboardReportRuntimeChart(
             field = it,
             includeBlockIdInGeneratedId = true
         )
-    }
+    } + dashboardReportRuntimeAuthoredSelectionDescriptors(block, actionFields)
     return DashboardReportRuntimeChartValue(
         dataSourceRef = jsonString(dataset?.get("dataSourceRef")) ?: datasetRef,
         chart = chart,
@@ -688,6 +725,26 @@ fun dashboardReportRuntimeActionDescriptors(
     return descriptors
 }
 
+fun dashboardReportRuntimeAuthoredSelectionDescriptors(
+    block: JsonObject,
+    fields: List<DashboardReportRuntimeActionField>
+): List<DashboardReportRuntimeActionDescriptor> {
+    val actions = (((block["runtime"] as? JsonObject)?.get("actions")) as? JsonArray).orEmpty()
+    return actions.mapNotNull { value ->
+        val action = value as? JsonObject ?: return@mapNotNull null
+        if (!jsonString(action["kind"]).equals("select", ignoreCase = true)) return@mapNotNull null
+        val dimension = jsonString(action["dimension"]) ?: return@mapNotNull null
+        val field = fields.firstOrNull { it.valueKey == dimension } ?: return@mapNotNull null
+        DashboardReportRuntimeActionDescriptor(
+            id = jsonString(action["id"]) ?: "select_$dimension",
+            kind = "select",
+            fieldValueKey = field.valueKey,
+            label = jsonString(action["label"]) ?: "Select ${field.label}",
+            selectionDimension = dimension
+        )
+    }
+}
+
 fun dashboardReportRuntimeTableActionExecutions(
     blockId: String?,
     descriptors: List<DashboardReportRuntimeActionDescriptor>,
@@ -764,6 +821,12 @@ fun dashboardReportRuntimeActionExecutionPayload(
                 )
             )
         }
+        execution.selection?.let { selection -> put("selection", mapOf(
+            "dimension" to selection.dimension,
+            "entityKey" to selection.entityKey,
+            "selected" to selection.selected,
+            "sourceBlockId" to selection.sourceBlockId
+        )) }
         execution.transition?.let { transition ->
             put(
                 "transition",
@@ -872,6 +935,17 @@ private fun dashboardReportRuntimeActionExecution(
                 )
             )
         }
+        "select" -> DashboardReportRuntimeActionExecution(
+            id = descriptor.id,
+            label = descriptor.label,
+            kind = "select",
+            selection = DashboardSelectionState(
+                dimension = descriptor.selectionDimension ?: descriptor.fieldValueKey,
+                entityKey = value?.toString(),
+                selected = item,
+                sourceBlockId = sourceBlockId
+            )
+        )
         else -> null
     }
 }

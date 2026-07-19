@@ -401,7 +401,6 @@ final class ForgeIOSTests: XCTestCase {
             ),
             ChartDataStateFeedback(
                 message: "Unable to load chart data",
-                detail: "Timeout",
                 isError: true
             )
         )
@@ -3342,6 +3341,34 @@ final class ForgeIOSTests: XCTestCase {
         ))
     }
 
+    func testDashboardReportRuntimePreservesResolvedPresentationContent() throws {
+        let presentationKinds = [
+            "badgesBlock", "collectionBlock", "sectionBlock", "tabGroupBlock", "compositeBlock",
+            "stepperBlock", "infoPanelBlock", "calloutBlock", "kanbanBlock", "timelineBlock"
+        ]
+        let blocks = presentationKinds.enumerated().map { index, kind in
+            """
+            {"id":"block-\(index + 1)","kind":"\(kind)","content":{"marker":"\(kind)"}}
+            """
+        }.joined(separator: ",")
+        let payload = """
+        {
+          "id": "runtime",
+          "kind": "dashboard.reportRuntime",
+          "reportRuntime": {
+            "reportFill": {
+              "blocks": [\(blocks)]
+            }
+          }
+        }
+        """
+        let container = try JSONDecoder().decode(ContainerDef.self, from: Data(payload.utf8))
+        let summary = DashboardRuntime.dashboardReportRuntimeSummary(container)
+
+        XCTAssertEqual(summary.blocks.map(\.kind), presentationKinds)
+        XCTAssertEqual(summary.blocks.compactMap { $0.content["marker"]?.stringValue }, presentationKinds)
+    }
+
     func testDashboardReportRuntimeTableActionExecutionsMatchWebPayloadShape() {
         let field = DashboardReportRuntimeActionField(
             id: "channelV2",
@@ -3431,6 +3458,38 @@ final class ForgeIOSTests: XCTestCase {
                 )
             )
         ])
+    }
+
+    func testDashboardReportRuntimeExecutesAuthoredSelectionAction() {
+        let field = DashboardReportRuntimeActionField(
+            id: "market",
+            valueKey: "market",
+            displayValueKey: "market",
+            label: "Market",
+            runtimeFilterable: false
+        )
+        let block: [String: JSONValue] = [
+            "runtime": .object([
+                "actions": .array([.object([
+                    "id": .string("selectMarket"),
+                    "kind": .string("select"),
+                    "dimension": .string("market")
+                ])])
+            ])
+        ]
+        let descriptors = DashboardRuntime.dashboardReportRuntimeAuthoredSelectionDescriptors(block: block, fields: [field])
+        let executions = DashboardRuntime.dashboardReportRuntimeTableActionExecutions(
+            blockID: "marketTable",
+            descriptors: descriptors,
+            field: field,
+            item: ["market": .string("US"), "spend": .number(10)]
+        )
+        XCTAssertEqual(executions.first?.selection, DashboardSelectionState(
+            dimension: "market",
+            entityKey: "US",
+            selected: ["market": .string("US"), "spend": .number(10)],
+            sourceBlockID: "marketTable"
+        ))
     }
 
     func testDashboardReportRuntimeChartActionExecutionsMatchWebPayloadShape() {
@@ -4437,6 +4496,22 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(reselected, Set(["spend"]))
     }
 
+    func testChartAxisLabelsSampleDenseCategoriesWithoutDroppingBoundaries() {
+        XCTAssertEqual(
+            sampledChartAxisLabels(["Jan", "Feb", "Feb", "Mar", "Apr", "May", "Jun", "Jul"], maximum: 4),
+            ["Jan", "Mar", "May", "Jul"]
+        )
+        XCTAssertEqual(sampledChartAxisLabels(["Jan", "Feb"], maximum: 4), ["Jan", "Feb"])
+        XCTAssertEqual(sampledChartAxisLabels(["Jan", "Feb"], maximum: 1), ["Jan"])
+    }
+
+    func testChartAxisLabelsPreserveRawCategoryIdentity() {
+        XCTAssertEqual(
+            sampledChartAxisLabels([" Q1 ", "Q1", "Q2"], maximum: 4),
+            [" Q1 ", "Q1", "Q2"]
+        )
+    }
+
     func testChartSelectionSummaryKeepsDuplicateSeriesLabelsDistinct() {
         let data = [
             SeriesDatum(rowIndex: 0, category: "Jan", seriesKey: "grossSpend", seriesLabel: "Spend", value: 12),
@@ -4523,7 +4598,6 @@ final class ForgeIOSTests: XCTestCase {
             ),
             ChartDataStateFeedback(
                 message: "Unable to load chart data",
-                detail: "Timeout",
                 isError: true
             )
         )
@@ -5325,6 +5399,9 @@ final class ForgeIOSTests: XCTestCase {
         let context = ParameterResolver.ResolutionContext(
             identityDataSourceRef: "report",
             dataSources: [
+                "report": ParameterResolver.DataSourceSnapshot(
+                    input: InputState(parameters: ["pageSize": .number(25)])
+                ),
                 "items": ParameterResolver.DataSourceSnapshot(
                     selectionMode: "multi",
                     selection: SelectionState(
@@ -5354,6 +5431,12 @@ final class ForgeIOSTests: XCTestCase {
                     location: .string("id"),
                     from: "items:selection",
                     to: ":query"
+                ),
+                ParameterDef(
+                    name: "pageSize",
+                    location: .string("parameters.pageSize"),
+                    from: ":input",
+                    to: ":query"
                 )
             ],
             context: context
@@ -5363,6 +5446,7 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(query?["period"], .string("today"))
         XCTAssertEqual(query?["granularity"], .string("hour"))
         XCTAssertEqual(query?["itemIds"], .array([.string("item-1"), .string("item-2")]))
+        XCTAssertEqual(query?["pageSize"], .number(25))
     }
 
     func testParameterDefDecodesCompactParameterFields() throws {

@@ -179,6 +179,7 @@ export function buildDraftReportExportRequest({
         artifactKind: normalizeString(source?.kind || "dashboard.reportBuilder") || "dashboard.reportBuilder",
         containerId: normalizeString(source?.containerId),
         stateKey: normalizeString(source?.stateKey),
+        reportId: normalizeString(source?.containerId || source?.stateKey) ? "" : normalizeString(reportDocument?.id),
       }),
       containerId: normalizeString(source?.containerId),
       stateKey: normalizeString(source?.stateKey),

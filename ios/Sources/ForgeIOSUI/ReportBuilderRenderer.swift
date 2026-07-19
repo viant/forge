@@ -3,6 +3,7 @@ import Charts
 import ForgeIOSRuntime
 
 public struct ReportBuilderRenderer: View {
+    @Environment(\.forgePresentationDensity) private var presentationDensity
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
     private let container: ContainerDef
@@ -735,13 +736,6 @@ public struct ReportBuilderRenderer: View {
                 Text(feedback.message)
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(feedback.isError ? .red : .secondary)
-                if let detail = feedback.detail {
-                    Text(detail)
-                        .font(.caption2)
-                        .foregroundStyle(feedback.isError ? .red.opacity(0.85) : .secondary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.center)
-                }
             }
             .frame(maxWidth: .infinity, minHeight: 220)
             .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 12))
@@ -772,8 +766,22 @@ public struct ReportBuilderRenderer: View {
                     .foregroundStyle(by: .value("Series", point.series))
                 }
             }
+            .chartXAxis {
+                AxisMarks(values: sampledChartAxisLabels(
+                    points.map(\.x),
+                    maximum: isCompactPresentation ? 4 : 6
+                )) {
+                    AxisGridLine()
+                    AxisTick()
+                    AxisValueLabel()
+                }
+            }
             .frame(height: 220)
         }
+    }
+
+    private var isCompactPresentation: Bool {
+        presentationDensity == .compact
     }
 
     private func loadRows() async {

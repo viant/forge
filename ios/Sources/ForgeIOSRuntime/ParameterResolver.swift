@@ -55,11 +55,14 @@ public enum ParameterResolver {
             let sourceDataSourceRef = sourceParts.dataSourceRef.isEmpty ? context.identityDataSourceRef : sourceParts.dataSourceRef
             let destinationDataSourceRef = destinationParts.dataSourceRef.isEmpty ? context.identityDataSourceRef : destinationParts.dataSourceRef
             guard !sourceDataSourceRef.isEmpty, !destinationDataSourceRef.isEmpty else { continue }
+            let sourcePath = parameter.name == "..."
+                ? parameter.location?.stringValue
+                : parameter.location?.stringValue ?? parameter.name
             guard let value = readCompactValue(
                 context: context,
                 dataSourceRef: sourceDataSourceRef,
                 store: expandStore(sourceParts.store),
-                path: parameter.location?.stringValue ?? parameter.name
+                path: sourcePath
             ) else {
                 continue
             }

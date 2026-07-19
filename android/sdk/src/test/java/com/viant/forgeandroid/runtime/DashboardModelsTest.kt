@@ -2,7 +2,7 @@ package com.viant.forgeandroid.runtime
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.content
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -42,7 +42,10 @@ class DashboardModelsTest {
             }
         """.trimIndent()
 
-        val metadata = json.decodeFromString(WindowMetadata.serializer(), payload)
+        val metadata = json.decodeFromJsonElement(
+            WindowMetadata.serializer(),
+            normalizeWindowMetadataJson(json.parseToJsonElement(payload))
+        )
         val group = metadata.view
             ?.content
             ?.containers
@@ -88,11 +91,11 @@ class DashboardModelsTest {
         val metadata = json.decodeFromString(WindowMetadata.serializer(), payload)
         val condition = metadata.view?.content?.containers?.firstOrNull()?.visibleWhen
 
-        assertEquals("enterprise", condition?.equals?.jsonObject?.get("id")?.jsonPrimitive?.content)
-        assertEquals(2, condition?.equals?.jsonObject?.get("tier")?.jsonPrimitive?.content?.toInt())
-        assertEquals("blocked", condition?.notEquals?.jsonArray?.firstOrNull()?.jsonPrimitive?.content)
-        assertEquals("enterprise", condition?.inValues?.firstOrNull()?.jsonObject?.get("id")?.jsonPrimitive?.content)
-        assertEquals("agency", condition?.inValues?.getOrNull(1)?.jsonArray?.firstOrNull()?.jsonPrimitive?.content)
+        assertEquals("enterprise", condition?.equals?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull)
+        assertEquals(2, condition?.equals?.jsonObject?.get("tier")?.jsonPrimitive?.contentOrNull?.toInt())
+        assertEquals("blocked", condition?.notEquals?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull)
+        assertEquals("enterprise", condition?.inValues?.firstOrNull()?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull)
+        assertEquals("agency", condition?.inValues?.getOrNull(1)?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull)
     }
 
     @Test
@@ -115,14 +118,17 @@ class DashboardModelsTest {
             }
         """.trimIndent()
 
-        val metadata = json.decodeFromString(WindowMetadata.serializer(), payload)
+        val metadata = json.decodeFromJsonElement(
+            WindowMetadata.serializer(),
+            normalizeWindowMetadataJson(json.parseToJsonElement(payload))
+        )
         val parameter = metadata.dataSources["report"]?.parameters?.firstOrNull()
 
         assertNotNull(parameter)
         assertEquals("scope", parameter?.name)
         assertEquals("const", parameter?.input)
-        assertEquals("payload.scope", parameter?.locationValue?.jsonObject?.get("path")?.jsonPrimitive?.content)
-        assertEquals("phone", parameter?.value?.jsonObject?.get("platforms")?.jsonArray?.firstOrNull()?.jsonPrimitive?.content)
+        assertEquals("payload.scope", parameter?.locationValue?.jsonObject?.get("path")?.jsonPrimitive?.contentOrNull)
+        assertEquals("phone", parameter?.value?.jsonObject?.get("platforms")?.jsonArray?.firstOrNull()?.jsonPrimitive?.contentOrNull)
         assertEquals("prefill.scope", parameter?.selector)
     }
 
@@ -270,8 +276,8 @@ class DashboardModelsTest {
         assertEquals("type", item?.dataSourceRefSelector)
         assertEquals("names", item?.dataSourceRefs?.get("lookup"))
         assertEquals("windowForm", item?.scope)
-        assertEquals("Enter name", item?.properties?.get("placeholder")?.jsonPrimitive?.content)
-        assertEquals("compact", item?.targetOverrides?.get("phone")?.jsonObject?.get("type")?.jsonPrimitive?.content)
+        assertEquals("Enter name", item?.properties?.get("placeholder")?.jsonPrimitive?.contentOrNull)
+        assertEquals("compact", item?.targetOverrides?.get("phone")?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull)
     }
 
     @Test
@@ -332,8 +338,8 @@ class DashboardModelsTest {
         assertEquals("supporting", container?.role)
         assertEquals(2, container?.card?.elevation)
         assertEquals("quiet-card", container?.card?.className)
-        assertEquals("compact", container?.card?.style?.get("padding")?.jsonPrimitive?.content)
-        assertEquals("info", container?.section?.properties?.get("tone")?.jsonPrimitive?.content)
+        assertEquals("compact", container?.card?.style?.get("padding")?.jsonPrimitive?.contentOrNull)
+        assertEquals("info", container?.section?.properties?.get("tone")?.jsonPrimitive?.contentOrNull)
         assertEquals("refresh", container?.toolbar?.items?.firstOrNull()?.id)
         assertEquals("data.refresh", container?.toolbar?.items?.firstOrNull()?.on?.firstOrNull()?.handler)
         assertTrue(container?.toolbar?.targetOverrides?.containsKey("phone") == true)
@@ -345,7 +351,7 @@ class DashboardModelsTest {
         assertEquals(true, container?.terminal?.truncateLongOutput)
         assertEquals(1200, container?.terminal?.truncateLength)
         assertEquals("clear", container?.terminal?.toolbar?.items?.firstOrNull()?.id)
-        assertEquals("tablet", container?.terminal?.target?.jsonObject?.get("platform")?.jsonPrimitive?.content)
+        assertEquals("tablet", container?.terminal?.target?.jsonObject?.get("platform")?.jsonPrimitive?.contentOrNull)
         assertEquals("open", container?.actions?.firstOrNull()?.id)
         assertEquals("window.open", container?.actions?.firstOrNull()?.on?.firstOrNull()?.handler)
         assertEquals("onAppear", container?.on?.firstOrNull()?.event)
@@ -399,7 +405,7 @@ class DashboardModelsTest {
         assertEquals("back", chat?.header?.left?.firstOrNull()?.icon)
         assertEquals("window.back", chat?.header?.left?.firstOrNull()?.on?.firstOrNull()?.handler)
         assertEquals("Tune", chat?.header?.right?.firstOrNull()?.label)
-        assertEquals("Tune", chat?.header?.right?.firstOrNull()?.targetOverrides?.get("phone")?.jsonObject?.get("label")?.jsonPrimitive?.content)
+        assertEquals("Tune", chat?.header?.right?.firstOrNull()?.targetOverrides?.get("phone")?.jsonObject?.get("label")?.jsonPrimitive?.contentOrNull)
         assertEquals(false, chat?.showUpload)
         assertEquals("uploads", chat?.uploadField)
         assertEquals(true, chat?.showMic)
@@ -407,9 +413,9 @@ class DashboardModelsTest {
         assertEquals(true, chat?.showAbort)
         assertEquals(false, chat?.showTools)
         assertEquals(true, chat?.commandCenter)
-        assertEquals("state.streaming", chat?.abortVisible?.jsonObject?.get("selector")?.jsonPrimitive?.content)
-        assertEquals("phone", chat?.target?.jsonObject?.get("platform")?.jsonPrimitive?.content)
-        assertEquals(true, chat?.targetOverrides?.get("tablet")?.jsonObject?.get("showTools")?.jsonPrimitive?.content == "true")
+        assertEquals("state.streaming", chat?.abortVisible?.jsonObject?.get("selector")?.jsonPrimitive?.contentOrNull)
+        assertEquals("phone", chat?.target?.jsonObject?.get("platform")?.jsonPrimitive?.contentOrNull)
+        assertEquals(true, chat?.targetOverrides?.get("tablet")?.jsonObject?.get("showTools")?.jsonPrimitive?.contentOrNull == "true")
         assertEquals("onSubmit", chat?.on?.firstOrNull()?.event)
         assertEquals("chat.submit", chat?.on?.firstOrNull()?.handler)
     }
@@ -443,7 +449,10 @@ class DashboardModelsTest {
             }
         """.trimIndent()
 
-        val metadata = json.decodeFromString(WindowMetadata.serializer(), payload)
+        val metadata = json.decodeFromJsonElement(
+            WindowMetadata.serializer(),
+            normalizeWindowMetadataJson(json.parseToJsonElement(payload))
+        )
         val dataSource = metadata.dataSources["rows"]
         val item = metadata.view?.content?.containers?.firstOrNull()?.items?.firstOrNull()
 
@@ -806,10 +815,10 @@ class DashboardModelsTest {
         assertEquals("compact", chart.yAxis?.tickFormat)
         assertEquals("avails", chart.series?.valueKey)
         assertEquals("channel", chart.series?.nameKey)
-        assertEquals("100%", chart.width?.jsonPrimitive?.content)
-        assertEquals("420", chart.height?.jsonPrimitive?.content)
-        assertEquals("dashboard", chart.target?.jsonObject?.get("surface")?.jsonPrimitive?.content)
-        assertEquals("260", chart.targetOverrides["android:phone"]?.jsonObject?.get("height")?.jsonPrimitive?.content)
+        assertEquals("100%", chart.width?.jsonPrimitive?.contentOrNull)
+        assertEquals("420", chart.height?.jsonPrimitive?.contentOrNull)
+        assertEquals("dashboard", chart.target?.jsonObject?.get("surface")?.jsonPrimitive?.contentOrNull)
+        assertEquals("260", chart.targetOverrides["android:phone"]?.jsonObject?.get("height")?.jsonPrimitive?.contentOrNull)
     }
 
     @Test
@@ -853,10 +862,10 @@ class DashboardModelsTest {
         assertEquals("form.done", rich.onDone)
         assertEquals("form.success", rich.onSuccess)
         assertEquals(true, rich.async)
-        assertEquals("dialog", rich.target?.jsonObject?.get("surface")?.jsonPrimitive?.content)
+        assertEquals("dialog", rich.target?.jsonObject?.get("surface")?.jsonPrimitive?.contentOrNull)
         assertEquals(
             "sheet",
-            rich.targetOverrides["android:phone"]?.jsonObject?.get("surface")?.jsonPrimitive?.content
+            rich.targetOverrides["android:phone"]?.jsonObject?.get("surface")?.jsonPrimitive?.contentOrNull
         )
     }
 

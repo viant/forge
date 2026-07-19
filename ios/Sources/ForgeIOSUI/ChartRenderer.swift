@@ -79,13 +79,6 @@ public struct ChartRenderer: View {
                             Text(chartStateFeedback.message)
                                 .font(.footnote.weight(.medium))
                                 .foregroundStyle(chartStateFeedback.isError ? .red : .secondary)
-                            if let detail = chartStateFeedback.detail {
-                                Text(detail)
-                                    .font(.caption2)
-                                    .foregroundStyle(chartStateFeedback.isError ? .red.opacity(0.85) : .secondary)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.center)
-                            }
                         }
                         .padding(.horizontal, 12)
                     )
@@ -233,7 +226,10 @@ public struct ChartRenderer: View {
             }
             .chartForegroundStyleScale(domain: seriesKeys, range: seriesColors)
             .chartXAxis {
-                AxisMarks(values: .automatic) { value in
+                AxisMarks(values: sampledChartAxisLabels(
+                    chartSeriesData.map(\.category),
+                    maximum: isCompactPresentation ? 4 : 6
+                )) { value in
                     AxisGridLine()
                     AxisTick()
                     AxisValueLabel()
@@ -806,6 +802,22 @@ internal func toggledChartSeriesSelection(current: Set<String>, key: String) -> 
     return next
 }
 
+internal func sampledChartAxisLabels(_ labels: [String], maximum: Int) -> [String] {
+    let orderedLabels = labels.reduce(into: [String]()) { result, label in
+        guard !label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !result.contains(label) else { return }
+        result.append(label)
+    }
+    guard maximum > 0, orderedLabels.count > maximum else { return orderedLabels }
+    guard maximum > 1 else { return [orderedLabels[0]] }
+
+    let lastIndex = orderedLabels.count - 1
+    return (0..<maximum).map { position in
+        let index = Int((Double(position) * Double(lastIndex) / Double(maximum - 1)).rounded())
+        return orderedLabels[index]
+    }
+}
+
 internal func chartSelectionSummary(category: String?, data: [SeriesDatum]) -> ChartSelectionSummary? {
     guard let category, !category.isEmpty else {
         return nil
@@ -941,12 +953,10 @@ internal struct ChartAccessibleDataRow: Identifiable, Equatable {
 
 internal struct ChartDataStateFeedback: Equatable {
     let message: String
-    let detail: String?
     let isError: Bool
 
-    init(message: String, detail: String? = nil, isError: Bool = false) {
+    init(message: String, isError: Bool = false) {
         self.message = message
-        self.detail = detail
         self.isError = isError
     }
 }
@@ -1002,11 +1012,9 @@ internal func chartDataStateFeedback(
     if loading || !hasResolvedRows {
         return ChartDataStateFeedback(message: "Loading chart")
     }
-    let detail = error?.trimmingCharacters(in: .whitespacesAndNewlines)
-    if let detail, !detail.isEmpty {
+    if let error, !error.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
         return ChartDataStateFeedback(
             message: "Unable to load chart data",
-            detail: detail,
             isError: true
         )
     }

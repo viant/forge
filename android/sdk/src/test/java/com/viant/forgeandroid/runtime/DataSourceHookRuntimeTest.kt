@@ -125,7 +125,7 @@ class DataSourceHookRuntimeTest {
                         ParameterDef(name = "orderId", input = "dataSource", location = "orderId", to = ":query"),
                         ParameterDef(name = "status", input = "dataSource", location = "status", to = ":query"),
                         ParameterDef(name = "country", input = "filter", location = "country", to = ":query"),
-                        ParameterDef(name = "pageSize", input = "input", location = "parameters.pageSize", to = ":query")
+                        ParameterDef(name = "pageSize", location = "parameters.pageSize", from = ":input", to = ":query")
                     )
                 )
             )
@@ -139,7 +139,7 @@ class DataSourceHookRuntimeTest {
             dataSourceRuntime = runtime
         )
         val ctx = runtime.attach(window, "orders")
-        signals.selection(WindowIdentity("W1").dataSourceId("orders")).set(
+        signals.selection(WindowIdentity("W1").dataSourceId("orders"), SelectionState()).set(
             SelectionState(selected = mapOf("orderId" to 201))
         )
         signals.form(WindowIdentity("W1").dataSourceId("orders")).set(
@@ -241,7 +241,7 @@ class DataSourceHookRuntimeTest {
                         parameters = mapOf("page" to "offset", "size" to "limit")
                     ),
                     parameters = listOf(
-                        ParameterDef(name = "status", input = "filter", location = "status", to = ":query")
+                        ParameterDef(name = "status", location = "filter.status", from = ":input", to = ":query")
                     )
                 )
             )
@@ -276,6 +276,55 @@ class DataSourceHookRuntimeTest {
         assertEquals("US", inputs["country"])
         assertEquals("active", inputs["status"])
         assertEquals(2L, ctx.collection.peek().firstOrNull()?.get("id"))
+    }
+
+    @Test
+    fun fetchCollectionResolvesCompactInputBodyParameters() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"data": [{"id": 3}]}"""))
+        server.start()
+
+        val signals = SignalRegistry()
+        val runtime = DataSourceRuntime(
+            signals,
+            RestClient(
+                EndpointRegistry(
+                    mapOf("appAPI" to EndpointConfig(baseUrl = server.url("/").toString().trimEnd('/')))
+                )
+            ),
+            CoroutineScope(Dispatchers.Unconfined)
+        )
+        val metadataSignal = signals.metadata("W1").also {
+            it.set(
+                WindowMetadata(
+                    dataSources = mapOf(
+                        "report" to DataSourceDef(
+                            service = ServiceDef(endpoint = "appAPI", uri = "/reports", method = "POST"),
+                            parameters = listOf(
+                                ParameterDef(
+                                    name = "pageSize",
+                                    location = "parameters.pageSize",
+                                    from = ":input",
+                                    to = ":body"
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        }
+        val window = WindowContext("W1", metadataSignal, signals, runtime)
+        val ctx = runtime.attach(window, "report")
+        signals.input(WindowIdentity("W1").dataSourceId("report")).set(
+            InputState(parameters = mapOf("pageSize" to 25))
+        )
+
+        ctx.fetchCollection()
+        delay(150)
+
+        val request = server.takeRequest()
+        val body = JsonUtil.parseObject(request.body.readUtf8())
+        assertEquals("POST", request.method)
+        assertEquals(25L, body["pageSize"])
     }
 
     @Test

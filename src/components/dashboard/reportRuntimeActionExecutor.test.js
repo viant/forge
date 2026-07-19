@@ -10,6 +10,38 @@ let clearCalls = 0;
 let undoCalls = 0;
 let redoCalls = 0;
 
+let hostPayload = null;
+assert.deepEqual(executeReportRuntimeAction({
+  kind: "host",
+  handler: "openMarket",
+  arguments: { mode: "detail" },
+  item: { market: "US" },
+  sourceBlockId: "marketChart",
+}, {
+  executeHostAction(payload) {
+    hostPayload = payload;
+    return "opened";
+  },
+}), {
+  executed: true,
+  branch: "host",
+  result: "opened",
+});
+assert.deepEqual(hostPayload, {
+  handler: "openMarket",
+  arguments: { mode: "detail" },
+  item: { market: "US" },
+  sourceBlockId: "marketChart",
+});
+
+assert.deepEqual(executeReportRuntimeAction({
+  kind: "host",
+  handler: "openMarket",
+}, {}), {
+  executed: false,
+  reason: "unsupportedExecution",
+});
+
 assert.deepEqual(executeReportRuntimeAction({
   kind: "keep",
   refinement: {
