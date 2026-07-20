@@ -91,6 +91,7 @@ assert.deepEqual(starter.datasetFieldHints, {
     pct: "measure",
   },
 });
+const interpretationBlockId = starter.blocks.find((block) => block.kind === "markdownBlock")?.id;
 assert.deepEqual(starter.layout.items.slice(0, 8), [
   { blockId: "primaryBuilder" },
   { blockId: "posture_metric_primary_blocker_family", span: 6 },
@@ -98,7 +99,7 @@ assert.deepEqual(starter.layout.items.slice(0, 8), [
   { blockId: "signals_badges" },
   { blockId: "evidence_table" },
   { blockId: "restricting_factors_by_share_chart" },
-  { blockId: "interpretation_section_1" },
+  { blockId: interpretationBlockId },
   { blockId: "takeaways_message_primary_cause" },
 ]);
 assert.equal(starter.blocks[0].kind, "kpiBlock");

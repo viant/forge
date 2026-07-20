@@ -43,12 +43,20 @@ public struct TranscriptForgeDataStore: Equatable, Sendable {
 /// Platform-neutral transcript parts emitted by a conversation SDK. Forge owns
 /// their data/UI pairing so native hosts do not re-parse completed messages.
 public struct TranscriptCanonicalData: Equatable, Sendable {
+    public let version: Int?
+    public let scope: String?
+    public let reportRef: String?
+    public let sequence: Int?
     public let id: String
     public let format: String?
     public let mode: String?
     public let payload: JSONValue?
 
-    public init(id: String, format: String? = nil, mode: String? = nil, payload: JSONValue? = nil) {
+    public init(version: Int? = nil, scope: String? = nil, reportRef: String? = nil, sequence: Int? = nil, id: String, format: String? = nil, mode: String? = nil, payload: JSONValue? = nil) {
+        self.version = version
+        self.scope = scope
+        self.reportRef = reportRef
+        self.sequence = sequence
         self.id = id
         self.format = format
         self.mode = mode
@@ -69,6 +77,37 @@ public struct TranscriptCanonicalPart: Equatable, Sendable {
         self.source = source
         self.payload = payload
         self.data = data
+    }
+}
+
+public struct TranscriptCanonicalReport: Equatable, Sendable {
+    public let scope: String
+    public let id: String
+    public let grammar: String
+    public let status: String
+    public let sequence: Int?
+    public let resetVersion: Int
+    public let source: JSONValue
+    public let dataSources: [String: TranscriptCanonicalData]
+
+    public init(
+        scope: String,
+        id: String,
+        grammar: String,
+        status: String,
+        sequence: Int? = nil,
+        resetVersion: Int = 0,
+        source: JSONValue,
+        dataSources: [String: TranscriptCanonicalData] = [:]
+    ) {
+        self.scope = scope
+        self.id = id
+        self.grammar = grammar
+        self.status = status
+        self.sequence = sequence
+        self.resetVersion = resetVersion
+        self.source = source
+        self.dataSources = dataSources
     }
 }
 
@@ -137,7 +176,9 @@ public enum TranscriptEnvelope {
                     appendMarkdown(&parts, text)
                 }
             case "forgedata":
-                if let data = canonicalData(part) {
+                if isProgressiveData(part) {
+                    continue
+                } else if let data = canonicalData(part) {
                     dataBlocks.append(data)
                     dataRaw.append(part.source ?? "")
                 } else {
@@ -192,12 +233,17 @@ public enum TranscriptEnvelope {
         let id = data.id.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !id.isEmpty, let payload = data.payload else { return nil }
         return TranscriptForgeDataBlock(
-            version: 1,
+            version: data.version ?? 1,
             id: id,
             format: data.format?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
             mode: data.mode,
             data: payload
         )
+    }
+
+    private static func isProgressiveData(_ part: TranscriptCanonicalPart) -> Bool {
+        guard let data = part.data else { return false }
+        return data.version == 2 || !(data.reportRef?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
     }
 
     private static func canonicalUI(_ part: TranscriptCanonicalPart) -> TranscriptForgeUIPayload? {

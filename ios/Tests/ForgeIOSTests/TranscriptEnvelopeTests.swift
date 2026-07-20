@@ -272,6 +272,32 @@ final class TranscriptEnvelopeTests: XCTestCase {
         XCTAssertEqual(row["name"], .string("kept"))
     }
 
+    func testProgressiveDataDoesNotLeakIntoLegacyForgeUI() {
+        let parts = TranscriptEnvelope.fromCanonical([
+            TranscriptCanonicalPart(
+                kind: "forgeData",
+                source: "progressive source must stay hidden",
+                data: TranscriptCanonicalData(
+                    version: 2,
+                    scope: "campaign",
+                    reportRef: "delivery",
+                    sequence: 1,
+                    id: "rows",
+                    payload: .array([.object(["name": .string("leaked")])])
+                )
+            ),
+            TranscriptCanonicalPart(
+                kind: "forgeUI",
+                payload: .object(["blocks": .array([])])
+            )
+        ])
+
+        guard parts.count == 1, case .forgeUI(_, let store) = parts[0] else {
+            return XCTFail("Expected one legacy Forge UI part")
+        }
+        XCTAssertTrue(store.isEmpty)
+    }
+
     func testUpdatesInlineWindowWithoutAllocatingAnotherWindow() async {
         let runtime = ForgeRuntime()
         let initial = await runtime.openWindowInline(

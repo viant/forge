@@ -32,6 +32,10 @@ data class TranscriptForgeDataStore(val id: String, val rows: Any?)
  * their data/UI pairing so native hosts do not re-parse completed messages.
  */
 data class TranscriptCanonicalData(
+    val version: Int? = null,
+    val scope: String? = null,
+    val reportRef: String? = null,
+    val sequence: Int? = null,
     val id: String,
     val format: String? = null,
     val mode: String? = null,
@@ -44,6 +48,17 @@ data class TranscriptCanonicalPart(
     val source: String? = null,
     val payload: JsonElement? = null,
     val data: TranscriptCanonicalData? = null
+)
+
+data class TranscriptCanonicalReport(
+    val scope: String,
+    val id: String,
+    val grammar: String,
+    val status: String,
+    val sequence: Int? = null,
+    val resetVersion: Int = 0,
+    val source: JsonElement,
+    val dataSources: Map<String, TranscriptCanonicalData> = emptyMap()
 )
 
 sealed interface TranscriptEnvelopePart {
@@ -127,7 +142,9 @@ object TranscriptEnvelope {
                     }
                 }
 
-                "forgedata" -> canonicalData(part)?.let { block ->
+                "forgedata" -> if (isProgressiveData(part)) {
+                    Unit
+                } else canonicalData(part)?.let { block ->
                     dataBlocks += block
                     dataRaw += part.source.orEmpty()
                 } ?: run {
@@ -189,11 +206,17 @@ object TranscriptEnvelope {
         val id = data.id.trim()
         if (id.isBlank() || data.payload == null) return null
         return TranscriptForgeDataBlock(
+            version = data.version ?: 1,
             id = id,
             format = data.format?.trim()?.lowercase(),
             mode = data.mode,
             data = data.payload
         )
+    }
+
+    private fun isProgressiveData(part: TranscriptCanonicalPart): Boolean {
+        val data = part.data ?: return false
+        return data.version == 2 || !data.reportRef.isNullOrBlank()
     }
 
     private fun canonicalUi(part: TranscriptCanonicalPart): TranscriptForgeUiPayload? {
