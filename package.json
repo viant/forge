@@ -7,6 +7,7 @@
     "./hooks": "./src/hooks/index.js",
     "./components": "./src/components/index.js",
     "./actions": "./src/actions/index.js",
+    "./reporting": "./src/reporting/index.js",
     "./utils": "./src/utils/index.js",
     "./utils/*": "./src/utils/*.js",
     "./utils/schema": "./src/utils/schema.js",

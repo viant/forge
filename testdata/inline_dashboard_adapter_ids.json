@@ -1,0 +1,21 @@
+{
+  "source": {
+    "title": "Stable",
+    "blocks": [
+      { "kind": "dashboard.table", "dataSourceRef": "rows", "columns": [{ "key": "channel" }] },
+      {
+        "kind": "dashboard.timeline",
+        "dataSourceRef": "rows",
+        "chart": {
+          "type": "line",
+          "xAxis": { "dataKey": "date" },
+          "series": { "valueKey": "spend" }
+        }
+      }
+    ]
+  },
+  "expectedBlockIds": [
+    "dashboard_table_source_4445zf_table",
+    "dashboard_timeline_source_1ojo0pq_chart"
+  ]
+}

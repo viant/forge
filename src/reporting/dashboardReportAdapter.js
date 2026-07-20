@@ -97,8 +97,27 @@ function layoutItem(blockId = "", span = 12) {
   return normalizedSpan === 12 ? { blockId } : { blockId, span: normalizedSpan };
 }
 
+function stableSemanticJSON(value) {
+  if (Array.isArray(value)) return `[${value.map(stableSemanticJSON).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableSemanticJSON(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+function stableSemanticSuffix(value, fallback = "item") {
+  const source = stableSemanticJSON(value);
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${fallback}_${(hash >>> 0).toString(36)}`;
+}
+
 function sourcePrefix(block = {}, index = 0, parentPrefix = "") {
-  const candidate = sanitizeId(block?.id || block?.title || `${block?.kind || "block"}_${index + 1}`) || `block_${index + 1}`;
+  const semanticFallback = `${sanitizeId(block?.kind || "block") || "block"}_${stableSemanticSuffix(block, "source")}`;
+  const candidate = sanitizeId(block?.id || block?.title || semanticFallback) || semanticFallback;
   return parentPrefix ? `${parentPrefix}_${candidate}` : candidate;
 }
 
@@ -215,7 +234,7 @@ function buildSummaryProjection(block, prefix) {
   metrics.forEach((metric, index) => {
     const field = resolveField(metric);
     if (!field) return;
-    const id = `${prefix}_metric_${sanitizeId(metric?.id || field) || index + 1}`;
+    const id = `${prefix}_metric_${sanitizeId(metric?.id || field) || stableSemanticSuffix(metric, "value")}`;
     const secondaryField = normalizeString(metric?.secondarySelector || metric?.secondaryField || metric?.secondaryKey || metric?.secondaryValueField);
     blocks.push({
       id,
@@ -288,7 +307,7 @@ function buildKpiTableProjection(block, prefix) {
     if (!field) return null;
     addFieldHint(hints, ref, field, "measure");
     return {
-      id: `${prefix}_row_${sanitizeId(row?.id || field) || index + 1}`,
+      id: `${prefix}_row_${sanitizeId(row?.id || field) || stableSemanticSuffix(row, "value")}`,
       kind: "kpiBlock",
       title: normalizeString(row?.label || humanizeLabel(field)),
       datasetRef: ref,
@@ -315,7 +334,7 @@ function buildCompareProjection(block, prefix) {
     addFieldHint(hints, ref, current, "measure");
     addFieldHint(hints, ref, previous, "measure");
     return {
-      id: `${prefix}_compare_${sanitizeId(item?.id || current) || index + 1}`,
+      id: `${prefix}_compare_${sanitizeId(item?.id || current) || stableSemanticSuffix(item, "value")}`,
       kind: "kpiBlock",
       title: normalizeString(item?.label || humanizeLabel(current)),
       datasetRef: ref,
@@ -441,7 +460,7 @@ function buildStatusProjection(block, prefix) {
     if (!field) return null;
     addFieldHint(hints, ref, field, "measure");
     return {
-      id: `${prefix}_status_${sanitizeId(check?.id || field) || index + 1}`,
+      id: `${prefix}_status_${sanitizeId(check?.id || field) || stableSemanticSuffix(check, "check")}`,
       kind: "kpiBlock",
       title: normalizeString(check?.label || humanizeLabel(field)),
       datasetRef: ref,
@@ -525,7 +544,7 @@ function buildMessagesProjection(block, prefix) {
       ...(source?.visibleWhen ? { visibleWhen: cloneValue(source.visibleWhen) } : {}),
     };
     return {
-      id: `${prefix}_message_${sanitizeId(source?.id || source?.title) || index + 1}`,
+      id: `${prefix}_message_${sanitizeId(source?.id || source?.title) || stableSemanticSuffix(source, "message")}`,
       kind: "calloutBlock",
       title: normalizeString(source?.title || `${block?.title || "Message"} ${index + 1}`),
       tone: normalizeString(source?.severity || source?.tone || "info"),
@@ -542,7 +561,7 @@ function buildMessagesProjection(block, prefix) {
 function buildBadgesProjection(block, prefix) {
   const config = nestedConfig(block, "badges");
   const items = listValue(config.items, block.items).map((item, index) => ({
-    id: normalizeString(item?.id || `${prefix}_badge_${index + 1}`),
+    id: normalizeString(item?.id || `${prefix}_badge_${stableSemanticSuffix(item, "item")}`),
     ...(normalizeString(item?.label) ? { label: normalizeString(item.label) } : {}),
     ...(normalizeString(item?.value) ? { value: normalizeString(item.value) } : {}),
     ...(normalizeString(item?.valueField || item?.selector || item?.field) ? { valueField: normalizeString(item?.valueField || item?.selector || item?.field) } : {}),
@@ -568,7 +587,7 @@ function buildReportProjection(block, prefix) {
   const blocks = sections.map((section, index) => {
     const body = Array.isArray(section?.body) ? section.body.join("\n\n") : String(section?.body || "");
     return {
-      id: `${prefix}_section_${sanitizeId(section?.id || section?.title) || index + 1}`,
+      id: `${prefix}_section_${sanitizeId(section?.id || section?.title) || stableSemanticSuffix(section, "section")}`,
       kind: normalizeString(section?.tone) ? "calloutBlock" : "markdownBlock",
       title: normalizeString(section?.title || (sections.length === 1 ? block?.title : `Section ${index + 1}`)),
       ...(normalizeString(section?.tone) ? { tone: normalizeString(section.tone), body } : { markdown: body }),

@@ -149,6 +149,33 @@ class TranscriptEnvelopeTest {
     }
 
     @Test
+    fun `progressive data does not leak into legacy forge ui`() {
+        val parts = TranscriptEnvelope.fromCanonical(
+            listOf(
+                TranscriptCanonicalPart(
+                    kind = "forgeData",
+                    source = "progressive source must stay hidden",
+                    data = TranscriptCanonicalData(
+                        version = 2,
+                        scope = "campaign",
+                        reportRef = "delivery",
+                        sequence = 1,
+                        id = "rows",
+                        payload = Json.parseToJsonElement("[{\"name\":\"leaked\"}]")
+                    )
+                ),
+                TranscriptCanonicalPart(
+                    kind = "forgeUI",
+                    payload = Json.parseToJsonElement("{\"blocks\":[]}")
+                )
+            )
+        )
+
+        val ui = assertIs<TranscriptEnvelopePart.ForgeUi>(parts.single())
+        assertEquals(emptyMap<String, TranscriptForgeDataStore>(), ui.dataStore)
+    }
+
+    @Test
     fun `inline policy responds only to form factor`() {
         val metadata = WindowMetadata(namespace = "unrelated")
         assertEquals(340, transcriptInlinePresentation(metadata, TranscriptInlineFormFactor.Compact).maximumHeight.value.toInt())
