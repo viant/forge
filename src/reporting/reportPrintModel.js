@@ -1188,10 +1188,26 @@ function buildReportPrintKpiBodyLines(block = {}) {
   return bodyMarkdown ? bodyMarkdown.split("\n").filter((line) => normalizeString(line)) : [];
 }
 
+function resolveReportPrintKpiTone(tone = "") {
+  switch (normalizeString(tone).toLowerCase()) {
+    case "success":
+      return { background: "#eef8f0", border: "#cfe7d6" };
+    case "warning":
+      return { background: "#fff7e1", border: "#f5d28c" };
+    case "danger":
+      return { background: "#fff1f0", border: "#f5c2c0" };
+    case "info":
+      return { background: "#eef4ff", border: "#cddcfd" };
+    default:
+      return { background: REPORT_PRINT_THEME.cardBackground, border: REPORT_PRINT_THEME.cardBorderColor };
+  }
+}
+
 function renderReportPrintKpiBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
   const content = block?.content || {};
+  const tone = resolveReportPrintKpiTone(content?.tone || block?.tone);
   const presentationMode = normalizeReportPrintKpiPresentationMode(block);
   const showCard = presentationMode !== "body";
   const bodyLines = presentationMode !== "card" ? buildReportPrintKpiBodyLines(block) : [];
@@ -1244,8 +1260,8 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
     id: `${blockId}__card`,
     kind: "rect",
     box: { x: state.contentLeft, y: cardY, width: state.contentWidth, height: cardHeight },
-    fillColor: REPORT_PRINT_THEME.cardBackground,
-    strokeColor: REPORT_PRINT_THEME.cardBorderColor,
+    fillColor: tone.background,
+    strokeColor: tone.border,
     strokeWidth: 1,
     radius: REPORT_PRINT_THEME.cardRadius,
   }));

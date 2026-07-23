@@ -1581,7 +1581,6 @@ private fun formatDashboardGroupedNumber(
     maximumFractionDigits: Int
 ): String {
     val symbols = DecimalFormatSymbols(Locale.US).apply {
-        groupingSeparator = ' '
         decimalSeparator = '.'
     }
     return DecimalFormat("#,##0.#####", symbols).apply {

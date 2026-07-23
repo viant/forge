@@ -1247,6 +1247,7 @@ public struct DashboardRenderer: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } else if block.kind == "kpiBlock", let kpi = block.kpi {
+            let tone = toneStyle(block.content["tone"]?.stringValue)
             VStack(alignment: .leading, spacing: 6) {
                 Text(block.title)
                     .font(.caption.weight(.semibold))
@@ -1274,6 +1275,9 @@ public struct DashboardRenderer: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 12).fill(tone.background))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(tone.border, lineWidth: 1))
         } else if block.kind == "filterBarBlock", let filterBar = block.filterBar {
             reportRuntimeFilterBarPreview(filterBar)
         } else if block.kind == "refinementBarBlock", let refinementBar = block.refinementBar {

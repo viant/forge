@@ -76,17 +76,17 @@ export const formatDisplayValue = (value, format, locale = 'en-US', options = {}
         case 'percentFraction':
             return `${(numeric * 100).toFixed(1)}%`;
         case 'number':
-            return new Intl.NumberFormat('en-US', {
+            return new Intl.NumberFormat(locale, {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 5,
                 useGrouping: true,
-            }).format(numeric).replace(/,/g, ' ');
+            }).format(numeric);
         case 'number5':
-            return new Intl.NumberFormat('en-US', {
+            return new Intl.NumberFormat(locale, {
                 minimumFractionDigits: 5,
                 maximumFractionDigits: 5,
                 useGrouping: true,
-            }).format(numeric).replace(/,/g, ' ');
+            }).format(numeric);
         default:
             return new Intl.NumberFormat(locale, {maximumFractionDigits: 2}).format(numeric);
     }

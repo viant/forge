@@ -1720,10 +1720,18 @@ private fun DashboardReportRuntimeAuthoredBlockBody(runtime: ForgeRuntime, windo
             MarkdownRenderer(markdown = block.markdown, modifier = Modifier.fillMaxWidth())
         }
 
-        block.kind == "kpiBlock" && block.kpi != null -> Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
+        block.kind == "kpiBlock" && block.kpi != null -> {
+            val tone = severityTone(
+                (block.content["tone"] as? JsonPrimitive)?.contentOrNull ?: "neutral"
+            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(tone.background, RoundedCornerShape(12.dp))
+                    .border(1.dp, tone.border, RoundedCornerShape(12.dp))
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
             Text(
                 text = block.title,
                 style = MaterialTheme.typography.labelMedium,
@@ -1761,6 +1769,7 @@ private fun DashboardReportRuntimeAuthoredBlockBody(runtime: ForgeRuntime, windo
                     )
                 }
             }
+        }
         }
 
         block.kind == "filterBarBlock" && block.filterBar != null -> DashboardReportRuntimeFilterBarPreview(block)

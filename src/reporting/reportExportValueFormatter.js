@@ -84,15 +84,17 @@ export function formatExportNumericValue(value, format = "", {
     case "percentfraction":
       return `${(numeric * 100).toFixed(1)}%`;
     case "number":
-      return formatGroupedNumberWithSpaces(numeric, {
+      return new Intl.NumberFormat("en-US", {
         minimumFractionDigits: 0,
         maximumFractionDigits: axis ? (Number.isInteger(numeric) ? 0 : 1) : 5,
-      });
+        useGrouping: true,
+      }).format(numeric);
     case "number5":
-      return formatGroupedNumberWithSpaces(numeric, {
+      return new Intl.NumberFormat("en-US", {
         minimumFractionDigits: 5,
         maximumFractionDigits: 5,
-      });
+        useGrouping: true,
+      }).format(numeric);
     case "":
       return new Intl.NumberFormat("en-US", {
         minimumFractionDigits: 0,
