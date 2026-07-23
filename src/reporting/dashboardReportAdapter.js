@@ -123,7 +123,10 @@ function sourcePrefix(block = {}, index = 0, parentPrefix = "") {
 
 function resolveField(entry = {}, ...fallbackKeys) {
   const keys = ["selector", "field", "key", "valueField", ...fallbackKeys];
-  return keys.map((key) => normalizeString(entry?.[key])).find(Boolean) || "";
+  const field = keys.map((key) => normalizeString(entry?.[key])).find(Boolean) || "";
+  // Dashboard selectors address the datasource envelope; canonical blocks
+  // address the selected row. Keep the common first-row shorthand lossless.
+  return field.replace(/^0\./, "");
 }
 
 function normalizeFormat(format = "") {

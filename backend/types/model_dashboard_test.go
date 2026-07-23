@@ -170,6 +170,48 @@ view:
 	}
 }
 
+func TestReportBuilderCompactShapePreservesRegistryReference(t *testing.T) {
+	const source = `
+view:
+  content:
+    id: reportWindow
+    kind: dashboard.reportBuilder
+    reportBuilderRef: primary
+    reportBuilders: {}
+`
+	var window Window
+	if err := yaml.Unmarshal([]byte(source), &window); err != nil {
+		t.Fatalf("unmarshal report builder metadata: %v", err)
+	}
+	content := window.View.Content
+	if content == nil || content.Dashboard == nil {
+		t.Fatalf("expected normalized report builder dashboard: %#v", content)
+	}
+	if content.Dashboard.ReportBuilderRef != "primary" {
+		t.Fatalf("expected reportBuilderRef to survive compact normalization, got %#v", content.Dashboard)
+	}
+	if content.Dashboard.ReportBuilders == nil {
+		t.Fatalf("expected empty reportBuilders catalog marker to survive compact normalization")
+	}
+	encoded, err := json.Marshal(content)
+	if err != nil {
+		t.Fatalf("marshal report builder metadata: %v", err)
+	}
+	if string(encoded) == "" || !containsJSONField(encoded, "reportBuilderRef", "primary") {
+		t.Fatalf("marshaled report builder dropped registry reference: %s", encoded)
+	}
+}
+
+func containsJSONField(data []byte, key, expected string) bool {
+	var value map[string]any
+	if json.Unmarshal(data, &value) != nil {
+		return false
+	}
+	dashboard, _ := value["dashboard"].(map[string]any)
+	actual, _ := dashboard[key].(string)
+	return actual == expected
+}
+
 func TestDashboardGroupedShapePreservesOptionalFields(t *testing.T) {
 	const source = `
 view:

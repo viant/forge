@@ -102,14 +102,12 @@ export function resolveReportBuilderSurfaceAutoRunAction({
     if (!normalizedAutoRunKey || normalizedAutoRunKey === normalizeString(consumedAutoRunKey)) {
         return { type: "skip" };
     }
-    if (normalizedRequestDispatchFingerprint !== normalizedCurrentDispatchFingerprint) {
-        return {
-            type: "dispatch",
-            autoRunKey: normalizedAutoRunKey,
-        };
-    }
+    // A matching input fingerprint only proves that parameters were staged. Without
+    // rows, it does not prove that a collection fetch completed for this surface.
+    // Dispatch once for the authored auto-run key rather than promoting an empty
+    // staged request into a completed report.
     return {
-        type: "promote",
+        type: "dispatch",
         autoRunKey: normalizedAutoRunKey,
     };
 }

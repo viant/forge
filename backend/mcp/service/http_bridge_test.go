@@ -166,6 +166,39 @@ func TestHTTPBridgeSessionCloseKeepsExplicitPollingClientSnapshot(t *testing.T) 
 	}
 }
 
+func TestUIRPCHandlerSnapshotStatusDetectsMissingAndPublishedSnapshot(t *testing.T) {
+	hub := NewHub(&Config{})
+	bridge := &httpRPCBridge{hub: hub, sessions: map[string]*httpSessionInfo{}}
+	handler := &uiRPCHandler{bridge: bridge}
+	ctx := context.Background()
+
+	if _, jerr := handler.handle(ctx, "ui.hello", json.RawMessage(`{"clientId":"status-client"}`)); jerr != nil {
+		t.Fatalf("ui.hello error: %v", jerr)
+	}
+	assertStatus := func(expected bool) {
+		t.Helper()
+		result, jerr := handler.handle(ctx, "ui.snapshot.status", json.RawMessage(`{"clientId":"status-client"}`))
+		if jerr != nil {
+			t.Fatalf("ui.snapshot.status error: %v", jerr)
+		}
+		var decoded struct {
+			Connected bool `json:"connected"`
+		}
+		if err := json.Unmarshal(result, &decoded); err != nil {
+			t.Fatalf("decode snapshot status: %v", err)
+		}
+		if decoded.Connected != expected {
+			t.Fatalf("expected connected=%v, got %v", expected, decoded.Connected)
+		}
+	}
+
+	assertStatus(false)
+	if _, jerr := handler.handle(ctx, "ui.snapshot", json.RawMessage(`{"clientId":"status-client","data":{"windows":[]}}`)); jerr != nil {
+		t.Fatalf("ui.snapshot error: %v", jerr)
+	}
+	assertStatus(true)
+}
+
 func TestServiceUICommand_QueueRoundTripForSetFormData(t *testing.T) {
 	svc := NewService(&Config{})
 

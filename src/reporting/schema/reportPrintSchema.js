@@ -214,6 +214,9 @@ export const reportPrintSchema = {
         text: { type: "string" },
         format: { type: "string" },
         align: { enum: ["left", "center", "right"] },
+        fontSize: { type: "number", minimum: 1 },
+        color: { type: "string" },
+        wrap: { type: "boolean" },
       },
     },
     tableCellDataBarElement: {

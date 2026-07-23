@@ -16,6 +16,10 @@ import {
     buildReportBuilderExportRequestSummary,
 } from "./reportBuilderExportRequest.js";
 import { recordReportBuilderExportAuditEvent } from "./reportBuilderAuditHandler.js";
+import {
+    buildReportBuilderExportEventDetail,
+    emitReportBuilderUIEvent,
+} from "./reportBuilderUIEvents.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -64,6 +68,13 @@ function buildExportFormatLabel(format = "") {
 }
 
 export const REPORT_EXPORT_STATUS_POLL_INTERVAL_MS = 1500;
+
+export function resolveReportBuilderExportEventSourceKind({
+    sourceKind = "",
+    eventSourceKind = "",
+} = {}) {
+    return normalizeString(eventSourceKind) || normalizeString(sourceKind);
+}
 
 export function shouldAutoRefreshReportBuilderExportJob(job = null, reportExportHandler = null) {
     const normalizedJob = normalizeReportBuilderExportJob(job);
@@ -141,11 +152,17 @@ function triggerDownload({ filename = "", mimeType = "application/octet-stream",
 export function useReportBuilderExportExecution({
     request = null,
     sourceKind = "",
+    eventSourceKind = "",
+    eventRuntimeRequest = null,
+    eventReportId = "",
+    eventReportName = "",
     localSavedPayloads = [],
     reportExportHandler = null,
     reportAuditHandler = null,
     reportAuditActorRef = "",
     reportAuditMetadata = {},
+    reportEventHandler = null,
+    reportEventContext = {},
     setFeedback = () => {},
     missingRequestMessage = "No export request is available.",
     missingJobMessage = "No export job is available to refresh.",
@@ -180,6 +197,7 @@ export function useReportBuilderExportExecution({
     const historyRequestVersionRef = React.useRef(0);
     const statusRequestVersionRef = React.useRef(0);
     const statusPollTimerRef = React.useRef(null);
+    const completedEventKeysRef = React.useRef(new Set());
     const jobSummary = React.useMemo(
         () => buildReportBuilderExportJobSummary(job),
         [job],
@@ -207,7 +225,56 @@ export function useReportBuilderExportExecution({
         setHistoryLoading(false);
         setHistoryJobs([]);
         setHistoryArtifacts([]);
+        completedEventKeysRef.current.clear();
     }, [requestIdentity]);
+
+    const emitExportEvent = React.useCallback(async (kind, {
+        nextJob = null,
+        nextArtifact = null,
+    } = {}) => emitReportBuilderUIEvent(reportEventHandler, {
+        kind,
+        windowId: normalizeString(reportEventContext?.windowId),
+        windowKey: normalizeString(reportEventContext?.windowKey),
+        conversationId: normalizeString(reportEventContext?.conversationId),
+        detail: buildReportBuilderExportEventDetail({
+            request,
+            sourceKind: resolveReportBuilderExportEventSourceKind({ sourceKind, eventSourceKind }),
+            job: nextJob,
+            artifact: nextArtifact,
+            runtimeRequest: eventRuntimeRequest,
+            reportId: eventReportId,
+            reportName: eventReportName,
+        }),
+    }), [eventReportId, eventReportName, eventRuntimeRequest, eventSourceKind, reportEventContext?.conversationId, reportEventContext?.windowId, reportEventContext?.windowKey, reportEventHandler, request, sourceKind]);
+
+    const emitExportComplete = React.useCallback(async (nextJob = null) => {
+        const normalizedJob = normalizeReportBuilderExportJob(nextJob);
+        if (normalizedJob?.status !== "succeeded" || !normalizeString(normalizedJob?.artifactId)) {
+            return false;
+        }
+        const eventKey = normalizeString(normalizedJob.jobId || normalizedJob.artifactId);
+        if (completedEventKeysRef.current.has(eventKey)) {
+            return false;
+        }
+        completedEventKeysRef.current.add(eventKey);
+        let nextArtifact = null;
+        if (typeof reportExportHandler?.getArtifact === "function") {
+            try {
+                nextArtifact = normalizeReportBuilderExportArtifact(await reportExportHandler.getArtifact({
+                    artifactId: normalizedJob.artifactId,
+                }));
+                if (nextArtifact) {
+                    setArtifact(nextArtifact);
+                }
+            } catch (_) {
+                // Completion remains useful with the canonical artifact id.
+            }
+        }
+        return emitExportEvent("report.export_complete", {
+            nextJob: normalizedJob,
+            nextArtifact,
+        });
+    }, [emitExportEvent, reportExportHandler]);
 
     const selectHistoryEntry = React.useCallback(({ job: nextJob = null, artifact: nextArtifact = null } = {}) => {
         const normalizedJob = normalizeReportBuilderExportJob(nextJob);
@@ -287,6 +354,7 @@ export function useReportBuilderExportExecution({
             return null;
         }
         setSubmitting(true);
+        await emitExportEvent("report.export_start");
         try {
             const result = await reportExportHandler.submitRequest({
                 request: cloneValue(request),
@@ -296,6 +364,7 @@ export function useReportBuilderExportExecution({
             if (normalizedJob) {
                 setJob(normalizedJob);
                 setArtifact(null);
+                await emitExportComplete(normalizedJob);
             }
             const auditResult = await recordReportBuilderExportAuditEvent(request, {
                 handler: reportAuditHandler,
@@ -343,6 +412,8 @@ export function useReportBuilderExportExecution({
         reportAuditActorRef,
         reportAuditHandler,
         reportAuditMetadata,
+        emitExportComplete,
+        emitExportEvent,
         reportExportHandler,
         request,
         setFeedback,
@@ -408,6 +479,7 @@ export function useReportBuilderExportExecution({
                 if (historyAvailable) {
                     Promise.resolve().then(() => refreshHistory({ silent: true }));
                 }
+                await emitExportComplete(nextJob);
             }
             return nextJob;
         } catch (error) {
@@ -439,7 +511,7 @@ export function useReportBuilderExportExecution({
                 setStatusLoading(false);
             }
         }
-    }, [historyAvailable, job, missingJobMessage, refreshHistory, reportExportHandler, request, setFeedback]);
+    }, [emitExportComplete, historyAvailable, job, missingJobMessage, refreshHistory, reportExportHandler, request, setFeedback, sourceKind]);
 
     const refreshStatusRef = React.useRef(refreshStatus);
     React.useEffect(() => {

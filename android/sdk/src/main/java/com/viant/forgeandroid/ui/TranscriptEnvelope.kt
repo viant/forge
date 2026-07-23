@@ -70,6 +70,24 @@ sealed interface TranscriptEnvelopePart {
 object TranscriptEnvelope {
     private val json = Json { ignoreUnknownKeys = true }
 
+    /**
+     * Removes progressive report transport fences from text that accompanies
+     * an already-assembled canonical report. Ordinary markdown and legacy
+     * Forge UI payloads remain visible.
+     */
+    fun suppressProgressiveTransport(markdown: String): String =
+        MarkdownFenceParser.parse(markdown).joinToString(separator = "") { part ->
+            when (part) {
+                is MarkdownFencePart.Text -> part.value
+                is MarkdownFencePart.Fence -> when {
+                    !part.closed -> part.raw
+                    part.language == "forge-report" -> ""
+                    part.language == "forge-data" && isProgressiveDataBody(part.body) -> ""
+                    else -> part.raw
+                }
+            }
+        }
+
     fun parse(markdown: String): List<TranscriptEnvelopePart> {
         if (markdown.isEmpty()) return emptyList()
         val result = mutableListOf<TranscriptEnvelopePart>()
@@ -130,6 +148,7 @@ object TranscriptEnvelope {
         val dataBlocks = mutableListOf<TranscriptForgeDataBlock>()
         val dataRaw = mutableListOf<String>()
         var renderedUi = false
+        var renderedReport = false
         parts.forEach { part ->
             when (part.kind.trim().lowercase()) {
                 "markdown" -> {
@@ -143,7 +162,7 @@ object TranscriptEnvelope {
                 }
 
                 "forgedata" -> if (isProgressiveData(part)) {
-                    Unit
+                    renderedReport = true
                 } else canonicalData(part)?.let { block ->
                     dataBlocks += block
                     dataRaw += part.source.orEmpty()
@@ -162,6 +181,8 @@ object TranscriptEnvelope {
                     appendMarkdown(result, part.source.orEmpty())
                 }
 
+                "forgereport" -> renderedReport = true
+
                 else -> {
                     flushPendingData(result, dataBlocks, dataRaw)
                     appendMarkdown(result, part.source.orEmpty())
@@ -169,7 +190,7 @@ object TranscriptEnvelope {
             }
         }
         flushPendingData(result, dataBlocks, dataRaw)
-        return if (renderedUi) result else listOf(
+        return if (renderedUi || renderedReport) result else listOf(
             TranscriptEnvelopePart.Markdown(parts.joinToString(separator = "") { it.text ?: it.source.orEmpty() })
         )
     }
@@ -219,6 +240,12 @@ object TranscriptEnvelope {
         return data.version == 2 || !data.reportRef.isNullOrBlank()
     }
 
+    private fun isProgressiveDataBody(body: String): Boolean {
+        val data = runCatching { json.parseToJsonElement(body) as? JsonObject }.getOrNull() ?: return false
+        val version = (data["version"] as? JsonPrimitive)?.content?.toIntOrNull()
+        return version == 2 || !(data["reportRef"] as? JsonPrimitive)?.content.isNullOrBlank()
+    }
+
     private fun canonicalUi(part: TranscriptCanonicalPart): TranscriptForgeUiPayload? {
         val payload = part.payload ?: return null
         return runCatching {
@@ -248,6 +275,13 @@ object TranscriptEnvelope {
         if (format != "csv") return block.data?.let(JsonUtil::elementToAny)
         val text = (block.data as? JsonPrimitive)?.content.orEmpty()
         return parseCsv(text) ?: text
+    }
+
+    internal fun materializeCanonicalPayload(format: String?, payload: JsonElement?): JsonElement? {
+        payload ?: return null
+        if (format?.trim()?.lowercase() != "csv") return payload
+        val text = (payload as? JsonPrimitive)?.content ?: return payload
+        return parseCsv(text)?.let(JsonUtil::anyToElement) ?: payload
     }
 
     private fun parseCsv(text: String): List<Map<String, Any?>>? {

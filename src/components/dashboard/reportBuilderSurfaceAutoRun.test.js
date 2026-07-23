@@ -130,7 +130,7 @@ assert.deepEqual(
         requestDispatchFingerprint: '{"q":1}::fetch',
     }),
     {
-        type: "promote",
+        type: "dispatch",
         autoRunKey: 'preview::{"q":1}',
     },
 );

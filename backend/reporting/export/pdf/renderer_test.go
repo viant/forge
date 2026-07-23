@@ -40,6 +40,12 @@ type inspectedPDF struct {
 	pageStream map[int]string
 }
 
+func TestInterpolateColorChannel(t *testing.T) {
+	require.Equal(t, 220, interpolateColorChannel(220, 37, 0))
+	require.Equal(t, 37, interpolateColorChannel(220, 37, 1))
+	require.Equal(t, 129, interpolateColorChannel(220, 37, 0.5))
+}
+
 type groupedTextRun struct {
 	run  pdfTextRun
 	endX float64
@@ -870,8 +876,8 @@ func TestRender_AuthoredFixtureShapeParity(t *testing.T) {
 
 	// Page 3 keeps the smaller table data bars and alternating status badges
 	// from the authored comparison table preview.
-	require.True(t, hasMatchingPDFRect(page3Rects, 222, 680, 250.8, 664))
-	require.True(t, hasMatchingPDFRect(page3Rects, 222, 656, 255.6, 640))
+	require.True(t, hasPDFRectsCoveringBounds(page3Rects, 222, 680, 250.8, 664))
+	require.True(t, hasPDFRectsCoveringBounds(page3Rects, 222, 656, 255.6, 640))
 	require.True(t, hasMatchingPathBounds(page3, 402, 680, 471, 664, "B"))
 	require.True(t, hasMatchingPDFTextRun(page3Runs, pdfTextRun{
 		PageNumber: 3,
@@ -889,8 +895,8 @@ func TestRender_AuthoredFixtureShapeParity(t *testing.T) {
 	}))
 
 	// Page 4 preserves the larger later-row bar widths and badge geometry.
-	require.True(t, hasMatchingPDFRect(page4Rects, 222, 680, 370.8, 664))
-	require.True(t, hasMatchingPDFRect(page4Rects, 222, 656, 375.6, 640))
+	require.True(t, hasPDFRectsCoveringBounds(page4Rects, 222, 680, 370.8, 664))
+	require.True(t, hasPDFRectsCoveringBounds(page4Rects, 222, 656, 375.6, 640))
 	require.True(t, hasMatchingPathBounds(page4, 402, 680, 478, 664, "B"))
 	require.True(t, hasMatchingPDFTextRun(page4Runs, pdfTextRun{
 		PageNumber: 4,
@@ -3119,6 +3125,24 @@ func hasMatchingPDFRect(actual []pdfreader.Rect, minX float64, minY float64, max
 		return true
 	}
 	return false
+}
+
+func hasPDFRectsCoveringBounds(actual []pdfreader.Rect, minX float64, minY float64, maxX float64, maxY float64) bool {
+	const tolerance = 0.25
+	foundStart := false
+	foundEnd := false
+	for _, candidate := range actual {
+		if math.Abs(candidate.Min.Y-minY) > tolerance || math.Abs(candidate.Max.Y-maxY) > tolerance {
+			continue
+		}
+		if math.Abs(candidate.Min.X-minX) <= tolerance {
+			foundStart = true
+		}
+		if math.Abs(candidate.Max.X-maxX) <= tolerance {
+			foundEnd = true
+		}
+	}
+	return foundStart && foundEnd
 }
 
 var moveLinePattern = regexp.MustCompile(`(?s)([-0-9.]+)\s+([-0-9.]+)\s+m\s+([-0-9.]+)\s+([-0-9.]+)\s+l`)

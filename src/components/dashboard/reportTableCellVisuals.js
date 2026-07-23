@@ -1,4 +1,5 @@
 import equal from "fast-deep-equal";
+import { buildReportVisualTint } from "../../reporting/reportVisualColor.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -134,11 +135,18 @@ export function resolveReportTableCellVisualState(row = {}, column = {}) {
     }
     const range = column?.cellVisualRuntime?.range || null;
     const palette = Array.isArray(column?.cellVisual?.palette) ? column.cellVisual.palette : [];
+    const colorField = normalizeString(column?.cellVisual?.colorField);
+    const colorValue = colorField ? row?.[colorField] : rawValue;
+    const colorRule = resolveRuleMatch(colorValue, resolveCellVisualRules(column));
+    const ruleColor = normalizeString(colorRule?.color);
+    const resolvedPalette = colorRule
+      ? [normalizeString(colorRule?.background) || buildReportVisualTint(ruleColor) || palette[0], ruleColor || palette[1]].filter(Boolean)
+      : palette;
     return {
       kind,
       value: numericValue,
       percent: buildDataBarPercent(numericValue, range),
-      palette,
+      palette: resolvedPalette,
     };
   }
   if (kind === "shareBar") {

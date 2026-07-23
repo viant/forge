@@ -63,6 +63,147 @@ public struct DashboardGeoMapRow: Sendable, Equatable, Identifiable {
     }
 }
 
+public struct DashboardGeoStateTile: Sendable, Equatable, Identifiable {
+    public let key: String
+    public let label: String
+    public let column: Int
+    public let row: Int
+
+    public init(key: String, label: String, column: Int, row: Int) {
+        self.key = key
+        self.label = label
+        self.column = column
+        self.row = row
+    }
+
+    public var id: String { key }
+}
+
+public struct DashboardGeoTileRegion: Sendable, Equatable, Identifiable {
+    public let tile: DashboardGeoStateTile
+    public let value: DashboardGeoMapRow?
+    public let paletteIndex: Int?
+
+    public init(tile: DashboardGeoStateTile, value: DashboardGeoMapRow?, paletteIndex: Int?) {
+        self.tile = tile
+        self.value = value
+        self.paletteIndex = paletteIndex
+    }
+
+    public var id: String { tile.key }
+}
+
+public let dashboardUSStateTiles: [DashboardGeoStateTile] = [
+    .init(key: "AK", label: "Alaska", column: 1, row: 1),
+    .init(key: "ME", label: "Maine", column: 12, row: 1),
+    .init(key: "VT", label: "Vermont", column: 10, row: 2),
+    .init(key: "NH", label: "New Hampshire", column: 11, row: 2),
+    .init(key: "MA", label: "Massachusetts", column: 12, row: 2),
+    .init(key: "WA", label: "Washington", column: 1, row: 3),
+    .init(key: "ID", label: "Idaho", column: 2, row: 3),
+    .init(key: "MT", label: "Montana", column: 3, row: 3),
+    .init(key: "ND", label: "North Dakota", column: 4, row: 3),
+    .init(key: "MN", label: "Minnesota", column: 5, row: 3),
+    .init(key: "IL", label: "Illinois", column: 6, row: 3),
+    .init(key: "WI", label: "Wisconsin", column: 7, row: 3),
+    .init(key: "MI", label: "Michigan", column: 8, row: 3),
+    .init(key: "NY", label: "New York", column: 10, row: 3),
+    .init(key: "RI", label: "Rhode Island", column: 11, row: 3),
+    .init(key: "CT", label: "Connecticut", column: 12, row: 3),
+    .init(key: "OR", label: "Oregon", column: 1, row: 4),
+    .init(key: "NV", label: "Nevada", column: 2, row: 4),
+    .init(key: "WY", label: "Wyoming", column: 3, row: 4),
+    .init(key: "SD", label: "South Dakota", column: 4, row: 4),
+    .init(key: "IA", label: "Iowa", column: 5, row: 4),
+    .init(key: "IN", label: "Indiana", column: 6, row: 4),
+    .init(key: "OH", label: "Ohio", column: 7, row: 4),
+    .init(key: "PA", label: "Pennsylvania", column: 8, row: 4),
+    .init(key: "NJ", label: "New Jersey", column: 10, row: 4),
+    .init(key: "CA", label: "California", column: 1, row: 5),
+    .init(key: "UT", label: "Utah", column: 2, row: 5),
+    .init(key: "CO", label: "Colorado", column: 3, row: 5),
+    .init(key: "NE", label: "Nebraska", column: 4, row: 5),
+    .init(key: "MO", label: "Missouri", column: 5, row: 5),
+    .init(key: "KY", label: "Kentucky", column: 6, row: 5),
+    .init(key: "WV", label: "West Virginia", column: 7, row: 5),
+    .init(key: "VA", label: "Virginia", column: 8, row: 5),
+    .init(key: "MD", label: "Maryland", column: 9, row: 5),
+    .init(key: "DE", label: "Delaware", column: 10, row: 5),
+    .init(key: "AZ", label: "Arizona", column: 2, row: 6),
+    .init(key: "NM", label: "New Mexico", column: 3, row: 6),
+    .init(key: "KS", label: "Kansas", column: 4, row: 6),
+    .init(key: "AR", label: "Arkansas", column: 5, row: 6),
+    .init(key: "TN", label: "Tennessee", column: 6, row: 6),
+    .init(key: "NC", label: "North Carolina", column: 7, row: 6),
+    .init(key: "SC", label: "South Carolina", column: 8, row: 6),
+    .init(key: "DC", label: "District of Columbia", column: 9, row: 6),
+    .init(key: "HI", label: "Hawaii", column: 1, row: 7),
+    .init(key: "OK", label: "Oklahoma", column: 4, row: 7),
+    .init(key: "LA", label: "Louisiana", column: 5, row: 7),
+    .init(key: "MS", label: "Mississippi", column: 6, row: 7),
+    .init(key: "AL", label: "Alabama", column: 7, row: 7),
+    .init(key: "GA", label: "Georgia", column: 8, row: 7),
+    .init(key: "TX", label: "Texas", column: 4, row: 8),
+    .init(key: "FL", label: "Florida", column: 9, row: 8)
+]
+
+public let dashboardDefaultGeoPalette = [
+    "#d9f0ea",
+    "#9fd8ce",
+    "#55b9aa",
+    "#187f78",
+    "#0c4d52"
+]
+
+public func dashboardSupportsGeoShape(_ shape: String?) -> Bool {
+    guard let normalized = shape?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() else {
+        return false
+    }
+    return normalized == "us-states" || normalized == "us-state-tiles"
+}
+
+public func dashboardGeoPaletteIndex(
+    value: Double,
+    minimum: Double,
+    maximum: Double,
+    paletteSize: Int
+) -> Int {
+    guard paletteSize > 1, maximum > minimum else {
+        return max(paletteSize - 1, 0)
+    }
+    let ratio = min(max((value - minimum) / (maximum - minimum), 0), 1)
+    return min(max(Int(floor(ratio * Double(paletteSize))), 0), paletteSize - 1)
+}
+
+public func dashboardGeoTileRegions(
+    rows: [DashboardGeoMapRow],
+    paletteSize: Int = dashboardDefaultGeoPalette.count
+) -> [DashboardGeoTileRegion] {
+    let rowsByKey = Dictionary(
+        rows.sorted { $0.value > $1.value }
+            .map { ($0.regionCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(), $0) },
+        uniquingKeysWith: { first, _ in first }
+    )
+    let values = rowsByKey.values.map(\.value).filter(\.isFinite)
+    let minimum = values.min() ?? 0
+    let maximum = values.max() ?? 0
+    return dashboardUSStateTiles.map { tile in
+        let value = rowsByKey[tile.key]
+        return DashboardGeoTileRegion(
+            tile: tile,
+            value: value,
+            paletteIndex: value.map {
+                dashboardGeoPaletteIndex(
+                    value: $0.value,
+                    minimum: minimum,
+                    maximum: maximum,
+                    paletteSize: paletteSize
+                )
+            }
+        )
+    }
+}
+
 public struct DashboardSummaryResolvedCard: Sendable, Equatable {
     public let id: String?
     public let label: String
@@ -973,7 +1114,7 @@ public enum DashboardRuntime {
         let ranked = rankedDashboardGeoMapRows(
             rows,
             metricKey: metricKey,
-            limit: nil,
+            limit: .max,
             regionKey: nonBlank(geo["key"]?.stringValue),
             labelKey: nonBlank(geo["labelKey"]?.stringValue)
         )
@@ -1466,9 +1607,15 @@ public enum DashboardRuntime {
     }
 
     public static func dashboardReportRuntimeKPI(content: [String: JSONValue]) -> DashboardReportRuntimeKPIValue {
-        let valueText = dashboardReportRuntimeValueText(content["value"])
+        let valueText = dashboardReportRuntimeFormattedValueText(
+            content["value"],
+            format: nonBlank(content["valueFormat"]?.stringValue)
+        )
         let secondaryField = nonBlank(content["secondaryField"]?.stringValue)
-        let secondaryValue = dashboardReportRuntimeValueText(content["secondaryValue"])
+        let secondaryValue = dashboardReportRuntimeFormattedValueText(
+            content["secondaryValue"],
+            format: nonBlank(content["secondaryFormat"]?.stringValue)
+        )
         return DashboardReportRuntimeKPIValue(
             description: nonBlank(content["description"]?.stringValue),
             valueLabel: nonBlank(content["valueLabel"]?.stringValue)
@@ -1569,6 +1716,26 @@ public enum DashboardRuntime {
                 return String(describing: value)
             }
             return text
+        }
+    }
+
+    private static func dashboardReportRuntimeFormattedValueText(
+        _ value: JSONValue?,
+        format: String?
+    ) -> String? {
+        guard let value else { return nil }
+        guard let format else {
+            return dashboardReportRuntimeValueText(value)
+        }
+        switch value {
+        case .null:
+            return nil
+        case .string(let string):
+            return formatDashboardValue(string, format: format)
+        case .number(let number):
+            return formatDashboardValue(number, format: format)
+        case .bool, .array, .object:
+            return dashboardReportRuntimeValueText(value)
         }
     }
 
@@ -2067,7 +2234,7 @@ public enum DashboardRuntime {
                 formatter.maximumFractionDigits = 0
                 return formatter.string(from: NSNumber(value: number)) ?? String(Int(number))
             }
-        case "compactnumber":
+        case "compact", "compactnumber":
             if let number = numericValue(value) {
                 return formatCompactNumber(number, locale: locale)
             }
@@ -2076,6 +2243,21 @@ public enum DashboardRuntime {
                 let formatter = NumberFormatter()
                 formatter.locale = locale
                 formatter.numberStyle = .decimal
+                formatter.groupingSeparator = " "
+                formatter.usesGroupingSeparator = true
+                formatter.minimumFractionDigits = 0
+                formatter.maximumFractionDigits = 5
+                return formatter.string(from: NSNumber(value: number)) ?? String(number)
+            }
+        case "number5":
+            if let number = numericValue(value) {
+                let formatter = NumberFormatter()
+                formatter.locale = locale
+                formatter.numberStyle = .decimal
+                formatter.groupingSeparator = " "
+                formatter.usesGroupingSeparator = true
+                formatter.minimumFractionDigits = 5
+                formatter.maximumFractionDigits = 5
                 return formatter.string(from: NSNumber(value: number)) ?? String(number)
             }
         default:

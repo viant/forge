@@ -955,7 +955,7 @@ assert.deepEqual(
             groupDescription: "Narrative story charts for split trends and channel movement.",
             eyebrow: "Visual Story",
             metaItems: ["Split by Site Type", "Trend View", "Full Query"],
-            description: "Preset (line) that reselects the current table and chart for a curated visual read. — adds siteType",
+            description: "Quick chart (line) that adjusts the current table and visualization for a focused read. — adds siteType",
         },
         {
             label: "Spend + Impressions by Date",
@@ -963,7 +963,7 @@ assert.deepEqual(
             groupDescription: "Blended KPI charts for volume and reach comparisons.",
             eyebrow: "KPI Blend",
             metaItems: ["Dual Axis", "Reach + Volume", "Full Query"],
-            description: "Preset (bar) that reselects the current table and chart for a curated visual read.",
+            description: "Quick chart (bar) that adjusts the current table and visualization for a focused read.",
         },
         {
             label: "Saved Trend",

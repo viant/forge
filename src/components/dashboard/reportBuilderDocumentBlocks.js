@@ -2659,7 +2659,17 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
             const itemTitleField = normalizeString(block?.itemTitleField);
             const valueField = normalizeString(block?.valueField);
             const secondaryField = normalizeString(block?.secondaryField);
-            if (itemTitleField && !effectiveSecondaryOptionIds.has(itemTitleField)) {
+            if (!itemTitleField) {
+                diagnostics.push({
+                    id: `documentBlockCollectionTitleFieldMissing:${blockId}`,
+                    code: "documentBlockCollectionTitleFieldMissing",
+                    severity: "error",
+                    blockId,
+                    path: `reportDocument.blocks.${blockId}.itemTitleField`,
+                    message: `${blockTitle} does not define a collection title field.`,
+                    suggestedFix: "Edit the collection block and select a title field for each repeated item.",
+                });
+            } else if (!effectiveSecondaryOptionIds.has(itemTitleField)) {
                 diagnostics.push({
                     id: `documentBlockCollectionTitleFieldUnavailable:${blockId}`,
                     code: "documentBlockCollectionTitleFieldUnavailable",

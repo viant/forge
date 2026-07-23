@@ -7,8 +7,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -18,6 +21,8 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +37,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -60,12 +66,15 @@ import com.viant.forgeandroid.runtime.WindowContext
 import com.viant.forgeandroid.runtime.applyDashboardSelectionToCollection
 import com.viant.forgeandroid.runtime.dashboardFilterSignal
 import com.viant.forgeandroid.runtime.dashboardCompositionChart
+import com.viant.forgeandroid.runtime.dashboardDefaultGeoPalette
+import com.viant.forgeandroid.runtime.dashboardGeoTileRegions
 import com.viant.forgeandroid.runtime.dashboardReportRuntimeActionExecutionPayload
 import com.viant.forgeandroid.runtime.dashboardReportRuntimeSummary
 import com.viant.forgeandroid.runtime.dashboardReportRuntimeBlockVisible
 import com.viant.forgeandroid.runtime.dashboardReportRuntimeTableActionExecutions
 import com.viant.forgeandroid.runtime.dashboardSelectionSignal
 import com.viant.forgeandroid.runtime.dashboardSummaryMetrics
+import com.viant.forgeandroid.runtime.dashboardSupportsGeoShape
 import com.viant.forgeandroid.runtime.dashboardToneName
 import com.viant.forgeandroid.runtime.dashboardTimelineChart
 import com.viant.forgeandroid.runtime.evaluateDashboardVisibility
@@ -1265,7 +1274,7 @@ private fun DashboardGeoMapBlock(
     val rankedRows = rankedDashboardGeoMapRows(
         rows = selectedRows,
         metricKey = metric?.key,
-        limit = container.limit
+        limit = Int.MAX_VALUE
     )
     Column(
         modifier = Modifier
@@ -1282,59 +1291,217 @@ private fun DashboardGeoMapBlock(
         }
         if (rankedRows.isEmpty()) {
             Text(
-                "No regional rows available. Mobile renders geo maps as a compact summary until map geometry is available.",
+                "No regional rows available.",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(0xFF6A7280)
             )
         } else {
-            rankedRows.forEach { row ->
-                val tone = severityTone(row.tone)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(tone.background, RoundedCornerShape(10.dp))
-                        .border(1.dp, tone.border, RoundedCornerShape(10.dp))
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = row.rank?.let { "#$it" } ?: row.regionCode,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color(0xFF6A7280),
-                        modifier = Modifier.weight(0.28f)
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        val href = row.href?.trim().orEmpty()
-                        Text(
-                            row.label,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            textDecoration = if (href.isNotEmpty()) TextDecoration.Underline else null,
-                            modifier = if (href.isNotEmpty()) {
-                                Modifier.clickable { uriHandler.openUri(href) }
-                            } else {
-                                Modifier
-                            }
-                        )
-                        if (row.label != row.regionCode) {
-                            Text(row.regionCode, style = MaterialTheme.typography.labelSmall, color = Color(0xFF6A7280))
-                        }
-                    }
-                    Text(
-                        formatDashboardValue(row.value, metric?.format),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = tone.text
-                    )
-                }
-            }
+            DashboardGeoTileMap(
+                shape = dashboardGeoShape(container),
+                rows = rankedRows,
+                metricLabel = metric?.label ?: metric?.key ?: "Regional metric",
+                metricFormat = metric?.format,
+                rankingLimit = container.limit ?: 5,
+                onOpenHref = uriHandler::openUri
+            )
+        }
+    }
+}
+
+@Composable
+private fun DashboardGeoTileMap(
+    shape: String,
+    rows: List<com.viant.forgeandroid.runtime.DashboardGeoMapRow>,
+    metricLabel: String,
+    metricFormat: String?,
+    rankingLimit: Int = 5,
+    onOpenHref: (String) -> Unit = {}
+) {
+    if (!dashboardSupportsGeoShape(shape)) {
+        Text(
+            "Unsupported geo shape: $shape",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFF6A7280)
+        )
+        return
+    }
+    val regions = remember(rows) { dashboardGeoTileRegions(rows) }
+    val rankedRows = remember(rows, rankingLimit) {
+        rows.sortedByDescending { it.value }.take(rankingLimit.coerceAtLeast(0))
+    }
+    var selectedKey by remember(rows) {
+        mutableStateOf(rows.maxByOrNull { it.value }?.regionCode?.trim()?.uppercase())
+    }
+    val selected = rows.firstOrNull { it.regionCode.trim().uppercase() == selectedKey }
+        ?: rankedRows.firstOrNull()
+    val total = rows.sumOf { it.value }
+    val displayFormat = metricFormat?.trim()?.takeIf { it.isNotEmpty() } ?: "compactnumber"
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
             Text(
-                "Map geometry is not available in this native renderer; showing ranked regional fallback rows.",
+                "${rows.size} regions",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF6A7280)
+            )
+            Text(
+                "Total ${formatDashboardValue(total, displayFormat)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF6A7280)
+            )
+            Text(
+                "Top ${rankedRows.firstOrNull()?.regionCode ?: "-"}",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color(0xFF6A7280)
             )
         }
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            for (rowIndex in 1..8) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    for (columnIndex in 1..12) {
+                        val region = regions.firstOrNull {
+                            it.tile.row == rowIndex && it.tile.column == columnIndex
+                        }
+                        if (region == null) {
+                            Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+                        } else {
+                            val paletteIndex = region.paletteIndex
+                            val fill = paletteIndex?.let {
+                                dashboardColor(dashboardDefaultGeoPalette[it])
+                            } ?: Color(0xFFEEF3F8)
+                            val isSelected = region.tile.key == selectedKey
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f)
+                                    .background(fill, RoundedCornerShape(5.dp))
+                                    .border(
+                                        if (isSelected) 2.dp else 1.dp,
+                                        if (isSelected) Color(0xFF101828) else Color(0xFFD0D5DD),
+                                        RoundedCornerShape(5.dp)
+                                    )
+                                    .clickable(enabled = region.value != null) {
+                                        selectedKey = region.tile.key
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    region.tile.key,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if ((paletteIndex ?: 0) >= 3) Color.White else Color(0xFF102A43)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Low", style = MaterialTheme.typography.labelSmall, color = Color(0xFF6A7280))
+            dashboardDefaultGeoPalette.forEach { color ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(dashboardColor(color), RoundedCornerShape(999.dp))
+                        .padding(vertical = 4.dp)
+                )
+            }
+            Text("High", style = MaterialTheme.typography.labelSmall, color = Color(0xFF6A7280))
+        }
+        selected?.let { row ->
+            val href = row.href?.trim().orEmpty()
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFFBFDFF), RoundedCornerShape(10.dp))
+                    .border(1.dp, Color(0xFFD8E1E8), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "${row.label} (${row.regionCode.trim().uppercase()})",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        textDecoration = if (href.isNotEmpty()) TextDecoration.Underline else null,
+                        modifier = if (href.isNotEmpty()) {
+                            Modifier.clickable { onOpenHref(href) }
+                        } else {
+                            Modifier
+                        }
+                    )
+                    Text(metricLabel, style = MaterialTheme.typography.labelSmall, color = Color(0xFF6A7280))
+                }
+                Text(
+                    formatDashboardValue(row.value, displayFormat),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+        rankedRows.forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    row.regionCode.trim().uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(0.2f)
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .background(Color(0xFFEEF3F8), RoundedCornerShape(999.dp))
+                ) {
+                    val maximum = rankedRows.firstOrNull()?.value?.takeIf { it > 0 } ?: 1.0
+                    Spacer(
+                        modifier = Modifier
+                            .fillMaxWidth((row.value / maximum).toFloat().coerceIn(0.04f, 1f))
+                            .background(Color(0xFF187F78), RoundedCornerShape(999.dp))
+                            .padding(vertical = 4.dp)
+                    )
+                }
+                Text(
+                    formatDashboardValue(row.value, displayFormat),
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.weight(0.42f)
+                )
+            }
+        }
     }
+}
+
+private fun dashboardGeoShape(container: ContainerDef): String {
+    val geo = container.geo as? JsonObject
+    return (geo?.get("shape") as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
+        .ifEmpty { "us-states" }
+}
+
+private fun dashboardColor(value: String): Color {
+    val normalized = value.trim().removePrefix("#")
+    return runCatching {
+        val argb = when (normalized.length) {
+            6 -> ("FF$normalized").toLong(16)
+            8 -> normalized.toLong(16)
+            else -> return@runCatching Color(0xFFEEF3F8)
+        }
+        Color(argb)
+    }.getOrDefault(Color(0xFFEEF3F8))
 }
 
 @Composable
@@ -1387,6 +1554,15 @@ private fun DashboardReportBlock(
 @Composable
 private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowContext, container: ContainerDef, dashboardRoot: ContainerDef, filters: Map<String, Any?>, selection: DashboardSelectionState) {
     val summary = dashboardReportRuntimeSummary(container)
+    val blockById = summary.blocks.associateBy { it.id }
+    val tabSectionIds = summary.blocks
+        .filter { it.kind == "tabGroupBlock" }
+        .flatMap { reportRuntimeReferenceIds(it.content, "sectionIds", "sections") }
+    val tabChildIds = tabSectionIds
+        .mapNotNull(blockById::get)
+        .flatMap { reportRuntimeReferenceIds(it.content, "childBlockIds", "blockIds", "children") }
+    val nestedBlockIds = (tabSectionIds + tabChildIds).toSet()
+    var selectedTabs by remember(summary.blocks) { mutableStateOf(emptyMap<String, String>()) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1416,13 +1592,102 @@ private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowCon
         if (summaryDiagnostics.isNotEmpty()) {
             DashboardReportRuntimeDiagnosticsPreview(summaryDiagnostics)
         }
-        summary.blocks.forEach { block ->
+        summary.blocks.filterNot { it.id in nestedBlockIds }.forEach { block ->
             val metrics = (block.table?.rows?.firstOrNull() ?: block.chart?.rows?.firstOrNull()).orEmpty()
             if (dashboardReportRuntimeBlockVisible(block, metrics, filters, selection)) {
-                DashboardReportRuntimeAuthoredBlock(runtime, window, dashboardRoot, block)
+                if (block.kind == "tabGroupBlock") {
+                    DashboardReportRuntimeTabGroup(
+                        runtime = runtime,
+                        window = window,
+                        dashboardRoot = dashboardRoot,
+                        tabGroup = block,
+                        blocks = summary.blocks,
+                        selectedId = selectedTabs[block.id],
+                        onSelect = { selectedTabs = selectedTabs + (block.id to it) },
+                        filters = filters,
+                        selection = selection
+                    )
+                } else {
+                    DashboardReportRuntimeAuthoredBlock(runtime, window, dashboardRoot, block)
+                }
             }
         }
     }
+}
+
+@Composable
+private fun DashboardReportRuntimeTabGroup(
+    runtime: ForgeRuntime,
+    window: WindowContext,
+    dashboardRoot: ContainerDef,
+    tabGroup: DashboardReportRuntimeBlockSummary,
+    blocks: List<DashboardReportRuntimeBlockSummary>,
+    selectedId: String?,
+    onSelect: (String) -> Unit,
+    filters: Map<String, Any?>,
+    selection: DashboardSelectionState
+) {
+    val blockById = blocks.associateBy { it.id }
+    val sections = reportRuntimeReferenceIds(tabGroup.content, "sectionIds", "sections")
+        .mapNotNull(blockById::get)
+    val selectedSection = sections.firstOrNull { it.id == selectedId } ?: sections.firstOrNull()
+    if (selectedSection == null) {
+        DashboardReportRuntimeAuthoredBlock(runtime, window, dashboardRoot, tabGroup)
+        return
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            sections.forEach { section ->
+                FilterChip(
+                    selected = section.id == selectedSection.id,
+                    onClick = { onSelect(section.id) },
+                    label = { Text(section.title) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                )
+            }
+        }
+
+        DashboardReportRuntimeAuthoredBlock(runtime, window, dashboardRoot, selectedSection)
+        reportRuntimeReferenceIds(
+            selectedSection.content,
+            "childBlockIds",
+            "blockIds",
+            "children"
+        ).mapNotNull(blockById::get).forEach { child ->
+            val metrics = (child.table?.rows?.firstOrNull() ?: child.chart?.rows?.firstOrNull()).orEmpty()
+            if (dashboardReportRuntimeBlockVisible(child, metrics, filters, selection)) {
+                DashboardReportRuntimeAuthoredBlock(runtime, window, dashboardRoot, child)
+            }
+        }
+    }
+}
+
+private fun reportRuntimeReferenceIds(
+    content: Map<String, JsonElement>,
+    vararg keys: String
+): List<String> {
+    keys.forEach { key ->
+        val values = content[key] as? JsonArray ?: return@forEach
+        val ids = values.mapNotNull { value ->
+            when (value) {
+                is JsonPrimitive -> value.contentOrNull
+                is JsonObject -> (value["id"] as? JsonPrimitive)?.contentOrNull
+                else -> null
+            }
+        }.filter { it.isNotBlank() }
+        if (ids.isNotEmpty()) {
+            return ids
+        }
+    }
+    return emptyList()
 }
 
 @Composable
@@ -1751,42 +2016,11 @@ private fun DashboardReportRuntimeGeoMapPreview(block: DashboardReportRuntimeBlo
         if (geoMap.rows.isEmpty()) {
             Text("No regional rows available.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF6A7280))
         } else {
-            geoMap.rows.take(5).forEach { row ->
-                val tone = severityTone(row.tone)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(tone.background, RoundedCornerShape(10.dp))
-                        .border(1.dp, tone.border, RoundedCornerShape(10.dp))
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        text = row.rank?.let { "#$it" } ?: row.regionCode,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF6A7280),
-                        modifier = Modifier.weight(0.25f)
-                    )
-                    Text(
-                        text = row.label,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = formatDashboardValue(row.value, geoMap.metricFormat),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = tone.text
-                    )
-                }
-            }
-            Text(
-                "Map geometry is not available in this native renderer; showing ranked regional fallback rows.",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF6A7280)
+            DashboardGeoTileMap(
+                shape = geoMap.shape,
+                rows = geoMap.rows,
+                metricLabel = geoMap.metricLabel,
+                metricFormat = geoMap.metricFormat
             )
         }
     }

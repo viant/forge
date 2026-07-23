@@ -302,11 +302,16 @@ export function buildReportPrintTableCellTextElement(element = {}) {
   }
   const format = normalizeString(element?.format);
   const align = normalizeEnumValue(element?.align, ["left", "center", "right"]);
+  const fontSize = normalizeNonNegativeNumber(element?.fontSize, { minimum: 1, allowZero: false });
+  const color = normalizeString(element?.color);
   return {
     ...next,
     text,
     ...(format ? { format } : {}),
     ...(align ? { align } : {}),
+    ...(fontSize != null ? { fontSize } : {}),
+    ...(color ? { color } : {}),
+    ...(element?.wrap === true ? { wrap: true } : {}),
   };
 }
 
@@ -529,6 +534,10 @@ const REPORT_PRINT_THEME = Object.freeze({
   tableBorderColor: "#d0d5dd",
   dataBarBackground: "#dbeafe",
   dataBarForeground: "#2563eb",
+  cardBackground: "#ffffff",
+  cardBorderColor: "#d8e2ec",
+  cardRadius: 7,
+  cardPadding: 10,
 });
 
 function buildOrderedReportFillBlocks(reportSpec = {}, reportFill = {}) {
@@ -1029,6 +1038,17 @@ function syncReportPrintStateFromChildren(state = {}, children = []) {
   }
 }
 
+function resolveResponsiveReportPrintSpan(state = {}, block = {}, authoredSpan = REPORT_LAYOUT_GRID_COLUMNS) {
+  const span = Math.max(1, Math.min(REPORT_LAYOUT_GRID_COLUMNS, Math.trunc(Number(authoredSpan) || REPORT_LAYOUT_GRID_COLUMNS)));
+  const kind = normalizeString(block?.kind);
+  // A quarter-width desktop KPI is not legible on a portrait page. Reflow it
+  // to two cards per row while preserving the authored desktop layout.
+  if (kind === "kpiBlock" && state.contentWidth <= 600) {
+    return Math.max(6, span);
+  }
+  return span;
+}
+
 function renderReportPrintGridRow(state = {}, entries = []) {
   const rowEntries = (Array.isArray(entries) ? entries : [])
     .filter((entry) => !!entry?.block && Number.isFinite(entry?.span) && entry.span > 0)
@@ -1171,7 +1191,6 @@ function buildReportPrintKpiBodyLines(block = {}) {
 function renderReportPrintKpiBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
-  renderReportPrintSectionTitle(state, block, { layoutNote });
   const content = block?.content || {};
   const presentationMode = normalizeReportPrintKpiPresentationMode(block);
   const showCard = presentationMode !== "body";
@@ -1180,16 +1199,10 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
     content?.value,
     content?.valueFormat || content?.format,
   );
-  if (showCard) {
-    renderReportPrintTextLines(state, {
-      idPrefix: `${normalizeString(block?.id || block?.kind || "block")}__value`,
-      lines: [`${normalizeString(content?.valueLabel || content?.valueField || "Value")}: ${formatReportPrintValue(content?.value, valueFormat)}`],
-      fontSize: REPORT_PRINT_THEME.kpiValueFontSize,
-      lineHeight: REPORT_PRINT_THEME.kpiValueLineHeight,
-      fontWeight: "700",
-      color: REPORT_PRINT_THEME.titleColor,
-    });
-  }
+  const blockId = normalizeString(block?.id || block?.kind || "block");
+  const title = resolveReportPrintBlockTitle(block);
+  const valueLabel = normalizeString(content?.valueLabel || content?.valueField || "Value");
+  const valueText = formatReportPrintValue(content?.value, valueFormat);
   const detailLines = [];
   if (showCard && normalizeString(content?.secondaryField || content?.secondaryLabel)) {
     detailLines.push(`${normalizeString(content?.secondaryLabel || content?.secondaryField)}: ${formatReportPrintValue(content?.secondaryValue, normalizeString(content?.secondaryFormat))}`);
@@ -1199,14 +1212,97 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
   }
   detailLines.push(...bodyLines);
   if (!showCard && detailLines.length === 0) {
-    detailLines.push(`${normalizeString(content?.valueLabel || content?.valueField || "Value")}: ${formatReportPrintValue(content?.value, valueFormat)}`);
+    detailLines.push(`${valueLabel}: ${valueText}`);
   }
-  if (detailLines.length > 0) {
+  if (!showCard) {
+    renderReportPrintSectionTitle(state, block, { layoutNote });
     renderReportPrintTextLines(state, {
-      idPrefix: `${normalizeString(block?.id || block?.kind || "block")}__detail`,
+      idPrefix: `${blockId}__detail`,
       lines: detailLines,
     });
+    finishReportPrintBlock(state);
+    return;
   }
+
+  const cardPadding = REPORT_PRINT_THEME.cardPadding;
+  const innerWidth = Math.max(1, state.contentWidth - (cardPadding * 2));
+  const valueFontSize = state.contentWidth < 220 ? 17 : REPORT_PRINT_THEME.kpiValueFontSize;
+  const titleLines = wrapReportPrintText(title, innerWidth, 12);
+  const valueLines = wrapReportPrintText(valueText, innerWidth, valueFontSize);
+  const wrappedDetails = detailLines.flatMap((line) => wrapReportPrintText(line, innerWidth, 10));
+  const cardHeight = Math.max(
+    92,
+    (cardPadding * 2)
+      + (titleLines.length * 16)
+      + 12
+      + (valueLines.length * 24)
+      + (wrappedDetails.length > 0 ? 6 + (wrappedDetails.length * 14) : 0),
+  );
+  ensureReportPrintSpace(state, cardHeight);
+  const cardY = state.cursorY;
+  pushReportPrintElement(state, buildReportPrintRectElement({
+    id: `${blockId}__card`,
+    kind: "rect",
+    box: { x: state.contentLeft, y: cardY, width: state.contentWidth, height: cardHeight },
+    fillColor: REPORT_PRINT_THEME.cardBackground,
+    strokeColor: REPORT_PRINT_THEME.cardBorderColor,
+    strokeWidth: 1,
+    radius: REPORT_PRINT_THEME.cardRadius,
+  }));
+  state.cursorY = cardY + cardPadding;
+  const titleElement = renderReportPrintTextLines(state, {
+    idPrefix: `${blockId}__title`,
+    lines: titleLines,
+    x: state.contentLeft + cardPadding,
+    width: innerWidth,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: "600",
+    color: REPORT_PRINT_THEME.titleColor,
+  });
+  if (titleElement) {
+    pushReportPrintBookmark(state, {
+      id: `bookmark.${blockId}`,
+      title,
+      pageNumber: state.currentPage?.number,
+      elementId: titleElement.id,
+      level: 1,
+      y: titleElement.box?.y,
+    });
+  }
+  renderReportPrintTextLines(state, {
+    idPrefix: `${blockId}__value_label`,
+    lines: [valueLabel.toUpperCase()],
+    x: state.contentLeft + cardPadding,
+    width: innerWidth,
+    fontSize: 8,
+    lineHeight: 12,
+    fontWeight: "600",
+    color: REPORT_PRINT_THEME.mutedColor,
+  });
+  renderReportPrintTextLines(state, {
+    idPrefix: `${blockId}__value`,
+    lines: valueLines,
+    x: state.contentLeft + cardPadding,
+    width: innerWidth,
+    fontSize: valueFontSize,
+    lineHeight: 24,
+    fontWeight: "700",
+    color: REPORT_PRINT_THEME.titleColor,
+  });
+  if (wrappedDetails.length > 0) {
+    state.cursorY += 4;
+    renderReportPrintTextLines(state, {
+      idPrefix: `${blockId}__detail`,
+      lines: wrappedDetails,
+      x: state.contentLeft + cardPadding,
+      width: innerWidth,
+      fontSize: 10,
+      lineHeight: 14,
+      color: REPORT_PRINT_THEME.bodyColor,
+    });
+  }
+  state.cursorY = cardY + cardHeight;
   finishReportPrintBlock(state);
 }
 
@@ -1287,7 +1383,11 @@ function renderReportPrintCompositeBlock(state = {}, block = {}, {
   };
   childBlocks.forEach((childBlock) => {
     const blockId = normalizeString(childBlock?.id);
-    const span = resolveReportLayoutSpan(state.layoutSpanByBlockId.get(blockId));
+    const span = resolveResponsiveReportPrintSpan(
+      state,
+      childBlock,
+      resolveReportLayoutSpan(state.layoutSpanByBlockId.get(blockId)),
+    );
     if (span >= REPORT_LAYOUT_GRID_COLUMNS) {
       flushPendingRow();
       renderReportPrintBlock(state, childBlock, {});
@@ -1310,27 +1410,14 @@ function renderReportPrintTabGroupBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
   renderReportPrintSectionTitle(state, block, { layoutNote });
-  const tabs = Array.isArray(block?.content?.tabs) ? block.content.tabs : [];
-  const sectionIds = Array.isArray(block?.content?.sectionIds)
-    ? block.content.sectionIds
-    : (Array.isArray(block?.sectionIds) ? block.sectionIds : []);
-  const lines = [];
   const description = normalizeString(block?.content?.description || block?.description);
   if (description) {
-    lines.push(description);
+    renderReportPrintTextLines(state, {
+      idPrefix: `${normalizeString(block?.id || "tabGroup")}__description`,
+      lines: [description],
+      color: REPORT_PRINT_THEME.mutedColor,
+    });
   }
-  if (tabs.length > 0) {
-    lines.push(`Tabs: ${tabs.map((tab) => normalizeString(tab?.navigationLabel || tab?.title || tab?.id)).filter(Boolean).join(" • ")}`);
-  } else if (sectionIds.length > 0) {
-    lines.push(`Tabs: ${sectionIds.map((sectionId) => normalizeString(sectionId)).filter(Boolean).join(" • ")}`);
-  } else {
-    lines.push("No tab sections configured.");
-  }
-  renderReportPrintTextLines(state, {
-    idPrefix: `${normalizeString(block?.id || "tabGroup")}__tabs`,
-    lines,
-    color: REPORT_PRINT_THEME.mutedColor,
-  });
   finishReportPrintBlock(state);
 }
 
@@ -1493,29 +1580,112 @@ function renderReportPrintCollectionBlock(state = {}, block = {}, {
     ? block.content
     : {};
   const items = Array.isArray(content?.items) ? content.items : [];
-  const lines = [];
   if (items.length === 0) {
-    lines.push(normalizeString(content?.emptyLabel || "No collection items available."));
-  } else {
-    items.forEach((item, index) => {
-      const title = normalizeString(item?.title || `Item ${index + 1}`);
-      lines.push(`## ${title}`);
+    renderReportPrintTextLines(state, {
+      idPrefix: `${normalizeString(block?.id || block?.kind || "block")}__collection_empty`,
+      lines: [normalizeString(content?.emptyLabel || "No collection items available.")],
+    });
+    finishReportPrintBlock(state);
+    return;
+  }
+
+  const blockId = normalizeString(block?.id || block?.kind || "block");
+  const requestedColumns = Math.max(1, Math.trunc(Number(content?.columns) || 1));
+  const columns = state.contentWidth >= 480 ? Math.min(2, requestedColumns) : 1;
+  const gap = 10;
+  const cardWidth = (state.contentWidth - (gap * (columns - 1))) / columns;
+  const padding = REPORT_PRINT_THEME.cardPadding;
+  const rows = [];
+  for (let index = 0; index < items.length; index += columns) {
+    rows.push(items.slice(index, index + columns));
+  }
+  rows.forEach((rowItems, rowIndex) => {
+    const layouts = rowItems.map((item, columnIndex) => {
+      const innerWidth = Math.max(1, cardWidth - (padding * 2));
+      const toneLabel = normalizeString(item?.toneLabel || item?.tone).toUpperCase();
+      const titleWidth = Math.max(80, innerWidth - (toneLabel ? 58 : 0));
+      const titleLines = wrapReportPrintText(normalizeString(item?.title || `Item ${(rowIndex * columns) + columnIndex + 1}`), titleWidth, 11);
+      const detailLines = [];
       if (normalizeString(item?.valueField || item?.valueLabel)) {
-        lines.push(`${normalizeString(item?.valueLabel || item?.valueField || "Value")}: ${formatReportPrintValue(item?.value, normalizeString(item?.valueFormat || item?.format))}`);
+        detailLines.push(`${normalizeString(item?.valueLabel || item?.valueField || "Value")}: ${formatReportPrintValue(item?.value, normalizeString(item?.valueFormat || item?.format))}`);
       }
       if (normalizeString(item?.secondaryField || item?.secondaryLabel)) {
-        lines.push(`${normalizeString(item?.secondaryLabel || item?.secondaryField)}: ${formatReportPrintValue(item?.secondaryValue, normalizeString(item?.secondaryFormat))}`);
+        detailLines.push(`${normalizeString(item?.secondaryLabel || item?.secondaryField)}: ${formatReportPrintValue(item?.secondaryValue, normalizeString(item?.secondaryFormat))}`);
       }
-      const bodyLines = normalizeMarkdownToPlainText(item?.bodyMarkdown || "").split("\n").map((entry) => normalizeString(entry)).filter(Boolean);
-      lines.push(...bodyLines);
-      if (index < items.length - 1) {
-        lines.push("");
-      }
+      detailLines.push(...normalizeMarkdownToPlainText(item?.bodyMarkdown || "").split("\n").map((entry) => normalizeString(entry)).filter(Boolean));
+      const bodyLines = detailLines.flatMap((line) => wrapReportPrintText(line, innerWidth, 9));
+      return {
+        item,
+        toneLabel,
+        titleLines,
+        bodyLines,
+        height: Math.max(70, (padding * 2) + (titleLines.length * 14) + 5 + (bodyLines.length * 13)),
+      };
     });
-  }
-  renderReportPrintTextLines(state, {
-    idPrefix: `${normalizeString(block?.id || block?.kind || "block")}__collection`,
-    lines,
+    const rowHeight = Math.max(...layouts.map((layout) => layout.height));
+    ensureReportPrintSpace(state, rowHeight);
+    const rowY = state.cursorY;
+    layouts.forEach((layout, columnIndex) => {
+      const item = layout.item;
+      const cardX = state.contentLeft + (columnIndex * (cardWidth + gap));
+      const backgroundColor = normalizeString(item?.backgroundColor) || REPORT_PRINT_THEME.cardBackground;
+      const borderColor = normalizeString(item?.borderColor) || REPORT_PRINT_THEME.cardBorderColor;
+      const accentColor = normalizeString(item?.textColor) || borderColor;
+      pushReportPrintElement(state, buildReportPrintRectElement({
+        id: `${blockId}__card_${rowIndex}_${columnIndex}`,
+        kind: "rect",
+        box: { x: cardX, y: rowY, width: cardWidth, height: rowHeight },
+        fillColor: backgroundColor,
+        strokeColor: borderColor,
+        strokeWidth: 1,
+        radius: REPORT_PRINT_THEME.cardRadius,
+      }));
+      pushReportPrintElement(state, buildReportPrintRectElement({
+        id: `${blockId}__card_${rowIndex}_${columnIndex}__accent`,
+        kind: "rect",
+        box: { x: cardX, y: rowY, width: 3, height: rowHeight },
+        fillColor: accentColor,
+        radius: 2,
+      }));
+      let textY = rowY + padding;
+      layout.titleLines.forEach((line, lineIndex) => {
+        pushReportPrintElement(state, buildReportPrintTextElement({
+          id: `${blockId}__card_${rowIndex}_${columnIndex}__title_${lineIndex}`,
+          kind: "text",
+          box: { x: cardX + padding, y: textY, width: cardWidth - (padding * 2) - (layout.toneLabel ? 58 : 0), height: 14 },
+          text: line,
+          fontSize: 11,
+          fontWeight: "600",
+          color: accentColor,
+        }));
+        textY += 14;
+      });
+      if (layout.toneLabel) {
+        pushReportPrintElement(state, buildReportPrintTextElement({
+          id: `${blockId}__card_${rowIndex}_${columnIndex}__tone`,
+          kind: "text",
+          box: { x: cardX + cardWidth - padding - 54, y: rowY + padding, width: 54, height: 12 },
+          text: layout.toneLabel,
+          fontSize: 8,
+          fontWeight: "700",
+          color: accentColor,
+          align: "right",
+        }));
+      }
+      textY += 5;
+      layout.bodyLines.forEach((line, lineIndex) => {
+        pushReportPrintElement(state, buildReportPrintTextElement({
+          id: `${blockId}__card_${rowIndex}_${columnIndex}__body_${lineIndex}`,
+          kind: "text",
+          box: { x: cardX + padding, y: textY, width: cardWidth - (padding * 2), height: 13 },
+          text: line,
+          fontSize: 9,
+          color: REPORT_PRINT_THEME.bodyColor,
+        }));
+        textY += 13;
+      });
+    });
+    state.cursorY = rowY + rowHeight + gap;
   });
   finishReportPrintBlock(state);
 }
@@ -1574,7 +1744,74 @@ function resolveReportPrintTonePalette(tone = "", theme = {}) {
   }
 }
 
-function renderReportPrintTableHeader(state = {}, block = {}, columns = [], rowY = 0, columnWidth = 0) {
+function resolveReportPrintTableCellText(column = {}, cell = {}) {
+  return formatReportPrintValue(
+    cell?.displayValue !== undefined && cell?.displayValue !== null && cell?.displayValue !== ""
+      ? cell.displayValue
+      : cell?.value,
+    normalizeString(column?.format),
+  );
+}
+
+function buildReportPrintTableColumnLayout(state = {}, block = {}, columns = []) {
+  const rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
+  const weights = columns.map((column) => {
+    const key = normalizeString(column?.key);
+    const numeric = normalizeString(column?.kind) === "measure" || rows.some((row) => {
+      const cell = (Array.isArray(row?.cells) ? row.cells : []).find((entry) => normalizeString(entry?.key) === key);
+      return typeof cell?.value === "number";
+    });
+    let longest = numeric
+      ? Math.min(12, normalizeString(column?.label || key).length)
+      : normalizeString(column?.label || key).length;
+    rows.slice(0, 50).forEach((row) => {
+      const cell = (Array.isArray(row?.cells) ? row.cells : []).find((entry) => normalizeString(entry?.key) === key);
+      longest = Math.max(longest, resolveReportPrintTableCellText(column, cell).length);
+    });
+    return Math.max(7, Math.min(numeric ? 18 : 30, longest));
+  });
+  const totalWeight = Math.max(1, weights.reduce((sum, weight) => sum + weight, 0));
+  const baseWidth = Math.min(64, (state.contentWidth / Math.max(1, columns.length)) * 0.7);
+  const flexibleWidth = Math.max(0, state.contentWidth - (baseWidth * columns.length));
+  const widths = weights.map((weight) => baseWidth + (flexibleWidth * (weight / totalWeight)));
+  const offsets = [];
+  widths.reduce((left, width) => {
+    offsets.push(left);
+    return left + width;
+  }, 0);
+  const headerHeight = Math.max(
+    REPORT_PRINT_THEME.tableHeaderHeight,
+    ...columns.map((column, index) => (
+      (wrapReportPrintText(
+        normalizeString(column?.label || column?.key || `Column ${index + 1}`),
+        Math.max(1, widths[index] - (REPORT_PRINT_THEME.tableCellPaddingX * 2)),
+        9,
+      ).length * 12) + (REPORT_PRINT_THEME.tableCellPaddingY * 2)
+    )),
+  );
+  return { widths, offsets, headerHeight };
+}
+
+function resolveReportPrintTableRowHeight(columns = [], row = {}, widths = []) {
+  const cells = new Map((Array.isArray(row?.cells) ? row.cells : []).map((cell) => [normalizeString(cell?.key), cell]));
+  return Math.max(
+    REPORT_PRINT_THEME.tableRowHeight,
+    ...columns.map((column, index) => {
+      const text = resolveReportPrintTableCellText(column, cells.get(normalizeString(column?.key)));
+      const lines = wrapReportPrintText(
+        text,
+        Math.max(1, (widths[index] || 1) - (REPORT_PRINT_THEME.tableCellPaddingX * 2)),
+        9,
+      );
+      return (Math.max(1, lines.length) * 12) + (REPORT_PRINT_THEME.tableCellPaddingY * 2);
+    }),
+  );
+}
+
+function renderReportPrintTableHeader(state = {}, block = {}, columns = [], rowY = 0, columnLayout = {}) {
+  const widths = Array.isArray(columnLayout?.widths) ? columnLayout.widths : [];
+  const offsets = Array.isArray(columnLayout?.offsets) ? columnLayout.offsets : [];
+  const headerHeight = Number(columnLayout?.headerHeight) || REPORT_PRINT_THEME.tableHeaderHeight;
   pushReportPrintElement(state, buildReportPrintRectElement({
     id: `${normalizeString(block?.id || "table")}__header_bg__page_${state.currentPage?.number}`,
     kind: "rect",
@@ -1582,7 +1819,7 @@ function renderReportPrintTableHeader(state = {}, block = {}, columns = [], rowY
       x: state.contentLeft,
       y: rowY,
       width: state.contentWidth,
-      height: REPORT_PRINT_THEME.tableHeaderHeight,
+      height: headerHeight,
     },
     fillColor: REPORT_PRINT_THEME.tableHeaderBackground,
     strokeColor: REPORT_PRINT_THEME.tableBorderColor,
@@ -1593,21 +1830,24 @@ function renderReportPrintTableHeader(state = {}, block = {}, columns = [], rowY
       id: `${normalizeString(block?.id || "table")}__header__${normalizeString(column?.key || columnIndex)}__page_${state.currentPage?.number}`,
       kind: "text",
       box: {
-        x: state.contentLeft + (columnIndex * columnWidth) + REPORT_PRINT_THEME.tableCellPaddingX,
+        x: state.contentLeft + (offsets[columnIndex] || 0) + REPORT_PRINT_THEME.tableCellPaddingX,
         y: rowY + REPORT_PRINT_THEME.tableCellPaddingY,
-        width: Math.max(1, columnWidth - (REPORT_PRINT_THEME.tableCellPaddingX * 2)),
-        height: REPORT_PRINT_THEME.tableHeaderHeight - (REPORT_PRINT_THEME.tableCellPaddingY * 2),
+        width: Math.max(1, (widths[columnIndex] || 1) - (REPORT_PRINT_THEME.tableCellPaddingX * 2)),
+        height: headerHeight - (REPORT_PRINT_THEME.tableCellPaddingY * 2),
       },
       text: normalizeString(column?.label || column?.key || `Column ${columnIndex + 1}`),
-      fontSize: 11,
+      fontSize: 9,
       fontWeight: "600",
       color: REPORT_PRINT_THEME.titleColor,
       align: resolveReportPrintTableColumnAlign(column, {}),
+      wrap: true,
     }));
   });
 }
 
-function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {}, rowPosition = 0, rowSequence = 0, columnWidth = 0, dataBarRanges = new Map()) {
+function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {}, rowPosition = 0, rowSequence = 0, columnLayout = {}, rowHeight = REPORT_PRINT_THEME.tableRowHeight, dataBarRanges = new Map()) {
+  const widths = Array.isArray(columnLayout?.widths) ? columnLayout.widths : [];
+  const offsets = Array.isArray(columnLayout?.offsets) ? columnLayout.offsets : [];
   const rowKey = `row_${normalizePositiveInteger(row?.rowIndex + 1) || rowSequence}`;
   const cellByKey = new Map(
     (Array.isArray(row?.cells) ? row.cells : [])
@@ -1619,7 +1859,7 @@ function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {
     kind: "line",
     box: {
       x: state.contentLeft,
-      y: rowPosition + REPORT_PRINT_THEME.tableRowHeight,
+      y: rowPosition + rowHeight,
       width: state.contentWidth,
       height: 0,
     },
@@ -1629,12 +1869,12 @@ function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {
   columns.forEach((column, columnIndex) => {
     const columnKey = normalizeString(column?.key || columnIndex);
     const cell = cellByKey.get(columnKey) || null;
-    const cellX = state.contentLeft + (columnIndex * columnWidth);
-    const cellWidth = columnWidth;
+    const cellX = state.contentLeft + (offsets[columnIndex] || 0);
+    const cellWidth = widths[columnIndex] || 1;
     const cellInnerX = cellX + REPORT_PRINT_THEME.tableCellPaddingX;
     const cellInnerY = rowPosition + REPORT_PRINT_THEME.tableCellPaddingY;
     const cellInnerWidth = Math.max(1, cellWidth - (REPORT_PRINT_THEME.tableCellPaddingX * 2));
-    const cellInnerHeight = REPORT_PRINT_THEME.tableRowHeight - (REPORT_PRINT_THEME.tableCellPaddingY * 2);
+    const cellInnerHeight = rowHeight - (REPORT_PRINT_THEME.tableCellPaddingY * 2);
     const visualState = cell?.visualState || null;
     if (["dataBar", "progressBar", "sparkBar"].includes(normalizeString(visualState?.kind)) && typeof visualState?.value === "number") {
       const range = dataBarRanges.get(columnKey) || {
@@ -1812,6 +2052,8 @@ function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {
       ),
       ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
       align: resolveReportPrintTableColumnAlign(column, cell),
+      fontSize: 9,
+      wrap: true,
     }));
   });
 }
@@ -1819,10 +2061,10 @@ function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {
 function renderReportPrintTableBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
-  renderReportPrintSectionTitle(state, block, { layoutNote });
   const columns = Array.isArray(block?.content?.columns) ? block.content.columns : [];
   const rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
   if (columns.length === 0) {
+    renderReportPrintSectionTitle(state, block, { layoutNote });
     renderReportPrintTextLines(state, {
       idPrefix: `${normalizeString(block?.id || "table")}__empty`,
       lines: ["No table columns are available for print."],
@@ -1832,6 +2074,7 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
     return;
   }
   if (rows.length === 0) {
+    renderReportPrintSectionTitle(state, block, { layoutNote });
     renderReportPrintTextLines(state, {
       idPrefix: `${normalizeString(block?.id || "table")}__empty_rows`,
       lines: ["No rows are available for print."],
@@ -1840,17 +2083,25 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
     finishReportPrintBlock(state);
     return;
   }
-  const columnWidth = state.contentWidth / columns.length;
+  const columnLayout = buildReportPrintTableColumnLayout(state, block, columns);
   const dataBarRanges = buildReportPrintDataBarRanges(block);
+  const firstRowHeight = resolveReportPrintTableRowHeight(columns, rows[0], columnLayout.widths);
+  const headingHeight = REPORT_PRINT_THEME.titleLineHeight
+    + (layoutNote ? REPORT_PRINT_THEME.warningLineHeight : 0)
+    + 4;
+  ensureReportPrintSpace(state, headingHeight + columnLayout.headerHeight + firstRowHeight);
+  renderReportPrintSectionTitle(state, block, { layoutNote });
   let rowIndex = 0;
   while (rowIndex < rows.length) {
-    ensureReportPrintSpace(state, REPORT_PRINT_THEME.tableHeaderHeight + REPORT_PRINT_THEME.tableRowHeight);
+    const nextRowHeight = resolveReportPrintTableRowHeight(columns, rows[rowIndex], columnLayout.widths);
+    ensureReportPrintSpace(state, columnLayout.headerHeight + nextRowHeight);
     const headerY = state.cursorY;
-    renderReportPrintTableHeader(state, block, columns, headerY, columnWidth);
-    state.cursorY += REPORT_PRINT_THEME.tableHeaderHeight;
+    renderReportPrintTableHeader(state, block, columns, headerY, columnLayout);
+    state.cursorY += columnLayout.headerHeight;
     while (rowIndex < rows.length) {
       ensureReportPrintPage(state);
-      if (state.cursorY + REPORT_PRINT_THEME.tableRowHeight > state.contentBottom && state.cursorY > state.contentTop) {
+      const rowHeight = resolveReportPrintTableRowHeight(columns, rows[rowIndex], columnLayout.widths);
+      if (state.cursorY + rowHeight > state.contentBottom && state.cursorY > state.contentTop) {
         startNextReportPrintPage(state);
         break;
       }
@@ -1861,10 +2112,11 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
         rows[rowIndex],
         state.cursorY,
         rowIndex,
-        columnWidth,
+        columnLayout,
+        rowHeight,
         dataBarRanges,
       );
-      state.cursorY += REPORT_PRINT_THEME.tableRowHeight;
+      state.cursorY += rowHeight;
       rowIndex += 1;
     }
   }
@@ -2082,7 +2334,11 @@ export function buildReportPrintFromReportFill({
   for (let index = 0; index < orderedBlocks.length; index += 1) {
     const block = orderedBlocks[index];
     const blockId = normalizeString(block?.id);
-    const span = resolveReportLayoutSpan(state.layoutSpanByBlockId.get(blockId));
+    const span = resolveResponsiveReportPrintSpan(
+      state,
+      block,
+      resolveReportLayoutSpan(state.layoutSpanByBlockId.get(blockId)),
+    );
     if (span >= REPORT_LAYOUT_GRID_COLUMNS) {
       flushPendingRow();
       renderReportPrintBlock(state, block, {});

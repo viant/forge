@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
     REPORT_EXPORT_STATUS_POLL_INTERVAL_MS,
+    resolveReportBuilderExportEventSourceKind,
     resolveReportBuilderExportStatusFailure,
     resolveReportBuilderExportSubmitFailure,
     shouldAutoRefreshReportBuilderExportJob,
@@ -147,6 +148,16 @@ assert.deepEqual(
 );
 
 assert.equal(REPORT_EXPORT_STATUS_POLL_INTERVAL_MS, 1500);
+
+assert.equal(
+    resolveReportBuilderExportEventSourceKind({ sourceKind: "draft", eventSourceKind: "preset" }),
+    "preset",
+);
+
+assert.equal(
+    resolveReportBuilderExportEventSourceKind({ sourceKind: "draft" }),
+    "draft",
+);
 
 assert.equal(
     shouldAutoRefreshReportBuilderExportJob({

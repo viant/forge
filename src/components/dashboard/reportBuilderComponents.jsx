@@ -4640,7 +4640,7 @@ export function ReportBuilderChartQuickActions({
     onCreate,
     quickOptions = [],
     onSelectQuickOption,
-    buttonLabel = "Presets",
+    buttonLabel = "Quick chart",
     buttonIcon = "timeline-line-chart",
     busy = false,
     busyButtonLabel = "",

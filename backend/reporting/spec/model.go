@@ -215,56 +215,58 @@ type BadgeItem struct {
 }
 
 type Block struct {
-	ID                       string          `json:"id"`
-	Kind                     string          `json:"kind"`
-	Title                    string          `json:"title,omitempty"`
-	DatasetRef               string          `json:"datasetRef,omitempty"`
-	Columns                  []TableColumn   `json:"columns,omitempty"`
-	ChartSpec                map[string]any  `json:"chartSpec,omitempty"`
-	ChartModel               map[string]any  `json:"chartModel,omitempty"`
-	ValueField               string          `json:"valueField,omitempty"`
-	ValueLabel               string          `json:"valueLabel,omitempty"`
-	ValueFormat              string          `json:"valueFormat,omitempty"`
-	SecondaryField           string          `json:"secondaryField,omitempty"`
-	SecondaryLabel           string          `json:"secondaryLabel,omitempty"`
-	SecondaryFormat          string          `json:"secondaryFormat,omitempty"`
-	SecondaryDisplayKey      string          `json:"secondaryDisplayKey,omitempty"`
-	SecondaryDisplayValueMap map[string]any  `json:"secondaryDisplayValueMap,omitempty"`
-	Description              string          `json:"description,omitempty"`
-	EmptyLabel               string          `json:"emptyLabel,omitempty"`
-	RowSelector              string          `json:"rowSelector,omitempty"`
-	PresentationMode         string          `json:"presentationMode,omitempty"`
-	ParamIDs                 []string        `json:"paramIds,omitempty"`
-	Mode                     string          `json:"mode,omitempty"`
-	Placement                string          `json:"placement,omitempty"`
-	GroupOrder               []string        `json:"groupOrder,omitempty"`
-	VisibleGroups            []string        `json:"visibleGroups,omitempty"`
-	CollapsedGroups          []string        `json:"collapsedGroups,omitempty"`
-	ActionKinds              []string        `json:"actionKinds,omitempty"`
-	Markdown                 string          `json:"markdown,omitempty"`
-	Geo                      map[string]any  `json:"geo,omitempty"`
-	Subtitle                 string          `json:"subtitle,omitempty"`
-	NavigationLabel          string          `json:"navigationLabel,omitempty"`
-	ChildBlockIDs            []string        `json:"childBlockIds,omitempty"`
-	SectionIDs               []string        `json:"sectionIds,omitempty"`
-	DefaultSectionID         string          `json:"defaultSectionId,omitempty"`
-	Steps                    []StepperStep   `json:"steps,omitempty"`
-	Eyebrow                  string          `json:"eyebrow,omitempty"`
-	Icon                     string          `json:"icon,omitempty"`
-	Tone                     string          `json:"tone,omitempty"`
-	Badges                   []string        `json:"badges,omitempty"`
-	BodyFormat               string          `json:"bodyFormat,omitempty"`
-	Body                     string          `json:"body,omitempty"`
-	ColumnsLayout            []KanbanColumn  `json:"columns,omitempty"`
-	Events                   []TimelineEvent `json:"events,omitempty"`
-	Items                    []BadgeItem     `json:"items,omitempty"`
-	CollectionCols           int             `json:"columnsCount,omitempty"`
-	ItemTitleField           string          `json:"itemTitleField,omitempty"`
-	ItemTitleLabel           string          `json:"itemTitleLabel,omitempty"`
-	Layout                   string          `json:"layout,omitempty"`
-	RowLimit                 *int            `json:"rowLimit,omitempty"`
-	BodyTemplate             string          `json:"bodyTemplate,omitempty"`
-	Runtime                  map[string]any  `json:"runtime,omitempty"`
+	ID                       string           `json:"id"`
+	Kind                     string           `json:"kind"`
+	Title                    string           `json:"title,omitempty"`
+	DatasetRef               string           `json:"datasetRef,omitempty"`
+	Columns                  []TableColumn    `json:"columns,omitempty"`
+	ChartSpec                map[string]any   `json:"chartSpec,omitempty"`
+	ChartModel               map[string]any   `json:"chartModel,omitempty"`
+	ValueField               string           `json:"valueField,omitempty"`
+	ValueLabel               string           `json:"valueLabel,omitempty"`
+	ValueFormat              string           `json:"valueFormat,omitempty"`
+	SecondaryField           string           `json:"secondaryField,omitempty"`
+	SecondaryLabel           string           `json:"secondaryLabel,omitempty"`
+	SecondaryFormat          string           `json:"secondaryFormat,omitempty"`
+	SecondaryDisplayKey      string           `json:"secondaryDisplayKey,omitempty"`
+	SecondaryDisplayValueMap map[string]any   `json:"secondaryDisplayValueMap,omitempty"`
+	Description              string           `json:"description,omitempty"`
+	EmptyLabel               string           `json:"emptyLabel,omitempty"`
+	RowSelector              string           `json:"rowSelector,omitempty"`
+	PresentationMode         string           `json:"presentationMode,omitempty"`
+	ParamIDs                 []string         `json:"paramIds,omitempty"`
+	Mode                     string           `json:"mode,omitempty"`
+	Placement                string           `json:"placement,omitempty"`
+	GroupOrder               []string         `json:"groupOrder,omitempty"`
+	VisibleGroups            []string         `json:"visibleGroups,omitempty"`
+	CollapsedGroups          []string         `json:"collapsedGroups,omitempty"`
+	ActionKinds              []string         `json:"actionKinds,omitempty"`
+	Markdown                 string           `json:"markdown,omitempty"`
+	Geo                      map[string]any   `json:"geo,omitempty"`
+	Subtitle                 string           `json:"subtitle,omitempty"`
+	NavigationLabel          string           `json:"navigationLabel,omitempty"`
+	ChildBlockIDs            []string         `json:"childBlockIds,omitempty"`
+	SectionIDs               []string         `json:"sectionIds,omitempty"`
+	DefaultSectionID         string           `json:"defaultSectionId,omitempty"`
+	Steps                    []StepperStep    `json:"steps,omitempty"`
+	Eyebrow                  string           `json:"eyebrow,omitempty"`
+	Icon                     string           `json:"icon,omitempty"`
+	Tone                     string           `json:"tone,omitempty"`
+	Badges                   []string         `json:"badges,omitempty"`
+	BodyFormat               string           `json:"bodyFormat,omitempty"`
+	Body                     string           `json:"body,omitempty"`
+	ColumnsLayout            []KanbanColumn   `json:"columns,omitempty"`
+	Events                   []TimelineEvent  `json:"events,omitempty"`
+	Items                    []BadgeItem      `json:"items,omitempty"`
+	CollectionCols           int              `json:"columnsCount,omitempty"`
+	ItemTitleField           string           `json:"itemTitleField,omitempty"`
+	ItemTitleLabel           string           `json:"itemTitleLabel,omitempty"`
+	ToneField                string           `json:"toneField,omitempty"`
+	ToneRules                []map[string]any `json:"toneRules,omitempty"`
+	Layout                   string           `json:"layout,omitempty"`
+	RowLimit                 *int             `json:"rowLimit,omitempty"`
+	BodyTemplate             string           `json:"bodyTemplate,omitempty"`
+	Runtime                  map[string]any   `json:"runtime,omitempty"`
 }
 
 type rawReportSpec struct {
@@ -447,25 +449,27 @@ type rawTimelineBlock struct {
 }
 
 type rawCollectionBlock struct {
-	ID              string `json:"id"`
-	Kind            string `json:"kind"`
-	Title           string `json:"title"`
-	Description     string `json:"description,omitempty"`
-	DatasetRef      string `json:"datasetRef"`
-	ItemTitleField  string `json:"itemTitleField"`
-	ItemTitleLabel  string `json:"itemTitleLabel,omitempty"`
-	ValueField      string `json:"valueField,omitempty"`
-	ValueLabel      string `json:"valueLabel,omitempty"`
-	ValueFormat     string `json:"valueFormat,omitempty"`
-	SecondaryField  string `json:"secondaryField,omitempty"`
-	SecondaryLabel  string `json:"secondaryLabel,omitempty"`
-	SecondaryFormat string `json:"secondaryFormat,omitempty"`
-	Layout          string `json:"layout"`
-	Columns         int    `json:"columns"`
-	RowLimit        int    `json:"rowLimit"`
-	BodyFormat      string `json:"bodyFormat,omitempty"`
-	BodyTemplate    string `json:"bodyTemplate,omitempty"`
-	EmptyLabel      string `json:"emptyLabel,omitempty"`
+	ID              string           `json:"id"`
+	Kind            string           `json:"kind"`
+	Title           string           `json:"title"`
+	Description     string           `json:"description,omitempty"`
+	DatasetRef      string           `json:"datasetRef"`
+	ItemTitleField  string           `json:"itemTitleField"`
+	ItemTitleLabel  string           `json:"itemTitleLabel,omitempty"`
+	ToneField       string           `json:"toneField,omitempty"`
+	ToneRules       []map[string]any `json:"toneRules,omitempty"`
+	ValueField      string           `json:"valueField,omitempty"`
+	ValueLabel      string           `json:"valueLabel,omitempty"`
+	ValueFormat     string           `json:"valueFormat,omitempty"`
+	SecondaryField  string           `json:"secondaryField,omitempty"`
+	SecondaryLabel  string           `json:"secondaryLabel,omitempty"`
+	SecondaryFormat string           `json:"secondaryFormat,omitempty"`
+	Layout          string           `json:"layout"`
+	Columns         int              `json:"columns"`
+	RowLimit        int              `json:"rowLimit"`
+	BodyFormat      string           `json:"bodyFormat,omitempty"`
+	BodyTemplate    string           `json:"bodyTemplate,omitempty"`
+	EmptyLabel      string           `json:"emptyLabel,omitempty"`
 }
 
 func DecodeJSON(data []byte) (*ReportSpec, error) {
@@ -943,6 +947,8 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			DatasetRef:      block.DatasetRef,
 			ItemTitleField:  block.ItemTitleField,
 			ItemTitleLabel:  block.ItemTitleLabel,
+			ToneField:       block.ToneField,
+			ToneRules:       block.ToneRules,
 			ValueField:      block.ValueField,
 			ValueLabel:      block.ValueLabel,
 			ValueFormat:     block.ValueFormat,
@@ -1166,7 +1172,7 @@ func rejectTrailingJSON(decoder *json.Decoder, label string) error {
 
 func isAllowedReportValueFormat(value string) bool {
 	switch strings.TrimSpace(value) {
-	case "", "currency", "number", "percent", "percentFraction", "compact", "compactNumber":
+	case "", "currency", "number", "number5", "percent", "percentFraction", "compact", "compactNumber":
 		return true
 	default:
 		return false

@@ -464,6 +464,45 @@ assert.ok(collectionBlockHtml.includes("CTV"));
 assert.ok(collectionBlockHtml.includes("Spend"));
 assert.ok(collectionBlockHtml.includes("40,400"));
 
+const invalidCollectionBlockHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Invalid Collection Runtime",
+      layoutIntent: {
+        blockOrder: ["findings"],
+        items: [{ blockId: "findings" }],
+      },
+      blocks: [{
+        id: "findings",
+        kind: "collectionBlock",
+        title: "Actionable findings",
+        datasetRef: "primary",
+      }],
+      datasets: [{ id: "primary", request: {} }],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [{ id: "primary", rows: [], provenance: { diagnostics: [] } }],
+      blocks: [{
+        id: "findings",
+        kind: "collectionBlock",
+        title: "Actionable findings",
+        datasetRef: "primary",
+        content: {
+          title: "Actionable findings",
+          layout: "grid",
+          columns: 2,
+          rowCount: 2,
+          rowLimit: 2,
+          items: [{ title: null }, { title: null }],
+        },
+      }],
+    },
+  }),
+);
+assert.ok(invalidCollectionBlockHtml.includes("does not define a collection title field"));
+assert.equal(invalidCollectionBlockHtml.includes("Item 1"), false);
+
 const sectionRuntimeHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
     reportSpec: {

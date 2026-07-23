@@ -262,13 +262,13 @@ function resolveReportFillSelectedRow(dataset = {}, rowSelector = "", {
   if (!normalizedValueField) {
     return rows[0] && typeof rows[0] === "object" && !Array.isArray(rows[0]) ? rows[0] : null;
   }
-  const comparableRows = rows.filter((row) => row && typeof row === "object" && !Array.isArray(row) && Number.isFinite(Number(row?.[normalizedValueField])));
+  const comparableRows = rows.filter((row) => row && typeof row === "object" && !Array.isArray(row) && Number.isFinite(Number(resolveKey(row, normalizedValueField))));
   if (comparableRows.length === 0) {
     return rows[0] && typeof rows[0] === "object" && !Array.isArray(rows[0]) ? rows[0] : null;
   }
   const reducer = normalizedRowSelector === "minbyvalue"
-    ? ((best, row) => (Number(row?.[normalizedValueField]) < Number(best?.[normalizedValueField]) ? row : best))
-    : ((best, row) => (Number(row?.[normalizedValueField]) > Number(best?.[normalizedValueField]) ? row : best));
+    ? ((best, row) => (Number(resolveKey(row, normalizedValueField)) < Number(resolveKey(best, normalizedValueField)) ? row : best))
+    : ((best, row) => (Number(resolveKey(row, normalizedValueField)) > Number(resolveKey(best, normalizedValueField)) ? row : best));
   return comparableRows.slice(1).reduce(reducer, comparableRows[0]);
 }
 
@@ -375,7 +375,7 @@ function resolveReportFillTemplateToken(token = "", {
     });
     return formatReportFillKpiMacroValue(rawValue, resolveReportFillMacroFormat(formatMatch[2]));
   }
-  const helperMatch = normalizedToken.match(/^fmt\.(compact|compactNumber|currency|percent|percentFraction|number)\((.+)\)$/i);
+  const helperMatch = normalizedToken.match(/^fmt\.(compact|compactNumber|currency|percent|percentFraction|number|number5)\((.+)\)$/i);
   if (helperMatch) {
     const rawValue = resolveReportFillTemplateRawValue(helperMatch[2], {
       content,
@@ -468,7 +468,7 @@ function buildReportFillKpiContent(block = {}, dataset = {}, {
     valueField,
     valueLabel: normalizeString(block?.valueLabel || valueField || "Value"),
     ...(normalizeString(block?.valueFormat) ? { valueFormat: normalizeString(block.valueFormat) } : {}),
-    value: valueField && selectedRow ? selectedRow[valueField] ?? null : null,
+    value: valueField && selectedRow ? resolveKey(selectedRow, valueField) ?? null : null,
     rowCount: Number(dataset?.provenance?.rowCount || 0),
     ...(secondaryField
       ? {
@@ -516,6 +516,10 @@ function buildReportFillCollectionItemContent(block = {}, row = null, rowIndex =
       displayValueMap: block?.secondaryDisplayValueMap,
     })
     : null;
+  const toneField = normalizeString(block?.toneField);
+  const toneValue = toneField && row ? row[toneField] : null;
+  const toneRule = (Array.isArray(block?.toneRules) ? block.toneRules : [])
+    .find((rule) => JSON.stringify(rule?.value) === JSON.stringify(toneValue)) || null;
   const content = {
     index: rowIndex,
     title: itemTitleField && row
@@ -524,7 +528,7 @@ function buildReportFillCollectionItemContent(block = {}, row = null, rowIndex =
         displayKey: block?.itemTitleDisplayKey,
         displayValueMap: block?.itemTitleDisplayValueMap,
       })
-      : `Item ${rowIndex + 1}`,
+      : null,
     ...(itemTitleField ? { itemTitleField } : {}),
     ...(normalizeString(block?.itemTitleLabel) ? { itemTitleLabel: normalizeString(block.itemTitleLabel) } : {}),
     ...(valueField
@@ -543,6 +547,11 @@ function buildReportFillCollectionItemContent(block = {}, row = null, rowIndex =
         secondaryValue,
       }
       : {}),
+    ...(toneField ? { toneField, toneValue } : {}),
+    ...(normalizeString(toneRule?.tone) ? { tone: normalizeString(toneRule.tone).toLowerCase() } : {}),
+    ...(normalizeString(toneRule?.label) ? { toneLabel: normalizeString(toneRule.label) } : {}),
+    ...(normalizeString(toneRule?.background) ? { backgroundColor: normalizeString(toneRule.background) } : {}),
+    ...(normalizeString(toneRule?.color) ? { textColor: normalizeString(toneRule.color), borderColor: normalizeString(toneRule.color) } : {}),
   };
   const bodyMarkdown = String(block?.bodyTemplate || "").trim()
     ? resolveReportFillTemplateMarkdown(String(block.bodyTemplate || ""), {

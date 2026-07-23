@@ -4,6 +4,7 @@ import {
     buildReportBuilderSemanticWorkspaceImportFeedback,
     hasSemanticWorkspaceImportActivation,
     resolveReportBuilderSemanticWorkspaceImportRevealState,
+    shouldAutoActivateReportBuilderImport,
 } from "./reportBuilderSemanticWorkspaceImportState.js";
 
 assert.equal(hasSemanticWorkspaceImportActivation(), false);
@@ -11,6 +12,27 @@ assert.equal(hasSemanticWorkspaceImportActivation({ message: "Imported report fi
 assert.equal(hasSemanticWorkspaceImportActivation({
     semanticBindingChips: ["Model Performance Delivery"],
 }), true);
+
+assert.equal(shouldAutoActivateReportBuilderImport({
+    imported: { importedArtifactKind: "forge.reporting.reportFile" },
+    semanticWorkspaceTitle: "Performance Delivery",
+    activationResponse: { document: { id: "delivery" } },
+}), true);
+assert.equal(shouldAutoActivateReportBuilderImport({
+    imported: { importedArtifactKind: "reportBuilder.savedReportPayload" },
+    feedback: { semanticBindingChips: ["Model Performance Delivery"] },
+    semanticWorkspaceTitle: "Performance Delivery",
+    activationResponse: { document: { id: "delivery" } },
+}), false);
+assert.equal(shouldAutoActivateReportBuilderImport({
+    imported: { importedArtifactKind: "reportBuilder.savedReportPayload" },
+    feedback: { semanticBindingChips: ["Model Performance Delivery"] },
+    semanticWorkspaceTitle: "No data model configured",
+    activationResponse: { document: { id: "delivery" } },
+}), true);
+assert.equal(shouldAutoActivateReportBuilderImport({
+    imported: { importedArtifactKind: "forge.reporting.reportFile" },
+}), false);
 
 assert.deepEqual(
     buildReportBuilderSemanticWorkspaceImportFeedback({

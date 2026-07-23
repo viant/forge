@@ -17,6 +17,7 @@ const groupedLine = buildReportPrintChartSvg({
     rows: [
       { eventDate: "2026-05-01", Display: 40400, CTV: 34300 },
       { eventDate: "2026-05-02", Display: 42000, CTV: 35500 },
+      { eventDate: "2026-05-03", Display: 38000, CTV: 33200 },
     ],
   },
   width: 640,
@@ -26,8 +27,40 @@ assert.equal(groupedLine.diagnostics.length, 0);
 assert.ok(groupedLine.height > 200);
 assert.match(groupedLine.svg, /<svg/);
 assert.match(groupedLine.svg, /<path d="M/);
+assert.match(groupedLine.svg, / C/);
+assert.match(groupedLine.svg, /stroke-linecap="round"/);
+assert.doesNotMatch(groupedLine.svg, /stroke-dasharray=/);
 assert.match(groupedLine.svg, /Display/);
 assert.match(groupedLine.svg, /CTV/);
+
+const lineWithEmptySeries = buildReportPrintChartSvg({
+  chartModel: {
+    type: "line",
+    series: {
+      values: [
+        { value: "overall", label: "Overall", color: "#137cbd", type: "line" },
+        { value: "location", label: "Location", color: "#ff7f0e", type: "line" },
+      ],
+    },
+  },
+  resolvedChart: {
+    kind: "directSeries",
+    type: "line",
+    xAxisKey: "date",
+    seriesKeys: ["overall", "location"],
+    rows: [
+      { date: "2026-07-20", location: 104000000000 },
+      { date: "2026-07-21", location: 104500000000 },
+      { date: "2026-07-22", location: 55000000000 },
+    ],
+  },
+  width: 640,
+});
+
+assert.equal(lineWithEmptySeries.diagnostics.length, 0);
+assert.doesNotMatch(lineWithEmptySeries.svg, />Overall</);
+assert.match(lineWithEmptySeries.svg, />Location</);
+assert.match(lineWithEmptySeries.svg, / C/);
 
 const directBar = buildReportPrintChartSvg({
   chartModel: {
@@ -137,7 +170,7 @@ assert.match(horizontalBar.svg, /<rect/);
 assert.match(horizontalBar.svg, /Display/);
 assert.match(horizontalBar.svg, /CTV/);
 assert.match(horizontalBar.svg, /158.4K/);
-assert.match(horizontalBar.svg, /158 400/);
+assert.match(horizontalBar.svg, />158K</);
 assert.match(horizontalBar.svg, /Available Impressions/);
 
 const hiddenHorizontalLabels = buildReportPrintChartSvg({
@@ -244,7 +277,7 @@ assert.match(funnelBar.svg, /<rect/);
 assert.match(funnelBar.svg, /Display/);
 assert.match(funnelBar.svg, /CTV/);
 assert.match(funnelBar.svg, /158.4K/);
-assert.match(funnelBar.svg, /158 400/);
+assert.match(funnelBar.svg, />158K</);
 assert.match(funnelBar.svg, /Available Impressions/);
 
 const donut = buildReportPrintChartSvg({

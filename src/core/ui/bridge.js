@@ -283,6 +283,7 @@ export function startUIBridgeHTTP(options = {}) {
     ? options.snapshotBuilder
     : () => buildUISnapshot(snapshotOptions);
   const snapshotIntervalMs = Math.max(200, options.snapshotIntervalMs || 1000);
+  const snapshotStatusIntervalMs = Math.max(1000, options.snapshotStatusIntervalMs || 5000);
   const reconnectDelayMs = Math.max(500, options.reconnectDelayMs || 1000);
   const sessionHeader = options.sessionHeader || 'Mcp-Session-Id';
   const snapshotEvents = normalizeEventList(options.snapshotEvents, DEFAULT_SNAPSHOT_EVENTS);
@@ -290,6 +291,7 @@ export function startUIBridgeHTTP(options = {}) {
 
   let stopped = false;
   let snapshotTimer = null;
+  let snapshotStatusTimer = null;
   let lastSnapshotText = '';
   let sessionId = null;
   let lastEventId = null;
@@ -373,6 +375,27 @@ export function startUIBridgeHTTP(options = {}) {
       return true;
     } catch (err) {
       if (strict) throw err;
+      return false;
+    }
+  };
+
+  const checkSnapshotStatus = async () => {
+    if (!readyToPublish || stopped) return false;
+    try {
+      const result = await rpc(
+        'ui.snapshot.status',
+        { clientId },
+        `snapshot_status_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+      );
+      if (result?.connected !== false) return true;
+      // The backend may have restarted while this browser retained an unchanged
+      // semantic snapshot. Reset only transport dedupe and republish once.
+      lastSnapshotText = '';
+      return await publishSnapshot({ strict: true });
+    } catch (err) {
+      if (isMissingSessionError(err)) {
+        resetSessionAndRestart();
+      }
       return false;
     }
   };
@@ -480,12 +503,15 @@ export function startUIBridgeHTTP(options = {}) {
   const resetSessionAndRestart = () => {
     sessionId = null;
     readyToPublish = false;
+    lastSnapshotText = '';
     try { detachListeners?.(); } catch (_) {}
     detachListeners = null;
     try { detachLifecycle?.(); } catch (_) {}
     detachLifecycle = null;
     if (snapshotTimer) clearInterval(snapshotTimer);
     snapshotTimer = null;
+    if (snapshotStatusTimer) clearInterval(snapshotStatusTimer);
+    snapshotStatusTimer = null;
     if (stopped) return;
     void ensureStarted();
   };
@@ -583,6 +609,7 @@ export function startUIBridgeHTTP(options = {}) {
       await publishSnapshot();
       settleBridgeReadyState(true);
       snapshotTimer = setInterval(publishSnapshot, snapshotIntervalMs);
+      snapshotStatusTimer = setInterval(checkSnapshotStatus, snapshotStatusIntervalMs);
       detachListeners = bindImmediateSnapshotListeners();
       detachLifecycle = bindLifecycleListeners(stop);
       detachOwner = bindOwnerListeners();
@@ -628,6 +655,8 @@ export function startUIBridgeHTTP(options = {}) {
     try { streamAbort?.abort(); } catch (_) {}
     if (snapshotTimer) clearInterval(snapshotTimer);
     snapshotTimer = null;
+    if (snapshotStatusTimer) clearInterval(snapshotStatusTimer);
+    snapshotStatusTimer = null;
   }
 
   return stop;

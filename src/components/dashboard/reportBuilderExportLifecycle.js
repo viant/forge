@@ -146,6 +146,9 @@ export function normalizeReportBuilderExportArtifact(artifact = null) {
         ...(normalizeString(artifact?.artifactRef) ? { artifactRef: normalizeString(artifact.artifactRef) } : {}),
         ...(normalizeString(artifact?.jobId) ? { jobId: normalizeString(artifact.jobId) } : {}),
         ...(normalizeString(artifact?.format) ? { format: normalizeString(artifact.format).toLowerCase() } : {}),
+        ...(normalizeString(artifact?.sourceURL || artifact?.sourceUrl)
+            ? { sourceUrl: normalizeString(artifact?.sourceURL || artifact?.sourceUrl) }
+            : {}),
         createdAt: normalizeTimestamp(artifact?.createdAt),
         retentionTtlMs: normalizeMaybeDurationMs(artifact?.retentionTtlMs, artifact?.retentionTtl),
     };

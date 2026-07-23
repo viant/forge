@@ -5,6 +5,7 @@ import {
   normalizeReportTableBlockColumn,
   normalizeReportTableCellVisual,
 } from "./tableVisualSpec.js";
+import { buildReportFillTableRows } from "./reportFillTablePayload.js";
 
 assert.equal(normalizeReportTableCellVisual(null), null);
 assert.equal(normalizeReportTableCellVisual({ kind: "unknown" }), null);
@@ -12,16 +13,46 @@ assert.equal(normalizeReportTableCellVisual({ kind: "unknown" }), null);
 assert.deepEqual(normalizeReportTableCellVisual({
   kind: "dataBar",
   valueField: " spend ",
+  colorField: " category ",
   range: { mode: "columnMax", min: "0", max: 200 },
   palette: ["#dbeafe", " #2563eb "],
+  rules: [
+    { value: "location", color: "#2563eb", background: "#dbeafe" },
+  ],
   nullBehavior: "hide",
 }), {
   kind: "dataBar",
   valueField: "spend",
+  colorField: "category",
   range: { mode: "columnMax", min: 0, max: 200 },
   palette: ["#dbeafe", "#2563eb"],
+  rules: [
+    { value: "location", color: "#2563eb", background: "#dbeafe" },
+  ],
   nullBehavior: "hide",
 });
+
+assert.deepEqual(buildReportFillTableRows([{
+  key: "seenRatio",
+  format: "percentFraction",
+  cellVisual: {
+    kind: "dataBar",
+    valueField: "seenRatio",
+    colorField: "category",
+    range: { min: 0, max: 1 },
+    palette: ["#eef2f6", "#4c6fff"],
+    rules: [
+      { value: "location", color: "#2563eb", background: "#dbeafe" },
+      { value: "data", color: "#f97316", background: "#ffedd5" },
+    ],
+  },
+}], [
+  { category: "location", seenRatio: 0.84 },
+  { category: "data", seenRatio: 0.57 },
+]).map((row) => row.cells[0].visualState.palette), [
+  ["#dbeafe", "#2563eb"],
+  ["#ffedd5", "#f97316"],
+]);
 
 assert.deepEqual(normalizeReportTableCellVisual({
   kind: "tone",

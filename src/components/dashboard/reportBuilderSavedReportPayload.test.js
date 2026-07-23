@@ -18,6 +18,7 @@ import {
     buildReportBuilderSavedReportPayloadSummary,
     serializeReportBuilderSavedReportPayload,
 } from "./reportBuilderSavedReportPayload.js";
+import { buildReportBuilderPortableReportFile } from "./reportBuilderPortableReportFile.js";
 import {
     applyReportBuilderPersistedRuntimePreviewInteraction,
 } from "./reportBuilderRuntimePreviewInteractionPersistence.js";
@@ -1028,9 +1029,9 @@ assert.equal(embeddedSavedPayloadSummaryWithEmptySpecScope.semanticBindingChips.
 assert.equal(embeddedSavedPayloadSummaryWithEmptySpecScope.scopeSummaryText, "Reporting Window");
 
 assert.deepEqual(buildReportBuilderSavedReportPayloadDownload(payload), {
-    filename: "Exploration Demo-saved-report-payload.json",
+    filename: "Exploration Demo.forge-report.json",
     mimeType: "application/json;charset=utf-8",
-    payload: serializeReportBuilderSavedReportPayload(payload),
+    payload: JSON.stringify(buildReportBuilderPortableReportFile(payload), null, 2),
 });
 
 assert.equal(buildReportBuilderSavedReportPayload(null), null);

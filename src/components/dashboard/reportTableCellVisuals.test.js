@@ -6,8 +6,8 @@ import {
 } from "./reportTableCellVisuals.js";
 
 const rows = [
-  { spend: 120, status: "healthy", trend: "up", wowDelta: 0.12, churnDelta: -0.08, spendRank: 120, progress: 30, sparkValue: 30, ctvShare: 0.6, displayShare: 0.4 },
-  { spend: 240, status: "critical", trend: "down", wowDelta: -0.05, churnDelta: 0.03, spendRank: 240, progress: 90, sparkValue: 90, ctvShare: 0.35, displayShare: 0.65 },
+  { spend: 120, category: "location", status: "healthy", trend: "up", wowDelta: 0.12, churnDelta: -0.08, spendRank: 120, progress: 30, sparkValue: 30, ctvShare: 0.6, displayShare: 0.4 },
+  { spend: 240, category: "data", status: "critical", trend: "down", wowDelta: -0.05, churnDelta: 0.03, spendRank: 240, progress: 90, sparkValue: 90, ctvShare: 0.35, displayShare: 0.65 },
 ];
 
 const runtimeColumns = buildReportTableRuntimeColumns([
@@ -17,8 +17,13 @@ const runtimeColumns = buildReportTableRuntimeColumns([
     cellVisual: {
       kind: "dataBar",
       valueField: "spend",
+      colorField: "category",
       range: { mode: "columnMax" },
       palette: ["#dbeafe", "#2563eb"],
+      rules: [
+        { value: "location", color: "#2563eb", background: "#dbeafe" },
+        { value: "data", color: "#7c3aed", background: "#ede9fe" },
+      ],
     },
   },
   {
@@ -118,7 +123,7 @@ assert.deepEqual(resolveReportTableCellVisualState(rows[1], runtimeColumns[0]), 
   kind: "dataBar",
   value: 240,
   percent: 1,
-  palette: ["#dbeafe", "#2563eb"],
+  palette: ["#ede9fe", "#7c3aed"],
 });
 
 assert.deepEqual(resolveReportTableCellVisualState(rows[0], runtimeColumns[1]), {

@@ -33,6 +33,10 @@ import {
     buildSavedViewOverlaySummary,
     extractSavedViewOverlayArtifactState,
 } from "../../reporting/views/savedViewOverlayModel.js";
+import {
+    parseReportBuilderPortableReportFile,
+    REPORT_BUILDER_PORTABLE_REPORT_FILE_KIND,
+} from "./reportBuilderPortableReportFile.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -82,6 +86,17 @@ function buildImportFailure(message = "", code = "invalidImport", {
 }
 
 function buildImportedLocalReopenSource(payload = null) {
+    const builderTarget = isPlainObject(payload?.sourceSession?.builderTarget)
+        ? payload.sourceSession.builderTarget
+        : null;
+    if (builderTarget) {
+        return {
+            kind: "dashboard.reportBuilder",
+            containerId: normalizeString(builderTarget.containerId),
+            stateKey: normalizeString(builderTarget.stateKey),
+            dataSourceRef: normalizeString(builderTarget.dataSourceRef),
+        };
+    }
     const kind = normalizeString(payload?.kind);
     const source = {
         kind: kind || "localImport",
@@ -347,6 +362,38 @@ export function parseReportBuilderLocalImport(rawContent = "", {
         );
     }
     const kind = normalizeString(payload?.kind);
+    if (kind === REPORT_BUILDER_PORTABLE_REPORT_FILE_KIND) {
+        const portable = parseReportBuilderPortableReportFile(payload);
+        if (!portable.valid || !portable.payload) {
+            return buildImportFailure(
+                normalizedFileName
+                    ? `Could not import ${normalizedFileName}. ${portable.message || "The portable report file is invalid."}`
+                    : `Could not import this report file. ${portable.message || "The portable report file is invalid."}`,
+                portable.code || "invalidPortableReportFile",
+                { fileName: normalizedFileName },
+            );
+        }
+        const savedPayload = portable.payload;
+        const title = normalizeString(savedPayload.title || stripJsonExtension(normalizedFileName) || "Report");
+        const getReportDocumentResponse = buildImportedLocalGetReportDocumentResponse(savedPayload);
+        if (!getReportDocumentResponse) {
+            return buildImportFailure(
+                `Could not import ${normalizedFileName || "this report file"}. The portable ReportDocument could not be reopened.`,
+                "invalidPortableReportDocument",
+                { fileName: normalizedFileName },
+            );
+        }
+        return {
+            valid: true,
+            kind: "reportBuilder.savedReportPayload",
+            importedArtifactKind: kind,
+            payload: savedPayload,
+            fileName: normalizedFileName,
+            title,
+            getReportDocumentResponse,
+            message: `Imported report file ${title} as an unsaved local draft.`,
+        };
+    }
     const normalizedSavedRecord = normalizeReportBuilderSavedReportRecord(payload);
     if ((kind === "reportBuilder.savedReportRecord" || (!kind && normalizedSavedRecord && isPlainObject(payload?.savedReportPayload)))) {
         const title = normalizeString(normalizedSavedRecord?.title || stripJsonExtension(normalizedFileName) || "Report");

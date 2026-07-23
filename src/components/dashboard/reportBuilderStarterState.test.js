@@ -2,8 +2,24 @@ import assert from "node:assert/strict";
 
 import {
     buildReportBuilderStarterAppliedState,
+    findReportBuilderStarterTemplate,
     resolveAutoAppliedReportStarterId,
 } from "./reportBuilderStarterState.js";
+
+const availableTemplates = [{
+    id: "performance_delivery_command_center",
+    label: "Performance Delivery Command Center",
+}];
+
+assert.equal(
+    findReportBuilderStarterTemplate("Performance Delivery Command Center", availableTemplates)?.id,
+    "performance_delivery_command_center",
+);
+assert.equal(
+    findReportBuilderStarterTemplate("performanceDeliveryCommandCenter", availableTemplates),
+    null,
+    "unknown transformed ids must not resolve through a permissive fallback",
+);
 
 assert.equal(
     resolveAutoAppliedReportStarterId({
@@ -14,6 +30,15 @@ assert.equal(
         availableTemplateIds: ["forecast_inventory_brief"],
     }),
     "forecast_inventory_brief",
+);
+
+assert.equal(
+    resolveAutoAppliedReportStarterId({
+        requestedReportStarterId: "Performance Delivery Command Center",
+        availableTemplates,
+    }),
+    "performance_delivery_command_center",
+    "host requests may use the declared human label but must resolve to the stable preset id",
 );
 
 assert.equal(
