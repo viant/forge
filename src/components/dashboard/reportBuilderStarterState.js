@@ -5,20 +5,38 @@ function normalizeString(value = "") {
     return String(value || "").trim();
 }
 
+function starterReferenceKeys(value = "") {
+    const raw = normalizeString(value);
+    if (!raw) {
+        return new Set();
+    }
+    const normalized = raw.toLowerCase();
+    const snake = raw
+        .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+        .replace(/[^a-z0-9]+/g, "_")
+        .toLowerCase()
+        .replace(/^_+|_+$/g, "");
+    const compact = snake.replace(/_/g, "");
+    return new Set([normalized, snake, compact].filter(Boolean));
+}
+
 function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
 export function findReportBuilderStarterTemplate(reference = "", availableTemplates = []) {
-    const normalizedReference = normalizeString(reference).toLowerCase();
-    if (!normalizedReference) {
+    const referenceKeys = starterReferenceKeys(reference);
+    if (referenceKeys.size === 0) {
         return null;
     }
     return (Array.isArray(availableTemplates) ? availableTemplates : [])
-        .find((template) => (
-            normalizeString(template?.id).toLowerCase() === normalizedReference
-            || normalizeString(template?.label).toLowerCase() === normalizedReference
-        )) || null;
+        .find((template) => {
+            const templateKeys = new Set([
+                ...starterReferenceKeys(template?.id),
+                ...starterReferenceKeys(template?.label),
+            ]);
+            return [...referenceKeys].some((key) => templateKeys.has(key));
+        }) || null;
 }
 
 export function buildReportBuilderStarterAppliedState(state = {}) {

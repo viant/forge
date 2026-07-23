@@ -16,9 +16,9 @@ assert.equal(
     "performance_delivery_command_center",
 );
 assert.equal(
-    findReportBuilderStarterTemplate("performanceDeliveryCommandCenter", availableTemplates),
-    null,
-    "unknown transformed ids must not resolve through a permissive fallback",
+    findReportBuilderStarterTemplate("performanceDeliveryCommandCenter", availableTemplates)?.id,
+    "performance_delivery_command_center",
+    "host requests may use camelCase ids while presets keep stable snake_case ids",
 );
 
 assert.equal(
@@ -39,6 +39,15 @@ assert.equal(
     }),
     "performance_delivery_command_center",
     "host requests may use the declared human label but must resolve to the stable preset id",
+);
+
+assert.equal(
+    resolveAutoAppliedReportStarterId({
+        requestedReportStarterId: "performanceDeliveryCommandCenter",
+        availableTemplates,
+    }),
+    "performance_delivery_command_center",
+    "host requests may use camelCase aliases but must resolve to the stable preset id",
 );
 
 assert.equal(

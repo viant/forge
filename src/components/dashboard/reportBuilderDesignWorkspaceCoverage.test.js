@@ -846,7 +846,7 @@ assert.equal(
     && source.includes('forge-report-builder__run-button forge-report-builder__action-button')
     && source.includes('className="forge-report-builder__action-menu-button"'),
   true,
-  "Run, Design, and export controls should share the unified green report-action styling.",
+  "Run, Design, and export controls should share the unified report-action styling.",
 );
 
 assert.equal(

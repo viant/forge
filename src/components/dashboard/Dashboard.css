@@ -4064,10 +4064,10 @@
     border-radius: 10px;
     font-size: 11px;
     font-weight: 800;
-    background: linear-gradient(135deg, #159667 0%, #0f7652 100%);
-    border-color: #147d57;
-    color: #ffffff;
-    box-shadow: 0 7px 16px rgba(15, 118, 82, 0.2);
+    background: linear-gradient(135deg, #eafaf1 0%, #d8f3e4 100%);
+    border-color: #b7e4c7;
+    color: #0a6640;
+    box-shadow: 0 6px 14px rgba(10, 102, 64, 0.1);
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -4082,7 +4082,7 @@
 .forge-report-builder__run-button.bp6-button .bp6-icon {
     margin-right: 0;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.16);
+    background: rgba(10, 102, 64, 0.1);
     padding: 2px;
 }
 
@@ -4098,9 +4098,9 @@
 .forge-report-builder__action-button.bp5-button:not(:disabled):focus-visible,
 .forge-report-builder__run-button.bp6-button:not(:disabled):hover,
 .forge-report-builder__run-button.bp6-button:not(:disabled):focus-visible {
-    background: linear-gradient(135deg, #18a875 0%, #11835c 100%);
-    border-color: #147d57;
-    box-shadow: 0 9px 20px rgba(15, 118, 82, 0.27);
+    background: linear-gradient(135deg, #def6e9 0%, #c9ecd9 100%);
+    border-color: #91d5ad;
+    box-shadow: 0 8px 18px rgba(10, 102, 64, 0.14);
     transform: translateY(-1px);
 }
 
@@ -4126,16 +4126,16 @@
 .forge-report-builder__action-menu-button.bp5-button {
     min-height: 30px;
     min-width: 30px;
-    border: 1px solid #a8d8c3;
+    border: 1px solid #c7ead5;
     border-radius: 10px;
-    background: #f0fbf6;
+    background: #f7fdf9;
     color: #0d6848;
 }
 
 .forge-report-builder__action-menu-button.bp6-button:not(:disabled):hover,
 .forge-report-builder__action-menu-button.bp5-button:not(:disabled):hover {
-    border-color: #75bd9d;
-    background: #e5f7ee;
+    border-color: #a8dcc0;
+    background: #effaf4;
 }
 
 .forge-report-builder__result-frame {
