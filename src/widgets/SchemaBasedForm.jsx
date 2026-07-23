@@ -1,7 +1,7 @@
 // SchemaBasedForm.jsx – renders a form based on either an explicit list of
 // fields or a minimal JSON-schema (object with properties).
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSignalEffect } from '@preact/signals-react';
 import { resolveSelector } from '../utils/selector.js';
 import WidgetRenderer from '../runtime/WidgetRenderer.jsx';
@@ -26,6 +26,7 @@ const SchemaBasedForm = (props) => {
     const {
         fields,
         schema: schemaProp,
+        data,
         onSubmit,
         context,
         dataSourceRef,
@@ -82,11 +83,23 @@ const SchemaBasedForm = (props) => {
         derivedFields.forEach((f) => {
             if (f.default !== undefined) obj[f.name] = f.default;
         });
+        if (scope === 'local' && data && typeof data === 'object' && !Array.isArray(data)) {
+            Object.entries(data).forEach(([key, value]) => {
+                if (value !== undefined) {
+                    obj[key] = value;
+                }
+            });
+        }
         return obj;
-    }, [derivedFields]);
+    }, [data, derivedFields, scope]);
 
     const [values, setValues] = useState(initialValues);
     const [errors, setErrors] = useState({});
+
+    useEffect(() => {
+        if (scope !== 'local') return;
+        setValues(initialValues);
+    }, [scope, initialValues]);
 
     const handleChangeDirect = (name, val) => {
         setValues((prev) => ({ ...prev, [name]: val }));
