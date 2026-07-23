@@ -177,7 +177,7 @@ function buildRuntimeTableRows(block = {}, dataset = {}) {
   });
 }
 
-function RuntimePanel({ title = "", subtitle = "", children, className = "" }) {
+function RuntimePanel({ title = "", subtitle = "", children, className = "", style = {} }) {
   return (
     <section
       className={className || undefined}
@@ -190,6 +190,7 @@ function RuntimePanel({ title = "", subtitle = "", children, className = "" }) {
         display: "flex",
         flexDirection: "column",
         gap: 12,
+        ...style,
       }}
     >
       {title || subtitle ? (
@@ -1382,6 +1383,10 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
       className="forge-report-runtime-kpi-panel"
       title={blockTitle}
       subtitle={normalizeString(content?.description)}
+      style={{
+        background: toneStyles.chipBackground,
+        borderColor: toneStyles.chipBorder,
+      }}
     >
       <div
         data-report-runtime-kpi-tone={normalizeString(content?.tone).toLowerCase() || "neutral"}

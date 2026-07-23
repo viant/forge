@@ -2243,7 +2243,6 @@ public enum DashboardRuntime {
                 let formatter = NumberFormatter()
                 formatter.locale = locale
                 formatter.numberStyle = .decimal
-                formatter.groupingSeparator = " "
                 formatter.usesGroupingSeparator = true
                 formatter.minimumFractionDigits = 0
                 formatter.maximumFractionDigits = 5
@@ -2254,7 +2253,6 @@ public enum DashboardRuntime {
                 let formatter = NumberFormatter()
                 formatter.locale = locale
                 formatter.numberStyle = .decimal
-                formatter.groupingSeparator = " "
                 formatter.usesGroupingSeparator = true
                 formatter.minimumFractionDigits = 5
                 formatter.maximumFractionDigits = 5

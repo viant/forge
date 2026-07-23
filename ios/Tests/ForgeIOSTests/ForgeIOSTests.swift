@@ -3974,7 +3974,7 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(DashboardRuntime.formatDashboardValue(1250.0, format: "compactNumber"), "1.2K")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue(1250.0, format: "compact"), "1.2K")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue("1250", format: "compactNumber"), "1.2K")
-        XCTAssertEqual(DashboardRuntime.formatDashboardValue(126_329_231_621, format: "number"), "126 329 231 621")
+        XCTAssertEqual(DashboardRuntime.formatDashboardValue(126_329_231_621, format: "number"), "126,329,231,621")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue(95.000000409, format: "number5"), "95.00000")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue(JSONPrimitive.string("0.1937"), format: "percentFraction"), "19.4%")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue(nil, format: "number"), "n/a")
@@ -3993,7 +3993,7 @@ final class ForgeIOSTests: XCTestCase {
             "secondaryFormat": .string("number5")
         ])
 
-        XCTAssertEqual(value.valueText, "126 329 231 621")
+        XCTAssertEqual(value.valueText, "126,329,231,621")
         XCTAssertEqual(value.secondaryValueText, "95.00000")
     }
 

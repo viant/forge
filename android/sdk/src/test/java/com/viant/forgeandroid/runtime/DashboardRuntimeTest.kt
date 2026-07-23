@@ -96,7 +96,7 @@ class DashboardRuntimeTest {
         assertEquals("1.2K", formatDashboardValue(1250.0, "compactNumber"))
         assertEquals("1.2K", formatDashboardValue(1250.0, "compact"))
         assertEquals("1.2K", formatDashboardValue("1250", "compactNumber"))
-        assertEquals("126 329 231 621", formatDashboardValue(126329231621.0, "number"))
+        assertEquals("126,329,231,621", formatDashboardValue(126329231621.0, "number"))
         assertEquals("95.00000", formatDashboardValue(95.000000409, "number5"))
         assertEquals("19.4%", formatDashboardValue(JsonPrimitive("0.1937"), "percentFraction"))
         assertEquals("n/a", formatDashboardValue(null, "number"))
@@ -118,7 +118,7 @@ class DashboardRuntimeTest {
             )
         )
 
-        assertEquals("126 329 231 621", value.valueText)
+        assertEquals("126,329,231,621", value.valueText)
         assertEquals("95.00000", value.secondaryValueText)
     }
 
