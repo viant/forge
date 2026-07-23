@@ -299,6 +299,15 @@ Authoring fields:
 - optional `bodyFormat`
 - optional `bodyTemplate`
 
+Supported KPI and collection value formats:
+
+- `number`: full value with spaces between digit groups and up to five fractional digits
+- `number5`: full value with spaces between digit groups and exactly five fractional digits
+- `compact` or `compactNumber`: abbreviated magnitude such as `126.3B`
+- `currency`
+- `percent`
+- `percentFraction`
+
 ### KPI Resolution
 
 KPI data is resolved structurally first:

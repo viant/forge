@@ -209,6 +209,11 @@ export function resolveReportRuntimeDatasetRequest(reportSpec = {}, datasetRef =
 }
 
 export function resolveReportRuntimeBlocks(reportSpec = {}, reportFill = {}) {
+  const specBlockIndex = new Map(
+    (Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : [])
+      .map((block) => [normalizeString(block?.id), block])
+      .filter(([id]) => !!id),
+  );
   const fillBlocks = Array.isArray(reportFill?.blocks) ? reportFill.blocks : [];
   const blockIndex = new Map(
     fillBlocks
@@ -222,8 +227,17 @@ export function resolveReportRuntimeBlocks(reportSpec = {}, reportFill = {}) {
       .map((item) => [item.blockId, item]),
   );
   const cloneBlockWithLayout = (block = null) => {
-    const nextBlock = cloneValue(block);
-    const blockId = normalizeString(nextBlock?.id);
+    const blockId = normalizeString(block?.id);
+    const specBlock = specBlockIndex.get(blockId);
+    const nextBlock = {
+      ...(specBlock ? cloneValue(specBlock) : {}),
+      ...cloneValue(block),
+      ...(
+        specBlock?.content && block?.content
+          ? { content: { ...cloneValue(specBlock.content), ...cloneValue(block.content) } }
+          : {}
+      ),
+    };
     const layoutItem = layoutItemIndex.get(blockId);
     if (layoutItem) {
       nextBlock.layoutItem = cloneValue(layoutItem);

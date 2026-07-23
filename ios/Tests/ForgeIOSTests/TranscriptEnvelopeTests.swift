@@ -2,6 +2,24 @@ import XCTest
 @testable import ForgeIOSRuntime
 
 final class TranscriptEnvelopeTests: XCTestCase {
+    func testSuppressesProgressiveTransportWithoutRemovingNarration() {
+        let content = """
+        Forecast ready.
+        ```forge-data
+        {"version":2,"scope":"forecast","reportRef":"review","id":"states","sequence":2,"data":[{"stateCode":"CA"}]}
+        ```
+        ```forge-report
+        {"version":1,"scope":"forecast","id":"review","sequence":3,"mode":"commit"}
+        ```
+        """
+
+        XCTAssertEqual(
+            TranscriptEnvelope.suppressProgressiveTransport(in: content)
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+            "Forecast ready."
+        )
+    }
+
     func testMaterializesLegacyDataHeadersAndAppendModeBeforeUI() {
         let content = """
         before
@@ -296,6 +314,27 @@ final class TranscriptEnvelopeTests: XCTestCase {
             return XCTFail("Expected one legacy Forge UI part")
         }
         XCTAssertTrue(store.isEmpty)
+    }
+
+    func testCanonicalReportAtomsStayHiddenBehindCompiledReport() {
+        let parts = TranscriptEnvelope.fromCanonical([
+            TranscriptCanonicalPart(kind: "markdown", text: "Forecast ready."),
+            TranscriptCanonicalPart(
+                kind: "forgeData",
+                source: "hidden data",
+                data: TranscriptCanonicalData(
+                    version: 2,
+                    scope: "forecast",
+                    reportRef: "review",
+                    sequence: 1,
+                    id: "rows",
+                    payload: .array([])
+                )
+            ),
+            TranscriptCanonicalPart(kind: "forgeReport", source: "hidden report atom")
+        ])
+
+        XCTAssertEqual(parts, [.markdown("Forecast ready.")])
     }
 
     func testUpdatesInlineWindowWithoutAllocatingAnotherWindow() async {

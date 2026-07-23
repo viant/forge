@@ -1264,12 +1264,12 @@ export function buildReportBuilderQuickViewOptions({
             )
             : "";
         const authoredDescription = String(entry?.description || "").trim();
-        const baseDescription = authoredDescription || `Preset (${entry.type}) that reselects the current table and chart for a curated visual read.`;
+        const baseDescription = authoredDescription || `Quick chart (${entry.type}) that adjusts the current table and visualization for a focused read.`;
         return {
             value: `default:${index}`,
             label: String(entry?.title || "").trim(),
             kind: "default",
-            group: String(entry?.group || "").trim() || "Presets",
+            group: String(entry?.group || "").trim() || "Quick charts",
             groupDescription: String(entry?.groupDescription || "").trim(),
             spec: entry,
             eyebrow: String(entry?.eyebrow || "").trim(),

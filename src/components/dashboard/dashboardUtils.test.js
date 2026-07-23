@@ -290,7 +290,9 @@ assert.deepEqual(
   ['CA', 'TX'],
 );
 
-assert.equal(formatDashboardValue(1234.5, 'number', 'de-DE'), '1.234,5');
+assert.equal(formatDashboardValue(1234.5, 'number', 'de-DE'), '1 234.5');
+assert.equal(formatDashboardValue(126329231621, 'number', 'en-US'), '126 329 231 621');
+assert.equal(formatDashboardValue(95.000000409, 'number5', 'en-US'), '95.00000');
 assert.equal(formatDashboardValue(1234, 'currency', 'de-DE').includes('1.234'), true);
 assert.equal(formatDashboardValue(19.37, 'percent', 'en-US'), '19.4%');
 assert.equal(formatDashboardValue(0.1937, 'percentFraction', 'en-US'), '19.4%');

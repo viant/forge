@@ -75,6 +75,7 @@ function resolveCartesianSeriesDescriptors(chartModel = {}, resolvedChart = {}) 
           format: normalizeString(matched?.format),
           dataLabels: normalizeString(matched?.dataLabels).toLowerCase(),
           pointColorMode: normalizeString(matched?.pointColorMode),
+          strokeDasharray: normalizeString(matched?.strokeDasharray),
         };
       })
       .filter(Boolean);
@@ -125,7 +126,12 @@ function resolveChartSupportedSeriesType(type = "") {
 }
 
 function formatAxisTick(value, format = "") {
-  return formatExportNumericValue(value, format, { axis: true });
+  const normalizedFormat = normalizeString(format);
+  const numeric = normalizeNumber(value);
+  const effectiveFormat = !normalizedFormat && numeric != null && Math.abs(numeric) >= 1_000
+    ? "compactNumber"
+    : normalizedFormat;
+  return formatExportNumericValue(value, effectiveFormat, { axis: true });
 }
 
 function formatSeriesDataLabel(value, format = "") {
@@ -566,11 +572,44 @@ function buildPolylinePath(points = []) {
   )).join(" ");
 }
 
-function buildAreaPath(points = [], baselineY = 0) {
+function buildMonotonePath(points = []) {
+  if (points.length < 3) {
+    return buildPolylinePath(points);
+  }
+  const slopes = points.slice(0, -1).map((point, index) => {
+    const next = points[index + 1];
+    const deltaX = next.x - point.x;
+    return deltaX === 0 ? 0 : (next.y - point.y) / deltaX;
+  });
+  const tangents = points.map((point, index) => {
+    if (index === 0) {
+      return slopes[0];
+    }
+    if (index === points.length - 1) {
+      return slopes[slopes.length - 1];
+    }
+    const previous = slopes[index - 1];
+    const next = slopes[index];
+    if (previous === 0 || next === 0 || Math.sign(previous) !== Math.sign(next)) {
+      return 0;
+    }
+    return (2 * previous * next) / (previous + next);
+  });
+  return points.slice(0, -1).reduce((path, point, index) => {
+    const next = points[index + 1];
+    const deltaX = next.x - point.x;
+    const controlOffset = deltaX / 3;
+    return `${path} C${point.x + controlOffset},${point.y + (tangents[index] * controlOffset)}`
+      + ` ${next.x - controlOffset},${next.y - (tangents[index + 1] * controlOffset)}`
+      + ` ${next.x},${next.y}`;
+  }, `M${points[0].x},${points[0].y}`);
+}
+
+function buildAreaPath(points = [], baselineY = 0, { smooth = false } = {}) {
   if (points.length === 0) {
     return "";
   }
-  const line = buildPolylinePath(points);
+  const line = smooth ? buildMonotonePath(points) : buildPolylinePath(points);
   const closing = [
     `L${points[points.length - 1].x},${baselineY}`,
     `L${points[0].x},${baselineY}`,
@@ -713,7 +752,8 @@ function renderCartesianChartSvg({
   width = 680,
 } = {}) {
   const rows = resolveCartesianRows(resolvedChart);
-  const seriesDescriptors = resolveCartesianSeriesDescriptors(chartModel, resolvedChart);
+  const seriesDescriptors = resolveCartesianSeriesDescriptors(chartModel, resolvedChart)
+    .filter((series) => rows.some((row) => normalizeNumber(row?.[series.key]) != null));
   if (rows.length === 0 || seriesDescriptors.length === 0) {
     return {
       svg: "",
@@ -806,7 +846,7 @@ function renderCartesianChartSvg({
   const groupWidth = Math.min(48, Math.max(14, (plotWidth / Math.max(rows.length, 1)) * 0.56));
   const barWidth = barSeries.length > 0 ? Math.max(8, groupWidth / barSeries.length) : 0;
 
-  const renderedSeries = seriesDescriptors.map((series, seriesIndex) => {
+  const renderedSeries = seriesDescriptors.map((series) => {
     const supportedType = resolveChartSupportedSeriesType(series.type);
     const points = rows.map((row, rowIndex) => {
       const value = normalizeNumber(row?.[series.key]);
@@ -836,7 +876,10 @@ function renderCartesianChartSvg({
       return bars;
     }
 
-    const path = buildPolylinePath(points);
+    const smoothPath = supportedType === "line" || supportedType === "area";
+    const strokeDasharray = normalizeString(series?.strokeDasharray);
+    const dashAttribute = escapeStrokeDasharray(strokeDasharray);
+    const path = smoothPath ? buildMonotonePath(points) : buildPolylinePath(points);
     const markers = points.map((point) => `
       <circle cx="${point.x}" cy="${point.y}" r="2.5" fill="${escapeXml(resolveSeriesPointColor(series, point.value, series.color))}" />
     `).join("\n");
@@ -847,14 +890,14 @@ function renderCartesianChartSvg({
       : "";
     if (supportedType === "area") {
       return `
-        <path d="${buildAreaPath(points, baselineY)}" fill="${escapeXml(series.color)}" fill-opacity="0.18" stroke="none" />
-        <path d="${path}" fill="none" stroke="${escapeXml(series.color)}" stroke-width="2" />
+        <path d="${buildAreaPath(points, baselineY, { smooth: true })}" fill="${escapeXml(series.color)}" fill-opacity="0.18" stroke="none" />
+        <path d="${path}" fill="none" stroke="${escapeXml(series.color)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${dashAttribute} />
         ${markers}
         ${labels}
       `;
     }
     return `
-      <path d="${path}" fill="none" stroke="${escapeXml(series.color)}" stroke-width="2" />
+      <path d="${path}" fill="none" stroke="${escapeXml(series.color)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${dashAttribute} />
       ${markers}
       ${labels}
     `;

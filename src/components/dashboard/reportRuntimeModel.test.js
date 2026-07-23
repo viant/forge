@@ -132,6 +132,42 @@ assert.deepEqual(
   resolveReportRuntimeBlocks(reportSpec, reportFill).find((block) => block.id === "narrativeIntro")?.layoutItem,
   { blockId: "narrativeIntro", size: "half" },
 );
+const mergedCollectionRuntimeBlock = resolveReportRuntimeBlocks({
+  ...reportSpec,
+  blocks: [
+    ...(Array.isArray(reportSpec.blocks) ? reportSpec.blocks : []),
+    {
+      id: "findings",
+      kind: "collectionBlock",
+      itemTitleField: "channel",
+      content: { layout: "grid", columns: 2 },
+    },
+  ],
+  layoutIntent: {
+    ...reportSpec.layoutIntent,
+    blockOrder: [...reportSpec.layoutIntent.blockOrder, "findings"],
+    items: [...reportSpec.layoutIntent.items, { blockId: "findings" }],
+  },
+}, {
+  ...reportFill,
+  blocks: [
+    ...reportFill.blocks,
+    {
+      id: "findings",
+      kind: "collectionBlock",
+      content: {
+        columns: 3,
+        items: [{ title: "Display" }],
+      },
+    },
+  ],
+}).find((block) => block.id === "findings");
+assert.equal(mergedCollectionRuntimeBlock?.itemTitleField, "channel");
+assert.deepEqual(mergedCollectionRuntimeBlock?.content, {
+  layout: "grid",
+  columns: 3,
+  items: [{ title: "Display" }],
+});
 assert.deepEqual(
   resolveReportRuntimeBlocks({
     ...reportSpec,

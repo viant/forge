@@ -1560,11 +1560,30 @@ function normalizeCollectionRowLimit(value = 0) {
   return Number.isInteger(normalized) && normalized > 0 ? normalized : 6;
 }
 
+function normalizeCollectionToneRules(rules = []) {
+  return (Array.isArray(rules) ? rules : [])
+    .map((rule) => {
+      if (!rule || typeof rule !== "object" || Array.isArray(rule) || !("value" in rule)) {
+        return null;
+      }
+      return {
+        value: cloneValue(rule.value),
+        ...(normalizeString(rule?.tone) ? { tone: normalizeString(rule.tone).toLowerCase() } : {}),
+        ...(normalizeString(rule?.label) ? { label: normalizeString(rule.label) } : {}),
+        ...(normalizeString(rule?.color) ? { color: normalizeString(rule.color) } : {}),
+        ...(normalizeString(rule?.background) ? { background: normalizeString(rule.background) } : {}),
+      };
+    })
+    .filter(Boolean);
+}
+
 export function buildReportDocumentCollectionBlock(block = {}) {
   const itemTitleField = normalizeString(block?.itemTitleField);
   const valueField = normalizeString(block?.valueField);
   const secondaryField = normalizeString(block?.secondaryField);
   const bodyTemplate = String(block?.bodyTemplate || "");
+  const toneField = normalizeString(block?.toneField);
+  const toneRules = normalizeCollectionToneRules(block?.toneRules);
   return {
     id: normalizeString(block?.id || "collectionBlock"),
     kind: "collectionBlock",
@@ -1602,6 +1621,8 @@ export function buildReportDocumentCollectionBlock(block = {}) {
     ...(block?.templateFieldDisplayMap && typeof block.templateFieldDisplayMap === "object" && !Array.isArray(block.templateFieldDisplayMap)
       ? { templateFieldDisplayMap: cloneValue(block.templateFieldDisplayMap) }
       : {}),
+    ...(toneField ? { toneField } : {}),
+    ...(toneRules.length > 0 ? { toneRules } : {}),
     ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
     ...(normalizeString(block?.emptyLabel) ? { emptyLabel: normalizeString(block.emptyLabel) } : {}),
   };

@@ -141,6 +141,68 @@ assert.equal(activeWindows.peek().filter((win) => win.windowKey === 'metricRepor
 assert.equal(activeWindows.peek().find((win) => win.windowKey === 'metricReportBuilder').windowId, replacedBuilder.windowId);
 assert.equal(activeWindows.peek().find((win) => win.windowKey === 'metricReportBuilder').parentKey, 'chat/new');
 
+const campaignWindow = await runUICommand({
+  method: 'ui.window.open',
+  params: {
+    windowId: 'campaign_42__conv-1',
+    windowKey: 'campaign',
+    windowTitle: 'Campaign 42',
+    inTab: true,
+    parameters: { CampaignId: [42] },
+    options: {
+      conversationId: 'conv-1',
+      presentation: 'hosted',
+      region: 'chat.top',
+      parentKey: 'chat/new',
+      replaceHostedRegion: false,
+    },
+  },
+});
+const forecastReportWindow = await runUICommand({
+  method: 'ui.window.open',
+  params: {
+    windowId: 'reportBuilder__conv-1',
+    windowKey: 'reportBuilder',
+    windowTitle: 'Forecasting',
+    inTab: true,
+    parameters: { reportBuilderRef: 'forecasting' },
+    options: {
+      conversationId: 'conv-1',
+      presentation: 'hosted',
+      region: 'chat.top',
+      parentKey: 'chat/new',
+      replaceHostedRegion: false,
+    },
+  },
+});
+const performanceReportWindow = await runUICommand({
+  method: 'ui.window.open',
+  params: {
+    windowId: 'reportBuilder__conv-1',
+    windowKey: 'reportBuilder',
+    windowTitle: 'Performance',
+    inTab: true,
+    parameters: { reportBuilderRef: 'performance' },
+    options: {
+      conversationId: 'conv-1',
+      presentation: 'hosted',
+      region: 'chat.top',
+      parentKey: 'chat/new',
+      replaceHostedRegion: false,
+    },
+  },
+});
+assert.equal(forecastReportWindow.windowId, performanceReportWindow.windowId);
+assert.equal(activeWindows.peek().filter((win) => win.windowKey === 'reportBuilder').length, 1);
+assert.deepEqual(
+  activeWindows.peek().find((win) => win.windowKey === 'reportBuilder').parameters,
+  { reportBuilderRef: 'performance' }
+);
+assert.deepEqual(
+  activeWindows.peek().find((win) => win.windowId === campaignWindow.windowId).parameters,
+  { CampaignId: [42] }
+);
+
 getDashboardFilterSignal(`${res.windowId}:demoDashboard`).value = { periodView: 'today' };
 
 await runUICommand({ method: 'ui.window.activate', params: { windowId: res.windowId } });
@@ -158,6 +220,8 @@ await runUICommand({ method: 'ui.window.close', params: { windowId: replacedHost
 await runUICommand({ method: 'ui.window.close', params: { windowId: appendedHosted.windowId } });
 await runUICommand({ method: 'ui.window.close', params: { windowId: crossConversationHosted.windowId } });
 await runUICommand({ method: 'ui.window.close', params: { windowId: replacedBuilder.windowId } });
+await runUICommand({ method: 'ui.window.close', params: { windowId: campaignWindow.windowId } });
+await runUICommand({ method: 'ui.window.close', params: { windowId: performanceReportWindow.windowId } });
 assert.equal(activeWindows.peek().length, 1);
 assert.equal(activeWindows.peek()[0].windowId, 'chat/new');
 assert.equal(selectedWindowId.peek(), 'chat/new');

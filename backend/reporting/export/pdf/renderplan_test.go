@@ -818,12 +818,13 @@ func TestBuildRenderPlan_CompilesPrimitivePaintOperations(t *testing.T) {
 						Align:     "right",
 					},
 					{
-						ID:        "cell_bar",
-						Kind:      "tableCellDataBar",
-						Box:       reportprint.Box{X: 140, Y: 174, Width: 48, Height: 8},
-						RowKey:    "row_1",
-						ColumnKey: "spend",
-						FillColor: "#2563eb",
+						ID:              "cell_bar",
+						Kind:            "tableCellDataBar",
+						Box:             reportprint.Box{X: 140, Y: 174, Width: 48, Height: 8},
+						RowKey:          "row_1",
+						ColumnKey:       "spend",
+						FillColor:       "#2563eb",
+						BackgroundColor: "#dbeafe",
 					},
 					{
 						ID:              "cell_badge",
@@ -865,6 +866,8 @@ func TestBuildRenderPlan_CompilesPrimitivePaintOperations(t *testing.T) {
 
 	require.Equal(t, "tableCellDataBar", plan.pages[0].operations[4].kind)
 	require.Equal(t, 48.0, plan.pages[0].operations[4].dataBar.box.Width)
+	require.Equal(t, "#2563eb", plan.pages[0].operations[4].dataBar.fillColor)
+	require.Equal(t, "#dbeafe", plan.pages[0].operations[4].dataBar.backgroundColor)
 
 	require.Equal(t, "tableCellBadge", plan.pages[0].operations[5].kind)
 	require.Equal(t, "Healthy", plan.pages[0].operations[5].labelPill.label)

@@ -43,7 +43,7 @@ export function buildReportBuilderCompactChartSheetState({
             canCreateChart,
             showCreateButton: !hasValidChartSpec,
             quickOptions: quickChartOptions,
-            buttonLabel: "Presets",
+            buttonLabel: hasTableQuickPresets ? "Quick views" : "Quick chart",
             buttonIcon: hasTableQuickPresets ? "panel-table" : "timeline-line-chart",
         },
         presetIdentity: normalizeString(activeChartPresetEyebrow)

@@ -119,6 +119,27 @@ public enum TranscriptEnvelopePart: Equatable, Sendable {
 /// Generic Forge transcript envelope decoding. Hosts decide where to place the
 /// result; Forge owns fence interpretation and data-mode materialization.
 public enum TranscriptEnvelope {
+    /// Removes progressive report transport fences from text that accompanies
+    /// an already-assembled canonical report. Ordinary markdown and legacy
+    /// Forge UI payloads remain visible.
+    public static func suppressProgressiveTransport(in markdown: String) -> String {
+        MarkdownFenceParser.parse(markdown).map { part in
+            switch part {
+            case .text(let value):
+                return value
+            case .fence(let raw, let language, _, let body, let closed):
+                guard closed else { return raw }
+                if language == "forge-report" {
+                    return ""
+                }
+                if language == "forge-data", isProgressiveDataBody(body) {
+                    return ""
+                }
+                return raw
+            }
+        }.joined()
+    }
+
     public static func parse(_ markdown: String) -> [TranscriptEnvelopePart] {
         guard !markdown.isEmpty else { return [] }
         var parts: [TranscriptEnvelopePart] = []
@@ -165,6 +186,7 @@ public enum TranscriptEnvelope {
         var dataBlocks: [TranscriptForgeDataBlock] = []
         var dataRaw: [String] = []
         var renderedUI = false
+        var renderedReport = false
         for part in canonicalParts {
             switch part.kind.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
             case "markdown":
@@ -177,6 +199,7 @@ public enum TranscriptEnvelope {
                 }
             case "forgedata":
                 if isProgressiveData(part) {
+                    renderedReport = true
                     continue
                 } else if let data = canonicalData(part) {
                     dataBlocks.append(data)
@@ -195,13 +218,16 @@ public enum TranscriptEnvelope {
                     flushPendingData(&parts, dataBlocks: &dataBlocks, raw: &dataRaw)
                     appendMarkdown(&parts, part.source ?? "")
                 }
+            case "forgereport":
+                renderedReport = true
+                continue
             default:
                 flushPendingData(&parts, dataBlocks: &dataBlocks, raw: &dataRaw)
                 appendMarkdown(&parts, part.source ?? "")
             }
         }
         flushPendingData(&parts, dataBlocks: &dataBlocks, raw: &dataRaw)
-        return renderedUI ? parts : [.markdown(canonicalParts.map { $0.text ?? $0.source ?? "" }.joined())]
+        return renderedUI || renderedReport ? parts : [.markdown(canonicalParts.map { $0.text ?? $0.source ?? "" }.joined())]
     }
 
     public static func rows(from value: JSONValue) -> [[String: JSONValue]] {
@@ -246,6 +272,19 @@ public enum TranscriptEnvelope {
         return data.version == 2 || !(data.reportRef?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
     }
 
+    private static func isProgressiveDataBody(_ body: String) -> Bool {
+        guard let object = try? JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: Any] else {
+            return false
+        }
+        if let version = object["version"] as? NSNumber, version.intValue == 2 {
+            return true
+        }
+        guard let reportRef = object["reportRef"] as? String else {
+            return false
+        }
+        return !reportRef.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private static func canonicalUI(_ part: TranscriptCanonicalPart) -> TranscriptForgeUIPayload? {
         guard let payload = part.payload,
               let data = try? JSONEncoder().encode(payload) else { return nil }
@@ -278,6 +317,14 @@ public enum TranscriptEnvelope {
             return block.data ?? .null
         }
         guard let rows = parseCSVRows(text) else { return .string(text) }
+        return .array(rows.map(JSONValue.object))
+    }
+
+    static func materializeCanonicalPayload(format: String?, payload: JSONValue?) -> JSONValue? {
+        guard let payload else { return nil }
+        let normalizedFormat = format?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard normalizedFormat == "csv", let text = payload.stringValue else { return payload }
+        guard let rows = parseCSVRows(text) else { return payload }
         return .array(rows.map(JSONValue.object))
     }
 

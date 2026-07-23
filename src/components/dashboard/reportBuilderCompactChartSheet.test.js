@@ -30,7 +30,7 @@ assert.deepEqual(buildReportBuilderCompactChartSheetState({
         canCreateChart: true,
         showCreateButton: true,
         quickOptions: [{ value: "table:0" }],
-        buttonLabel: "Presets",
+        buttonLabel: "Quick views",
         buttonIcon: "panel-table",
     },
     presetIdentity: {
@@ -67,7 +67,7 @@ assert.deepEqual(buildReportBuilderCompactChartSheetState({
         canCreateChart: true,
         showCreateButton: false,
         quickOptions: [],
-        buttonLabel: "Presets",
+        buttonLabel: "Quick chart",
         buttonIcon: "timeline-line-chart",
     },
     presetIdentity: null,

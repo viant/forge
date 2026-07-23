@@ -205,6 +205,31 @@ func (h *uiRPCHandler) handle(ctx context.Context, method string, params json.Ra
 			"snapshot":  json.RawMessage(snap),
 			"connected": len(snap) > 0,
 		}), nil
+	case "ui.snapshot.status":
+		var p struct {
+			ClientID string `json:"clientId,omitempty"`
+		}
+		if len(params) > 0 {
+			if err := json.Unmarshal(params, &p); err != nil {
+				return nil, jsonrpc.NewInvalidParamsError("invalid params", nil)
+			}
+		}
+		info := h.bridge.sessionInfo(ctx)
+		clientID := p.ClientID
+		ns := "default"
+		if info != nil {
+			if clientID == "" {
+				clientID = info.clientID
+			}
+			ns = info.ns
+		}
+		if clientID == "" {
+			return mustJSON(map[string]any{"clientId": "", "connected": false}), nil
+		}
+		return mustJSON(map[string]any{
+			"clientId":  clientID,
+			"connected": len(h.bridge.hub.Snapshot(ns, clientID)) > 0,
+		}), nil
 	case "ui.poll":
 		var p struct {
 			ClientID  string `json:"clientId"`

@@ -21,6 +21,8 @@ export function buildReportBuilderExportExecutionConfigs({
     reportAuditHandler = null,
     reportAuditActorRef = "",
     reportAuditMetadata = {},
+    reportEventHandler = null,
+    reportEventContext = {},
     setFeedback = () => {},
 } = {}) {
     const auditConfig = {
@@ -28,6 +30,10 @@ export function buildReportBuilderExportExecutionConfigs({
         reportAuditActorRef,
         reportAuditMetadata,
     };
+    const eventConfig = reportEventHandler ? {
+        reportEventHandler,
+        reportEventContext,
+    } : {};
     return {
         draft: {
             ...buildReportBuilderDraftExportExecutionConfig({
@@ -37,6 +43,7 @@ export function buildReportBuilderExportExecutionConfigs({
             setFeedback,
             }),
             ...auditConfig,
+            ...eventConfig,
         },
         importedStandalone: {
             ...buildImportedStandaloneExportExecutionConfig({
@@ -46,6 +53,7 @@ export function buildReportBuilderExportExecutionConfigs({
             setFeedback,
             }),
             ...auditConfig,
+            ...eventConfig,
         },
         importedPipeline: {
             ...buildImportedPipelineExportExecutionConfig({
@@ -55,6 +63,7 @@ export function buildReportBuilderExportExecutionConfigs({
             setFeedback,
             }),
             ...auditConfig,
+            ...eventConfig,
         },
         savedPayload: {
             ...buildReportBuilderSavedPayloadExportExecutionConfig({
@@ -64,6 +73,7 @@ export function buildReportBuilderExportExecutionConfigs({
             setFeedback,
             }),
             ...auditConfig,
+            ...eventConfig,
         },
         reopened: {
             ...buildReportBuilderReopenedExportExecutionConfig({
@@ -73,6 +83,7 @@ export function buildReportBuilderExportExecutionConfigs({
             setFeedback,
             }),
             ...auditConfig,
+            ...eventConfig,
         },
         selectedListEntry: {
             ...buildReportBuilderSelectedListEntryExportExecutionConfig({
@@ -82,6 +93,7 @@ export function buildReportBuilderExportExecutionConfigs({
             setFeedback,
             }),
             ...auditConfig,
+            ...eventConfig,
         },
     };
 }

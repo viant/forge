@@ -40,6 +40,7 @@ import {
 import { resolveReportBuilderBlock } from "../../reporting/reportBuilderBlockModel.js";
 import { resolveReportBuilderSavedViewOverlayReopenSourceResolution } from "./reportBuilderReopenSourceResolution.js";
 import { resolveReportBuilderPersistedRuntimePreviewInteraction } from "./reportBuilderRuntimePreviewInteractionPersistence.js";
+import { buildReportBuilderPortableReportFile } from "./reportBuilderPortableReportFile.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -810,15 +811,15 @@ export function buildReportBuilderSavedReportPayloadDownload(payload = null) {
     if (!summary) {
         return null;
     }
-    const content = serializeReportBuilderSavedReportPayload(payload);
-    if (!content) {
+    const reportFile = buildReportBuilderPortableReportFile(payload);
+    if (!reportFile) {
         return null;
     }
     const normalizedName = sanitizeFilenameSegment(summary.title || summary.payloadId || "saved-report-payload")
         || "saved-report-payload";
     return {
-        filename: `${normalizedName}-saved-report-payload.json`,
+        filename: `${normalizedName}.forge-report.json`,
         mimeType: "application/json;charset=utf-8",
-        payload: content,
+        payload: JSON.stringify(reportFile, null, 2),
     };
 }

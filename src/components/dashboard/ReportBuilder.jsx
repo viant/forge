@@ -89,6 +89,7 @@ import {
     buildReportBuilderSemanticWorkspaceImportFeedback,
     hasSemanticWorkspaceImportActivation,
     resolveReportBuilderSemanticWorkspaceImportRevealState,
+    shouldAutoActivateReportBuilderImport,
 } from "./reportBuilderSemanticWorkspaceImportState.js";
 import {
     buildReportBuilderActionModel,
@@ -136,7 +137,11 @@ import {
 import {
     buildHostedReportActivationRequest,
     buildHostedReportActivationResponse,
+    buildHostedInlineReportActivation,
     resolveHostedReportId,
+    resolveHostedReportSource,
+    resolveHostedReportStarterId,
+    resolveHostedReportWorkspaceMode,
 } from "./reportBuilderHostedReportActivation.js";
 import {
     buildReportBuilderAuthoredCapabilityViewModel,
@@ -439,6 +444,12 @@ import {
     useReportBuilderExportExecution,
 } from "./useReportBuilderExportExecution.js";
 import {
+    buildReportBuilderExportEventDetail,
+    buildReportBuilderRunEvent,
+    emitReportBuilderUIEvent,
+    resolveReportBuilderEventHandler,
+} from "./reportBuilderUIEvents.js";
+import {
     parseReportBuilderLocalImport,
 } from "./reportBuilderLocalImport.js";
 import {
@@ -592,6 +603,7 @@ import {
 } from "./reportBuilderHydratedReportDocumentDiagnostic.js";
 import {
     buildReportBuilderStarterAppliedState,
+    findReportBuilderStarterTemplate,
     resolveAutoAppliedReportStarterId,
 } from "./reportBuilderStarterState.js";
 import { buildReportBuilderShareableArtifactViewState } from "./reportBuilderShareableArtifactViewState.js";
@@ -641,6 +653,10 @@ import {
     resolveReportBuilderLeftRailWidthPercentForMove,
     resolveReportBuilderLeftRailWidthPercentForKey,
 } from "./reportBuilderLeftRailLayout.js";
+import {
+    resolveReportBuilderVariant,
+    resolveReportBuilderVariantStateKey,
+} from "./reportBuilderVariantModel.js";
 
 function getBuilderConfig(container = {}) {
     return container.dashboard?.reportBuilder || container.reportBuilder || container.builder || {};
@@ -652,10 +668,6 @@ function getLookupExtensionConfig(config = {}) {
         return extension;
     }
     return {};
-}
-
-function getBuilderStateKey(container = {}) {
-    return String(container.stateKey || container.id || "reportBuilder").trim() || "reportBuilder";
 }
 
 function normalizeString(value = "") {
@@ -1672,8 +1684,20 @@ function resolveDynamicFilterFamilies(config = {}) {
       .sort((left, right) => left.order - right.order);
 }
 
-export default function ReportBuilder({ container, context }) {
+export default function ReportBuilder({ container: sourceContainer, context }) {
     useSignals();
+    const rootWindowFormSignal = context?.signals?.windowForm;
+    const rootWindowFormValue = rootWindowFormSignal?.value || {};
+    const activeBuilderVariant = resolveReportBuilderVariant(sourceContainer, rootWindowFormValue);
+    const container = useMemo(() => ({
+        ...sourceContainer,
+        ...(activeBuilderVariant.dataSourceRef ? { dataSourceRef: activeBuilderVariant.dataSourceRef } : {}),
+        dashboard: {
+            ...(sourceContainer?.dashboard || {}),
+            reportBuilderRef: activeBuilderVariant.builderRef,
+            reportBuilder: activeBuilderVariant.reportBuilder,
+        },
+    }), [activeBuilderVariant.builderRef, activeBuilderVariant.dataSourceRef, activeBuilderVariant.reportBuilder, sourceContainer]);
     const baseConfig = getBuilderConfig(container);
     const builderContext = container?.dataSourceRef && typeof context?.Context === "function"
         ? context.Context(container.dataSourceRef)
@@ -1682,6 +1706,20 @@ export default function ReportBuilder({ container, context }) {
         () => resolveReportBuilderExportHandler(builderContext),
         [builderContext?.handlers?.reportExport],
     );
+    const reportEventHandler = useMemo(
+        () => resolveReportBuilderEventHandler(builderContext),
+        [builderContext?.handlers?.reportEvents],
+    );
+    const reportEventContext = useMemo(() => ({
+        conversationId: String(builderContext?.identity?.conversationId || builderContext?.windowState?.conversationId || "").trim(),
+        windowId: String(builderContext?.identity?.windowId || container?.windowId || "").trim(),
+        windowKey: String(container?.windowKey || builderContext?.identity?.windowKey || "").trim(),
+    }), [builderContext?.identity?.conversationId, builderContext?.identity?.windowId, builderContext?.identity?.windowKey, builderContext?.windowState?.conversationId, container?.windowId, container?.windowKey]);
+    const currentReportEventRequestRef = useRef(null);
+    const currentReportEventRuntimeRequestRef = useRef(null);
+    const currentReportEventIdentityRef = useRef({ reportId: "", reportName: "", sourceKind: "" });
+    const activeRunEventRef = useRef(null);
+    const completedRunEventKeyRef = useRef("");
     const reportStoreHandler = useMemo(
         () => resolveReportBuilderReportStoreHandler(builderContext),
         [builderContext?.handlers?.reportStore],
@@ -1709,7 +1747,10 @@ export default function ReportBuilder({ container, context }) {
         }),
         [builderContext?.identity?.dataSourceRef, builderContext?.identity?.windowId, container?.dataSourceRef, container?.id],
     );
-    const stateKey = useMemo(() => getBuilderStateKey(container), [container]);
+    const stateKey = useMemo(
+        () => resolveReportBuilderVariantStateKey(container, activeBuilderVariant),
+        [activeBuilderVariant, container],
+    );
     const stateStorageScope = useMemo(() => resolveReportBuilderStateStorageScope({
         stateKey,
         windowId: builderContext?.identity?.windowId,
@@ -1724,7 +1765,7 @@ export default function ReportBuilder({ container, context }) {
         stateKey,
         stateStorageScope,
     }), [stateKey, stateStorageScope]);
-    const windowFormSignal = builderContext?.signals?.windowForm;
+    const windowFormSignal = builderContext?.signals?.windowForm || rootWindowFormSignal;
     const windowFormValue = windowFormSignal?.value || {};
     const persistedState = resolveKey(windowFormValue || {}, stateKey);
     const [persistedStateOverride, setPersistedStateOverride] = useState(null);
@@ -1989,6 +2030,7 @@ export default function ReportBuilder({ container, context }) {
     const authoredPreviewAutoFetchKeyRef = useRef("");
     const lastManualRunFingerprintRef = useRef("");
     const lastAutoCollapsedRunSequenceRef = useRef(0);
+    const hostedRuntimeFiltersCollapsedRef = useRef(false);
     const lastSeededRailFilterCollapseFingerprintRef = useRef("");
     const lastAutoAppliedChartCycleRef = useRef("");
     const seededDefaultsRef = useRef(false);
@@ -2148,14 +2190,24 @@ export default function ReportBuilder({ container, context }) {
     const [builderWidth, setBuilderWidth] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 0));
     const hostedExecuteOnOpen = normalizeBooleanFlag(container?.parameters?.executeOnOpen);
     const hostedExportOnComplete = normalizeString(container?.parameters?.exportOnComplete).toLowerCase();
+    const hostedReportSource = resolveHostedReportSource(container);
     const hostedReportId = resolveHostedReportId(container);
-    const hostedReportStarterId = normalizeString(container?.parameters?.reportStarterId);
+    const hostedReportStarterId = resolveHostedReportStarterId(container);
+    const hostedInlineReportActivation = useMemo(
+        () => buildHostedInlineReportActivation(container, {
+            containerId: container?.id,
+            stateKey,
+            dataSourceRef: builderContext?.identity?.dataSourceRef || container?.dataSourceRef,
+        }),
+        [builderContext?.identity?.dataSourceRef, container, stateKey],
+    );
+    const hostedActivationRequired = !!hostedReportId || hostedReportSource.kind === "inline";
     const [hostedReportActivationState, setHostedReportActivationState] = useState(() => ({
-        reportId: hostedReportId,
-        status: hostedReportId ? "pending" : "idle",
+        reportId: hostedReportSource.id,
+        status: hostedActivationRequired ? "pending" : "idle",
     }));
-    const hostedReportActivationPending = !!hostedReportId && hostedReportActivationState.status !== "ready";
-    const requestedWorkspaceMode = normalizeString(container?.parameters?.workspaceMode)
+    const hostedReportActivationPending = hostedActivationRequired && hostedReportActivationState.status !== "ready";
+    const requestedWorkspaceMode = resolveHostedReportWorkspaceMode(container)
         || (hostedExecuteOnOpen ? "report" : "");
     const [workspaceMode, setWorkspaceMode] = useState(() => {
         const initialCompactMode = resolveReportBuilderCompactMode({
@@ -2793,6 +2845,7 @@ export default function ReportBuilder({ container, context }) {
         () => applyReportBuilderRequestHook(builderContext, semanticDisplayConfig, state, buildReportBuilderRequest(semanticDisplayConfig, state)),
         [builderContext, semanticDisplayConfig, state],
     );
+    currentReportEventRuntimeRequestRef.current = currentRequest;
     const currentRequestFingerprint = useMemo(
         () => JSON.stringify(currentRequest),
         [currentRequest],
@@ -3020,7 +3073,7 @@ export default function ReportBuilder({ container, context }) {
             return;
         }
         if (
-            (hostedReportId && hostedReportActivationState.status !== "ready")
+            (hostedActivationRequired && hostedReportActivationState.status !== "ready")
             || (hostedReportStarterId && normalizeString(state?.reportDocumentTemplateId) !== hostedReportStarterId)
         ) {
             return;
@@ -3040,7 +3093,7 @@ export default function ReportBuilder({ container, context }) {
         if (currentRequestShouldFetch) {
             builderContext?.handlers?.dataSource?.fetchCollection?.();
         }
-    }, [builderContext, currentPrefillSignature, currentRequest, currentRequestDispatchFingerprint, currentRequestFingerprint, currentRequestShouldFetch, hostedReportActivationState.status, hostedReportId, hostedReportStarterId, state]);
+    }, [builderContext, currentPrefillSignature, currentRequest, currentRequestDispatchFingerprint, currentRequestFingerprint, currentRequestShouldFetch, hostedActivationRequired, hostedReportActivationState.status, hostedReportStarterId, state]);
 
     useEffect(() => {
         if (!pendingScrollRowId) {
@@ -3263,6 +3316,15 @@ export default function ReportBuilder({ container, context }) {
         () => normalizeReportBuilderDocumentTemplates(displayConfig?.reportDocumentTemplates),
         [displayConfig?.reportDocumentTemplates],
     );
+    const resolvedHostedReportStarterId = useMemo(
+        () => normalizeString(
+            findReportBuilderStarterTemplate(hostedReportStarterId, reportDocumentTemplates)?.id
+            || hostedReportStarterId,
+        ),
+        [hostedReportStarterId, reportDocumentTemplates],
+    );
+    const hostedReportStarterReady = !resolvedHostedReportStarterId
+        || normalizeString(state?.reportDocumentTemplateId) === resolvedHostedReportStarterId;
     const authoredDrillMetadata = runtimePreviewMetadata;
     const authoredDrillSummary = useMemo(
         () => summarizeReportBuilderAuthoredDrillMetadata({
@@ -3498,6 +3560,7 @@ export default function ReportBuilder({ container, context }) {
         };
     }, [state?.reportDashboardAdapter?.diagnostics]);
     const authoredDocumentBlockCount = Number(authoredDocumentSummary?.totalCount || 0) || 0;
+    const isAuthoredRuntimeExecution = !designWorkspaceMode && authoredDocumentBlockCount > 0;
     const designWorkspaceOverviewState = useMemo(() => {
         const hasDrillStructure = Number(authoredDrillSummary?.hierarchyCount || 0) > 0
             || Number(authoredDrillSummary?.detailTargetCount || 0) > 0
@@ -5242,6 +5305,10 @@ export default function ReportBuilder({ container, context }) {
                             minimal: false,
                             outlined: true,
                         }) : null}
+                        {showAuthoredReportSurface ? renderSaveAsReportButton({
+                            minimal: false,
+                            outlined: true,
+                        }) : null}
                         <Button
                             small
                             outlined
@@ -6436,7 +6503,7 @@ export default function ReportBuilder({ container, context }) {
                             placement="bottom-start"
                             content={(
                                 <Menu className="forge-report-builder__chart-menu">
-                                    <MenuDivider title="Report templates" />
+                                    <MenuDivider title="Report presets" />
                                     {reportDocumentTemplates.map((template) => (
                                         <MenuItem
                                             key={template.id}
@@ -6449,7 +6516,7 @@ export default function ReportBuilder({ container, context }) {
                             )}
                         >
                             <Button small outlined icon="duplicate">
-                                Apply template
+                                Apply report preset
                             </Button>
                         </Popover>
                     ) : null}
@@ -6890,9 +6957,8 @@ export default function ReportBuilder({ container, context }) {
         return (
             <Button
                 small
-                minimal
                 icon={designWorkspaceMode ? "eye-open" : "style"}
-                className="forge-report-builder__design-mode-control"
+                className="forge-report-builder__design-mode-control forge-report-builder__action-button"
                 aria-label={`${targetLabel} mode. ${targetDescription}`}
                 title={targetDescription}
                 onClick={() => {
@@ -7446,6 +7512,42 @@ export default function ReportBuilder({ container, context }) {
         return { request, fingerprint, readiness: nextReadiness, shouldFetch };
     }, [builderContext, config.request?.autoFetch, resolveStateReadiness, semanticDisplayConfig]);
 
+    const emitRunLifecycleEvent = React.useCallback((kind, {
+        runId = "",
+        status = "",
+        rowCount = null,
+    } = {}) => {
+        const event = buildReportBuilderRunEvent({
+            kind,
+            request: currentReportEventRequestRef.current,
+            sourceKind: currentReportEventIdentityRef.current.sourceKind || "runtime",
+            runId,
+            status,
+            rowCount,
+            runtimeRequest: currentReportEventRuntimeRequestRef.current,
+            reportId: currentReportEventIdentityRef.current.reportId,
+            reportName: currentReportEventIdentityRef.current.reportName,
+        });
+        emitReportBuilderUIEvent(reportEventHandler, {
+            ...event,
+            windowId: reportEventContext.windowId,
+            windowKey: reportEventContext.windowKey,
+            conversationId: reportEventContext.conversationId,
+        });
+    }, [reportEventContext, reportEventHandler]);
+
+    const beginReportRunLifecycle = React.useCallback(({ reuseCurrent = false } = {}) => {
+        const activeRun = activeRunEventRef.current;
+        if (reuseCurrent && activeRun?.runId && activeRun?.fingerprint === currentRequestFingerprint) {
+            return { runId: activeRun.runId, started: false };
+        }
+        const runId = globalThis.crypto?.randomUUID?.() || `report-run-${Date.now()}`;
+        activeRunEventRef.current = { runId, fingerprint: currentRequestFingerprint };
+        completedRunEventKeyRef.current = "";
+        emitRunLifecycleEvent("report.run_start", { runId });
+        return { runId, started: true };
+    }, [currentRequestFingerprint, emitRunLifecycleEvent]);
+
     const runReport = React.useCallback(() => {
         const currentState = currentBuilderStateRef.current || state;
         setChartApplyFeedback(null);
@@ -7458,9 +7560,25 @@ export default function ReportBuilder({ container, context }) {
         if (designWorkspaceMode) {
             setWorkspaceMode("report");
         }
+        beginReportRunLifecycle();
         dispatchReportRequest(currentState, { forceFetch: true, markManual: true });
-    }, [designWorkspaceMode, dispatchReportRequest, state, useFilterDrawer, useFilterRail]);
+    }, [beginReportRunLifecycle, designWorkspaceMode, dispatchReportRequest, state, useFilterDrawer, useFilterRail]);
     const hasRows = Array.isArray(computedCollection) && computedCollection.length > 0;
+    useEffect(() => {
+        if (isAuthoredRuntimeExecution || !hasCompletedCurrentRun || !activeRunEventRef.current?.runId) {
+            return;
+        }
+        const eventKey = `${activeRunEventRef.current.runId}:${currentRequestFingerprint}`;
+        if (completedRunEventKeyRef.current === eventKey) {
+            return;
+        }
+        completedRunEventKeyRef.current = eventKey;
+        emitRunLifecycleEvent("report.run", {
+            runId: activeRunEventRef.current.runId,
+            status: "succeeded",
+            rowCount: Array.isArray(computedCollection) ? computedCollection.length : 0,
+        });
+    }, [computedCollection, currentRequestFingerprint, emitRunLifecycleEvent, hasCompletedCurrentRun, isAuthoredRuntimeExecution]);
     const canShowResults = canRunReport && hasRows;
     const canShowResultsRef = useRef(canShowResults);
     canShowResultsRef.current = canShowResults;
@@ -8639,14 +8757,14 @@ export default function ReportBuilder({ container, context }) {
     const runtimePreviewRowsState = useReportRuntimePreviewRows({
         enabled: (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
             && !hostedReportActivationPending
-            && (!hostedReportStarterId || normalizeString(state?.reportDocumentTemplateId) === hostedReportStarterId)
+            && hostedReportStarterReady
             && !shouldDeferReportBuilderRequestForPrefill({
                 currentPrefillSignature,
                 appliedPrefillSignature: appliedPrefillSignatureRef.current,
             }),
         canRun: canRunReport
             && !hostedReportActivationPending
-            && (!hostedReportStarterId || normalizeString(state?.reportDocumentTemplateId) === hostedReportStarterId),
+            && hostedReportStarterReady,
         hasModel: !!runtimePreviewModel,
         request: runtimePreviewRequest,
         fingerprint: runtimePreviewFingerprint,
@@ -8689,20 +8807,21 @@ export default function ReportBuilder({ container, context }) {
             }))
             .filter((dataset) => dataset.id && dataset.dataSourceRef && dataset.request);
     }, [authoredDatasetOptionIndex, authoredRuntimePreviewModel?.reportSpec?.datasets, authoredRuntimePreviewModel?.staticDatasetPayloads]);
+    const runtimePreviewPublishedDatasetsRequestKey = useMemo(() => JSON.stringify({
+        previewRequestKey: runtimePreviewRequestKey,
+        datasets: runtimePreviewPublishedDatasets,
+    }), [runtimePreviewPublishedDatasets, runtimePreviewRequestKey]);
     const runtimePreviewDatasetPayloadState = useReportRuntimePreviewDatasetPayloads({
         enabled: (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
             && !hostedReportActivationPending
-            && (!hostedReportStarterId || normalizeString(state?.reportDocumentTemplateId) === hostedReportStarterId)
+            && hostedReportStarterReady
             && !shouldDeferReportBuilderRequestForPrefill({
                 currentPrefillSignature,
                 appliedPrefillSignature: appliedPrefillSignatureRef.current,
             }),
         builderContext,
         datasets: runtimePreviewPublishedDatasets,
-        requestKey: JSON.stringify({
-            previewRequestKey: runtimePreviewRequestKey,
-            datasets: runtimePreviewPublishedDatasets,
-        }),
+        requestKey: runtimePreviewPublishedDatasetsRequestKey,
         fetcherOptions: {
             preferDataSourceRoute: true,
             omitConversationId: true,
@@ -8797,6 +8916,16 @@ export default function ReportBuilder({ container, context }) {
             metadata: runtimeExportMetadata,
         }) || runtimePreviewArtifact?.exportRequest || null;
     }, [runtimeExportMetadata, runtimePreviewArtifact]);
+    const activeReportEventId = hostedReportSource.id || normalizeString(state?.reportDocumentTemplateId);
+    const activeReportEventName = resolveReportDocumentMetadataTitle(state, container, displayConfig);
+    const activeReportEventSourceKind = hostedReportSource.kind
+        || (normalizeString(state?.reportDocumentTemplateId) ? "preset" : "inline");
+    currentReportEventRequestRef.current = draftExportRequest;
+    currentReportEventIdentityRef.current = {
+        reportId: activeReportEventId,
+        reportName: activeReportEventName,
+        sourceKind: activeReportEventSourceKind,
+    };
     const draftXlsxExportRequest = useMemo(() => {
         if (!runtimePreviewArtifact?.document || !runtimePreviewArtifact?.reportSpec || !runtimePreviewArtifact?.reportFill) {
             return null;
@@ -8814,8 +8943,10 @@ export default function ReportBuilder({ container, context }) {
         () => !!showAuthoredReportSurface
             && !!runtimePreviewArtifact?.document
             && !!runtimePreviewArtifact?.reportSpec
-            && !!runtimePreviewArtifact?.reportFill,
+            && !!runtimePreviewArtifact?.reportFill
+            && authoredDocumentCompileValidation.valid,
         [
+            authoredDocumentCompileValidation.valid,
             runtimePreviewArtifact?.document,
             runtimePreviewArtifact?.reportFill,
             runtimePreviewArtifact?.reportSpec,
@@ -8913,6 +9044,8 @@ export default function ReportBuilder({ container, context }) {
             reportAuditHandler,
             reportAuditActorRef,
             reportAuditMetadata,
+            reportEventHandler,
+            reportEventContext,
             setFeedback: setChartApplyFeedback,
         }),
         [
@@ -8924,12 +9057,39 @@ export default function ReportBuilder({ container, context }) {
             reportAuditActorRef,
             reportAuditHandler,
             reportAuditMetadata,
+            reportEventContext,
+            reportEventHandler,
             reportExportHandler,
             savedReportPayloadExportRequest,
             selectedListEntryExportRequest,
             setChartApplyFeedback,
         ],
     );
+    const reportContextEventFingerprintRef = useRef("");
+    useEffect(() => {
+        if (!reportEventHandler || !draftExportRequest) {
+            return;
+        }
+        const detail = buildReportBuilderExportEventDetail({
+            request: draftExportRequest,
+            sourceKind: activeReportEventSourceKind,
+            runtimeRequest: currentRequest,
+            reportId: activeReportEventId,
+            reportName: activeReportEventName,
+        });
+        const fingerprint = JSON.stringify(detail);
+        if (!fingerprint || reportContextEventFingerprintRef.current === fingerprint) {
+            return;
+        }
+        reportContextEventFingerprintRef.current = fingerprint;
+        emitReportBuilderUIEvent(reportEventHandler, {
+            kind: "report.context_updated",
+            windowId: reportEventContext.windowId,
+            windowKey: reportEventContext.windowKey,
+            conversationId: reportEventContext.conversationId,
+            detail,
+        });
+    }, [activeReportEventId, activeReportEventName, activeReportEventSourceKind, currentRequest, draftExportRequest, reportEventContext, reportEventHandler]);
     const latestLifecycleSharedArtifactExportExecutionConfig = useMemo(
         () => ({
             request: latestLifecycleSharedArtifactRecord?.exportRequest || null,
@@ -8939,6 +9099,8 @@ export default function ReportBuilder({ container, context }) {
             reportAuditHandler,
             reportAuditActorRef,
             reportAuditMetadata,
+            reportEventHandler,
+            reportEventContext,
             setFeedback: setChartApplyFeedback,
             missingRequestMessage: "No export-ready shared artifact is available yet.",
             missingJobMessage: "No shared artifact export job is available to refresh.",
@@ -8950,19 +9112,33 @@ export default function ReportBuilder({ container, context }) {
             reportAuditActorRef,
             reportAuditHandler,
             reportAuditMetadata,
+            reportEventContext,
+            reportEventHandler,
             reportExportHandler,
             setChartApplyFeedback,
         ],
     );
-    const draftExportExecution = useReportBuilderExportExecution(exportExecutionConfigs.draft);
+    const draftExportExecution = useReportBuilderExportExecution({
+        ...exportExecutionConfigs.draft,
+        eventSourceKind: activeReportEventSourceKind,
+        eventRuntimeRequest: currentRequest,
+        eventReportId: activeReportEventId,
+        eventReportName: activeReportEventName,
+    });
     const draftXlsxExportExecution = useReportBuilderExportExecution({
         request: draftXlsxExportRequest,
         sourceKind: "draft",
+        eventSourceKind: activeReportEventSourceKind,
         localSavedPayloads: configuredExportContextSavedPayloads,
         reportExportHandler,
         reportAuditHandler,
         reportAuditActorRef,
         reportAuditMetadata,
+        reportEventHandler,
+        reportEventContext,
+        eventRuntimeRequest: currentRequest,
+        eventReportId: activeReportEventId,
+        eventReportName: activeReportEventName,
         setFeedback: setChartApplyFeedback,
         missingRequestMessage: "No draft XLSX export request is available.",
         missingJobMessage: "No draft XLSX export job is available to refresh.",
@@ -9106,6 +9282,63 @@ export default function ReportBuilder({ container, context }) {
         runtimePreviewEnabled,
         runtimePreviewRowsSource,
     ]);
+    useEffect(() => {
+        const activeRun = activeRunEventRef.current;
+        if (
+            !isAuthoredRuntimeExecution
+            || runtimePreviewDatasetPayloadState.loading
+            || (runtimePreviewPublishedDatasets.length > 0
+                && runtimePreviewDatasetPayloadState.requestKey !== runtimePreviewPublishedDatasetsRequestKey)
+            || !authoredRuntimePreviewState?.canRenderRuntime
+            || !activeRun?.runId
+        ) {
+            return;
+        }
+        const eventKey = `${activeRun.runId}:${currentRequestFingerprint}`;
+        if (completedRunEventKeyRef.current === eventKey) {
+            return;
+        }
+        completedRunEventKeyRef.current = eventKey;
+        const primaryRows = Array.isArray(runtimePreviewPrimaryDatasetPayload?.rows)
+            ? runtimePreviewPrimaryDatasetPayload.rows
+            : runtimePreviewRowsSource.rows;
+        emitRunLifecycleEvent("report.run", {
+            runId: activeRun.runId,
+            status: authoredRuntimePreviewState?.errorState ? "failed" : "succeeded",
+            rowCount: Array.isArray(primaryRows) ? primaryRows.length : 0,
+        });
+    }, [
+        authoredRuntimePreviewState?.canRenderRuntime,
+        authoredRuntimePreviewState?.errorState,
+        currentRequestFingerprint,
+        emitRunLifecycleEvent,
+        isAuthoredRuntimeExecution,
+        runtimePreviewDatasetPayloadState.loading,
+        runtimePreviewDatasetPayloadState.requestKey,
+        runtimePreviewPublishedDatasets.length,
+        runtimePreviewPublishedDatasetsRequestKey,
+        runtimePreviewPrimaryDatasetPayload?.rows,
+        runtimePreviewRowsSource.rows,
+    ]);
+    useEffect(() => {
+        const shouldCollapseHostedExecution = hostedExecuteOnOpen
+            && authoredRuntimePreviewState?.canRenderRuntime
+            && !hostedRuntimeFiltersCollapsedRef.current;
+        const shouldCollapseCompletedRun = shouldAutoCollapseReportBuilderFilters({
+            canShowResults: authoredRuntimePreviewState?.canRenderRuntime,
+            hasCompletedCurrentRun,
+            manualRunSequence,
+            collapsedRunSequence: lastAutoCollapsedRunSequenceRef.current,
+        });
+        if (!shouldCollapseHostedExecution && !shouldCollapseCompletedRun) {
+            return;
+        }
+        hostedRuntimeFiltersCollapsedRef.current = shouldCollapseHostedExecution
+            || hostedRuntimeFiltersCollapsedRef.current;
+        lastAutoCollapsedRunSequenceRef.current = manualRunSequence;
+        setFilterPanels(collapseReportBuilderFilterBodyState);
+        setFiltersDrawerOpen(false);
+    }, [authoredRuntimePreviewState?.canRenderRuntime, hasCompletedCurrentRun, hostedExecuteOnOpen, manualRunSequence]);
     const hideAuthoredRuntimeSemanticErrorCard = useMemo(() => {
         const errorState = authoredRuntimePreviewState?.errorState || null;
         if (!semanticResultSurfaceState || !errorState) {
@@ -10769,6 +11002,8 @@ export default function ReportBuilder({ container, context }) {
                 baseState: state,
             }));
             requestFingerprintRef.current = "";
+            lastManualRunFingerprintRef.current = "";
+            executeOnOpenRunKeyRef.current = "";
             persistStateWithConfig(blankState, config, {
                 preserveHydratedSession: false,
                 skipExplorationHistory: true,
@@ -10790,6 +11025,8 @@ export default function ReportBuilder({ container, context }) {
             return false;
         }
         requestFingerprintRef.current = "";
+        lastManualRunFingerprintRef.current = "";
+        executeOnOpenRunKeyRef.current = "";
         persistStateWithConfig(buildReportBuilderStarterAppliedState(result.nextState), config, {
             preserveHydratedSession: false,
             skipExplorationHistory: true,
@@ -10833,17 +11070,18 @@ export default function ReportBuilder({ container, context }) {
     }, [resetReportDocumentToBlank]);
     const requestedReportStarterId = useMemo(
         () => resolveAutoAppliedReportStarterId({
-            requestedReportStarterId: normalizeString(container?.parameters?.reportStarterId),
+            requestedReportStarterId: hostedReportStarterId,
             prefillReportStarterId: normalizeString(displayConfig?.prefillReportStarterId),
             hasPrefill: !!currentPrefillSignature,
             currentTemplateId: normalizeString(state?.reportDocumentTemplateId),
             authoredBlockCount: Array.isArray(state?.reportDocumentBlocks) ? state.reportDocumentBlocks.length : 0,
             availableTemplateIds: reportDocumentTemplates.map((template) => normalizeString(template?.id)),
+            availableTemplates: reportDocumentTemplates,
         }),
         [
-            container?.parameters?.reportStarterId,
             currentPrefillSignature,
             displayConfig?.prefillReportStarterId,
+            hostedReportStarterId,
             reportDocumentTemplates,
             state?.reportDocumentBlocks,
             state?.reportDocumentTemplateId,
@@ -10895,8 +11133,16 @@ export default function ReportBuilder({ container, context }) {
             appliedReportStarterIdRef.current = requestedReportStarterId;
             return;
         }
-        if (!reportDocumentTemplates.some((template) => normalizeString(template?.id) === requestedReportStarterId)) {
+        if (!findReportBuilderStarterTemplate(requestedReportStarterId, reportDocumentTemplates)) {
             if (reportDocumentTemplates.length > 0) {
+                const availableLabels = reportDocumentTemplates
+                    .map((template) => normalizeString(template?.label || template?.id))
+                    .filter(Boolean)
+                    .join(", ");
+                setChartApplyFeedback({
+                    level: "danger",
+                    message: `Report preset '${requestedReportStarterId}' is unavailable.${availableLabels ? ` Available presets: ${availableLabels}.` : ""}`,
+                });
                 appliedReportStarterIdRef.current = requestedReportStarterId;
             }
             return;
@@ -11590,7 +11836,7 @@ export default function ReportBuilder({ container, context }) {
             message: "Draft discarded.",
         });
     }, [persistState, state]);
-    const saveReportFile = React.useCallback(async () => {
+    const buildCurrentReportSaveBundle = React.useCallback(() => {
         const artifact = buildReportBuilderExplorationArtifact({
             container,
             config: semanticDisplayConfig,
@@ -11650,7 +11896,7 @@ export default function ReportBuilder({ container, context }) {
                 },
             } : {}),
         };
-        const payload = buildReportBuilderSavedReportPayload(artifact)
+        const basePayload = buildReportBuilderSavedReportPayload(artifact)
             || buildReportBuilderSavedReportPayloadFromBuilderState(
                 savedReportPayload
                 || savedReportPayloadRecord?.savedReportPayload
@@ -11665,12 +11911,43 @@ export default function ReportBuilder({ container, context }) {
                     semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
                 },
             );
+        const payload = basePayload
+            ? {
+                ...basePayload,
+                sourceSession: {
+                    ...(basePayload.sourceSession && typeof basePayload.sourceSession === "object" && !Array.isArray(basePayload.sourceSession)
+                        ? cloneReportBuilderValue(basePayload.sourceSession)
+                        : {}),
+                    builderTarget: {
+                        kind: "dashboard.reportBuilder",
+                        containerId: normalizeString(container?.id),
+                        stateKey: normalizeString(stateKey),
+                        dataSourceRef: normalizeString(builderContext?.identity?.dataSourceRef || container?.dataSourceRef),
+                    },
+                },
+            }
+            : null;
+        const nextSavedReportPayloadRecord = payload
+            ? buildReportBuilderSavedReportPayloadRecord(payload, {
+                runtimeArtifact: runtimeArtifactValue,
+            })
+            : null;
+        return {
+            artifact,
+            fallbackReportTitle,
+            nextSavedReportPayloadRecord,
+            payload,
+            runtimeArtifactValue,
+        };
+    }, [builderContext?.identity?.dataSourceRef, container, runtimePreviewArtifact, runtimePreviewSemanticDiagnostics, savedReportPayload, savedReportPayloadRecord, semanticDisplayConfig, semanticModelState.model, semanticRuntimeSummary, state, stateKey, storedReportArtifact]);
+    const stageCurrentReportSaveBundle = React.useCallback((bundle = null) => {
         setSettingsOpen(false);
         setLocalLifecycleSharedArtifactRecords([]);
         setLatestLifecycleSharedArtifactOpen(false);
-        if (!payload) {
-            setSavedExplorationArtifact(artifact || null);
-            setSavedExplorationRuntimeArtifact(runtimeArtifactValue);
+        if (!bundle?.payload) {
+            const fallbackReportTitle = bundle?.fallbackReportTitle || "Report";
+            setSavedExplorationArtifact(bundle?.artifact || null);
+            setSavedExplorationRuntimeArtifact(bundle?.runtimeArtifactValue || null);
             setSavedExplorationArtifactOpen(false);
             setSavedReportPayload(null);
             setSavedReportPayloadRecord(null);
@@ -11682,27 +11959,43 @@ export default function ReportBuilder({ container, context }) {
                 level: "warning",
                 message: `Saved draft snapshot ${fallbackReportTitle}, but could not build the reusable report file from it.`,
             });
-            return;
+            return false;
         }
-        const nextSavedReportPayloadRecord = buildReportBuilderSavedReportPayloadRecord(payload, {
-            runtimeArtifact: runtimeArtifactValue,
-        });
-        const saveReportRequest = buildReportBuilderSaveReportRequest(payload, {
-            runtimeArtifact: runtimeArtifactValue,
-            savedReportPayloadRecord: nextSavedReportPayloadRecord,
-            metadata: {
-                conversationId: String(container?.conversationId || builderContext?.conversationId || builderContext?.windowState?.conversationId || "").trim(),
-                workspaceId: String(container?.windowKey || container?.id || "").trim(),
-            },
-        });
-        setSavedExplorationArtifact(artifact || null);
-        setSavedExplorationRuntimeArtifact(runtimeArtifactValue);
+        setSavedExplorationArtifact(bundle.artifact || null);
+        setSavedExplorationRuntimeArtifact(bundle.runtimeArtifactValue);
         setSavedExplorationArtifactOpen(false);
-        setSavedReportPayload(payload);
-        setSavedReportPayloadRecord(nextSavedReportPayloadRecord);
+        setSavedReportPayload(bundle.payload);
+        setSavedReportPayloadRecord(bundle.nextSavedReportPayloadRecord);
         setSavedReportPayloadOpen(false);
         setSavedReportPayloadApiArtifactsOpen(false);
         setSavedReportPayloadExportRequestOpen(false);
+        return true;
+    }, [resetPreparedApiArtifactOrigins]);
+    const saveReportFile = React.useCallback(() => {
+        const bundle = buildCurrentReportSaveBundle();
+        if (!stageCurrentReportSaveBundle(bundle)) {
+            return;
+        }
+        const { fallbackReportTitle, payload } = bundle;
+        const downloadDescriptor = buildReportBuilderSavedReportPayloadDownload(payload);
+        if (!downloadDescriptor) {
+            setChartApplyFeedback({
+                level: "warning",
+                message: `Could not download ${payload?.title || fallbackReportTitle}. Resolve the report metadata validation issues and try again.`,
+            });
+            return;
+        }
+        const blob = new Blob([downloadDescriptor.payload], { type: downloadDescriptor.mimeType });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = downloadDescriptor.filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        window.setTimeout(() => {
+            anchor.remove();
+            URL.revokeObjectURL(url);
+        }, 1000);
         setCreateReportDocumentPayload(null);
         setCreateReportDocumentPayloadOpen(false);
         setReportDocumentVersionDraft("");
@@ -11722,59 +12015,64 @@ export default function ReportBuilder({ container, context }) {
         setUpdateReportDocumentConflictDiagnostic(null);
         setUpdateReportDocumentConflictDiagnosticOpen(false);
         resetPreparedApiArtifactOrigins();
-        let persistedStore = false;
-        let persistedStoreMode = "";
-        if (
-            saveReportRequest
-            && storedReportArtifact?.artifactId
-            && typeof reportStoreHandler?.updateReport === "function"
-        ) {
-            try {
-                const updatedReport = await reportStoreHandler.updateReport({
+        setChartApplyFeedback({
+            level: "success",
+            message: `Downloaded report file ${payload?.title || fallbackReportTitle} as portable metadata. This local draft is not persisted until Save as report is explicitly used.`,
+        });
+    }, [buildCurrentReportSaveBundle, resetPreparedApiArtifactOrigins, stageCurrentReportSaveBundle]);
+    const saveCurrentReportToStore = React.useCallback(async () => {
+        const bundle = buildCurrentReportSaveBundle();
+        if (!stageCurrentReportSaveBundle(bundle)) {
+            return;
+        }
+        const saveReportRequest = buildReportBuilderSaveReportRequest(bundle.payload, {
+            runtimeArtifact: bundle.runtimeArtifactValue,
+            savedReportPayloadRecord: bundle.nextSavedReportPayloadRecord,
+            metadata: {
+                conversationId: String(container?.conversationId || builderContext?.conversationId || builderContext?.windowState?.conversationId || "").trim(),
+                workspaceId: String(container?.windowKey || container?.id || "").trim(),
+            },
+        });
+        if (!saveReportRequest) {
+            setChartApplyFeedback({
+                level: "warning",
+                message: "Could not build the report-store request from the current report.",
+            });
+            return;
+        }
+        const canUpdateStoredReport = !!storedReportArtifact?.artifactId
+            && bundle.payload?.sourceSession?.unsavedDraft !== true
+            && typeof reportStoreHandler?.updateReport === "function";
+        try {
+            const storedReport = canUpdateStoredReport
+                ? await reportStoreHandler.updateReport({
                     artifactId: storedReportArtifact.artifactId,
                     ...saveReportRequest,
-                });
-                if (updatedReport && typeof updatedReport === "object" && !Array.isArray(updatedReport)) {
-                    setStoredReportArtifact(updatedReport);
-                    setImportedLocalSavedRecordsExpanded(designWorkspaceMode);
-                    setImportedLocalSavedReportRecords((current) => normalizeImportedLocalSavedReportRecords([
-                        ...current,
-                        updatedReport,
-                    ]));
-                    persistedStore = true;
-                    persistedStoreMode = "updated";
-                }
-            } catch (error) {
-                console.warn("reportBuilder.saveReportFile store update failed", error);
+                })
+                : await reportStoreHandler?.saveReport?.(saveReportRequest);
+            if (!storedReport || typeof storedReport !== "object" || Array.isArray(storedReport)) {
+                throw new Error("The report store did not return a saved report artifact.");
             }
-        } else if (saveReportRequest && typeof reportStoreHandler?.saveReport === "function") {
-            try {
-                const storedReport = await reportStoreHandler.saveReport(saveReportRequest);
-                if (storedReport && typeof storedReport === "object" && !Array.isArray(storedReport)) {
-                    setStoredReportArtifact(storedReport);
-                    setImportedLocalSavedRecordsExpanded(designWorkspaceMode);
-                    setImportedLocalSavedReportRecords((current) => normalizeImportedLocalSavedReportRecords([
-                        ...current,
-                        storedReport,
-                    ]));
-                    persistedStore = true;
-                    persistedStoreMode = "saved";
-                }
-            } catch (error) {
-                console.warn("reportBuilder.saveReportFile store persistence failed", error);
-            }
+            setStoredReportArtifact(storedReport);
+            setImportedLocalSavedRecordsExpanded(designWorkspaceMode);
+            setImportedLocalSavedReportRecords((current) => normalizeImportedLocalSavedReportRecords([
+                ...current,
+                storedReport,
+            ]));
+            setChartApplyFeedback({
+                level: "success",
+                message: canUpdateStoredReport
+                    ? `Updated saved report ${bundle.payload?.title || bundle.fallbackReportTitle}.`
+                    : `Saved ${bundle.payload?.title || bundle.fallbackReportTitle} as a persistent report.`,
+            });
+        } catch (error) {
+            console.warn("reportBuilder.saveCurrentReportToStore failed", error);
+            setChartApplyFeedback({
+                level: "warning",
+                message: `Could not save ${bundle.payload?.title || bundle.fallbackReportTitle} to the report store. ${renderReportBuilderError(error)}`,
+            });
         }
-        setChartApplyFeedback({
-            level: persistedStore ? "success" : "success",
-            message: persistedStore
-                ? (
-                    persistedStoreMode === "updated"
-                        ? `Saved report file ${payload?.title || fallbackReportTitle} and updated it in the report store. Download it to reopen locally, or open delivery handoff when you need reopen bundles, catalog responses, or persisted API requests.`
-                        : `Saved report file ${payload?.title || fallbackReportTitle} and persisted it to the report store. Download it to reopen locally, or open delivery handoff when you need reopen bundles, catalog responses, or persisted API requests.`
-                )
-                : `Saved report file ${payload?.title || fallbackReportTitle}. Download it to reopen locally, or open delivery handoff when you need reopen bundles, catalog responses, or persisted API requests.`,
-        });
-    }, [builderContext?.conversationId, builderContext?.windowState?.conversationId, container, reportStoreHandler, resetPreparedApiArtifactOrigins, runtimePreviewArtifact, runtimePreviewSemanticDiagnostics, semanticDisplayConfig, semanticModelState.model, semanticRuntimeSummary, state, storedReportArtifact?.artifactId]);
+    }, [buildCurrentReportSaveBundle, builderContext?.conversationId, builderContext?.windowState?.conversationId, container, designWorkspaceMode, reportStoreHandler, stageCurrentReportSaveBundle, storedReportArtifact]);
     const renderSaveReportFileButton = React.useCallback(({
         small = true,
         minimal = false,
@@ -11796,6 +12094,26 @@ export default function ReportBuilder({ container, context }) {
             {savedArtifactViewState.saveLabel}
         </Button>
     ), [canSaveCurrentReportFile, saveReportFile, savedArtifactViewState.saveLabel]);
+    const renderSaveAsReportButton = React.useCallback(({
+        small = true,
+        minimal = false,
+        outlined = true,
+        className = "",
+        disabled = !canSaveCurrentReportFile || typeof reportStoreHandler?.saveReport !== "function",
+    } = {}) => (
+        <Button
+            small={small}
+            minimal={minimal}
+            outlined={outlined}
+            icon="database"
+            className={className || undefined}
+            onClick={saveCurrentReportToStore}
+            disabled={disabled}
+            title={disabled ? "A report store and a valid authored report are required." : "Persist this report for the current authenticated user."}
+        >
+            {storedReportArtifact?.artifactId ? "Update saved report" : "Save as report"}
+        </Button>
+    ), [canSaveCurrentReportFile, reportStoreHandler?.saveReport, saveCurrentReportToStore, storedReportArtifact?.artifactId]);
     const resetImportedArtifactState = React.useCallback(({
         preserveStandaloneReportFill = false,
         preservePipelinePreview = false,
@@ -12205,6 +12523,41 @@ export default function ReportBuilder({ container, context }) {
     ]);
     activateImportedResponseInBuilderRef.current = activateImportedResponseInBuilder;
     useEffect(() => {
+        if (hostedReportSource.kind !== "inline") {
+            return;
+        }
+        const activationKey = hostedInlineReportActivation.key;
+        if (!activationKey || hostedReportActivationKeyRef.current === activationKey) {
+            return;
+        }
+        hostedReportActivationKeyRef.current = activationKey;
+        if (!hostedInlineReportActivation.response) {
+            setHostedReportActivationState({
+                reportId: hostedReportSource.id,
+                status: "error",
+                message: hostedInlineReportActivation.message || "Inline reportDefinition could not be loaded.",
+            });
+            return;
+        }
+        setHostedReportActivationState({ reportId: hostedReportSource.id, status: "loading" });
+        const activated = activateImportedResponseInBuilderRef.current?.(hostedInlineReportActivation.response, {
+            suppressFeedback: true,
+        });
+        if (!activated) {
+            setHostedReportActivationState({
+                reportId: hostedReportSource.id,
+                status: "error",
+                message: "Inline reportDefinition is incompatible with this workspace.",
+            });
+            return;
+        }
+        executeOnOpenRunKeyRef.current = "";
+        setHostedReportActivationState({ reportId: hostedReportSource.id, status: "ready" });
+    }, [hostedInlineReportActivation, hostedReportSource.id, hostedReportSource.kind]);
+    useEffect(() => {
+        if (hostedReportSource.kind !== "report") {
+            return undefined;
+        }
         const request = buildHostedReportActivationRequest(hostedReportId);
         if (!request) {
             hostedReportActivationKeyRef.current = "";
@@ -12257,7 +12610,7 @@ export default function ReportBuilder({ container, context }) {
         return () => {
             cancelled = true;
         };
-    }, [hostedReportId, reportStoreHandler]);
+    }, [hostedReportId, hostedReportSource.kind, reportStoreHandler]);
     const removeImportedLocalReopenable = React.useCallback((targetIdentity = "", title = "") => {
         const normalizedIdentity = normalizeString(targetIdentity);
         if (!normalizedIdentity) {
@@ -12662,15 +13015,39 @@ export default function ReportBuilder({ container, context }) {
                         })
                         : null)
                 );
-            const shouldAutoActivateImportedResponse = normalizeString(semanticWorkspacePanelState?.title).toLowerCase() === "no data model configured"
-                && hasSemanticWorkspaceImportActivation(importFeedback)
-                && importedActivationResponse;
+            const shouldAutoActivateImportedResponse = shouldAutoActivateReportBuilderImport({
+                imported,
+                feedback: importFeedback,
+                semanticWorkspaceTitle: semanticWorkspacePanelState?.title,
+                activationResponse: importedActivationResponse,
+            });
             if (shouldAutoActivateImportedResponse) {
+                const portableReportFile = imported.importedArtifactKind === "forge.reporting.reportFile";
                 const activated = activateImportedResponseInBuilder(importedActivationResponse, {
-                    successMessage: `${normalizeString(file?.name || imported.kind || "Imported report")} loaded and activated in the builder.`,
+                    successMessage: portableReportFile
+                        ? `${normalizeString(file?.name || "Imported report")} loaded as an unsaved local draft.`
+                        : `${normalizeString(file?.name || imported.kind || "Imported report")} loaded and activated in the builder.`,
                 });
                 if (activated) {
-                    revealSemanticImportSurface();
+                    if (portableReportFile) {
+                        setStoredReportArtifact(null);
+                        if (!compactMode) {
+                            setFiltersDrawerOpen(false);
+                            setWorkspaceMode("design");
+                        }
+                    }
+                    const importedBlocks = Array.isArray(importedActivationResponse?.document?.blocks)
+                        ? importedActivationResponse.document.blocks
+                        : [];
+                    setSelectedDocumentOutlineEntryId(normalizeString(importedBlocks[0]?.id));
+                    setPendingDocumentInsertionAfterId(resolveDefaultReportBuilderInsertionAfterId({
+                        authoredBlocks: importedBlocks,
+                    }));
+                    setPendingDocumentInsertionPlacement("after");
+                    closeReportDocumentShellPanels();
+                    if (!portableReportFile) {
+                        revealSemanticImportSurface();
+                    }
                     return;
                 }
             }
@@ -12684,7 +13061,7 @@ export default function ReportBuilder({ container, context }) {
                 message: `Could not import ${String(file?.name || "the selected report file")}. ${renderReportBuilderError(error)}`,
             });
         }
-    }, [activateImportedResponseInBuilder, applyPreparedApiArtifactOrigins, compactMode, importedArtifactState, importedLocalGetReportDocumentResponses, importedLocalSavedReportRecords, resetImportedArtifactState, revealSemanticImportSurface, semanticWorkspacePanelState?.title]);
+    }, [activateImportedResponseInBuilder, applyPreparedApiArtifactOrigins, closeReportDocumentShellPanels, compactMode, importedArtifactState, importedLocalGetReportDocumentResponses, importedLocalSavedReportRecords, resetImportedArtifactState, revealSemanticImportSurface, semanticWorkspacePanelState?.title]);
     const openStaticDatasetImport = React.useCallback((targetDatasetId = "") => {
         setPendingStaticDatasetImportTargetId(normalizeString(targetDatasetId));
         importStaticDatasetFileInputRef.current?.click();
@@ -15373,7 +15750,7 @@ export default function ReportBuilder({ container, context }) {
                             ) : null}
                             {reportDataSourceCards.map((card) => (
                                 <div
-                                    key={card.dataSourceRef}
+                                    key={reportBuilderSourceCardId(card)}
                                     className={[
                                         "forge-report-builder__design-source-grid-row",
                                         card.active ? "is-active" : "",
@@ -15405,9 +15782,9 @@ export default function ReportBuilder({ container, context }) {
                                     {card.datasetRef && (card.canAddTable || card.canAddChart || card.canAddKpi || card.canAddCollection) ? (
                                         <Tooltip content={describeSourceAddAction("Add block", card.label)} placement="top">
                                             <Popover
-                                                isOpen={designSourceAddMenuRef === normalizeString(card.dataSourceRef)}
+                                                isOpen={designSourceAddMenuRef === reportBuilderSourceCardId(card)}
                                                 onInteraction={(nextOpen) => {
-                                                    setDesignSourceAddMenuRef(nextOpen ? normalizeString(card.dataSourceRef) : "");
+                                                    setDesignSourceAddMenuRef(nextOpen ? reportBuilderSourceCardId(card) : "");
                                                 }}
                                                 usePortal={!compactMode}
                                                 placement="bottom-start"
@@ -15627,7 +16004,7 @@ export default function ReportBuilder({ container, context }) {
                         <Menu className="forge-report-builder__chart-menu">
                             <MenuItem
                                 icon="swap-horizontal"
-                                text={starterChooserOpen ? "Close report switcher" : "Switch report..."}
+                                text={starterChooserOpen ? "Close report presets" : "Switch report preset..."}
                                 onClick={toggleStarterChooser}
                             />
                             <MenuDivider />
@@ -15690,7 +16067,7 @@ export default function ReportBuilder({ container, context }) {
                                 aria-label="Change report starter"
                             >
                                 <div className="forge-report-builder__design-stage-description">
-                                    Pick another starter or a new report. Your current content stays as-is until you choose one.
+                                    Pick another report preset or start a new report. Your current content stays as-is until you choose one.
                                 </div>
                                 {renderTemplateChooser({ compact: true })}
                             </section>
@@ -17591,6 +17968,7 @@ export default function ReportBuilder({ container, context }) {
             return;
         }
         authoredPreviewAutoFetchKeyRef.current = autoRunAction.autoRunKey;
+        beginReportRunLifecycle({ reuseCurrent: true });
         if (autoRunAction.type === "dispatch") {
             dispatchReportRequest(currentBuilderStateRef.current || state, { forceFetch: true, markManual: true });
             return;
@@ -17600,6 +17978,7 @@ export default function ReportBuilder({ container, context }) {
     }, [
         authoredDocumentCompileValidation.valid,
         authoredPreviewAutoFetchKey,
+        beginReportRunLifecycle,
         canRunReport,
         currentPrefillSignature,
         currentRequestFingerprint,
@@ -17629,14 +18008,14 @@ export default function ReportBuilder({ container, context }) {
         })) {
             return;
         }
-        if (hostedReportId && hostedReportActivationState.status !== "ready") {
+        if (hostedActivationRequired && hostedReportActivationState.status !== "ready") {
             return;
         }
         if (!showAuthoredReportSurface || !canRunReport || loading || error || hasRows || hasCompletedCurrentRun) {
             return;
         }
         const authoredBlockCount = Array.isArray(state?.reportDocumentBlocks) ? state.reportDocumentBlocks.length : 0;
-        const executeIdentity = hostedReportId || normalizeString(state?.reportDocumentTemplateId);
+        const executeIdentity = hostedReportSource.id || normalizeString(state?.reportDocumentTemplateId);
         const executeRunKey = [
             executeIdentity,
             currentRequestFingerprint,
@@ -17649,8 +18028,14 @@ export default function ReportBuilder({ container, context }) {
             return;
         }
         executeOnOpenRunKeyRef.current = executeRunKey;
+        const activeRun = activeRunEventRef.current;
+        if (activeRun?.runId && activeRun?.fingerprint === currentRequestFingerprint) {
+            return;
+        }
+        beginReportRunLifecycle({ reuseCurrent: true });
         dispatchReportRequest(currentBuilderStateRef.current || state, { forceFetch: true, markManual: true });
     }, [
+        beginReportRunLifecycle,
         canRunReport,
         currentPrefillSignature,
         currentRequestFingerprint,
@@ -17660,8 +18045,9 @@ export default function ReportBuilder({ container, context }) {
         hasCompletedCurrentRun,
         hasRows,
         hostedExecuteOnOpen,
+        hostedActivationRequired,
         hostedReportActivationState.status,
-        hostedReportId,
+        hostedReportSource.id,
         loading,
         showAuthoredReportSurface,
         state,
@@ -17741,7 +18127,7 @@ export default function ReportBuilder({ container, context }) {
             <input
                 ref={importReportFileInputRef}
                 type="file"
-                accept=".json,application/json"
+                accept=".forge-report.json,.json,application/json"
                 aria-label="Import report file"
                 style={{ display: "none" }}
                 onChange={importLocalReportFile}
@@ -17793,7 +18179,7 @@ export default function ReportBuilder({ container, context }) {
                                         small
                                         intent="primary"
                                         icon="play"
-                                        className="forge-report-builder__run-button"
+                                        className="forge-report-builder__run-button forge-report-builder__action-button"
                                         disabled={!canRunReport || loading}
                                         onClick={runReport}
                                     >
@@ -17804,8 +18190,8 @@ export default function ReportBuilder({ container, context }) {
                                             <Button
                                                 small
                                                 intent={draftToolbarExportControlState.intent || "none"}
-                                                outlined={draftToolbarExportControlState.intent !== "success"}
                                                 icon={draftToolbarExportControlState.icon || "download"}
+                                                className="forge-report-builder__action-button"
                                                 loading={draftToolbarExportControlState.loading === true}
                                                 disabled={draftToolbarExportControlState.disabled === true}
                                                 onClick={draftToolbarExportControlState.onClick || undefined}
@@ -17820,6 +18206,7 @@ export default function ReportBuilder({ container, context }) {
                                                     small
                                                     outlined
                                                     icon="caret-down"
+                                                    className="forge-report-builder__action-menu-button"
                                                     aria-label="More export options"
                                                     disabled={!canOpenDraftExportMenu}
                                                 />
@@ -17832,8 +18219,8 @@ export default function ReportBuilder({ container, context }) {
                                         >
                                             <Button
                                                 small
-                                                outlined
                                                 icon="download"
+                                                className="forge-report-builder__action-button"
                                                 disabled={!canOpenDraftExportMenu}
                                             >
                                                 Export
@@ -18112,6 +18499,9 @@ export default function ReportBuilder({ container, context }) {
                                 {showAuthoredReportSurface ? renderSaveReportFileButton({
                                     className: "forge-report-builder__chart-action-button",
                                 }) : null}
+                                {showAuthoredReportSurface ? renderSaveAsReportButton({
+                                    className: "forge-report-builder__chart-action-button",
+                                }) : null}
                                 <div className="forge-report-builder__view-toggle">
                                     {desktopResultHeaderState.viewToggleModes.map((modeState) => (
                                         <button
@@ -18192,6 +18582,11 @@ export default function ReportBuilder({ container, context }) {
                                             minimal: true,
                                             outlined: false,
                                             disabled: false,
+                                        }) : null}
+                                        {explorationBannerState.canSaveArtifact ? renderSaveAsReportButton({
+                                            minimal: true,
+                                            outlined: false,
+                                            disabled: typeof reportStoreHandler?.saveReport !== "function",
                                         }) : null}
                                         <Button small minimal onClick={discardExploration}>Discard draft</Button>
                                     </div>

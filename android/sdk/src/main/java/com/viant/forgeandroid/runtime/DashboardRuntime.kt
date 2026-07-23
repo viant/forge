@@ -1,6 +1,8 @@
 package com.viant.forgeandroid.runtime
 
 import java.text.NumberFormat
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
 import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -34,6 +36,122 @@ data class DashboardGeoMapRow(
     val rank: Int? = null,
     val href: String? = null
 )
+
+data class DashboardGeoStateTile(
+    val key: String,
+    val label: String,
+    val column: Int,
+    val row: Int
+)
+
+data class DashboardGeoTileRegion(
+    val tile: DashboardGeoStateTile,
+    val value: DashboardGeoMapRow?,
+    val paletteIndex: Int?
+)
+
+val dashboardUSStateTiles = listOf(
+    DashboardGeoStateTile("AK", "Alaska", 1, 1),
+    DashboardGeoStateTile("ME", "Maine", 12, 1),
+    DashboardGeoStateTile("VT", "Vermont", 10, 2),
+    DashboardGeoStateTile("NH", "New Hampshire", 11, 2),
+    DashboardGeoStateTile("MA", "Massachusetts", 12, 2),
+    DashboardGeoStateTile("WA", "Washington", 1, 3),
+    DashboardGeoStateTile("ID", "Idaho", 2, 3),
+    DashboardGeoStateTile("MT", "Montana", 3, 3),
+    DashboardGeoStateTile("ND", "North Dakota", 4, 3),
+    DashboardGeoStateTile("MN", "Minnesota", 5, 3),
+    DashboardGeoStateTile("IL", "Illinois", 6, 3),
+    DashboardGeoStateTile("WI", "Wisconsin", 7, 3),
+    DashboardGeoStateTile("MI", "Michigan", 8, 3),
+    DashboardGeoStateTile("NY", "New York", 10, 3),
+    DashboardGeoStateTile("RI", "Rhode Island", 11, 3),
+    DashboardGeoStateTile("CT", "Connecticut", 12, 3),
+    DashboardGeoStateTile("OR", "Oregon", 1, 4),
+    DashboardGeoStateTile("NV", "Nevada", 2, 4),
+    DashboardGeoStateTile("WY", "Wyoming", 3, 4),
+    DashboardGeoStateTile("SD", "South Dakota", 4, 4),
+    DashboardGeoStateTile("IA", "Iowa", 5, 4),
+    DashboardGeoStateTile("IN", "Indiana", 6, 4),
+    DashboardGeoStateTile("OH", "Ohio", 7, 4),
+    DashboardGeoStateTile("PA", "Pennsylvania", 8, 4),
+    DashboardGeoStateTile("NJ", "New Jersey", 10, 4),
+    DashboardGeoStateTile("CA", "California", 1, 5),
+    DashboardGeoStateTile("UT", "Utah", 2, 5),
+    DashboardGeoStateTile("CO", "Colorado", 3, 5),
+    DashboardGeoStateTile("NE", "Nebraska", 4, 5),
+    DashboardGeoStateTile("MO", "Missouri", 5, 5),
+    DashboardGeoStateTile("KY", "Kentucky", 6, 5),
+    DashboardGeoStateTile("WV", "West Virginia", 7, 5),
+    DashboardGeoStateTile("VA", "Virginia", 8, 5),
+    DashboardGeoStateTile("MD", "Maryland", 9, 5),
+    DashboardGeoStateTile("DE", "Delaware", 10, 5),
+    DashboardGeoStateTile("AZ", "Arizona", 2, 6),
+    DashboardGeoStateTile("NM", "New Mexico", 3, 6),
+    DashboardGeoStateTile("KS", "Kansas", 4, 6),
+    DashboardGeoStateTile("AR", "Arkansas", 5, 6),
+    DashboardGeoStateTile("TN", "Tennessee", 6, 6),
+    DashboardGeoStateTile("NC", "North Carolina", 7, 6),
+    DashboardGeoStateTile("SC", "South Carolina", 8, 6),
+    DashboardGeoStateTile("DC", "District of Columbia", 9, 6),
+    DashboardGeoStateTile("HI", "Hawaii", 1, 7),
+    DashboardGeoStateTile("OK", "Oklahoma", 4, 7),
+    DashboardGeoStateTile("LA", "Louisiana", 5, 7),
+    DashboardGeoStateTile("MS", "Mississippi", 6, 7),
+    DashboardGeoStateTile("AL", "Alabama", 7, 7),
+    DashboardGeoStateTile("GA", "Georgia", 8, 7),
+    DashboardGeoStateTile("TX", "Texas", 4, 8),
+    DashboardGeoStateTile("FL", "Florida", 9, 8)
+)
+
+val dashboardDefaultGeoPalette = listOf(
+    "#d9f0ea",
+    "#9fd8ce",
+    "#55b9aa",
+    "#187f78",
+    "#0c4d52"
+)
+
+fun dashboardSupportsGeoShape(shape: String?): Boolean {
+    return shape?.trim()?.lowercase() in setOf("us-states", "us-state-tiles")
+}
+
+fun dashboardGeoPaletteIndex(
+    value: Double,
+    minimum: Double,
+    maximum: Double,
+    paletteSize: Int
+): Int {
+    if (paletteSize <= 1 || maximum <= minimum) {
+        return (paletteSize - 1).coerceAtLeast(0)
+    }
+    val ratio = ((value - minimum) / (maximum - minimum)).coerceIn(0.0, 1.0)
+    return kotlin.math.floor(ratio * paletteSize)
+        .toInt()
+        .coerceIn(0, paletteSize - 1)
+}
+
+fun dashboardGeoTileRegions(
+    rows: List<DashboardGeoMapRow>,
+    paletteSize: Int = dashboardDefaultGeoPalette.size
+): List<DashboardGeoTileRegion> {
+    val rowsByKey = rows
+        .sortedByDescending { it.value }
+        .associateBy { it.regionCode.trim().uppercase() }
+    val values = rowsByKey.values.map { it.value }.filter { it.isFinite() }
+    val minimum = values.minOrNull() ?: 0.0
+    val maximum = values.maxOrNull() ?: 0.0
+    return dashboardUSStateTiles.map { tile ->
+        val value = rowsByKey[tile.key]
+        DashboardGeoTileRegion(
+            tile = tile,
+            value = value,
+            paletteIndex = value?.takeIf { it.value.isFinite() }?.let {
+                dashboardGeoPaletteIndex(it.value, minimum, maximum, paletteSize)
+            }
+        )
+    }
+}
 
 data class DashboardDimensionRow(
     val entityKey: String?,
@@ -595,7 +713,7 @@ fun dashboardReportRuntimeGeoMap(
         rows = rankedDashboardGeoMapRows(
             rows = rows,
             metricKey = metricKey,
-            limit = null,
+            limit = Int.MAX_VALUE,
             regionKey = jsonString(geo["key"]),
             labelKey = jsonString(geo["labelKey"])
         )
@@ -1062,9 +1180,15 @@ fun dashboardReportRuntimeColumns(values: List<JsonElement>): List<ColumnDef> {
 }
 
 fun dashboardReportRuntimeKpi(content: Map<String, JsonElement>): DashboardReportRuntimeKpiValue {
-    val valueText = dashboardReportRuntimeValueText(content["value"])
+    val valueText = dashboardReportRuntimeFormattedValueText(
+        content["value"],
+        jsonString(content["valueFormat"])
+    )
     val secondaryField = jsonString(content["secondaryField"])
-    val secondaryValueText = dashboardReportRuntimeValueText(content["secondaryValue"])
+    val secondaryValueText = dashboardReportRuntimeFormattedValueText(
+        content["secondaryValue"],
+        jsonString(content["secondaryFormat"])
+    )
     return DashboardReportRuntimeKpiValue(
         description = jsonString(content["description"]),
         valueLabel = firstNonBlank(jsonString(content["valueLabel"]), jsonString(content["valueField"]), "Value") ?: "Value",
@@ -1083,6 +1207,19 @@ fun dashboardReportRuntimeValueText(value: JsonElement?): String? {
         is JsonObject -> value.toString()
         is JsonPrimitive -> JsonUtil.elementToAny(value)?.toString()
         else -> null
+    }
+}
+
+private fun dashboardReportRuntimeFormattedValueText(value: JsonElement?, format: String?): String? {
+    if (value == null || value == JsonNull) {
+        return null
+    }
+    if (format.isNullOrBlank()) {
+        return dashboardReportRuntimeValueText(value)
+    }
+    return when (value) {
+        is JsonPrimitive -> formatDashboardValue(JsonUtil.elementToAny(value), format)
+        else -> dashboardReportRuntimeValueText(value)
     }
 }
 
@@ -1431,10 +1568,27 @@ fun formatDashboardValue(value: Any?, format: String?): String {
             "${NumberFormat.getNumberInstance(locale).apply { minimumFractionDigits = 1; maximumFractionDigits = 1 }.format(it * 100)}%"
         } ?: value.toString()
         "integer" -> dashboardNumberValue(value)?.let { NumberFormat.getIntegerInstance(locale).format(it.toLong()) } ?: value.toString()
-        "compactnumber" -> dashboardNumberValue(value)?.let { formatCompactDashboardNumber(it, locale) } ?: value.toString()
-        "number" -> dashboardNumberValue(value)?.let { NumberFormat.getNumberInstance(locale).format(it) } ?: value.toString()
+        "compact", "compactnumber" -> dashboardNumberValue(value)?.let { formatCompactDashboardNumber(it, locale) } ?: value.toString()
+        "number" -> dashboardNumberValue(value)?.let { formatDashboardGroupedNumber(it, 0, 5) } ?: value.toString()
+        "number5" -> dashboardNumberValue(value)?.let { formatDashboardGroupedNumber(it, 5, 5) } ?: value.toString()
         else -> value.toString()
     }
+}
+
+private fun formatDashboardGroupedNumber(
+    value: Double,
+    minimumFractionDigits: Int,
+    maximumFractionDigits: Int
+): String {
+    val symbols = DecimalFormatSymbols(Locale.US).apply {
+        groupingSeparator = ' '
+        decimalSeparator = '.'
+    }
+    return DecimalFormat("#,##0.#####", symbols).apply {
+        isGroupingUsed = true
+        this.minimumFractionDigits = minimumFractionDigits
+        this.maximumFractionDigits = maximumFractionDigits
+    }.format(value)
 }
 
 private fun formatDashboardDateValue(value: Any?, pattern: String, locale: Locale): String {

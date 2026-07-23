@@ -3898,6 +3898,27 @@ final class ForgeIOSTests: XCTestCase {
         ])
     }
 
+    func testDashboardGeoTileRegionsMatchesSharedUSStateGeometryAndValueScale() {
+        let regions = dashboardGeoTileRegions(rows: [
+            DashboardGeoMapRow(regionCode: "ca", label: "California", value: 100),
+            DashboardGeoMapRow(regionCode: "TX", label: "Texas", value: 50),
+            DashboardGeoMapRow(regionCode: "NY", label: "New York", value: 0)
+        ])
+
+        XCTAssertEqual(regions.count, 51)
+        XCTAssertEqual(
+            regions.first { $0.tile.key == "CA" }?.tile,
+            DashboardGeoStateTile(key: "CA", label: "California", column: 1, row: 5)
+        )
+        XCTAssertEqual(regions.first { $0.tile.key == "CA" }?.paletteIndex, 4)
+        XCTAssertEqual(regions.first { $0.tile.key == "TX" }?.paletteIndex, 2)
+        XCTAssertEqual(regions.first { $0.tile.key == "NY" }?.paletteIndex, 0)
+        XCTAssertNil(regions.first { $0.tile.key == "WA" }?.paletteIndex)
+        XCTAssertTrue(dashboardSupportsGeoShape("us-states"))
+        XCTAssertTrue(dashboardSupportsGeoShape("US-STATE-TILES"))
+        XCTAssertFalse(dashboardSupportsGeoShape("world"))
+    }
+
     func testDashboardSelectionPayloadKeepsPrimitiveRowValuesOnly() {
         let payload = DashboardRuntime.dashboardSelectionPayload(from: [
             "region": .string("NA"),
@@ -3951,13 +3972,29 @@ final class ForgeIOSTests: XCTestCase {
     func testFormatDashboardValueSupportsCommonFormats() {
         XCTAssertEqual(DashboardRuntime.formatDashboardValue(42, format: "integer"), "42")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue(1250.0, format: "compactNumber"), "1.2K")
+        XCTAssertEqual(DashboardRuntime.formatDashboardValue(1250.0, format: "compact"), "1.2K")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue("1250", format: "compactNumber"), "1.2K")
+        XCTAssertEqual(DashboardRuntime.formatDashboardValue(126_329_231_621, format: "number"), "126 329 231 621")
+        XCTAssertEqual(DashboardRuntime.formatDashboardValue(95.000000409, format: "number5"), "95.00000")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue(JSONPrimitive.string("0.1937"), format: "percentFraction"), "19.4%")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue(nil, format: "number"), "n/a")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue("2026-05-01T04:00:00Z", format: "date"), "May 1, 2026")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue("2026-05-01T04:00:00Z", format: "dateTime"), "May 1, 2026, 4:00 AM")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue("2026-05-13T00:00:00Z", format: "wallClockHour"), "12 AM")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue("2026-05-13T00:00:00Z", format: "wallClockDate"), "May 13, 2026")
+    }
+
+    func testDashboardReportRuntimeKPIHonorsAuthoredNumberFormat() {
+        let value = DashboardRuntime.dashboardReportRuntimeKPI(content: [
+            "value": .number(126_329_231_621),
+            "valueFormat": .string("number"),
+            "secondaryField": .string("clearingPrice"),
+            "secondaryValue": .number(95.000000409),
+            "secondaryFormat": .string("number5")
+        ])
+
+        XCTAssertEqual(value.valueText, "126 329 231 621")
+        XCTAssertEqual(value.secondaryValueText, "95.00000")
     }
 
     // MARK: - Execution handler tests

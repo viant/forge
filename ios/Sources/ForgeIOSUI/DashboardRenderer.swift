@@ -12,6 +12,7 @@ public struct DashboardRenderer: View {
     @State private var dashboardSelection = DashboardSelectionState()
     @State private var dashboardCollections: [String: [[String: JSONValue]]] = [:]
     @State private var dashboardDimensionsModes: [String: String] = [:]
+    @State private var reportRuntimeTabSelections: [String: String] = [:]
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef) {
         self.runtime = runtime
@@ -620,41 +621,18 @@ public struct DashboardRenderer: View {
                     .background(Capsule().fill(Color.secondary.opacity(0.08)))
             }
             if rows.isEmpty {
-                Text("No regional rows available. Mobile renders geo maps as a compact summary until map geometry is available.")
+                Text("No regional rows available.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(rows) { row in
-                        HStack(spacing: 10) {
-                            Text(row.rank.map { "#\($0)" } ?? row.regionCode)
-                                .font(.caption.monospacedDigit().weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 42, alignment: .leading)
-                            VStack(alignment: .leading, spacing: 2) {
-                                geoMapRowLabel(row)
-                                if row.label != row.regionCode {
-                                    Text(row.regionCode)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer()
-                            Text(DashboardRuntime.formatDashboardValue(row.value, format: container.metric?.format))
-                                .font(.subheadline.monospacedDigit().weight(.semibold))
-                                .foregroundStyle(toneColor(row.tone))
-                        }
-                        .padding(.vertical, 7)
-                        .padding(.horizontal, 10)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(toneBackground(row.tone)))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(toneBorder(row.tone), lineWidth: 1))
-                    }
-                    Text("Map geometry is not available in this native renderer; showing ranked regional fallback rows.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                DashboardGeoTileMapView(
+                    shape: container.geo?.objectValue?["shape"]?.stringValue ?? "us-states",
+                    rows: rows,
+                    metricLabel: metricLabel,
+                    metricFormat: container.metric?.format,
+                    rankingLimit: container.limit ?? 5
+                )
             }
         }
     }
@@ -682,30 +660,8 @@ public struct DashboardRenderer: View {
         return DashboardRuntime.rankedDashboardGeoMapRows(
             selectedRows,
             metricKey: container.metric?.key,
-            limit: container.limit
+            limit: .max
         )
-    }
-
-    @ViewBuilder
-    private func geoMapRowLabel(_ row: DashboardGeoMapRow) -> some View {
-        if let url = geoMapURL(row.href) {
-            Link(destination: url) {
-                Text(row.label)
-                    .font(.subheadline.weight(.medium))
-                    .underline()
-            }
-        } else {
-            Text(row.label)
-                .font(.subheadline.weight(.medium))
-        }
-    }
-
-    private func geoMapURL(_ href: String?) -> URL? {
-        let trimmed = href?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !trimmed.isEmpty else {
-            return nil
-        }
-        return URL(string: trimmed)
     }
 
     private func dimensionsBlock(
@@ -1123,6 +1079,7 @@ public struct DashboardRenderer: View {
     @ViewBuilder
     private func reportRuntimeBlock(_ container: ContainerDef) -> some View {
         let summary = DashboardRuntime.dashboardReportRuntimeSummary(container)
+        let nestedBlockIDs = reportRuntimeNestedTabBlockIDs(summary.blocks)
         VStack(alignment: .leading, spacing: 8) {
             Text(summary.title ?? container.title ?? "Report runtime")
                 .font(.body.weight(.semibold))
@@ -1138,14 +1095,18 @@ public struct DashboardRenderer: View {
             if !summaryDiagnostics.isEmpty {
                 reportRuntimeDiagnosticsPreview(summaryDiagnostics)
             }
-            ForEach(summary.blocks) { block in
+            ForEach(summary.blocks.filter { !nestedBlockIDs.contains($0.id) }) { block in
                 if DashboardRuntime.dashboardReportRuntimeBlockVisible(
                     block,
                     metrics: reportRuntimeBlockMetrics(block),
                     filters: dashboardFilters.mapValues(dashboardJSONAny),
                     selection: dashboardSelection
                 ) {
-                    reportRuntimeAuthoredBlock(block)
+                    if block.kind == "tabGroupBlock" {
+                        reportRuntimeTabGroup(block, blocks: summary.blocks)
+                    } else {
+                        reportRuntimeAuthoredBlock(block)
+                    }
                 }
             }
         }
@@ -1164,6 +1125,102 @@ public struct DashboardRenderer: View {
     private func reportRuntimeBlockMetrics(_ block: DashboardReportRuntimeBlockSummary) -> [String: Any] {
         let row = block.table?.rows.first ?? block.chart?.rows.first ?? [:]
         return row.mapValues(dashboardJSONAny)
+    }
+
+    private func reportRuntimeNestedTabBlockIDs(
+        _ blocks: [DashboardReportRuntimeBlockSummary]
+    ) -> Set<String> {
+        let blockByID = Dictionary(uniqueKeysWithValues: blocks.map { ($0.id, $0) })
+        let sectionIDs = blocks
+            .filter { $0.kind == "tabGroupBlock" }
+            .flatMap { reportRuntimeReferenceIDs($0.content, keys: ["sectionIds", "sections"]) }
+        let childIDs = sectionIDs.compactMap { blockByID[$0] }.flatMap {
+            reportRuntimeReferenceIDs($0.content, keys: ["childBlockIds", "blockIds", "children"])
+        }
+        return Set(sectionIDs + childIDs)
+    }
+
+    @ViewBuilder
+    private func reportRuntimeTabGroup(
+        _ tabGroup: DashboardReportRuntimeBlockSummary,
+        blocks: [DashboardReportRuntimeBlockSummary]
+    ) -> some View {
+        let blockByID = Dictionary(uniqueKeysWithValues: blocks.map { ($0.id, $0) })
+        let sectionIDs = reportRuntimeReferenceIDs(tabGroup.content, keys: ["sectionIds", "sections"])
+        let sections = sectionIDs.compactMap { blockByID[$0] }
+        let selectedID = reportRuntimeTabSelections[tabGroup.id]
+            .flatMap { selected in sections.contains(where: { $0.id == selected }) ? selected : nil }
+            ?? sections.first?.id
+
+        if sections.isEmpty {
+            reportRuntimeAuthoredBlock(tabGroup)
+        } else if let selectedID,
+                  let selectedSection = blockByID[selectedID] {
+            VStack(alignment: .leading, spacing: 8) {
+                if sections.count <= 4 {
+                    Picker(
+                        tabGroup.title,
+                        selection: Binding(
+                            get: { selectedID },
+                            set: { reportRuntimeTabSelections[tabGroup.id] = $0 }
+                        )
+                    ) {
+                        ForEach(sections) { section in
+                            Text(section.title).tag(section.id)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .accessibilityLabel(tabGroup.title)
+                } else {
+                    Picker(
+                        tabGroup.title,
+                        selection: Binding(
+                            get: { selectedID },
+                            set: { reportRuntimeTabSelections[tabGroup.id] = $0 }
+                        )
+                    ) {
+                        ForEach(sections) { section in
+                            Text(section.title).tag(section.id)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+
+                reportRuntimeAuthoredBlock(selectedSection)
+
+                let childIDs = reportRuntimeReferenceIDs(
+                    selectedSection.content,
+                    keys: ["childBlockIds", "blockIds", "children"]
+                )
+                ForEach(childIDs.compactMap { blockByID[$0] }) { child in
+                    if DashboardRuntime.dashboardReportRuntimeBlockVisible(
+                        child,
+                        metrics: reportRuntimeBlockMetrics(child),
+                        filters: dashboardFilters.mapValues(dashboardJSONAny),
+                        selection: dashboardSelection
+                    ) {
+                        reportRuntimeAuthoredBlock(child)
+                    }
+                }
+            }
+        }
+    }
+
+    private func reportRuntimeReferenceIDs(
+        _ content: [String: JSONValue],
+        keys: [String]
+    ) -> [String] {
+        for key in keys {
+            guard let values = content[key]?.arrayValue else { continue }
+            let ids = values.compactMap { value in
+                value.stringValue ?? value.objectValue?["id"]?.stringValue
+            }.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            if !ids.isEmpty {
+                return ids
+            }
+        }
+        return []
     }
 
     @ViewBuilder
@@ -1591,28 +1648,12 @@ public struct DashboardRenderer: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                ForEach(geoMap.rows.prefix(5)) { row in
-                    HStack(spacing: 8) {
-                        Text(row.rank.map { "#\($0)" } ?? row.regionCode)
-                            .font(.caption2.monospacedDigit().weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 36, alignment: .leading)
-                        Text(row.label)
-                            .font(.caption.weight(.medium))
-                            .lineLimit(1)
-                        Spacer()
-                        Text(DashboardRuntime.formatDashboardValue(row.value, format: geoMap.metricFormat))
-                            .font(.caption.monospacedDigit().weight(.semibold))
-                    }
-                    .padding(.vertical, 5)
-                    .padding(.horizontal, 8)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(toneBackground(row.tone)))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(toneBorder(row.tone), lineWidth: 1))
-                }
-                Text("Map geometry is not available in this native renderer; showing ranked regional fallback rows.")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                DashboardGeoTileMapView(
+                    shape: geoMap.shape,
+                    rows: geoMap.rows,
+                    metricLabel: geoMap.metricLabel,
+                    metricFormat: geoMap.metricFormat
+                )
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -2276,6 +2317,188 @@ private struct DashboardSummaryCard {
     let label: String
     let displayValue: String
     let tone: DashboardCardTone
+}
+
+private struct DashboardGeoTileMapView: View {
+    let shape: String
+    let rows: [DashboardGeoMapRow]
+    let metricLabel: String
+    let metricFormat: String?
+    let rankingLimit: Int
+
+    @State private var selectedKey: String?
+
+    init(
+        shape: String,
+        rows: [DashboardGeoMapRow],
+        metricLabel: String,
+        metricFormat: String?,
+        rankingLimit: Int = 5
+    ) {
+        self.shape = shape
+        self.rows = rows
+        self.metricLabel = metricLabel
+        self.metricFormat = metricFormat
+        self.rankingLimit = rankingLimit
+        _selectedKey = State(initialValue: rows.max { $0.value < $1.value }?.regionCode.uppercased())
+    }
+
+    private var regions: [DashboardGeoTileRegion] {
+        dashboardGeoTileRegions(rows: rows)
+    }
+
+    private var rankedRows: [DashboardGeoMapRow] {
+        Array(rows.sorted { $0.value > $1.value }.prefix(max(rankingLimit, 0)))
+    }
+
+    private var selected: DashboardGeoMapRow? {
+        rows.first {
+            $0.regionCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() == selectedKey
+        } ?? rankedRows.first
+    }
+
+    private var displayFormat: String {
+        let normalized = metricFormat?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return normalized.isEmpty ? "compactnumber" : normalized
+    }
+
+    var body: some View {
+        if !dashboardSupportsGeoShape(shape) {
+            Text("Unsupported geo shape: \(shape)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("\(rows.count) regions")
+                    Spacer()
+                    Text("Total \(DashboardRuntime.formatDashboardValue(rows.reduce(0) { $0 + $1.value }, format: displayFormat))")
+                    Spacer()
+                    Text("Top \(rankedRows.first?.regionCode ?? "-")")
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+                Grid(horizontalSpacing: 3, verticalSpacing: 3) {
+                    ForEach(1...8, id: \.self) { rowIndex in
+                        GridRow {
+                            ForEach(1...12, id: \.self) { columnIndex in
+                                if let region = regions.first(where: {
+                                    $0.tile.row == rowIndex && $0.tile.column == columnIndex
+                                }) {
+                                    Button {
+                                        selectedKey = region.tile.key
+                                    } label: {
+                                        Text(region.tile.key)
+                                            .font(.system(size: 8, weight: .bold, design: .rounded))
+                                            .foregroundStyle((region.paletteIndex ?? 0) >= 3 ? Color.white : Color(red: 0.06, green: 0.16, blue: 0.26))
+                                            .frame(maxWidth: .infinity)
+                                            .aspectRatio(1, contentMode: .fit)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 5)
+                                                    .fill(dashboardGeoColor(region.paletteIndex))
+                                            )
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 5)
+                                                    .stroke(
+                                                        region.tile.key == selectedKey ? Color(red: 0.06, green: 0.09, blue: 0.16) : Color(red: 0.82, green: 0.84, blue: 0.87),
+                                                        lineWidth: region.tile.key == selectedKey ? 2 : 1
+                                                    )
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(region.value == nil)
+                                } else {
+                                    Color.clear
+                                        .frame(maxWidth: .infinity)
+                                        .aspectRatio(1, contentMode: .fit)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HStack(spacing: 4) {
+                    Text("Low")
+                    ForEach(Array(dashboardDefaultGeoPalette.enumerated()), id: \.offset) { _, color in
+                        Capsule()
+                            .fill(dashboardGeoColor(color))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 8)
+                    }
+                    Text("High")
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+
+                if let selected {
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            if let href = selected.href, let url = URL(string: href) {
+                                Link("\(selected.label) (\(selected.regionCode.uppercased()))", destination: url)
+                                    .font(.caption.weight(.semibold))
+                            } else {
+                                Text("\(selected.label) (\(selected.regionCode.uppercased()))")
+                                    .font(.caption.weight(.semibold))
+                            }
+                            Text(metricLabel)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text(DashboardRuntime.formatDashboardValue(selected.value, format: displayFormat))
+                            .font(.caption.monospacedDigit().weight(.semibold))
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color(red: 0.98, green: 0.99, blue: 1)))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(red: 0.85, green: 0.88, blue: 0.91), lineWidth: 1))
+                }
+
+                ForEach(rankedRows) { row in
+                    HStack(spacing: 8) {
+                        Text(row.regionCode.uppercased())
+                            .font(.caption2.weight(.semibold))
+                            .frame(width: 28, alignment: .leading)
+                        GeometryReader { proxy in
+                            let maximum = max(rankedRows.first?.value ?? 1, 1)
+                            let fraction = max(min(row.value / maximum, 1), 0.04)
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color(red: 0.93, green: 0.95, blue: 0.97))
+                                Capsule()
+                                    .fill(Color(red: 0.09, green: 0.50, blue: 0.47))
+                                    .frame(width: proxy.size.width * fraction)
+                            }
+                        }
+                        .frame(height: 8)
+                        Text(DashboardRuntime.formatDashboardValue(row.value, format: displayFormat))
+                            .font(.caption2.monospacedDigit())
+                            .frame(minWidth: 72, alignment: .trailing)
+                    }
+                }
+            }
+        }
+    }
+
+    private func dashboardGeoColor(_ paletteIndex: Int?) -> Color {
+        guard let paletteIndex,
+              dashboardDefaultGeoPalette.indices.contains(paletteIndex) else {
+            return Color(red: 0.93, green: 0.95, blue: 0.97)
+        }
+        return dashboardGeoColor(dashboardDefaultGeoPalette[paletteIndex])
+    }
+
+    private func dashboardGeoColor(_ value: String) -> Color {
+        let normalized = value.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        guard normalized.count == 6, let raw = UInt64(normalized, radix: 16) else {
+            return Color(red: 0.93, green: 0.95, blue: 0.97)
+        }
+        return Color(
+            red: Double((raw >> 16) & 0xff) / 255,
+            green: Double((raw >> 8) & 0xff) / 255,
+            blue: Double(raw & 0xff) / 255
+        )
+    }
 }
 
 private extension JSONValue {

@@ -1641,6 +1641,27 @@ assert.deepEqual(buildReportBuilderDocumentBlockDiagnostics([
 
 assert.deepEqual(buildReportBuilderDocumentBlockDiagnostics([
     {
+        id: "findings",
+        kind: "collectionBlock",
+        title: "Actionable findings",
+        datasetRef: "primary",
+    },
+], {
+    secondaryFieldOptions: [{ value: "title", label: "Title" }],
+}), [
+    {
+        id: "documentBlockCollectionTitleFieldMissing:findings",
+        code: "documentBlockCollectionTitleFieldMissing",
+        severity: "error",
+        blockId: "findings",
+        path: "reportDocument.blocks.findings.itemTitleField",
+        message: "Actionable findings does not define a collection title field.",
+        suggestedFix: "Edit the collection block and select a title field for each repeated item.",
+    },
+]);
+
+assert.deepEqual(buildReportBuilderDocumentBlockDiagnostics([
+    {
         id: "statusPills",
         kind: "badgesBlock",
         title: "Status Pills",

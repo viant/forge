@@ -9,6 +9,18 @@ function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
+export function findReportBuilderStarterTemplate(reference = "", availableTemplates = []) {
+    const normalizedReference = normalizeString(reference).toLowerCase();
+    if (!normalizedReference) {
+        return null;
+    }
+    return (Array.isArray(availableTemplates) ? availableTemplates : [])
+        .find((template) => (
+            normalizeString(template?.id).toLowerCase() === normalizedReference
+            || normalizeString(template?.label).toLowerCase() === normalizedReference
+        )) || null;
+}
+
 export function buildReportBuilderStarterAppliedState(state = {}) {
     const baseState = cloneValue(state && typeof state === "object" && !Array.isArray(state) ? state : {});
     delete baseState.explorationSession;
@@ -25,10 +37,12 @@ export function resolveAutoAppliedReportStarterId({
     currentTemplateId = "",
     authoredBlockCount = 0,
     availableTemplateIds = [],
+    availableTemplates = [],
 } = {}) {
     const explicitStarterId = normalizeString(requestedReportStarterId);
     if (explicitStarterId) {
-        return explicitStarterId;
+        const matchedTemplate = findReportBuilderStarterTemplate(explicitStarterId, availableTemplates);
+        return normalizeString(matchedTemplate?.id) || explicitStarterId;
     }
     if (!hasPrefill) {
         return "";

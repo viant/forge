@@ -3950,14 +3950,13 @@
 
 .forge-report-builder__design-mode-control {
     flex: 0 0 auto;
-    color: #4b5d73;
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.02em;
 }
 
 .forge-report-builder__design-mode-control[aria-pressed="true"] {
-    color: #17345d;
+    color: #ffffff;
 }
 
 .forge-report-builder__view-toggle {
@@ -4054,37 +4053,89 @@
     color: #ffffff;
 }
 
+.forge-report-builder__toolbar .forge-report-builder__action-button.bp6-button,
+.forge-report-builder__toolbar .forge-report-builder__action-button.bp5-button,
+.forge-report-builder__toolbar .forge-report-builder__run-button.bp6-button,
+.forge-report-builder__action-button.bp6-button,
+.forge-report-builder__action-button.bp5-button,
 .forge-report-builder__run-button.bp6-button {
     min-height: 30px;
     padding: 0 12px;
     border-radius: 10px;
     font-size: 11px;
     font-weight: 800;
-    background: linear-gradient(180deg, #f2a23a 0%, #e18814 100%);
-    border-color: #d07a12;
+    background: linear-gradient(135deg, #159667 0%, #0f7652 100%);
+    border-color: #147d57;
     color: #ffffff;
-    box-shadow: 0 8px 18px rgba(225, 136, 20, 0.22);
+    box-shadow: 0 7px 16px rgba(15, 118, 82, 0.2);
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    letter-spacing: 0.01em;
 }
 
+.forge-report-builder__toolbar .forge-report-builder__action-button.bp6-button .bp6-icon,
+.forge-report-builder__toolbar .forge-report-builder__action-button.bp5-button .bp5-icon,
+.forge-report-builder__toolbar .forge-report-builder__run-button.bp6-button .bp6-icon,
+.forge-report-builder__action-button.bp6-button .bp6-icon,
+.forge-report-builder__action-button.bp5-button .bp5-icon,
 .forge-report-builder__run-button.bp6-button .bp6-icon {
     margin-right: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.16);
+    padding: 2px;
 }
 
-.forge-report-builder__run-button.bp6-button:hover,
-.forge-report-builder__run-button.bp6-button:focus-visible {
-    background: linear-gradient(180deg, #f6ab4a 0%, #cf780e 100%);
-    border-color: #c06d0b;
+.forge-report-builder__toolbar .forge-report-builder__action-button.bp6-button:not(:disabled):hover,
+.forge-report-builder__toolbar .forge-report-builder__action-button.bp6-button:not(:disabled):focus-visible,
+.forge-report-builder__toolbar .forge-report-builder__action-button.bp5-button:not(:disabled):hover,
+.forge-report-builder__toolbar .forge-report-builder__action-button.bp5-button:not(:disabled):focus-visible,
+.forge-report-builder__toolbar .forge-report-builder__run-button.bp6-button:not(:disabled):hover,
+.forge-report-builder__toolbar .forge-report-builder__run-button.bp6-button:not(:disabled):focus-visible,
+.forge-report-builder__action-button.bp6-button:not(:disabled):hover,
+.forge-report-builder__action-button.bp6-button:not(:disabled):focus-visible,
+.forge-report-builder__action-button.bp5-button:not(:disabled):hover,
+.forge-report-builder__action-button.bp5-button:not(:disabled):focus-visible,
+.forge-report-builder__run-button.bp6-button:not(:disabled):hover,
+.forge-report-builder__run-button.bp6-button:not(:disabled):focus-visible {
+    background: linear-gradient(135deg, #18a875 0%, #11835c 100%);
+    border-color: #147d57;
+    box-shadow: 0 9px 20px rgba(15, 118, 82, 0.27);
+    transform: translateY(-1px);
 }
 
+.forge-report-builder__toolbar .forge-report-builder__action-button.bp6-button.bp6-disabled,
+.forge-report-builder__toolbar .forge-report-builder__action-button.bp6-button[disabled],
+.forge-report-builder__toolbar .forge-report-builder__action-button.bp5-button.bp5-disabled,
+.forge-report-builder__toolbar .forge-report-builder__action-button.bp5-button[disabled],
+.forge-report-builder__toolbar .forge-report-builder__run-button.bp6-button.bp6-disabled,
+.forge-report-builder__toolbar .forge-report-builder__run-button.bp6-button[disabled],
+.forge-report-builder__action-button.bp6-button.bp6-disabled,
+.forge-report-builder__action-button.bp6-button[disabled],
+.forge-report-builder__action-button.bp5-button.bp5-disabled,
+.forge-report-builder__action-button.bp5-button[disabled],
 .forge-report-builder__run-button.bp6-button.bp6-disabled,
 .forge-report-builder__run-button.bp6-button[disabled] {
     background: linear-gradient(180deg, #d7dee5 0%, #cfd8e1 100%);
     border-color: #cfd8e1;
     color: #7b8a9b;
     box-shadow: none;
+}
+
+.forge-report-builder__action-menu-button.bp6-button,
+.forge-report-builder__action-menu-button.bp5-button {
+    min-height: 30px;
+    min-width: 30px;
+    border: 1px solid #a8d8c3;
+    border-radius: 10px;
+    background: #f0fbf6;
+    color: #0d6848;
+}
+
+.forge-report-builder__action-menu-button.bp6-button:not(:disabled):hover,
+.forge-report-builder__action-menu-button.bp5-button:not(:disabled):hover {
+    border-color: #75bd9d;
+    background: #e5f7ee;
 }
 
 .forge-report-builder__result-frame {

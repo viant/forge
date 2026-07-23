@@ -670,6 +670,12 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             axis: "left",
             color: palette[index % Math.max(palette.length, 1)] || "#137cbd",
         }));
+    const renderableSeriesDefinitions = selectedSeriesDefinitions.filter((entry) => (
+        chartData.some((row) => {
+            const value = readChartDataValue(row, entry.value);
+            return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+        })
+    ));
 
     const emitDatumSelection = React.useCallback((event) => {
         if (!interactiveDatumSelection) {
@@ -772,27 +778,30 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const denseChartData = fillMissingTemporalBuckets(
         chartData,
         xAxis?.dataKey || "name",
-        selectedSeriesDefinitions,
+        renderableSeriesDefinitions,
         chart?.fillMissingTemporalBuckets,
     );
 
     const normalizedChartData = (isHorizontalBar
         ? [...denseChartData].sort((a, b) => {
-            const primaryKey = selectedSeriesDefinitions[0]?.value;
+            const primaryKey = renderableSeriesDefinitions[0]?.value;
             return Number(b?.[primaryKey] || 0) - Number(a?.[primaryKey] || 0);
         })
         : denseChartData
     ).map((row) => ({
         ...row,
-        __seriesFormats: Object.fromEntries(selectedSeriesDefinitions.map((entry) => [entry.value, entry.format || leftAxis.format])),
-        __seriesAxes: Object.fromEntries(selectedSeriesDefinitions.map((entry) => [entry.value, entry.axis === "right" ? rightAxis?.format : leftAxis.format])),
+        __seriesFormats: Object.fromEntries(renderableSeriesDefinitions.map((entry) => [entry.value, entry.format || leftAxis.format])),
+        __seriesAxes: Object.fromEntries(renderableSeriesDefinitions.map((entry) => [entry.value, entry.axis === "right" ? rightAxis?.format : leftAxis.format])),
     }));
 
     const resolvedChartAnnotations = React.useMemo(() => (
         buildRuntimeChartAnnotationElements(normalizeChartAnnotations(chart), { embedded })
     ), [chart, embedded]);
 
-    const cartesianSeriesElements = selectedSeriesDefinitions.map((entry) => {
+    const cartesianSeriesElements = renderableSeriesDefinitions.map((entry, seriesIndex) => {
+        const defaultLineDash = renderableSeriesDefinitions.length > 1 && (entry.type === "line" || entry.type === "area")
+            ? [undefined, "8 4", "3 3", "10 3 2 3"][seriesIndex % 4]
+            : undefined;
         const commonProps = {
             dataKey: entry.value,
             name: entry.name || entry.label,
@@ -800,7 +809,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             stroke: entry.color,
             fill: entry.color,
             strokeWidth: entry.strokeWidth || (embedded ? 3 : 2),
-            strokeDasharray: entry.strokeDasharray,
+            strokeDasharray: entry.strokeDasharray || defaultLineDash,
             fillOpacity: entry.fillOpacity ?? (entry.type === "area" ? 0.22 : 1),
             opacity: entry.opacity,
         };

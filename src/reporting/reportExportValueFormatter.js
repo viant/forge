@@ -58,47 +58,51 @@ export function formatExportNumericValue(value, format = "", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }).format(numeric);
+    case "compact":
     case "compactnumber":
-      if (axis) {
+      {
         const absolute = Math.abs(numeric);
-        if (absolute >= 1_000_000) {
-          return `${(numeric / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
-        }
-        if (absolute >= 1_000) {
-          return `${(numeric / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+        const compactUnits = [
+          [1_000_000_000_000, "T"],
+          [1_000_000_000, "B"],
+          [1_000_000, "M"],
+          [1_000, "K"],
+        ];
+        const match = compactUnits.find(([threshold]) => absolute >= threshold);
+        if (match) {
+          const [threshold, suffix] = match;
+          const precision = axis ? 1 : (absolute / threshold >= 100 ? 0 : 2);
+          return `${(numeric / threshold).toFixed(precision).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1")}${suffix}`;
         }
       }
       return formatGroupedNumberWithSpaces(numeric, {
-        minimumFractionDigits: Number.isInteger(numeric) ? 0 : 5,
-        maximumFractionDigits: Number.isInteger(numeric) ? 0 : 5,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
       });
     case "percent":
       return `${numeric.toFixed(1)}%`;
     case "percentfraction":
       return `${(numeric * 100).toFixed(1)}%`;
     case "number":
-    case "":
-      if (axis) {
-        if (Number.isInteger(numeric)) {
-          return new Intl.NumberFormat("en-US", {
-            maximumFractionDigits: 0,
-            useGrouping: true,
-          }).format(numeric);
-        }
-        return new Intl.NumberFormat("en-US", {
-          maximumFractionDigits: 1,
-          useGrouping: true,
-        }).format(numeric);
-      }
-      return new Intl.NumberFormat("en-US", {
+      return formatGroupedNumberWithSpaces(numeric, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: axis ? (Number.isInteger(numeric) ? 0 : 1) : 5,
+      });
+    case "number5":
+      return formatGroupedNumberWithSpaces(numeric, {
         minimumFractionDigits: 5,
         maximumFractionDigits: 5,
+      });
+    case "":
+      return new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
         useGrouping: true,
       }).format(numeric);
     default:
       return new Intl.NumberFormat("en-US", {
-        minimumFractionDigits: 5,
-        maximumFractionDigits: 5,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
         useGrouping: true,
       }).format(numeric);
   }

@@ -1443,11 +1443,21 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
   );
 }
 
-function CollectionBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false }) {
+function CollectionBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, theme = {} }) {
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
-  const invalidDiagnostic = (Array.isArray(diagnostics) ? diagnostics : [])
+  const configurationDiagnostic = normalizeString(block?.itemTitleField) ? null : {
+    code: "documentBlockCollectionTitleFieldMissing",
+    severity: "error",
+    blockId: normalizeString(block?.id),
+    message: `${normalizeString(block?.title || content?.title || "Collection")} does not define a collection title field.`,
+    suggestedFix: "Edit the collection block and select a title field for each repeated item.",
+  };
+  const effectiveDiagnostics = configurationDiagnostic
+    ? [...(Array.isArray(diagnostics) ? diagnostics : []), configurationDiagnostic]
+    : (Array.isArray(diagnostics) ? diagnostics : []);
+  const invalidDiagnostic = effectiveDiagnostics
     .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
     || null;
   const items = (Array.isArray(content?.items) ? content.items : [])
@@ -1460,7 +1470,7 @@ function CollectionBlock({ block = {}, diagnostics = [], locale = "en-US", onRet
       title={normalizeString(block?.title || content?.title || "Collection")}
       subtitle={normalizeString(content?.description)}
     >
-      <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
+      <BlockDiagnosticsCallout diagnostics={effectiveDiagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
       {invalidDiagnostic ? (
         <BlockErrorCallout diagnostic={invalidDiagnostic} />
       ) : items.length === 0 ? (
@@ -1480,20 +1490,32 @@ function CollectionBlock({ block = {}, diagnostics = [], locale = "en-US", onRet
             const valueLabel = normalizeString(item?.valueLabel || item?.valueField || "");
             const secondaryLabel = normalizeString(item?.secondaryLabel || item?.secondaryField || "");
             const bodyMarkdown = String(item?.bodyMarkdown || "");
+            const toneStyles = resolveRuntimeBadgeToneStyles(item?.tone, theme);
+            const backgroundColor = normalizeString(item?.backgroundColor) || toneStyles.background;
+            const borderColor = normalizeString(item?.borderColor) || toneStyles.border;
+            const textColor = normalizeString(item?.textColor) || toneStyles.color;
             return (
               <div
                 key={normalizeString(item?.id || title || `item_${index + 1}`)}
                 style={{
-                  border: "1px solid #dbe5ec",
+                  border: `1px solid ${borderColor || "#dbe5ec"}`,
+                  borderLeft: `4px solid ${textColor || borderColor || "#dbe5ec"}`,
                   borderRadius: 12,
-                  background: "#fff",
+                  background: backgroundColor || "#fff",
                   padding: 12,
                   display: "flex",
                   flexDirection: "column",
                   gap: 8,
                 }}
               >
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#182026" }}>{title}</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: textColor || "#182026" }}>{title}</div>
+                  {normalizeString(item?.toneLabel) ? (
+                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: textColor || "#30404d" }}>
+                      {normalizeString(item.toneLabel)}
+                    </span>
+                  ) : null}
+                </div>
                 {valueLabel ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#5f6b7c" }}>
@@ -2862,7 +2884,7 @@ export default function ReportRuntime({
     }
     if (kind === "collectionBlock") {
       const dataset = datasetIndex.get(resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef) || null;
-      return <CollectionBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)} locale={locale} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
+      return <CollectionBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)} locale={locale} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} theme={runtimeTheme} />;
     }
     if (kind === "filterBarBlock") {
       const normalizedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;

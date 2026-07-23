@@ -78,6 +78,7 @@ export function normalizeReportTableCellVisual(cellVisual = {}) {
   const next = {
     kind,
     ...(normalizeString(cellVisual.valueField) ? { valueField: normalizeString(cellVisual.valueField) } : {}),
+    ...(normalizeString(cellVisual.colorField) ? { colorField: normalizeString(cellVisual.colorField) } : {}),
     ...(normalizeRange(cellVisual.range) ? { range: normalizeRange(cellVisual.range) } : {}),
     ...(normalizeStringArray(cellVisual.palette).length > 0 ? { palette: normalizeStringArray(cellVisual.palette) } : {}),
     ...(normalizeSegments(cellVisual.segments).length > 0 ? { segments: normalizeSegments(cellVisual.segments) } : {}),

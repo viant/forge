@@ -675,7 +675,9 @@ type Dashboard struct {
 	// metadata can pass through unchanged from YAML/JSON into the Forge
 	// frontend contract, including explicit chart configuration under
 	// reportBuilder.result.
-	ReportBuilder map[string]interface{} `json:"reportBuilder,omitempty" yaml:"reportBuilder,omitempty"`
+	ReportBuilderRef string                            `json:"reportBuilderRef,omitempty" yaml:"reportBuilderRef,omitempty"`
+	ReportBuilder    map[string]interface{}            `json:"reportBuilder,omitempty" yaml:"reportBuilder,omitempty"`
+	ReportBuilders   map[string]map[string]interface{} `json:"reportBuilders,omitempty" yaml:"reportBuilders,omitempty"`
 	// ReportOptions controls the dashboard-level report mode. The older
 	// compact alias is Container.report.
 	ReportOptions *DashboardReportOptions `json:"reportOptions,omitempty" yaml:"reportOptions,omitempty"`
@@ -806,10 +808,22 @@ func (c *Container) applyDashboardCompactAliases(compact dashboardCompactAliases
 			}
 		}
 	case "dashboard.reportBuilder":
+		if compact.ReportBuilderRef != "" {
+			dashboard := c.ensureDashboard()
+			if dashboard.ReportBuilderRef == "" {
+				dashboard.ReportBuilderRef = compact.ReportBuilderRef
+			}
+		}
 		if compact.ReportBuilder != nil {
 			dashboard := c.ensureDashboard()
 			if dashboard.ReportBuilder == nil {
 				dashboard.ReportBuilder = compact.ReportBuilder
+			}
+		}
+		if compact.ReportBuilders != nil {
+			dashboard := c.ensureDashboard()
+			if dashboard.ReportBuilders == nil {
+				dashboard.ReportBuilders = compact.ReportBuilders
 			}
 		}
 	case "dashboard.table":
@@ -854,23 +868,25 @@ type dashboardCompactAliases struct {
 	Report      *DashboardReportOptions `json:"report,omitempty" yaml:"report,omitempty"`
 	// ReportBuilder intentionally remains open-ended so frontend-owned
 	// report-builder metadata can evolve without a backend release gate.
-	ReportBuilder   map[string]interface{}   `json:"reportBuilder,omitempty" yaml:"reportBuilder,omitempty"`
-	Metrics         []DashboardMetric        `json:"metrics,omitempty" yaml:"metrics,omitempty"`
-	Rows            []DashboardKPIRow        `json:"rows,omitempty" yaml:"rows,omitempty"`
-	Checks          []DashboardStatusCheck   `json:"checks,omitempty" yaml:"checks,omitempty"`
-	Fields          *DashboardFeedFields     `json:"fields,omitempty" yaml:"fields,omitempty"`
-	FilterItems     []DashboardFilterItem    `json:"items,omitempty" yaml:"items,omitempty"`
-	Sections        []DashboardReportSection `json:"sections,omitempty" yaml:"sections,omitempty"`
-	Metric          *DashboardField          `json:"metric,omitempty" yaml:"metric,omitempty"`
-	Dimension       *DashboardField          `json:"dimension,omitempty" yaml:"dimension,omitempty"`
-	Geo             *DashboardGeoMap         `json:"geo,omitempty" yaml:"geo,omitempty"`
-	Limit           int                      `json:"limit,omitempty" yaml:"limit,omitempty"`
-	ViewModes       []string                 `json:"viewModes,omitempty" yaml:"viewModes,omitempty"`
-	Columns         []DashboardTableColumn   `json:"columns,omitempty" yaml:"columns,omitempty"`
-	QuickFilter     bool                     `json:"quickFilter,omitempty" yaml:"quickFilter,omitempty"`
-	Density         string                   `json:"density,omitempty" yaml:"density,omitempty"`
-	FormattingRules []TableFormattingRule    `json:"formattingRules,omitempty" yaml:"formattingRules,omitempty"`
-	RowActions      []DashboardTableAction   `json:"rowActions,omitempty" yaml:"rowActions,omitempty"`
+	ReportBuilderRef string                            `json:"reportBuilderRef,omitempty" yaml:"reportBuilderRef,omitempty"`
+	ReportBuilder    map[string]interface{}            `json:"reportBuilder,omitempty" yaml:"reportBuilder,omitempty"`
+	ReportBuilders   map[string]map[string]interface{} `json:"reportBuilders,omitempty" yaml:"reportBuilders,omitempty"`
+	Metrics          []DashboardMetric                 `json:"metrics,omitempty" yaml:"metrics,omitempty"`
+	Rows             []DashboardKPIRow                 `json:"rows,omitempty" yaml:"rows,omitempty"`
+	Checks           []DashboardStatusCheck            `json:"checks,omitempty" yaml:"checks,omitempty"`
+	Fields           *DashboardFeedFields              `json:"fields,omitempty" yaml:"fields,omitempty"`
+	FilterItems      []DashboardFilterItem             `json:"items,omitempty" yaml:"items,omitempty"`
+	Sections         []DashboardReportSection          `json:"sections,omitempty" yaml:"sections,omitempty"`
+	Metric           *DashboardField                   `json:"metric,omitempty" yaml:"metric,omitempty"`
+	Dimension        *DashboardField                   `json:"dimension,omitempty" yaml:"dimension,omitempty"`
+	Geo              *DashboardGeoMap                  `json:"geo,omitempty" yaml:"geo,omitempty"`
+	Limit            int                               `json:"limit,omitempty" yaml:"limit,omitempty"`
+	ViewModes        []string                          `json:"viewModes,omitempty" yaml:"viewModes,omitempty"`
+	Columns          []DashboardTableColumn            `json:"columns,omitempty" yaml:"columns,omitempty"`
+	QuickFilter      bool                              `json:"quickFilter,omitempty" yaml:"quickFilter,omitempty"`
+	Density          string                            `json:"density,omitempty" yaml:"density,omitempty"`
+	FormattingRules  []TableFormattingRule             `json:"formattingRules,omitempty" yaml:"formattingRules,omitempty"`
+	RowActions       []DashboardTableAction            `json:"rowActions,omitempty" yaml:"rowActions,omitempty"`
 }
 
 func isDashboardContainerKind(kind string) bool {

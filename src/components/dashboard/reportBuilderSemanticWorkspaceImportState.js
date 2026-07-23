@@ -2,6 +2,8 @@ function normalizeString(value = "") {
     return String(value || "").trim();
 }
 
+const PORTABLE_REPORT_FILE_KIND = "forge.reporting.reportFile";
+
 export function hasSemanticWorkspaceImportActivation(feedback = null) {
     if (!feedback || typeof feedback !== "object" || Array.isArray(feedback)) {
         return false;
@@ -11,6 +13,22 @@ export function hasSemanticWorkspaceImportActivation(feedback = null) {
     ) || (
         Array.isArray(feedback.semanticBindingFieldGroups) && feedback.semanticBindingFieldGroups.length > 0
     );
+}
+
+export function shouldAutoActivateReportBuilderImport({
+    imported = null,
+    feedback = null,
+    semanticWorkspaceTitle = "",
+    activationResponse = null,
+} = {}) {
+    if (!activationResponse) {
+        return false;
+    }
+    if (normalizeString(imported?.importedArtifactKind) === PORTABLE_REPORT_FILE_KIND) {
+        return true;
+    }
+    return normalizeString(semanticWorkspaceTitle).toLowerCase() === "no data model configured"
+        && hasSemanticWorkspaceImportActivation(feedback);
 }
 
 export function buildReportBuilderSemanticWorkspaceImportFeedback(feedback = null, {

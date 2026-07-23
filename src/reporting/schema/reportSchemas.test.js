@@ -493,6 +493,37 @@ assert.deepEqual(validateReportFill(buildReportFillFromReportSpec(annotatedChart
   errors: [],
 });
 
+const tonedKpiSpec = {
+  ...reportSpec,
+  blocks: [{
+    id: "deliveryKpi",
+    kind: "kpiBlock",
+    title: "Delivery KPI",
+    datasetRef: "primary",
+    valueField: "totalSpend",
+    valueLabel: "Spend",
+    valueFormat: "currency",
+    tone: "success",
+  }],
+};
+const tonedKpiFill = buildReportFillFromReportSpec(tonedKpiSpec, {
+  primary: { rows: [{ totalSpend: 40400 }] },
+});
+const tonedKpiPrint = buildReportPrintFromReportFill({
+  reportSpec: tonedKpiSpec,
+  reportFill: tonedKpiFill,
+});
+const tonedKpiExportRequest = buildDraftReportExportRequest({
+  reportDocument: { id: "tonedKpiReport", title: "Toned KPI Report" },
+  reportSpec: tonedKpiSpec,
+  reportFill: tonedKpiFill,
+  reportPrint: tonedKpiPrint,
+});
+assert.deepEqual(validateReportSpec(tonedKpiSpec), { valid: true, errors: [] });
+assert.deepEqual(validateReportFill(tonedKpiFill), { valid: true, errors: [] });
+assert.equal(tonedKpiExportRequest?.kind, "reportExportRequest");
+assert.deepEqual(validateReportExportRequest(tonedKpiExportRequest), { valid: true, errors: [] });
+
 const sectionSpec = {
   ...reportSpec,
   blocks: [

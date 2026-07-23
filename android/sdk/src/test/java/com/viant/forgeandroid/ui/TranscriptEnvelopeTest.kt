@@ -8,6 +8,21 @@ import kotlinx.serialization.json.Json
 
 class TranscriptEnvelopeTest {
     @Test
+    fun `suppresses progressive transport without removing narration`() {
+        val content = """
+            Forecast ready.
+            ```forge-data
+            {"version":2,"scope":"forecast","reportRef":"review","id":"states","sequence":2,"data":[{"stateCode":"CA"}]}
+            ```
+            ```forge-report
+            {"version":1,"scope":"forecast","id":"review","sequence":3,"mode":"commit"}
+            ```
+        """.trimIndent()
+
+        assertEquals("Forecast ready.", TranscriptEnvelope.suppressProgressiveTransport(content).trim())
+    }
+
+    @Test
     fun `materializes quoted multiline CSV`() {
         val parts = TranscriptEnvelope.parse("""
             ```forge-data id=rows format=csv
@@ -173,6 +188,30 @@ class TranscriptEnvelopeTest {
 
         val ui = assertIs<TranscriptEnvelopePart.ForgeUi>(parts.single())
         assertEquals(emptyMap<String, TranscriptForgeDataStore>(), ui.dataStore)
+    }
+
+    @Test
+    fun `canonical report atoms stay hidden behind compiled report`() {
+        val parts = TranscriptEnvelope.fromCanonical(
+            listOf(
+                TranscriptCanonicalPart(kind = "markdown", text = "Forecast ready."),
+                TranscriptCanonicalPart(
+                    kind = "forgeData",
+                    source = "hidden data",
+                    data = TranscriptCanonicalData(
+                        version = 2,
+                        scope = "forecast",
+                        reportRef = "review",
+                        sequence = 1,
+                        id = "rows",
+                        payload = Json.parseToJsonElement("[]")
+                    )
+                ),
+                TranscriptCanonicalPart(kind = "forgeReport", source = "hidden report atom")
+            )
+        )
+
+        assertEquals(listOf(TranscriptEnvelopePart.Markdown("Forecast ready.")), parts)
     }
 
     @Test

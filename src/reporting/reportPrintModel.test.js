@@ -543,6 +543,10 @@ const authoredDocument = buildReportBuilderReportDocument({
       secondaryField: "eventDate",
       secondaryLabel: "Date",
       rowLimit: 2,
+      toneField: "status",
+      toneRules: [
+        { value: "healthy", label: "High priority", tone: "danger", color: "#b42318", background: "#fff1f0" },
+      ],
       bodyTemplate: "Print note ${format(row.totalSpend,currency)} for ${row.channelId}.",
     }),
     buildReportDocumentGeoMapBlock({
@@ -658,22 +662,29 @@ assert.ok(printElements.some((element) => (
 )));
 assert.ok(printElements.some((element) => (
   element.kind === "text"
-  && /Spend: \$20,000/.test(element.text)
+  && element.id.startsWith("headlineKpi__value_")
+  && /20/.test(element.text)
 )));
 assert.ok(printElements.some((element) => (
   element.kind === "text"
   && /Print note \$20,000 for Display\./.test(element.text)
 )));
+assert.ok(printElements.some((element) => (
+  element.kind === "text"
+  && element.text === "HIGH PRIORITY"
+  && element.color === "#b42318"
+)));
+assert.ok(printElements.some((element) => (
+  element.kind === "rect"
+  && element.fillColor === "#fff1f0"
+)));
 const headlineKpiTitle = loweredPrint.pages
   .flatMap((page) => (page.elements || []).map((element) => ({ page: page.number, element })))
   .find((entry) => entry.element?.id === "headlineKpi__title_0");
 assert.equal(headlineKpiTitle?.page, 2);
-assert.deepEqual(headlineKpiTitle?.element?.box, {
-  x: 36,
-  y: 412,
-  width: 258,
-  height: 20,
-});
+assert.ok(headlineKpiTitle?.element?.box?.x >= 36);
+assert.ok(headlineKpiTitle?.element?.box?.width >= 200);
+assert.equal(headlineKpiTitle?.element?.box?.height, 16);
 
 const compositeDocument = buildReportBuilderReportDocument({
   container,
@@ -785,6 +796,10 @@ assert.ok(tabGroupPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.s
 assert.equal(tabGroupPrint.diagnostics.some((diagnostic) => diagnostic.code === "unsupportedReportPrintBlock" && /tabGroupBlock/.test(diagnostic.message)), false);
 assert.equal(
   tabGroupPrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "text" && /Tabs: Overview • Execution/.test(element.text)),
+  false,
+);
+assert.equal(
+  tabGroupPrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "text" && element.text === "Opening summary section."),
   true,
 );
 

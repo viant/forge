@@ -1,5 +1,6 @@
 import { resolveKey } from "../utils/selector.js";
 import { formatDashboardValue } from "../components/dashboard/dashboardUtils.js";
+import { buildReportVisualTint } from "./reportVisualColor.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -164,6 +165,13 @@ function resolveCellVisualState(row = {}, column = {}) {
     }
     const range = column?.cellVisualRuntime?.range || null;
     const palette = Array.isArray(column?.cellVisual?.palette) ? column.cellVisual.palette : [];
+    const colorField = normalizeString(column?.cellVisual?.colorField);
+    const colorValue = colorField ? resolveKey(row, colorField) : rawValue;
+    const colorRule = resolveRuleMatch(colorValue, resolveCellVisualRules(column));
+    const ruleColor = normalizeString(colorRule?.color);
+    const resolvedPalette = colorRule
+      ? [normalizeString(colorRule?.background) || buildReportVisualTint(ruleColor) || palette[0], ruleColor || palette[1]].filter(Boolean)
+      : palette;
     const percent = !range
       ? 0
       : (range.max === range.min
@@ -173,7 +181,7 @@ function resolveCellVisualState(row = {}, column = {}) {
       kind,
       value: numericValue,
       percent,
-      palette: cloneValue(palette),
+      palette: cloneValue(resolvedPalette),
     };
   }
   if (kind === "shareBar") {

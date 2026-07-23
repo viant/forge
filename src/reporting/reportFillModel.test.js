@@ -330,14 +330,19 @@ const collectionFill = buildReportFillFromReportSpec({
       secondaryLabel: "Date",
       rowLimit: 2,
       columns: 2,
+      toneField: "importance",
+      toneRules: [
+        { value: "high", label: "High priority", tone: "danger", color: "#b42318", background: "#fff1f0" },
+        { value: "medium", label: "Medium priority", tone: "warning", color: "#b54708", background: "#fffaeb" },
+      ],
       bodyTemplate: "**${valueLabel}:** ${value}\n**${secondaryLabel}:** ${secondaryValue}",
     }),
   ],
 }, {
   primary: {
     rows: [
-      { eventDate: "2026-05-01", channelId: "Display", totalSpend: 40400 },
-      { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 34300 },
+      { eventDate: "2026-05-01", channelId: "Display", totalSpend: 40400, importance: "high" },
+      { eventDate: "2026-05-02", channelId: "CTV", totalSpend: 34300, importance: "medium" },
       { eventDate: "2026-05-03", channelId: "Audio", totalSpend: 1200 },
     ],
     provenance: {
@@ -352,6 +357,15 @@ assert.equal(collectionFill.blocks[0].content.columns, 2);
 assert.equal(collectionFill.blocks[0].content.rowCount, 3);
 assert.equal(collectionFill.blocks[0].content.rowLimit, 2);
 assert.equal(collectionFill.blocks[0].content.items[0].bodyMarkdown.includes("Spend"), true);
+assert.deepEqual(collectionFill.blocks[0].content.items.map((item) => ({
+  tone: item.tone,
+  toneLabel: item.toneLabel,
+  backgroundColor: item.backgroundColor,
+  textColor: item.textColor,
+})), [
+  { tone: "danger", toneLabel: "High priority", backgroundColor: "#fff1f0", textColor: "#b42318" },
+  { tone: "warning", toneLabel: "Medium priority", backgroundColor: "#fffaeb", textColor: "#b54708" },
+]);
 
 const mappedNarrativeAndCollectionFill = buildReportFillFromReportSpec({
   title: "Mapped Display Runtime",
@@ -2211,6 +2225,30 @@ const mappedKpiFill = buildReportFillFromReportSpec({
 });
 assert.equal(mappedKpiFill.blocks[0].content.value, 12);
 assert.equal(mappedKpiFill.blocks[0].content.secondaryValue, "Display");
+
+const zeroNestedKpiFill = buildReportFillFromReportSpec({
+  version: 1,
+  kind: "reportSpec",
+  source: {
+    kind: "dashboard.reportBuilder",
+    containerId: "zeroNestedKpi",
+    stateKey: "zeroNestedKpi",
+    dataSourceRef: "forecast_summary",
+  },
+  datasets: [{ id: "summary", dataSourceRef: "forecast_summary", request: {} }],
+  blocks: [{
+    id: "zeroAvails",
+    kind: "kpiBlock",
+    title: "Total Avails",
+    datasetRef: "summary",
+    valueField: "metrics.totalAvails",
+    valueLabel: "Avails",
+  }],
+}, {
+  summary: { rows: [{ metrics: { totalAvails: 0 } }] },
+});
+assert.equal(zeroNestedKpiFill.blocks[0].content.value, 0);
+assert.equal(zeroNestedKpiFill.blocks[0].content.rowCount, 1);
 
 const kpiBodyMacroFill = buildReportFillFromReportSpec({
   version: 1,

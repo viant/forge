@@ -303,8 +303,32 @@ func (r *renderer) renderTableCellDataBarOperation(operation dataBarPaintOperati
 	// ReportPrint lowering already resolves the proportional bar geometry into
 	// absolute print-space width. Value/min/max remain on the element for
 	// provenance and diagnostics, not for a second scaling pass here.
-	r.applyOptionalFillColor(operation.fillColor)
-	r.pdf.Rect(operation.box.X, operation.box.Y, operation.box.Width, operation.box.Height, "F")
+	if !hasPaintValue(operation.backgroundColor) {
+		r.applyOptionalFillColor(operation.fillColor)
+		r.pdf.Rect(operation.box.X, operation.box.Y, operation.box.Width, operation.box.Height, "F")
+		return
+	}
+	startRed, startGreen, startBlue := parseHexColor(operation.backgroundColor, 255, 255, 255)
+	endRed, endGreen, endBlue := parseHexColor(operation.fillColor, startRed, startGreen, startBlue)
+	const steps = 64
+	stepWidth := operation.box.Width / steps
+	for index := 0; index < steps; index++ {
+		ratio := float64(index) / float64(steps-1)
+		red := interpolateColorChannel(startRed, endRed, ratio)
+		green := interpolateColorChannel(startGreen, endGreen, ratio)
+		blue := interpolateColorChannel(startBlue, endBlue, ratio)
+		r.pdf.SetFillColor(red, green, blue)
+		x := operation.box.X + (float64(index) * stepWidth)
+		width := stepWidth
+		if index < steps-1 {
+			width += 0.05
+		}
+		r.pdf.Rect(x, operation.box.Y, width, operation.box.Height, "F")
+	}
+}
+
+func interpolateColorChannel(start int, end int, ratio float64) int {
+	return int(float64(start) + (float64(end-start) * ratio) + 0.5)
 }
 
 func (r *renderer) renderLabelPillOperation(operation labelPillPaintOperation) {

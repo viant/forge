@@ -101,6 +101,8 @@ type Block struct {
 	DefaultSectionID         string                `json:"defaultSectionId,omitempty"`
 	ItemTitleField           string                `json:"itemTitleField,omitempty"`
 	ItemTitleLabel           string                `json:"itemTitleLabel,omitempty"`
+	ToneField                string                `json:"toneField,omitempty"`
+	ToneRules                []map[string]any      `json:"toneRules,omitempty"`
 	Layout                   string                `json:"layout,omitempty"`
 	ChartContent             *ChartContent         `json:"-"`
 	GeoContent               *GeoContent           `json:"-"`
@@ -296,6 +298,13 @@ type CollectionItemContent struct {
 	SecondaryFormat string `json:"secondaryFormat,omitempty"`
 	SecondaryValue  any    `json:"secondaryValue,omitempty"`
 	BodyMarkdown    string `json:"bodyMarkdown,omitempty"`
+	ToneField       string `json:"toneField,omitempty"`
+	ToneValue       any    `json:"toneValue,omitempty"`
+	Tone            string `json:"tone,omitempty"`
+	ToneLabel       string `json:"toneLabel,omitempty"`
+	BackgroundColor string `json:"backgroundColor,omitempty"`
+	BorderColor     string `json:"borderColor,omitempty"`
+	TextColor       string `json:"textColor,omitempty"`
 }
 
 type CollectionContent struct {
@@ -542,6 +551,8 @@ type rawCollectionBlock struct {
 	Description     string            `json:"description,omitempty"`
 	ItemTitleField  string            `json:"itemTitleField"`
 	ItemTitleLabel  string            `json:"itemTitleLabel,omitempty"`
+	ToneField       string            `json:"toneField,omitempty"`
+	ToneRules       []map[string]any  `json:"toneRules,omitempty"`
 	ValueField      string            `json:"valueField,omitempty"`
 	ValueLabel      string            `json:"valueLabel,omitempty"`
 	ValueFormat     string            `json:"valueFormat,omitempty"`
@@ -781,6 +792,8 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				SecondaryFormat:   collectionBlock.SecondaryFormat,
 				ItemTitleField:    collectionBlock.ItemTitleField,
 				ItemTitleLabel:    collectionBlock.ItemTitleLabel,
+				ToneField:         collectionBlock.ToneField,
+				ToneRules:         collectionBlock.ToneRules,
 				Layout:            collectionBlock.Layout,
 				BodyFormat:        collectionBlock.BodyFormat,
 				BodyTemplate:      collectionBlock.BodyTemplate,
@@ -1790,7 +1803,7 @@ func decodeRequestPayload(payload json.RawMessage, index int) (reportspec.Reques
 
 func isAllowedReportValueFormat(value string) bool {
 	switch strings.TrimSpace(value) {
-	case "", "currency", "number", "percent", "percentFraction", "compact", "compactNumber":
+	case "", "currency", "number", "number5", "percent", "percentFraction", "compact", "compactNumber":
 		return true
 	default:
 		return false

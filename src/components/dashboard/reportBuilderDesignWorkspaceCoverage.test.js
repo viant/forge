@@ -138,6 +138,18 @@ assert.equal(
 );
 
 assert.equal(
+  source.includes("key={reportBuilderSourceCardId(card)}"),
+  true,
+  "ReportBuilder should key source rows by authored dataset identity when several datasets share one backend source.",
+);
+
+assert.equal(
+  source.includes("designSourceAddMenuRef === reportBuilderSourceCardId(card)"),
+  true,
+  "ReportBuilder should open add-block menus by authored dataset identity rather than a shared backend source reference.",
+);
+
+assert.equal(
   source.includes('text="Table"'),
   true,
   "ReportBuilder should keep Table as an explicit dataset-scoped add-block menu choice.",
@@ -159,6 +171,12 @@ assert.equal(
   source.includes("authoredBlocks: resolvedTemplateBlocks"),
   true,
   "ReportBuilder should reset the insertion anchor against the newly applied template blocks instead of reusing stale document state.",
+);
+
+assert.equal(
+  source.includes("Apply report preset") && source.includes("Switch report preset..."),
+  true,
+  "ReportBuilder should distinguish complete authored report presets from lightweight quick views.",
 );
 
 assert.equal(
@@ -342,7 +360,7 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("Switch report..."),
+  source.includes("Switch report preset..."),
   true,
   "ReportBuilder should expose switching the authored report through the compact report actions menu.",
 );
@@ -357,6 +375,36 @@ assert.equal(
   source.includes('requestFingerprintRef.current = "";'),
   true,
   "ReportBuilder should clear the request replay fingerprint when applying starters so committed-state auto-fetch can rerun even if the starter keeps the same effective request.",
+);
+
+assert.equal(
+  source.includes('lastManualRunFingerprintRef.current = "";')
+    && source.includes('executeOnOpenRunKeyRef.current = "";'),
+  true,
+  "ReportBuilder should clear completed-run and hosted execute identities when applying a starter so the authored document executes after commit.",
+);
+
+assert.equal(
+  source.includes("const resolvedHostedReportStarterId = useMemo(")
+    && source.includes("findReportBuilderStarterTemplate(hostedReportStarterId, reportDocumentTemplates)?.id")
+    && source.includes("&& hostedReportStarterReady"),
+  true,
+  "ReportBuilder should resolve hosted starter labels to stable ids before gating authored runtime dataset fetches.",
+);
+
+assert.equal(
+  source.includes("canShowResults: authoredRuntimePreviewState?.canRenderRuntime")
+    && source.includes("const shouldCollapseHostedExecution = hostedExecuteOnOpen"),
+  true,
+  "ReportBuilder should collapse live filters after authored runtime datasets complete, not only after primary collection rows render.",
+);
+
+assert.equal(
+  source.includes('beginReportRunLifecycle({ reuseCurrent: true });')
+    && source.includes('emitRunLifecycleEvent("report.run", {')
+    && source.includes('status: authoredRuntimePreviewState?.errorState ? "failed" : "succeeded"'),
+  true,
+  "hosted authored execution should emit correlated run start and completion events from resolved runtime datasets.",
 );
 
 assert.equal(
@@ -791,6 +839,20 @@ assert.equal(
   source.includes("4. Drill Downs"),
   true,
   "ReportBuilder should keep drill summary metadata available even after drill setup moves into the shared data flow.",
+);
+
+assert.equal(
+  source.includes('forge-report-builder__design-mode-control forge-report-builder__action-button')
+    && source.includes('forge-report-builder__run-button forge-report-builder__action-button')
+    && source.includes('className="forge-report-builder__action-menu-button"'),
+  true,
+  "Run, Design, and export controls should share the unified green report-action styling.",
+);
+
+assert.equal(
+  source.includes('eventSourceKind: activeReportEventSourceKind'),
+  true,
+  "Draft export events should retain the canonical active report source kind.",
 );
 
 console.log("reportBuilderDesignWorkspaceCoverage ✓ design mode keeps live results on the report surface only");

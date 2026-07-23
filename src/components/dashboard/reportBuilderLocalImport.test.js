@@ -22,6 +22,41 @@ const audienceArtifactFixture = JSON.parse(
         "utf8",
     ),
 );
+const portableReportFile = {
+    schemaVersion: 1,
+    kind: "forge.reporting.reportFile",
+    title: "Portable Delivery",
+    sourceSession: {
+        builderTarget: {
+            kind: "dashboard.reportBuilder",
+            containerId: "performanceMetrics",
+            stateKey: "reportBuilder:metricsCubeBuilder",
+            dataSourceRef: "metrics_ad_cube_report",
+        },
+    },
+    reportDocument: {
+        version: 1,
+        kind: "reportDocument",
+        id: "portableDelivery",
+        title: "Portable Delivery",
+        blocks: [{ id: "detail", kind: "tableBlock", datasetRef: "delivery", columns: ["date"] }],
+        layout: { items: [{ blockId: "detail" }] },
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        datasets: [{ id: "delivery", sourceRef: "metrics_ad_cube_report" }],
+    },
+};
+const importedPortableReportFile = parseReportBuilderLocalImport(JSON.stringify(portableReportFile), {
+    fileName: "portable-delivery.forge-report.json",
+});
+
+assert.equal(importedPortableReportFile.valid, true);
+assert.equal(importedPortableReportFile.importedArtifactKind, "forge.reporting.reportFile");
+assert.deepEqual(importedPortableReportFile.getReportDocumentResponse?.source, portableReportFile.sourceSession.builderTarget);
+assert.equal(importedPortableReportFile.getReportDocumentResponse?.sourceSession?.unsavedDraft, true);
+
 const importedSavedReportRecord = parseReportBuilderLocalImport(JSON.stringify(savedReportRecordFixture), {
     fileName: "capacity-kpi-blend.saved-report-record.json",
 });
@@ -1323,5 +1358,32 @@ assert.equal(invalidExportRequest.valid, false);
 assert.equal(invalidExportRequest.code, "invalidReportExportRequest");
 assert.equal(invalidExportRequest.fileName, "broken.export-request.json");
 assert.match(invalidExportRequest.message, /report export request failed validation/i);
+
+const portableReportImport = parseReportBuilderLocalImport(JSON.stringify({
+    schemaVersion: 1,
+    kind: "forge.reporting.reportFile",
+    title: "Portable Delivery",
+    reportDocument: {
+        version: 1,
+        kind: "reportDocument",
+        id: "portableDelivery",
+        title: "Portable Delivery",
+        blocks: [{ id: "deliveryTable", kind: "tableBlock", datasetRef: "delivery" }],
+        layout: { items: [{ blockId: "deliveryTable", span: 12 }] },
+    },
+    reportSpec: {
+        version: 1,
+        kind: "reportSpec",
+        datasets: [{ id: "delivery", sourceRef: "metrics_delivery" }],
+        blocks: [{ id: "deliveryTable", kind: "table" }],
+    },
+}), { fileName: "Portable Delivery.forge-report.json" });
+
+assert.equal(portableReportImport.valid, true);
+assert.equal(portableReportImport.kind, "reportBuilder.savedReportPayload");
+assert.equal(portableReportImport.importedArtifactKind, "forge.reporting.reportFile");
+assert.equal(portableReportImport.payload?.sourceSession?.unsavedDraft, true);
+assert.equal(portableReportImport.getReportDocumentResponse?.document?.id, "portableDelivery");
+assert.match(portableReportImport.message, /unsaved local draft/i);
 
 console.log("reportBuilderLocalImport ✓ validates and classifies local report JSON artifacts");

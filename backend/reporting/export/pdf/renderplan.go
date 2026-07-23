@@ -78,8 +78,9 @@ type imagePaintOperation struct {
 }
 
 type dataBarPaintOperation struct {
-	box       reportprint.Box
-	fillColor string
+	box             reportprint.Box
+	fillColor       string
+	backgroundColor string
 }
 
 type labelPillPaintOperation struct {
@@ -463,8 +464,9 @@ func buildReportRectPaintOperation(element reportprint.Element) *reportRectPaint
 
 func buildDataBarPaintOperation(element reportprint.Element) *dataBarPaintOperation {
 	return &dataBarPaintOperation{
-		box:       element.Box,
-		fillColor: element.FillColor,
+		box:             element.Box,
+		fillColor:       element.FillColor,
+		backgroundColor: element.BackgroundColor,
 	}
 }
 

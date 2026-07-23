@@ -94,13 +94,32 @@ class DashboardRuntimeTest {
     fun dashboardRuntimeFormatsSummaryValues() {
         assertEquals("42", formatDashboardValue(42, "integer"))
         assertEquals("1.2K", formatDashboardValue(1250.0, "compactNumber"))
+        assertEquals("1.2K", formatDashboardValue(1250.0, "compact"))
         assertEquals("1.2K", formatDashboardValue("1250", "compactNumber"))
+        assertEquals("126 329 231 621", formatDashboardValue(126329231621.0, "number"))
+        assertEquals("95.00000", formatDashboardValue(95.000000409, "number5"))
         assertEquals("19.4%", formatDashboardValue(JsonPrimitive("0.1937"), "percentFraction"))
         assertEquals("n/a", formatDashboardValue(null, "number"))
         assertEquals("May 1, 2026", formatDashboardValue("2026-05-01T04:00:00Z", "date"))
         assertEquals("May 1, 2026, 4:00 AM", formatDashboardValue("2026-05-01T04:00:00Z", "dateTime"))
         assertEquals("12 AM", formatDashboardValue("2026-05-13T00:00:00Z", "wallClockHour"))
         assertEquals("May 13, 2026", formatDashboardValue("2026-05-13T00:00:00Z", "wallClockDate"))
+    }
+
+    @Test
+    fun dashboardReportRuntimeKpiHonorsAuthoredNumberFormat() {
+        val value = dashboardReportRuntimeKpi(
+            mapOf(
+                "value" to JsonPrimitive(126329231621),
+                "valueFormat" to JsonPrimitive("number"),
+                "secondaryField" to JsonPrimitive("clearingPrice"),
+                "secondaryValue" to JsonPrimitive(95.000000409),
+                "secondaryFormat" to JsonPrimitive("number5")
+            )
+        )
+
+        assertEquals("126 329 231 621", value.valueText)
+        assertEquals("95.00000", value.secondaryValueText)
     }
 
     @Test
@@ -1616,6 +1635,30 @@ class DashboardRuntimeTest {
             listOf("https://example.test/ca", "https://example.test/tx", "https://example.test/ny"),
             ranked.map { it.href }
         )
+    }
+
+    @Test
+    fun dashboardGeoTileRegionsMatchesSharedUSStateGeometryAndValueScale() {
+        val regions = dashboardGeoTileRegions(
+            rows = listOf(
+                DashboardGeoMapRow(regionCode = "ca", label = "California", value = 100.0),
+                DashboardGeoMapRow(regionCode = "TX", label = "Texas", value = 50.0),
+                DashboardGeoMapRow(regionCode = "NY", label = "New York", value = 0.0)
+            )
+        )
+
+        assertEquals(51, regions.size)
+        assertEquals(
+            DashboardGeoStateTile("CA", "California", 1, 5),
+            regions.first { it.tile.key == "CA" }.tile
+        )
+        assertEquals(4, regions.first { it.tile.key == "CA" }.paletteIndex)
+        assertEquals(2, regions.first { it.tile.key == "TX" }.paletteIndex)
+        assertEquals(0, regions.first { it.tile.key == "NY" }.paletteIndex)
+        assertEquals(null, regions.first { it.tile.key == "WA" }.paletteIndex)
+        assertTrue(dashboardSupportsGeoShape("us-states"))
+        assertTrue(dashboardSupportsGeoShape("US-STATE-TILES"))
+        assertFalse(dashboardSupportsGeoShape("world"))
     }
 
     @Test
