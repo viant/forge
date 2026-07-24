@@ -32,6 +32,7 @@ assert.match(groupedLine.svg, /stroke-linecap="round"/);
 assert.doesNotMatch(groupedLine.svg, /stroke-dasharray=/);
 assert.match(groupedLine.svg, /Display/);
 assert.match(groupedLine.svg, /CTV/);
+assert.match(groupedLine.svg, />eventDate</);
 
 const lineWithEmptySeries = buildReportPrintChartSvg({
   chartModel: {
@@ -65,6 +66,9 @@ assert.match(lineWithEmptySeries.svg, / C/);
 const directBar = buildReportPrintChartSvg({
   chartModel: {
     type: "bar",
+    xAxis: {
+      label: "Date",
+    },
     series: {
       values: [
         { value: "totalSpend", label: "Spend", color: "#137cbd", type: "bar" },
@@ -89,6 +93,7 @@ assert.equal(directBar.diagnostics.length, 0);
 assert.match(directBar.svg, /<rect/);
 assert.match(directBar.svg, /Spend/);
 assert.match(directBar.svg, /Impressions/);
+assert.match(directBar.svg, />Date</);
 
 const labeledDirectBar = buildReportPrintChartSvg({
   chartModel: {

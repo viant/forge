@@ -884,7 +884,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 tickLine={false}
                 minTickGap={embedded ? 24 : 5}
                 label={{
-                    value: embedded ? "" : xAxis.label,
+                    value: embedded ? "" : (xAxis.label || xAxis.sourceDataKey || xAxis.dataKey),
                     position: "insideBottomRight",
                     offset: 0,
                     ...axisLabelStyle,
