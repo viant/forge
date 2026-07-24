@@ -13,11 +13,25 @@ const savedReportPayload = {
         sourceRef: {
             templateId: "forecast_review",
         },
+        builderTarget: {
+            kind: "dashboard.reportBuilder",
+            containerId: "performanceMetrics",
+            stateKey: "metricReportBuilder",
+            dataSourceRef: "metrics_ad_cube_report",
+        },
     },
     reportDocument: {
         kind: "reportDocument",
         id: "forecastingQ3",
         title: "Forecasting Q3",
+        blocks: [{
+            kind: "reportBuilderBlock",
+            id: "builder",
+            source: {
+                kind: "dashboard.reportBuilder",
+                stateKey: "reportBuilder",
+            },
+        }],
     },
     reportSpec: {
         kind: "reportSpec",
@@ -34,6 +48,14 @@ const runtimeArtifact = {
         kind: "reportDocument",
         id: "forecastingQ3",
         title: "Forecasting Q3 Runtime",
+        blocks: [{
+            kind: "reportBuilderBlock",
+            id: "builder",
+            source: {
+                kind: "dashboard.reportBuilder",
+                stateKey: "reportBuilder",
+            },
+        }],
     },
     reportSpec: {
         kind: "reportSpec",
@@ -75,6 +97,16 @@ assert.deepEqual(buildReportBuilderSaveReportRequest(savedReportPayload, {
         kind: "reportDocument",
         id: "forecastingQ3",
         title: "Forecasting Q3 Runtime",
+        blocks: [{
+            kind: "reportBuilderBlock",
+            id: "builder",
+            source: {
+                kind: "dashboard.reportBuilder",
+                containerId: "performanceMetrics",
+                stateKey: "metricReportBuilder",
+                dataSourceRef: "metrics_ad_cube_report",
+            },
+        }],
     },
     reportSpec: {
         kind: "reportSpec",
@@ -99,6 +131,12 @@ assert.deepEqual(buildReportBuilderSaveReportRequest(savedReportPayload, {
         sourceSession: {
             sourceRef: {
                 templateId: "forecast_review",
+            },
+            builderTarget: {
+                kind: "dashboard.reportBuilder",
+                containerId: "performanceMetrics",
+                stateKey: "metricReportBuilder",
+                dataSourceRef: "metrics_ad_cube_report",
             },
         },
         conversationId: "conv-123",

@@ -41,6 +41,7 @@ import { resolveReportBuilderBlock } from "../../reporting/reportBuilderBlockMod
 import { resolveReportBuilderSavedViewOverlayReopenSourceResolution } from "./reportBuilderReopenSourceResolution.js";
 import { resolveReportBuilderPersistedRuntimePreviewInteraction } from "./reportBuilderRuntimePreviewInteractionPersistence.js";
 import { buildReportBuilderPortableReportFile } from "./reportBuilderPortableReportFile.js";
+import { applyReportBuilderTarget } from "./reportBuilderTarget.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -384,6 +385,11 @@ export function buildReportBuilderSaveReportRequest(savedReportPayload = null, {
     const runtimePrint = runtimeArtifact?.reportPrint && typeof runtimeArtifact.reportPrint === "object" && !Array.isArray(runtimeArtifact.reportPrint)
         ? cloneValue(runtimeArtifact.reportPrint)
         : null;
+    const builderTarget = payload?.sourceSession?.builderTarget;
+    const reportDocument = applyReportBuilderTarget(
+        runtimeDocument || payload?.reportDocument || null,
+        builderTarget,
+    );
     const exportRequest = savedReportPayloadRecord?.exportRequest && typeof savedReportPayloadRecord.exportRequest === "object" && !Array.isArray(savedReportPayloadRecord.exportRequest)
         ? savedReportPayloadRecord.exportRequest
         : null;
@@ -404,7 +410,7 @@ export function buildReportBuilderSaveReportRequest(savedReportPayload = null, {
         title: normalizeString(payload?.title || payload?.reportDocument?.title || "Report") || "Report",
         version: Number(savedReportPayloadRecord?.documentVersion || 0) || 1,
         documentVersion: Number(savedReportPayloadRecord?.documentVersion || 0) || 0,
-        reportDocument: runtimeDocument || cloneValue(payload?.reportDocument || null),
+        reportDocument,
         reportSpec: runtimeSpec || cloneValue(payload?.reportSpec || null),
         compileState: cloneValue(payload?.compileState || null),
         reportFill: runtimeFill,

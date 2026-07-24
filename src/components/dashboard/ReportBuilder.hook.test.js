@@ -6,6 +6,9 @@ import {
     buildLookupHydrationJobs,
     hydrateReportBuilderLookupLabels,
     prefillSignature,
+    reportDefinitionSignature,
+    resolveHostedExecuteOnOpen,
+    shouldDeferReportBuilderExecutionForDefinition,
     resolveReportBuilderHookHandler,
     resolveReportBuilderLookupDescriptor,
     resolveReportBuilderNotices,
@@ -23,6 +26,59 @@ assert.notEqual(
         prefill,
         __forge: { prefillRevision: 2 },
     }),
+);
+assert.equal(reportDefinitionSignature({}), "");
+assert.notEqual(
+    reportDefinitionSignature({
+        reportDefinition: { documentPatch: { title: "First" } },
+        __forge: { reportDefinitionRevision: 1 },
+    }),
+    reportDefinitionSignature({
+        reportDefinition: { documentPatch: { title: "First" } },
+        __forge: { reportDefinitionRevision: 2 },
+    }),
+);
+assert.notEqual(
+    reportDefinitionSignature({
+        reportDefinition: { documentPatch: { title: "First" } },
+    }),
+    reportDefinitionSignature({
+        reportDefinition: { documentPatch: { title: "Second" } },
+    }),
+);
+assert.equal(resolveHostedExecuteOnOpen({}, {}), false);
+assert.equal(
+    resolveHostedExecuteOnOpen({ parameters: { executeOnOpen: true } }, {}),
+    true,
+);
+assert.equal(
+    resolveHostedExecuteOnOpen(
+        { parameters: { executeOnOpen: true } },
+        { executeOnOpen: false },
+    ),
+    false,
+);
+assert.equal(
+    resolveHostedExecuteOnOpen(
+        { parameters: { executeOnOpen: false } },
+        { executeOnOpen: "true" },
+    ),
+    true,
+);
+assert.equal(shouldDeferReportBuilderExecutionForDefinition({}), false);
+assert.equal(
+    shouldDeferReportBuilderExecutionForDefinition({
+        currentSignature: '{"documentPatch":{}}',
+        committedSignature: "",
+    }),
+    true,
+);
+assert.equal(
+    shouldDeferReportBuilderExecutionForDefinition({
+        currentSignature: '{"documentPatch":{}}',
+        committedSignature: '{"documentPatch":{}}',
+    }),
+    false,
 );
 assert.equal(
     shouldDeferReportBuilderRequestForPrefill({

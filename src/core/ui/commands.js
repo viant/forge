@@ -33,6 +33,7 @@ import { DASHBOARD_BLOCK_KINDS, DASHBOARD_CHART_TYPES, DASHBOARD_COMMANDS, DASHB
 import { getWindowContext } from '../context/registry.js';
 import { buildDashboardDefaultFilters, setDashboardSelectionState } from '../../components/dashboard/dashboardUtils.js';
 import { mergeWindowFormValues, withWindowFormPrefillRevision } from '../../hooks/dataSource.js';
+import { invokeReportWindowAction } from './reportActions.js';
 
 function requireString(name, v) {
   if (typeof v !== 'string' || v.trim() === '') {
@@ -565,6 +566,22 @@ export async function runUICommand(cmd = {}) {
       const windowId = requireString('windowId', params.windowId);
       undockWindow(windowId);
       return { ok: true };
+    }
+
+    // ------------------------------------------------------------------
+    // Reports
+    // ------------------------------------------------------------------
+    case 'ui.report.getCurrent': {
+      const windowId = requireString('windowId', params.windowId);
+      return invokeReportWindowAction(windowId, 'getCurrent', params);
+    }
+    case 'ui.report.run': {
+      const windowId = requireString('windowId', params.windowId);
+      return invokeReportWindowAction(windowId, 'run', params);
+    }
+    case 'ui.report.save': {
+      const windowId = requireString('windowId', params.windowId);
+      return invokeReportWindowAction(windowId, 'save', params);
     }
 
     // ------------------------------------------------------------------

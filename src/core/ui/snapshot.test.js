@@ -51,6 +51,50 @@ getMetadataSignal('W1').value = {
     content: {
       id: 'c1',
       type: 'container',
+      dashboard: {
+        reportBuilderRef: 'performance',
+        reportBuilders: {
+          performance: {
+            label: 'Performance Reports',
+            reportBuilder: {
+              dataSources: [
+                {
+                  id: 'delivery_last_7_days',
+                  dataSourceRef: 'metrics_ad_cube_report',
+                  label: 'Delivery · Last 7 Days',
+                  description: 'Trailing seven-day delivery.',
+                  kindLabel: 'relative window',
+                  capabilities: { preview: true, export: true },
+                  scope: {
+                    mode: 'override',
+                    relativeDateRange: {
+                      preset: 'last7Days',
+                      startParamPath: 'filters.From',
+                      endParamPath: 'filters.To',
+                    },
+                  },
+                  columnOptions: [
+                    { key: 'eventDate', label: 'Date', kind: 'dimension' },
+                    { key: 'totalSpend', label: 'Spend', kind: 'measure', format: 'currency' },
+                  ],
+                  valueFieldOptions: [
+                    { value: 'totalSpend', label: 'Spend', format: 'currency' },
+                  ],
+                  scopeParamOptions: [
+                    {
+                      value: 'orderIds',
+                      label: 'Ad Order',
+                      kind: 'multiSelect',
+                      multiple: true,
+                      paramPath: 'filters.orderIds',
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      },
       tabs: { defaultSelectedTabId: 'deliveryTab' },
       containers: [
         { id: 'deliveryTab', title: 'Delivery' },
@@ -63,7 +107,7 @@ getMetadataSignal('W1').value = {
 
 getInputSignal('W1DSfs').value = { filter: { uri: '/tmp' }, fetch: true, refresh: true };
 getControlSignal('W1DSfs').value = { loading: true, error: null };
-getFormSignal('W1:windowForm').value = { granularity: 'day' };
+getFormSignal('W1:windowForm').value = { granularity: 'day', reportBuilderRef: 'performance' };
 getViewSignal('W1').value = { tabs: { c1: 'kpiTab' } };
 
 const snap = buildUISnapshot({ includeCollection: false, includeInlineMetadata: true });
@@ -93,5 +137,65 @@ assert.deepEqual(snap.windows[0].metadata.view.tabs, [
   { containerId: 'c1', tabId: 'kpiTab', title: 'KPIs' },
 ]);
 assert.deepEqual(snap.windows[0].metadata.view.controls, []);
+assert.equal(snap.windows[0].metadata.reportBuilder.builderRef, 'performance');
+assert.equal(
+  snap.windows[0].metadata.reportBuilder.authoringContract,
+  'Use dataSources[].id as report block datasetRef. dataSources[].dataSourceRef is the underlying execution source. Dataset scope mode inherit follows the active report filters; relativeDateRange overrides them with its declared window.',
+);
+assert.deepEqual(snap.windows[0].metadata.reportBuilder.dataSources, [
+  {
+    id: 'delivery_last_7_days',
+    dataSourceRef: 'metrics_ad_cube_report',
+    label: 'Delivery · Last 7 Days',
+    description: 'Trailing seven-day delivery.',
+    kindLabel: 'relative window',
+    capabilities: { preview: true, export: true },
+    scope: {
+      mode: 'override',
+      relativeDateRange: {
+        preset: 'last7Days',
+        startParamPath: 'filters.From',
+        endParamPath: 'filters.To',
+      },
+    },
+    fields: [
+      {
+        key: 'eventDate',
+        label: 'Date',
+        kind: 'dimension',
+        format: null,
+        required: undefined,
+        multiple: undefined,
+        paramPath: null,
+        startParamPath: null,
+        endParamPath: null,
+      },
+      {
+        key: 'totalSpend',
+        label: 'Spend',
+        kind: 'measure',
+        format: 'currency',
+        required: undefined,
+        multiple: undefined,
+        paramPath: null,
+        startParamPath: null,
+        endParamPath: null,
+      },
+    ],
+    scopeParams: [
+      {
+        key: 'orderIds',
+        label: 'Ad Order',
+        kind: 'multiSelect',
+        format: null,
+        required: undefined,
+        multiple: true,
+        paramPath: 'filters.orderIds',
+        startParamPath: null,
+        endParamPath: null,
+      },
+    ],
+  },
+]);
 
 resetSignals();

@@ -119,6 +119,45 @@ export function prefillSignature(windowForm = {}) {
     });
 }
 
+export function reportDefinitionSignature(windowForm = {}) {
+    const reportDefinition = windowForm?.reportDefinition;
+    if (!reportDefinition || typeof reportDefinition !== "object" || Array.isArray(reportDefinition)) {
+        return "";
+    }
+    const revision = Number(windowForm?.__forge?.reportDefinitionRevision || 0);
+    return JSON.stringify({
+        revision: Number.isFinite(revision) ? revision : 0,
+        reportDefinition,
+    });
+}
+
+function normalizeExecutionBooleanFlag(value = false) {
+    if (value === true || value === false) {
+        return value;
+    }
+    const normalized = String(value || "").trim().toLowerCase();
+    return normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on";
+}
+
+export function resolveHostedExecuteOnOpen(container = {}, windowForm = {}) {
+    const formValue = windowForm?.executeOnOpen;
+    if (formValue !== undefined && formValue !== null) {
+        return normalizeExecutionBooleanFlag(formValue);
+    }
+    return normalizeExecutionBooleanFlag(container?.parameters?.executeOnOpen);
+}
+
+export function shouldDeferReportBuilderExecutionForDefinition({
+    currentSignature = "",
+    committedSignature = "",
+} = {}) {
+    const current = String(currentSignature || "").trim();
+    if (!current) {
+        return false;
+    }
+    return current !== String(committedSignature || "").trim();
+}
+
 export function shouldDeferReportBuilderRequestForPrefill({
     currentPrefillSignature = "",
     appliedPrefillSignature = "",

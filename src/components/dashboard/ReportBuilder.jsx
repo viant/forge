@@ -182,6 +182,7 @@ import {
 } from "./reportBuilderWorkspaceMode.js";
 import {
     isBlankReportBuilderStarterId,
+    isReportBuilderStarterReady,
     shouldShowReportBuilderStarterChooser,
 } from "./reportBuilderStarterChooserState.js";
 import {
@@ -231,6 +232,9 @@ import {
     buildLookupHydrationJobs,
     hydrateReportBuilderLookupLabels,
     prefillSignature,
+    reportDefinitionSignature,
+    resolveHostedExecuteOnOpen,
+    shouldDeferReportBuilderExecutionForDefinition,
     shouldMarkReportBuilderPrefillApplied,
     shouldDeferReportBuilderRequestForPrefill,
     resolveReportBuilderHookHandler,
@@ -630,6 +634,10 @@ import {
     setScopeParamValue,
 } from "../../reporting/scopeStateModel.js";
 import { normalizeReportRuntimeInteractionState } from "./reportRuntimeInteractionStateModel.js";
+import {
+    registerReportWindowActions,
+    scheduleReportWindowMutation,
+} from "../../core/ui/reportActions.js";
 import { useReportRuntimeInteractionState } from "./useReportRuntimeInteractionState.js";
 import { useAuthoredRuntimePreviewSurface } from "./useAuthoredRuntimePreviewSurface.js";
 import { resolveReportRuntimeChartActionFields } from "./reportRuntimeModel.js";
@@ -1794,6 +1802,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     const useFilterRail = filterPresentation === "rail-left";
     const useFilterDrawer = filterPresentation === "drawer-left";
     const currentPrefillSignature = prefillSignature(windowFormValue);
+    const currentReportDefinitionSignature = reportDefinitionSignature(windowFormValue);
     useEffect(() => {
         setPersistedStateOverride(null);
     }, [currentPrefillSignature, stateStorageScope]);
@@ -2035,6 +2044,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     const lastAutoAppliedChartCycleRef = useRef("");
     const seededDefaultsRef = useRef(false);
     const appliedPrefillSignatureRef = useRef("");
+    const appliedReportDefinitionSignatureRef = useRef("");
     const hydrationFingerprintRef = useRef("");
     const storedStateHydrationFingerprintRef = useRef("");
     const [settingsOpen, setSettingsOpen] = useState(false);
@@ -2188,7 +2198,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         setPreparedApiArtifactOrigins(buildEmptyPreparedApiArtifactOrigins());
     }, []);
     const [builderWidth, setBuilderWidth] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 0));
-    const hostedExecuteOnOpen = normalizeBooleanFlag(container?.parameters?.executeOnOpen);
+    const hostedExecuteOnOpen = resolveHostedExecuteOnOpen(container, windowFormValue);
     const hostedExportOnComplete = normalizeString(container?.parameters?.exportOnComplete).toLowerCase();
     const hostedReportSource = resolveHostedReportSource(container);
     const hostedReportId = resolveHostedReportId(container);
@@ -2272,6 +2282,9 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     const reportBuilderMountedRef = useRef(true);
     const appliedReportStarterIdRef = useRef("");
     const executeOnOpenRunKeyRef = useRef("");
+    const [committedReportDefinitionSignature, setCommittedReportDefinitionSignature] = useState(
+        () => currentReportDefinitionSignature,
+    );
     const exportOnCompleteRunKeyRef = useRef("");
     const hostedReportActivationKeyRef = useRef("");
     const activateImportedResponseInBuilderRef = useRef(null);
@@ -3063,6 +3076,35 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     }, [builderContext, config, currentPrefillSignature, persistState, state, windowFormValue]);
 
     useEffect(() => {
+        if (
+            !currentReportDefinitionSignature
+            || appliedReportDefinitionSignatureRef.current === currentReportDefinitionSignature
+        ) {
+            return;
+        }
+        const next = mergeReportBuilderState(
+            config,
+            applyReportBuilderStateHook(
+                builderContext,
+                config,
+                state,
+                windowFormValue,
+            ),
+        );
+        appliedReportDefinitionSignatureRef.current = currentReportDefinitionSignature;
+        executeOnOpenRunKeyRef.current = "";
+        persistState(next);
+        setCommittedReportDefinitionSignature(currentReportDefinitionSignature);
+    }, [
+        builderContext,
+        config,
+        currentReportDefinitionSignature,
+        persistState,
+        state,
+        windowFormValue,
+    ]);
+
+    useEffect(() => {
         if (!currentRequestFingerprint || requestFingerprintRef.current === currentRequestDispatchFingerprint) {
             return;
         }
@@ -3074,7 +3116,10 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         }
         if (
             (hostedActivationRequired && hostedReportActivationState.status !== "ready")
-            || (hostedReportStarterId && normalizeString(state?.reportDocumentTemplateId) !== hostedReportStarterId)
+            || !isReportBuilderStarterReady({
+                requestedStarterId: hostedReportStarterId,
+                currentTemplateId: state?.reportDocumentTemplateId,
+            })
         ) {
             return;
         }
@@ -3323,8 +3368,10 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         ),
         [hostedReportStarterId, reportDocumentTemplates],
     );
-    const hostedReportStarterReady = !resolvedHostedReportStarterId
-        || normalizeString(state?.reportDocumentTemplateId) === resolvedHostedReportStarterId;
+    const hostedReportStarterReady = isReportBuilderStarterReady({
+        requestedStarterId: resolvedHostedReportStarterId,
+        currentTemplateId: state?.reportDocumentTemplateId,
+    });
     const authoredDrillMetadata = runtimePreviewMetadata;
     const authoredDrillSummary = useMemo(
         () => summarizeReportBuilderAuthoredDrillMetadata({
@@ -11896,9 +11943,10 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                 },
             } : {}),
         };
-        const basePayload = buildReportBuilderSavedReportPayload(artifact)
-            || buildReportBuilderSavedReportPayloadFromBuilderState(
-                savedReportPayload
+        const explorationPayload = buildReportBuilderSavedReportPayload(artifact);
+        const basePayload = buildReportBuilderSavedReportPayloadFromBuilderState(
+                explorationPayload
+                || savedReportPayload
                 || savedReportPayloadRecord?.savedReportPayload
                 || storedReportArtifact
                 || fallbackSavedReportPayloadSeed,
@@ -11910,7 +11958,8 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                     semanticModel: semanticModelState.model,
                     semanticRuntimeDiagnostics: runtimePreviewSemanticDiagnostics,
                 },
-            );
+            )
+            || explorationPayload;
         const payload = basePayload
             ? {
                 ...basePayload,
@@ -12023,7 +12072,10 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     const saveCurrentReportToStore = React.useCallback(async () => {
         const bundle = buildCurrentReportSaveBundle();
         if (!stageCurrentReportSaveBundle(bundle)) {
-            return;
+            return {
+                ok: false,
+                error: "The current report is not saveable. Resolve report validation issues and run it before saving.",
+            };
         }
         const saveReportRequest = buildReportBuilderSaveReportRequest(bundle.payload, {
             runtimeArtifact: bundle.runtimeArtifactValue,
@@ -12038,7 +12090,10 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                 level: "warning",
                 message: "Could not build the report-store request from the current report.",
             });
-            return;
+            return {
+                ok: false,
+                error: "Could not build the report-store request from the current report.",
+            };
         }
         const canUpdateStoredReport = !!storedReportArtifact?.artifactId
             && bundle.payload?.sourceSession?.unsavedDraft !== true
@@ -12065,14 +12120,71 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                     ? `Updated saved report ${bundle.payload?.title || bundle.fallbackReportTitle}.`
                     : `Saved ${bundle.payload?.title || bundle.fallbackReportTitle} as a persistent report.`,
             });
+            return {
+                ok: true,
+                artifactId: normalizeString(storedReport.artifactId),
+                reportId: normalizeString(storedReport.reportId || saveReportRequest.reportId),
+                title: normalizeString(storedReport.title || saveReportRequest.title),
+                version: Number(storedReport.version || saveReportRequest.version || 0) || 0,
+                updated: canUpdateStoredReport,
+            };
         } catch (error) {
             console.warn("reportBuilder.saveCurrentReportToStore failed", error);
+            const message = `Could not save ${bundle.payload?.title || bundle.fallbackReportTitle} to the report store. ${renderReportBuilderError(error)}`;
             setChartApplyFeedback({
                 level: "warning",
-                message: `Could not save ${bundle.payload?.title || bundle.fallbackReportTitle} to the report store. ${renderReportBuilderError(error)}`,
+                message,
             });
+            return { ok: false, error: message };
         }
     }, [buildCurrentReportSaveBundle, builderContext?.conversationId, builderContext?.windowState?.conversationId, container, designWorkspaceMode, reportStoreHandler, stageCurrentReportSaveBundle, storedReportArtifact]);
+    useEffect(() => {
+        const windowId = normalizeString(reportEventContext.windowId);
+        if (!windowId) {
+            return undefined;
+        }
+        return registerReportWindowActions(windowId, {
+            getCurrent: () => ({
+                ok: true,
+                windowId,
+                windowKey: normalizeString(reportEventContext.windowKey),
+                reportId: normalizeString(activeReportEventId),
+                reportName: normalizeString(activeReportEventName),
+                sourceKind: normalizeString(activeReportEventSourceKind || "runtime"),
+                request: cloneReportBuilderValue(currentRequest),
+                canRun: !!canRunReport,
+                canSave: !!canSaveCurrentReportFile && typeof reportStoreHandler?.saveReport === "function",
+                hasCompletedRun: !!hasCompletedCurrentRun,
+            }),
+            run: () => {
+                if (!canRunReport) {
+                    return { ok: false, error: "The current report is not ready to run." };
+                }
+                scheduleReportWindowMutation(runReport);
+                return {
+                    ok: true,
+                    windowId,
+                    reportId: normalizeString(activeReportEventId),
+                    reportName: normalizeString(activeReportEventName),
+                    request: cloneReportBuilderValue(currentRequest),
+                };
+            },
+            save: saveCurrentReportToStore,
+        });
+    }, [
+        activeReportEventId,
+        activeReportEventName,
+        activeReportEventSourceKind,
+        canRunReport,
+        canSaveCurrentReportFile,
+        currentRequest,
+        hasCompletedCurrentRun,
+        reportEventContext.windowId,
+        reportEventContext.windowKey,
+        reportStoreHandler?.saveReport,
+        runReport,
+        saveCurrentReportToStore,
+    ]);
     const renderSaveReportFileButton = React.useCallback(({
         small = true,
         minimal = false,
@@ -18011,6 +18123,12 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         if (hostedActivationRequired && hostedReportActivationState.status !== "ready") {
             return;
         }
+        if (shouldDeferReportBuilderExecutionForDefinition({
+            currentSignature: currentReportDefinitionSignature,
+            committedSignature: committedReportDefinitionSignature,
+        })) {
+            return;
+        }
         if (!showAuthoredReportSurface || !canRunReport || loading || error || hasRows || hasCompletedCurrentRun) {
             return;
         }
@@ -18037,7 +18155,9 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     }, [
         beginReportRunLifecycle,
         canRunReport,
+        committedReportDefinitionSignature,
         currentPrefillSignature,
+        currentReportDefinitionSignature,
         currentRequestFingerprint,
         designWorkspaceMode,
         dispatchReportRequest,

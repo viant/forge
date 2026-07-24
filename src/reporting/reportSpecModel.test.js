@@ -770,6 +770,62 @@ assert.equal(
 );
 assert.deepEqual(uniqueEndpointDeclarations[0]?.request.filters.orderIds, [222]);
 
+const crossEndpointInheritedScopeDeclarations = buildReportBuilderPublishedDatasetDeclarations(
+  {
+    datasets: [
+      {
+        id: "site_delivery",
+        dataSourceRef: "siteDeliverySource",
+        scope: { mode: "inherit" },
+        scopeParamOptions: [
+          {
+            value: "dateRange",
+            kind: "dateRange",
+            startParamPath: "filters.From",
+            endParamPath: "filters.To",
+          },
+          {
+            value: "orderIds",
+            kind: "multiSelect",
+            paramPath: "filters.orderIds",
+          },
+        ],
+        request: {
+          measures: { totalSpend: true },
+          dimensions: { siteId: true },
+          filters: {},
+        },
+      },
+    ],
+  },
+  {
+    ...rawState,
+    scopeParams: {},
+  },
+  new Set(["site_delivery"]),
+  null,
+  {
+    dataSourceRef: "demoReportSource",
+    request: {
+      filters: {
+        From: "2026-07-10",
+        To: "2026-07-21",
+        orderIds: [2680567],
+        primaryOnlyFilter: "must-not-leak",
+      },
+    },
+  },
+);
+assert.deepEqual(
+  crossEndpointInheritedScopeDeclarations[0]?.request.filters,
+  {
+    From: "2026-07-10",
+    To: "2026-07-21",
+    orderIds: [2680567],
+  },
+  "a different endpoint must inherit only scope values explicitly mapped by its metadata",
+);
+
 const tableOnlySpec = buildReportBuilderReportSpec({
   container: {
     id: "performanceBuilderTable",

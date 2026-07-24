@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 
 import {
+    REPORT_EXPORT_ARTIFACT_TIMEOUT_MS,
+    REPORT_EXPORT_HISTORY_TIMEOUT_MS,
+    REPORT_EXPORT_SIDE_EFFECT_TIMEOUT_MS,
     REPORT_EXPORT_STATUS_POLL_INTERVAL_MS,
+    REPORT_EXPORT_STATUS_TIMEOUT_MS,
+    REPORT_EXPORT_SUBMIT_TIMEOUT_MS,
     resolveReportBuilderExportEventSourceKind,
     resolveReportBuilderExportStatusFailure,
     resolveReportBuilderExportSubmitFailure,
+    runReportBuilderExportOperation,
     shouldAutoRefreshReportBuilderExportJob,
 } from "./useReportBuilderExportExecution.js";
 
@@ -148,6 +154,31 @@ assert.deepEqual(
 );
 
 assert.equal(REPORT_EXPORT_STATUS_POLL_INTERVAL_MS, 1500);
+assert.equal(REPORT_EXPORT_SUBMIT_TIMEOUT_MS, 30000);
+assert.equal(REPORT_EXPORT_STATUS_TIMEOUT_MS, 15000);
+assert.equal(REPORT_EXPORT_ARTIFACT_TIMEOUT_MS, 30000);
+assert.equal(REPORT_EXPORT_HISTORY_TIMEOUT_MS, 20000);
+assert.equal(REPORT_EXPORT_SIDE_EFFECT_TIMEOUT_MS, 5000);
+
+assert.equal(
+    await runReportBuilderExportOperation(() => Promise.resolve("completed"), {
+        timeoutMs: 25,
+    }),
+    "completed",
+);
+
+await assert.rejects(
+    runReportBuilderExportOperation(() => new Promise(() => {}), {
+        timeoutMs: 5,
+        timeoutMessage: "Export submission timed out.",
+    }),
+    /Export submission timed out/,
+);
+
+await assert.rejects(
+    runReportBuilderExportOperation(null),
+    /report export operation is required/i,
+);
 
 assert.equal(
     resolveReportBuilderExportEventSourceKind({ sourceKind: "draft", eventSourceKind: "preset" }),

@@ -204,6 +204,60 @@ const declaredMCPDatasetWithAmbientDataSource = {
 
 {
   const builderContext = {
+    conversationId: "conv-route-extract",
+    handlers: {
+      reportBuilderPreview: {
+        async fetchByRef() {
+          return {
+            payload: {
+              records: [
+                { channel: "Display", spend: 21 },
+                { channel: "CTV", spend: 13 },
+              ],
+            },
+            dataInfo: {
+              hasMore: true,
+            },
+          };
+        },
+      },
+    },
+    Context(dataSourceRef) {
+      assert.equal(dataSourceRef, "nestedRouteSource");
+      return {
+        dataSource: {
+          selectors: {
+            data: "payload.records",
+          },
+        },
+      };
+    },
+  };
+  const fetcher = resolveReportBuilderDatasetPreviewFetcher(builderContext, {
+    id: "nested_route",
+    dataSourceRef: "nestedRouteSource",
+    request: {
+      query: "nested_route",
+    },
+  }, {
+    preferDataSourceRoute: true,
+  });
+  const body = await fetcher.fetcher({
+    parameters: {
+      query: "nested_route",
+    },
+  });
+  assert.deepEqual(fetcher.resolveResult(body), {
+    rows: [
+      { channel: "Display", spend: 21 },
+      { channel: "CTV", spend: 13 },
+    ],
+    hasMore: true,
+  });
+}
+
+{
+  const builderContext = {
     conversationId: "conv-route-authoring",
     handlers: {
       reportBuilderPreview: {
