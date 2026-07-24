@@ -2279,6 +2279,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
         type: seriesType,
         xAxis: {
             dataKey: xDisplayKey || xSourceKey,
+            label: xField?.label || xField?.id || xSourceKey,
             ...(xSourceKey && ((xDisplayKey && xDisplayKey !== xSourceKey) || hasXDisplayValueMap) ? { sourceDataKey: xSourceKey } : {}),
             ...(hasXDisplayValueMap
                 ? { displayValueMap: clone(xField.displayValueMap) }

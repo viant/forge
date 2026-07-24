@@ -1945,6 +1945,7 @@ const displayConfig = {
         {
             id: "channelId",
             key: "channelId",
+            label: "Channel",
             displayKey: "channel.channel",
             displayValueMap: { "1": "Display", "6": "CTV" },
             paramPath: "dimensions.channelId",
@@ -2032,7 +2033,7 @@ assert.deepEqual(
         selectedMeasures: ["totalSpend"],
     }),
     [
-        { key: "channel.channel", aliases: ["channelId"], label: "channelId", kind: "dimension", format: undefined, align: undefined },
+        { key: "channel.channel", aliases: ["channelId"], label: "Channel", kind: "dimension", format: undefined, align: undefined },
         { key: "eventDate", aliases: ["eventDate"], label: "eventDate", kind: "dimension", format: undefined, align: undefined },
         { key: "totalSpend", aliases: ["totalSpend"], label: "totalSpend", kind: "measure", format: undefined, align: "right" },
     ],
@@ -2066,6 +2067,7 @@ const displayContainer = buildExplicitReportBuilderChartContainer(
     },
 );
 assert.equal(displayContainer.chart.xAxis.dataKey, "channel.channel");
+assert.equal(displayContainer.chart.xAxis.label, "Channel");
 
 const blockedQuickApply = prepareReportBuilderChartApplication(displayConfig, {
     selectedDimensions: ["eventDate"],
@@ -2080,7 +2082,7 @@ const blockedQuickApply = prepareReportBuilderChartApplication(displayConfig, {
 });
 assert.equal(blockedQuickApply.canApply, false);
 assert.equal(blockedQuickApply.reason, "missingDimensions");
-assert.deepEqual(blockedQuickApply.missingDimensionLabels, ["channelId"]);
+assert.deepEqual(blockedQuickApply.missingDimensionLabels, ["Channel"]);
 
 const autoProvisionedQuickApply = prepareReportBuilderChartApplication(displayConfig, {
     selectedDimensions: ["eventDate"],

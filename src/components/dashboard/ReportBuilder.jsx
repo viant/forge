@@ -1199,6 +1199,7 @@ function buildChartContainer(container = {}, config = {}, state = {}) {
             type: config.result?.chartType || "line",
             xAxis: {
                 dataKey: xDisplayKey,
+                label: xDimension?.label || xDimension?.id || xSourceKey,
                 ...(xSourceKey && (normalizeString(xDisplayKey) !== normalizeString(xSourceKey) || hasXDisplayValueMap)
                     ? { sourceDataKey: xSourceKey }
                     : {}),
