@@ -1,3 +1,5 @@
+import { applyReportBuilderTarget } from "./reportBuilderTarget.js";
+
 const REPORT_FILE_KIND = "forge.reporting.reportFile";
 const REPORT_FILE_SCHEMA_VERSION = 1;
 
@@ -136,26 +138,6 @@ function collectDatasetRefs(value = null, refs = []) {
     return refs;
 }
 
-function applyPortableBuilderTarget(document = null, builderTarget = null) {
-    if (!isPlainObject(document) || !isPlainObject(builderTarget)) {
-        return cloneValue(document);
-    }
-    const target = {
-        kind: "dashboard.reportBuilder",
-        containerId: normalizeString(builderTarget.containerId),
-        stateKey: normalizeString(builderTarget.stateKey),
-        dataSourceRef: normalizeString(builderTarget.dataSourceRef),
-    };
-    return {
-        ...cloneValue(document),
-        blocks: (Array.isArray(document.blocks) ? document.blocks : []).map((block) => (
-            normalizeString(block?.kind) === "reportBuilderBlock"
-                ? { ...cloneValue(block), source: target }
-                : cloneValue(block)
-        )),
-    };
-}
-
 function findUnsafeSourceValue(value = null, path = "") {
     if (Array.isArray(value)) {
         for (let index = 0; index < value.length; index += 1) {
@@ -247,7 +229,7 @@ export function buildReportBuilderPortableReportFile(savedReportPayload = null) 
         kind: REPORT_FILE_KIND,
         title: normalizeString(savedReportPayload.title || savedReportPayload.reportDocument.title || "Report") || "Report",
         builderRef: sourceRef,
-        reportDocument: applyPortableBuilderTarget(savedReportPayload.reportDocument, builderTarget),
+        reportDocument: applyReportBuilderTarget(savedReportPayload.reportDocument, builderTarget),
         reportSpec: cloneValue(savedReportPayload.reportSpec),
         ...(savedReportPayload.semanticBindingViewState
             ? { semanticBindingViewState: cloneValue(savedReportPayload.semanticBindingViewState) }

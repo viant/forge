@@ -67,6 +67,21 @@ function setNestedValue(target, path, value) {
   cursor[segments[segments.length - 1]] = value;
 }
 
+function getNestedValue(target, path) {
+  const segments = normalizeString(path).split(".").filter(Boolean);
+  if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
+    return undefined;
+  }
+  let cursor = target;
+  for (const segment of segments) {
+    if (!cursor || typeof cursor !== "object" || Array.isArray(cursor)) {
+      return undefined;
+    }
+    cursor = cursor[segment];
+  }
+  return cursor;
+}
+
 function deleteNestedValue(target, path) {
   const segments = normalizeString(path).split(".").filter(Boolean);
   if (!target || typeof target !== "object" || Array.isArray(target) || segments.length === 0) {
@@ -265,6 +280,7 @@ function buildReportBuilderPublishedDatasetRequest(
   state = {},
   datasetScopeParamValues = null,
   inheritedRequestContext = null,
+  primaryRequestContext = null,
 ) {
   const request = isPlainObject(source?.request) ? cloneValue(source.request) : null;
   if (!request) {
@@ -286,20 +302,27 @@ function buildReportBuilderPublishedDatasetRequest(
       return;
     }
     const hasDatasetScopedValue = datasetScopeParamValues && Object.prototype.hasOwnProperty.call(datasetScopeParamValues, paramId);
-    const rawValue = hasDatasetScopedValue
+    let rawValue = hasDatasetScopedValue
       ? datasetScopeParamValues[paramId]
       : getScopeParamValue(state, paramId);
     const kind = normalizeString(option?.kind || "");
     if (kind.toLowerCase() === "daterange") {
       const startParamPath = normalizeString(option?.startParamPath);
       const endParamPath = normalizeString(option?.endParamPath);
-      if (normalizeString(rawValue?.start) && startParamPath) {
-        setNestedValue(contextPatch, startParamPath, rawValue.start);
+      const startValue = normalizeString(rawValue?.start)
+        || normalizeString(getNestedValue(primaryRequestContext, startParamPath));
+      const endValue = normalizeString(rawValue?.end)
+        || normalizeString(getNestedValue(primaryRequestContext, endParamPath));
+      if (startValue && startParamPath) {
+        setNestedValue(contextPatch, startParamPath, startValue);
       }
-      if (normalizeString(rawValue?.end) && endParamPath) {
-        setNestedValue(contextPatch, endParamPath, rawValue.end);
+      if (endValue && endParamPath) {
+        setNestedValue(contextPatch, endParamPath, endValue);
       }
       return;
+    }
+    if (rawValue == null || rawValue === "" || (Array.isArray(rawValue) && rawValue.length === 0)) {
+      rawValue = getNestedValue(primaryRequestContext, paramPath);
     }
     if (rawValue == null || rawValue === "" || (Array.isArray(rawValue) && rawValue.length === 0)) {
       return;
@@ -377,7 +400,13 @@ export function buildReportBuilderPublishedDatasetDeclarations(
               : {}),
           }
         : null;
-      const request = buildReportBuilderPublishedDatasetRequest(source, state, scopedValues, inheritedRequestContext);
+      const request = buildReportBuilderPublishedDatasetRequest(
+        source,
+        state,
+        scopedValues,
+        inheritedRequestContext,
+        primaryRequestContext?.request,
+      );
       if (!request) {
         return null;
       }

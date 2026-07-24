@@ -180,6 +180,7 @@ export function resolveReportBuilderDatasetPreviewFetcher(builderContext = null,
             dataSourceContext,
             resolveResult(body = null) {
                 return resolvePreviewFetchResult(body, {
+                    extractConfig: dataSourceContext?.dataSource,
                     resultContract: normalizedDataset?.resultContract,
                     useDataSourcePagingFallback: true,
                 });
@@ -214,6 +215,7 @@ export function resolveReportBuilderDatasetPreviewFetcher(builderContext = null,
             dataSourceContext,
             resolveResult(body = null) {
                 return resolvePreviewFetchResult(body, {
+                    extractConfig: dataSourceContext?.dataSource,
                     resultContract: normalizedDataset?.resultContract,
                     useDataSourcePagingFallback: true,
                 });

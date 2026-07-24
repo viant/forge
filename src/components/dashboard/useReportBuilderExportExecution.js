@@ -68,6 +68,50 @@ function buildExportFormatLabel(format = "") {
 }
 
 export const REPORT_EXPORT_STATUS_POLL_INTERVAL_MS = 1500;
+export const REPORT_EXPORT_SUBMIT_TIMEOUT_MS = 30000;
+export const REPORT_EXPORT_STATUS_TIMEOUT_MS = 15000;
+export const REPORT_EXPORT_ARTIFACT_TIMEOUT_MS = 30000;
+export const REPORT_EXPORT_HISTORY_TIMEOUT_MS = 20000;
+export const REPORT_EXPORT_SIDE_EFFECT_TIMEOUT_MS = 5000;
+
+export async function runReportBuilderExportOperation(operation, {
+    timeoutMs = 0,
+    timeoutMessage = "The report export operation timed out.",
+} = {}) {
+    if (typeof operation !== "function") {
+        throw new TypeError("A report export operation is required.");
+    }
+    const normalizedTimeoutMs = Math.max(0, Math.trunc(Number(timeoutMs) || 0));
+    if (!normalizedTimeoutMs || typeof globalThis.setTimeout !== "function") {
+        return operation();
+    }
+    let timeoutId = null;
+    try {
+        return await Promise.race([
+            Promise.resolve().then(operation),
+            new Promise((_, reject) => {
+                timeoutId = globalThis.setTimeout(() => {
+                    reject(new Error(normalizeString(timeoutMessage) || "The report export operation timed out."));
+                }, normalizedTimeoutMs);
+            }),
+        ]);
+    } finally {
+        if (timeoutId != null) {
+            globalThis.clearTimeout(timeoutId);
+        }
+    }
+}
+
+function runReportBuilderExportSideEffect(operation, label = "report export side effect") {
+    void runReportBuilderExportOperation(operation, {
+        timeoutMs: REPORT_EXPORT_SIDE_EFFECT_TIMEOUT_MS,
+        timeoutMessage: `${label} did not respond within ${REPORT_EXPORT_SIDE_EFFECT_TIMEOUT_MS / 1000} seconds.`,
+    }).catch((error) => {
+        globalThis.console?.warn?.(
+            `[forge-reporting] ${label} did not complete: ${normalizeString(error?.message || error) || "unknown error"}`,
+        );
+    });
+}
 
 export function resolveReportBuilderExportEventSourceKind({
     sourceKind = "",
@@ -300,14 +344,20 @@ export function useReportBuilderExportExecution({
         historyRequestVersionRef.current = requestVersion;
         setHistoryLoading(true);
         try {
-            const [jobsResult, artifactsResult] = await Promise.all([
-                typeof reportExportHandler?.listJobs === "function"
-                    ? reportExportHandler.listJobs({ artifactRef: historyArtifactRef, limit: 6 })
-                    : Promise.resolve([]),
-                typeof reportExportHandler?.listArtifacts === "function"
-                    ? reportExportHandler.listArtifacts({ artifactRef: historyArtifactRef, limit: 6 })
-                    : Promise.resolve([]),
-            ]);
+            const [jobsResult, artifactsResult] = await runReportBuilderExportOperation(
+                () => Promise.all([
+                    typeof reportExportHandler?.listJobs === "function"
+                        ? reportExportHandler.listJobs({ artifactRef: historyArtifactRef, limit: 6 })
+                        : Promise.resolve([]),
+                    typeof reportExportHandler?.listArtifacts === "function"
+                        ? reportExportHandler.listArtifacts({ artifactRef: historyArtifactRef, limit: 6 })
+                        : Promise.resolve([]),
+                ]),
+                {
+                    timeoutMs: REPORT_EXPORT_HISTORY_TIMEOUT_MS,
+                    timeoutMessage: `Recent exports did not respond within ${REPORT_EXPORT_HISTORY_TIMEOUT_MS / 1000} seconds.`,
+                },
+            );
             const nextJobs = normalizeReportBuilderExportJobList(jobsResult);
             const nextArtifacts = normalizeReportBuilderExportArtifactList(artifactsResult);
             if (historyRequestVersionRef.current !== requestVersion) {
@@ -354,26 +404,30 @@ export function useReportBuilderExportExecution({
             return null;
         }
         setSubmitting(true);
-        await emitExportEvent("report.export_start");
+        runReportBuilderExportSideEffect(
+            () => emitExportEvent("report.export_start"),
+            "report.export_start event",
+        );
         try {
-            const result = await reportExportHandler.submitRequest({
-                request: cloneValue(request),
-                source: normalizedSourceKind,
-            });
+            const result = await runReportBuilderExportOperation(
+                () => reportExportHandler.submitRequest({
+                    request: cloneValue(request),
+                    source: normalizedSourceKind,
+                }),
+                {
+                    timeoutMs: REPORT_EXPORT_SUBMIT_TIMEOUT_MS,
+                    timeoutMessage: `Export submission did not respond within ${REPORT_EXPORT_SUBMIT_TIMEOUT_MS / 1000} seconds. Check recent exports before retrying.`,
+                },
+            );
             const normalizedJob = normalizeReportBuilderExportJob(result);
             if (normalizedJob) {
                 setJob(normalizedJob);
                 setArtifact(null);
-                await emitExportComplete(normalizedJob);
+                runReportBuilderExportSideEffect(
+                    () => emitExportComplete(normalizedJob),
+                    "report.export_complete event",
+                );
             }
-            const auditResult = await recordReportBuilderExportAuditEvent(request, {
-                handler: reportAuditHandler,
-                actorRef: reportAuditActorRef,
-                metadata: {
-                    ...normalizeMetadata(reportAuditMetadata),
-                    ...(normalizedSourceKind ? { triggerSource: normalizedSourceKind } : {}),
-                },
-            });
             const readyAction = normalizedJob?.status === "succeeded" && normalizeString(normalizedJob?.artifactId)
                 ? {
                     action: "downloadArtifact",
@@ -383,10 +437,24 @@ export function useReportBuilderExportExecution({
                 }
                 : {};
             setFeedback({
-                level: auditResult.issue ? "warning" : "success",
-                message: `${normalizeString(result?.message) || `Submitted ${format} export for ${title}.`}${auditResult.issue ? ` ${auditResult.issue}` : ""}`,
+                level: "success",
+                message: normalizeString(result?.message) || `Submitted ${format} export for ${title}.`,
                 ...readyAction,
             });
+            runReportBuilderExportSideEffect(async () => {
+                const auditResult = await recordReportBuilderExportAuditEvent(request, {
+                    handler: reportAuditHandler,
+                    actorRef: reportAuditActorRef,
+                    metadata: {
+                        ...normalizeMetadata(reportAuditMetadata),
+                        ...(normalizedSourceKind ? { triggerSource: normalizedSourceKind } : {}),
+                    },
+                });
+                if (auditResult.issue) {
+                    globalThis.console?.warn?.(`[forge-reporting] ${auditResult.issue}`);
+                }
+                return auditResult;
+            }, "report export audit");
             if (historyAvailable) {
                 Promise.resolve().then(() => refreshHistory({ silent: true }));
             }
@@ -445,7 +513,13 @@ export function useReportBuilderExportExecution({
         statusRequestVersionRef.current = requestVersion;
         setStatusLoading(true);
         try {
-            const nextJob = normalizeReportBuilderExportJob(await reportExportHandler.getStatus({ jobId }));
+            const nextJob = normalizeReportBuilderExportJob(await runReportBuilderExportOperation(
+                () => reportExportHandler.getStatus({ jobId }),
+                {
+                    timeoutMs: REPORT_EXPORT_STATUS_TIMEOUT_MS,
+                    timeoutMessage: `Export status ${jobId} did not respond within ${REPORT_EXPORT_STATUS_TIMEOUT_MS / 1000} seconds.`,
+                },
+            ));
             if (statusRequestVersionRef.current !== requestVersion) {
                 return null;
             }
@@ -479,7 +553,10 @@ export function useReportBuilderExportExecution({
                 if (historyAvailable) {
                     Promise.resolve().then(() => refreshHistory({ silent: true }));
                 }
-                await emitExportComplete(nextJob);
+                runReportBuilderExportSideEffect(
+                    () => emitExportComplete(nextJob),
+                    "report.export_complete event",
+                );
             }
             return nextJob;
         } catch (error) {
@@ -581,7 +658,13 @@ export function useReportBuilderExportExecution({
             }
             setArtifactLoading(true);
             try {
-                const nextArtifact = normalizeReportBuilderExportArtifact(await reportExportHandler.getArtifact({ artifactId: normalizedArtifactId }));
+                const nextArtifact = normalizeReportBuilderExportArtifact(await runReportBuilderExportOperation(
+                    () => reportExportHandler.getArtifact({ artifactId: normalizedArtifactId }),
+                    {
+                        timeoutMs: REPORT_EXPORT_ARTIFACT_TIMEOUT_MS,
+                        timeoutMessage: `Export artifact ${normalizedArtifactId} did not respond within ${REPORT_EXPORT_ARTIFACT_TIMEOUT_MS / 1000} seconds.`,
+                    },
+                ));
                 if (nextArtifact) {
                     resolvedArtifact = nextArtifact;
                     if (job?.artifactId === normalizedArtifactId) {

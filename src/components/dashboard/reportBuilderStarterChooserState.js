@@ -6,6 +6,16 @@ export function isBlankReportBuilderStarterId(value = "") {
     return normalizeString(value) === "__blank__";
 }
 
+export function isReportBuilderStarterReady({
+    requestedStarterId = "",
+    currentTemplateId = "",
+} = {}) {
+    const requested = normalizeString(requestedStarterId);
+    return !requested
+        || isBlankReportBuilderStarterId(requested)
+        || normalizeString(currentTemplateId) === requested;
+}
+
 export function shouldShowReportBuilderStarterChooser({
     authoredBlockCount = 0,
 } = {}) {

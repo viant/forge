@@ -8,8 +8,10 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -35,8 +37,9 @@ type Hub struct {
 	httpHandler http.Handler
 	httpBridge  *httpRPCBridge
 
-	pendingMu sync.Mutex
-	pending   map[string]chan *rpcResponse
+	pendingMu  sync.Mutex
+	pending    map[string]chan *rpcResponse
+	commandSeq atomic.Uint64
 
 	upgrader websocket.Upgrader
 }
@@ -509,7 +512,7 @@ func (h *Hub) Call(ctx context.Context, ns, clientID string, method string, para
 	}
 	h.mu.RUnlock()
 
-	id := "cmd_" + ns + "_" + clientID + "_" + time.Now().Format("20060102T150405.000")
+	id := h.nextCommandID(ns, clientID, time.Now())
 	ch := make(chan *rpcResponse, 1)
 	h.pendingMu.Lock()
 	h.pending[id] = ch
@@ -558,6 +561,12 @@ func (h *Hub) Call(ctx context.Context, ns, clientID string, method string, para
 		log.Printf("[forge-ui] call response ns=%q client=%q method=%q id=%q ok=%v err=%q", ns, clientID, method, id, resp.OK, resp.Error)
 		return resp, nil
 	}
+}
+
+func (h *Hub) nextCommandID(ns, clientID string, now time.Time) string {
+	return "cmd_" + ns + "_" + clientID + "_" +
+		now.Format("20060102T150405.000000000") + "_" +
+		strconv.FormatUint(h.commandSeq.Add(1), 10)
 }
 
 func mustJSON(v any) json.RawMessage {

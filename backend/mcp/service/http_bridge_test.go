@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/viant/jsonrpc"
 	"github.com/viant/jsonrpc/transport/server/base"
@@ -266,5 +268,34 @@ func TestServiceUICommand_QueueRoundTripForSetFormData(t *testing.T) {
 		if !out.OK {
 			t.Fatalf("expected OK output, got %#v", out)
 		}
+	}
+}
+
+func TestHubNextCommandIDIsUniqueForConcurrentCallsAtSameInstant(t *testing.T) {
+	hub := NewHub(&Config{})
+	now := time.Date(2026, time.July, 24, 2, 40, 3, 440000000, time.UTC)
+
+	const count = 1000
+	ids := make(chan string, count)
+	var wg sync.WaitGroup
+	wg.Add(count)
+	for i := 0; i < count; i++ {
+		go func() {
+			defer wg.Done()
+			ids <- hub.nextCommandID("default", "client-1", now)
+		}()
+	}
+	wg.Wait()
+	close(ids)
+
+	seen := make(map[string]struct{}, count)
+	for id := range ids {
+		if _, ok := seen[id]; ok {
+			t.Fatalf("duplicate command ID %q", id)
+		}
+		seen[id] = struct{}{}
+	}
+	if len(seen) != count {
+		t.Fatalf("expected %d unique command IDs, got %d", count, len(seen))
 	}
 }

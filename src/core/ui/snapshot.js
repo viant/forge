@@ -97,6 +97,91 @@ export function serializeInlineMetadata(metadata) {
   return toSerializableDefinition(metadata);
 }
 
+function compactReportBuilderField(option = {}) {
+  const key = String(option?.key || option?.value || '').trim();
+  if (!key) return null;
+  return {
+    key,
+    label: String(option?.label || key).trim(),
+    kind: String(option?.kind || '').trim() || null,
+    format: String(option?.format || '').trim() || null,
+    required: option?.required === true || undefined,
+    multiple: option?.multiple === true || undefined,
+    paramPath: String(option?.paramPath || '').trim() || null,
+    startParamPath: String(option?.startParamPath || '').trim() || null,
+    endParamPath: String(option?.endParamPath || '').trim() || null,
+  };
+}
+
+function uniqueReportBuilderFields(options = []) {
+  const seen = new Set();
+  return (Array.isArray(options) ? options : [])
+    .map(compactReportBuilderField)
+    .filter((field) => {
+      if (!field || seen.has(field.key)) return false;
+      seen.add(field.key);
+      return true;
+    })
+    .slice(0, 100);
+}
+
+function compactReportBuilderDataSource(source = {}) {
+  const id = String(source?.id || '').trim();
+  if (!id) return null;
+  const fields = uniqueReportBuilderFields([
+    ...(Array.isArray(source?.columnOptions) ? source.columnOptions : []),
+    ...(Array.isArray(source?.chartFieldOptions) ? source.chartFieldOptions : []),
+    ...(Array.isArray(source?.valueFieldOptions) ? source.valueFieldOptions : []),
+    ...(Array.isArray(source?.secondaryFieldOptions) ? source.secondaryFieldOptions : []),
+  ]);
+  return {
+    id,
+    dataSourceRef: String(source?.dataSourceRef || '').trim() || null,
+    label: String(source?.label || id).trim(),
+    description: String(source?.description || '').trim() || null,
+    kindLabel: String(source?.kindLabel || '').trim() || null,
+    capabilities: source?.capabilities && typeof source.capabilities === 'object'
+      ? safeJSON(source.capabilities, { maxDepth: 2, maxKeys: 30, maxString: 500 })
+      : undefined,
+    scope: source?.scope && typeof source.scope === 'object'
+      ? safeJSON(source.scope, { maxDepth: 4, maxKeys: 30, maxString: 500 })
+      : undefined,
+    fields,
+    scopeParams: uniqueReportBuilderFields(source?.scopeParamOptions),
+  };
+}
+
+function getReportBuilderAuthoringCatalog(content = {}, windowForm = {}) {
+  const dashboard = content?.dashboard && typeof content.dashboard === 'object'
+    ? content.dashboard
+    : {};
+  const variants = dashboard?.reportBuilders && typeof dashboard.reportBuilders === 'object'
+    ? dashboard.reportBuilders
+    : {};
+  const requestedRef = String(windowForm?.reportBuilderRef || '').trim();
+  const defaultRef = String(dashboard?.reportBuilderRef || content?.reportBuilderRef || '').trim();
+  const builderRef = requestedRef || defaultRef;
+  const variant = builderRef && variants[builderRef] && typeof variants[builderRef] === 'object'
+    ? variants[builderRef]
+    : null;
+  const config = variant?.reportBuilder
+    || dashboard?.reportBuilder
+    || content?.reportBuilder
+    || null;
+  if (!config || typeof config !== 'object') return undefined;
+
+  const dataSources = (Array.isArray(config?.dataSources) ? config.dataSources : [])
+    .map(compactReportBuilderDataSource)
+    .filter(Boolean)
+    .slice(0, 50);
+  return {
+    builderRef: builderRef || null,
+    label: String(variant?.label || config?.label || content?.title || builderRef || '').trim() || null,
+    authoringContract: 'Use dataSources[].id as report block datasetRef. dataSources[].dataSourceRef is the underlying execution source. Dataset scope mode inherit follows the active report filters; relativeDateRange overrides them with its declared window.',
+    dataSources,
+  };
+}
+
 function getWindowMetadataSummary(windowId, options) {
   try {
     const meta = getMetadataSignal(windowId).peek();
@@ -107,6 +192,8 @@ function getWindowMetadataSummary(windowId, options) {
 
     const view = meta.view || {};
     const content = view.content || {};
+    const windowForm = getFormSignal(`${windowId}:windowForm`).peek() || {};
+    const reportBuilder = getReportBuilderAuthoringCatalog(content, windowForm);
     const tabs = [];
     const controls = [];
     const collectTabs = (node) => {
@@ -161,6 +248,7 @@ function getWindowMetadataSummary(windowId, options) {
         tabs,
         controls,
       },
+      reportBuilder,
       raw: options?.includeMetadata ? safeJSON(meta, options) : undefined,
     };
   } catch (e) {
