@@ -3,6 +3,8 @@ import ForgeIOSRuntime
 
 public struct ContainerRenderer: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.forgePresentationDensity) private var presentationDensity
+    @Environment(\.forgeContainerRendererRegistry) private var rendererRegistry
 
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
@@ -45,7 +47,9 @@ public struct ContainerRenderer: View {
     @ViewBuilder
     private var renderedBody: some View {
         let effectiveContainer = resolvedContainer()
-        if effectiveContainer.kind == "dashboard" || effectiveContainer.kind?.starts(with: "dashboard.") == true {
+        if let renderer = rendererRegistry.renderer(for: effectiveContainer.kind) {
+            customRendererBody(renderer, container: effectiveContainer)
+        } else if effectiveContainer.kind == "dashboard" || effectiveContainer.kind?.starts(with: "dashboard.") == true {
             DashboardRenderer(runtime: runtime, window: window, container: effectiveContainer)
         } else if effectiveContainer.schemaBasedForm != nil {
             VStack(alignment: .leading, spacing: 12) {
@@ -120,6 +124,36 @@ public struct ContainerRenderer: View {
             }
         } else {
             PlaceholderContainerView(container: effectiveContainer)
+        }
+    }
+
+    private func customRendererBody(
+        _ renderer: any ForgeContainerRendererExtension,
+        container: ContainerDef
+    ) -> AnyView {
+        do {
+            return try renderer.render(context: ForgeContainerRendererContext(
+                runtime: runtime,
+                window: window,
+                container: container,
+                inheritedDataSourceRef: inheritedDataSourceRef,
+                suppressTitle: suppressTitle,
+                presentationDensity: presentationDensity,
+                targetContext: runtime?.targetContext
+            ))
+        } catch {
+            return AnyView(
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Unsupported content").font(.headline)
+                    Text("This content could not be displayed.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Unsupported content")
+            )
         }
     }
 
