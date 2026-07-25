@@ -1615,22 +1615,24 @@ public struct ReportBuilderRenderer: View {
             records = [payload]
         }
 
-        return records.compactMap { record in
+        var selections: [ReportBuilderDynamicSelectionState] = []
+        selections.reserveCapacity(records.count)
+        for record in records {
             let valueSelector = (filter.valueSelector ?? "value").trimmingCharacters(in: .whitespacesAndNewlines)
             let labelSelector = (filter.labelSelector ?? "label").trimmingCharacters(in: .whitespacesAndNewlines)
             let groupSelector = (filter.groupSelector ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
 
             let rawValue = resolveRecordValue(record, selectors: lookupValueFallbackSelectors(valueSelector))
             guard let value = coerceSelectionValue(filter: filter, rawValue: rawValue) else {
-                return nil
+                continue
             }
 
             let labelValue = resolveRecordValue(record, selectors: lookupLabelFallbackSelectors(labelSelector, valueSelector))
-            let label = labelValue?.stringValue
-                ?? labelValue?.intValue.map(String.init)
-                ?? value.stringValue
-                ?? value.intValue.map(String.init)
-                ?? ""
+            let labelString = labelValue?.stringValue
+            let labelInteger = labelValue?.intValue.map { String($0) }
+            let valueString = value.stringValue
+            let valueInteger = value.intValue.map { String($0) }
+            let label = labelString ?? labelInteger ?? valueString ?? valueInteger ?? ""
             let group = resolveRecordValue(record, selectors: [groupSelector])?.stringValue ?? ""
             let recordSelectors = filter.recordSelectors ?? []
             let compactRecord = compactLookupRecord(
@@ -1639,13 +1641,14 @@ public struct ReportBuilderRenderer: View {
                 selectors: [valueSelector, labelSelector, groupSelector] + recordSelectors
             )
 
-            return ReportBuilderDynamicSelectionState(
+            selections.append(ReportBuilderDynamicSelectionState(
                 value: value,
                 label: label,
                 group: group,
                 record: compactRecord
-            )
+            ))
         }
+        return selections
     }
 
     private static func upsertDynamicSelections(

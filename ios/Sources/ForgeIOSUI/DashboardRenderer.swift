@@ -2022,8 +2022,9 @@ public struct DashboardRenderer: View {
         for ref in refs {
             loaded[ref] = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
         }
+        let loadedSnapshot = loaded
         await MainActor.run {
-            dashboardCollections = loaded
+            dashboardCollections = loadedSnapshot
         }
 
         await withTaskGroup(of: Void.self) { group in
