@@ -12,7 +12,7 @@ import kotlinx.serialization.json.decodeFromJsonElement
 class ForgeRuntime(
     endpoints: Map<String, EndpointConfig>,
     val scope: CoroutineScope,
-    private val targetContext: ForgeTargetContext = ForgeTargetContext(platform = "android"),
+    val targetContext: ForgeTargetContext = ForgeTargetContext(platform = "android"),
     private val windowMetadataBaseUri: String = "forge/window"
 ) {
     data class DataSourceFetchRequest(

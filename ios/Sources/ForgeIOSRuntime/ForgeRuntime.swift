@@ -95,7 +95,7 @@ public actor ForgeRuntime {
     }
 
     public private(set) var windows: [WindowState] = []
-    public let targetContext: ForgeTargetContext
+    public nonisolated let targetContext: ForgeTargetContext
     let signals: SignalRegistry
     let dataSourceRuntime: DataSourceRuntime
     private var windowMetadataEndpoint: URL?
