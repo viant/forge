@@ -446,10 +446,13 @@ public struct MenuListRenderer: View {
             nextCollections[ref] = collection
         }
 
+        let formsSnapshot = nextForms
+        let metricsSnapshot = nextMetrics
+        let collectionsSnapshot = nextCollections
         await MainActor.run {
-            formValuesByDataSource = nextForms
-            metricsValuesByDataSource = nextMetrics
-            collectionValuesByDataSource = nextCollections
+            formValuesByDataSource = formsSnapshot
+            metricsValuesByDataSource = metricsSnapshot
+            collectionValuesByDataSource = collectionsSnapshot
         }
     }
 
@@ -605,14 +608,11 @@ public struct MenuListRenderer: View {
     }
 
     private func resolvedLinkDisplayText(_ item: ItemDef) -> String {
-        let raw = resolvedItemDisplayValue(item)
-            ?? item.link?.text?.trimmingCharacters(in: .whitespacesAndNewlines)
-            ?? item.label
-            ?? item.title
-            ?? item.id
-            ?? item.link?.windowTitle
-            ?? item.link?.windowKey
-            ?? "Open"
+        let resolved = resolvedItemDisplayValue(item)
+        let linkText = item.link?.text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallback = item.label ?? item.title ?? item.id
+        let windowFallback = item.link?.windowTitle ?? item.link?.windowKey
+        let raw = resolved ?? linkText ?? fallback ?? windowFallback ?? "Open"
         return isPlaceholderSummaryValue(raw) ? "No data" : raw
     }
 

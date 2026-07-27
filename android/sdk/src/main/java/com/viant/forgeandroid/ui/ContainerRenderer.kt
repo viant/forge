@@ -55,6 +55,8 @@ fun ContainerRenderer(
         androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
     }
     val kind = container.kind?.trim().orEmpty()
+    val customRenderer = LocalForgeContainerRendererRegistry.current.renderer(kind)
+    val presentationDensity = LocalForgePresentationDensity.current
 
     LaunchedEffect(container.id, visibilityContext?.dataSourceRef) {
         if (container.visibleWhen != null && visibilityContext != null && visibilityContext.dataSource.autoFetch != false) {
@@ -65,6 +67,22 @@ fun ContainerRenderer(
     if (kind != "dashboard" && !kind.startsWith("dashboard.") &&
         !evaluateDashboardCondition(container.visibleWhen, metrics = visibilityMetrics)
     ) {
+        return
+    }
+
+    if (customRenderer != null) {
+        customRenderer.Render(
+            ForgeContainerRendererContext(
+                runtime = runtime,
+                window = window,
+                container = container,
+                inheritedDataSourceRef = inheritedDataSourceRef,
+                suppressTitle = suppressTitle,
+                presentationDensity = presentationDensity,
+                targetContext = runtime.targetContext,
+                modifier = modifier
+            )
+        )
         return
     }
 

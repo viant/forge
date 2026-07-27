@@ -114,8 +114,9 @@ public struct EditorRenderer: View {
         var next = form
         next[sourceKey] = .string(value)
         form = next
+        let updatedForm = next
         Task {
-            await runtime.setDataSourceForm(windowID: window.windowID, dataSourceRef: dataSourceRef, values: next)
+            await runtime.setDataSourceForm(windowID: window.windowID, dataSourceRef: dataSourceRef, values: updatedForm)
         }
     }
 }
