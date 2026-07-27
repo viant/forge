@@ -451,7 +451,7 @@ const annotatedChartSpec = {
       },
       chartModel: {
         type: "line",
-        xAxis: { dataKey: "eventDate" },
+        xAxis: { dataKey: "eventDate", label: "Event Date" },
         yAxis: { format: "currency" },
         annotations: {
           verticalMarkers: [

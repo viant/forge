@@ -898,6 +898,7 @@ export const reportFillSchema = {
       properties: {
         dataKey: { type: "string" },
         sourceDataKey: { type: "string" },
+        label: { type: "string" },
         displayValueMap: {
           type: "object",
           additionalProperties: { $ref: "#/$defs/jsonValue" },
