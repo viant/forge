@@ -17,6 +17,18 @@ const config = {
   measures: [
     { id: "totalSpend", key: "totalSpend", label: "Spend", default: true, format: "currency" },
   ],
+  computedMeasures: [
+    {
+      id: "efficiency",
+      key: "efficiency",
+      label: "Efficiency",
+      compute: {
+        type: "ratio",
+        numerator: "totalSpend",
+        denominator: "totalSpend",
+      },
+    },
+  ],
   dimensions: [
     { id: "channelId", key: "channelId", label: "Channel", default: true },
   ],
@@ -98,7 +110,7 @@ const config = {
 };
 
 const state = {
-  selectedMeasures: ["totalSpend"],
+  selectedMeasures: ["totalSpend", "efficiency"],
   primaryMeasure: "totalSpend",
   selectedDimensions: ["channelId"],
   viewMode: "table",
@@ -180,6 +192,7 @@ const model = buildReportBuilderRuntimePreviewModel({
 
 assert.ok(model);
 assert.equal(model.reportSpec.datasets.some((dataset) => dataset.id === "primary"), false);
+assert.equal(model.reportSpec.calculatedFields.some((field) => field.datasetRef === "primary"), false);
 assert.equal(model.reportSpec.datasets.some((dataset) => dataset.id === "forecast_cube"), true);
 assert.equal(model.reportSpec.datasets.some((dataset) => dataset.id === "forecast_chart_only"), true);
 assert.equal(model.document.datasets.some((dataset) => dataset.id === "forecast_cube"), true);
@@ -222,6 +235,7 @@ const artifacts = buildReportBuilderRuntimePreviewArtifacts({
 });
 
 assert.ok(artifacts);
+assert.ok(artifacts.exportRequest);
 const forecastDataset = artifacts.reportFill.datasets.find((dataset) => dataset.id === "forecast_cube");
 assert.ok(forecastDataset);
 assert.equal(forecastDataset.rows.length, 2);

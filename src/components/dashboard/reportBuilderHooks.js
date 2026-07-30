@@ -158,6 +158,12 @@ export function shouldDeferReportBuilderExecutionForDefinition({
     return current !== String(committedSignature || "").trim();
 }
 
+export function shouldSuppressReportStarterForDefinition({
+    reportDefinitionSignature: signature = "",
+} = {}) {
+    return String(signature || "").trim() !== "";
+}
+
 export function shouldDeferReportBuilderRequestForPrefill({
     currentPrefillSignature = "",
     appliedPrefillSignature = "",

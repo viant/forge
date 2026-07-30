@@ -2185,6 +2185,12 @@ const displayMappedBadgesDocument = buildReportBuilderReportDocument({
           valueField: "channelId",
           tone: "info",
         },
+        {
+          id: "spend",
+          label: "Spend",
+          valueField: "totalSpend",
+          tone: "warning",
+        },
       ],
     }),
   ],
@@ -2201,6 +2207,13 @@ assert.deepEqual(mappedBadgesBlock?.items?.[0], {
     "2": "CTV",
   },
   tone: "info",
+});
+assert.deepEqual(mappedBadgesBlock?.items?.[1], {
+  id: "spend",
+  label: "Spend",
+  valueField: "totalSpend",
+  format: "currency",
+  tone: "warning",
 });
 
 const displayMappedChartDocument = buildReportBuilderReportDocument({
