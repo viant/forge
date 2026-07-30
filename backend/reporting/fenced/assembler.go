@@ -84,7 +84,8 @@ func Assemble(fences []Fence, reportID string) (*CompileResult, error) {
 			diagnostics = append(diagnostics, diagnostic("REPORT_SEQUENCE_REQUIRED", "progressive transactions require a positive sequence", id, payload.Sequence))
 			continue
 		}
-		canonical := string(fence.Payload)
+		canonicalRaw, _ := json.Marshal(payload.Raw)
+		canonical := string(canonicalRaw)
 		if prior, ok := current.seen[payload.Sequence]; ok {
 			if prior != canonical {
 				diagnostics = append(diagnostics, diagnostic("REPORT_SEQUENCE_CONFLICT", "sequence was replayed with different content", id, payload.Sequence))
@@ -172,14 +173,55 @@ func applyReport(s *state, p envelope) error {
 		if !s.started {
 			return fmt.Errorf("report append requires an accepted start transaction")
 		}
-		blocks, _ := s.assembly.Source["blocks"].([]any)
-		for _, block := range p.Blocks {
-			blocks = append(blocks, block)
+		if err := appendReportBlocks(s.assembly.Source, p.Blocks, p.Target); err != nil {
+			return err
 		}
+		blocks, _ := s.assembly.Source["blocks"].([]any)
 		if len(blocks) > maxBlocks {
 			return fmt.Errorf("report block limit exceeded")
 		}
-		s.assembly.Source["blocks"] = blocks
+	case "patch":
+		if !s.started {
+			return fmt.Errorf("report patch requires an accepted start transaction")
+		}
+		patch := reportSource(p.Raw)
+		if incoming, ok := patch["blocks"].([]any); ok {
+			delete(patch, "blocks")
+			for _, value := range incoming {
+				blockPatch, ok := value.(map[string]any)
+				if !ok {
+					return fmt.Errorf("block patches must be objects")
+				}
+				id := textValue(blockPatch["id"])
+				block := findReportBlock(s.assembly.Source["blocks"], id)
+				if block == nil {
+					return fmt.Errorf("patch references unknown block %q", id)
+				}
+				mergeJSON(block, blockPatch)
+			}
+		}
+		mergeJSON(s.assembly.Source, patch)
+		for _, id := range p.RemoveBlockIDs {
+			s.assembly.Source["blocks"] = removeReportBlock(s.assembly.Source["blocks"], id)
+		}
+		if err := validateReportBlocks(s.assembly.Source); err != nil {
+			return err
+		}
+	case "replace":
+		if !s.started {
+			return fmt.Errorf("report replace requires an accepted start transaction")
+		}
+		if strings.TrimSpace(p.Grammar) == "" {
+			return fmt.Errorf("report replace must restate the established grammar")
+		}
+		if strings.ToLower(strings.TrimSpace(p.Grammar)) != s.assembly.Grammar {
+			return fmt.Errorf("report grammar is immutable after start")
+		}
+		replacement := reportSource(p.Raw)
+		if err := validateReportBlocks(replacement); err != nil {
+			return err
+		}
+		s.assembly.Source = replacement
 	case "commit":
 		if !s.started {
 			return fmt.Errorf("report commit requires an accepted start transaction")
@@ -200,9 +242,6 @@ func applyReport(s *state, p envelope) error {
 func applyData(s *state, p envelope) error {
 	if p.Version != 2 {
 		return fmt.Errorf("progressive forge-data requires version 2")
-	}
-	if !s.started {
-		return fmt.Errorf("forge-data requires an accepted report start transaction")
 	}
 	id := strings.TrimSpace(p.ID)
 	if id == "" || !safeSegment.MatchString(id) {
@@ -277,6 +316,129 @@ func reportSource(raw map[string]any) map[string]any {
 		result["blocks"] = []any{}
 	}
 	return result
+}
+
+func appendReportBlocks(source map[string]any, incoming []map[string]any, target map[string]any) error {
+	targetKind, targetRef, targetSlot, position := "report", "root", "", "append"
+	if target != nil {
+		if value := textValue(target["kind"]); value != "" {
+			targetKind = value
+		}
+		if value := textValue(target["ref"]); value != "" {
+			targetRef = value
+		}
+		targetSlot = textValue(target["slot"])
+		if value := textValue(target["position"]); value != "" {
+			position = value
+		}
+	}
+	if position != "append" {
+		return fmt.Errorf("unsupported target position %q", position)
+	}
+	if targetKind == "report" {
+		if targetRef != "root" {
+			return fmt.Errorf("the report root supports ref root only")
+		}
+	} else if targetKind == "block" {
+		parent := findReportBlock(source["blocks"], targetRef)
+		if parent == nil {
+			return fmt.Errorf("target block %q does not exist", targetRef)
+		}
+		parentKind := textValue(parent["kind"])
+		if targetSlot != "childBlockIds" && targetSlot != "sectionIds" {
+			return fmt.Errorf("unsupported target slot %q", targetSlot)
+		}
+		if targetSlot == "childBlockIds" && parentKind != "compositeBlock" {
+			return fmt.Errorf("childBlockIds requires a compositeBlock target")
+		}
+		if targetSlot == "sectionIds" && parentKind != "tabGroupBlock" {
+			return fmt.Errorf("sectionIds requires a tabGroupBlock target")
+		}
+		ids, _ := parent[targetSlot].([]any)
+		for _, block := range incoming {
+			if targetSlot == "sectionIds" && textValue(block["kind"]) != "sectionBlock" {
+				return fmt.Errorf("sectionIds accepts sectionBlock entries only")
+			}
+			ids = append(ids, textValue(block["id"]))
+		}
+		parent[targetSlot] = ids
+	} else {
+		return fmt.Errorf("unsupported target kind %q", targetKind)
+	}
+	blocks, _ := source["blocks"].([]any)
+	for _, block := range incoming {
+		if id := textValue(block["id"]); id == "" {
+			return fmt.Errorf("appended blocks require an id")
+		} else if findReportBlock(blocks, id) != nil {
+			return fmt.Errorf("duplicate block id %q", id)
+		}
+		blocks = append(blocks, block)
+	}
+	source["blocks"] = blocks
+	return validateReportBlocks(source)
+}
+
+func validateReportBlocks(source map[string]any) error {
+	seen := map[string]bool{}
+	blocks, _ := source["blocks"].([]any)
+	for _, value := range blocks {
+		block, ok := value.(map[string]any)
+		if !ok {
+			return fmt.Errorf("report blocks must be objects")
+		}
+		id := textValue(block["id"])
+		if id == "" {
+			return fmt.Errorf("report blocks require an id")
+		}
+		if seen[id] {
+			return fmt.Errorf("duplicate block id %q", id)
+		}
+		seen[id] = true
+	}
+	return nil
+}
+
+func findReportBlock(value any, id string) map[string]any {
+	blocks, _ := value.([]any)
+	for _, value := range blocks {
+		block, _ := value.(map[string]any)
+		if textValue(block["id"]) == strings.TrimSpace(id) {
+			return block
+		}
+	}
+	return nil
+}
+
+func removeReportBlock(value any, id string) any {
+	blocks, ok := value.([]any)
+	if !ok {
+		return value
+	}
+	result := make([]any, 0, len(blocks))
+	for _, value := range blocks {
+		block, _ := value.(map[string]any)
+		if textValue(block["id"]) != strings.TrimSpace(id) {
+			result = append(result, value)
+		}
+	}
+	return result
+}
+
+func mergeJSON(target, patch map[string]any) map[string]any {
+	for key, value := range patch {
+		if value == nil {
+			delete(target, key)
+			continue
+		}
+		patchObject, patchOK := value.(map[string]any)
+		targetObject, targetOK := target[key].(map[string]any)
+		if patchOK && targetOK {
+			target[key] = mergeJSON(targetObject, patchObject)
+			continue
+		}
+		target[key] = value
+	}
+	return target
 }
 
 func cloneState(input *state) *state {
