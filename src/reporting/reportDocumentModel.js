@@ -431,6 +431,9 @@ function buildAuthoredBadgesBlock(block = {}, fieldCatalog = {}) {
     ) {
       normalizedItem.displayValueMap = cloneValue(valueFieldEntry.entry.displayValueMap);
     }
+    if (!normalizeString(normalizedItem?.format) && normalizeString(valueFieldEntry?.entry?.format)) {
+      normalizedItem.format = normalizeString(valueFieldEntry.entry.format);
+    }
     if (!normalizeString(normalizedItem?.label)) {
       const label = normalizeString(valueFieldEntry?.entry?.label || valueFieldId);
       if (label) {
@@ -2538,6 +2541,12 @@ export function lowerReportDocumentToReportSpec(document = {}, {
     ...(resolvedPrimaryDataset ? [resolvedPrimaryDataset] : []),
     ...mergedDatasets.filter((dataset) => normalizeString(dataset?.id) !== "primary"),
   ];
+  const nextDatasetIds = new Set(nextDatasets.map((dataset) => normalizeString(dataset?.id)).filter(Boolean));
+  const nextCalculatedFields = (Array.isArray(baseSpec?.calculatedFields) ? baseSpec.calculatedFields : [])
+    .filter((field) => {
+      const datasetRef = normalizeString(field?.datasetRef || "primary") || "primary";
+      return nextDatasetIds.has(datasetRef);
+    });
   const loweredScopeParams = enrichLoweredScopeParams(
     document?.scope?.params,
     buildReportDocumentScopeParams(effectiveScopedConfig, effectiveScopedState, runtimeDatasetScopeParams),
@@ -2559,6 +2568,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
       items: loweredLayout.items,
     },
     datasets: nextDatasets,
+    calculatedFields: nextCalculatedFields,
     blocks: nextBlocks,
   };
   return augmentReportRequestForAuthoredBlocks(nextSpec, nextBlocks, effectiveConfig);

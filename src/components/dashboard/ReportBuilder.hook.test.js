@@ -9,6 +9,7 @@ import {
     reportDefinitionSignature,
     resolveHostedExecuteOnOpen,
     shouldDeferReportBuilderExecutionForDefinition,
+    shouldSuppressReportStarterForDefinition,
     resolveReportBuilderHookHandler,
     resolveReportBuilderLookupDescriptor,
     resolveReportBuilderNotices,
@@ -79,6 +80,14 @@ assert.equal(
         committedSignature: '{"documentPatch":{}}',
     }),
     false,
+);
+assert.equal(shouldSuppressReportStarterForDefinition({}), false);
+assert.equal(
+    shouldSuppressReportStarterForDefinition({
+        reportDefinitionSignature: '{"documentPatch":{"blocks":[{"id":"kpi"}]}}',
+    }),
+    true,
+    "an inline report definition takes precedence over the starter that seeded the builder",
 );
 assert.equal(
     shouldDeferReportBuilderRequestForPrefill({

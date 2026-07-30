@@ -235,6 +235,7 @@ import {
     reportDefinitionSignature,
     resolveHostedExecuteOnOpen,
     shouldDeferReportBuilderExecutionForDefinition,
+    shouldSuppressReportStarterForDefinition,
     shouldMarkReportBuilderPrefillApplied,
     shouldDeferReportBuilderRequestForPrefill,
     resolveReportBuilderHookHandler,
@@ -11149,6 +11150,16 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         if (appliedReportStarterIdRef.current === requestedReportStarterId) {
             return;
         }
+        if (shouldSuppressReportStarterForDefinition({
+            reportDefinitionSignature: currentReportDefinitionSignature,
+        })) {
+            // An explicit inline definition is the final authored state. The
+            // starter only seeds the builder before that definition arrives;
+            // reapplying "__blank__" here would erase the newly authored
+            // document while leaving its semantic selections behind.
+            appliedReportStarterIdRef.current = requestedReportStarterId;
+            return;
+        }
         if (requestedReportStarterId === "__blank__") {
             const blankState = buildReportBuilderStarterAppliedState(buildBlankReportBuilderDocumentState(displayConfig, {
                 baseState: state,
@@ -11204,6 +11215,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         applyDocumentTemplate,
         closeReportDocumentShellPanels,
         currentPrefillSignature,
+        currentReportDefinitionSignature,
         config,
         displayConfig,
         persistStateWithConfig,
