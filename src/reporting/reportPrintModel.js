@@ -160,12 +160,22 @@ function buildReportPrintElementBase(element = {}, expectedKind = "") {
   return next;
 }
 
+function normalizeReportPrintText(value = "") {
+  return String(value || "")
+    .replace(/\s*\u00e2\u2020\u2019\s*/g, " -> ")
+    .replace(/\s*\u2192\s*/g, " -> ")
+    .replace(/[\u2010\u2011\u2012\u2013\u2014\u2212]/g, "-")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201c\u201d]/g, "\"")
+    .replace(/\u2026/g, "...");
+}
+
 export function buildReportPrintTextElement(element = {}) {
   const next = buildReportPrintElementBase({
     ...element,
     kind: "text",
   }, "text");
-  const text = String(element?.text || "");
+  const text = normalizeReportPrintText(element?.text);
   if (!next || !text) {
     return null;
   }
@@ -824,7 +834,7 @@ function buildReportPrintLayoutState(reportSpec = {}, reportFill = {}, geometry 
     contentTop,
     contentBottom,
     contentWidth,
-    title: normalizeString(reportSpec?.title || reportFill?.title || "Report"),
+    title: normalizeString(normalizeReportPrintText(reportSpec?.title || reportFill?.title || "Report")),
     pages: [],
     bookmarks: [],
     diagnostics: [],
@@ -1149,6 +1159,10 @@ function buildRefinementBarLines(block = {}) {
 function renderReportPrintTextSectionBlock(state = {}, block = {}, lines = [], {
   layoutNote = "",
 } = {}) {
+  ensureReportPrintSpace(
+    state,
+    120,
+  );
   renderReportPrintSectionTitle(state, block, { layoutNote });
   renderReportPrintTextLines(state, {
     idPrefix: `${normalizeString(block?.id || block?.kind || "block")}__line`,
@@ -1218,7 +1232,7 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
   const blockId = normalizeString(block?.id || block?.kind || "block");
   const title = resolveReportPrintBlockTitle(block);
   const valueLabel = normalizeString(content?.valueLabel || content?.valueField || "Value");
-  const valueText = formatReportPrintValue(content?.value, valueFormat);
+  const valueText = `${formatReportPrintValue(content?.value, valueFormat)}${normalizeString(content?.suffix || block?.suffix)}`;
   const detailLines = [];
   if (showCard && normalizeString(content?.secondaryField || content?.secondaryLabel)) {
     detailLines.push(`${normalizeString(content?.secondaryLabel || content?.secondaryField)}: ${formatReportPrintValue(content?.secondaryValue, normalizeString(content?.secondaryFormat))}`);
@@ -1325,6 +1339,10 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
 function renderReportPrintBadgesBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
+  ensureReportPrintSpace(
+    state,
+    REPORT_PRINT_THEME.titleLineHeight + (REPORT_PRINT_THEME.bodyLineHeight * 2) + 8,
+  );
   renderReportPrintSectionTitle(state, block, { layoutNote });
   const items = Array.isArray(block?.content?.items)
     ? block.content.items
@@ -1345,6 +1363,10 @@ function renderReportPrintBadgesBlock(state = {}, block = {}, {
 function renderReportPrintSectionBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
+  ensureReportPrintSpace(
+    state,
+    220,
+  );
   renderReportPrintSectionTitle(state, block, { layoutNote });
   const lines = [
     normalizeString(block?.content?.subtitle || block?.subtitle),
@@ -1471,6 +1493,10 @@ function renderReportPrintStepperBlock(state = {}, block = {}, {
 function renderReportPrintInfoPanelBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
+  ensureReportPrintSpace(
+    state,
+    REPORT_PRINT_THEME.titleLineHeight + (REPORT_PRINT_THEME.bodyLineHeight * 2) + 8,
+  );
   renderReportPrintSectionTitle(state, block, { layoutNote });
   const lines = [
     normalizeString(block?.content?.eyebrow || block?.eyebrow),
@@ -1487,6 +1513,10 @@ function renderReportPrintInfoPanelBlock(state = {}, block = {}, {
 function renderReportPrintCalloutBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
+  ensureReportPrintSpace(
+    state,
+    REPORT_PRINT_THEME.titleLineHeight + (REPORT_PRINT_THEME.bodyLineHeight * 2) + 8,
+  );
   renderReportPrintSectionTitle(state, block, { layoutNote });
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
@@ -1558,6 +1588,10 @@ function renderReportPrintKanbanBlock(state = {}, block = {}, {
 function renderReportPrintTimelineBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
+  ensureReportPrintSpace(
+    state,
+    REPORT_PRINT_THEME.titleLineHeight + (REPORT_PRINT_THEME.bodyLineHeight * 2) + 8,
+  );
   renderReportPrintSectionTitle(state, block, { layoutNote });
   const events = Array.isArray(block?.content?.events) ? block.content.events : [];
   const lines = [];

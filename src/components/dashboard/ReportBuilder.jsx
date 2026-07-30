@@ -2066,6 +2066,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     const [sourceEditorDraft, setSourceEditorDraft] = useState(null);
     const [sourceEditorError, setSourceEditorError] = useState("");
     const [designDataActionsMenuOpen, setDesignDataActionsMenuOpen] = useState(false);
+    const [designSourceCatalogOpen, setDesignSourceCatalogOpen] = useState(false);
     const [designSourceAddMenuRef, setDesignSourceAddMenuRef] = useState("");
     const sourceEditorValidation = useMemo(
         () => validateReportBuilderSourceEditorDraft(sourceEditorDraft),
@@ -15780,7 +15781,21 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             </section>
         );
         const renderSharedDataSelectionCard = () => {
-            const hasMultipleSources = reportDataSourceCards.length > 1;
+            const linkedDatasetRefs = new Set(
+                authoredDocumentBlocks
+                    .map((block) => normalizeString(block?.datasetRef))
+                    .filter(Boolean),
+            );
+            const linkedReportDataSourceCards = reportDataSourceCards.filter((card) => (
+                card.active
+                || linkedDatasetRefs.has(normalizeString(card.datasetRef))
+                || linkedDatasetRefs.has(normalizeString(card.id))
+                || linkedDatasetRefs.has(normalizeString(card.dataSourceRef))
+            ));
+            const visibleReportDataSourceCards = designSourceCatalogOpen
+                ? reportDataSourceCards
+                : linkedReportDataSourceCards;
+            const hasMultipleSources = visibleReportDataSourceCards.length > 1;
             const selectedInsertionAnchorTitle = normalizeString(selectedDocumentInsertionTarget.insertionAnchorTitle || "");
             const insertionPlacementLabel = pendingDocumentInsertionPlacement === "before" ? "before" : "after";
             const describeSourceAddAction = (actionLabel = "", sourceLabel = "") => {
@@ -15815,6 +15830,16 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                         <div className="forge-report-builder__design-stage-title">Data Sources</div>
                     </div>
                     <div className="forge-report-builder__design-stage-actions">
+                        {reportDataSourceCards.length > linkedReportDataSourceCards.length ? (
+                            <Button
+                                small
+                                outlined
+                                icon={designSourceCatalogOpen ? "chevron-up" : "add"}
+                                onClick={() => setDesignSourceCatalogOpen((current) => !current)}
+                            >
+                                {designSourceCatalogOpen ? "Hide source catalog" : "Add data source"}
+                            </Button>
+                        ) : null}
                         <Popover
                             isOpen={designDataActionsMenuOpen}
                             onInteraction={setDesignDataActionsMenuOpen}
@@ -15851,7 +15876,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                             </Button>
                         </Popover>
                     </div>
-                    {reportDataSourceCards.length > 0 ? (
+                    {visibleReportDataSourceCards.length > 0 ? (
                         <div className="forge-report-builder__design-source-grid" aria-label="Available data sources" role="table">
                             {hasMultipleSources ? (
                                 <div className="forge-report-builder__design-source-grid-header" role="row">
@@ -15861,7 +15886,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                                     <div role="columnheader">Actions</div>
                                 </div>
                             ) : null}
-                            {reportDataSourceCards.map((card) => (
+                            {visibleReportDataSourceCards.map((card) => (
                                 <div
                                     key={reportBuilderSourceCardId(card)}
                                     className={[
@@ -16350,6 +16375,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         designWorkspaceFocus,
         designWorkspaceMode,
         designDataActionsMenuOpen,
+        designSourceCatalogOpen,
         designSourceAddMenuRef,
         documentDataViewOpen,
         authoredDocumentBlockCount,

@@ -94,6 +94,19 @@ const container = {
   dataSourceRef: "demoReportSource",
 };
 
+assert.equal(buildReportPrintTextElement({
+  id: "asciiSafeText",
+  kind: "text",
+  box: { x: 0, y: 0, width: 100, height: 20 },
+  text: "Capacity → bids — impressions",
+})?.text, "Capacity -> bids - impressions");
+assert.equal(buildReportPrintTextElement({
+  id: "mojibakeSafeText",
+  kind: "text",
+  box: { x: 0, y: 0, width: 100, height: 20 },
+  text: "Capacity â†’ bids",
+})?.text, "Capacity -> bids");
+
 const reportSpec = buildReportBuilderReportSpec({
   container,
   config,

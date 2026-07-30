@@ -7,6 +7,7 @@ assert.equal(isReportDatasetBackedBlockKind("chartBlock"), true);
 assert.equal(isReportDatasetBackedBlockKind("kpiBlock"), true);
 assert.equal(isReportDatasetBackedBlockKind("geoMapBlock"), true);
 assert.equal(isReportDatasetBackedBlockKind("badgesBlock"), true);
+assert.equal(isReportDatasetBackedBlockKind("timelineBlock"), true);
 assert.equal(isReportDatasetBackedBlockKind("filterBarBlock"), true);
 assert.equal(isReportDatasetBackedBlockKind(" tableBlock "), true);
 assert.equal(isReportDatasetBackedBlockKind("reportBuilderBlock"), false);

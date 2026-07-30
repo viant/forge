@@ -186,8 +186,9 @@ func TestRender_SupportedSubsetIsDeterministic(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, first.Diagnostics)
 	require.True(t, bytes.HasPrefix(first.Bytes, []byte("%PDF")))
-	require.Contains(t, string(first.Bytes), "Supported Subset")
-	require.Contains(t, string(first.Bytes), "Healthy")
+	_, plainText := extractPDFPlainText(t, first.Bytes)
+	require.Contains(t, plainText, "Supported Subset")
+	require.Contains(t, plainText, "Healthy")
 
 	second, err := Render(report, Options{})
 	require.NoError(t, err)
@@ -256,7 +257,7 @@ func TestRender_TableCellTextPreservesFontStyle(t *testing.T) {
 	}
 	require.True(t, found)
 	require.Equal(t, 13.0, matched.FontSize)
-	require.Contains(t, strings.ToLower(matched.Font), "bold")
+	require.Equal(t, "utf8forgesansb", strings.ToLower(matched.Font))
 }
 
 func TestRender_TableCellLabelPillsPreserveConfiguredTextStyle(t *testing.T) {
@@ -380,10 +381,55 @@ func TestNormalizeSeverity_UnknownDefaultsToWarning(t *testing.T) {
 	require.Equal(t, "info", normalizeSeverity("INFO"))
 }
 
-func TestSanitizePDFText_NormalizesUnsafeUnicodePunctuation(t *testing.T) {
-	require.Equal(t, "Inventory - Include Site Type", sanitizePDFText("Inventory · Include Site Type"))
-	require.Equal(t, "\"Quoted\" - value", sanitizePDFText("“Quoted” – value"))
-	require.Equal(t, "Keep*Drop...", sanitizePDFText("Keep•Drop…"))
+func TestSanitizePDFText_PreservesUnicodePunctuation(t *testing.T) {
+	require.Equal(t, "Inventory · Include Site Type", sanitizePDFText("Inventory · Include Site Type"))
+	require.Equal(t, "“Quoted” – value", sanitizePDFText("“Quoted” – value"))
+	require.Equal(t, "Keep•Drop…", sanitizePDFText("Keep•Drop…"))
+	require.Equal(t, "Allocated capacity → bids → impressions", sanitizePDFText("Allocated capacity → bids → impressions"))
+}
+
+func TestRender_PreservesUnicodeReportText(t *testing.T) {
+	const title = "Allocated capacity → bids → impressions"
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "unicodeReportBuilder",
+			StateKey:      "unicodeReportBuilder",
+			DataSourceRef: "unicodeReportSource",
+		},
+		Title: title,
+		PageGeometry: reportprint.PageGeometry{
+			Width:  612,
+			Height: 792,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:         "unicode_heading",
+						Kind:       "text",
+						Box:        reportprint.Box{X: 36, Y: 48, Width: 540, Height: 24},
+						Text:       title,
+						FontSize:   18,
+						FontWeight: "700",
+					},
+				},
+			},
+		},
+	}
+
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+
+	require.Contains(t, string(result.Bytes), "/ToUnicode")
+	require.NotContains(t, string(result.Bytes), "â†’")
 }
 
 func TestParseHexColor_ExpandsThreeDigitHex(t *testing.T) {
@@ -583,10 +629,11 @@ func TestRender_RawFixtureRendersCanonicalSVGContent(t *testing.T) {
 	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintElement"))
 	require.Empty(t, findDiagnosticsByCode(result.Diagnostics, "unsupportedReportPrintSVGChild"))
 
-	require.Contains(t, string(result.Bytes), "Performance Report")
-	require.Contains(t, string(result.Bytes), "Manual Spend Trend")
-	require.Contains(t, string(result.Bytes), "Display")
-	require.Contains(t, string(result.Bytes), "CTV")
+	_, plainText := extractPDFPlainText(t, result.Bytes)
+	require.Contains(t, plainText, "Performance Report")
+	require.Contains(t, plainText, "Manual Spend Trend")
+	require.Contains(t, plainText, "Display")
+	require.Contains(t, plainText, "CTV")
 }
 
 func TestRender_UnsupportedImageProducesDiagnostic(t *testing.T) {
@@ -3047,7 +3094,8 @@ func buildExpectedSVGTextRun(node *svgText, viewport svgViewport, pageHeight flo
 func measureExpectedTextWidth(text string, fontSize float64, fontWeight string) float64 {
 	pdf := fpdf.New(fpdf.OrientationPortrait, fpdf.UnitPoint, fpdf.PageSizeLetter, "")
 	pdf.AddPage()
-	pdf.SetFont("Helvetica", fontStyle(fontWeight), fontSize)
+	registerUnicodeFonts(pdf)
+	pdf.SetFont(pdfUnicodeFontFamily, fontStyle(fontWeight), fontSize)
 	return pdf.GetStringWidth(text)
 }
 
@@ -3055,13 +3103,13 @@ func expectedFontName(fontWeight string) string {
 	style := strings.ToUpper(fontStyle(fontWeight))
 	switch style {
 	case "BI", "IB":
-		return "Helvetica-BoldOblique"
+		return "utf8forgesansBI"
 	case "B":
-		return "Helvetica-Bold"
+		return "utf8forgesansB"
 	case "I":
-		return "Helvetica-Oblique"
+		return "utf8forgesansI"
 	default:
-		return "Helvetica"
+		return "utf8forgesans"
 	}
 }
 

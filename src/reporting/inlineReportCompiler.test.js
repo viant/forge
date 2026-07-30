@@ -34,7 +34,8 @@ assert.equal(dashboard.reportFill.kind, "reportFill");
 assert.equal(dashboard.reportPrint.kind, "reportPrint");
 assert.equal(dashboard.reportFill.datasets.find((entry) => entry.id === "delivery_rows")?.rows[0]?.spend, 125);
 assert.ok(dashboard.reportSpec.blocks.some((entry) => entry.kind === "tableBlock"));
-assert.equal(dashboard.promotion.eligible, false);
+assert.equal(dashboard.promotion.eligible, true);
+assert.equal(dashboard.promotion.mode, "snapshot");
 assert.deepEqual(dashboard.promotion.materializedDatasetIds, ["delivery_rows"]);
 
 const zeroSummary = compileInlineReport({
@@ -70,6 +71,105 @@ const canonical = compileInlineReport({
 assert.deepEqual(canonical.reportSpec.blocks.map((entry) => entry.id), ["intro", "detail"]);
 assert.equal(canonical.reportFill.datasets.find((entry) => entry.id === "rows")?.rows[0]?.market, "US");
 
+const diagnosticOverview = compileInlineReport({
+  reportId: "order-2672373-troubleshoot",
+  grammar: "report-document-v1",
+  source: {
+    title: "Diagnostic Overview",
+    blocks: [
+      {
+        id: "pacing",
+        kind: "badgesBlock",
+        title: "Delivery posture",
+        datasetRef: "order_2672373_troubleshoot_pacing",
+        items: [
+          { labelField: "dailyPacingStatus", tone: "warning" },
+          { labelField: "flightPacingStatus", tone: "warning" },
+        ],
+      },
+      {
+        id: "bidPotential",
+        kind: "kpiBlock",
+        title: "Bid potential",
+        datasetRef: "order_2672373_troubleshoot_setup",
+        valueField: "bidPotential",
+        format: "number5",
+        suffix: "x",
+      },
+      {
+        id: "changes",
+        kind: "timelineBlock",
+        title: "Recent changes",
+        datasetRef: "order_2672373_troubleshoot_changes",
+        timeField: "changeTs",
+        titleField: "eventLabel",
+        descriptionField: "changeDetail",
+      },
+    ],
+  },
+  dataSources: {
+    "order_2672373_troubleshoot_pacing": {
+      rows: [{ dailyPacingStatus: "behind", flightPacingStatus: "behind" }],
+    },
+    "order_2672373_troubleshoot_setup": {
+      rows: [{ bidPotential: 0.003671280903755624 }],
+    },
+    "order_2672373_troubleshoot_changes": {
+      rows: [{
+        changeTs: "2026-07-07T16:27:25Z",
+        eventLabel: "General configuration change",
+        changeDetail: "Goal Mode changed from 2 to 1.",
+      }],
+    },
+  },
+});
+assert.deepEqual(
+  diagnosticOverview.reportFill.blocks.find((entry) => entry.id === "pacing")?.content?.items
+    .map((item) => ({ label: item.label, value: item.value })),
+  [
+    { label: "Daily Pacing Status", value: "behind" },
+    { label: "Flight Pacing Status", value: "behind" },
+  ],
+);
+assert.equal(
+  diagnosticOverview.reportFill.blocks.find((entry) => entry.id === "bidPotential")?.content?.valueFormat,
+  "number5",
+);
+assert.equal(
+  diagnosticOverview.reportFill.blocks.find((entry) => entry.id === "bidPotential")?.content?.value,
+  0.003671280903755624,
+);
+assert.equal(
+  diagnosticOverview.reportFill.blocks.find((entry) => entry.id === "bidPotential")?.content?.suffix,
+  "x",
+);
+assert.deepEqual(
+  diagnosticOverview.reportFill.blocks.find((entry) => entry.id === "changes")?.content?.events,
+  [{
+    id: "event_1",
+    date: "2026-07-07T16:27:25Z",
+    title: "General configuration change",
+    body: "Goal Mode changed from 2 to 1.",
+  }],
+);
+
+const narrativeOnly = compileInlineReport({
+  reportId: "order_2678042_order_2678042_troubleshoot",
+  grammar: "report-document-v1",
+  source: {
+    title: "Delivery troubleshooting",
+    blocks: [
+      { id: "primary_read", kind: "markdownBlock", title: "Primary read", markdown: "Delivery was behind." },
+    ],
+  },
+});
+assert.deepEqual(
+  narrativeOnly.reportSpec.datasets,
+  [],
+  "narrative-only reports must not invent the report id as a workspace datasource",
+);
+assert.deepEqual(narrativeOnly.promotion.reusableDataSourceRefs, []);
+
 const live = compileInlineReport({
   reportId: "live-brief",
   grammar: "report-document-v1",
@@ -82,6 +182,7 @@ const live = compileInlineReport({
 
 assert.equal(live.workspaceDatasetRequests.length, 1);
 assert.equal(live.promotion.eligible, true);
+assert.equal(live.promotion.mode, "reusable");
 assert.deepEqual(live.promotion.reusableDataSourceRefs, ["metrics_delivery"]);
 const materialized = await materializeInlineReport(live, {
   fetchDataset: async (request) => {
@@ -92,6 +193,10 @@ const materialized = await materializeInlineReport(live, {
 });
 assert.equal(materialized.reportFill.datasets.find((entry) => entry.id === "delivery")?.rows[0]?.spend, 404);
 assert.equal(materialized.reportPrint.kind, "reportPrint");
+
+assert.equal(canonical.promotion.eligible, true);
+assert.equal(canonical.promotion.mode, "snapshot");
+assert.deepEqual(canonical.promotion.materializedDatasetIds, ["rows"]);
 
 assert.throws(() => compileInlineReport({
   source: {

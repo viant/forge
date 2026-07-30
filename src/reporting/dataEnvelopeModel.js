@@ -1,3 +1,5 @@
+import { autoType, csvParse } from "d3-dsv";
+
 export const resolveKey = (holder, name) => {
   if (holder == null) {
     return undefined;
@@ -45,6 +47,17 @@ function extractEnvelopeInfo(data) {
   return resolveKey(data, "info") || resolveKey(data, "Info") || {};
 }
 
+function extractCsvDatasetRecords(value) {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const csv = typeof value.csv === "string" ? value.csv.trim() : "";
+  if (!csv) {
+    return undefined;
+  }
+  return csvParse(csv, autoType).map((row) => ({ ...row }));
+}
+
 export function isDeferredCacheHitEnvelope(data) {
   if (data == null || typeof data !== "object" || Array.isArray(data)) {
     return false;
@@ -77,8 +90,11 @@ export function extractData(selectors = {}, paging, data) {
     }
   }
 
+  const csvDatasetRecords = extractCsvDatasetRecords(respData);
   if (Array.isArray(respData)) {
     records = respData;
+  } else if (Array.isArray(csvDatasetRecords)) {
+    records = csvDatasetRecords;
   } else if (respData) {
     records = [respData];
   }

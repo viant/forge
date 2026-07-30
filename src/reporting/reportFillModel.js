@@ -468,6 +468,7 @@ function buildReportFillKpiContent(block = {}, dataset = {}, {
     valueField,
     valueLabel: normalizeString(block?.valueLabel || valueField || "Value"),
     ...(normalizeString(block?.valueFormat) ? { valueFormat: normalizeString(block.valueFormat) } : {}),
+    ...(normalizeString(block?.suffix) ? { suffix: normalizeString(block.suffix) } : {}),
     value: valueField && selectedRow ? resolveKey(selectedRow, valueField) ?? null : null,
     rowCount: Number(dataset?.provenance?.rowCount || 0),
     ...(secondaryField
@@ -761,8 +762,24 @@ function buildReportFillKanbanContent(block = {}) {
   };
 }
 
-function buildReportFillTimelineContent(block = {}) {
-  const events = (Array.isArray(block?.events) ? block.events : [])
+function buildReportFillTimelineContent(block = {}, dataset = {}) {
+  const timeField = normalizeString(block?.timeField);
+  const titleField = normalizeString(block?.titleField);
+  const descriptionField = normalizeString(block?.descriptionField);
+  const badgeField = normalizeString(block?.badgeField);
+  const toneField = normalizeString(block?.toneField);
+  const datasetRows = Array.isArray(dataset?.rows) ? dataset.rows : [];
+  const sourceEvents = datasetRows.length > 0 && (timeField || titleField || descriptionField || badgeField || toneField)
+    ? datasetRows.map((row, index) => ({
+      id: resolveKey(row, "id") || `event_${index + 1}`,
+      date: timeField ? resolveKey(row, timeField) : "",
+      title: titleField ? resolveKey(row, titleField) : "",
+      body: descriptionField ? resolveKey(row, descriptionField) : "",
+      badge: badgeField ? resolveKey(row, badgeField) : "",
+      tone: toneField ? resolveKey(row, toneField) : "",
+    }))
+    : (Array.isArray(block?.events) ? block.events : []);
+  const events = sourceEvents
     .map((event, index) => {
       if (!event || typeof event !== "object" || Array.isArray(event)) {
         return null;
@@ -788,6 +805,7 @@ function buildReportFillTimelineContent(block = {}) {
   return {
     title: normalizeString(block?.title || "Timeline") || "Timeline",
     ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    rowCount: Number(dataset?.provenance?.rowCount || events.length || 0),
     events,
   };
 }
@@ -1079,7 +1097,7 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
     if (normalizeString(block?.kind) === "timelineBlock") {
       return {
         ...normalizedBlock,
-        content: buildReportFillTimelineContent(block),
+        content: buildReportFillTimelineContent(block, dataset),
       };
     }
     if (normalizeString(block?.kind) === "badgesBlock") {

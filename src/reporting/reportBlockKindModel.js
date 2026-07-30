@@ -10,5 +10,6 @@ export function isReportDatasetBackedBlockKind(kind = "") {
     || normalizedKind === "collectionBlock"
     || normalizedKind === "geoMapBlock"
     || normalizedKind === "badgesBlock"
+    || normalizedKind === "timelineBlock"
     || normalizedKind === "filterBarBlock";
 }
