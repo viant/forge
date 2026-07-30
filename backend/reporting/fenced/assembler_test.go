@@ -124,3 +124,23 @@ func TestAssembleRejectsSequenceGap(t *testing.T) {
 	require.Equal(t, "incomplete", result.Assembly.Status)
 	require.NotEmpty(t, result.Diagnostics)
 }
+
+func TestAssembleAcceptsDataBeforeStartAndPatchesBlocks(t *testing.T) {
+	content := "```forge-data\n" +
+		`{"version":2,"id":"rows","reportRef":"demo","sequence":1,"format":"json","mode":"replace","data":[{"spend":12.5}]}` +
+		"\n```\n```forge-report\n" +
+		`{"version":1,"id":"demo","sequence":2,"mode":"start","grammar":"report-document-v1","title":"Draft","blocks":[{"id":"summary","kind":"markdownBlock","title":"Old","markdown":"Before"}]}` +
+		"\n```\n```forge-report\n" +
+		`{"version":1,"id":"demo","sequence":3,"mode":"patch","title":"Final","blocks":[{"id":"summary","title":"Finding","markdown":"After"}]}` +
+		"\n```\n```forge-report\n" +
+		`{"version":1,"id":"demo","sequence":4,"mode":"commit"}` +
+		"\n```"
+
+	result, err := Compile(&CompileRequest{Content: content, ReportID: "demo"})
+	require.NoError(t, err)
+	require.Equal(t, "committed", result.Assembly.Status)
+	require.Equal(t, "Final", textValue(result.Assembly.Source["title"]))
+	block := findReportBlock(result.Assembly.Source["blocks"], "summary")
+	require.Equal(t, "Finding", textValue(block["title"]))
+	require.Equal(t, "After", textValue(block["markdown"]))
+}
