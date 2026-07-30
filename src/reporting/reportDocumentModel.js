@@ -497,25 +497,27 @@ function augmentReportRequestField(request = {}, fieldLookup = new Map(), fieldK
 
 function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], config = {}) {
   const datasets = Array.isArray(baseSpec?.datasets) ? baseSpec.datasets : [];
-  const primaryDatasetIndex = datasets.findIndex((dataset) => normalizeString(dataset?.id) === "primary");
-  if (primaryDatasetIndex === -1) {
+  if (datasets.length === 0) {
     return baseSpec;
   }
   const nextSpec = cloneValue(baseSpec);
-  const request = nextSpec?.datasets?.[primaryDatasetIndex]?.request;
-  if (!request || typeof request !== "object" || Array.isArray(request)) {
-    return nextSpec;
-  }
   const fieldCatalog = buildReportBuilderFieldCatalog(config);
   const calculatedFields = Array.isArray(nextSpec?.calculatedFields) ? nextSpec.calculatedFields : [];
   nextSpec.calculatedFields = calculatedFields;
   const calculatedFieldIds = new Set(
     calculatedFields
-      .map((field) => resolveReportBuilderFieldId(field))
+      .map((field) => {
+        const fieldId = resolveReportBuilderFieldId(field);
+        return fieldId ? `${normalizeString(field?.datasetRef || "primary") || "primary"}:${fieldId}` : "";
+      })
       .filter(Boolean),
   );
   const visitingCalculatedFields = new Set();
-  const enableField = (fieldKey = "") => {
+  const enableField = (fieldKey = "", datasetRef = "primary", request = null) => {
+    const normalizedDatasetRef = normalizeString(datasetRef || "primary") || "primary";
+    if (!request || typeof request !== "object" || Array.isArray(request)) {
+      return false;
+    }
     const catalogEntry = resolveReportBuilderCatalogEntry(fieldCatalog, fieldKey);
     if (!catalogEntry) {
       return false;
@@ -526,16 +528,21 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
       if (!calculatedFieldId) {
         return false;
       }
-      if (!calculatedFieldIds.has(calculatedFieldId)) {
-        nextSpec.calculatedFields.push(cloneValue(calculatedField));
-        calculatedFieldIds.add(calculatedFieldId);
+      const calculatedFieldKey = `${normalizedDatasetRef}:${calculatedFieldId}`;
+      if (!calculatedFieldIds.has(calculatedFieldKey)) {
+        nextSpec.calculatedFields.push({
+          ...cloneValue(calculatedField),
+          datasetRef: normalizedDatasetRef,
+        });
+        calculatedFieldIds.add(calculatedFieldKey);
       }
-      if (visitingCalculatedFields.has(calculatedFieldId)) {
+      if (visitingCalculatedFields.has(calculatedFieldKey)) {
         return true;
       }
-      visitingCalculatedFields.add(calculatedFieldId);
-      normalizeStringArray(calculatedField?.dependencies).forEach((dependencyKey) => enableField(dependencyKey));
-      visitingCalculatedFields.delete(calculatedFieldId);
+      visitingCalculatedFields.add(calculatedFieldKey);
+      normalizeStringArray(calculatedField?.dependencies)
+        .forEach((dependencyKey) => enableField(dependencyKey, normalizedDatasetRef, request));
+      visitingCalculatedFields.delete(calculatedFieldKey);
       return true;
     }
     setNestedValue(
@@ -555,36 +562,39 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
       return;
     }
     const normalizedDatasetRef = normalizeString(normalizedBlock?.datasetRef || "primary") || "primary";
-    if (normalizedDatasetRef !== "primary") {
+    const dataset = nextSpec.datasets.find((entry) => normalizeString(entry?.id) === normalizedDatasetRef) || null;
+    const request = dataset?.request;
+    if (!request || typeof request !== "object" || Array.isArray(request)) {
       return;
     }
     switch (normalizeString(normalizedBlock?.kind)) {
       case "chartBlock":
-        enableField(normalizedBlock?.chartSpec?.xField);
-        normalizeString(normalizedBlock?.chartSpec?.seriesField) && enableField(normalizedBlock.chartSpec.seriesField);
+        enableField(normalizedBlock?.chartSpec?.xField, normalizedDatasetRef, request);
+        normalizeString(normalizedBlock?.chartSpec?.seriesField)
+          && enableField(normalizedBlock.chartSpec.seriesField, normalizedDatasetRef, request);
         (Array.isArray(normalizedBlock?.chartSpec?.yFields) ? normalizedBlock.chartSpec.yFields : [])
-          .forEach((fieldKey) => enableField(fieldKey));
+          .forEach((fieldKey) => enableField(fieldKey, normalizedDatasetRef, request));
         break;
       case "kpiBlock":
-        enableField(normalizedBlock?.valueField);
-        enableField(normalizedBlock?.secondaryField);
+        enableField(normalizedBlock?.valueField, normalizedDatasetRef, request);
+        enableField(normalizedBlock?.secondaryField, normalizedDatasetRef, request);
         break;
       case "badgesBlock":
         (Array.isArray(normalizedBlock?.items) ? normalizedBlock.items : []).forEach((item) => {
-          enableField(item?.valueField);
+          enableField(item?.valueField, normalizedDatasetRef, request);
         });
         break;
       case "tableBlock":
         (Array.isArray(normalizedBlock?.columns) ? normalizedBlock.columns : []).forEach((column) => {
-          enableField(column?.key);
-          enableField(column?.cellVisual?.valueField);
+          enableField(column?.key, normalizedDatasetRef, request);
+          enableField(column?.cellVisual?.valueField, normalizedDatasetRef, request);
         });
         break;
       case "geoMapBlock":
-        enableField(normalizedBlock?.geo?.key);
-        enableField(normalizedBlock?.geo?.labelKey);
-        enableField(normalizedBlock?.geo?.metric?.key);
-        enableField(normalizedBlock?.geo?.color?.field);
+        enableField(normalizedBlock?.geo?.key, normalizedDatasetRef, request);
+        enableField(normalizedBlock?.geo?.labelKey, normalizedDatasetRef, request);
+        enableField(normalizedBlock?.geo?.metric?.key, normalizedDatasetRef, request);
+        enableField(normalizedBlock?.geo?.color?.field, normalizedDatasetRef, request);
         break;
       default:
         break;
@@ -1498,6 +1508,8 @@ export function buildReportDocumentRefinementBarBlock({
 
 export function buildReportDocumentKpiBlock(block = {}) {
   const valueField = normalizeString(block?.valueField || "value");
+  const valueFormat = normalizeString(block?.valueFormat || block?.format);
+  const suffix = normalizeString(block?.suffix);
   const secondaryField = normalizeString(block?.secondaryField);
   const presentationMode = normalizeString(block?.presentationMode).toLowerCase();
   const normalizedPresentationMode = ["card", "body", "both"].includes(presentationMode)
@@ -1517,7 +1529,8 @@ export function buildReportDocumentKpiBlock(block = {}) {
     datasetRef: normalizeString(block?.datasetRef || "primary"),
     valueField,
     valueLabel: normalizeString(block?.valueLabel || valueField || "Value"),
-    ...(normalizeString(block?.valueFormat) ? { valueFormat: normalizeString(block.valueFormat) } : {}),
+    ...(valueFormat ? { valueFormat } : {}),
+    ...(suffix ? { suffix } : {}),
     ...(secondaryField
       ? {
         secondaryField,
@@ -1844,13 +1857,32 @@ function normalizeReportDocumentTimelineEvents(events = []) {
 }
 
 export function buildReportDocumentTimelineBlock(block = {}) {
+  const datasetRef = normalizeString(block?.datasetRef);
+  const timeField = normalizeString(block?.timeField);
+  const titleField = normalizeString(block?.titleField);
+  const descriptionField = normalizeString(block?.descriptionField);
+  const badgeField = normalizeString(block?.badgeField);
+  const toneField = normalizeString(block?.toneField);
   return {
     id: normalizeString(block?.id || "timelineBlock"),
     kind: "timelineBlock",
     title: normalizeString(block?.title || "Timeline") || "Timeline",
     ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    ...(datasetRef ? { datasetRef } : {}),
+    ...(timeField ? { timeField } : {}),
+    ...(titleField ? { titleField } : {}),
+    ...(descriptionField ? { descriptionField } : {}),
+    ...(badgeField ? { badgeField } : {}),
+    ...(toneField ? { toneField } : {}),
     events: normalizeReportDocumentTimelineEvents(block?.events),
   };
+}
+
+function humanizeReportDocumentFieldName(value = "") {
+  return normalizeString(value)
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 function normalizeReportDocumentBadgeItems(items = []) {
@@ -1859,9 +1891,12 @@ function normalizeReportDocumentBadgeItems(items = []) {
       if (!item || typeof item !== "object" || Array.isArray(item)) {
         return null;
       }
-      const label = normalizeString(item?.label);
+      const legacyLabelField = normalizeString(item?.labelField);
+      const label = normalizeString(
+        item?.label || (legacyLabelField ? humanizeReportDocumentFieldName(legacyLabelField) : ""),
+      );
       const value = normalizeString(item?.value);
-      const valueField = normalizeString(item?.valueField);
+      const valueField = normalizeString(item?.valueField || legacyLabelField);
       const format = normalizeString(item?.format);
       const displayKey = normalizeString(item?.displayKey);
       const labelMode = normalizeString(item?.labelMode).toLowerCase();

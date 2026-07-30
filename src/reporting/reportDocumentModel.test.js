@@ -201,6 +201,21 @@ assert.deepEqual(buildReportDocumentKpiBlock(), {
   valueLabel: "value",
 });
 assert.deepEqual(buildReportDocumentKpiBlock({
+  id: "bidPotential",
+  valueField: "bidPotential",
+  format: "number5",
+  suffix: "x",
+}), {
+  id: "bidPotential",
+  kind: "kpiBlock",
+  title: "KPI",
+  datasetRef: "primary",
+  valueField: "bidPotential",
+  valueLabel: "bidPotential",
+  valueFormat: "number5",
+  suffix: "x",
+});
+assert.deepEqual(buildReportDocumentKpiBlock({
   id: "hybridKpi",
   valueField: "totalSpend",
   valueLabel: "Spend",
@@ -370,6 +385,33 @@ assert.deepEqual(buildReportDocumentBadgesBlock(), {
   title: "Status Pills",
   datasetRef: "primary",
   items: [],
+});
+assert.deepEqual(buildReportDocumentBadgesBlock({
+  id: "deliveryPosture",
+  datasetRef: "pacing",
+  items: [
+    { labelField: "dailyPacingStatus", tone: "warning" },
+    { labelField: "flight_pacing_status", tone: "warning" },
+  ],
+}), {
+  id: "deliveryPosture",
+  kind: "badgesBlock",
+  title: "Status Pills",
+  datasetRef: "pacing",
+  items: [
+    {
+      id: "badge_1",
+      label: "Daily Pacing Status",
+      valueField: "dailyPacingStatus",
+      tone: "warning",
+    },
+    {
+      id: "badge_2",
+      label: "Flight Pacing Status",
+      valueField: "flight_pacing_status",
+      tone: "warning",
+    },
+  ],
 });
 const authoredChartBlock = buildReportDocumentChartBlock({
   id: "channelTrend",
@@ -898,6 +940,7 @@ assert.deepEqual(lowered.blocks.find((block) => block.id === "channelTrend"), {
     type: "line",
     xAxis: {
       dataKey: "eventDate",
+      label: "Date",
     },
     yAxis: {
       format: "compactNumber",
@@ -2216,6 +2259,10 @@ const authoredComputedChartDocument = buildReportBuilderReportDocument({
   container,
   config: {
     ...config,
+    measures: [
+      ...config.measures,
+      { id: "clicks", key: "clicks", label: "Clicks", paramPath: "measures.clicks", format: "compactNumber" },
+    ],
     computedMeasures: [
       {
         id: "ctr",
@@ -2282,6 +2329,78 @@ assert.equal(loweredAuthoredComputedChartDocument.blocks.find((block) => block.i
 assert.equal(loweredAuthoredComputedChartDocument.blocks.find((block) => block.id === "ctrTrend")?.chartModel?.type, "line");
 assert.equal(loweredAuthoredComputedChartDocument.blocks.find((block) => block.id === "ctrTrend")?.chartModel?.series?.values?.[0]?.value, "ctr");
 assert.equal(loweredAuthoredComputedChartDocument.blocks.find((block) => block.id === "ctrTrend")?.chartModel?.yAxis?.format, "percent");
+
+const authoredPublishedComputedKpiDocument = buildReportBuilderReportDocument({
+  container,
+  config: {
+    ...config,
+    measures: [
+      ...config.measures,
+      { id: "clicks", key: "clicks", label: "Clicks", paramPath: "measures.clicks", format: "compactNumber" },
+    ],
+    computedMeasures: [
+      {
+        id: "ctr",
+        key: "ctr",
+        label: "CTR",
+        format: "percent",
+        dependencies: ["clicks", "impressions"],
+        compute: {
+          type: "ratio",
+          numerator: "clicks",
+          denominator: "impressions",
+          scale: 100,
+          decimals: 2,
+        },
+      },
+    ],
+    dataSources: [
+      {
+        id: "active_range",
+        dataSourceRef: "performance_cube",
+        request: { measures: {}, dimensions: {}, filters: {} },
+        columnOptions: [
+          { key: "clicks", label: "Clicks", kind: "measure" },
+          { key: "impressions", label: "Impressions", kind: "measure" },
+          { key: "ctr", label: "CTR", kind: "computedMeasure", format: "percent" },
+        ],
+        valueFieldOptions: [
+          { value: "ctr", label: "CTR", format: "percent" },
+        ],
+      },
+    ],
+  },
+  state: {
+    ...state,
+    selectedMeasures: ["totalSpend"],
+    primaryMeasure: "totalSpend",
+    selectedDimensions: ["eventDate"],
+    viewMode: "table",
+    chartSpec: null,
+  },
+  additionalBlocks: [
+    {
+      id: "ctrKpi",
+      kind: "kpiBlock",
+      title: "CTR",
+      datasetRef: "active_range",
+      valueField: "ctr",
+    },
+  ],
+});
+
+const loweredAuthoredPublishedComputedKpiDocument = lowerReportDocumentToReportSpec(authoredPublishedComputedKpiDocument);
+assert.equal(
+  loweredAuthoredPublishedComputedKpiDocument.calculatedFields.some(
+    (field) => field.id === "ctr" && field.datasetRef === "active_range",
+  ),
+  true,
+);
+const activeRangeDataset = loweredAuthoredPublishedComputedKpiDocument.datasets.find(
+  (dataset) => dataset.id === "active_range",
+);
+assert.equal(activeRangeDataset.request.measures.clicks, true);
+assert.equal(activeRangeDataset.request.measures.impressions, true);
 
 const authoredLocalTableCalculationDocument = buildReportBuilderReportDocument({
   container,

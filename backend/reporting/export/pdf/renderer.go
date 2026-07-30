@@ -10,25 +10,15 @@ import (
 
 	"codeberg.org/go-pdf/fpdf"
 	reportprint "github.com/viant/forge/backend/reporting/print"
+	"golang.org/x/image/font/gofont/gobold"
+	"golang.org/x/image/font/gofont/gobolditalic"
+	"golang.org/x/image/font/gofont/goitalic"
+	"golang.org/x/image/font/gofont/goregular"
 )
 
 var deterministicCreationDate = time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
-var pdfCoreFontTextSanitizer = strings.NewReplacer(
-	"\u00a0", " ",
-	"\u00b7", " - ",
-	"\u2010", "-",
-	"\u2011", "-",
-	"\u2012", "-",
-	"\u2013", "-",
-	"\u2014", "-",
-	"\u2018", "'",
-	"\u2019", "'",
-	"\u201c", "\"",
-	"\u201d", "\"",
-	"\u2022", "*",
-	"\u2026", "...",
-)
+const pdfUnicodeFontFamily = "ForgeSans"
 
 type Options struct {
 	CreationDate time.Time
@@ -91,8 +81,9 @@ func emitRenderPlan(plan *renderPlan, options Options) (*RenderResult, error) {
 	creationDate := resolveCreationDate(options)
 	doc.SetCreationDate(creationDate)
 	doc.SetModificationDate(creationDate)
-	doc.SetTitle(report.Title, false)
-	doc.SetFont("Helvetica", "", 10)
+	doc.SetTitle(report.Title, true)
+	registerUnicodeFonts(doc)
+	doc.SetFont(pdfUnicodeFontFamily, "", 10)
 
 	engine := &renderer{
 		pdf:         doc,
@@ -118,6 +109,13 @@ func emitRenderPlan(plan *renderPlan, options Options) (*RenderResult, error) {
 		Bytes:       buffer.Bytes(),
 		Diagnostics: engine.diagnostics,
 	}, nil
+}
+
+func registerUnicodeFonts(doc *fpdf.Fpdf) {
+	doc.AddUTF8FontFromBytes(pdfUnicodeFontFamily, "", goregular.TTF)
+	doc.AddUTF8FontFromBytes(pdfUnicodeFontFamily, "B", gobold.TTF)
+	doc.AddUTF8FontFromBytes(pdfUnicodeFontFamily, "I", goitalic.TTF)
+	doc.AddUTF8FontFromBytes(pdfUnicodeFontFamily, "BI", gobolditalic.TTF)
 }
 
 func resolveDocumentOrientationAndSize(geometry reportprint.PageGeometry) (string, fpdf.SizeType) {
@@ -375,23 +373,12 @@ func (r *renderer) addDiagnostic(diagnostic RenderDiagnostic) {
 }
 
 func (r *renderer) applyTextStyle(element reportprint.Element, defaultSize float64) {
-	fontFamily := "Helvetica"
-	switch strings.ToLower(strings.TrimSpace(element.FontFamily)) {
-	case "", "helvetica", "arial":
-		fontFamily = "Helvetica"
-	case "courier":
-		fontFamily = "Courier"
-	case "times", "times-roman":
-		fontFamily = "Times"
-	default:
-		fontFamily = "Helvetica"
-	}
 	style := fontStyle(element.FontWeight)
 	size := element.FontSize
 	if size <= 0 {
 		size = defaultSize
 	}
-	r.pdf.SetFont(fontFamily, style, size)
+	r.pdf.SetFont(pdfUnicodeFontFamily, style, size)
 	r.applyTextColor(element.Color)
 }
 
@@ -415,11 +402,7 @@ func fontStyle(weight string) string {
 }
 
 func sanitizePDFText(value string) string {
-	normalized := pdfCoreFontTextSanitizer.Replace(value)
-	normalized = strings.ReplaceAll(normalized, "  -  ", " - ")
-	normalized = strings.ReplaceAll(normalized, " -  ", " - ")
-	normalized = strings.ReplaceAll(normalized, "  - ", " - ")
-	return normalized
+	return strings.ReplaceAll(value, "\u00a0", " ")
 }
 
 func resolveLineHeight(size float64, fallback float64) float64 {

@@ -1122,6 +1122,7 @@ export const reportFillSchema = {
         valueField: { type: "string" },
         valueLabel: { type: "string" },
         valueFormat: { enum: ["currency", "number", "number5", "percent", "percentFraction", "compact", "compactNumber"] },
+        suffix: { type: "string" },
         secondaryField: { type: "string" },
         secondaryLabel: { type: "string" },
         secondaryFormat: { enum: ["currency", "number", "number5", "percent", "percentFraction", "compact", "compactNumber"] },
@@ -1148,6 +1149,7 @@ export const reportFillSchema = {
             valueField: { type: "string" },
             valueLabel: { type: "string" },
             valueFormat: { enum: ["currency", "number", "number5", "percent", "percentFraction", "compact", "compactNumber"] },
+            suffix: { type: "string" },
             value: { $ref: "#/$defs/jsonValue" },
             rowCount: { type: "integer", minimum: 0 },
             secondaryField: { type: "string" },
@@ -1588,6 +1590,12 @@ export const reportFillSchema = {
         runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         description: { type: "string" },
+        datasetRef: { type: "string" },
+        timeField: { type: "string" },
+        titleField: { type: "string" },
+        descriptionField: { type: "string" },
+        badgeField: { type: "string" },
+        toneField: { type: "string" },
         events: {
           type: "array",
           items: { $ref: "#/$defs/timelineEvent" },
@@ -1599,6 +1607,7 @@ export const reportFillSchema = {
           properties: {
             title: { type: "string" },
             description: { type: "string" },
+            rowCount: { type: "integer", minimum: 0 },
             events: {
               type: "array",
               items: { $ref: "#/$defs/timelineEvent" },

@@ -1368,6 +1368,11 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
   const toneStyles = resolveRuntimeKpiToneStyles(content?.tone, theme);
   const blockTitle = normalizeString(block?.title || content?.title || "KPI");
   const valueLabel = normalizeString(content?.valueLabel || content?.valueField || "Value");
+  const formattedPrimaryValue = `${formatKpiValue(
+    content?.value,
+    normalizeString(content?.valueFormat || content?.format),
+    locale,
+  )}${normalizeString(content?.suffix || block?.suffix)}`;
   const showValueLabel = !!valueLabel && valueLabel.toLowerCase() !== blockTitle.toLowerCase();
   const presentationMode = ["body", "both"].includes(normalizeString(content?.presentationMode || block?.presentationMode).toLowerCase())
     ? normalizeString(content?.presentationMode || block?.presentationMode).toLowerCase()
@@ -1416,7 +1421,7 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
                   </span>
                 ) : null}
                 <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.1, color: "#182026" }}>
-                  {formatKpiValue(content?.value, normalizeString(content?.valueFormat || content?.format), locale)}
+                  {formattedPrimaryValue}
                 </span>
               </div>
               {hasSecondaryValue ? (
@@ -1440,7 +1445,7 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
             </div>
           ) : null}
           {!showCard && !showBody ? (
-            <RuntimeMarkdownBody markdown={`${valueLabel}: ${formatKpiValue(content?.value, normalizeString(content?.valueFormat || content?.format), locale)}`} />
+            <RuntimeMarkdownBody markdown={`${valueLabel}: ${formattedPrimaryValue}`} />
           ) : null}
         </div>
       )}

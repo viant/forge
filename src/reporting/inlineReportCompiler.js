@@ -169,13 +169,13 @@ function buildInlinePromotionState(staticDatasets = [], workspaceDatasetRequests
       .map((entry) => normalizeString(entry?.dataSourceRef))
       .filter(Boolean),
   ));
+  const snapshot = materializedDatasetIds.length > 0;
   return {
-    eligible: materializedDatasetIds.length === 0,
+    eligible: true,
+    mode: snapshot ? "snapshot" : "reusable",
     reusableDataSourceRefs,
     materializedDatasetIds,
-    reason: materializedDatasetIds.length > 0
-      ? "Materialized inline datasets must be mapped to registered workspace data sources before this report can be saved."
-      : "",
+    reason: "",
   };
 }
 
@@ -315,6 +315,15 @@ export function compileInlineReport({
     builderTarget,
   });
   const reportSpec = lowerReportDocumentToReportSpec(reportDocument, { includePrimaryBlocks: false });
+  // The report-builder document requires a primary source internally even for
+  // narrative-only reports. In that case buildInlineDocument uses reportId as
+  // a private placeholder. It must not escape into the promotable ReportSpec,
+  // where Save Report would treat it as a real workspace datasource.
+  if (declarations.length === 0 && staticDatasets.length === 0 && Array.isArray(reportSpec.datasets)) {
+    reportSpec.datasets = reportSpec.datasets.filter((dataset) => (
+      normalizeString(dataset?.dataSourceRef) !== normalizedReportId
+    ));
+  }
   const staticPayloads = buildReportBuilderStaticDatasetPayloadMap(staticDatasets);
   const workspaceDatasetRequests = buildWorkspaceDatasetRequests(
     declarations,
