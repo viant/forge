@@ -87,7 +87,7 @@ func lowerAssembly(assembly *Assembly) (json.RawMessage, json.RawMessage, json.R
 	}
 	specRaw, _ := json.Marshal(specObject)
 	if _, err = reportspec.DecodeJSON(specRaw); err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("compile fenced reportSpec: %w (document: %s)", err, specRaw)
+		return nil, nil, nil, nil, nil, fmt.Errorf("compile fenced reportSpec: %w", err)
 	}
 	fillBlocks := buildFillBlocks(blocks, fillDatasets)
 	fillObject := map[string]any{
