@@ -3,6 +3,7 @@ package fenced
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -103,6 +104,69 @@ func TestCompileProducesExportableMultiTabDashboard(t *testing.T) {
 	require.Greater(t, len(rendered.Bytes), 1000)
 }
 
+func TestCompilePrintGroupsKPIsAndFormatsCounts(t *testing.T) {
+	content := "```forge-report\n" +
+		`{"version":1,"scope":"message","id":"kpis","sequence":1,"mode":"start","grammar":"report-document-v1","title":"KPI report","blocks":[{"id":"spend","kind":"kpiBlock","datasetRef":"metrics","valueField":"spend","valueFormat":"currency","title":"Spend"},{"id":"bids","kind":"kpiBlock","datasetRef":"metrics","valueField":"bids","valueFormat":"compact","title":"Bids"},{"id":"impressions","kind":"kpiBlock","datasetRef":"metrics","valueField":"impressions","valueFormat":"compact","title":"Impressions"},{"id":"detail","kind":"tableBlock","datasetRef":"metrics","title":"Delivery","columns":[{"key":"bids","label":"Submitted bids","format":"integer"},{"key":"impressions","label":"Impressions","format":"integer"}]}]}` +
+		"\n```\n```forge-data\n" +
+		`{"version":2,"scope":"message","id":"metrics","reportRef":"kpis","sequence":2,"format":"json","mode":"replace","data":[{"spend":9292.606,"bids":6226971,"impressions":903913}]}` +
+		"\n```\n```forge-report\n" +
+		`{"version":1,"scope":"message","id":"kpis","sequence":3,"mode":"commit"}` +
+		"\n```"
+
+	compiled, err := Compile(&CompileRequest{Content: content, ReportID: "kpis"})
+	require.NoError(t, err)
+
+	var printArtifact map[string]any
+	require.NoError(t, json.Unmarshal(compiled.ReportPrint, &printArtifact))
+	pages := printArtifact["pages"].([]any)
+	elements := pages[0].(map[string]any)["elements"].([]any)
+	byID := map[string]map[string]any{}
+	for _, item := range elements {
+		element := item.(map[string]any)
+		byID[element["id"].(string)] = element
+	}
+	require.Equal(t, "$9,292.61", byID["spend__value"]["text"])
+	require.Equal(t, "6.23M", byID["bids__value"]["text"])
+	require.Equal(t, "904K", byID["impressions__value"]["text"])
+	require.Equal(t, byID["spend__card"]["box"].(map[string]any)["y"], byID["bids__card"]["box"].(map[string]any)["y"])
+	require.NotEqual(t, byID["spend__card"]["box"].(map[string]any)["x"], byID["bids__card"]["box"].(map[string]any)["x"])
+	require.Equal(t, "6,226,971", byID["detail__r0_bids"]["text"])
+}
+
+func TestCompilePreservesAuthoredGridSpans(t *testing.T) {
+	content := "```forge-report\n" +
+		`{"version":1,"scope":"message","id":"layout","sequence":1,"mode":"start","grammar":"report-document-v1","title":"Layout report","blocks":[{"id":"spend","kind":"kpiBlock","datasetRef":"metrics","valueField":"spend","title":"Spend"},{"id":"detail","kind":"tableBlock","datasetRef":"metrics","title":"Delivery","columns":[{"key":"spend","label":"Spend"}]}]}` +
+		"\n```\n```forge-data\n" +
+		`{"version":2,"scope":"message","id":"metrics","reportRef":"layout","sequence":2,"format":"json","mode":"replace","data":[{"spend":10}]}` +
+		"\n```\n```forge-report\n" +
+		`{"version":1,"scope":"message","id":"layout","sequence":3,"mode":"patch","layout":{"type":"grid","columns":12,"items":[{"blockId":"spend","x":0,"y":0,"w":3,"h":2},{"blockId":"detail","x":0,"y":2,"w":12,"h":4}]}}` +
+		"\n```\n```forge-report\n" +
+		`{"version":1,"scope":"message","id":"layout","sequence":4,"mode":"commit"}` +
+		"\n```"
+
+	compiled, err := Compile(&CompileRequest{Content: content, ReportID: "layout"})
+	require.NoError(t, err)
+
+	var spec map[string]any
+	require.NoError(t, json.Unmarshal(compiled.ReportSpec, &spec))
+	layout := spec["layoutIntent"].(map[string]any)
+	items := layout["items"].([]any)
+	require.Equal(t, "quarter", items[0].(map[string]any)["size"])
+	require.Equal(t, "full", items[1].(map[string]any)["size"])
+}
+
+func TestFitTableTextPreventsCellOverflow(t *testing.T) {
+	require.Equal(t, "short", fitTableText("short", 100, 9))
+	require.Equal(t, "a very lon…", fitTableText("a very long operational interpretation", 54, 9))
+}
+
+func TestFormatValueDoesNotAddMeaninglessDecimalZeros(t *testing.T) {
+	require.Equal(t, "1", formatValue(float64(1), "number"))
+	require.Equal(t, "0.684", formatValue(0.684, "number"))
+	require.Equal(t, "6,226,971", formatValue(float64(6226971), "integer"))
+	require.Equal(t, "6.23M", formatValue(float64(6226971), "compact"))
+}
+
 type jsonRaw []byte
 
 func (j jsonRaw) MarshalJSON() ([]byte, error) { return j, nil }
@@ -123,6 +187,27 @@ func TestAssembleRejectsSequenceGap(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "incomplete", result.Assembly.Status)
 	require.NotEmpty(t, result.Diagnostics)
+}
+
+func TestAssembleRejectsTabSectionMissingFromExplicitLayout(t *testing.T) {
+	content := "```forge-report\n" +
+		`{"version":1,"scope":"message","id":"tabs","sequence":1,"mode":"start","grammar":"report-document-v1","blocks":[{"id":"tabs_block","kind":"tabGroupBlock","sectionIds":["overview"]},{"id":"overview","kind":"sectionBlock","title":"Overview"},{"id":"finding","kind":"markdownBlock","title":"Finding","markdown":"Useful content."}]}` +
+		"\n```\n```forge-report\n" +
+		`{"version":1,"scope":"message","id":"tabs","sequence":2,"mode":"patch","layout":{"type":"grid","columns":12,"items":[{"blockId":"tabs_block"},{"blockId":"finding"}]}}` +
+		"\n```\n```forge-report\n" +
+		`{"version":1,"scope":"message","id":"tabs","sequence":3,"mode":"commit"}` +
+		"\n```"
+
+	fences, err := Parse(content)
+	require.NoError(t, err)
+	result, err := Assemble(fences, "tabs")
+	require.NoError(t, err)
+	require.NotEqual(t, "committed", result.Assembly.Status)
+	messages := make([]string, 0, len(result.Diagnostics))
+	for _, diagnostic := range result.Diagnostics {
+		messages = append(messages, diagnostic.Message)
+	}
+	require.Contains(t, strings.Join(messages, "\n"), `section "overview" must appear in layout.items`)
 }
 
 func TestAssembleAcceptsDataBeforeStartAndPatchesBlocks(t *testing.T) {
