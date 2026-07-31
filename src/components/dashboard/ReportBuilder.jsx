@@ -2207,14 +2207,24 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     const hostedReportSource = resolveHostedReportSource(container);
     const hostedReportId = resolveHostedReportId(container);
     const hostedReportStarterId = resolveHostedReportStarterId(container);
+    const hostedWindowParameters = builderContext?.windowState?.parameters
+        || context?.windowState?.parameters
+        || {};
     const hostedRunFrom = normalizeString(
-        container?.parameters?.runFrom || windowFormValue?.runFrom,
+        hostedWindowParameters?.runFrom
+        || container?.parameters?.runFrom
+        || windowFormValue?.runFrom,
     );
     const hostedRunTo = normalizeString(
-        container?.parameters?.runTo || windowFormValue?.runTo,
+        hostedWindowParameters?.runTo
+        || container?.parameters?.runTo
+        || windowFormValue?.runTo,
     );
-    const hostedRunOrderIds = container?.parameters?.runOrderIds || windowFormValue?.runOrderIds;
+    const hostedRunOrderIds = hostedWindowParameters?.runOrderIds
+        || container?.parameters?.runOrderIds
+        || windowFormValue?.runOrderIds;
     const hostedRunOverrideCandidate = [
+        hostedWindowParameters?.runOverride,
         container?.parameters?.runOverride,
         windowFormValue?.runOverride,
     ].find((candidate) => candidate && typeof candidate === "object" && !Array.isArray(candidate))
@@ -2225,13 +2235,6 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         ...(hostedRunTo ? { to: hostedRunTo } : {}),
         ...(hostedRunOrderIds ? { orderIds: hostedRunOrderIds } : {}),
     } : null;
-    if (typeof window !== "undefined" && window.location?.search?.includes("forgeReportDebug=1")) {
-        window.__forgeReportBuilderDebug = {
-            parameters: container?.parameters,
-            windowFormValue,
-            hostedRunOverride,
-        };
-    }
     const hostedRunOverrideSignature = hostedRunOverride ? JSON.stringify(hostedRunOverride) : "";
     const appliedHostedRunOverrideSignatureRef = useRef("");
     const hostedInlineReportActivation = useMemo(
