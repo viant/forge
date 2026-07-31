@@ -56,7 +56,9 @@ const synthesized = buildReportBuilderHostServices({
 });
 
 assert.equal(typeof synthesized.reportExport?.submitRequest, "function");
+assert.equal(typeof synthesized.reportExport?.submitSource, "function");
 assert.equal(typeof synthesized.reportStore?.listReports, "function");
+assert.equal(typeof synthesized.reportStore?.deleteReport, "function");
 assert.equal(typeof synthesized.reportLifecycle?.shareArtifact, "function");
 assert.equal(typeof synthesized.reportSharedArtifacts?.listArtifacts, "function");
 
@@ -126,6 +128,7 @@ const fetchCallCountBeforeCompleteExplicit = calls.length;
 const completeExplicitServices = {
   reportExport: {
     submitRequest: async () => ({ ok: true }),
+    submitSource: async () => ({ ok: true }),
     getStatus: async () => ({ status: "queued" }),
     getArtifact: async () => ({ bytes: new Uint8Array() }),
     listJobs: async () => ({ jobs: [] }),
@@ -136,6 +139,9 @@ const completeExplicitServices = {
     getReport: async () => ({ artifactId: "report-1" }),
     listReports: async () => ({ reports: [] }),
     updateReport: async () => ({ ok: true }),
+    duplicateReport: async () => ({ ok: true }),
+    deleteReport: async () => ({ deleted: true }),
+    recordReportRun: async () => ({ ok: true }),
   },
   reportLifecycle: {
     shareArtifact: async () => ({ ok: true }),

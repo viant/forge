@@ -1729,6 +1729,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     const currentReportEventRuntimeRequestRef = useRef(null);
     const currentReportEventIdentityRef = useRef({ reportId: "", reportName: "", sourceKind: "" });
     const activeRunEventRef = useRef(null);
+    const recordedStoredRunKeyRef = useRef("");
     const completedRunEventKeyRef = useRef("");
     const reportStoreHandler = useMemo(
         () => resolveReportBuilderReportStoreHandler(builderContext),
@@ -2206,6 +2207,33 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     const hostedReportSource = resolveHostedReportSource(container);
     const hostedReportId = resolveHostedReportId(container);
     const hostedReportStarterId = resolveHostedReportStarterId(container);
+    const hostedRunFrom = normalizeString(
+        container?.parameters?.runFrom || windowFormValue?.runFrom,
+    );
+    const hostedRunTo = normalizeString(
+        container?.parameters?.runTo || windowFormValue?.runTo,
+    );
+    const hostedRunOrderIds = container?.parameters?.runOrderIds || windowFormValue?.runOrderIds;
+    const hostedRunOverrideCandidate = [
+        container?.parameters?.runOverride,
+        windowFormValue?.runOverride,
+    ].find((candidate) => candidate && typeof candidate === "object" && !Array.isArray(candidate))
+        || ((hostedRunFrom || hostedRunTo || hostedRunOrderIds) ? {} : null);
+    const hostedRunOverride = hostedRunOverrideCandidate ? {
+        ...hostedRunOverrideCandidate,
+        ...(hostedRunFrom ? { from: hostedRunFrom } : {}),
+        ...(hostedRunTo ? { to: hostedRunTo } : {}),
+        ...(hostedRunOrderIds ? { orderIds: hostedRunOrderIds } : {}),
+    } : null;
+    if (typeof window !== "undefined" && window.location?.search?.includes("forgeReportDebug=1")) {
+        window.__forgeReportBuilderDebug = {
+            parameters: container?.parameters,
+            windowFormValue,
+            hostedRunOverride,
+        };
+    }
+    const hostedRunOverrideSignature = hostedRunOverride ? JSON.stringify(hostedRunOverride) : "";
+    const appliedHostedRunOverrideSignatureRef = useRef("");
     const hostedInlineReportActivation = useMemo(
         () => buildHostedInlineReportActivation(container, {
             containerId: container?.id,
@@ -3057,6 +3085,12 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         if (!currentPrefillSignature || appliedPrefillSignatureRef.current === currentPrefillSignature) {
             return;
         }
+        // A persisted report hydrates asynchronously. Apply explicit caller
+        // scope/date overrides only after that hydration completes so the
+        // saved defaults cannot overwrite a one-off catalog run.
+        if (hostedActivationRequired && hostedReportActivationState.status !== "ready") {
+            return;
+        }
         const next = mergeReportBuilderState(
             config,
             applyReportBuilderStateHook(
@@ -3076,7 +3110,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             return;
         }
         persistState(next);
-    }, [builderContext, config, currentPrefillSignature, persistState, state, windowFormValue]);
+    }, [builderContext, config, currentPrefillSignature, hostedActivationRequired, hostedReportActivationState.status, persistState, state, windowFormValue]);
 
     useEffect(() => {
         if (
@@ -7629,6 +7663,26 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             rowCount: Array.isArray(computedCollection) ? computedCollection.length : 0,
         });
     }, [computedCollection, currentRequestFingerprint, emitRunLifecycleEvent, hasCompletedCurrentRun, isAuthoredRuntimeExecution]);
+    useEffect(() => {
+        const artifactId = normalizeString(storedReportArtifact?.artifactId);
+        if (!hasCompletedCurrentRun || !artifactId || typeof reportStoreHandler?.recordReportRun !== "function") {
+            return;
+        }
+        const runKey = `${artifactId}:${currentRequestFingerprint}:${manualRunSequence}`;
+        if (recordedStoredRunKeyRef.current === runKey) {
+            return;
+        }
+        recordedStoredRunKeyRef.current = runKey;
+        Promise.resolve(reportStoreHandler.recordReportRun({ artifactId }))
+            .then((updated) => {
+                if (updated && typeof updated === "object" && !Array.isArray(updated)) {
+                    setStoredReportArtifact(updated);
+                }
+            })
+            .catch((runRecordError) => {
+                console.warn("reportBuilder.recordReportRun failed", runRecordError);
+            });
+    }, [currentRequestFingerprint, hasCompletedCurrentRun, manualRunSequence, reportStoreHandler, storedReportArtifact?.artifactId]);
     const canShowResults = canRunReport && hasRows;
     const canShowResultsRef = useRef(canShowResults);
     canShowResultsRef.current = canShowResults;
@@ -12097,6 +12151,9 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             metadata: {
                 conversationId: String(container?.conversationId || builderContext?.conversationId || builderContext?.windowState?.conversationId || "").trim(),
                 workspaceId: String(container?.windowKey || container?.id || "").trim(),
+                ...(windowFormValue?.prefill && typeof windowFormValue.prefill === "object" && !Array.isArray(windowFormValue.prefill)
+                    ? { prefill: cloneReportBuilderValue(windowFormValue.prefill) }
+                    : {}),
             },
         });
         if (!saveReportRequest) {
@@ -12151,7 +12208,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             });
             return { ok: false, error: message };
         }
-    }, [buildCurrentReportSaveBundle, builderContext?.conversationId, builderContext?.windowState?.conversationId, container, designWorkspaceMode, reportStoreHandler, stageCurrentReportSaveBundle, storedReportArtifact]);
+    }, [buildCurrentReportSaveBundle, builderContext?.conversationId, builderContext?.windowState?.conversationId, container, designWorkspaceMode, reportStoreHandler, stageCurrentReportSaveBundle, storedReportArtifact, windowFormValue?.prefill]);
     useEffect(() => {
         const windowId = normalizeString(reportEventContext.windowId);
         if (!windowId) {
@@ -12677,6 +12734,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             });
             return;
         }
+        appliedPrefillSignatureRef.current = "";
         executeOnOpenRunKeyRef.current = "";
         setHostedReportActivationState({ reportId: hostedReportSource.id, status: "ready" });
     }, [hostedInlineReportActivation, hostedReportSource.id, hostedReportSource.kind]);
@@ -12720,6 +12778,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                 if (!activated) {
                     throw new Error(`Saved report ${request.reportId} is incompatible with this workspace.`);
                 }
+                appliedPrefillSignatureRef.current = "";
                 executeOnOpenRunKeyRef.current = "";
                 setHostedReportActivationState({ reportId: request.reportId, status: "ready" });
             })
@@ -12737,6 +12796,37 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             cancelled = true;
         };
     }, [hostedReportId, hostedReportSource.kind, reportStoreHandler]);
+    useEffect(() => {
+        if (
+            hostedReportSource.kind !== "report"
+            || hostedReportActivationState.status !== "ready"
+            || !hostedRunOverrideSignature
+            || appliedHostedRunOverrideSignatureRef.current === hostedRunOverrideSignature
+        ) {
+            return;
+        }
+        const next = mergeReportBuilderState(
+            config,
+            applyReportBuilderStateHook(
+                builderContext,
+                config,
+                state,
+                { prefill: hostedRunOverride },
+            ),
+        );
+        appliedHostedRunOverrideSignatureRef.current = hostedRunOverrideSignature;
+        executeOnOpenRunKeyRef.current = "";
+        persistState(next);
+    }, [
+        builderContext,
+        config,
+        hostedReportActivationState.status,
+        hostedReportSource.kind,
+        hostedRunOverride,
+        hostedRunOverrideSignature,
+        persistState,
+        state,
+    ]);
     const removeImportedLocalReopenable = React.useCallback((targetIdentity = "", title = "") => {
         const normalizedIdentity = normalizeString(targetIdentity);
         if (!normalizedIdentity) {

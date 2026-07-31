@@ -14,6 +14,7 @@ export const DASHBOARD_BLOCK_KINDS = [
   'dashboard.table',
   'dashboard.report',
   'dashboard.reportRuntime',
+  'dashboard.reportCatalog',
   'dashboard.detail',
 ];
 

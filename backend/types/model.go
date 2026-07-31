@@ -678,6 +678,9 @@ type Dashboard struct {
 	ReportBuilderRef string                            `json:"reportBuilderRef,omitempty" yaml:"reportBuilderRef,omitempty"`
 	ReportBuilder    map[string]interface{}            `json:"reportBuilder,omitempty" yaml:"reportBuilder,omitempty"`
 	ReportBuilders   map[string]map[string]interface{} `json:"reportBuilders,omitempty" yaml:"reportBuilders,omitempty"`
+	// ReportCatalog remains open-ended so workspace extensions own their
+	// preset catalog, builder routing, and product-specific labels.
+	ReportCatalog map[string]interface{} `json:"reportCatalog,omitempty" yaml:"reportCatalog,omitempty"`
 	// ReportOptions controls the dashboard-level report mode. The older
 	// compact alias is Container.report.
 	ReportOptions *DashboardReportOptions `json:"reportOptions,omitempty" yaml:"reportOptions,omitempty"`
@@ -826,6 +829,13 @@ func (c *Container) applyDashboardCompactAliases(compact dashboardCompactAliases
 				dashboard.ReportBuilders = compact.ReportBuilders
 			}
 		}
+	case "dashboard.reportCatalog":
+		if compact.ReportCatalog != nil {
+			dashboard := c.ensureDashboard()
+			if dashboard.ReportCatalog == nil {
+				dashboard.ReportCatalog = compact.ReportCatalog
+			}
+		}
 	case "dashboard.table":
 		if len(compact.Columns) > 0 || compact.Limit > 0 || compact.QuickFilter || compact.Density != "" || len(compact.FormattingRules) > 0 || len(compact.RowActions) > 0 {
 			dashboard := c.ensureDashboard()
@@ -871,6 +881,7 @@ type dashboardCompactAliases struct {
 	ReportBuilderRef string                            `json:"reportBuilderRef,omitempty" yaml:"reportBuilderRef,omitempty"`
 	ReportBuilder    map[string]interface{}            `json:"reportBuilder,omitempty" yaml:"reportBuilder,omitempty"`
 	ReportBuilders   map[string]map[string]interface{} `json:"reportBuilders,omitempty" yaml:"reportBuilders,omitempty"`
+	ReportCatalog    map[string]interface{}            `json:"reportCatalog,omitempty" yaml:"reportCatalog,omitempty"`
 	Metrics          []DashboardMetric                 `json:"metrics,omitempty" yaml:"metrics,omitempty"`
 	Rows             []DashboardKPIRow                 `json:"rows,omitempty" yaml:"rows,omitempty"`
 	Checks           []DashboardStatusCheck            `json:"checks,omitempty" yaml:"checks,omitempty"`

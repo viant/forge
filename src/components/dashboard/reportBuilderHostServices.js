@@ -10,6 +10,13 @@ function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
+function notifyReportStoreChanged(detail = {}) {
+    if (typeof globalThis?.dispatchEvent !== "function" || typeof globalThis?.CustomEvent !== "function") {
+        return;
+    }
+    globalThis.dispatchEvent(new globalThis.CustomEvent("agently:report-store-changed", { detail }));
+}
+
 function resolveBearerToken(auth = {}) {
     const authProvider = normalizeString(auth?.defaultAuthProvider);
     if (!authProvider) {
@@ -165,6 +172,14 @@ function createReportingHandlers({
                     reportExportRequest: cloneValue(request),
                 });
             },
+            async submitSource({ source, format = "pdf", conversationId: requestedConversationId = "", workspaceId = "" } = {}) {
+                return call("reporting:submit_export", {
+                    source: cloneValue(source),
+                    format: normalizeString(format || "pdf").toLowerCase(),
+                    ...(normalizeString(requestedConversationId) ? { conversationId: normalizeString(requestedConversationId) } : {}),
+                    ...(normalizeString(workspaceId) ? { workspaceId: normalizeString(workspaceId) } : {}),
+                });
+            },
             async getStatus({ jobId } = {}) {
                 return call("reporting:get_export_status", { jobId: normalizeString(jobId) });
             },
@@ -186,7 +201,9 @@ function createReportingHandlers({
         },
         reportStore: {
             async saveReport(request = {}) {
-                return call("reporting:save_report", cloneValue(request));
+                const result = await call("reporting:save_report", cloneValue(request));
+                notifyReportStoreChanged({ action: "saved", report: result });
+                return result;
             },
             async getReport(request = {}) {
                 return call("reporting:get_report", cloneValue(request));
@@ -195,7 +212,24 @@ function createReportingHandlers({
                 return call("reporting:list_reports", cloneValue(request));
             },
             async updateReport(request = {}) {
-                return call("reporting:update_report", cloneValue(request));
+                const result = await call("reporting:update_report", cloneValue(request));
+                notifyReportStoreChanged({ action: "updated", report: result });
+                return result;
+            },
+            async duplicateReport(request = {}) {
+                const result = await call("reporting:duplicate_report", cloneValue(request));
+                notifyReportStoreChanged({ action: "duplicated", report: result });
+                return result;
+            },
+            async deleteReport(request = {}) {
+                const result = await call("reporting:delete_report", cloneValue(request));
+                notifyReportStoreChanged({ action: "deleted", ...result });
+                return result;
+            },
+            async recordReportRun(request = {}) {
+                const result = await call("reporting:record_report_run", cloneValue(request));
+                notifyReportStoreChanged({ action: "ran", report: result });
+                return result;
             },
         },
         reportLifecycle: {
@@ -239,6 +273,7 @@ function hasFunctions(group = null, methodNames = []) {
 function isCompleteReportExportGroup(group = null) {
     return hasFunctions(group, [
         "submitRequest",
+        "submitSource",
         "getStatus",
         "getArtifact",
         "listJobs",
@@ -252,6 +287,9 @@ function isCompleteReportStoreGroup(group = null) {
         "getReport",
         "listReports",
         "updateReport",
+        "duplicateReport",
+        "deleteReport",
+        "recordReportRun",
     ]);
 }
 
