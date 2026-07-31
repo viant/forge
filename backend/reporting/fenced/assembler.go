@@ -231,6 +231,12 @@ func applyReport(s *state, p envelope) error {
 				return fmt.Errorf("cannot commit with missing sequence %d", sequence)
 			}
 		}
+		if err := validateReportBlocks(s.assembly.Source); err != nil {
+			return err
+		}
+		if err := validateTabSectionLayout(s.assembly.Source); err != nil {
+			return err
+		}
 		s.committed = true
 		s.assembly.Status = "committed"
 	default:
@@ -394,6 +400,47 @@ func validateReportBlocks(source map[string]any) error {
 			return fmt.Errorf("duplicate block id %q", id)
 		}
 		seen[id] = true
+	}
+	return nil
+}
+
+func validateTabSectionLayout(source map[string]any) error {
+	blocks, _ := source["blocks"].([]any)
+	blockKinds := map[string]string{}
+	var tabSections []string
+	for _, value := range blocks {
+		block, _ := value.(map[string]any)
+		id := textValue(block["id"])
+		blockKinds[id] = textValue(block["kind"])
+		if textValue(block["kind"]) == "tabGroupBlock" {
+			tabSections = append(tabSections, stringSlice(block["sectionIds"])...)
+		}
+	}
+	for _, sectionID := range tabSections {
+		if blockKinds[sectionID] != "sectionBlock" {
+			return fmt.Errorf("tab group section %q must reference a sectionBlock", sectionID)
+		}
+	}
+	if len(tabSections) == 0 {
+		return nil
+	}
+	layout, _ := source["layout"].(map[string]any)
+	if layout == nil {
+		return nil
+	}
+	items, _ := layout["items"].([]any)
+	if len(items) == 0 {
+		return nil
+	}
+	layoutIDs := map[string]bool{}
+	for _, value := range items {
+		item, _ := value.(map[string]any)
+		layoutIDs[textValue(item["blockId"])] = true
+	}
+	for _, sectionID := range tabSections {
+		if !layoutIDs[sectionID] {
+			return fmt.Errorf("tab group section %q must appear in layout.items so the tab body can render", sectionID)
+		}
 	}
 	return nil
 }

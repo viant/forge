@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -71,10 +72,15 @@ func lowerAssembly(assembly *Assembly) (json.RawMessage, json.RawMessage, json.R
 	}
 	blockOrder := make([]string, 0, len(blocks))
 	items := make([]any, 0, len(blocks))
+	layoutSizes := sourceLayoutSizes(assembly.Source)
 	for _, block := range blocks {
 		id := textValue(block["id"])
 		blockOrder = append(blockOrder, id)
-		items = append(items, map[string]any{"blockId": id})
+		item := map[string]any{"blockId": id}
+		if size, ok := layoutSizes[id]; ok {
+			item["size"] = size
+		}
+		items = append(items, item)
 	}
 	specObject := map[string]any{
 		"version": 1, "kind": "reportSpec", "source": source, "title": title,
@@ -111,6 +117,33 @@ func lowerAssembly(assembly *Assembly) (json.RawMessage, json.RawMessage, json.R
 	}
 	documentRaw, _ := json.Marshal(documentObject)
 	return documentRaw, specRaw, fillRaw, printRaw, nil, nil
+}
+
+func sourceLayoutSizes(source map[string]any) map[string]string {
+	result := map[string]string{}
+	layout, _ := source["layout"].(map[string]any)
+	rawItems, _ := layout["items"].([]any)
+	for _, rawItem := range rawItems {
+		item, _ := rawItem.(map[string]any)
+		blockID := textValue(item["blockId"])
+		if blockID == "" {
+			continue
+		}
+		value := item["span"]
+		if value == nil {
+			value = item["w"]
+		}
+		number, ok := numberValue(value)
+		span := int(number)
+		if !ok || number != float64(span) || span < 1 || span > 12 {
+			continue
+		}
+		sizes := map[int]string{3: "quarter", 4: "third", 6: "half", 8: "two-thirds", 12: "full"}
+		if size := sizes[span]; size != "" {
+			result[blockID] = size
+		}
+	}
+	return result
 }
 
 func normalizeBlocks(value any) ([]map[string]any, error) {
@@ -381,11 +414,16 @@ func buildPrint(title string, source map[string]any, specRaw, fillRaw json.RawMe
 		ds := item.(map[string]any)
 		rowsByID[textValue(ds["id"])], _ = ds["rows"].([]map[string]any)
 	}
+	pendingKPIs := 0
 	for _, item := range blocks {
 		block := item.(map[string]any)
 		kind, id, blockTitle := textValue(block["kind"]), textValue(block["id"]), textValue(block["title"])
 		if kind == "tabGroupBlock" || kind == "compositeBlock" {
 			continue
+		}
+		if kind != "kpiBlock" && pendingKPIs > 0 {
+			y += 76
+			pendingKPIs = 0
 		}
 		if blockTitle == "" {
 			blockTitle = humanize(id)
@@ -414,7 +452,8 @@ func buildPrint(title string, source map[string]any, specRaw, fillRaw json.RawMe
 			colWidth := (width - 2*margin) / float64(max(1, len(columns)))
 			elements = append(elements, rectElement(id+"__header_bg", margin, y, width-2*margin, 24, "#f8fafc"))
 			for index, column := range columns {
-				elements = append(elements, textElement(id+"__header_"+textValue(column["key"]), margin+float64(index)*colWidth+6, y+4, colWidth-12, 16, textValue(column["label"]), 10, "600"))
+				label := fitTableText(textValue(column["label"]), colWidth-12, 9)
+				elements = append(elements, textElement(id+"__header_"+textValue(column["key"]), margin+float64(index)*colWidth+6, y+4, colWidth-12, 16, label, 9, "600"))
 			}
 			y += 24
 			columnMax := map[string]float64{}
@@ -449,7 +488,8 @@ func buildPrint(title string, source map[string]any, specRaw, fillRaw json.RawMe
 							"fillColor": "#93c5fd", "backgroundColor": "#eff6ff",
 						})
 					}
-					elements = append(elements, textElement(fmt.Sprintf("%s__r%d_%s", id, rowIndex, key), margin+float64(columnIndex)*colWidth+6, y+4, colWidth-12, 16, formatValue(row[key], textValue(column["format"])), 9, ""))
+					displayValue := fitTableText(formatValue(row[key], textValue(column["format"])), colWidth-12, 8.5)
+					elements = append(elements, textElement(fmt.Sprintf("%s__r%d_%s", id, rowIndex, key), margin+float64(columnIndex)*colWidth+6, y+4, colWidth-12, 16, displayValue, 8.5, ""))
 				}
 				y += 24
 				elements = append(elements, lineElement(fmt.Sprintf("%s__rule_%d", id, rowIndex), margin, y, width-2*margin))
@@ -490,19 +530,29 @@ func buildPrint(title string, source map[string]any, specRaw, fillRaw json.RawMe
 			}
 			y += 46
 		case "kpiBlock":
-			ensure(76)
+			if pendingKPIs == 0 {
+				ensure(76)
+			}
 			rows := rowsByID[textValue(block["datasetRef"])]
 			field := textValue(block["valueField"])
 			value := any(nil)
 			if len(rows) > 0 {
 				value = rows[0][field]
 			}
+			const columns = 3
+			const gap = 8.0
+			cardWidth := (width - 2*margin - gap*float64(columns-1)) / columns
+			x := margin + float64(pendingKPIs)*(cardWidth+gap)
 			titleID := id + "__title"
-			elements = append(elements, rectElement(id+"__card", margin, y, width-2*margin, 64, "#f7faff"))
-			elements = append(elements, textElement(titleID, margin+12, y+8, width-2*margin-24, 16, blockTitle, 11, "600"))
-			elements = append(elements, textElement(id+"__value", margin+12, y+28, width-2*margin-24, 28, formatValue(value, textValue(block["valueFormat"])), 20, "700"))
+			elements = append(elements, rectElement(id+"__card", x, y, cardWidth, 64, "#f7faff"))
+			elements = append(elements, textElement(titleID, x+12, y+8, cardWidth-24, 16, fitTableText(blockTitle, cardWidth-24, 10), 10, "600"))
+			elements = append(elements, textElement(id+"__value", x+12, y+28, cardWidth-24, 28, fitTableText(formatValue(value, textValue(block["valueFormat"])), cardWidth-24, 18), 18, "700"))
 			bookmarks = append(bookmarks, bookmark(id, blockTitle, pageNumber, titleID, y))
-			y += 76
+			pendingKPIs++
+			if pendingKPIs == columns {
+				y += 76
+				pendingKPIs = 0
+			}
 		default:
 			body := textValue(block["markdown"])
 			if body == "" {
@@ -700,18 +750,92 @@ func formatValue(value any, format string) string {
 	if value == nil {
 		return "—"
 	}
-	number, numeric := value.(float64)
+	number, numeric := numberValue(value)
 	if numeric {
 		switch strings.ToLower(format) {
 		case "currency":
-			return fmt.Sprintf("$%.2f", number)
+			return "$" + formatGroupedFixed(number, 2)
 		case "percent":
 			return fmt.Sprintf("%.1f%%", number)
+		case "percentfraction":
+			return fmt.Sprintf("%.1f%%", number*100)
+		case "integer":
+			return formatGroupedFixed(number, 0)
+		case "compact", "compactnumber":
+			return formatCompactNumber(number)
+		case "number":
+			return formatTrimmedFixed(number, 3)
+		case "number5":
+			return formatTrimmedFixed(number, 5)
 		default:
-			return strconv.FormatFloat(number, 'f', 3, 64)
+			if math.Trunc(number) == number {
+				return formatGroupedFixed(number, 0)
+			}
+			return formatTrimmedFixed(number, 3)
 		}
 	}
 	return fmt.Sprint(value)
+}
+
+func formatTrimmedFixed(value float64, precision int) string {
+	formatted := strconv.FormatFloat(value, 'f', precision, 64)
+	return strings.TrimRight(strings.TrimRight(formatted, "0"), ".")
+}
+
+func formatCompactNumber(value float64) string {
+	absolute := math.Abs(value)
+	divisor, suffix := 1.0, ""
+	switch {
+	case absolute >= 1_000_000_000:
+		divisor, suffix = 1_000_000_000, "B"
+	case absolute >= 1_000_000:
+		divisor, suffix = 1_000_000, "M"
+	case absolute >= 1_000:
+		divisor, suffix = 1_000, "K"
+	}
+	if suffix == "" {
+		if math.Trunc(value) == value {
+			return formatGroupedFixed(value, 0)
+		}
+		return strconv.FormatFloat(value, 'f', 3, 64)
+	}
+	scaled := value / divisor
+	precision := 2
+	if math.Abs(scaled) >= 100 {
+		precision = 0
+	} else if math.Abs(scaled) >= 10 {
+		precision = 1
+	}
+	formatted := strconv.FormatFloat(scaled, 'f', precision, 64)
+	if strings.Contains(formatted, ".") {
+		formatted = strings.TrimRight(strings.TrimRight(formatted, "0"), ".")
+	}
+	return formatted + suffix
+}
+
+func formatGroupedFixed(value float64, precision int) string {
+	formatted := strconv.FormatFloat(value, 'f', precision, 64)
+	parts := strings.SplitN(formatted, ".", 2)
+	sign, whole := "", parts[0]
+	if strings.HasPrefix(whole, "-") {
+		sign, whole = "-", strings.TrimPrefix(whole, "-")
+	}
+	for index := len(whole) - 3; index > 0; index -= 3 {
+		whole = whole[:index] + "," + whole[index:]
+	}
+	if len(parts) == 2 {
+		return sign + whole + "." + parts[1]
+	}
+	return sign + whole
+}
+
+func fitTableText(value string, width, fontSize float64) string {
+	runes := []rune(value)
+	maxRunes := int(width / (fontSize * 0.54))
+	if maxRunes < 2 || len(runes) <= maxRunes {
+		return value
+	}
+	return string(runes[:maxRunes-1]) + "…"
 }
 
 func buildChartSVG(rows []map[string]any, chartSpec map[string]any, width, height float64) string {

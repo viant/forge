@@ -1257,4 +1257,41 @@ assert.deepEqual(validateReportPrint(customToneTablePrint), {
 });
 assert.equal(customToneTablePrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "tableCellTone" && element.backgroundColor === "#fdecea" && element.textColor === "#7a271a"), true);
 
+const authoredKpiGridSpec = {
+  version: 1,
+  kind: "reportSpec",
+  source: { kind: "dashboard.reportBuilder", containerId: "kpiGrid", stateKey: "kpiGrid", dataSourceRef: "metrics" },
+  title: "KPI Grid",
+  parameters: { viewMode: "table", groupBy: "", pageSize: 25, orderField: "", orderDir: "asc" },
+  layoutIntent: {
+    kind: "single",
+    resultPanePosition: "right",
+    blockOrder: ["spend", "impressions"],
+    items: [
+      { blockId: "spend", size: "quarter" },
+      { blockId: "impressions", size: "quarter" },
+    ],
+  },
+  refinements: [],
+  calculatedFields: [],
+  datasets: [{ id: "metrics", dataSourceRef: "metrics", request: {} }],
+  blocks: [
+    { id: "spend", kind: "kpiBlock", title: "Spend", datasetRef: "metrics", valueField: "total_spend", valueFormat: "currency" },
+    { id: "impressions", kind: "kpiBlock", title: "Impressions", datasetRef: "metrics", valueField: "impressions", valueFormat: "compact" },
+  ],
+};
+const authoredKpiGridFill = buildReportFillFromReportSpec(authoredKpiGridSpec, {
+  metrics: { rows: [{ total_spend: 155690.15, impressions: 12492757 }] },
+});
+const authoredKpiGridPrint = buildReportPrintFromReportFill({
+  reportSpec: authoredKpiGridSpec,
+  reportFill: authoredKpiGridFill,
+});
+const authoredKpiCards = authoredKpiGridPrint.pages
+  .flatMap((page) => page.elements)
+  .filter((element) => element.id === "spend__card" || element.id === "impressions__card");
+assert.equal(authoredKpiCards.length, 2);
+assert.equal(authoredKpiCards[0].box.y, authoredKpiCards[1].box.y);
+assert.notEqual(authoredKpiCards[0].box.x, authoredKpiCards[1].box.x);
+
 console.log("reportPrintModel ✓ builds the canonical ReportPrint contract and lowers authored ReportFill blocks into paginated print output");
