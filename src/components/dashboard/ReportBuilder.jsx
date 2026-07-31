@@ -144,6 +144,10 @@ import {
     resolveHostedReportWorkspaceMode,
 } from "./reportBuilderHostedReportActivation.js";
 import {
+    applySavedReportRunOverride,
+    consumeSavedReportRunOverride,
+} from "./reportBuilderRunOverrides.js";
+import {
     buildReportBuilderAuthoredCapabilityViewModel,
 } from "./reportBuilderAuthoredCapabilities.js";
 import {
@@ -2210,6 +2214,11 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     const hostedWindowParameters = builderContext?.windowState?.parameters
         || context?.windowState?.parameters
         || {};
+    const hostedRunOverrideToken = normalizeString(
+        hostedWindowParameters?.runOverrideToken
+        || container?.parameters?.runOverrideToken
+        || windowFormValue?.runOverrideToken,
+    );
     const hostedRunFrom = normalizeString(
         hostedWindowParameters?.runFrom
         || container?.parameters?.runFrom
@@ -12771,7 +12780,10 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                 if (cancelled) {
                     return;
                 }
-                const response = buildHostedReportActivationResponse(result);
+                const response = applySavedReportRunOverride(
+                    buildHostedReportActivationResponse(result),
+                    consumeSavedReportRunOverride(hostedRunOverrideToken),
+                );
                 if (!response || typeof activateImportedResponseInBuilderRef.current !== "function") {
                     throw new Error(`Saved report ${request.reportId} could not be hydrated.`);
                 }
@@ -12798,7 +12810,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         return () => {
             cancelled = true;
         };
-    }, [hostedReportId, hostedReportSource.kind, reportStoreHandler]);
+    }, [hostedReportId, hostedReportSource.kind, hostedRunOverrideToken, reportStoreHandler]);
     useEffect(() => {
         if (
             hostedReportSource.kind !== "report"

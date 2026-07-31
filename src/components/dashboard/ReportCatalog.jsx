@@ -17,6 +17,7 @@ import {
     normalizeReportBuilderExportArtifact,
     normalizeReportBuilderExportJob,
 } from "./reportBuilderExportLifecycle.js";
+import { registerSavedReportRunOverride } from "./reportBuilderRunOverrides.js";
 import "./ReportCatalog.css";
 
 const SCOPES = [
@@ -119,42 +120,6 @@ function resolveBuilderWindow(report = {}, config = {}) {
 
 function reportEntryKey(report = {}) {
     return `${normalizeString(report.sourceKind || "report")}:${normalizeString(report.artifactId || report.reportId || report.id)}`;
-}
-
-function buildTemporaryRunDefinition(storedReport = {}, report = {}, {
-    from = "",
-    to = "",
-    orderId = "",
-} = {}) {
-    const source = storedReport?.document && typeof storedReport.document === "object" && !Array.isArray(storedReport.document)
-        ? JSON.parse(JSON.stringify(storedReport.document))
-        : null;
-    if (!source) {
-        throw new Error("The saved report does not contain an editable report document.");
-    }
-    const normalizedOrderId = Number(orderId);
-    const params = Array.isArray(source?.scope?.params) ? source.scope.params : [];
-    source.scope = {
-        ...(source.scope || {}),
-        params: params.map((param) => {
-            const id = normalizeString(param?.id);
-            if (id === "dateRange") {
-                return { ...param, value: { start: from, end: to } };
-            }
-            if (id === "orderIds" && Number.isFinite(normalizedOrderId) && normalizedOrderId > 0) {
-                return { ...param, value: [normalizedOrderId] };
-            }
-            return param;
-        }),
-    };
-    const baseId = normalizeString(report.reportId || storedReport.reportId || "saved-report");
-    return {
-        id: `${baseId}-temporary-run`,
-        reportId: `${baseId}-temporary-run`,
-        grammar: "report-document-v1",
-        status: "ready",
-        source,
-    };
 }
 
 function downloadArtifact(artifact = null, title = "") {
@@ -349,6 +314,7 @@ export default function ReportCatalog({container, context}) {
         to = "",
         newInstance = false,
         reportDefinition = null,
+        runOverrideToken = "",
     } = {}) => {
         if (typeof windowHandler?.openWindow !== "function") {
             setFeedback({ intent: "danger", message: "The report builder window is unavailable." });
@@ -372,6 +338,7 @@ export default function ReportCatalog({container, context}) {
                 : (isPreset ? { reportStarterId: report.reportId } : { reportId: report.reportId })),
             mode,
             executeOnOpen,
+            ...(runOverrideToken ? { runOverrideToken } : {}),
             ...prefill,
             ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
             ...(!isPreset && !isInline && Object.keys(prefill).length > 0 ? {
@@ -496,35 +463,26 @@ export default function ReportCatalog({container, context}) {
         }
     }, [config, context?.windowState?.conversationId, openBuilder, reportExport]);
 
-    const runRange = useCallback(async () => {
+    const runRange = useCallback(() => {
         if (!rangeTarget || !rangeFrom || !rangeTo) return;
-        if (typeof reportStore?.getReport !== "function") {
-            setFeedback({ intent: "danger", message: "Saved-report retrieval is unavailable." });
-            return;
-        }
         const target = rangeTarget;
-        const key = `${reportEntryKey(target)}:run-range`;
-        setBusyAction(key);
-        try {
-            const storedReport = await reportStore.getReport({ artifactId: target.artifactId });
-            const reportDefinition = buildTemporaryRunDefinition(storedReport, target, {
-                from: rangeFrom,
-                to: rangeTo,
-                orderId: currentOrderId,
-            });
-            openBuilder(target, {
-                mode: "result",
-                executeOnOpen: true,
-                newInstance: true,
-                reportDefinition,
-            });
-            setRangeTarget(null);
-        } catch (runError) {
-            setFeedback({ intent: "danger", message: runError?.message || "Could not run the saved report for that date range." });
-        } finally {
-            setBusyAction("");
-        }
-    }, [currentOrderId, openBuilder, rangeFrom, rangeTarget, rangeTo, reportStore]);
+        const normalizedOrderId = Number(currentOrderId);
+        const runOverrideToken = `${target.reportId}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+        registerSavedReportRunOverride(runOverrideToken, {
+            from: rangeFrom,
+            to: rangeTo,
+            ...(Number.isFinite(normalizedOrderId) && normalizedOrderId > 0
+                ? { orderIds: [normalizedOrderId] }
+                : {}),
+        });
+        openBuilder(target, {
+            mode: "result",
+            executeOnOpen: true,
+            newInstance: true,
+            runOverrideToken,
+        });
+        setRangeTarget(null);
+    }, [currentOrderId, openBuilder, rangeFrom, rangeTarget, rangeTo]);
 
     const emptyTitle = scope === "order"
         ? `No saved reports for order ${currentOrderId || ""}`.trim()
