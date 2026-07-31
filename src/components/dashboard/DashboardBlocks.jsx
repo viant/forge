@@ -4,6 +4,7 @@ import {useDataSourceState} from "../../hooks/useDataSourceState.js";
 import Chart from "../Chart.jsx";
 import {resolveKey} from "../../utils/selector.js";
 import ReportBuilder from "./ReportBuilder.jsx";
+import ReportCatalog from "./ReportCatalog.jsx";
 import {applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, buildDashboardDefaultFilters, createDashboardConditionSnapshot, evaluateDashboardCondition, formatDashboardDelta, formatDashboardValue, getDashboardToneName, getDashboardVisibleWhen, interpolateDashboardTemplate, publishDashboardSelection, shouldShowDashboardKPIContext} from "./dashboardUtils.js";
 import {getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
 import {aggregateGeoRows, buildGeoConfig, DEFAULT_GEO_PALETTE, findGeoColorRule, normalizeGeoKey, resolveGeoColor, US_STATE_TILES} from "./geoMapUtils.js";
@@ -1404,6 +1405,9 @@ export function DashboardBlock({container, context, isActive, children}) {
             break;
         case 'dashboard.reportBuilder':
             content = <ReportBuilder container={container} context={context}/>;
+            break;
+        case 'dashboard.reportCatalog':
+            content = <ReportCatalog container={container} context={context}/>;
             break;
         case 'dashboard.table':
             content = <DashboardTable container={container} context={context}/>;

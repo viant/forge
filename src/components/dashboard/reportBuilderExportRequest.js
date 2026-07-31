@@ -298,6 +298,9 @@ export function resolveReportBuilderReportStoreHandler(builderContext = {}) {
         "getReport",
         "listReports",
         "updateReport",
+        "duplicateReport",
+        "deleteReport",
+        "recordReportRun",
     ];
     return supportedMethods.some((method) => typeof candidate?.[method] === "function")
         ? candidate

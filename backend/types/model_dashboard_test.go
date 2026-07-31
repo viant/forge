@@ -202,6 +202,78 @@ view:
 	}
 }
 
+func TestReportCatalogGroupedShapePreservesExtensionConfiguration(t *testing.T) {
+	const source = `
+view:
+  content:
+    id: reports
+    kind: dashboard.reportCatalog
+    dashboard:
+      reportCatalog:
+        title: Reports
+        orderID: 2637055
+        presets:
+          - id: performance
+            title: Performance Delivery Command Center
+`
+	var window Window
+	if err := yaml.Unmarshal([]byte(source), &window); err != nil {
+		t.Fatalf("unmarshal grouped report catalog metadata: %v", err)
+	}
+	content := window.View.Content
+	if content == nil || content.Dashboard == nil || content.Dashboard.ReportCatalog == nil {
+		t.Fatalf("expected grouped report catalog configuration: %#v", content)
+	}
+	if content.Dashboard.ReportCatalog["title"] != "Reports" {
+		t.Fatalf("unexpected grouped report catalog title: %#v", content.Dashboard.ReportCatalog)
+	}
+	presets, ok := content.Dashboard.ReportCatalog["presets"].([]interface{})
+	if !ok || len(presets) != 1 {
+		t.Fatalf("expected grouped report catalog preset: %#v", content.Dashboard.ReportCatalog)
+	}
+}
+
+func TestReportCatalogCompactShapeNormalizesExtensionConfiguration(t *testing.T) {
+	const source = `
+view:
+  content:
+    id: reports
+    kind: dashboard.reportCatalog
+    reportCatalog:
+      title: Reports
+      orderID: 2637055
+      presets:
+        - id: performance
+          title: Performance Delivery Command Center
+`
+	var window Window
+	if err := yaml.Unmarshal([]byte(source), &window); err != nil {
+		t.Fatalf("unmarshal compact report catalog metadata: %v", err)
+	}
+	content := window.View.Content
+	if content == nil || content.Dashboard == nil || content.Dashboard.ReportCatalog == nil {
+		t.Fatalf("expected normalized report catalog configuration: %#v", content)
+	}
+	if content.Dashboard.ReportCatalog["title"] != "Reports" {
+		t.Fatalf("unexpected compact report catalog title: %#v", content.Dashboard.ReportCatalog)
+	}
+	encoded, err := json.Marshal(content)
+	if err != nil {
+		t.Fatalf("marshal report catalog metadata: %v", err)
+	}
+	var asMap map[string]interface{}
+	if err := json.Unmarshal(encoded, &asMap); err != nil {
+		t.Fatalf("unmarshal marshaled report catalog metadata: %v", err)
+	}
+	if _, ok := asMap["reportCatalog"]; ok {
+		t.Fatalf("compact reportCatalog should be normalized under dashboard: %s", encoded)
+	}
+	dashboard, _ := asMap["dashboard"].(map[string]interface{})
+	if _, ok := dashboard["reportCatalog"]; !ok {
+		t.Fatalf("marshaled report catalog dropped normalized configuration: %s", encoded)
+	}
+}
+
 func containsJSONField(data []byte, key, expected string) bool {
 	var value map[string]any
 	if json.Unmarshal(data, &value) != nil {
