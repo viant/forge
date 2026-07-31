@@ -5,6 +5,7 @@ import {
     buildHostedReportActivationResponse,
     buildHostedInlineReportActivation,
     normalizeHostedReportSourceKind,
+    resolveHostedReportArtifactId,
     resolveHostedReportId,
     resolveHostedReportSource,
     resolveHostedReportStarterId,
@@ -13,6 +14,12 @@ import {
 import { buildReportBuilderImportedResponseActivation } from "./reportBuilderImportedActivation.js";
 
 assert.equal(resolveHostedReportId({ parameters: { reportId: " saved-report " } }), "saved-report");
+assert.equal(resolveHostedReportArtifactId({ parameters: {
+    sourceKind: "report",
+    sourceId: "saved-report",
+    artifactId: " artifact-123 ",
+} }), "artifact-123");
+assert.equal(resolveHostedReportArtifactId({ parameters: { sourceKind: "preset", artifactId: "ignored" } }), "");
 assert.equal(resolveHostedReportId({ parameters: {} }), "");
 assert.deepEqual(resolveHostedReportSource({ parameters: { sourceKind: "report", sourceId: " saved-report " } }), {
     kind: "report",
@@ -35,6 +42,7 @@ assert.equal(resolveHostedReportWorkspaceMode({ parameters: { mode: "result", wo
 assert.equal(resolveHostedReportWorkspaceMode({ parameters: { mode: "design", workspaceMode: "report" } }), "design");
 assert.equal(resolveHostedReportWorkspaceMode({ parameters: { workspaceMode: "preview" } }), "preview");
 assert.deepEqual(buildHostedReportActivationRequest(" saved-report "), { reportId: "saved-report" });
+assert.deepEqual(buildHostedReportActivationRequest(" saved-report ", " artifact-123 "), { artifactId: "artifact-123" });
 assert.equal(buildHostedReportActivationRequest(""), null);
 
 const response = buildHostedReportActivationResponse({

@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from "react";
+import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {
     Button,
     Dialog,
@@ -17,7 +17,11 @@ import {
     normalizeReportBuilderExportArtifact,
     normalizeReportBuilderExportJob,
 } from "./reportBuilderExportLifecycle.js";
-import { registerSavedReportRunOverride } from "./reportBuilderRunOverrides.js";
+import {
+    buildReportCatalogPageItems,
+    normalizeReportCatalogPageSize,
+    paginateReportCatalogEntries,
+} from "./reportCatalogPagination.js";
 import "./ReportCatalog.css";
 
 const SCOPES = [
@@ -25,6 +29,7 @@ const SCOPES = [
     { id: "all", label: "All my reports", icon: "folder-open" },
     { id: "presets", label: "Built-in presets", icon: "layout-auto" },
 ];
+const DEFAULT_PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -251,8 +256,22 @@ export default function ReportCatalog({container, context}) {
         () => normalizePresets(config.presets, config.defaultBuilderWindow),
         [config.defaultBuilderWindow, config.presets],
     );
+    const pageSizeOptions = useMemo(() => {
+        const configured = Array.isArray(config.pageSizeOptions) ? config.pageSizeOptions : DEFAULT_PAGE_SIZE_OPTIONS;
+        const normalized = configured
+            .map((entry) => Number(entry))
+            .filter((entry, index, source) => Number.isInteger(entry) && entry > 0 && source.indexOf(entry) === index)
+            .sort((left, right) => left - right);
+        return normalized.length > 0 ? normalized : DEFAULT_PAGE_SIZE_OPTIONS;
+    }, [config.pageSizeOptions]);
+    const catalogRef = useRef(null);
     const [scope, setScope] = useState(currentOrderId ? "order" : "all");
     const [query, setQuery] = useState("");
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(() => normalizeReportCatalogPageSize(
+        config.defaultPageSize,
+        pageSizeOptions,
+    ));
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -306,6 +325,40 @@ export default function ReportCatalog({container, context}) {
             ...(entry.orderIds || []),
         ].join(" ").toLowerCase().includes(normalizedQuery));
     }, [currentOrderId, presets, query, reports, scope]);
+    const pagination = useMemo(
+        () => paginateReportCatalogEntries(entries, page, pageSize),
+        [entries, page, pageSize],
+    );
+    const pageItems = useMemo(
+        () => buildReportCatalogPageItems(pagination.currentPage, pagination.totalPages),
+        [pagination.currentPage, pagination.totalPages],
+    );
+
+    useEffect(() => {
+        setPage(1);
+    }, [query, scope]);
+
+    useEffect(() => {
+        if (page !== pagination.currentPage) {
+            setPage(pagination.currentPage);
+        }
+    }, [page, pagination.currentPage]);
+
+    useEffect(() => {
+        const target = catalogRef.current;
+        if (!target || typeof target.scrollTo !== "function") return;
+        target.scrollTo({ top: 0, behavior: "smooth" });
+    }, [pagination.currentPage, pageSize, query, scope]);
+
+    const selectPage = useCallback((nextPage) => {
+        const normalized = Math.min(pagination.totalPages, Math.max(1, Number(nextPage) || 1));
+        setPage(normalized);
+    }, [pagination.totalPages]);
+
+    const selectPageSize = useCallback((event) => {
+        setPageSize(normalizeReportCatalogPageSize(event.currentTarget.value, pageSizeOptions));
+        setPage(1);
+    }, [pageSizeOptions]);
 
     const openBuilder = useCallback((report, {
         mode = "result",
@@ -314,7 +367,6 @@ export default function ReportCatalog({container, context}) {
         to = "",
         newInstance = false,
         reportDefinition = null,
-        runOverrideToken = "",
     } = {}) => {
         if (typeof windowHandler?.openWindow !== "function") {
             setFeedback({ intent: "danger", message: "The report builder window is unavailable." });
@@ -335,10 +387,12 @@ export default function ReportCatalog({container, context}) {
                 : report.reportId,
             ...(isInline
                 ? { reportDefinition }
-                : (isPreset ? { reportStarterId: report.reportId } : { reportId: report.reportId })),
+                : (isPreset ? { reportStarterId: report.reportId } : {
+                    artifactId: report.artifactId,
+                    reportId: report.reportId,
+                })),
             mode,
             executeOnOpen,
-            ...(runOverrideToken ? { runOverrideToken } : {}),
             ...prefill,
             ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
             ...(!isPreset && !isInline && Object.keys(prefill).length > 0 ? {
@@ -466,30 +520,22 @@ export default function ReportCatalog({container, context}) {
     const runRange = useCallback(() => {
         if (!rangeTarget || !rangeFrom || !rangeTo) return;
         const target = rangeTarget;
-        const normalizedOrderId = Number(currentOrderId);
-        const runOverrideToken = `${target.reportId}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-        registerSavedReportRunOverride(runOverrideToken, {
-            from: rangeFrom,
-            to: rangeTo,
-            ...(Number.isFinite(normalizedOrderId) && normalizedOrderId > 0
-                ? { orderIds: [normalizedOrderId] }
-                : {}),
-        });
         openBuilder(target, {
             mode: "result",
             executeOnOpen: true,
+            from: rangeFrom,
+            to: rangeTo,
             newInstance: true,
-            runOverrideToken,
         });
         setRangeTarget(null);
-    }, [currentOrderId, openBuilder, rangeFrom, rangeTarget, rangeTo]);
+    }, [openBuilder, rangeFrom, rangeTarget, rangeTo]);
 
     const emptyTitle = scope === "order"
         ? `No saved reports for order ${currentOrderId || ""}`.trim()
         : (scope === "presets" ? "No built-in presets are configured" : "No saved reports yet");
 
     return (
-        <section className="forge-report-catalog">
+        <section className="forge-report-catalog" ref={catalogRef}>
             <header className="forge-report-catalog__hero">
                 <div className="forge-report-catalog__hero-icon"><Icon icon="projects" size={24} /></div>
                 <div>
@@ -569,8 +615,9 @@ export default function ReportCatalog({container, context}) {
                     </Button>
                 </div>
             ) : (
-                <div className="forge-report-catalog__grid">
-                    {entries.map((report) => (
+                <>
+                <div className="forge-report-catalog__grid" aria-live="polite">
+                    {pagination.entries.map((report) => (
                         <ReportCard
                             key={reportEntryKey(report)}
                             report={report}
@@ -594,6 +641,51 @@ export default function ReportCatalog({container, context}) {
                         />
                     ))}
                 </div>
+                {pagination.totalItems > pageSizeOptions[0] ? (
+                    <nav className="forge-report-catalog__pagination" aria-label="Report catalog pagination">
+                        <div className="forge-report-catalog__pagination-summary" aria-live="polite">
+                            <strong>{pagination.startIndex + 1}–{pagination.endIndex}</strong>
+                            <span>of {pagination.totalItems} reports</span>
+                        </div>
+                        <label className="forge-report-catalog__page-size">
+                            <span>Reports per page</span>
+                            <select value={pageSize} onChange={selectPageSize} aria-label="Reports per page">
+                                {pageSizeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                            </select>
+                        </label>
+                        <div className="forge-report-catalog__page-buttons">
+                            <Button
+                                minimal
+                                icon="chevron-left"
+                                aria-label="Previous reports page"
+                                disabled={pagination.currentPage <= 1}
+                                onClick={() => selectPage(pagination.currentPage - 1)}
+                            />
+                            {pageItems.map((item) => typeof item === "number" ? (
+                                <button
+                                    key={item}
+                                    type="button"
+                                    className={item === pagination.currentPage ? "is-active" : ""}
+                                    aria-label={`Reports page ${item}`}
+                                    aria-current={item === pagination.currentPage ? "page" : undefined}
+                                    onClick={() => selectPage(item)}
+                                >
+                                    {item}
+                                </button>
+                            ) : (
+                                <span key={item} className="forge-report-catalog__page-ellipsis" aria-hidden="true">…</span>
+                            ))}
+                            <Button
+                                minimal
+                                icon="chevron-right"
+                                aria-label="Next reports page"
+                                disabled={pagination.currentPage >= pagination.totalPages}
+                                onClick={() => selectPage(pagination.currentPage + 1)}
+                            />
+                        </div>
+                    </nav>
+                ) : null}
+                </>
             )}
 
             <Dialog isOpen={!!renameTarget} onClose={() => setRenameTarget(null)} title="Rename report" icon="edit">
@@ -617,8 +709,8 @@ export default function ReportCatalog({container, context}) {
                 <DialogBody>
                     <p className="forge-report-catalog__dialog-copy">This run uses a temporary date override and does not change the saved report defaults.</p>
                     <div className="forge-report-catalog__date-fields">
-                        <label className="forge-report-catalog__field"><span>From</span><input type="date" value={rangeFrom} onChange={(event) => setRangeFrom(event.target.value)} /></label>
-                        <label className="forge-report-catalog__field"><span>To</span><input type="date" value={rangeTo} onChange={(event) => setRangeTo(event.target.value)} /></label>
+                        <label className="forge-report-catalog__field"><span>From</span><input type="date" value={rangeFrom} onInput={(event) => setRangeFrom(event.currentTarget.value)} /></label>
+                        <label className="forge-report-catalog__field"><span>To</span><input type="date" value={rangeTo} onInput={(event) => setRangeTo(event.currentTarget.value)} /></label>
                     </div>
                 </DialogBody>
                 <DialogFooter
