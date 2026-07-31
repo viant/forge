@@ -24,6 +24,23 @@ function normalizeString(value = "") {
     return String(value || "").trim();
 }
 
+function stateKeyNamespaceRoot(value = "") {
+    return normalizeString(value).split(":")[0] || "";
+}
+
+function stateKeysAreCompatible(sourceStateKey = "", targetStateKey = "", {
+    sourceContainerId = "",
+    targetContainerId = "",
+} = {}) {
+    const source = normalizeString(sourceStateKey);
+    const target = normalizeString(targetStateKey);
+    if (!source || !target) return false;
+    if (source === target) return true;
+    return !!normalizeString(sourceContainerId)
+        && normalizeString(sourceContainerId) === normalizeString(targetContainerId)
+        && stateKeyNamespaceRoot(source) === stateKeyNamespaceRoot(target);
+}
+
 function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
 }
@@ -137,7 +154,10 @@ export function resolveReportBuilderReopenCompatibility(source = {}, builderIden
     if (sourceContainerId && (!target.containerId || sourceContainerId !== target.containerId)) {
         mismatches.push(`container ${sourceContainerId}`);
     }
-    if (sourceStateKey && (!target.stateKey || sourceStateKey !== target.stateKey)) {
+    if (sourceStateKey && !stateKeysAreCompatible(sourceStateKey, target.stateKey, {
+        sourceContainerId,
+        targetContainerId: target.containerId,
+    })) {
         mismatches.push(`state key ${sourceStateKey}`);
     }
     if (sourceDataSourceRef && (!target.dataSourceRef || sourceDataSourceRef !== target.dataSourceRef)) {

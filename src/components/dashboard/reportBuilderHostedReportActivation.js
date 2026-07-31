@@ -67,6 +67,14 @@ export function resolveHostedReportId(container = null) {
     return source.kind === "report" ? source.id : "";
 }
 
+export function resolveHostedReportArtifactId(container = null) {
+    const source = resolveHostedReportSource(container);
+    if (source.kind !== "report") {
+        return "";
+    }
+    return normalizeString(container?.parameters?.artifactId);
+}
+
 export function resolveHostedReportStarterId(container = null) {
     const source = resolveHostedReportSource(container);
     return source.kind === "preset" ? source.id : "";
@@ -83,7 +91,11 @@ export function resolveHostedReportWorkspaceMode(container = null) {
     return normalizeString(container?.parameters?.workspaceMode);
 }
 
-export function buildHostedReportActivationRequest(reportId = "") {
+export function buildHostedReportActivationRequest(reportId = "", artifactId = "") {
+    const normalizedArtifactId = normalizeString(artifactId);
+    if (normalizedArtifactId) {
+        return { artifactId: normalizedArtifactId };
+    }
     const normalizedReportId = normalizeString(reportId);
     return normalizedReportId ? { reportId: normalizedReportId } : null;
 }

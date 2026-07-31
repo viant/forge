@@ -138,6 +138,7 @@ import {
     buildHostedReportActivationRequest,
     buildHostedReportActivationResponse,
     buildHostedInlineReportActivation,
+    resolveHostedReportArtifactId,
     resolveHostedReportId,
     resolveHostedReportSource,
     resolveHostedReportStarterId,
@@ -145,7 +146,6 @@ import {
 } from "./reportBuilderHostedReportActivation.js";
 import {
     applySavedReportRunOverride,
-    consumeSavedReportRunOverride,
 } from "./reportBuilderRunOverrides.js";
 import {
     buildReportBuilderAuthoredCapabilityViewModel,
@@ -2210,24 +2210,26 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     const hostedExportOnComplete = normalizeString(container?.parameters?.exportOnComplete).toLowerCase();
     const hostedReportSource = resolveHostedReportSource(container);
     const hostedReportId = resolveHostedReportId(container);
+    const hostedReportArtifactId = resolveHostedReportArtifactId(container);
     const hostedReportStarterId = resolveHostedReportStarterId(container);
     const hostedWindowParameters = builderContext?.windowState?.parameters
         || context?.windowState?.parameters
         || {};
-    const hostedRunOverrideToken = normalizeString(
-        hostedWindowParameters?.runOverrideToken
-        || container?.parameters?.runOverrideToken
-        || windowFormValue?.runOverrideToken,
-    );
     const hostedRunFrom = normalizeString(
         hostedWindowParameters?.runFrom
         || container?.parameters?.runFrom
-        || windowFormValue?.runFrom,
+        || windowFormValue?.runFrom
+        || hostedWindowParameters?.from
+        || container?.parameters?.from
+        || windowFormValue?.from,
     );
     const hostedRunTo = normalizeString(
         hostedWindowParameters?.runTo
         || container?.parameters?.runTo
-        || windowFormValue?.runTo,
+        || windowFormValue?.runTo
+        || hostedWindowParameters?.to
+        || container?.parameters?.to
+        || windowFormValue?.to,
     );
     const hostedRunOrderIds = hostedWindowParameters?.runOrderIds
         || container?.parameters?.runOrderIds
@@ -2245,6 +2247,13 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         ...(hostedRunOrderIds ? { orderIds: hostedRunOrderIds } : {}),
     } : null;
     const hostedRunOverrideSignature = hostedRunOverride ? JSON.stringify(hostedRunOverride) : "";
+    const hostedActivationScopeOverride = hostedRunOverride
+        || (windowFormValue?.prefill && typeof windowFormValue.prefill === "object" && !Array.isArray(windowFormValue.prefill)
+            ? windowFormValue.prefill
+            : null);
+    const hostedActivationScopeOverrideSignature = hostedActivationScopeOverride
+        ? JSON.stringify(hostedActivationScopeOverride)
+        : "";
     const appliedHostedRunOverrideSignatureRef = useRef("");
     const hostedInlineReportActivation = useMemo(
         () => buildHostedInlineReportActivation(container, {
@@ -9437,6 +9446,48 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         runtimePreviewRowsSource.rows,
     ]);
     useEffect(() => {
+        const artifactId = normalizeString(storedReportArtifact?.artifactId);
+        if (
+            !isAuthoredRuntimeExecution
+            || runtimePreviewDatasetPayloadState.loading
+            || (runtimePreviewPublishedDatasets.length > 0
+                && runtimePreviewDatasetPayloadState.requestKey !== runtimePreviewPublishedDatasetsRequestKey)
+            || !authoredRuntimePreviewState?.canRenderRuntime
+            || authoredRuntimePreviewState?.errorState
+            || !activeRunEventRef.current?.runId
+            || !artifactId
+            || typeof reportStoreHandler?.recordReportRun !== "function"
+        ) {
+            return;
+        }
+        const runKey = `${artifactId}:${currentRequestFingerprint}:${manualRunSequence}`;
+        if (recordedStoredRunKeyRef.current === runKey) {
+            return;
+        }
+        recordedStoredRunKeyRef.current = runKey;
+        Promise.resolve(reportStoreHandler.recordReportRun({ artifactId }))
+            .then((updated) => {
+                if (updated && typeof updated === "object" && !Array.isArray(updated)) {
+                    setStoredReportArtifact(updated);
+                }
+            })
+            .catch((runRecordError) => {
+                console.warn("reportBuilder.recordReportRun failed", runRecordError);
+            });
+    }, [
+        authoredRuntimePreviewState?.canRenderRuntime,
+        authoredRuntimePreviewState?.errorState,
+        currentRequestFingerprint,
+        isAuthoredRuntimeExecution,
+        manualRunSequence,
+        reportStoreHandler,
+        runtimePreviewDatasetPayloadState.loading,
+        runtimePreviewDatasetPayloadState.requestKey,
+        runtimePreviewPublishedDatasets.length,
+        runtimePreviewPublishedDatasetsRequestKey,
+        storedReportArtifact?.artifactId,
+    ]);
+    useEffect(() => {
         const shouldCollapseHostedExecution = hostedExecuteOnOpen
             && authoredRuntimePreviewState?.canRenderRuntime
             && !hostedRuntimeFiltersCollapsedRef.current;
@@ -12754,63 +12805,67 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         if (hostedReportSource.kind !== "report") {
             return undefined;
         }
-        const request = buildHostedReportActivationRequest(hostedReportId);
+        const request = buildHostedReportActivationRequest(hostedReportId, hostedReportArtifactId);
         if (!request) {
             hostedReportActivationKeyRef.current = "";
             setHostedReportActivationState({ reportId: "", status: "idle" });
             return undefined;
         }
-        if (hostedReportActivationKeyRef.current === request.reportId) {
+        const requestIdentity = normalizeString(request.artifactId || request.reportId);
+        if (hostedReportActivationKeyRef.current === requestIdentity) {
             return undefined;
         }
         if (typeof reportStoreHandler?.getReport !== "function") {
-            hostedReportActivationKeyRef.current = request.reportId;
+            hostedReportActivationKeyRef.current = requestIdentity;
             setHostedReportActivationState({
-                reportId: request.reportId,
+                reportId: requestIdentity,
                 status: "error",
                 message: "Saved report loading is unavailable in this host.",
             });
             return undefined;
         }
-        hostedReportActivationKeyRef.current = request.reportId;
-        setHostedReportActivationState({ reportId: request.reportId, status: "loading" });
+        hostedReportActivationKeyRef.current = requestIdentity;
+        setHostedReportActivationState({ reportId: requestIdentity, status: "loading" });
         let cancelled = false;
         Promise.resolve(reportStoreHandler.getReport(request))
             .then((result) => {
                 if (cancelled) {
                     return;
                 }
+                if (result && typeof result === "object" && !Array.isArray(result)) {
+                    setStoredReportArtifact(result);
+                }
                 const response = applySavedReportRunOverride(
                     buildHostedReportActivationResponse(result),
-                    consumeSavedReportRunOverride(hostedRunOverrideToken),
+                    hostedActivationScopeOverride,
                 );
                 if (!response || typeof activateImportedResponseInBuilderRef.current !== "function") {
-                    throw new Error(`Saved report ${request.reportId} could not be hydrated.`);
+                    throw new Error(`Saved report ${requestIdentity} could not be hydrated.`);
                 }
                 const activated = activateImportedResponseInBuilderRef.current(response, {
                     suppressFeedback: true,
                 });
                 if (!activated) {
-                    throw new Error(`Saved report ${request.reportId} is incompatible with this workspace.`);
+                    throw new Error(`Saved report ${requestIdentity} is incompatible with this workspace.`);
                 }
                 appliedPrefillSignatureRef.current = "";
                 executeOnOpenRunKeyRef.current = "";
-                setHostedReportActivationState({ reportId: request.reportId, status: "ready" });
+                setHostedReportActivationState({ reportId: requestIdentity, status: "ready" });
             })
             .catch((error) => {
                 if (cancelled) {
                     return;
                 }
                 setHostedReportActivationState({
-                    reportId: request.reportId,
+                    reportId: requestIdentity,
                     status: "error",
-                    message: normalizeString(error?.message || error) || `Saved report ${request.reportId} could not be loaded.`,
+                    message: normalizeString(error?.message || error) || `Saved report ${requestIdentity} could not be loaded.`,
                 });
             });
         return () => {
             cancelled = true;
         };
-    }, [hostedReportId, hostedReportSource.kind, hostedRunOverrideToken, reportStoreHandler]);
+    }, [hostedActivationScopeOverrideSignature, hostedReportArtifactId, hostedReportId, hostedReportSource.kind, reportStoreHandler]);
     useEffect(() => {
         if (
             hostedReportSource.kind !== "report"

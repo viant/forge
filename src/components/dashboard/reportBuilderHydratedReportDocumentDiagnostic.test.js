@@ -8,6 +8,7 @@ import {
     buildReportBuilderHydratedReportDocumentDiagnosticSummary,
     buildReportBuilderListReportDocumentsEntryDiagnostic,
     mergeReportBuilderHydratedReportDocumentDiagnosticSharedArtifact,
+    resolveReportBuilderReopenCompatibility,
     serializeReportBuilderHydratedReportDocumentDiagnostic,
 } from "./reportBuilderHydratedReportDocumentDiagnostic.js";
 import { buildReportBuilderListReportDocumentsEntrySelectionKey } from "./reportBuilderReportDocumentReadResponse.js";
@@ -18,6 +19,32 @@ const audienceArtifactFixture = JSON.parse(
         "utf8",
     ),
 );
+
+assert.deepEqual(resolveReportBuilderReopenCompatibility({
+    kind: "dashboard.reportBuilder",
+    containerId: "metricsCubeBuilder",
+    stateKey: "metricsCubeBuilder",
+    dataSourceRef: "metrics_ad_cube_report",
+}, {
+    containerId: "metricsCubeBuilder",
+    stateKey: "metricsCubeBuilder:metricsCubeBuilder",
+    dataSourceRef: "metrics_ad_cube_report",
+}), {
+    compatible: true,
+    code: "",
+    message: "",
+});
+
+assert.equal(resolveReportBuilderReopenCompatibility({
+    kind: "dashboard.reportBuilder",
+    containerId: "metricsCubeBuilder",
+    stateKey: "metricsCubeBuilder",
+    dataSourceRef: "metrics_ad_cube_report",
+}, {
+    containerId: "otherBuilder",
+    stateKey: "metricsCubeBuilder:otherBuilder",
+    dataSourceRef: "metrics_ad_cube_report",
+}).compatible, false);
 
 const getResponse = {
     version: 1,
