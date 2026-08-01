@@ -106,6 +106,8 @@ export function buildReportBuilderRunEvent({
     request = null,
     sourceKind = "runtime",
     runId = "",
+    reportRunId = "",
+    revision = null,
     status = "",
     rowCount = null,
     runtimeRequest = null,
@@ -114,6 +116,8 @@ export function buildReportBuilderRunEvent({
 } = {}) {
     const normalizedKind = normalizeString(kind);
     const normalizedRunId = normalizeString(runId);
+    const normalizedReportRunId = normalizeString(reportRunId);
+    const numericRevision = revision == null ? Number.NaN : Number(revision);
     const normalizedStatus = normalizeString(status).toLowerCase();
     const numericRowCount = rowCount == null ? Number.NaN : Number(rowCount);
     const detail = buildReportBuilderExportEventDetail({
@@ -132,6 +136,10 @@ export function buildReportBuilderRunEvent({
             ...(normalizedReportName ? { reportName: normalizedReportName } : {}),
             ...(normalizedReportId ? { reportId: normalizedReportId } : {}),
             ...(normalizedRunId ? { runId: normalizedRunId } : {}),
+            ...(normalizedReportRunId ? { reportRunId: normalizedReportRunId } : {}),
+            ...(Number.isInteger(numericRevision) && numericRevision > 0
+                ? { revision: numericRevision }
+                : {}),
             ...(normalizedStatus ? { status: normalizedStatus } : {}),
             ...(Number.isFinite(numericRowCount) && numericRowCount >= 0
                 ? { rowCount: numericRowCount }

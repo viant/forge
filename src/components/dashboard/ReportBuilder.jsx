@@ -459,6 +459,26 @@ import {
     resolveReportBuilderEventHandler,
 } from "./reportBuilderUIEvents.js";
 import {
+    bindReportRunInvocation,
+    beginAndDispatchReportRun,
+    beginAndPromoteReportRun,
+    buildReportRunBeginInput,
+    buildReportRunMaterializationFingerprint,
+    canPersistReportRunInvocation,
+    captureReportRunDispatchSnapshot,
+    captureReportRunSettlementEvent,
+    classifyReportRunSupersede,
+    completeAndActivateReportRun,
+    failDurableReportRun,
+    newUIRunRequestId,
+    normalizeReportRunBeginResult,
+    resolveCompletedReportRunReference,
+    resolveHostedReportAutoExportDecision,
+    resolveReportBuilderRunHandler,
+    resolveReportRunBuilderRef,
+    settleReportRunInvocation,
+} from "./reportBuilderRunPersistence.js";
+import {
     parseReportBuilderLocalImport,
 } from "./reportBuilderLocalImport.js";
 import {
@@ -641,7 +661,6 @@ import {
 import { normalizeReportRuntimeInteractionState } from "./reportRuntimeInteractionStateModel.js";
 import {
     registerReportWindowActions,
-    scheduleReportWindowMutation,
 } from "../../core/ui/reportActions.js";
 import { useReportRuntimeInteractionState } from "./useReportRuntimeInteractionState.js";
 import { useAuthoredRuntimePreviewSurface } from "./useAuthoredRuntimePreviewSurface.js";
@@ -1725,19 +1744,43 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         [builderContext?.handlers?.reportEvents],
     );
     const reportEventContext = useMemo(() => ({
-        conversationId: String(builderContext?.identity?.conversationId || builderContext?.windowState?.conversationId || "").trim(),
+        conversationId: String(
+            builderContext?.identity?.conversationId
+            || builderContext?.conversationId
+            || builderContext?.windowState?.conversationId
+            || container?.conversationId
+            || "",
+        ).trim(),
+        turnId: String(
+            builderContext?.identity?.turnId
+            || builderContext?.turnId
+            || builderContext?.windowState?.turnId
+            || container?.turnId
+            || container?.parameters?.turnId
+            || "",
+        ).trim(),
         windowId: String(builderContext?.identity?.windowId || container?.windowId || "").trim(),
         windowKey: String(container?.windowKey || builderContext?.identity?.windowKey || "").trim(),
-    }), [builderContext?.identity?.conversationId, builderContext?.identity?.windowId, builderContext?.identity?.windowKey, builderContext?.windowState?.conversationId, container?.windowId, container?.windowKey]);
+    }), [builderContext?.conversationId, builderContext?.identity?.conversationId, builderContext?.identity?.turnId, builderContext?.identity?.windowId, builderContext?.identity?.windowKey, builderContext?.turnId, builderContext?.windowState?.conversationId, builderContext?.windowState?.turnId, container?.conversationId, container?.parameters?.turnId, container?.turnId, container?.windowId, container?.windowKey]);
     const currentReportEventRequestRef = useRef(null);
-    const currentReportEventRuntimeRequestRef = useRef(null);
     const currentReportEventIdentityRef = useRef({ reportId: "", reportName: "", sourceKind: "" });
+    const currentReportMaterializationRef = useRef(null);
+    const currentReportMaterializationFingerprintRef = useRef("");
     const activeRunEventRef = useRef(null);
+    const beginRunPromiseRef = useRef(null);
+    const settleRunPromiseRef = useRef(null);
+    const runInvocationGenerationRef = useRef(0);
+    const pendingReportWorkspaceRunRef = useRef(null);
     const recordedStoredRunKeyRef = useRef("");
     const completedRunEventKeyRef = useRef("");
+    const [completedDurableRunSignal, setCompletedDurableRunSignal] = useState(null);
     const reportStoreHandler = useMemo(
         () => resolveReportBuilderReportStoreHandler(builderContext),
         [builderContext?.handlers?.reportStore],
+    );
+    const reportRunHandler = useMemo(
+        () => resolveReportBuilderRunHandler(builderContext),
+        [builderContext?.handlers?.reportRuns],
     );
     const reportLifecycleHandler = useMemo(
         () => resolveReportBuilderLifecycleHandler(builderContext?.handlers?.reportLifecycle),
@@ -2910,11 +2953,12 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         () => applyReportBuilderRequestHook(builderContext, semanticDisplayConfig, state, buildReportBuilderRequest(semanticDisplayConfig, state)),
         [builderContext, semanticDisplayConfig, state],
     );
-    currentReportEventRuntimeRequestRef.current = currentRequest;
     const currentRequestFingerprint = useMemo(
         () => JSON.stringify(currentRequest),
         [currentRequest],
     );
+    const currentRequestFingerprintValueRef = useRef(currentRequestFingerprint);
+    currentRequestFingerprintValueRef.current = currentRequestFingerprint;
     const currentRequestShouldFetch = useMemo(
         () => config.request?.autoFetch !== false && resolveStateReadiness(state).canRun,
         [config.request?.autoFetch, resolveStateReadiness, state],
@@ -7585,15 +7629,44 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         );
     };
 
-    const dispatchReportRequest = React.useCallback((nextState, { forceFetch = false, markManual = false } = {}) => {
+    const captureRunDispatchSnapshot = React.useCallback((nextState, { origin = "manual" } = {}) => {
         const request = applyReportBuilderRequestHook(
             builderContext,
             semanticDisplayConfig,
             nextState,
             buildReportBuilderRequest(semanticDisplayConfig, nextState),
         );
-        const nextReadiness = resolveStateReadiness(nextState);
-        const fingerprint = JSON.stringify(request);
+        const source = currentReportEventIdentityRef.current || {};
+        return captureReportRunDispatchSnapshot({
+            request,
+            readiness: resolveStateReadiness(nextState),
+            materialization: currentReportMaterializationRef.current,
+            materializedExportRequest: currentReportEventRequestRef.current,
+            metadata: {
+                origin: String(origin || "manual").trim().toLowerCase() || "manual",
+                builderRef: resolveReportRunBuilderRef({
+                    activeBuilderVariant,
+                    config,
+                    container,
+                }),
+                source: {
+                    reportId: source.reportId,
+                    reportName: source.reportName,
+                    sourceKind: source.sourceKind,
+                },
+                event: {
+                    request: currentReportEventRequestRef.current,
+                    runtimeRequest: request,
+                    context: reportEventContext,
+                },
+            },
+        });
+    }, [activeBuilderVariant, builderContext, config, container, reportEventContext, resolveStateReadiness, semanticDisplayConfig]);
+
+    const dispatchReportRequestSnapshot = React.useCallback((snapshot, { forceFetch = false, markManual = false } = {}) => {
+        const request = snapshot.request;
+        const nextReadiness = snapshot.readiness;
+        const fingerprint = snapshot.requestFingerprint || snapshot.fingerprint;
         const shouldFetch = nextReadiness.canRun && (forceFetch || config.request?.autoFetch !== false);
         requestFingerprintRef.current = `${fingerprint}::${shouldFetch ? "fetch" : "hold"}`;
         if (markManual) {
@@ -7615,45 +7688,220 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             builderContext?.handlers?.dataSource?.fetchCollection?.();
         }
         return { request, fingerprint, readiness: nextReadiness, shouldFetch };
-    }, [builderContext, config.request?.autoFetch, resolveStateReadiness, semanticDisplayConfig]);
+    }, [builderContext, config.request?.autoFetch]);
+
+    const dispatchReportRequest = React.useCallback((nextState, options = {}) => (
+        dispatchReportRequestSnapshot(captureRunDispatchSnapshot(nextState), options)
+    ), [captureRunDispatchSnapshot, dispatchReportRequestSnapshot]);
 
     const emitRunLifecycleEvent = React.useCallback((kind, {
         runId = "",
+        reportRunId = "",
+        revision = null,
         status = "",
         rowCount = null,
-    } = {}) => {
+    } = {}, metadata = null) => {
+        const source = metadata?.source || {};
+        const eventMetadata = metadata?.event || {};
+        const eventContext = eventMetadata?.context || {};
         const event = buildReportBuilderRunEvent({
             kind,
-            request: currentReportEventRequestRef.current,
-            sourceKind: currentReportEventIdentityRef.current.sourceKind || "runtime",
+            request: eventMetadata.request,
+            sourceKind: source.sourceKind || "runtime",
             runId,
+            reportRunId,
+            revision,
             status,
             rowCount,
-            runtimeRequest: currentReportEventRuntimeRequestRef.current,
-            reportId: currentReportEventIdentityRef.current.reportId,
-            reportName: currentReportEventIdentityRef.current.reportName,
+            runtimeRequest: eventMetadata.runtimeRequest,
+            reportId: source.reportId,
+            reportName: source.reportName,
         });
         emitReportBuilderUIEvent(reportEventHandler, {
             ...event,
-            windowId: reportEventContext.windowId,
-            windowKey: reportEventContext.windowKey,
-            conversationId: reportEventContext.conversationId,
+            windowId: eventContext.windowId,
+            windowKey: eventContext.windowKey,
+            conversationId: eventContext.conversationId,
+            turnId: eventContext.turnId,
         });
-    }, [reportEventContext, reportEventHandler]);
+    }, [reportEventHandler]);
 
-    const beginReportRunLifecycle = React.useCallback(({ reuseCurrent = false } = {}) => {
-        const activeRun = activeRunEventRef.current;
-        if (reuseCurrent && activeRun?.runId && activeRun?.fingerprint === currentRequestFingerprint) {
-            return { runId: activeRun.runId, started: false };
+    const beginReportRunLifecycle = React.useCallback(({
+        reuseCurrent = false,
+        origin = "manual",
+        invocationSnapshot,
+    } = {}) => {
+        const requestFingerprint = invocationSnapshot?.requestFingerprint
+            || invocationSnapshot?.fingerprint
+            || "";
+        const materializationFingerprint = invocationSnapshot?.materializationFingerprint || "";
+        const durableRunEligible = !!reportRunHandler
+            && canPersistReportRunInvocation(invocationSnapshot);
+        const invocationFingerprint = durableRunEligible
+            ? materializationFingerprint
+            : requestFingerprint;
+        const invocationMetadata = invocationSnapshot?.metadata || {};
+        const invocationEventContext = invocationMetadata?.event?.context || {};
+        const invocationSource = invocationMetadata?.source || {};
+        const invocationOrigin = invocationMetadata?.origin
+            || String(origin || "manual").trim().toLowerCase()
+            || "manual";
+        if (!invocationSnapshot || !requestFingerprint || !materializationFingerprint) {
+            return Promise.resolve({ ok: false, error: "A report run request snapshot is required." });
         }
-        const runId = globalThis.crypto?.randomUUID?.() || `report-run-${Date.now()}`;
-        activeRunEventRef.current = { runId, fingerprint: currentRequestFingerprint };
-        completedRunEventKeyRef.current = "";
-        emitRunLifecycleEvent("report.run_start", { runId });
-        return { runId, started: true };
-    }, [currentRequestFingerprint, emitRunLifecycleEvent]);
+        const activeRun = activeRunEventRef.current;
+        const activeInvocationFingerprint = activeRun?.durable
+            ? activeRun?.invocation?.materializationFingerprint
+            : (activeRun?.invocation?.requestFingerprint || activeRun?.invocation?.fingerprint);
+        const requestedActiveFingerprint = activeRun?.durable
+            ? materializationFingerprint
+            : requestFingerprint;
+        if (reuseCurrent && activeRun?.runId && activeInvocationFingerprint === requestedActiveFingerprint) {
+            return Promise.resolve({
+                ok: true,
+                runId: activeRun.runId,
+                started: false,
+                durable: !!activeRun.durable,
+            });
+        }
+        if (beginRunPromiseRef.current?.fingerprint === invocationFingerprint) {
+            return beginRunPromiseRef.current.promise;
+        }
+        const supersededActiveRun = activeRun?.status === "running" ? activeRun : null;
+        if (supersededActiveRun) {
+            activeRunEventRef.current = { ...supersededActiveRun, status: "superseded" };
+            setCompletedDurableRunSignal(null);
+        }
+        const generation = runInvocationGenerationRef.current + 1;
+        runInvocationGenerationRef.current = generation;
+        const uiRunRequestId = newUIRunRequestId();
+        const beginMarker = {};
+        const promise = (async () => {
+            await Promise.resolve();
+            try {
+                if (supersededActiveRun?.durable) {
+                    try {
+                        const supersededRun = await failDurableReportRun(reportRunHandler, supersededActiveRun, {
+                            code: "browser_run_superseded",
+                            message: "A newer builder request superseded this run before terminal settlement.",
+                        });
+                        if (supersededRun.status === "failed") {
+                            emitRunLifecycleEvent("report.run", {
+                                runId: supersededRun.runId,
+                                reportRunId: supersededRun.reportRunId,
+                                revision: supersededRun.revision,
+                                status: supersededRun.status,
+                                rowCount: 0,
+                            }, supersededRun.invocation?.metadata);
+                        }
+                    } catch (_) {
+                        // The old run stays non-authoritative even if durable cleanup loses a CAS race.
+                    }
+                }
+                let nextRun;
+                if (durableRunEligible) {
+                    const beginResult = normalizeReportRunBeginResult(await reportRunHandler.begin(buildReportRunBeginInput({
+                        uiRunRequestId,
+                        conversationId: invocationEventContext.conversationId,
+                        turnId: invocationEventContext.turnId,
+                        windowId: invocationEventContext.windowId,
+                        origin: invocationOrigin,
+                        builderRef: invocationMetadata.builderRef,
+                        sourceKind: invocationSource.sourceKind,
+                        sourceId: invocationSource.reportId,
+                        presetId: invocationSource.sourceKind === "preset" ? invocationSource.reportId : "",
+                        requestedParams: invocationSnapshot.request,
+                        effectiveParams: invocationSnapshot.request,
+                    })));
+                    if (beginResult.enabled) {
+                        nextRun = {
+                            runId: beginResult.reportRunId,
+                            reportRunId: beginResult.reportRunId,
+                            revision: beginResult.revision,
+                            contextRevision: beginResult.contextRevision,
+                            conversationId: invocationEventContext.conversationId,
+                            turnId: invocationEventContext.turnId,
+                            windowId: invocationEventContext.windowId,
+                            origin: invocationOrigin,
+                            uiRunRequestId,
+                            durable: true,
+                            status: "running",
+                            fingerprint: requestFingerprint,
+                            materializationFingerprint,
+                        };
+                    }
+                }
+                if (!nextRun) {
+                    const legacyRunId = globalThis.crypto?.randomUUID?.() || `report-run-${Date.now()}`;
+                    nextRun = {
+                        runId: legacyRunId,
+                        durable: false,
+                        status: "running",
+                        fingerprint: requestFingerprint,
+                        materializationFingerprint,
+                    };
+                }
+                nextRun = bindReportRunInvocation(nextRun, invocationSnapshot);
+                if (runInvocationGenerationRef.current !== generation) {
+                    if (nextRun.durable) {
+                        try {
+                            await failDurableReportRun(reportRunHandler, nextRun, {
+                                code: "browser_run_superseded",
+                                message: "A newer builder request superseded this run before dispatch.",
+                            });
+                        } catch (_) {
+                            // The newer invocation remains authoritative even if stale-run cleanup fails.
+                        }
+                    }
+                    return { ok: false, superseded: true, error: "Report run was superseded before dispatch." };
+                }
+                activeRunEventRef.current = nextRun;
+                setCompletedDurableRunSignal(null);
+                completedRunEventKeyRef.current = "";
+                emitRunLifecycleEvent("report.run_start", {
+                    runId: nextRun.runId,
+                    reportRunId: nextRun.durable ? nextRun.reportRunId : "",
+                    revision: nextRun.durable ? nextRun.revision : null,
+                    status: nextRun.durable ? nextRun.status : "",
+                }, nextRun.invocation?.metadata);
+                return {
+                    ok: true,
+                    runId: nextRun.runId,
+                    started: true,
+                    durable: nextRun.durable,
+                };
+            } catch (runBeginError) {
+                const message = `Could not start a durable report run. ${renderReportBuilderError(runBeginError)}`;
+                setChartApplyFeedback({ level: "warning", message });
+                return { ok: false, error: message };
+            } finally {
+                if (beginRunPromiseRef.current?.marker === beginMarker) {
+                    beginRunPromiseRef.current = null;
+                }
+            }
+        })();
+        beginRunPromiseRef.current = {
+            fingerprint: invocationFingerprint,
+            marker: beginMarker,
+            promise,
+        };
+        return promise;
+    }, [emitRunLifecycleEvent, reportRunHandler]);
 
-    const runReport = React.useCallback(() => {
+    const executeCapturedReportRun = React.useCallback((invocationSnapshot, origin = "manual") => (
+        beginAndDispatchReportRun(invocationSnapshot, {
+            begin: (snapshot) => beginReportRunLifecycle({ origin, invocationSnapshot: snapshot }),
+            dispatch: (snapshot) => dispatchReportRequestSnapshot(
+                snapshot,
+                { forceFetch: true, markManual: true },
+            ),
+        })
+    ), [beginReportRunLifecycle, dispatchReportRequestSnapshot]);
+
+    const runReport = React.useCallback(async ({ origin = "manual" } = {}) => {
+        if (pendingReportWorkspaceRunRef.current?.promise) {
+            return pendingReportWorkspaceRunRef.current.promise;
+        }
         const currentState = currentBuilderStateRef.current || state;
         setChartApplyFeedback(null);
         if (designWorkspaceMode || (!useFilterRail && !useFilterDrawer)) {
@@ -7663,27 +7911,195 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         }
         setFiltersDrawerOpen(false);
         if (designWorkspaceMode) {
+            let resolvePendingRun;
+            const pendingRunPromise = new Promise((resolve) => {
+                resolvePendingRun = resolve;
+            });
+            pendingReportWorkspaceRunRef.current = {
+                origin,
+                promise: pendingRunPromise,
+                resolve: resolvePendingRun,
+                started: false,
+            };
             setWorkspaceMode("report");
+            return pendingRunPromise;
         }
-        beginReportRunLifecycle();
-        dispatchReportRequest(currentState, { forceFetch: true, markManual: true });
-    }, [beginReportRunLifecycle, designWorkspaceMode, dispatchReportRequest, state, useFilterDrawer, useFilterRail]);
-    const hasRows = Array.isArray(computedCollection) && computedCollection.length > 0;
+        return executeCapturedReportRun(captureRunDispatchSnapshot(currentState, { origin }), origin);
+    }, [captureRunDispatchSnapshot, designWorkspaceMode, executeCapturedReportRun, state, useFilterDrawer, useFilterRail]);
+
     useEffect(() => {
-        if (isAuthoredRuntimeExecution || !hasCompletedCurrentRun || !activeRunEventRef.current?.runId) {
+        const pendingRun = pendingReportWorkspaceRunRef.current;
+        if (designWorkspaceMode || !pendingRun || pendingRun.started) {
             return;
         }
-        const eventKey = `${activeRunEventRef.current.runId}:${currentRequestFingerprint}`;
+        pendingRun.started = true;
+        const invocationSnapshot = captureRunDispatchSnapshot(
+            currentBuilderStateRef.current || state,
+            { origin: pendingRun.origin },
+        );
+        void executeCapturedReportRun(invocationSnapshot, pendingRun.origin).then(
+            (result) => {
+                if (pendingReportWorkspaceRunRef.current === pendingRun) {
+                    pendingReportWorkspaceRunRef.current = null;
+                }
+                pendingRun.resolve(result);
+            },
+            (runError) => {
+                if (pendingReportWorkspaceRunRef.current === pendingRun) {
+                    pendingReportWorkspaceRunRef.current = null;
+                }
+                pendingRun.resolve({
+                    ok: false,
+                    error: `Could not run the report. ${renderReportBuilderError(runError)}`,
+                });
+            },
+        );
+    }, [captureRunDispatchSnapshot, designWorkspaceMode, executeCapturedReportRun, state]);
+
+    const settleReportRunLifecycle = React.useCallback((settlementEvent = null) => {
+        const activeRun = activeRunEventRef.current;
+        const runId = settlementEvent?.runId || "";
+        const requestFingerprint = settlementEvent?.requestFingerprint
+            || settlementEvent?.fingerprint
+            || "";
+        const materializationFingerprint = settlementEvent?.materializationFingerprint || "";
+        const status = settlementEvent?.status || "succeeded";
+        const rowCount = Number(settlementEvent?.rowCount || 0) || 0;
+        if (!activeRun?.runId || activeRun.status !== "running"
+            || activeRun.invocation?.runId !== runId
+            || (activeRun.invocation?.requestFingerprint || activeRun.invocation?.fingerprint) !== requestFingerprint
+            || (activeRun.durable
+                && activeRun.invocation?.materializationFingerprint !== materializationFingerprint)) {
+            return Promise.resolve(activeRun);
+        }
+        const settlementFingerprint = activeRun.durable
+            ? activeRun.invocation.materializationFingerprint
+            : requestFingerprint;
+        const eventKey = `${activeRun.invocation.runId}:${settlementFingerprint}:${status}`;
         if (completedRunEventKeyRef.current === eventKey) {
-            return;
+            return Promise.resolve(activeRun);
         }
-        completedRunEventKeyRef.current = eventKey;
-        emitRunLifecycleEvent("report.run", {
-            runId: activeRunEventRef.current.runId,
-            status: "succeeded",
-            rowCount: Array.isArray(computedCollection) ? computedCollection.length : 0,
-        });
-    }, [computedCollection, currentRequestFingerprint, emitRunLifecycleEvent, hasCompletedCurrentRun, isAuthoredRuntimeExecution]);
+        if (settleRunPromiseRef.current?.key === eventKey) {
+            return settleRunPromiseRef.current.promise;
+        }
+        const isStillCurrent = () => {
+            const current = activeRunEventRef.current;
+            const currentDispatch = requestFingerprintRef.current;
+            return current?.runId === activeRun.runId
+                && current?.status === "running"
+                && (current?.invocation?.requestFingerprint || current?.invocation?.fingerprint) === requestFingerprint
+                && (!activeRun.durable
+                    || current?.invocation?.materializationFingerprint === materializationFingerprint)
+                && currentRequestFingerprintValueRef.current === requestFingerprint
+                && (!activeRun.durable
+                    || currentReportMaterializationFingerprintRef.current === materializationFingerprint)
+                && (currentDispatch === `${requestFingerprint}::fetch`
+                    || currentDispatch === `${requestFingerprint}::hold`);
+        };
+        const settleMarker = {};
+        const promise = (async () => {
+            await Promise.resolve();
+            try {
+                if (!settlementEvent?.superseded && !isStillCurrent()) {
+                    return activeRunEventRef.current;
+                }
+                const settlement = await settleReportRunInvocation(activeRun, {
+                    ...settlementEvent,
+                    runId,
+                    fingerprint: requestFingerprint,
+                    requestFingerprint,
+                    materializationFingerprint,
+                    status,
+                }, {
+                    complete: (run, terminalRequest) => (
+                        run.durable
+                            ? completeAndActivateReportRun(reportRunHandler, run, terminalRequest, {
+                                shouldActivate: isStillCurrent,
+                            })
+                            : { ...run, status: "completed" }
+                    ),
+                    fail: (run, failure) => (
+                        run.durable
+                            ? failDurableReportRun(reportRunHandler, run, failure)
+                            : { ...run, status: "failed" }
+                    ),
+                });
+                if (!settlement.accepted) {
+                    return activeRunEventRef.current;
+                }
+                const settled = settlement.run;
+                if (!isStillCurrent()) {
+                    if (activeRunEventRef.current?.runId === activeRun.runId
+                        && activeRunEventRef.current?.status === "running") {
+                        activeRunEventRef.current = { ...settled, status: "superseded" };
+                        setCompletedDurableRunSignal(null);
+                    }
+                    return activeRunEventRef.current;
+                }
+                activeRunEventRef.current = settled;
+                const completedRunReference = resolveCompletedReportRunReference(settled);
+                setCompletedDurableRunSignal(completedRunReference ? {
+                    runId: settled.runId,
+                    reportRunId: completedRunReference.reportRunId,
+                    fingerprint: settled.invocation?.requestFingerprint || settled.invocation?.fingerprint || "",
+                    requestFingerprint: settled.invocation?.requestFingerprint || settled.invocation?.fingerprint || "",
+                    materializationFingerprint: settled.invocation?.materializationFingerprint || "",
+                } : null);
+                completedRunEventKeyRef.current = eventKey;
+                emitRunLifecycleEvent("report.run", {
+                    runId: settled.runId,
+                    reportRunId: settled.durable ? settled.reportRunId : "",
+                    revision: settled.durable ? settled.revision : null,
+                    status: settled.durable ? settled.status : status,
+                    rowCount,
+                }, settled.invocation?.metadata);
+                return settled;
+            } catch (persistenceError) {
+                if (activeRun.durable && status !== "failed" && isStillCurrent()) {
+                    try {
+                        const failedRun = await failDurableReportRun(reportRunHandler, activeRun, persistenceError);
+                        if (activeRunEventRef.current?.runId === activeRun.runId) {
+                            activeRunEventRef.current = failedRun;
+                            setCompletedDurableRunSignal(null);
+                        }
+                        completedRunEventKeyRef.current = `${activeRun.invocation.runId}:${settlementFingerprint}:failed`;
+                        emitRunLifecycleEvent("report.run", {
+                            runId: failedRun.runId,
+                            reportRunId: failedRun.reportRunId,
+                            revision: failedRun.revision,
+                            status: failedRun.status,
+                            rowCount: 0,
+                        }, failedRun.invocation?.metadata);
+                    } catch (_) {
+                        // Preserve the original persistence failure for the UI.
+                    }
+                }
+                if (activeRunEventRef.current?.runId === activeRun.runId
+                    && activeRunEventRef.current?.status === "running") {
+                    activeRunEventRef.current = {
+                        ...activeRunEventRef.current,
+                        status: "persistence_failed",
+                    };
+                    setCompletedDurableRunSignal(null);
+                }
+                setChartApplyFeedback({
+                    level: "warning",
+                    message: status === "failed"
+                        ? `The report failed, and its durable failure state was not recorded. ${renderReportBuilderError(persistenceError)}`
+                        : `The report ran, but durable completion was not recorded. ${renderReportBuilderError(persistenceError)}`,
+                });
+                return null;
+            } finally {
+                if (settleRunPromiseRef.current?.marker === settleMarker) {
+                    settleRunPromiseRef.current = null;
+                }
+            }
+        })();
+        settleRunPromiseRef.current = { key: eventKey, marker: settleMarker, promise };
+        return promise;
+    }, [emitRunLifecycleEvent, reportRunHandler]);
+
+    const hasRows = Array.isArray(computedCollection) && computedCollection.length > 0;
     useEffect(() => {
         const artifactId = normalizeString(storedReportArtifact?.artifactId);
         if (!hasCompletedCurrentRun || !artifactId || typeof reportStoreHandler?.recordReportRun !== "function") {
@@ -9045,12 +9461,129 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     const activeReportEventName = resolveReportDocumentMetadataTitle(state, container, displayConfig);
     const activeReportEventSourceKind = hostedReportSource.kind
         || (normalizeString(state?.reportDocumentTemplateId) ? "preset" : "inline");
+    const currentReportMaterialization = useMemo(() => {
+        const reportDocument = runtimePreviewArtifact?.document || authoredRuntimePreviewModel?.document || null;
+        const reportSpec = runtimePreviewArtifact?.reportSpec || authoredRuntimePreviewModel?.reportSpec || null;
+        if (!reportDocument && !reportSpec) {
+            return null;
+        }
+        const reportPrint = runtimePreviewArtifact?.reportPrint || null;
+        const runtimeBlock = runtimePreviewArtifact?.runtimeBlock || null;
+        return {
+            reportDocument,
+            reportSpec,
+            staticDatasetPayloads: authoredRuntimePreviewModel?.staticDatasetPayloads || null,
+            semanticBindingViewState: runtimePreviewArtifact?.semanticBindingViewState
+                || authoredRuntimePreviewModel?.semanticBindingViewState
+                || null,
+            unifiedFilterContent: authoredRuntimePreviewModel?.unifiedFilterContent || null,
+            reportPrintDefinition: reportPrint ? {
+                kind: reportPrint.kind,
+                version: reportPrint.version,
+                specVersion: reportPrint.specVersion,
+                specHash: reportPrint.specHash,
+                title: reportPrint.title,
+                source: reportPrint.source,
+                pageGeometry: reportPrint.pageGeometry,
+            } : null,
+            runtimePreview: runtimeBlock ? {
+                id: runtimeBlock.id,
+                title: runtimeBlock.title,
+                subtitle: runtimeBlock.subtitle,
+                hostIntent: runtimeBlock.dashboard?.reportRuntime?.hostIntent || null,
+            } : null,
+        };
+    }, [authoredRuntimePreviewModel, runtimePreviewArtifact]);
+    const currentReportMaterializationFingerprint = useMemo(
+        () => buildReportRunMaterializationFingerprint({
+            request: currentRequest,
+            materialization: currentReportMaterialization,
+        }),
+        [currentReportMaterialization, currentRequest],
+    );
     currentReportEventRequestRef.current = draftExportRequest;
     currentReportEventIdentityRef.current = {
         reportId: activeReportEventId,
         reportName: activeReportEventName,
         sourceKind: activeReportEventSourceKind,
     };
+    currentReportMaterializationRef.current = currentReportMaterialization;
+    currentReportMaterializationFingerprintRef.current = currentReportMaterializationFingerprint;
+    const activeRunForSettlement = activeRunEventRef.current;
+    const activeSettlementRunId = activeRunForSettlement?.invocation?.runId || "";
+    const activeSettlementRequestFingerprint = activeRunForSettlement?.invocation?.requestFingerprint
+        || activeRunForSettlement?.invocation?.fingerprint
+        || "";
+    const activeSettlementMaterializationFingerprint = activeRunForSettlement?.invocation?.materializationFingerprint || "";
+    const activeRunMatchesCurrentDispatch = activeSettlementRequestFingerprint !== ""
+        && lastManualRunFingerprintRef.current === activeSettlementRequestFingerprint
+        && currentRequestFingerprint === activeSettlementRequestFingerprint
+        && (!activeRunForSettlement?.durable
+            || (
+                activeSettlementMaterializationFingerprint !== ""
+                && currentReportMaterializationFingerprint === activeSettlementMaterializationFingerprint
+            ))
+        && (
+            requestFingerprintRef.current === `${activeSettlementRequestFingerprint}::fetch`
+            || requestFingerprintRef.current === `${activeSettlementRequestFingerprint}::hold`
+        );
+    const hasCompletedActiveRun = canRunReport
+        && !loading
+        && !error
+        && (
+            activeRunForSettlement?.durable
+                ? activeRunMatchesCurrentDispatch
+                : hasCompletedCurrentRun
+        );
+    useEffect(() => {
+        if (isAuthoredRuntimeExecution || !hasCompletedActiveRun || !activeSettlementRunId) {
+            return;
+        }
+        const event = captureReportRunSettlementEvent(activeRunEventRef.current, {
+            runId: activeSettlementRunId,
+            fingerprint: activeSettlementRequestFingerprint,
+            materializationFingerprint: activeSettlementMaterializationFingerprint,
+            currentFingerprint: currentRequestFingerprint,
+            currentMaterializationFingerprint: currentReportMaterializationFingerprint,
+            dispatchFingerprint: requestFingerprintRef.current,
+            status: "succeeded",
+            terminalRequest: currentReportEventRequestRef.current,
+            rowCount: Array.isArray(computedCollection) ? computedCollection.length : 0,
+        });
+        if (event) {
+            void settleReportRunLifecycle(event);
+        }
+    }, [activeSettlementMaterializationFingerprint, activeSettlementRequestFingerprint, activeSettlementRunId, computedCollection, currentReportMaterializationFingerprint, currentRequestFingerprint, hasCompletedActiveRun, isAuthoredRuntimeExecution, settleReportRunLifecycle]);
+    useEffect(() => {
+        if (loading || !error || !activeSettlementRunId
+            || (activeRunForSettlement?.durable && !activeRunMatchesCurrentDispatch)) {
+            return;
+        }
+        const event = captureReportRunSettlementEvent(activeRunEventRef.current, {
+            runId: activeSettlementRunId,
+            fingerprint: activeSettlementRequestFingerprint,
+            materializationFingerprint: activeSettlementMaterializationFingerprint,
+            currentFingerprint: currentRequestFingerprint,
+            currentMaterializationFingerprint: currentReportMaterializationFingerprint,
+            dispatchFingerprint: requestFingerprintRef.current,
+            status: "failed",
+            error,
+            rowCount: 0,
+        });
+        if (event) {
+            void settleReportRunLifecycle(event);
+        }
+    }, [activeRunForSettlement?.durable, activeRunMatchesCurrentDispatch, activeSettlementMaterializationFingerprint, activeSettlementRequestFingerprint, activeSettlementRunId, currentReportMaterializationFingerprint, currentRequestFingerprint, error, loading, settleReportRunLifecycle]);
+    useEffect(() => {
+        const event = classifyReportRunSupersede(activeRunEventRef.current, {
+            currentFingerprint: currentRequestFingerprint,
+            currentMaterializationFingerprint: currentReportMaterializationFingerprint,
+            dispatchFingerprint: requestFingerprintRef.current,
+        });
+        if (event) {
+            void settleReportRunLifecycle(event);
+        }
+    }, [activeSettlementMaterializationFingerprint, activeSettlementRequestFingerprint, activeSettlementRunId, currentReportMaterializationFingerprint, currentRequestFingerprint, manualRunSequence, settleReportRunLifecycle]);
     const draftXlsxExportRequest = useMemo(() => {
         if (!runtimePreviewArtifact?.document || !runtimePreviewArtifact?.reportSpec || !runtimePreviewArtifact?.reportFill) {
             return null;
@@ -9156,6 +9689,12 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         selectedListEntrySavedRecordExportRequest,
         state,
     ]);
+    const resolveDraftRunReference = React.useCallback(
+        () => resolveCompletedReportRunReference(activeRunEventRef.current, {
+            materializationFingerprint: currentReportMaterializationFingerprintRef.current,
+        }),
+        [],
+    );
     const exportExecutionConfigs = useMemo(
         () => buildReportBuilderExportExecutionConfigs({
             draftRequest: draftExportRequest,
@@ -9171,6 +9710,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             reportAuditMetadata,
             reportEventHandler,
             reportEventContext,
+            resolveRunReference: resolveDraftRunReference,
             setFeedback: setChartApplyFeedback,
         }),
         [
@@ -9185,6 +9725,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             reportEventContext,
             reportEventHandler,
             reportExportHandler,
+            resolveDraftRunReference,
             savedReportPayloadExportRequest,
             selectedListEntryExportRequest,
             setChartApplyFeedback,
@@ -9414,36 +9955,54 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             || runtimePreviewDatasetPayloadState.loading
             || (runtimePreviewPublishedDatasets.length > 0
                 && runtimePreviewDatasetPayloadState.requestKey !== runtimePreviewPublishedDatasetsRequestKey)
+            || (activeRun?.durable && !activeRunMatchesCurrentDispatch)
             || !authoredRuntimePreviewState?.canRenderRuntime
             || !activeRun?.runId
         ) {
             return;
         }
-        const eventKey = `${activeRun.runId}:${currentRequestFingerprint}`;
-        if (completedRunEventKeyRef.current === eventKey) {
-            return;
-        }
-        completedRunEventKeyRef.current = eventKey;
         const primaryRows = Array.isArray(runtimePreviewPrimaryDatasetPayload?.rows)
             ? runtimePreviewPrimaryDatasetPayload.rows
             : runtimePreviewRowsSource.rows;
-        emitRunLifecycleEvent("report.run", {
-            runId: activeRun.runId,
+        const expectedResultRequestKey = runtimePreviewPublishedDatasets.length > 0
+            ? runtimePreviewPublishedDatasetsRequestKey
+            : runtimePreviewRequestKey;
+        const resultRequestKey = runtimePreviewPublishedDatasets.length > 0
+            ? runtimePreviewDatasetPayloadState.requestKey
+            : runtimePreviewRowsState.requestKey;
+        const event = captureReportRunSettlementEvent(activeRun, {
+            runId: activeRun.invocation?.runId || "",
+            fingerprint: activeRun.invocation?.requestFingerprint || activeRun.invocation?.fingerprint || "",
+            materializationFingerprint: activeRun.invocation?.materializationFingerprint || "",
+            currentFingerprint: currentRequestFingerprint,
+            currentMaterializationFingerprint: currentReportMaterializationFingerprint,
+            dispatchFingerprint: requestFingerprintRef.current,
             status: authoredRuntimePreviewState?.errorState ? "failed" : "succeeded",
+            error: authoredRuntimePreviewState?.errorState || null,
+            terminalRequest: currentReportEventRequestRef.current,
             rowCount: Array.isArray(primaryRows) ? primaryRows.length : 0,
+            resultRequestKey,
+            expectedResultRequestKey,
         });
+        if (event) {
+            void settleReportRunLifecycle(event);
+        }
     }, [
+        activeRunMatchesCurrentDispatch,
         authoredRuntimePreviewState?.canRenderRuntime,
         authoredRuntimePreviewState?.errorState,
+        currentReportMaterializationFingerprint,
         currentRequestFingerprint,
-        emitRunLifecycleEvent,
         isAuthoredRuntimeExecution,
         runtimePreviewDatasetPayloadState.loading,
         runtimePreviewDatasetPayloadState.requestKey,
         runtimePreviewPublishedDatasets.length,
         runtimePreviewPublishedDatasetsRequestKey,
         runtimePreviewPrimaryDatasetPayload?.rows,
+        runtimePreviewRequestKey,
+        runtimePreviewRowsState.requestKey,
         runtimePreviewRowsSource.rows,
+        settleReportRunLifecycle,
     ]);
     useEffect(() => {
         const artifactId = normalizeString(storedReportArtifact?.artifactId);
@@ -12290,13 +12849,20 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                 canSave: !!canSaveCurrentReportFile && typeof reportStoreHandler?.saveReport === "function",
                 hasCompletedRun: !!hasCompletedCurrentRun,
             }),
-            run: () => {
+            run: async () => {
                 if (!canRunReport) {
                     return { ok: false, error: "The current report is not ready to run." };
                 }
-                scheduleReportWindowMutation(runReport);
+                const begun = await runReport({ origin: "prompt" });
+                if (!begun?.ok) {
+                    return begun;
+                }
                 return {
                     ok: true,
+                    ...(begun.durable ? {
+                        reportRunId: normalizeString(begun.runId),
+                        durable: true,
+                    } : {}),
                     windowId,
                     reportId: normalizeString(activeReportEventId),
                     reportName: normalizeString(activeReportEventName),
@@ -18257,6 +18823,9 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     };
 
     useEffect(() => {
+        if (pendingReportWorkspaceRunRef.current) {
+            return;
+        }
         const autoRunAction = resolveReportBuilderSurfaceAutoRunAction({
             workspaceMode: designWorkspaceMode ? "design" : (reportWorkspaceMode ? "report" : "preview"),
             requestFingerprint: currentRequestFingerprint,
@@ -18279,24 +18848,51 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             return;
         }
         authoredPreviewAutoFetchKeyRef.current = autoRunAction.autoRunKey;
-        beginReportRunLifecycle({ reuseCurrent: true });
+        const invocationSnapshot = captureRunDispatchSnapshot(
+            currentBuilderStateRef.current || state,
+            { origin: "manual" },
+        );
         if (autoRunAction.type === "dispatch") {
-            dispatchReportRequest(currentBuilderStateRef.current || state, { forceFetch: true, markManual: true });
+            void beginAndDispatchReportRun(invocationSnapshot, {
+                begin: (snapshot) => beginReportRunLifecycle({
+                    reuseCurrent: true,
+                    origin: "manual",
+                    invocationSnapshot: snapshot,
+                }),
+                dispatch: (snapshot) => dispatchReportRequestSnapshot(
+                    snapshot,
+                    { forceFetch: true, markManual: true },
+                ),
+            });
             return;
         }
-        lastManualRunFingerprintRef.current = currentRequestFingerprint;
-        setManualRunSequence((current) => current + 1);
+        void beginAndPromoteReportRun(invocationSnapshot, {
+            begin: (snapshot) => beginReportRunLifecycle({
+                reuseCurrent: true,
+                origin: "manual",
+                invocationSnapshot: snapshot,
+            }),
+            dispatch: (snapshot) => dispatchReportRequestSnapshot(
+                snapshot,
+                { forceFetch: true, markManual: true },
+            ),
+            promote: (snapshot) => {
+                lastManualRunFingerprintRef.current = snapshot.fingerprint;
+                setManualRunSequence((current) => current + 1);
+            },
+        });
     }, [
         authoredDocumentCompileValidation.valid,
         authoredPreviewAutoFetchKey,
         beginReportRunLifecycle,
         canRunReport,
+        captureRunDispatchSnapshot,
         currentPrefillSignature,
         currentRequestFingerprint,
         currentRequestDispatchFingerprint,
         currentRequestShouldFetch,
         designWorkspaceMode,
-        dispatchReportRequest,
+        dispatchReportRequestSnapshot,
         error,
         hasCompletedCurrentRun,
         hasRows,
@@ -18346,20 +18942,39 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         }
         executeOnOpenRunKeyRef.current = executeRunKey;
         const activeRun = activeRunEventRef.current;
-        if (activeRun?.runId && activeRun?.fingerprint === currentRequestFingerprint) {
+        const activeRunMatchesCurrentMaterialization = activeRun?.durable
+            ? activeRun?.invocation?.materializationFingerprint === currentReportMaterializationFingerprint
+            : (activeRun?.invocation?.requestFingerprint || activeRun?.invocation?.fingerprint)
+                === currentRequestFingerprint;
+        if (activeRun?.runId && activeRunMatchesCurrentMaterialization) {
             return;
         }
-        beginReportRunLifecycle({ reuseCurrent: true });
-        dispatchReportRequest(currentBuilderStateRef.current || state, { forceFetch: true, markManual: true });
+        const invocationSnapshot = captureRunDispatchSnapshot(
+            currentBuilderStateRef.current || state,
+            { origin: "prompt" },
+        );
+        void beginAndDispatchReportRun(invocationSnapshot, {
+            begin: (snapshot) => beginReportRunLifecycle({
+                reuseCurrent: true,
+                origin: "prompt",
+                invocationSnapshot: snapshot,
+            }),
+            dispatch: (snapshot) => dispatchReportRequestSnapshot(
+                snapshot,
+                { forceFetch: true, markManual: true },
+            ),
+        });
     }, [
         beginReportRunLifecycle,
         canRunReport,
+        captureRunDispatchSnapshot,
         committedReportDefinitionSignature,
         currentPrefillSignature,
+        currentReportMaterializationFingerprint,
         currentReportDefinitionSignature,
         currentRequestFingerprint,
         designWorkspaceMode,
-        dispatchReportRequest,
+        dispatchReportRequestSnapshot,
         error,
         hasCompletedCurrentRun,
         hasRows,
@@ -18395,16 +19010,33 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         const exportIdentity = hostedReportId || normalizeString(state?.reportDocumentTemplateId);
         const exportRunKey = [
             exportIdentity,
-            currentRequestFingerprint,
+            isXlsx ? currentRequestFingerprint : currentReportMaterializationFingerprint,
             String(manualRunSequence),
             hostedExportOnComplete,
         ].join("::");
-        if (!exportIdentity || exportOnCompleteRunKeyRef.current === exportRunKey) {
+        if (!exportIdentity) {
             return;
         }
-        exportOnCompleteRunKeyRef.current = exportRunKey;
-        submitExport();
+        const decision = resolveHostedReportAutoExportDecision({
+            format: hostedExportOnComplete,
+            runKey: exportRunKey,
+            submittedRunKey: exportOnCompleteRunKeyRef.current,
+            activeRun: activeRunEventRef.current,
+            completedRunSignal: completedDurableRunSignal,
+            currentFingerprint: currentRequestFingerprint,
+            currentMaterializationFingerprint: currentReportMaterializationFingerprint,
+        });
+        if (!decision) {
+            return;
+        }
+        exportOnCompleteRunKeyRef.current = decision.runKey;
+        void submitExport(decision.requireRunReference ? {
+            requireRunReference: true,
+            runReference: decision.runReference,
+        } : undefined);
     }, [
+        completedDurableRunSignal,
+        currentReportMaterializationFingerprint,
         currentRequestFingerprint,
         designWorkspaceMode,
         draftExportJob,
