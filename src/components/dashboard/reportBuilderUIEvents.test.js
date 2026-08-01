@@ -121,6 +121,36 @@ assert.deepEqual(buildReportBuilderRunEvent({
 });
 
 assert.deepEqual(buildReportBuilderRunEvent({
+    kind: "report.run",
+    request,
+    sourceKind: "preset",
+    runId: "run-1",
+    reportRunId: "server-run-1",
+    revision: 3,
+    status: "completed",
+    rowCount: 7,
+}), {
+    kind: "report.run",
+    detail: {
+        reportName: "Inventory Brief",
+        reportId: "inventory",
+        artifactRef: "report://inventory",
+        sourceKind: "preset",
+        format: "pdf",
+        filters: {
+            orderId: 2680567,
+            dateRange: { start: "2026-07-01", end: "2026-07-07" },
+            channel: ["CTV"],
+        },
+        runId: "run-1",
+        reportRunId: "server-run-1",
+        revision: 3,
+        status: "completed",
+        rowCount: 7,
+    },
+});
+
+assert.deepEqual(buildReportBuilderRunEvent({
     kind: "report.run_start",
     request,
     runtimeRequest: {
