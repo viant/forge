@@ -400,11 +400,13 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes('beginReportRunLifecycle({ reuseCurrent: true });')
+  source.includes('emitRunLifecycleEvent("report.run_start", {')
+    && source.includes("const event = captureReportRunSettlementEvent(activeRun, {")
+    && source.includes("void settleReportRunLifecycle(event);")
     && source.includes('emitRunLifecycleEvent("report.run", {')
     && source.includes('status: authoredRuntimePreviewState?.errorState ? "failed" : "succeeded"'),
   true,
-  "hosted authored execution should emit correlated run start and completion events from resolved runtime datasets.",
+  "hosted authored execution should start and settle correlated run lifecycle events from resolved runtime datasets.",
 );
 
 assert.equal(

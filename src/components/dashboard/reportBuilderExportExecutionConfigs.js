@@ -23,6 +23,7 @@ export function buildReportBuilderExportExecutionConfigs({
     reportAuditMetadata = {},
     reportEventHandler = null,
     reportEventContext = {},
+    resolveRunReference = null,
     setFeedback = () => {},
 } = {}) {
     const auditConfig = {
@@ -44,6 +45,7 @@ export function buildReportBuilderExportExecutionConfigs({
             }),
             ...auditConfig,
             ...eventConfig,
+            ...(typeof resolveRunReference === "function" ? { resolveRunReference } : {}),
         },
         importedStandalone: {
             ...buildImportedStandaloneExportExecutionConfig({
