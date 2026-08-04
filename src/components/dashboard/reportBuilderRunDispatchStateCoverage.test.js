@@ -21,14 +21,34 @@ const runReportStart = source.indexOf("const runReport = React.useCallback");
 const settlementStart = source.indexOf("const settleReportRunLifecycle", runReportStart);
 const runReportSource = source.slice(runReportStart, settlementStart);
 assert.equal(runReportStart >= 0 && settlementStart > runReportStart, true);
-assert.match(
-  runReportSource,
-  /if \(designWorkspaceMode\) \{[\s\S]*pendingReportWorkspaceRunRef\.current = \{[\s\S]*setWorkspaceMode\("report"\);[\s\S]*return pendingRunPromise;[\s\S]*useEffect\(\(\) => \{[\s\S]*if \(designWorkspaceMode \|\| !pendingRun \|\| pendingRun\.started\)[\s\S]*const invocationSnapshot = captureRunDispatchSnapshot\([\s\S]*executeCapturedReportRun\(invocationSnapshot, pendingRun\.origin\)/,
-  "Design Preview must commit report mode before capturing the durable materialization.",
+assert.equal(
+  runReportSource.includes('const runReport = React.useCallback(({ origin = "manual" } = {}) => {')
+    && runReportSource.includes("return existingPendingRun.promise")
+    && runReportSource.includes("resolvePendingReportRunExecutionAction(existingPendingRun, {")
+    && runReportSource.includes('if (pendingAction === "reuse")')
+    && runReportSource.includes('if (pendingAction === "supersede")')
+    && runReportSource.includes("const deferRunUntilCurrentMaterialization")
+    && runReportSource.includes("createPendingReportRunExecution({")
+    && runReportSource.includes("pendingReportWorkspaceRunRef.current = pendingRun")
+    && runReportSource.includes("if (designWorkspaceMode) {")
+    && runReportSource.includes("setWorkspaceMode(\"report\");")
+    && runReportSource.includes("if (!isRunDispatchMaterializationCurrent(invocationSnapshot))")
+    && runReportSource.includes("invocationSnapshot.requestFingerprint,")
+    && runReportSource.includes("invocationSnapshot.materializationFingerprint,")
+    && runReportSource.includes("if (pendingRun.requestFingerprint")
+    && runReportSource.includes("pendingRun.requestFingerprint !== invocationSnapshot.requestFingerprint")
+    && runReportSource.includes("if (pendingRun.materializationFingerprint")
+    && runReportSource.includes("pendingRun.materializationFingerprint !== invocationSnapshot.materializationFingerprint")
+    && runReportSource.includes("settlePendingReportRunExecution(pendingReportWorkspaceRunRef, pendingRun")
+    && runReportSource.includes("if (!isRunDispatchMaterializationCurrent(invocationSnapshot))")
+    && runReportSource.includes("pendingRun.started = true;")
+    && runReportSource.includes("executeCapturedReportRun(invocationSnapshot, pendingRun.origin)"),
+  true,
+  "Repeated exact clicks share one promise, while R1-to-R2, Design Preview, and export-ref waits retain exact request ownership.",
 );
 const designBranch = runReportSource.slice(
   runReportSource.indexOf("if (designWorkspaceMode) {"),
-  runReportSource.indexOf("return executeCapturedReportRun", runReportSource.indexOf("if (designWorkspaceMode) {")),
+  runReportSource.indexOf("const invocationSnapshot", runReportSource.indexOf("if (designWorkspaceMode) {")),
 );
 assert.equal(
   designBranch.includes("captureRunDispatchSnapshot"),
@@ -46,14 +66,49 @@ const captureEnd = source.indexOf("const dispatchReportRequestSnapshot", capture
 const captureSource = source.slice(captureStart, captureEnd);
 assert.equal(captureStart >= 0 && captureEnd > captureStart, true);
 assert.equal(
-  captureSource.includes("materialization: currentReportMaterializationRef.current")
-    && captureSource.includes("materializedExportRequest: currentReportEventRequestRef.current")
-    && captureSource.includes("request: currentReportEventRequestRef.current")
+  captureSource.includes("resolveReportRunDispatchMaterialization(")
+    && captureSource.includes("currentReportDispatchMaterializationRef.current")
+    && captureSource.includes("materialization: dispatchMaterialization?.materialization || null")
+    && captureSource.includes("materializedExportRequest,")
+    && captureSource.includes("request: materializedExportRequest")
     && captureSource.includes("runtimeRequest: request")
     && captureSource.includes("source: {")
     && captureSource.includes("context: reportEventContext"),
   true,
-  "The invocation snapshot must capture exact materialization and immutable event/source metadata before Begin.",
+  "The invocation snapshot must capture only the exact request-tagged materialization and immutable event/source metadata before Begin.",
+);
+assert.equal(
+  source.includes("currentReportDispatchMaterializationRef.current = {")
+    && source.includes("dispatchReady: true,")
+    && source.includes("terminalMaterializationFresh: currentTerminalMaterializationFresh,")
+    && source.includes("runtimePreviewRowsState.freshResultRequestKey === runtimePreviewRequestKey")
+    && source.includes("resolveReportRuntimePreviewDatasetResultFreshness({")
+    && source.includes("requestFingerprint: currentRequestFingerprint,")
+    && source.includes("materializationFingerprint: currentReportMaterializationFingerprint,")
+    && source.includes("materializedExportRequest: draftExportRequest,")
+    && source.includes("matchesReportRunDispatchMaterializationSnapshot("),
+  true,
+  "Dispatch may begin from an exact request-tagged render, but stale retained authored rows must remain a non-terminal provisional materialization.",
+);
+assert.equal(
+  source.includes("bindReportRunTerminalMaterialization(activeRun, terminalSnapshot, {")
+    && source.includes("trustedConversationId: reportEventContext.conversationId")
+    && source.includes("terminalRequest: terminalSnapshot.materializedExportRequest")
+    && source.includes("terminalRequest = terminalSnapshot.materializedExportRequest"),
+  true,
+  "A fresh terminal request may replace only the same running invocation's terminal fingerprint under the trusted conversation.",
+);
+
+const mountedLifecycleStart = source.indexOf("reportBuilderMountedRef.current = true;");
+const mountedLifecycleEnd = source.indexOf("}, []);", mountedLifecycleStart);
+const mountedLifecycleSource = source.slice(mountedLifecycleStart, mountedLifecycleEnd);
+assert.equal(
+  mountedLifecycleSource.includes("reportBuilderMountedRef.current = false;")
+    && mountedLifecycleSource.includes("const pendingRun = pendingReportWorkspaceRunRef.current;")
+    && mountedLifecycleSource.includes("settlePendingReportRunExecution(")
+    && mountedLifecycleSource.includes("buildCancelledReportRunResult()"),
+  true,
+  "Unmount must settle the one deferred Run promise with the deterministic non-throwing cancellation result.",
 );
 
 const emitStart = source.indexOf("const emitRunLifecycleEvent = React.useCallback");
@@ -76,6 +131,15 @@ const generationCheckIndex = beginSource.indexOf("if (runInvocationGenerationRef
 const activeRunAssignmentIndex = beginSource.indexOf("activeRunEventRef.current = nextRun;");
 const synchronousBoundCallbackIndex = beginSource.indexOf("onRunBound?.(nextRun)", activeRunAssignmentIndex);
 const capabilitySignalIndex = beginSource.indexOf("setReportRunDurableCapabilitySignal({", activeRunAssignmentIndex);
+const beginResponseIndex = beginSource.indexOf("const beginResponse = await reportRunHandler.begin(");
+const normalizedBeginIndex = beginSource.indexOf(
+  "const beginResult = normalizeReportRunBeginResult(beginResponse);",
+  beginResponseIndex,
+);
+const unmountedBeginCleanupIndex = beginSource.indexOf(
+  "return cancelUnmountedReportRunBegin(",
+  normalizedBeginIndex,
+);
 assert.equal(
   !beginSource.includes("currentReportEventIdentityRef")
     && !beginSource.includes("currentReportEventRequestRef")
@@ -89,6 +153,23 @@ assert.equal(
     && beginSource.includes("nextRun.invocation?.metadata"),
   true,
   "Async Begin must require exact artifacts and retain invocation metadata instead of re-reading render refs.",
+);
+assert.equal(
+  beginSource.includes("if (!reportBuilderMountedRef.current) {")
+    && beginResponseIndex >= 0
+    && normalizedBeginIndex > beginResponseIndex
+    && unmountedBeginCleanupIndex > normalizedBeginIndex
+    && beginSource.includes("beginResult,\n                            invocationSnapshot,")
+    && beginSource.includes("{ uiRunRequestId },")
+    && beginSource.includes("nextRun = bindReportRunInvocation(nextRun, invocationSnapshot)"),
+  true,
+  "Unmount must stop a queued Begin and CAS-fail an enabled post-Begin durable identity before React state, emit, or dispatch.",
+);
+assert.equal(
+  source.includes("reportBuilderMountedRef.current\n                    ? dispatchReportRequestSnapshot(")
+    && source.includes("const settleReportRunLifecycle = React.useCallback((settlementEvent = null) => {\n        const activeRun = activeRunEventRef.current;\n        if (!reportBuilderMountedRef.current)"),
+  true,
+  "Datasource dispatch and terminal lifecycle scheduling must both stop after unmount.",
 );
 
 assert.equal(
@@ -218,7 +299,8 @@ assert.equal(
     && source.includes("effectiveParams: invocationSnapshot.request")
     && source.includes("matchesReportRunSettlementCurrency(activeRun, settlementEvent, {")
     && source.includes("currentMaterializationFingerprint: currentReportMaterializationFingerprintRef.current")
-    && source.includes("shouldSettle: () => settlementEvent?.superseded === true || isStillCurrent()"),
+    && source.includes("shouldSettle: () => reportBuilderMountedRef.current")
+    && source.includes("&& (settlementEvent?.superseded === true || isStillCurrent())"),
   true,
   "Durable Begin and pre-persist settlement should use immutable request and target-aware materialization identities.",
 );
@@ -259,10 +341,52 @@ assert.equal(
   true,
   "Hosted supersede deferral and retry latching must be driven by the pure exact-identity lifecycle decisions.",
 );
-assert.match(
-  source,
-  /completeAndActivateReportRun\([\s\S]*shouldActivate: isStillCurrent[\s\S]*emitRunLifecycleEvent\("report\.run",/,
-  "Persistence and current-run activation must precede the durable completion event.",
+const settlementLifecycleSource = source.slice(
+  source.indexOf("const settleReportRunLifecycle"),
+  source.indexOf("const completedRunConversationSelectionKey"),
+);
+const supersedeCurrencyGuardIndex = settlementLifecycleSource.indexOf(
+  "if (!isStillCurrent())",
+);
+const conversationApplicationGuardIndex = settlementLifecycleSource.indexOf(
+  "if (!isSettlementApplicationCurrent())",
+);
+const settledRunApplicationIndex = settlementLifecycleSource.indexOf(
+  "activeRunEventRef.current = settled;",
+  conversationApplicationGuardIndex,
+);
+const settledRunEmitIndex = settlementLifecycleSource.indexOf(
+  'emitRunLifecycleEvent("report.run",',
+  settledRunApplicationIndex,
+);
+assert.equal(
+  settlementLifecycleSource.includes("matchesReportRunSettlementApplicationCurrency(")
+    && settlementLifecycleSource.includes("trustedConversationId,")
+    && settlementLifecycleSource.includes(
+      "currentTrustedConversationId: trustedReportRunConversationIdRef.current",
+    )
+    && settlementLifecycleSource.includes("shouldActivate: isSettlementApplicationCurrent")
+    && supersedeCurrencyGuardIndex >= 0
+    && conversationApplicationGuardIndex > supersedeCurrencyGuardIndex
+    && settledRunApplicationIndex > conversationApplicationGuardIndex
+    && settledRunEmitIndex > settledRunApplicationIndex,
+  true,
+  "Activation, local success application, and emission must require the same exact run and trusted conversation currency.",
+);
+const completedSelectionSource = source.slice(
+  source.indexOf("const completedRunConversationSelectionKey"),
+  source.indexOf("const hasRows", source.indexOf("const completedRunConversationSelectionKey")),
+);
+assert.equal(
+  completedSelectionSource.includes("buildCompletedReportRunConversationSelectionKey(selected, { trustedConversationId })")
+    && completedSelectionSource.includes("!== completedRunConversationSelectionKey")
+    && completedSelectionSource.includes("reportBuilderMountedRef.current")
+    && completedSelectionSource.includes("trustedReportRunConversationIdRef.current === trustedConversationId")
+    && completedSelectionSource.includes("activeRunEventRef.current,")
+    && completedSelectionSource.includes(") === completedRunConversationSelectionKey")
+    && completedSelectionSource.includes("isCurrent,"),
+  true,
+  "Manual null-conversation adoption remains reachable only for the exact selected run in the current trusted conversation.",
 );
 assert.equal(
   source.includes("reportRunId: nextRun.durable ? nextRun.reportRunId : \"\"")
