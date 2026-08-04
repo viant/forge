@@ -143,6 +143,82 @@ export function newUIRunRequestId() {
     return globalThis.crypto?.randomUUID?.() || `ui-report-run-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+export const REPORT_RUN_CANCELLED_CODE = "browser_run_cancelled";
+export const REPORT_RUN_CANCELLED_MESSAGE = "Report run was cancelled because the report builder was closed.";
+
+export function buildCancelledReportRunResult({
+    message = REPORT_RUN_CANCELLED_MESSAGE,
+} = {}) {
+    return Object.freeze({
+        ok: false,
+        superseded: true,
+        cancelled: true,
+        code: REPORT_RUN_CANCELLED_CODE,
+        error: normalizeString(message) || REPORT_RUN_CANCELLED_MESSAGE,
+    });
+}
+
+export function createPendingReportRunExecution({
+    origin = "manual",
+    requestFingerprint = "",
+    materializationFingerprint = "",
+} = {}) {
+    let resolvePendingRun;
+    const promise = new Promise((resolve) => {
+        resolvePendingRun = resolve;
+    });
+    return {
+        origin: normalizeString(origin).toLowerCase() || "manual",
+        requestFingerprint: normalizeString(requestFingerprint),
+        materializationFingerprint: normalizeString(materializationFingerprint),
+        promise,
+        resolve: resolvePendingRun,
+        started: false,
+        settled: false,
+    };
+}
+
+export function resolvePendingReportRunExecutionAction(pendingRun = null, {
+    origin = "manual",
+    requestFingerprint = "",
+    materializationFingerprint = "",
+} = {}) {
+    if (!pendingRun?.promise || pendingRun.settled === true) {
+        return "none";
+    }
+    const pendingOrigin = normalizeString(pendingRun.origin).toLowerCase() || "manual";
+    const requestedOrigin = normalizeString(origin).toLowerCase() || "manual";
+    if (pendingOrigin !== requestedOrigin) {
+        return "supersede";
+    }
+    const pendingFingerprint = normalizeString(pendingRun.requestFingerprint);
+    if (!pendingFingerprint) {
+        return "reuse";
+    }
+    if (pendingFingerprint !== normalizeString(requestFingerprint)) {
+        return "supersede";
+    }
+    const pendingMaterializationFingerprint = normalizeString(
+        pendingRun.materializationFingerprint,
+    );
+    return !pendingMaterializationFingerprint
+        || pendingMaterializationFingerprint === normalizeString(materializationFingerprint)
+        ? "reuse"
+        : "supersede";
+}
+
+export function settlePendingReportRunExecution(pendingRunRef = null, pendingRun = null, result = null) {
+    if (!pendingRun || typeof pendingRun.resolve !== "function" || pendingRun.settled === true) {
+        return false;
+    }
+    pendingRun.settled = true;
+    if (pendingRunRef?.current === pendingRun) {
+        pendingRunRef.current = null;
+    }
+    pendingRun.resolve(result);
+    return true;
+}
+
 export function buildReportRunMaterializationFingerprint({
     request = null,
     materialization = null,
@@ -151,6 +227,50 @@ export function buildReportRunMaterializationFingerprint({
         request: cloneValue(request),
         materialization: cloneValue(materialization),
     });
+}
+
+export function resolveReportRunDispatchMaterialization(request = null, candidate = null) {
+    if (!candidate
+        || typeof candidate !== "object"
+        || Array.isArray(candidate)
+        || candidate.dispatchReady !== true) {
+        return null;
+    }
+    const requestFingerprint = JSON.stringify(cloneValue(request));
+    const materialization = candidate.materialization ?? null;
+    const materializationFingerprint = buildReportRunMaterializationFingerprint({
+        request,
+        materialization,
+    });
+    if (normalizeString(candidate.requestFingerprint) !== requestFingerprint
+        || normalizeString(candidate.materializationFingerprint) !== materializationFingerprint) {
+        return null;
+    }
+    return Object.freeze({
+        requestFingerprint,
+        materializationFingerprint,
+        materialization,
+        materializedExportRequest: candidate.materializedExportRequest ?? null,
+        terminalMaterializationFresh: candidate.terminalMaterializationFresh === true,
+    });
+}
+
+export function matchesReportRunDispatchMaterializationSnapshot(snapshot = null, candidate = null) {
+    const selected = resolveReportRunDispatchMaterialization(snapshot?.request, candidate);
+    if (!selected) {
+        return false;
+    }
+    return normalizeString(snapshot?.requestFingerprint || snapshot?.fingerprint)
+            === selected.requestFingerprint
+        && normalizeString(snapshot?.materializationFingerprint)
+            === selected.materializationFingerprint
+        && normalizeString(snapshot?.terminalMaterializationFingerprint)
+            === buildReportRunTerminalMaterializationFingerprint(
+                selected.materializedExportRequest,
+                { materializationFingerprint: selected.materializationFingerprint },
+            )
+        && (snapshot?.terminalMaterializationFresh === true)
+            === selected.terminalMaterializationFresh;
 }
 
 export function buildReportRunTerminalMaterializationFingerprint(terminalRequest = null, {
@@ -1058,6 +1178,7 @@ export function captureReportRunDispatchSnapshot({
     readiness = null,
     materialization = null,
     materializedExportRequest = null,
+    terminalMaterializationFresh = false,
     metadata = null,
 } = {}) {
     const requestSnapshot = freezeValue(cloneValue(request));
@@ -1083,6 +1204,7 @@ export function captureReportRunDispatchSnapshot({
         requestFingerprint,
         materializationFingerprint,
         terminalMaterializationFingerprint,
+        terminalMaterializationFresh: terminalMaterializationFresh === true,
     });
 }
 
@@ -1107,6 +1229,77 @@ export function bindReportRunInvocation(run = null, snapshot = null) {
                 snapshot?.terminalMaterializationFingerprint,
             ),
             metadata: cloneValue(snapshot.metadata),
+        }),
+    };
+}
+
+export function bindReportRunTerminalMaterialization(activeRun = null, snapshot = null, {
+    trustedConversationId = "",
+} = {}) {
+    const activeRequestFingerprint = normalizeString(
+        activeRun?.invocation?.requestFingerprint
+        || activeRun?.invocation?.fingerprint,
+    );
+    const activeMaterializationFingerprint = normalizeString(
+        activeRun?.invocation?.materializationFingerprint,
+    );
+    const snapshotRequestFingerprint = normalizeString(
+        snapshot?.requestFingerprint
+        || snapshot?.fingerprint,
+    );
+    const snapshotMaterializationFingerprint = normalizeString(snapshot?.materializationFingerprint);
+    const terminalMaterializationFingerprint = normalizeString(
+        snapshot?.terminalMaterializationFingerprint,
+    );
+    const activeContext = activeRun?.invocation?.metadata?.event?.context || {};
+    const snapshotContext = snapshot?.metadata?.event?.context || {};
+    const activeMetadata = activeRun?.invocation?.metadata || {};
+    const snapshotMetadata = snapshot?.metadata || {};
+    const activeSource = activeMetadata?.source || {};
+    const snapshotSource = snapshotMetadata?.source || {};
+    const trustedConversation = normalizeString(trustedConversationId);
+    const activeOrigin = normalizeString(activeMetadata?.origin).toLowerCase();
+    const snapshotOrigin = normalizeString(snapshotMetadata?.origin).toLowerCase();
+    const exactInvocationIdentity = [
+        [normalizeString(activeMetadata?.builderRef), normalizeString(snapshotMetadata?.builderRef)],
+        [normalizeString(activeSource?.reportId), normalizeString(snapshotSource?.reportId)],
+        [normalizeString(activeSource?.sourceKind).toLowerCase(), normalizeString(snapshotSource?.sourceKind).toLowerCase()],
+        [normalizeString(activeContext?.conversationId), normalizeString(snapshotContext?.conversationId)],
+        [normalizeString(activeContext?.turnId), normalizeString(snapshotContext?.turnId)],
+        [normalizeString(activeContext?.windowId), normalizeString(snapshotContext?.windowId)],
+        [normalizeString(activeContext?.windowKey), normalizeString(snapshotContext?.windowKey)],
+    ].every(([activeValue, snapshotValue]) => activeValue === snapshotValue);
+    if (activeRun?.durable !== true
+        || normalizeString(activeRun?.status).toLowerCase() !== "running"
+        || normalizeString(activeRun?.runId) !== normalizeString(activeRun?.invocation?.runId)
+        || !activeRequestFingerprint
+        || !activeMaterializationFingerprint
+        || activeRequestFingerprint !== snapshotRequestFingerprint
+        || activeMaterializationFingerprint !== snapshotMaterializationFingerprint
+        || !terminalMaterializationFingerprint
+        || snapshot?.terminalMaterializationFresh !== true
+        || !canPersistReportRunInvocation(snapshot)
+        || !["manual", "prompt"].includes(activeOrigin)
+        || activeOrigin !== snapshotOrigin
+        || exactInvocationIdentity !== true
+        || !reportRunValuesEqual(activeMetadata?.event?.runtimeRequest, snapshot?.request)
+        || normalizeString(activeRun?.conversationId) !== trustedConversation
+        || normalizeString(activeRun?.turnId) !== normalizeString(activeContext?.turnId)
+        || normalizeString(activeRun?.windowId) !== normalizeString(activeContext?.windowId)
+        || normalizeString(activeContext?.conversationId) !== trustedConversation
+        || normalizeString(snapshotContext?.conversationId) !== trustedConversation
+    ) {
+        return null;
+    }
+    if (normalizeString(activeRun.invocation.terminalMaterializationFingerprint)
+        === terminalMaterializationFingerprint) {
+        return activeRun;
+    }
+    return {
+        ...activeRun,
+        invocation: freezeValue({
+            ...cloneValue(activeRun.invocation),
+            terminalMaterializationFingerprint,
         }),
     };
 }
@@ -1343,6 +1536,10 @@ export function matchesReportRunSettlementCurrency(activeRun = null, event = nul
         !== eventMaterializationFingerprint) {
         return false;
     }
+    if (normalizeString(currentRun?.invocation?.terminalMaterializationFingerprint)
+        !== normalizeString(activeRun?.invocation?.terminalMaterializationFingerprint)) {
+        return false;
+    }
     const currentMaterialization = normalizeString(currentMaterializationFingerprint);
     if (authorizedHostedFailure) {
         return currentMaterialization === hostedFailureTargetMaterialization;
@@ -1357,6 +1554,15 @@ export function matchesReportRunSettlementCurrency(activeRun = null, event = nul
         && normalizeString(event?.error?.code) === "runtimePreviewFreshnessUnavailable"
         && !!targetMaterialization
         && currentMaterialization === targetMaterialization;
+}
+
+export function matchesReportRunSettlementApplicationCurrency(activeRun = null, event = null, {
+    trustedConversationId = "",
+    currentTrustedConversationId = "",
+    ...settlementCurrency
+} = {}) {
+    return normalizeString(currentTrustedConversationId) === normalizeString(trustedConversationId)
+        && matchesReportRunSettlementCurrency(activeRun, event, settlementCurrency);
 }
 
 export function buildReportRunSettlementEventKey(activeRun = null, event = null) {
@@ -1885,6 +2091,54 @@ export function normalizeReportRunBeginResult(result = null) {
     };
 }
 
+export function bindDurableReportRunBeginResult(beginResult = null, snapshot = null, {
+    uiRunRequestId = "",
+} = {}) {
+    if (beginResult?.enabled !== true) {
+        throw new Error("An enabled durable report-run Begin result is required.");
+    }
+    const invocationContext = snapshot?.metadata?.event?.context || {};
+    const invocationOrigin = normalizeString(snapshot?.metadata?.origin).toLowerCase() || "manual";
+    return bindReportRunInvocation({
+        runId: beginResult.reportRunId,
+        reportRunId: beginResult.reportRunId,
+        revision: beginResult.revision,
+        contextRevision: beginResult.contextRevision,
+        conversationId: normalizeString(invocationContext.conversationId),
+        turnId: normalizeString(invocationContext.turnId),
+        windowId: normalizeString(invocationContext.windowId),
+        origin: invocationOrigin,
+        uiRunRequestId: normalizeString(uiRunRequestId),
+        durable: true,
+        durableCapability: "enabled",
+        status: "running",
+    }, snapshot);
+}
+
+export async function cancelUnmountedReportRunBegin(
+    handler,
+    beginResult = null,
+    snapshot = null,
+    { uiRunRequestId = "" } = {},
+) {
+    const cancellationResult = buildCancelledReportRunResult();
+    if (beginResult?.enabled !== true) {
+        return cancellationResult;
+    }
+    const begunRun = bindDurableReportRunBeginResult(beginResult, snapshot, {
+        uiRunRequestId,
+    });
+    try {
+        await failDurableReportRun(handler, begunRun, {
+            code: cancellationResult.code,
+            message: cancellationResult.error,
+        });
+    } catch (_) {
+        // The component is gone; cleanup is best-effort and cancellation remains deterministic.
+    }
+    return cancellationResult;
+}
+
 export function buildReportRunCompleteInput(activeRun = null, reportExportRequest = null) {
     const reportRunId = normalizeString(activeRun?.reportRunId);
     const expectedRevision = Number(activeRun?.revision || 0);
@@ -1907,8 +2161,318 @@ export function buildReportRunCompleteInput(activeRun = null, reportExportReques
     };
 }
 
+export function classifyCompletedReportRunConversationAction(activeRun = null, {
+    trustedConversationId = "",
+} = {}) {
+    const reportRunId = normalizeString(activeRun?.reportRunId);
+    const runId = normalizeString(activeRun?.runId);
+    const trustedConversation = normalizeString(trustedConversationId);
+    const storedConversation = normalizeString(activeRun?.conversationId);
+    const runOrigin = normalizeString(activeRun?.origin).toLowerCase();
+    const invocationOrigin = normalizeString(activeRun?.invocation?.metadata?.origin).toLowerCase();
+    const origin = runOrigin || invocationOrigin;
+    const revision = Number(activeRun?.revision || 0);
+    const contextRevision = Number(activeRun?.contextRevision || 0);
+    const valid = activeRun?.durable === true
+        && normalizeString(activeRun?.status).toLowerCase() === "completed"
+        && !!reportRunId
+        && (!runId || runId === reportRunId)
+        && Number.isInteger(revision)
+        && revision > 0
+        && Number.isInteger(contextRevision)
+        && contextRevision >= 0
+        && !!trustedConversation
+        && ["manual", "prompt"].includes(origin)
+        && (!runOrigin || !invocationOrigin || runOrigin === invocationOrigin);
+    if (!valid || (storedConversation && storedConversation !== trustedConversation)) {
+        return Object.freeze({ type: "reject" });
+    }
+    if (storedConversation === trustedConversation) {
+        return Object.freeze({
+            type: "activate",
+            request: Object.freeze({
+                reportRunId,
+                conversationId: trustedConversation,
+                ...(normalizeString(activeRun?.turnId) ? { turnId: normalizeString(activeRun.turnId) } : {}),
+                ...(normalizeString(activeRun?.windowId) ? { windowId: normalizeString(activeRun.windowId) } : {}),
+                expectedRunRevision: revision,
+                expectedContextRevision: contextRevision,
+                source: origin,
+            }),
+        });
+    }
+    if (origin === "manual") {
+        return Object.freeze({
+            type: "adopt",
+            request: Object.freeze({
+                reportRunId,
+                conversationId: trustedConversation,
+                expectedRunRevision: revision,
+                source: origin,
+            }),
+        });
+    }
+    return Object.freeze({ type: "reject" });
+}
+
+function bindReportRunTrustedConversation(activeRun = null, conversationId = "") {
+    const trustedConversationId = normalizeString(conversationId);
+    const invocation = activeRun?.invocation;
+    if (!invocation || !trustedConversationId) {
+        return activeRun;
+    }
+    return {
+        ...activeRun,
+        invocation: {
+            ...invocation,
+            metadata: {
+                ...invocation.metadata,
+                event: {
+                    ...invocation.metadata?.event,
+                    context: {
+                        ...invocation.metadata?.event?.context,
+                        conversationId: trustedConversationId,
+                    },
+                },
+            },
+        },
+    };
+}
+
+export function buildCompletedReportRunConversationSelectionKey(activeRun = null, {
+    trustedConversationId = "",
+} = {}) {
+    const classification = classifyCompletedReportRunConversationAction(activeRun, {
+        trustedConversationId,
+    });
+    if (classification.type === "reject") {
+        return "";
+    }
+    return JSON.stringify([
+        "completed-report-run-conversation-v1",
+        classification.type,
+        normalizeString(activeRun?.runId),
+        normalizeString(activeRun?.reportRunId),
+        Number(activeRun?.revision || 0),
+        Number(activeRun?.contextRevision || 0),
+        normalizeString(activeRun?.conversationId),
+        normalizeString(trustedConversationId),
+        normalizeString(activeRun?.invocation?.requestFingerprint || activeRun?.invocation?.fingerprint),
+        normalizeString(activeRun?.invocation?.materializationFingerprint),
+    ]);
+}
+
+async function callReportRunHostAction(action, request, {
+    isCurrent = () => true,
+} = {}) {
+    if (isCurrent() !== true) {
+        return { stale: true };
+    }
+    try {
+        const result = await action(request);
+        if (isCurrent() !== true) {
+            return { stale: true };
+        }
+        return { result };
+    } catch (error) {
+        if (isCurrent() !== true) {
+            return { stale: true };
+        }
+        throw error;
+    }
+}
+
+export async function reconcileCompletedReportRunConversation(handler, activeRun, {
+    trustedConversationId = "",
+    isCurrent = () => true,
+} = {}) {
+    const classification = classifyCompletedReportRunConversationAction(activeRun, {
+        trustedConversationId,
+    });
+    if (classification.type === "reject" || isCurrent() !== true) {
+        return { applied: false, run: activeRun, classification };
+    }
+    const action = handler?.[classification.type];
+    if (typeof action !== "function") {
+        if (classification.type === "activate") {
+            throw new Error("Report-run activation is unavailable.");
+        }
+        return { applied: false, unavailable: true, run: activeRun, classification };
+    }
+    let request = classification.request;
+    if (classification.type === "adopt") {
+        if (typeof handler?.getContext !== "function") {
+            return { applied: false, unavailable: true, run: activeRun, classification };
+        }
+        const contextCall = await callReportRunHostAction(handler.getContext, {
+            conversationId: classification.request.conversationId,
+        }, {
+            isCurrent,
+        });
+        if (contextCall.stale) {
+            return { applied: false, stale: true, run: activeRun, classification };
+        }
+        const contextResult = contextCall.result;
+        if (contextResult?.enabled === false) {
+            return { applied: false, enabled: false, run: activeRun, classification };
+        }
+        if (contextResult?.enabled !== true
+            || !Object.prototype.hasOwnProperty.call(contextResult, "context")
+            || (contextResult.context !== null
+                && (typeof contextResult.context !== "object" || Array.isArray(contextResult.context)))) {
+            throw new Error("Report-run context lookup returned an invalid response.");
+        }
+        const targetContext = contextResult.context;
+        const targetContextRevision = targetContext ? Number(targetContext.revision || 0) : 0;
+        if (targetContext && (
+            normalizeString(targetContext.conversationId) !== classification.request.conversationId
+            || !Number.isInteger(targetContextRevision)
+            || targetContextRevision <= 0
+        )) {
+            throw new Error("Report-run context lookup returned an invalid conversation context.");
+        }
+        request = Object.freeze({
+            ...classification.request,
+            expectedContextRevision: targetContextRevision,
+        });
+    }
+    const actionCall = await callReportRunHostAction(action, request, {
+        isCurrent,
+    });
+    if (actionCall.stale) {
+        return { applied: false, stale: true, run: activeRun, classification };
+    }
+    const result = actionCall.result;
+    if (classification.type === "adopt" && result?.enabled === false) {
+        return { applied: false, enabled: false, run: activeRun, classification };
+    }
+    const context = classification.type === "adopt" ? result?.context : result;
+    const contextRevision = Number(context?.revision || 0);
+    const contextConversationId = normalizeString(context?.conversationId);
+    if (normalizeString(context?.activeReportRunId) !== request.reportRunId
+        || (classification.type === "adopt"
+            ? contextConversationId !== request.conversationId
+            : (contextConversationId && contextConversationId !== request.conversationId))
+        || !Number.isInteger(contextRevision)
+        || contextRevision <= 0) {
+        throw new Error(`Report-run ${classification.type} returned an invalid active context.`);
+    }
+    let next = activeRun;
+    if (classification.type === "adopt") {
+        const adoptedRun = result?.run;
+        const adoptedRevision = Number(adoptedRun?.revision || 0);
+        if (normalizeString(adoptedRun?.reportRunId) !== request.reportRunId
+            || normalizeString(adoptedRun?.conversationId) !== request.conversationId
+            || normalizeString(adoptedRun?.origin).toLowerCase() !== "manual"
+            || normalizeString(adoptedRun?.status).toLowerCase() !== "completed"
+            || !Number.isInteger(adoptedRevision)
+            || adoptedRevision < request.expectedRunRevision) {
+            throw new Error("Report-run adopt returned an invalid completed run identity.");
+        }
+        next = bindReportRunTrustedConversation({
+            ...activeRun,
+            conversationId: request.conversationId,
+            revision: adoptedRevision,
+        }, request.conversationId);
+    }
+    return {
+        applied: true,
+        run: { ...next, contextRevision },
+        classification,
+    };
+}
+
+function resolveReportRunConversationReconciliationState(stateRef = null) {
+    if (!stateRef || typeof stateRef !== "object") {
+        return {
+            completedKeys: new Set(),
+            pendingByKey: new Map(),
+        };
+    }
+    if (!(stateRef.current?.completedKeys instanceof Set)
+        || !(stateRef.current?.pendingByKey instanceof Map)) {
+        stateRef.current = {
+            completedKeys: new Set(),
+            pendingByKey: new Map(),
+        };
+    }
+    return stateRef.current;
+}
+
+function rememberReportRunConversationReconciliationKey(state, key = "") {
+    const normalizedKey = normalizeString(key);
+    if (!normalizedKey) {
+        return;
+    }
+    state.completedKeys.add(normalizedKey);
+    while (state.completedKeys.size > 32) {
+        state.completedKeys.delete(state.completedKeys.values().next().value);
+    }
+}
+
+export function coordinateCompletedReportRunConversation({
+    handler = null,
+    activeRun = null,
+    trustedConversationId = "",
+    stateRef = null,
+    isCurrent = () => true,
+    applyRun = null,
+} = {}) {
+    const selectionKey = buildCompletedReportRunConversationSelectionKey(activeRun, {
+        trustedConversationId,
+    });
+    if (!selectionKey) {
+        return Promise.resolve({
+            applied: false,
+            run: activeRun,
+            classification: Object.freeze({ type: "reject" }),
+        });
+    }
+    const state = resolveReportRunConversationReconciliationState(stateRef);
+    if (state.completedKeys.has(selectionKey)) {
+        return Promise.resolve({ applied: false, duplicate: true, run: activeRun });
+    }
+    const pending = state.pendingByKey.get(selectionKey);
+    if (pending) {
+        return pending;
+    }
+    const promise = reconcileCompletedReportRunConversation(handler, activeRun, {
+        trustedConversationId,
+        isCurrent,
+    }).then((reconciliation) => {
+        if (reconciliation.stale || isCurrent() !== true) {
+            return reconciliation.stale
+                ? reconciliation
+                : { ...reconciliation, applied: false, stale: true, run: activeRun };
+        }
+        if (reconciliation.applied && typeof applyRun === "function") {
+            applyRun(reconciliation.run);
+        }
+        if (reconciliation.applied
+            || reconciliation.enabled === false
+            || reconciliation.unavailable === true) {
+            rememberReportRunConversationReconciliationKey(state, selectionKey);
+            rememberReportRunConversationReconciliationKey(
+                state,
+                buildCompletedReportRunConversationSelectionKey(reconciliation.run, {
+                    trustedConversationId,
+                }),
+            );
+        }
+        return reconciliation;
+    }).finally(() => {
+        if (state.pendingByKey.get(selectionKey) === promise) {
+            state.pendingByKey.delete(selectionKey);
+        }
+    });
+    state.pendingByKey.set(selectionKey, promise);
+    return promise;
+}
+
 export async function completeAndActivateReportRun(handler, activeRun, reportExportRequest, {
     shouldActivate = () => true,
+    trustedConversationId = activeRun?.conversationId,
+    reconciliationStateRef = null,
 } = {}) {
     if (!activeRun?.durable) {
         return activeRun;
@@ -1924,24 +2488,14 @@ export async function completeAndActivateReportRun(handler, activeRun, reportExp
         throw new Error("Report-run completion returned an invalid identity.");
     }
     const next = { ...activeRun, revision: completedRevision, status: "completed" };
-    const conversationId = normalizeString(activeRun.conversationId);
-    if (!conversationId || shouldActivate(next) !== true) {
-        return next;
-    }
-    if (typeof handler?.activate !== "function") {
-        throw new Error("Report-run activation is unavailable.");
-    }
-    const context = await handler.activate({
-        reportRunId: next.reportRunId,
-        ...buildReportRunCorrelation(activeRun),
-        expectedRunRevision: next.revision,
-        expectedContextRevision: Number(activeRun.contextRevision || 0) || 0,
-        source: normalizeString(activeRun.origin) || "manual",
+    const reconciliation = await coordinateCompletedReportRunConversation({
+        handler,
+        activeRun: next,
+        trustedConversationId,
+        stateRef: reconciliationStateRef,
+        isCurrent: () => shouldActivate(next) === true,
     });
-    if (normalizeString(context?.activeReportRunId) !== next.reportRunId) {
-        throw new Error("Report-run activation returned a different active reportRunId.");
-    }
-    return { ...next, contextRevision: Number(context?.revision || 0) || 0 };
+    return reconciliation.run;
 }
 
 export async function failDurableReportRun(handler, activeRun, error = null) {
