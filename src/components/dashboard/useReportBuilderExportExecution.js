@@ -20,6 +20,9 @@ import {
     buildReportBuilderExportEventDetail,
     emitReportBuilderUIEvent,
 } from "./reportBuilderUIEvents.js";
+import { resolveReportBuilderExportSubmission } from "./reportBuilderExportSubmission.js";
+
+export { resolveReportBuilderExportSubmission } from "./reportBuilderExportSubmission.js";
 
 function normalizeString(value = "") {
     return String(value || "").trim();
@@ -207,6 +210,7 @@ export function useReportBuilderExportExecution({
     reportAuditMetadata = {},
     reportEventHandler = null,
     reportEventContext = {},
+    resolveRunReference = null,
     setFeedback = () => {},
     missingRequestMessage = "No export request is available.",
     missingJobMessage = "No export job is available to refresh.",
@@ -306,6 +310,7 @@ export function useReportBuilderExportExecution({
             try {
                 nextArtifact = normalizeReportBuilderExportArtifact(await reportExportHandler.getArtifact({
                     artifactId: normalizedJob.artifactId,
+                    conversationId: normalizeString(reportEventContext?.conversationId),
                 }));
                 if (nextArtifact) {
                     setArtifact(nextArtifact);
@@ -318,7 +323,7 @@ export function useReportBuilderExportExecution({
             nextJob: normalizedJob,
             nextArtifact,
         });
-    }, [emitExportEvent, reportExportHandler]);
+    }, [emitExportEvent, reportEventContext?.conversationId, reportExportHandler]);
 
     const selectHistoryEntry = React.useCallback(({ job: nextJob = null, artifact: nextArtifact = null } = {}) => {
         const normalizedJob = normalizeReportBuilderExportJob(nextJob);
@@ -347,10 +352,18 @@ export function useReportBuilderExportExecution({
             const [jobsResult, artifactsResult] = await runReportBuilderExportOperation(
                 () => Promise.all([
                     typeof reportExportHandler?.listJobs === "function"
-                        ? reportExportHandler.listJobs({ artifactRef: historyArtifactRef, limit: 6 })
+                        ? reportExportHandler.listJobs({
+                            artifactRef: historyArtifactRef,
+                            limit: 6,
+                            conversationId: normalizeString(reportEventContext?.conversationId),
+                        })
                         : Promise.resolve([]),
                     typeof reportExportHandler?.listArtifacts === "function"
-                        ? reportExportHandler.listArtifacts({ artifactRef: historyArtifactRef, limit: 6 })
+                        ? reportExportHandler.listArtifacts({
+                            artifactRef: historyArtifactRef,
+                            limit: 6,
+                            conversationId: normalizeString(reportEventContext?.conversationId),
+                        })
                         : Promise.resolve([]),
                 ]),
                 {
@@ -382,9 +395,9 @@ export function useReportBuilderExportExecution({
                 setHistoryLoading(false);
             }
         }
-    }, [historyArtifactRef, historyAvailable, reportExportHandler, setFeedback]);
+    }, [historyArtifactRef, historyAvailable, reportEventContext?.conversationId, reportExportHandler, setFeedback]);
 
-    const submit = React.useCallback(async () => {
+    const submit = React.useCallback(async (submissionOptions = null) => {
         const normalizedSourceKind = normalizeString(sourceKind);
         const title = normalizeString(request?.source?.title || request?.reportSpec?.title || "Report") || "Report";
         const format = normalizeString(request?.target?.format).toUpperCase() || "EXPORT";
@@ -395,7 +408,8 @@ export function useReportBuilderExportExecution({
             });
             return null;
         }
-        if (typeof reportExportHandler?.submitRequest !== "function") {
+        if (typeof reportExportHandler?.submitRequest !== "function"
+            && typeof reportExportHandler?.submitRun !== "function") {
             setRequestOpen(true);
             setFeedback({
                 level: "info",
@@ -409,11 +423,22 @@ export function useReportBuilderExportExecution({
             "report.export_start event",
         );
         try {
+            const requireRunReference = submissionOptions?.requireRunReference === true;
+            const runReference = requireRunReference
+                ? submissionOptions?.runReference || null
+                : (typeof resolveRunReference === "function" ? resolveRunReference() : null);
+            const submission = resolveReportBuilderExportSubmission({
+                request,
+                sourceKind: normalizedSourceKind,
+                conversationId: reportEventContext?.conversationId,
+                reportExportHandler,
+                runReference,
+                requireRunReference,
+            });
+            const submitOperation = submission?.execute
+                || (() => Promise.reject(new Error("No exact completed report run is available for export.")));
             const result = await runReportBuilderExportOperation(
-                () => reportExportHandler.submitRequest({
-                    request: cloneValue(request),
-                    source: normalizedSourceKind,
-                }),
+                submitOperation,
                 {
                     timeoutMs: REPORT_EXPORT_SUBMIT_TIMEOUT_MS,
                     timeoutMessage: `Export submission did not respond within ${REPORT_EXPORT_SUBMIT_TIMEOUT_MS / 1000} seconds. Check recent exports before retrying.`,
@@ -483,7 +508,9 @@ export function useReportBuilderExportExecution({
         emitExportComplete,
         emitExportEvent,
         reportExportHandler,
+        reportEventContext?.conversationId,
         request,
+        resolveRunReference,
         setFeedback,
         sourceKind,
     ]);
@@ -514,7 +541,10 @@ export function useReportBuilderExportExecution({
         setStatusLoading(true);
         try {
             const nextJob = normalizeReportBuilderExportJob(await runReportBuilderExportOperation(
-                () => reportExportHandler.getStatus({ jobId }),
+                () => reportExportHandler.getStatus({
+                    jobId,
+                    conversationId: normalizeString(reportEventContext?.conversationId),
+                }),
                 {
                     timeoutMs: REPORT_EXPORT_STATUS_TIMEOUT_MS,
                     timeoutMessage: `Export status ${jobId} did not respond within ${REPORT_EXPORT_STATUS_TIMEOUT_MS / 1000} seconds.`,
@@ -588,7 +618,7 @@ export function useReportBuilderExportExecution({
                 setStatusLoading(false);
             }
         }
-    }, [emitExportComplete, historyAvailable, job, missingJobMessage, refreshHistory, reportExportHandler, request, setFeedback, sourceKind]);
+    }, [emitExportComplete, historyAvailable, job, missingJobMessage, refreshHistory, reportEventContext?.conversationId, reportExportHandler, request, setFeedback, sourceKind]);
 
     const refreshStatusRef = React.useRef(refreshStatus);
     React.useEffect(() => {
@@ -659,7 +689,10 @@ export function useReportBuilderExportExecution({
             setArtifactLoading(true);
             try {
                 const nextArtifact = normalizeReportBuilderExportArtifact(await runReportBuilderExportOperation(
-                    () => reportExportHandler.getArtifact({ artifactId: normalizedArtifactId }),
+                    () => reportExportHandler.getArtifact({
+                        artifactId: normalizedArtifactId,
+                        conversationId: normalizeString(reportEventContext?.conversationId),
+                    }),
                     {
                         timeoutMs: REPORT_EXPORT_ARTIFACT_TIMEOUT_MS,
                         timeoutMessage: `Export artifact ${normalizedArtifactId} did not respond within ${REPORT_EXPORT_ARTIFACT_TIMEOUT_MS / 1000} seconds.`,
@@ -698,7 +731,7 @@ export function useReportBuilderExportExecution({
             mimeType: descriptor.mimeType,
             payload: descriptor.bytes,
         });
-    }, [job?.artifactId, missingArtifactMessage, reportExportHandler, setFeedback]);
+    }, [job?.artifactId, missingArtifactMessage, reportEventContext?.conversationId, reportExportHandler, setFeedback]);
 
     const downloadArtifact = React.useCallback(async () => {
         const artifactId = normalizeString(job?.artifactId);
