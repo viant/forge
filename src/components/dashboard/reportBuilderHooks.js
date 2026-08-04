@@ -147,6 +147,23 @@ export function resolveHostedExecuteOnOpen(container = {}, windowForm = {}) {
     return normalizeExecutionBooleanFlag(container?.parameters?.executeOnOpen);
 }
 
+export function resolveHostedExecuteOnOpenHostAction({
+    executeOnOpen = false,
+    windowState = null,
+} = {}) {
+    if (executeOnOpen !== true) {
+        return "skip";
+    }
+    const hostOpenState = String(windowState?.hostOpenState || "").trim().toLowerCase();
+    if (hostOpenState === "fresh") {
+        return "execute";
+    }
+    if (hostOpenState === "historical_replay") {
+        return "restore";
+    }
+    return "skip";
+}
+
 export function shouldDeferReportBuilderExecutionForDefinition({
     currentSignature = "",
     committedSignature = "",

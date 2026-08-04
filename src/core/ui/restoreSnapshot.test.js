@@ -73,6 +73,11 @@ restoreWindowsFromSnapshot({
 assert.equal(activeWindows.value.length, 1);
 assert.equal(activeWindows.value[0].windowId, 'orderPerformance_1');
 assert.equal(activeWindows.value[0].windowKey, 'orderPerformance');
+assert.equal(
+  activeWindows.value[0].hostOpenState,
+  'historical_replay',
+  'a window restored from a durable UI snapshot must retain explicit historical replay provenance',
+);
 assert.deepEqual(activeWindows.value[0].parameters, { order_performance_profile: { parameters: { AdOrderId: [2667545] } } });
 assert.equal(selectedTabId.value, 'orderPerformance_1');
 assert.equal(selectedWindowId.value, 'orderPerformance_1');

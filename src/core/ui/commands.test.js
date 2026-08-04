@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { activeWindows, selectedTabId, selectedWindowId, getBusSignal, getCollectionSignal, getDashboardFilterSignal, getDashboardSelectionSignal, getFormSignal, getMetricsSignal, getViewSignal } from '../store/signals.js';
+import { addWindow, activeWindows, selectedTabId, selectedWindowId, getBusSignal, getCollectionSignal, getDashboardFilterSignal, getDashboardSelectionSignal, getFormSignal, getMetricsSignal, getViewSignal } from '../store/signals.js';
 import { runUICommand } from './commands.js';
 import { registerControlTarget, unregisterControlTarget } from './registry.js';
 
@@ -26,6 +26,7 @@ const res = await runUICommand({
 
 assert.ok(res.windowId);
 assert.equal(activeWindows.peek().length, 2);
+assert.equal(activeWindows.peek().find((win) => win.windowId === res.windowId)?.hostOpenState, 'fresh');
 assert.equal(selectedTabId.peek(), res.windowId);
 assert.equal(selectedWindowId.peek(), res.windowId);
 
@@ -227,6 +228,60 @@ assert.equal(activeWindows.peek()[0].windowId, 'chat/new');
 assert.equal(selectedWindowId.peek(), 'chat/new');
 assert.equal(selectedTabId.peek(), 'chat/new');
 assert.deepEqual(getDashboardFilterSignal(`${res.windowId}:demoDashboard`).peek(), {});
+
+const restoredHostedWindow = addWindow(
+  'Performance Inventory Brief',
+  'chat/new',
+  'reportBuilder',
+  null,
+  true,
+  { executeOnOpen: true, reportStarterId: 'performance_inventory_brief' },
+  {
+    windowId: 'reportBuilder__conv-session-restore',
+    conversationId: 'conv-session-restore',
+    presentation: 'hosted',
+    region: 'chat.top',
+    hostOpenState: 'historical_replay',
+  },
+);
+assert.equal(restoredHostedWindow.hostOpenState, 'historical_replay');
+
+const freshlyReopenedHostedWindow = addWindow(
+  'Performance Inventory Brief',
+  'chat/new',
+  'reportBuilder',
+  null,
+  true,
+  { executeOnOpen: true, reportStarterId: 'performance_inventory_brief' },
+  {
+    windowId: 'reportBuilder__conv-session-restore',
+    conversationId: 'conv-session-restore',
+    presentation: 'hosted',
+    region: 'chat.top',
+  },
+);
+assert.equal(freshlyReopenedHostedWindow.windowId, restoredHostedWindow.windowId);
+assert.equal(freshlyReopenedHostedWindow.hostOpenState, 'fresh');
+
+const restoredHostedWindowAgain = addWindow(
+  'Performance Inventory Brief',
+  'chat/new',
+  'reportBuilder',
+  null,
+  true,
+  { executeOnOpen: true, reportStarterId: 'performance_inventory_brief' },
+  {
+    windowId: 'reportBuilder__conv-session-restore',
+    conversationId: 'conv-session-restore',
+    presentation: 'hosted',
+    region: 'chat.top',
+    hostOpenState: 'historical_replay',
+  },
+);
+assert.equal(restoredHostedWindowAgain.windowId, restoredHostedWindow.windowId);
+assert.equal(restoredHostedWindowAgain.hostOpenState, 'historical_replay');
+await runUICommand({ method: 'ui.window.close', params: { windowId: restoredHostedWindowAgain.windowId } });
+assert.equal(activeWindows.peek().length, 1);
 
 const regKey = registerControlTarget(
   { windowId: 'W1', dataSourceRef: 'ds', controlId: 'name', label: 'Name', type: 'text', scope: 'form' },

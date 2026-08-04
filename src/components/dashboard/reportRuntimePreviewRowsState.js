@@ -10,6 +10,7 @@ export function buildIdleReportRuntimePreviewRowsState() {
   return {
     fingerprint: "",
     requestKey: "",
+    freshResultRequestKey: "",
     rows: [],
     hasMore: false,
     loading: false,
@@ -21,6 +22,7 @@ export function normalizeReportRuntimePreviewRowsState(state = {}) {
   return {
     fingerprint: normalizeString(state?.fingerprint),
     requestKey: normalizeString(state?.requestKey),
+    freshResultRequestKey: normalizeString(state?.freshResultRequestKey),
     rows: Array.isArray(state?.rows) ? state.rows.map((row) => cloneValue(row)) : [],
     hasMore: state?.hasMore === true,
     loading: state?.loading === true,
@@ -32,6 +34,7 @@ export function hasReportRuntimePreviewRowsStateValue(state = {}) {
   const normalized = normalizeReportRuntimePreviewRowsState(state);
   return !!(
     normalized.fingerprint
+    || normalized.freshResultRequestKey
     || normalized.rows.length > 0
     || normalized.hasMore
     || normalized.loading
@@ -60,6 +63,7 @@ export function buildPendingReportRuntimePreviewRowsState({
   return {
     fingerprint: normalizedFingerprint,
     requestKey: normalizedRequestKey,
+    freshResultRequestKey: "",
     rows: hasPriorFetchedState ? normalizedCurrentState.rows : normalizedSeedRows,
     hasMore: hasPriorFetchedState ? normalizedCurrentState.hasMore : (seedHasMore === true),
     loading: true,
@@ -72,10 +76,13 @@ export function buildResolvedReportRuntimePreviewRowsState({
   requestKey = "",
   rows = [],
   hasMore = false,
+  fresh = true,
 } = {}) {
+  const normalizedRequestKey = normalizeString(requestKey);
   return {
     fingerprint: normalizeString(fingerprint),
-    requestKey: normalizeString(requestKey),
+    requestKey: normalizedRequestKey,
+    freshResultRequestKey: fresh === true ? normalizedRequestKey : "",
     rows: Array.isArray(rows) ? rows.map((row) => cloneValue(row)) : [],
     hasMore: hasMore === true,
     loading: false,
@@ -95,6 +102,7 @@ export function buildRejectedReportRuntimePreviewRowsState({
   return {
     fingerprint: normalizedFingerprint,
     requestKey: normalizedRequestKey,
+    freshResultRequestKey: "",
     rows: normalizedCurrentState.fingerprint === normalizedFingerprint ? normalizedCurrentState.rows : [],
     hasMore: normalizedCurrentState.fingerprint === normalizedFingerprint ? normalizedCurrentState.hasMore : false,
     loading: false,
@@ -110,6 +118,7 @@ export function buildUnavailableReportRuntimePreviewRowsState({
   return {
     fingerprint: normalizeString(fingerprint),
     requestKey: normalizeString(requestKey),
+    freshResultRequestKey: "",
     rows: [],
     hasMore: false,
     loading: false,

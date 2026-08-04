@@ -4,15 +4,19 @@ import {
     bindReportRunInvocation,
     beginAndDispatchReportRun,
     beginAndPromoteReportRun,
+    buildHostedReportLifecycleContextKey,
     buildReportRunBeginInput,
     buildReportRunCompleteInput,
     buildReportRunMaterializationFingerprint,
+    buildReportRunSettlementEventKey,
     canPersistReportRunInvocation,
     captureReportRunDispatchSnapshot,
     captureReportRunSettlementEvent,
     classifyReportRunSupersede,
     completeAndActivateReportRun,
+    executeReportRunSettlementPromiseLifecycle,
     failDurableReportRun,
+    matchesReportRunSettlementCurrency,
     normalizeReportRunBeginResult,
     REPORT_RUN_SUPERSEDED_CODE,
     resolveCompletedReportRunReference,
@@ -106,7 +110,7 @@ const materializedExportRequest = {
     kind: "reportExportRequest",
     target: { format: "pdf" },
     reportSpec: mutableMaterialization.reportSpec,
-    reportFill: { kind: "reportFill", specHash: "spec-1", blocks: [] },
+    reportFill: { kind: "reportFill", specHash: "spec-1", rows: [{ orderId: 11 }] },
     reportPrint: {
         ...mutableMaterialization.reportPrintDefinition,
         fillVersion: 1,
@@ -268,9 +272,12 @@ assert.equal(activeRun.invocation.metadata.source.reportName, "Operations brief"
 assert.equal(Object.isFrozen(activeRun.invocation.metadata.event.request), true);
 
 const exactRequest = {
-    reportSpec: { kind: "reportSpec", title: "Exact completed report" },
-    reportFill: { kind: "reportFill", rows: [{ orderId: 11 }] },
-    reportPrint: { kind: "reportPrint", pages: [{ id: "page-1" }] },
+    reportSpec: snapshot.materializedExportRequest.reportSpec,
+    reportFill: {
+        ...snapshot.materializedExportRequest.reportFill,
+        rows: snapshot.materializedExportRequest.reportFill.rows.map((row) => ({ ...row })),
+    },
+    reportPrint: snapshot.materializedExportRequest.reportPrint,
 };
 const completeInput = buildReportRunCompleteInput(activeRun, exactRequest);
 assert.deepEqual(completeInput, {
@@ -378,6 +385,23 @@ const wrongMaterializationEvent = captureReportRunSettlementEvent(activeRun, {
 });
 assert.equal(wrongMaterializationEvent, null, "same-data-request layout changes must block durable settlement");
 
+const ordinaryFailureEvent = captureReportRunSettlementEvent(activeRun, {
+    runId: activeRun.runId,
+    fingerprint: activeRun.invocation.requestFingerprint,
+    materializationFingerprint: activeRun.invocation.materializationFingerprint,
+    currentFingerprint: activeRun.invocation.requestFingerprint,
+    currentMaterializationFingerprint: activeRun.invocation.materializationFingerprint,
+    dispatchFingerprint: `${activeRun.invocation.requestFingerprint}::fetch`,
+    status: "failed",
+    error: { code: "source_failed", message: "Datasource failed" },
+});
+assert.ok(ordinaryFailureEvent);
+assert.equal(
+    buildReportRunSettlementEventKey(activeRun, ordinaryFailureEvent),
+    `${activeRun.invocation.runId}:${activeRun.invocation.materializationFingerprint}:failed`,
+    "ordinary failure retains its existing settlement event identity",
+);
+
 const successEvent = captureReportRunSettlementEvent(activeRun, {
     runId: activeRun.runId,
     fingerprint: activeRun.invocation.fingerprint,
@@ -392,6 +416,26 @@ const successEvent = captureReportRunSettlementEvent(activeRun, {
 });
 assert.ok(successEvent);
 assert.equal(Object.isFrozen(successEvent.terminalRequest.reportFill.rows), true);
+assert.equal(
+    buildReportRunSettlementEventKey(activeRun, successEvent),
+    `${activeRun.invocation.runId}:${activeRun.invocation.materializationFingerprint}:succeeded`,
+    "ordinary success retains its existing settlement event identity",
+);
+const exactSuccessSettlementCurrency = {
+    currentRun: activeRun,
+    currentFingerprint: activeRun.invocation.requestFingerprint,
+    currentMaterializationFingerprint: activeRun.invocation.materializationFingerprint,
+    dispatchFingerprint: `${activeRun.invocation.requestFingerprint}::fetch`,
+};
+assert.equal(matchesReportRunSettlementCurrency(
+    activeRun,
+    successEvent,
+    exactSuccessSettlementCurrency,
+), true, "success remains current only for its exact durable materialization");
+assert.equal(matchesReportRunSettlementCurrency(activeRun, successEvent, {
+    ...exactSuccessSettlementCurrency,
+    currentMaterializationFingerprint: changedLayoutFingerprint,
+}), false, "success never receives hosted freshness materialization drift authority");
 const settled = await settleReportRunInvocation(activeRun, successEvent, {
     complete: async (run) => ({ ...run, status: "completed" }),
 });
@@ -419,6 +463,11 @@ const superseded = classifyReportRunSupersede(activeRun, {
 });
 assert.equal(superseded.status, "failed");
 assert.equal(superseded.error.code, REPORT_RUN_SUPERSEDED_CODE);
+assert.equal(
+    buildReportRunSettlementEventKey(activeRun, superseded),
+    `${activeRun.invocation.runId}:${activeRun.invocation.materializationFingerprint}:failed`,
+    "supersede retains its existing settlement event identity",
+);
 
 const materializationSuperseded = classifyReportRunSupersede(activeRun, {
     currentFingerprint: activeRun.invocation.requestFingerprint,
@@ -442,6 +491,7 @@ const pendingAutoExport = resolveHostedReportAutoExportDecision({
     activeRun,
     currentFingerprint: activeRun.invocation.fingerprint,
     currentMaterializationFingerprint: activeRun.invocation.materializationFingerprint,
+    currentContextKey: buildHostedReportLifecycleContextKey(snapshot.metadata.event.context),
 });
 assert.equal(pendingAutoExport, null);
 const completedBoundRun = { ...activeRun, status: "completed" };
@@ -455,9 +505,11 @@ const readyAutoExport = resolveHostedReportAutoExportDecision({
         fingerprint: activeRun.invocation.fingerprint,
         requestFingerprint: activeRun.invocation.requestFingerprint,
         materializationFingerprint: activeRun.invocation.materializationFingerprint,
+        contextKey: buildHostedReportLifecycleContextKey(snapshot.metadata.event.context),
     },
     currentFingerprint: activeRun.invocation.fingerprint,
     currentMaterializationFingerprint: activeRun.invocation.materializationFingerprint,
+    currentContextKey: buildHostedReportLifecycleContextKey(snapshot.metadata.event.context),
 });
 assert.deepEqual(readyAutoExport, {
     runKey: "report::run-1::pdf",
@@ -468,12 +520,159 @@ assert.deepEqual(resolveHostedReportAutoExportDecision({
     format: "xlsx",
     runKey: "report::run-1::xlsx",
     activeRun: completedBoundRun,
+    completedRunSignal: {
+        runId: activeRun.runId,
+        reportRunId: activeRun.reportRunId,
+        requestFingerprint: activeRun.invocation.requestFingerprint,
+        materializationFingerprint: activeRun.invocation.materializationFingerprint,
+        contextKey: buildHostedReportLifecycleContextKey(snapshot.metadata.event.context),
+    },
     currentFingerprint: activeRun.invocation.requestFingerprint,
     currentMaterializationFingerprint: changedPrintFingerprint,
+    currentContextKey: buildHostedReportLifecycleContextKey(snapshot.metadata.event.context),
 }), {
     runKey: "report::run-1::xlsx",
     requireRunReference: false,
     runReference: null,
 }, "XLSX auto-export remains on the request submission path");
+
+function createSettlementLifecycleGate() {
+    let release;
+    const promise = new Promise((resolve) => {
+        release = resolve;
+    });
+    return { promise, release };
+}
+
+async function exerciseConcurrentSettlementCompletionOrder(firstCompletedKey) {
+    const pendingSettlementRef = { current: null };
+    const gates = {
+        older: createSettlementLifecycleGate(),
+        newer: createSettlementLifecycleGate(),
+    };
+    const executions = [];
+    const start = (key, label) => executeReportRunSettlementPromiseLifecycle({
+        eventKey: `run:settlement:${key}`,
+        completedEventKey: "",
+        pendingSettlementRef,
+        execute: async () => {
+            executions.push(label);
+            await gates[key].promise;
+            return key;
+        },
+    });
+    const older = start("older", "older");
+    const newer = start("newer", "newer");
+    const duplicateOlder = start("older", "older-duplicate");
+    const duplicateNewer = start("newer", "newer-duplicate");
+    const initialDuplicateReuse = [
+        duplicateOlder === older,
+        duplicateNewer === newer,
+    ];
+    gates[firstCompletedKey].release();
+    await Promise.all(firstCompletedKey === "older"
+        ? [older, duplicateOlder]
+        : [newer, duplicateNewer]);
+    const stateRetainedForOtherKey = pendingSettlementRef.current !== null;
+    const remainingKey = firstCompletedKey === "older" ? "newer" : "older";
+    const remaining = remainingKey === "older" ? older : newer;
+    const lateDuplicateRemaining = start(remainingKey, `${remainingKey}-late-duplicate`);
+    const lateDuplicateReusedOriginal = lateDuplicateRemaining === remaining;
+    gates[remainingKey].release();
+    await Promise.all([
+        older,
+        newer,
+        duplicateOlder,
+        duplicateNewer,
+        lateDuplicateRemaining,
+    ]);
+    return {
+        executions,
+        initialDuplicateReuse,
+        lateDuplicateReusedOriginal,
+        stateRetainedForOtherKey,
+        finalState: pendingSettlementRef.current,
+    };
+}
+
+for (const firstCompletedKey of ["older", "newer"]) {
+    const result = await exerciseConcurrentSettlementCompletionOrder(firstCompletedKey);
+    assert.deepEqual(
+        result.initialDuplicateReuse,
+        [true, true],
+        `every active key reuses its promise when ${firstCompletedKey} completes first`,
+    );
+    assert.equal(result.stateRetainedForOtherKey, true);
+    assert.equal(
+        result.lateDuplicateReusedOriginal,
+        true,
+        `cleanup of ${firstCompletedKey} must retain the other active key`,
+    );
+    assert.deepEqual(result.executions, ["older", "newer"]);
+    assert.equal(result.finalState, null);
+}
+
+const rejectionPendingSettlementRef = { current: null };
+const rejectionSurvivorGate = createSettlementLifecycleGate();
+let survivorExecutionCount = 0;
+const survivorSettlementPromise = executeReportRunSettlementPromiseLifecycle({
+    eventKey: "run:settlement:survivor",
+    pendingSettlementRef: rejectionPendingSettlementRef,
+    execute: async () => {
+        survivorExecutionCount += 1;
+        await rejectionSurvivorGate.promise;
+        return "survivor";
+    },
+});
+const rejectionError = new Error("settlement executor rejected");
+const rejectedSettlementPromise = executeReportRunSettlementPromiseLifecycle({
+    eventKey: "run:settlement:rejected",
+    pendingSettlementRef: rejectionPendingSettlementRef,
+    execute: async () => {
+        throw rejectionError;
+    },
+});
+const observedRejection = rejectedSettlementPromise.then(
+    () => null,
+    (error) => error,
+);
+assert.equal(await observedRejection, rejectionError);
+const duplicateSurvivorSettlementPromise = executeReportRunSettlementPromiseLifecycle({
+    eventKey: "run:settlement:survivor",
+    pendingSettlementRef: rejectionPendingSettlementRef,
+    execute: () => assert.fail("the surviving executor must remain deduplicated"),
+});
+const retriedRejectedSettlementPromise = executeReportRunSettlementPromiseLifecycle({
+    eventKey: "run:settlement:rejected",
+    pendingSettlementRef: rejectionPendingSettlementRef,
+    execute: async () => "recovered",
+});
+const survivorWasReusedAfterRejection = duplicateSurvivorSettlementPromise
+    === survivorSettlementPromise;
+rejectionSurvivorGate.release();
+assert.deepEqual(await Promise.all([
+    survivorSettlementPromise,
+    duplicateSurvivorSettlementPromise,
+    retriedRejectedSettlementPromise,
+]), ["survivor", "survivor", "recovered"]);
+assert.equal(survivorWasReusedAfterRejection, true);
+assert.equal(survivorExecutionCount, 1);
+assert.equal(rejectionPendingSettlementRef.current, null);
+
+const completedValue = { status: "completed" };
+const completedPendingSettlementRef = { current: null };
+let completedExecutorCount = 0;
+assert.equal(await executeReportRunSettlementPromiseLifecycle({
+    eventKey: "run:settlement:completed",
+    completedEventKey: "run:settlement:completed",
+    pendingSettlementRef: completedPendingSettlementRef,
+    completedValue,
+    execute: () => {
+        completedExecutorCount += 1;
+        return null;
+    },
+}), completedValue);
+assert.equal(completedExecutorCount, 0);
+assert.equal(completedPendingSettlementRef.current, null);
 
 console.log("reportBuilderRunPersistence ✓ exact artifacts, durable identity/correlation, activation, waiting, and stale protection");

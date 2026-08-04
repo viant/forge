@@ -30,13 +30,24 @@ export function resolveReportBuilderRuntimePreviewRowsSource({
     fetchedHasMore = false,
     fetchedError = null,
     fetchedLoading = false,
+    fetchedResultFresh = false,
 } = {}) {
     const normalizedCurrentRequestFingerprint = normalizeString(currentRequestFingerprint);
     const normalizedRuntimePreviewFingerprint = normalizeString(runtimePreviewFingerprint);
     const normalizedCollectionRows = normalizeRows(collection);
     const normalizedFetchedRows = normalizeRows(fetchedRows);
     const shouldPreferFetchedRows = preferFetchedRows === true;
-    if (shouldPreferFetchedRows && (normalizedFetchedRows.length > 0 || fetchedHasMore === true || fetchedLoading === true || !!fetchedError)) {
+    const requestMatches = normalizedCurrentRequestFingerprint
+        && normalizedCurrentRequestFingerprint === normalizedRuntimePreviewFingerprint;
+    const requestDispatched = matchesReportBuilderRuntimePreviewDispatch(
+        requestDispatchFingerprint,
+        normalizedCurrentRequestFingerprint,
+    );
+    const hasFetchedDisplayState = normalizedFetchedRows.length > 0
+        || fetchedHasMore === true
+        || fetchedLoading === true
+        || !!fetchedError;
+    if (shouldPreferFetchedRows && (fetchedResultFresh === true || hasFetchedDisplayState)) {
         return {
             source: "runtimePreview",
             rows: normalizedFetchedRows,
@@ -45,12 +56,6 @@ export function resolveReportBuilderRuntimePreviewRowsSource({
             loading: fetchedLoading === true,
         };
     }
-    const requestMatches = normalizedCurrentRequestFingerprint
-        && normalizedCurrentRequestFingerprint === normalizedRuntimePreviewFingerprint;
-    const requestDispatched = matchesReportBuilderRuntimePreviewDispatch(
-        requestDispatchFingerprint,
-        normalizedCurrentRequestFingerprint,
-    );
     const canUseCollection = requestMatches
         && requestDispatched
         && (
