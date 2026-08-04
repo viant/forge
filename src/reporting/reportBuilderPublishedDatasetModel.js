@@ -20,6 +20,33 @@ function normalizeOptionalObject(value) {
   return isPlainObject(value) ? cloneValue(value) : null;
 }
 
+function normalizePublishedDatasetLineage(value) {
+  if (!isPlainObject(value)) {
+    return null;
+  }
+  const derivedFrom = normalizeString(value.derivedFrom);
+  return derivedFrom ? { derivedFrom } : null;
+}
+
+function normalizePublishedDatasetPresentation(value) {
+  if (!isPlainObject(value)) {
+    return null;
+  }
+  const version = Math.max(1, Number(value.version || 1) || 1);
+  const icon = normalizeString(value.icon);
+  const tone = normalizeString(value.tone);
+  const summary = normalizeString(value.summary);
+  if (!icon && !tone && !summary) {
+    return null;
+  }
+  return {
+    version,
+    ...(icon ? { icon } : {}),
+    ...(tone ? { tone } : {}),
+    ...(summary ? { summary } : {}),
+  };
+}
+
 function buildDerivedDimensionOptions(entry = {}) {
   const key = normalizeString(entry?.key || entry?.id);
   if (!key) {
@@ -193,6 +220,8 @@ export function normalizeReportBuilderPublishedDataSources(config = {}) {
         label: normalizeString(entry?.label || dataSourceRef),
         description: normalizeString(entry?.description),
         kindLabel: normalizeString(entry?.kindLabel || entry?.kind || "published"),
+        ...(normalizePublishedDatasetLineage(entry?.lineage) ? { lineage: normalizePublishedDatasetLineage(entry.lineage) } : {}),
+        ...(normalizePublishedDatasetPresentation(entry?.presentation) ? { presentation: normalizePublishedDatasetPresentation(entry.presentation) } : {}),
         scope: normalizeReportDatasetScope(entry?.scope),
         source: normalizeReportDatasetSource(entry?.source),
         resultContract: normalizeOptionalObject(entry?.resultContract),

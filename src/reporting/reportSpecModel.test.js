@@ -344,6 +344,28 @@ assert.deepEqual(normalizeReportBuilderPublishedDataSources(datasetCatalogConfig
     ],
   },
 ]);
+const [presentedPublishedDataset] = normalizeReportBuilderPublishedDataSources({
+  dataSources: [{
+    id: "daily",
+    dataSourceRef: "delivery",
+    label: "Daily Delivery",
+    lineage: { derivedFrom: "primary", ignored: "value" },
+    presentation: {
+      version: 1,
+      icon: "timeline-line-chart",
+      tone: "teal",
+      summary: "One row per day.",
+      ignored: "value",
+    },
+  }],
+});
+assert.deepEqual(presentedPublishedDataset.lineage, { derivedFrom: "primary" });
+assert.deepEqual(presentedPublishedDataset.presentation, {
+  version: 1,
+  icon: "timeline-line-chart",
+  tone: "teal",
+  summary: "One row per day.",
+});
 assert.deepEqual(normalizeReportBuilderPublishedDataSources({
   ...rawConfig,
   datasets: [
