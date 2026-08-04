@@ -1844,24 +1844,28 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             return undefined;
         }
         const loader = builderContext?.handlers?.reportProvenance?.getBuildContext;
-        if (typeof loader !== "function" || !reportEventContext.conversationId) {
+        const subscriber = builderContext?.handlers?.reportProvenance?.subscribeBuildContext;
+        if ((typeof loader !== "function" && typeof subscriber !== "function") || !reportEventContext.conversationId) {
             setReportBuildProvenance(null);
             return undefined;
         }
         let cancelled = false;
-        Promise.resolve(loader({ conversationId: reportEventContext.conversationId }))
-            .then((value) => {
-                if (!cancelled) {
-                    setReportBuildProvenance(normalizeReportBuilderBuildProvenance(value));
-                }
-            })
-            .catch(() => {
-                if (!cancelled) {
-                    setReportBuildProvenance(null);
-                }
-            });
+        const applyProvenance = (value) => {
+            if (!cancelled) {
+                setReportBuildProvenance(normalizeReportBuilderBuildProvenance(value));
+            }
+        };
+        if (typeof loader === "function") {
+            Promise.resolve(loader({ conversationId: reportEventContext.conversationId }))
+                .then(applyProvenance)
+                .catch(() => applyProvenance(null));
+        }
+        const unsubscribe = typeof subscriber === "function"
+            ? subscriber({ conversationId: reportEventContext.conversationId }, applyProvenance)
+            : null;
         return () => {
             cancelled = true;
+            if (typeof unsubscribe === "function") unsubscribe();
         };
     }, [builderContext?.handlers?.reportProvenance, reportEventContext.conversationId, rootWindowFormValue?.reportProvenance]);
     const currentReportEventRequestRef = useRef(null);

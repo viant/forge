@@ -25,7 +25,7 @@ data class InlineReportRuntimeArtifact(
 
 /**
  * Compiles portable inline reports into Forge's existing native report runtime.
- * Agently hosts placement and datasource transport; report semantics stay here.
+ * The host application owns placement and datasource transport; report semantics stay here.
  */
 object InlineReportRuntimeCompiler {
     fun workspaceDatasetRequests(report: TranscriptCanonicalReport): List<InlineReportWorkspaceDatasetRequest> {
