@@ -72,6 +72,10 @@ assert.equal(
 const beginStart = source.indexOf("const beginReportRunLifecycle = React.useCallback");
 const beginEnd = source.indexOf("const runReport = React.useCallback", beginStart);
 const beginSource = source.slice(beginStart, beginEnd);
+const generationCheckIndex = beginSource.indexOf("if (runInvocationGenerationRef.current !== generation)");
+const activeRunAssignmentIndex = beginSource.indexOf("activeRunEventRef.current = nextRun;");
+const synchronousBoundCallbackIndex = beginSource.indexOf("onRunBound?.(nextRun)", activeRunAssignmentIndex);
+const capabilitySignalIndex = beginSource.indexOf("setReportRunDurableCapabilitySignal({", activeRunAssignmentIndex);
 assert.equal(
   !beginSource.includes("currentReportEventIdentityRef")
     && !beginSource.includes("currentReportEventRequestRef")
@@ -88,9 +92,119 @@ assert.equal(
 );
 
 assert.equal(
+  source.includes("const autoRunAction = resolveReportBuilderSurfaceAutoRunAction({")
+    && source.includes("hostedExecuteOnOpen,")
+    && source.includes("if (!hostedExecuteOnOpen)"),
+  true,
+  "Hosted execute-on-open must exclusively own automatic dispatch while generic surface auto-run remains non-hosted.",
+);
+assert.equal(
+  source.includes("const hostedReportExecutionIdentity = resolveHostedReportExecutionIdentity(container, state)")
+    && source.includes("const executeIdentity = hostedReportExecutionIdentity")
+    && source.includes("const hostedRunExecutionIdentity = hostedReportExecutionIdentity")
+    && source.includes("hasExecutionIdentity: !!hostedRunExecutionIdentity")
+    && source.includes("if (!executeIdentity || authoredBlockCount === 0)")
+    && source.includes("const exportIdentity = hostedReportExecutionIdentity")
+    && source.includes("if (!exportIdentity)"),
+  true,
+  "Hosted initialization, dedicated execution, and export must share and independently require the activation-resolved identity.",
+);
+assert.equal(
+  beginSource.includes("const activeRunOrigin = String(")
+    && beginSource.includes("activeStatus: activeRun?.status")
+    && beginSource.includes("requestedOrigin: invocationOrigin")
+    && beginSource.includes("buildReportRunBeginDeduplicationKey(invocationSnapshot")
+    && beginSource.includes("buildReportRunPendingBeginDeduplicationKey(invocationSnapshot")
+    && source.includes("const reportRunPendingBeginScopeKey = React.useId()")
+    && beginSource.includes("scopeKey: reportRunPendingBeginScopeKey")
+    && beginSource.includes("resolveReportRunBeginReuseDecision({")
+    && beginSource.includes('beginReuseDecision === "active"')
+    && beginSource.includes('beginReuseDecision === "pending"')
+    && beginSource.includes("beginDeduplicationKey,")
+    && beginSource.includes("beginPendingDeduplicationKey: pendingBeginDeduplicationKey")
+    && beginSource.includes("activeBeginDeduplicationKey,")
+    && beginSource.includes("pendingBeginDeduplicationKey: beginRunPromiseRef.current?.key"),
+  true,
+  "Manual and prompt invocations must not reuse or coalesce across terminal, origin, source, or conversation identity.",
+);
+assert.equal(
+  beginSource.includes("let durableBeginDisabled = false")
+    && beginSource.includes("durableBeginDisabled = true")
+    && beginSource.includes("resolveReportRunDisabledLegacyFallback(supersededActiveRun")
+    && beginSource.includes("retainCurrent: retainLegacyOnDisabled")
+    && beginSource.includes("invocationSnapshot")
+    && beginSource.includes("origin: invocationOrigin")
+    && beginSource.includes("retainedDisabledLegacyRun = true")
+    && beginSource.includes('durableCapability: durableBeginDisabled ? "disabled" : "unknown"')
+    && beginSource.includes("setReportRunDurableCapabilitySignal({")
+    && beginSource.includes("durableCapability: nextRun.durableCapability"),
+  true,
+  "An explicit disabled durable Begin outcome must be retained on the active legacy run and exposed to hosted settlement ownership.",
+);
+assert.equal(
+  generationCheckIndex >= 0
+    && activeRunAssignmentIndex > generationCheckIndex
+    && synchronousBoundCallbackIndex > activeRunAssignmentIndex
+    && capabilitySignalIndex > synchronousBoundCallbackIndex
+    && beginSource.includes("try {")
+    && beginSource.includes("onRunBound?.(nextRun)")
+    && beginSource.includes("The bound run remains authoritative even if hosted attempt bookkeeping fails."),
+  true,
+  "Hosted attempt binding must run synchronously after the generation-checked active swap and before capability state can schedule a render.",
+);
+
+assert.equal(
   (source.match(/beginAndDispatchReportRun\(invocationSnapshot,/g) || []).length,
   3,
   "Manual/prompt, authored auto-dispatch, and execute-on-open should share snapshot-preserving dispatch.",
+);
+assert.equal(
+  source.includes("resolvePostBeginDispatch: (snapshot) =>")
+    && source.includes("return resolveHostedReportRunPostBeginDispatch(")
+    && source.includes("activeRunEventRef.current,")
+    && source.includes("currentInvocationSnapshot,")
+    && source.includes("currentFingerprint: currentRequestFingerprintValueRef.current")
+    && source.includes("dispatchFingerprint: requestFingerprintRef.current")
+    && source.includes("ownedRunId: hostedRunInitializationOwnedRunIdRef.current")
+    && source.includes("adopt: (snapshot) => adoptHostedReportRunCurrentDispatch(snapshot"),
+  true,
+  "Hosted execute-on-open must adopt an authorized current dispatch that advances while durable Begin is pending.",
+);
+assert.equal(
+  source.includes("reuseCurrent: true")
+    && source.includes("onRunBound: (boundRun) =>")
+    && source.includes("hostedRunInitializationOwnedRunIdRef.current = normalizeString("),
+  true,
+  "Hosted execute-on-open must synchronously latch the exact run it began before renderer materialization can advance.",
+);
+assert.equal(
+  source.includes("const executeRunKey = [\n            hostedReportLifecycleContextKey,")
+    && source.includes("const activeRunContextKey = buildHostedReportLifecycleContextKey(")
+    && source.includes("activeRunContextKey === hostedReportLifecycleContextKey")
+    && source.includes("hostedReportLifecycleContextChangedRef.current"),
+  true,
+  "Hosted execute-on-open must rerun once for a new mounted host context while retaining same-context de-duplication.",
+);
+assert.equal(
+  source.includes("const hostedExecuteOnOpenHostAction = resolveHostedExecuteOnOpenHostAction({")
+    && source.includes("if (hostedExecuteOnOpenHostAction !== \"execute\") {")
+    && source.includes("builderContext?.windowState || context?.windowState || null"),
+  true,
+  "Hosted execute-on-open must dispatch only for an explicitly fresh host open, never a restored historical window.",
+);
+const hostedPostBeginDispatchStart = source.indexOf("resolvePostBeginDispatch: (snapshot) =>");
+const hostedPostBeginAdoptStart = source.indexOf("adopt: (snapshot) =>", hostedPostBeginDispatchStart);
+const hostedPostBeginDispatchEnd = source.indexOf("dispatch: (snapshot) =>", hostedPostBeginAdoptStart);
+const hostedPostBeginAdoptSource = source.slice(
+  hostedPostBeginAdoptStart,
+  hostedPostBeginDispatchEnd,
+);
+assert.equal(
+  hostedPostBeginAdoptSource.includes("adoptHostedReportRunCurrentDispatch(snapshot")
+    && hostedPostBeginAdoptSource.includes("lastManualRunFingerprintRef.current = fingerprint")
+    && !hostedPostBeginAdoptSource.includes("setManualRunSequence"),
+  true,
+  "Adopting an already-fresh hosted dispatch must not invalidate rows or dataset request keys with a manual run sequence change.",
 );
 
 assert.match(
@@ -102,9 +216,11 @@ assert.match(
 assert.equal(
   source.includes("requestedParams: invocationSnapshot.request")
     && source.includes("effectiveParams: invocationSnapshot.request")
-    && source.includes("currentReportMaterializationFingerprintRef.current === materializationFingerprint"),
+    && source.includes("matchesReportRunSettlementCurrency(activeRun, settlementEvent, {")
+    && source.includes("currentMaterializationFingerprint: currentReportMaterializationFingerprintRef.current")
+    && source.includes("shouldSettle: () => settlementEvent?.superseded === true || isStillCurrent()"),
   true,
-  "Durable Begin and settlement should use the immutable request and exact materialization identities.",
+  "Durable Begin and pre-persist settlement should use immutable request and target-aware materialization identities.",
 );
 
 assert.equal(
@@ -124,10 +240,24 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("completedRunEventKeyRef.current === eventKey")
-    && source.includes("settleRunPromiseRef.current?.key === eventKey"),
+  source.includes("const settleRunPromiseRef = useRef(null);")
+    && source.includes("buildReportRunSettlementEventKey(activeRun, settlementEvent)")
+    && source.includes("executeReportRunSettlementPromiseLifecycle({")
+    && source.includes("completedEventKey: completedRunEventKeyRef.current")
+    && source.includes("pendingSettlementRef: settleRunPromiseRef"),
   true,
-  "Duplicate terminal observations should reuse one settlement.",
+  "Duplicate terminal observations should route one stable React ref through target-aware per-key promise reuse.",
+);
+assert.equal(
+  source.includes("shouldDeferReportRunSupersedeForInitialization(activeRun, currentInvocationSnapshot")
+    && source.includes("hostedRunInitializationReadiness.deferSupersede")
+    && source.includes("matchesHostedReportRunInitializationFailure(")
+    && source.includes("allowDurableFailureWithInvocationDrift: hostedRunInitializationFailureOwned")
+    && source.includes("hostedInitializationFailureSnapshot: hostedRunInitializationFailureSnapshot")
+    && source.includes("settleTransitionLatch(null)")
+    && source.includes("settleTransitionLatch(settledRun)"),
+  true,
+  "Hosted supersede deferral and retry latching must be driven by the pure exact-identity lifecycle decisions.",
 );
 assert.match(
   source,

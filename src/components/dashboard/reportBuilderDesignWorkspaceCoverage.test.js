@@ -399,12 +399,95 @@ assert.equal(
   "ReportBuilder should collapse live filters after authored runtime datasets complete, not only after primary collection rows render.",
 );
 
+const hostedInitializationTransitionIndex = source.indexOf("const transition = resolveReportRunInitializationTransition(");
+const hostedInitializationEffectStart = source.lastIndexOf("useEffect(() => {", hostedInitializationTransitionIndex);
+const hostedInitializationEffectEnd = source.indexOf("useEffect(() => {", hostedInitializationTransitionIndex + 1);
+const hostedInitializationEffectSource = source.slice(
+  hostedInitializationEffectStart,
+  hostedInitializationEffectEnd,
+);
 assert.equal(
-  source.includes('beginReportRunLifecycle({ reuseCurrent: true });')
-    && source.includes('emitRunLifecycleEvent("report.run", {')
-    && source.includes('status: authoredRuntimePreviewState?.errorState ? "failed" : "succeeded"'),
+  hostedInitializationTransitionIndex >= 0
+    && hostedInitializationEffectStart >= 0
+    && hostedInitializationEffectEnd > hostedInitializationTransitionIndex
+    && source.includes("const hostedRunInitializationReadiness = resolveHostedReportRunInitializationReadiness({")
+    && source.includes("primaryRowsLoading: runtimePreviewRowsState.loading")
+    && source.includes("rowsSourceLoading: runtimePreviewRowsSource.loading")
+    && source.includes("updating: !!authoredRuntimePreviewState?.updatingNotice")
+    && source.includes("runtimePreviewRowsState.freshResultRequestKey === runtimePreviewRequestKey")
+    && source.includes("resolveReportRuntimePreviewDatasetResultFreshness({")
+    && source.includes("fallbackFreshDatasetIds: authoredRuntimePrimaryRowsResultFresh")
+    && source.includes("resolveFreshReportRuntimePreviewPrimaryDatasetPayload({")
+    && source.includes("const hostedRunExecutionKey = [")
+    && source.includes("const hostedRunInitializationReady = hostedRunInitializationReadiness.ready")
+    && hostedInitializationEffectSource.includes(
+      "ownedRunId: hostedRunInitializationOwnedRunIdRef.current",
+    ),
   true,
-  "hosted authored execution should emit correlated run start and completion events from resolved runtime datasets.",
+  "ReportBuilder should expose a dedicated hosted initialization transition gated by exact non-updating primary and runtime result settlement.",
+);
+assert.equal(
+  (source.match(/ownedRunId: hostedRunInitializationOwnedRunIdRef\.current/g) || []).length,
+  4,
+  "Hosted ownership must reach ownership resolution, final transition, supersede deferral, and post-Begin dispatch.",
+);
+assert.equal(
+  source.includes("const hostedRunExecutionKey = [\n        hostedReportLifecycleContextKey,")
+    && source.includes("const hostedReportLifecycleContextKeyRef = useRef(hostedReportLifecycleContextKey)")
+    && source.includes("hostedRunInitializationAttemptSequenceRef.current = 0")
+    && source.includes("exportOnCompleteRunKeyRef.current = \"\"")
+    && source.includes("setCompletedDurableRunSignal(null)"),
+  true,
+  "Mounted host-context rollover must scope initialization and clear stale ownership, latches, and completion/export signals.",
+);
+assert.match(
+  hostedInitializationEffectSource,
+  /if \(!hostedRunInitializationReady[\s\S]*\|\| !hostedDurableHandoffAvailable[\s\S]*\|\| !hostedRunInitializationOwned\)[\s\S]*resolveReportRunInitializationTransition\([\s\S]*resolveReportRunInitializationTransitionAttempt\([\s\S]*transitionKey = transitionAttempt\.key[\s\S]*resolveReportRunInitializationLatch\(\{[\s\S]*phase: "acquire"[\s\S]*transition\.type === "retain"[\s\S]*hostedRunInitializationOwnedRunIdRef\.current = normalizeString\([\s\S]*beginReportRunLifecycle\(\{[\s\S]*reuseCurrent: false[\s\S]*onRunBound: \(boundRun\) =>[\s\S]*hostedRunInitializationOwnedRunIdRef\.current = normalizeString\([\s\S]*bindReportRunInitializationTransitionAttempt\([\s\S]*invocationSnapshot[\s\S]*result\.durable !== true[\s\S]*captureReportRunSettlementEvent\([\s\S]*terminalRequest: invocationSnapshot\.materializedExportRequest[\s\S]*await settleReportRunLifecycle\(event\)[\s\S]*settleTransitionLatch\(settledRun\)/,
+  "Hosted authored initialization must retain or begin a prompt durable run only for the exact settled result and complete it from the captured final artifacts.",
+);
+assert.equal(
+  hostedInitializationEffectSource.includes("dispatchReportRequestSnapshot")
+    || hostedInitializationEffectSource.includes("dispatchReportRequest("),
+  false,
+  "The hosted durable handoff must not execute the datasource again after final result materialization.",
+);
+assert.equal(
+  source.includes("const hostedDurableHandoffAvailable = resolveReportRunDurableCapability({")
+    && source.includes("durableCapability: durableBeginDisabled ? \"disabled\" : \"unknown\"")
+    && source.includes("setReportRunDurableCapabilitySignal({")
+    && source.includes("hostedRunInitializationAttemptRef.current = transitionAttempt")
+    && hostedInitializationEffectSource.includes("retainLegacyOnDisabled: true")
+    && (source.match(/onRunBound:/g) || []).length === 2,
+  true,
+  "Hosted Begin and final handoff wiring must preserve exact component-local ownership and attempt latches.",
+);
+
+const authoredRuntimeSettlementIndex = source.indexOf(
+  "const primaryRows = Array.isArray(runtimePreviewPrimaryDatasetPayload?.rows)",
+  hostedInitializationEffectEnd,
+);
+const authoredRuntimeSettlementEffectStart = source.lastIndexOf("useEffect(() => {", authoredRuntimeSettlementIndex);
+const authoredRuntimeSettlementEffectEnd = source.indexOf("useEffect(() => {", authoredRuntimeSettlementIndex + 1);
+const authoredRuntimeSettlementEffectSource = source.slice(
+  authoredRuntimeSettlementEffectStart,
+  authoredRuntimeSettlementEffectEnd,
+);
+assert.match(
+  authoredRuntimeSettlementEffectSource,
+  /if \([\s\S]*!authoredRuntimeSettlementReady[\s\S]*authoredRuntimeDatasetResultFresh[\s\S]*runtimePreviewRowsState\.freshResultRequestKey[\s\S]*captureReportRunSettlementEvent\([\s\S]*status: authoredRuntimeSettlementStatus/,
+  "The existing authored-runtime terminal observer must defer hosted durable success to the exact-final handoff while retaining its explicit error path.",
+);
+assert.equal(
+  source.includes("const authoredRuntimeSettlementDecision = resolveAuthoredRuntimeSettlementDecision({")
+    && source.includes("hostedHandoffOwned: hostedRunInitializationOwned")
+    && source.includes("const authoredRuntimeSettlementReady = resolveAuthoredRuntimeSettlementReadiness({")
+    && source.includes("datasetResultFresh: authoredRuntimeDatasetResultFresh")
+    && source.includes("primaryResultFresh: authoredRuntimePrimaryResultFresh")
+    && authoredRuntimeSettlementEffectSource.includes("authoredRuntimeSettlementError")
+    && !authoredRuntimeSettlementEffectSource.includes("dispatchReportRequestSnapshot")
+    && !authoredRuntimeSettlementEffectSource.includes("dispatchReportRequest("),
+  true,
+  "Authored-runtime settlement ownership must use the pure production decision and never dispatch datasource work.",
 );
 
 assert.equal(

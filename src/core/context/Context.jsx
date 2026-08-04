@@ -43,6 +43,27 @@ function buildDataSourceNotFoundError(dataSourceRef = "", identity = null) {
     return error;
 }
 
+export function resolveWindowContentContext({
+    existingContext = null,
+    hookContext = null,
+    metadata = null,
+    services = null,
+    windowState = null,
+} = {}) {
+    if (!existingContext || existingContext.metadata !== metadata) {
+        return hookContext;
+    }
+    const existingServices = existingContext._globalServices || existingContext.services || null;
+    const canonicalWindowState = services?.windowState || windowState;
+    if (existingContext.windowState !== canonicalWindowState || existingServices !== services) {
+        // Datasource contexts cache connectors and handlers that close over the
+        // service runtime, so replace the root context instead of mutating only
+        // its visible windowState and leaving those cached children stale.
+        return hookContext;
+    }
+    return existingContext;
+}
+
 
 export const Context = (windowId, metadata, dataSourceRef, services) => {
     // ------------------------------------------------------------------

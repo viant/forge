@@ -148,4 +148,46 @@ assert.deepEqual(authoredRuntimeFetchedRowsPreferredOverVisibleCollectionSource,
     loading: false,
 });
 
+const retainedDeferredRowsSource = resolveReportBuilderRuntimePreviewRowsSource({
+    currentRequestFingerprint: '{"dimensions":{"channelV2":true}}',
+    requestDispatchFingerprint: '{"dimensions":{"channelV2":true}}::fetch',
+    currentRequestShouldFetch: true,
+    runtimePreviewFingerprint: '{"dimensions":{"channelV2":true}}',
+    preferFetchedRows: true,
+    hasCompletedCurrentRun: false,
+    collection: [{ channelV2: "old collection" }],
+    loading: false,
+    fetchedRows: [{ channelV2: "retained preview" }],
+    fetchedLoading: false,
+    fetchedResultFresh: false,
+});
+assert.deepEqual(retainedDeferredRowsSource, {
+    source: "runtimePreview",
+    rows: [{ channelV2: "retained preview" }],
+    hasMore: false,
+    error: null,
+    loading: false,
+}, "deferred retained rows remain visible but are not terminal provenance");
+
+const freshZeroRowsSource = resolveReportBuilderRuntimePreviewRowsSource({
+    currentRequestFingerprint: '{"dimensions":{"channelV2":true}}',
+    requestDispatchFingerprint: '{"dimensions":{"channelV2":true}}::fetch',
+    currentRequestShouldFetch: true,
+    runtimePreviewFingerprint: '{"dimensions":{"channelV2":true}}',
+    preferFetchedRows: true,
+    hasCompletedCurrentRun: true,
+    collection: [{ channelV2: "old collection" }],
+    loading: false,
+    fetchedRows: [],
+    fetchedLoading: false,
+    fetchedResultFresh: true,
+});
+assert.deepEqual(freshZeroRowsSource, {
+    source: "runtimePreview",
+    rows: [],
+    hasMore: false,
+    error: null,
+    loading: false,
+}, "a fresh zero-row runtime response wins over preserved collection rows");
+
 console.log("reportBuilderRuntimePreviewSource ✓ reuses visible result rows only when the compiled runtime request matches the current builder request");
