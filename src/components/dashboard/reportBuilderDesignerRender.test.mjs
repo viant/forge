@@ -246,7 +246,15 @@ function buildContext(windowFormState) {
     signals: {
       collection: signal([]),
       control: signal({ loading: false, error: null }),
-      windowForm: signal({ designerRender: windowFormState }),
+      windowForm: signal({
+        designerRender: windowFormState,
+        reportProvenance: {
+          initialPrompt: "Build a performance report for order 2672373.",
+          events: [
+            { id: "step-1", label: "steward/MetricsAdCube", status: "completed", completedAt: "2026-08-04T12:00:00Z" },
+          ],
+        },
+      }),
       collectionInfo: signal({ hasMore: false }),
       input: signal({ parameters: {} }),
       form: signal({}),
@@ -321,7 +329,11 @@ assert.ok(!html.includes("Forecast Cube"));
 assert.ok(!html.includes("Regional Mix CSV"));
 assert.ok(html.includes("Add data source"));
 assert.ok(html.includes("Cube"));
-assert.ok(html.includes("View details for"));
+assert.ok(html.includes("Preview Performance Cube"));
+assert.ok(html.includes("forge-report-builder__design-source-item is-current"));
+assert.ok(html.includes("How this report was built"));
+assert.ok(html.includes("Build a performance report for order 2672373."));
+assert.ok(html.includes("steward/MetricsAdCube"));
 assert.ok(html.includes("Overview · Spend by Date and Channel"));
 assert.ok(html.includes("Report blocks"));
 assert.ok(!html.includes("After Detail Table"));
@@ -489,7 +501,7 @@ assert.ok(emptyHtml.includes("Performance Cube"));
 assert.ok(!emptyHtml.includes("Forecast Cube"));
 assert.ok(!emptyHtml.includes("Regional Mix CSV"));
 assert.ok(emptyHtml.includes("Add data source"));
-assert.ok(emptyHtml.includes("View details for"));
+assert.ok(emptyHtml.includes("Preview Performance Cube"));
 assert.ok(emptyHtml.includes("New report"));
 assert.ok(emptyHtml.includes("Current"));
 assert.ok(emptyHtml.includes("2 datasets"));

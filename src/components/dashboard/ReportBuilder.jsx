@@ -828,6 +828,78 @@ function formatReportBuilderSourceKindLabel(value = "") {
         .join(" ");
 }
 
+const REPORT_BUILDER_SOURCE_ICONS = new Set([
+    "calendar",
+    "chart",
+    "cube",
+    "database",
+    "document",
+    "globe",
+    "grouped-bar-chart",
+    "heat-grid",
+    "properties",
+    "th",
+    "timeline-line-chart",
+]);
+
+const REPORT_BUILDER_SOURCE_TONES = new Set(["neutral", "blue", "teal", "green", "amber", "slate"]);
+
+function resolveReportBuilderSourcePresentation(source = {}) {
+    const presentation = source?.presentation && typeof source.presentation === "object" && !Array.isArray(source.presentation)
+        ? source.presentation
+        : {};
+    const requestedIcon = normalizeString(presentation.icon);
+    const requestedTone = normalizeString(presentation.tone).toLowerCase();
+    return {
+        icon: REPORT_BUILDER_SOURCE_ICONS.has(requestedIcon) ? requestedIcon : "database",
+        tone: REPORT_BUILDER_SOURCE_TONES.has(requestedTone) ? requestedTone : "neutral",
+        summary: normalizeString(presentation.summary || source?.description),
+    };
+}
+
+function resolveReportBuilderSourceDerivedFrom(source = {}) {
+    return normalizeString(source?.lineage?.derivedFrom);
+}
+
+function normalizeReportBuilderBuildProvenance(value = null) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return null;
+    }
+    const initialPrompt = normalizeString(value.initialPrompt);
+    const events = normalizeArray(value.events).map((event, index) => {
+        if (!event || typeof event !== "object" || Array.isArray(event)) {
+            return null;
+        }
+        const label = normalizeString(event.label || event.toolName);
+        if (!label) {
+            return null;
+        }
+        return {
+            id: normalizeString(event.id) || `report-build-event-${index + 1}`,
+            label,
+            status: normalizeString(event.status).toLowerCase() || "completed",
+            startedAt: normalizeString(event.startedAt),
+            completedAt: normalizeString(event.completedAt),
+        };
+    }).filter(Boolean).slice(-50);
+    if (!initialPrompt && events.length === 0) {
+        return null;
+    }
+    return { initialPrompt, events };
+}
+
+function formatReportBuilderProvenanceTime(value = "") {
+    const timestamp = Date.parse(value);
+    if (!Number.isFinite(timestamp)) {
+        return "";
+    }
+    return new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+    }).format(new Date(timestamp));
+}
+
 function normalizeReportBuilderStringArray(values = []) {
     return (Array.isArray(values) ? values : [])
         .map((entry) => normalizeString(entry))
@@ -1793,6 +1865,36 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         () => buildHostedReportLifecycleContextKey(reportEventContext),
         [reportEventContext],
     );
+    const [reportBuildProvenance, setReportBuildProvenance] = useState(() => (
+        normalizeReportBuilderBuildProvenance(rootWindowFormValue?.reportProvenance)
+    ));
+    useEffect(() => {
+        const embedded = normalizeReportBuilderBuildProvenance(rootWindowFormValue?.reportProvenance);
+        if (embedded) {
+            setReportBuildProvenance(embedded);
+            return undefined;
+        }
+        const loader = builderContext?.handlers?.reportProvenance?.getBuildContext;
+        if (typeof loader !== "function" || !reportEventContext.conversationId) {
+            setReportBuildProvenance(null);
+            return undefined;
+        }
+        let cancelled = false;
+        Promise.resolve(loader({ conversationId: reportEventContext.conversationId }))
+            .then((value) => {
+                if (!cancelled) {
+                    setReportBuildProvenance(normalizeReportBuilderBuildProvenance(value));
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setReportBuildProvenance(null);
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [builderContext?.handlers?.reportProvenance, reportEventContext.conversationId, rootWindowFormValue?.reportProvenance]);
     const currentReportEventRequestRef = useRef(null);
     const currentReportEventIdentityRef = useRef({ reportId: "", reportName: "", sourceKind: "" });
     const currentReportMaterializationRef = useRef(null);
@@ -2153,6 +2255,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     const [designDataActionsMenuOpen, setDesignDataActionsMenuOpen] = useState(false);
     const [designSourceCatalogOpen, setDesignSourceCatalogOpen] = useState(false);
     const [designSourceAddMenuRef, setDesignSourceAddMenuRef] = useState("");
+    const [designSourceSearchQuery, setDesignSourceSearchQuery] = useState("");
     const sourceEditorValidation = useMemo(
         () => validateReportBuilderSourceEditorDraft(sourceEditorDraft),
         [sourceEditorDraft],
@@ -4297,6 +4400,12 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                     label: normalizeString(entry?.label || formatReportBuilderSourceLabel(dataSourceRef)) || formatReportBuilderSourceLabel(dataSourceRef),
                     description: normalizeString(entry?.description),
                     kindLabel: normalizeString(entry?.kindLabel || entry?.kind),
+                    ...(entry?.lineage && typeof entry.lineage === "object" && !Array.isArray(entry.lineage)
+                        ? { lineage: cloneReportBuilderValue(entry.lineage) }
+                        : {}),
+                    ...(entry?.presentation && typeof entry.presentation === "object" && !Array.isArray(entry.presentation)
+                        ? { presentation: cloneReportBuilderValue(entry.presentation) }
+                        : {}),
                     ...(entry?.source && typeof entry.source === "object" && !Array.isArray(entry.source)
                         ? { source: cloneReportBuilderValue(entry.source) }
                         : {}),
@@ -16984,7 +17093,44 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             const visibleReportDataSourceCards = designSourceCatalogOpen
                 ? reportDataSourceCards
                 : linkedReportDataSourceCards;
-            const hasMultipleSources = visibleReportDataSourceCards.length > 1;
+            const normalizedSourceSearchQuery = normalizeString(designSourceSearchQuery).toLowerCase();
+            const filteredReportDataSourceCards = normalizedSourceSearchQuery
+                ? visibleReportDataSourceCards.filter((card) => [
+                    card.label,
+                    card.description,
+                    card.kindLabel,
+                    card.presentation?.summary,
+                ].some((value) => normalizeString(value).toLowerCase().includes(normalizedSourceSearchQuery)))
+                : visibleReportDataSourceCards;
+            const visibleSourceIdMap = new Map(
+                reportDataSourceCards.map((card) => [reportBuilderSourceCardId(card), card]),
+            );
+            const currentSourceCard = filteredReportDataSourceCards.find((card) => card.active) || null;
+            const nonCurrentSourceCards = filteredReportDataSourceCards.filter((card) => !card.active);
+            const derivedSourceGroups = new Map();
+            const independentSourceCards = [];
+            nonCurrentSourceCards.forEach((card) => {
+                const derivedFrom = resolveReportBuilderSourceDerivedFrom(card);
+                const parent = derivedFrom && derivedFrom !== reportBuilderSourceCardId(card)
+                    ? visibleSourceIdMap.get(derivedFrom)
+                    : null;
+                if (!parent) {
+                    independentSourceCards.push(card);
+                    return;
+                }
+                const group = derivedSourceGroups.get(derivedFrom) || { parent, cards: [] };
+                group.cards.push(card);
+                derivedSourceGroups.set(derivedFrom, group);
+            });
+            const sourceCatalogCountLabel = `${visibleReportDataSourceCards.length} ${visibleReportDataSourceCards.length === 1 ? "source" : "sources"}${currentSourceCard ? " · 1 current" : ""}`;
+            const provenanceEvents = reportBuildProvenance?.events || [];
+            const provenanceCompletedCount = provenanceEvents.filter((event) => event.status === "completed" || event.status === "succeeded").length;
+            const provenanceFailedCount = provenanceEvents.filter((event) => event.status === "failed" || event.status === "error").length;
+            const provenanceSummary = [
+                reportBuildProvenance?.initialPrompt ? "Initial request" : "",
+                provenanceEvents.length > 0 ? `${provenanceCompletedCount}/${provenanceEvents.length} steps complete` : "",
+                provenanceFailedCount > 0 ? `${provenanceFailedCount} failed` : "",
+            ].filter(Boolean).join(" · ");
             const selectedInsertionAnchorTitle = normalizeString(selectedDocumentInsertionTarget.insertionAnchorTitle || "");
             const insertionPlacementLabel = pendingDocumentInsertionPlacement === "before" ? "before" : "after";
             const describeSourceAddAction = (actionLabel = "", sourceLabel = "") => {
@@ -17012,6 +17158,137 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                         callback();
                     }
                 }, 0);
+            };
+            const toggleSourceInspector = (card) => {
+                const sourceCardId = reportBuilderSourceCardId(card);
+                setInspectedDataSourceRef((current) => (
+                    normalizeString(current) === sourceCardId ? "" : sourceCardId
+                ));
+            };
+            const renderSourceAddAction = (card) => {
+                if (!card.datasetRef || !(card.canAddTable || card.canAddChart || card.canAddKpi || card.canAddCollection)) {
+                    return null;
+                }
+                const sourceCardId = reportBuilderSourceCardId(card);
+                return (
+                    <Popover
+                        isOpen={designSourceAddMenuRef === sourceCardId}
+                        onInteraction={(nextOpen) => setDesignSourceAddMenuRef(nextOpen ? sourceCardId : "")}
+                        usePortal={!compactMode}
+                        placement="bottom-start"
+                        content={(
+                            <Menu className="forge-report-builder__chart-menu">
+                                {card.canAddTable ? (
+                                    <MenuItem
+                                        icon="th"
+                                        text="Table"
+                                        onClick={() => queueDesignSourceAddAction(() => openDocumentBlockDialog({
+                                            kind: "tableBlock",
+                                            datasetRef: card.datasetRef,
+                                        }, {
+                                            insertionAfterId: selectedDocumentInsertionTarget.insertionAfterId,
+                                            insertionPlacement: pendingDocumentInsertionPlacement,
+                                        }))}
+                                    />
+                                ) : null}
+                                {card.canAddChart ? (
+                                    <MenuItem
+                                        icon="timeline-line-chart"
+                                        text="Chart"
+                                        onClick={() => queueDesignSourceAddAction(() => openAuthoredChartBlockDialog({
+                                            datasetRef: card.datasetRef,
+                                        }, {
+                                            insertionAfterId: selectedDocumentInsertionTarget.insertionAfterId,
+                                            insertionPlacement: pendingDocumentInsertionPlacement,
+                                        }))}
+                                    />
+                                ) : null}
+                                {card.canAddKpi ? (
+                                    <MenuItem
+                                        icon="ring"
+                                        text="KPI"
+                                        onClick={() => queueDesignSourceAddAction(() => openDocumentBlockDialog({
+                                            kind: "kpiBlock",
+                                            datasetRef: card.datasetRef,
+                                        }, {
+                                            insertionAfterId: selectedDocumentInsertionTarget.insertionAfterId,
+                                            insertionPlacement: pendingDocumentInsertionPlacement,
+                                        }))}
+                                    />
+                                ) : null}
+                                {card.canAddCollection ? (
+                                    <MenuItem
+                                        icon="widget"
+                                        text="Collection"
+                                        onClick={() => queueDesignSourceAddAction(() => openDocumentBlockDialog({
+                                            kind: "collectionBlock",
+                                            datasetRef: card.datasetRef,
+                                        }, {
+                                            insertionAfterId: selectedDocumentInsertionTarget.insertionAfterId,
+                                            insertionPlacement: pendingDocumentInsertionPlacement,
+                                        }))}
+                                    />
+                                ) : null}
+                            </Menu>
+                        )}
+                    >
+                        <Button
+                            small
+                            intent="primary"
+                            rightIcon="caret-down"
+                            aria-label={describeSourceAddAction("Add block", card.label)}
+                        >
+                            Add block
+                        </Button>
+                    </Popover>
+                );
+            };
+            const renderSourceItem = (card, { current = false } = {}) => {
+                const presentation = resolveReportBuilderSourcePresentation(card);
+                const sourceCardId = reportBuilderSourceCardId(card);
+                const summary = presentation.summary;
+                return (
+                    <article
+                        key={sourceCardId}
+                        className={[
+                            "forge-report-builder__design-source-item",
+                            current ? "is-current" : "",
+                            card.inspected ? "is-inspected" : "",
+                            `is-tone-${presentation.tone}`,
+                        ].filter(Boolean).join(" ")}
+                        aria-label={card.label}
+                    >
+                        <div className="forge-report-builder__design-source-item-icon" aria-hidden="true">
+                            <Icon icon={presentation.icon} size={current ? 22 : 18} />
+                        </div>
+                        <div className="forge-report-builder__design-source-item-copy">
+                            <div className="forge-report-builder__design-source-item-heading">
+                                <div className="forge-report-builder__design-projection-card-title">{card.label}</div>
+                                {current ? <span className="forge-report-builder__design-source-current-badge">Current</span> : null}
+                            </div>
+                            <div className="forge-report-builder__design-source-item-kind">
+                                {formatReportBuilderSourceKindLabel(card.kindLabel || "published")}
+                            </div>
+                            {summary ? (
+                                <div className="forge-report-builder__design-source-item-summary" title={summary}>{summary}</div>
+                            ) : null}
+                        </div>
+                        <div className="forge-report-builder__design-source-item-actions">
+                            <Button
+                                small
+                                minimal
+                                icon={card.inspected ? "chevron-up" : "eye-open"}
+                                aria-label={`${card.inspected ? "Hide preview for" : "Preview"} ${card.label}`}
+                                aria-expanded={card.inspected}
+                                aria-controls={card.inspected ? "forge-report-builder-source-inspector" : undefined}
+                                onClick={() => toggleSourceInspector(card)}
+                            >
+                                {card.inspected ? "Hide preview" : "Preview"}
+                            </Button>
+                            {renderSourceAddAction(card)}
+                        </div>
+                    </article>
+                );
             };
             return (
                 <section className="forge-report-builder__design-stage" aria-label="Report data sources">
@@ -17065,145 +17342,100 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                             </Button>
                         </Popover>
                     </div>
-                    {visibleReportDataSourceCards.length > 0 ? (
-                        <div className="forge-report-builder__design-source-grid" aria-label="Available data sources" role="table">
-                            {hasMultipleSources ? (
-                                <div className="forge-report-builder__design-source-grid-header" role="row">
-                                    <div role="columnheader">Source</div>
-                                    <div role="columnheader">Type</div>
-                                    <div role="columnheader">Status</div>
-                                    <div role="columnheader">Actions</div>
-                                </div>
-                            ) : null}
-                            {visibleReportDataSourceCards.map((card) => (
-                                <div
-                                    key={reportBuilderSourceCardId(card)}
-                                    className={[
-                                        "forge-report-builder__design-source-grid-row",
-                                        card.active ? "is-active" : "",
-                                        card.inspected ? "is-inspected" : "",
-                                    ].filter(Boolean).join(" ")}
-                                    role="row"
-                                >
-                                    <div className="forge-report-builder__design-source-grid-cell forge-report-builder__design-source-grid-cell--source" role="cell">
-                                        <div className="forge-report-builder__design-projection-card-title">{card.label}</div>
-                                        {card.isStatic && card.description ? (
-                                            <div className="forge-report-builder__design-projection-card-description">{card.description}</div>
-                                        ) : null}
-                                    </div>
-                                    <div className="forge-report-builder__design-source-grid-cell" role="cell">
-                                        <span className="forge-report-builder__result-meta-chip">
-                                            {formatReportBuilderSourceKindLabel(card.kindLabel || "published")}
-                                        </span>
-                                    </div>
-                                    <div className="forge-report-builder__design-source-grid-cell" role="cell">
-                                        {hasMultipleSources ? (
-                                            <div className="forge-report-builder__result-meta">
-                                                <span className="forge-report-builder__result-meta-chip">
-                                                    {card.active ? "Current source" : "Available"}
-                                                </span>
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                <div className="forge-report-builder__design-source-grid-cell forge-report-builder__design-source-grid-cell--actions" role="cell">
-                                    {card.datasetRef && (card.canAddTable || card.canAddChart || card.canAddKpi || card.canAddCollection) ? (
-                                        <Tooltip content={describeSourceAddAction("Add block", card.label)} placement="top">
-                                            <Popover
-                                                isOpen={designSourceAddMenuRef === reportBuilderSourceCardId(card)}
-                                                onInteraction={(nextOpen) => {
-                                                    setDesignSourceAddMenuRef(nextOpen ? reportBuilderSourceCardId(card) : "");
-                                                }}
-                                                usePortal={!compactMode}
-                                                placement="bottom-start"
-                                                content={(
-                                                    <Menu className="forge-report-builder__chart-menu">
-                                                        {card.canAddTable ? (
-                                                            <MenuItem
-                                                                icon="th"
-                                                                text="Table"
-                                                                onClick={() => queueDesignSourceAddAction(() => openDocumentBlockDialog({
-                                                                        kind: "tableBlock",
-                                                                        datasetRef: card.datasetRef,
-                                                                    }, {
-                                                                        insertionAfterId: selectedDocumentInsertionTarget.insertionAfterId,
-                                                                        insertionPlacement: pendingDocumentInsertionPlacement,
-                                                                    }))}
-                                                            />
-                                                        ) : null}
-                                                        {card.canAddChart ? (
-                                                            <MenuItem
-                                                                icon="timeline-line-chart"
-                                                                text="Chart"
-                                                                onClick={() => queueDesignSourceAddAction(() => openAuthoredChartBlockDialog({
-                                                                        datasetRef: card.datasetRef,
-                                                                    }, {
-                                                                        insertionAfterId: selectedDocumentInsertionTarget.insertionAfterId,
-                                                                        insertionPlacement: pendingDocumentInsertionPlacement,
-                                                                    }))}
-                                                            />
-                                                        ) : null}
-                                                        {card.canAddKpi ? (
-                                                            <MenuItem
-                                                                icon="ring"
-                                                                text="KPI"
-                                                                onClick={() => queueDesignSourceAddAction(() => openDocumentBlockDialog({
-                                                                        kind: "kpiBlock",
-                                                                        datasetRef: card.datasetRef,
-                                                                    }, {
-                                                                        insertionAfterId: selectedDocumentInsertionTarget.insertionAfterId,
-                                                                        insertionPlacement: pendingDocumentInsertionPlacement,
-                                                                    }))}
-                                                            />
-                                                        ) : null}
-                                                        {card.canAddCollection ? (
-                                                            <MenuItem
-                                                                icon="widget"
-                                                                text="Collection"
-                                                                onClick={() => queueDesignSourceAddAction(() => openDocumentBlockDialog({
-                                                                        kind: "collectionBlock",
-                                                                        datasetRef: card.datasetRef,
-                                                                    }, {
-                                                                        insertionAfterId: selectedDocumentInsertionTarget.insertionAfterId,
-                                                                        insertionPlacement: pendingDocumentInsertionPlacement,
-                                                                    }))}
-                                                            />
-                                                        ) : null}
-                                                    </Menu>
-                                                )}
-                                            >
-                                                <Button
-                                                    small
-                                                    minimal
-                                                    rightIcon="caret-down"
-                                                    aria-label={describeSourceAddAction("Add block", card.label)}
-                                                    title={describeSourceAddAction("Add block", card.label)}
-                                                >
-                                                    + Add
-                                                </Button>
-                                            </Popover>
-                                        </Tooltip>
-                                    ) : null}
-                                    <Tooltip content={card.inspected ? `Hide details for ${card.label}` : `View details for ${card.label}`} placement="top">
-                                        <Button
-                                            small
-                                            minimal
-                                            icon={card.inspected ? "chevron-up" : "eye-open"}
-                                            className="forge-report-builder__design-source-action-icon"
-                                            aria-label={card.inspected ? `Hide details for ${card.label}` : `View details for ${card.label}`}
-                                            onClick={() => setInspectedDataSourceRef((current) => (
-                                                normalizeString(current) === reportBuilderSourceCardId(card)
-                                                    ? ""
-                                                    : reportBuilderSourceCardId(card)
-                                            ))}
-                                        />
-                                    </Tooltip>
-                                </div>
-                                </div>
-                            ))}
-                        </div>
+                    {reportBuildProvenance ? (
+                        <details className="forge-report-builder__build-provenance">
+                            <summary>
+                                <span className="forge-report-builder__build-provenance-icon" aria-hidden="true">
+                                    <Icon icon="history" size={16} />
+                                </span>
+                                <span className="forge-report-builder__build-provenance-title">How this report was built</span>
+                                <span className="forge-report-builder__build-provenance-summary">{provenanceSummary}</span>
+                            </summary>
+                            <div className="forge-report-builder__build-provenance-body">
+                                {reportBuildProvenance.initialPrompt ? (
+                                    <section className="forge-report-builder__build-provenance-request" aria-label="Initial request">
+                                        <div className="forge-report-builder__build-provenance-label">Initial request</div>
+                                        <blockquote>{reportBuildProvenance.initialPrompt}</blockquote>
+                                    </section>
+                                ) : null}
+                                {provenanceEvents.length > 0 ? (
+                                    <section aria-label="Execution history">
+                                        <div className="forge-report-builder__build-provenance-label">Execution history</div>
+                                        <ol className="forge-report-builder__build-provenance-events">
+                                            {provenanceEvents.map((event) => {
+                                                const timeLabel = formatReportBuilderProvenanceTime(event.completedAt || event.startedAt);
+                                                return (
+                                                    <li key={event.id} className={`is-${event.status}`}>
+                                                        <span className="forge-report-builder__build-provenance-event-marker" aria-hidden="true" />
+                                                        <span className="forge-report-builder__build-provenance-event-label">{event.label}</span>
+                                                        <span className="forge-report-builder__build-provenance-event-status">{event.status}</span>
+                                                        {timeLabel ? <time dateTime={event.completedAt || event.startedAt}>{timeLabel}</time> : null}
+                                                    </li>
+                                                );
+                                            })}
+                                        </ol>
+                                    </section>
+                                ) : null}
+                            </div>
+                        </details>
                     ) : null}
+                    <div className="forge-report-builder__design-source-catalog-meta">
+                        <span>{sourceCatalogCountLabel}</span>
+                        {visibleReportDataSourceCards.length > 8 ? (
+                            <label className="forge-report-builder__design-source-search">
+                                <Icon icon="search" size={14} aria-hidden="true" />
+                                <input
+                                    type="search"
+                                    value={designSourceSearchQuery}
+                                    onChange={(event) => setDesignSourceSearchQuery(event.target.value)}
+                                    placeholder="Find a source"
+                                    aria-label="Find a data source"
+                                />
+                            </label>
+                        ) : null}
+                    </div>
+                    {filteredReportDataSourceCards.length > 0 ? (
+                        <div className="forge-report-builder__design-source-catalog" aria-label="Available data sources">
+                            {currentSourceCard ? (
+                                <section className="forge-report-builder__design-source-section" aria-labelledby="report-builder-current-source-heading">
+                                    <div id="report-builder-current-source-heading" className="forge-report-builder__design-source-section-title">Current source</div>
+                                    {renderSourceItem(currentSourceCard, { current: true })}
+                                </section>
+                            ) : null}
+                            {Array.from(derivedSourceGroups.entries()).map(([parentRef, group]) => {
+                                const parentLabel = normalizeString(group.parent?.label || parentRef);
+                                const currentParent = group.parent?.active === true;
+                                const title = currentParent ? "Prepared views" : `Views derived from ${parentLabel}`;
+                                return (
+                                    <section key={parentRef} className="forge-report-builder__design-source-section" aria-labelledby={`report-builder-source-group-${parentRef}`}>
+                                        <div className="forge-report-builder__design-source-section-heading">
+                                            <div id={`report-builder-source-group-${parentRef}`} className="forge-report-builder__design-source-section-title">{title}</div>
+                                            <div className="forge-report-builder__design-source-section-summary">
+                                                {`${group.cards.length} ${group.cards.length === 1 ? "view" : "views"} derived from ${parentLabel}`}
+                                            </div>
+                                        </div>
+                                        <div className="forge-report-builder__design-source-items">
+                                            {group.cards.map((card) => renderSourceItem(card))}
+                                        </div>
+                                    </section>
+                                );
+                            })}
+                            {independentSourceCards.length > 0 ? (
+                                <section className="forge-report-builder__design-source-section" aria-labelledby="report-builder-independent-source-heading">
+                                    {derivedSourceGroups.size > 0 ? (
+                                        <div id="report-builder-independent-source-heading" className="forge-report-builder__design-source-section-title">Independent sources</div>
+                                    ) : null}
+                                    <div className="forge-report-builder__design-source-items">
+                                        {independentSourceCards.map((card) => renderSourceItem(card))}
+                                    </div>
+                                </section>
+                            ) : null}
+                        </div>
+                    ) : (
+                        <div className="forge-report-builder__design-source-empty">No sources match this search.</div>
+                    )}
                     {inspectedReportDataSourceDetails ? (
-                        <section className="forge-report-builder__design-source-details" aria-label="Source details">
+                        <section id="forge-report-builder-source-inspector" className="forge-report-builder__design-source-details" aria-label="Source details">
                             <div className="forge-report-builder__design-stage-header">
                                 <div className="forge-report-builder__design-stage-title">{inspectedReportDataSourceDetails.title}</div>
                             </div>
@@ -17559,6 +17791,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         selectedDocumentOutlineEntry,
         selectedDocumentInsertionTarget,
         pendingDocumentInsertionPlacement,
+        reportBuildProvenance,
         selectedDocumentOutlineWidthLabels,
         effectiveSelectedDocumentOutlineEntryId,
         designWorkspaceFocus,
@@ -17566,6 +17799,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         designDataActionsMenuOpen,
         designSourceCatalogOpen,
         designSourceAddMenuRef,
+        designSourceSearchQuery,
         documentDataViewOpen,
         authoredDocumentBlockCount,
         documentDesignActionGroup,

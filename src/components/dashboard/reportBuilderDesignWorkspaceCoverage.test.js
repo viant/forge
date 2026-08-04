@@ -29,6 +29,30 @@ assert.equal(
   "ReportBuilder should render a dedicated design overview surface when Design mode is active.",
 );
 
+const renderDesignWorkspaceCallbackStart = source.indexOf(
+  "const renderDesignWorkspaceOverview = React.useCallback(() => {",
+);
+const renderDesignWorkspaceDependenciesStart = source.indexOf(
+  "\n    }, [",
+  renderDesignWorkspaceCallbackStart,
+);
+const renderDesignWorkspaceDependenciesEnd = source.indexOf(
+  "\n    ]);",
+  renderDesignWorkspaceDependenciesStart,
+);
+const renderDesignWorkspaceDependenciesSource = source.slice(
+  renderDesignWorkspaceDependenciesStart,
+  renderDesignWorkspaceDependenciesEnd,
+);
+assert.equal(
+  renderDesignWorkspaceCallbackStart >= 0
+    && renderDesignWorkspaceDependenciesStart > renderDesignWorkspaceCallbackStart
+    && renderDesignWorkspaceDependenciesEnd > renderDesignWorkspaceDependenciesStart
+    && renderDesignWorkspaceDependenciesSource.includes("\n        reportBuildProvenance,"),
+  true,
+  "ReportBuilder should refresh the memoized Design workspace when asynchronous build provenance changes.",
+);
+
 assert.equal(
   source.includes("Authoring surface"),
   false,
@@ -126,7 +150,7 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("View details for"),
+  source.includes("toggleSourceInspector"),
   true,
   "ReportBuilder should let authors inspect source details from the source manager without binding the source at report level.",
 );
@@ -138,13 +162,13 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("key={reportBuilderSourceCardId(card)}"),
+  source.includes("key={sourceCardId}"),
   true,
   "ReportBuilder should key source rows by authored dataset identity when several datasets share one backend source.",
 );
 
 assert.equal(
-  source.includes("designSourceAddMenuRef === reportBuilderSourceCardId(card)"),
+  source.includes("designSourceAddMenuRef === sourceCardId"),
   true,
   "ReportBuilder should open add-block menus by authored dataset identity rather than a shared backend source reference.",
 );
