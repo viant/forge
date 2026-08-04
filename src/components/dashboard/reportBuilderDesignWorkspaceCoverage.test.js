@@ -126,7 +126,7 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("View details for"),
+  source.includes("toggleSourceInspector"),
   true,
   "ReportBuilder should let authors inspect source details from the source manager without binding the source at report level.",
 );
@@ -138,13 +138,13 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("key={reportBuilderSourceCardId(card)}"),
+  source.includes("key={sourceCardId}"),
   true,
   "ReportBuilder should key source rows by authored dataset identity when several datasets share one backend source.",
 );
 
 assert.equal(
-  source.includes("designSourceAddMenuRef === reportBuilderSourceCardId(card)"),
+  source.includes("designSourceAddMenuRef === sourceCardId"),
   true,
   "ReportBuilder should open add-block menus by authored dataset identity rather than a shared backend source reference.",
 );
