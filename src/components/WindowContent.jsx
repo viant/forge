@@ -19,7 +19,7 @@ import {
     removeWindow,
 } from '../core';
 
-import {Context} from '../core';
+import {Context, resolveWindowContentContext} from '../core';
 import {useSetting} from '../core';
 import {clearWindowContext, getWindowContext, setWindowContext} from '../core/context/registry.js';
 
@@ -408,7 +408,13 @@ function WindowContentInner({window, metadata, services}) {
 
     const hookContext = Context(windowId, metadata, defaultDataSourceRef, services);
     const existingContext = getWindowContext(windowId);
-    const context = existingContext?.metadata === metadata ? existingContext : hookContext;
+    const context = resolveWindowContentContext({
+        existingContext,
+        hookContext,
+        metadata,
+        services,
+        windowState: services?.windowState || window,
+    });
     const initializedDashboardKeyRef = useRef('');
     const rootContainer = useMemo(
         () => resolveWindowRootContainer(metadata?.view?.content || null, parameters),

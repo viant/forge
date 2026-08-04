@@ -35,11 +35,23 @@ export function normalizeHostedReportSourceKind(value = "") {
 
 export function resolveHostedReportSource(container = null) {
     const parameters = container?.parameters || {};
+    const inlineDefinition = parameters.reportDefinition
+        && typeof parameters.reportDefinition === "object"
+        && !Array.isArray(parameters.reportDefinition)
+        ? parameters.reportDefinition
+        : null;
+    const inlineDefinitionId = normalizeString(
+        inlineDefinition?.id
+        || inlineDefinition?.source?.id,
+    );
     const canonicalKindValue = normalizeString(parameters.sourceKind);
     const canonicalKind = normalizeHostedReportSourceKind(parameters.sourceKind);
     const canonicalId = normalizeString(parameters.sourceId);
     if (canonicalKind) {
-        return { kind: canonicalKind, id: canonicalId };
+        return {
+            kind: canonicalKind,
+            id: canonicalId || (canonicalKind === "inline" ? inlineDefinitionId : ""),
+        };
     }
     if (canonicalKindValue) {
         return { kind: "", id: "" };
@@ -53,13 +65,30 @@ export function resolveHostedReportSource(container = null) {
     if (reportStarterId) {
         return { kind: "preset", id: reportStarterId };
     }
-    if (parameters.reportDefinition && typeof parameters.reportDefinition === "object") {
+    if (inlineDefinition) {
         return {
             kind: "inline",
-            id: normalizeString(parameters.reportDefinition.id),
+            id: inlineDefinitionId,
         };
     }
     return { kind: "", id: "" };
+}
+
+export function resolveHostedReportExecutionIdentity(container = null, state = null) {
+    const sourceId = resolveHostedReportSource(container).id;
+    if (sourceId) {
+        return sourceId;
+    }
+    const parameters = container?.parameters || {};
+    const hasDeclaredSource = !!normalizeString(parameters.sourceKind)
+        || !!normalizeString(parameters.reportId)
+        || !!normalizeString(parameters.reportStarterId)
+        || (!!parameters.reportDefinition
+            && typeof parameters.reportDefinition === "object"
+            && !Array.isArray(parameters.reportDefinition));
+    return hasDeclaredSource
+        ? ""
+        : normalizeString(state?.reportDocumentTemplateId);
 }
 
 export function resolveHostedReportId(container = null) {
@@ -78,6 +107,32 @@ export function resolveHostedReportArtifactId(container = null) {
 export function resolveHostedReportStarterId(container = null) {
     const source = resolveHostedReportSource(container);
     return source.kind === "preset" ? source.id : "";
+}
+
+export function resolveHostedReportActivationIdentity(container = null) {
+    const source = resolveHostedReportSource(container);
+    if (source.kind === "report") {
+        const request = buildHostedReportActivationRequest(
+            source.id,
+            resolveHostedReportArtifactId(container),
+        );
+        return normalizeString(request?.artifactId || request?.reportId);
+    }
+    return source.kind === "inline" ? source.id : "";
+}
+
+export function matchesHostedReportActivationCurrent({
+    activationRequired = false,
+    activationIdentity = "",
+    activationState = null,
+} = {}) {
+    if (activationRequired !== true) {
+        return true;
+    }
+    const requiredIdentity = normalizeString(activationIdentity);
+    return !!requiredIdentity
+        && normalizeString(activationState?.reportId) === requiredIdentity
+        && normalizeString(activationState?.status).toLowerCase() === "ready";
 }
 
 export function resolveHostedReportWorkspaceMode(container = null) {

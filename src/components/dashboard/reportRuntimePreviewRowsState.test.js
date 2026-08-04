@@ -13,6 +13,7 @@ import {
 assert.deepEqual(buildIdleReportRuntimePreviewRowsState(), {
   fingerprint: "",
   requestKey: "",
+  freshResultRequestKey: "",
   rows: [],
   hasMore: false,
   loading: false,
@@ -36,6 +37,7 @@ assert.deepEqual(buildPendingReportRuntimePreviewRowsState({
 }), {
   fingerprint: "runtime::1",
   requestKey: "runtime::1::0",
+  freshResultRequestKey: "",
   rows: [{ channelV2: "Display" }],
   hasMore: true,
   loading: true,
@@ -54,6 +56,7 @@ assert.deepEqual(buildPendingReportRuntimePreviewRowsState({
 }), {
   fingerprint: "runtime::2",
   requestKey: "runtime::2::0",
+  freshResultRequestKey: "",
   rows: [{ channelV2: "Display" }],
   hasMore: true,
   loading: true,
@@ -68,6 +71,7 @@ assert.deepEqual(buildResolvedReportRuntimePreviewRowsState({
 }), {
   fingerprint: "runtime::1",
   requestKey: "runtime::1::0",
+  freshResultRequestKey: "runtime::1::0",
   rows: [{ channelV2: "Display" }],
   hasMore: true,
   loading: false,
@@ -87,6 +91,7 @@ assert.deepEqual(buildRejectedReportRuntimePreviewRowsState({
 }), {
   fingerprint: "runtime::1",
   requestKey: "runtime::1::0",
+  freshResultRequestKey: "",
   rows: [{ channelV2: "Display" }],
   hasMore: true,
   loading: false,
@@ -100,6 +105,7 @@ assert.deepEqual(buildUnavailableReportRuntimePreviewRowsState({
 }), {
   fingerprint: "runtime::2",
   requestKey: "runtime::2::0",
+  freshResultRequestKey: "",
   rows: [],
   hasMore: false,
   loading: false,
@@ -157,6 +163,7 @@ assert.deepEqual(resolveReportRuntimePreviewRowsStateTransition({
   currentState: {
     fingerprint: "runtime::3",
     requestKey: "runtime::3::0",
+    freshResultRequestKey: "",
     rows: [{ channelV2: "Display" }],
     hasMore: false,
     loading: true,
@@ -167,6 +174,7 @@ assert.deepEqual(resolveReportRuntimePreviewRowsStateTransition({
   nextState: {
     fingerprint: "runtime::3",
     requestKey: "runtime::3::0",
+    freshResultRequestKey: "",
     rows: [{ channelV2: "Display" }],
     hasMore: false,
     loading: true,
@@ -185,6 +193,7 @@ assert.deepEqual(resolveReportRuntimePreviewRowsStateTransition({
   currentState: {
     fingerprint: "runtime::4",
     requestKey: "runtime::4::0",
+    freshResultRequestKey: "",
     rows: [{ channelV2: "Display" }],
     hasMore: true,
     loading: false,
@@ -195,6 +204,7 @@ assert.deepEqual(resolveReportRuntimePreviewRowsStateTransition({
   nextState: {
     fingerprint: "runtime::4",
     requestKey: "runtime::4::0",
+    freshResultRequestKey: "",
     rows: [{ channelV2: "Display" }],
     hasMore: true,
     loading: false,
@@ -213,6 +223,7 @@ assert.deepEqual(resolveReportRuntimePreviewRowsStateTransition({
   currentState: {
     fingerprint: "runtime::4-empty",
     requestKey: "runtime::4-empty::0",
+    freshResultRequestKey: "",
     rows: [],
     hasMore: false,
     loading: false,
@@ -223,6 +234,7 @@ assert.deepEqual(resolveReportRuntimePreviewRowsStateTransition({
   nextState: {
     fingerprint: "runtime::4-empty",
     requestKey: "runtime::4-empty::0",
+    freshResultRequestKey: "",
     rows: [],
     hasMore: false,
     loading: false,
@@ -241,6 +253,7 @@ assert.deepEqual(resolveReportRuntimePreviewRowsStateTransition({
   currentState: {
     fingerprint: "runtime::5",
     requestKey: "runtime::5::0",
+    freshResultRequestKey: "",
     rows: [],
     hasMore: false,
     loading: false,
@@ -252,6 +265,7 @@ assert.deepEqual(resolveReportRuntimePreviewRowsStateTransition({
   nextState: {
     fingerprint: "runtime::5",
     requestKey: "runtime::5::0",
+    freshResultRequestKey: "",
     rows: [],
     hasMore: false,
     loading: false,
@@ -280,6 +294,7 @@ assert.deepEqual(resolveReportRuntimePreviewRowsStateTransition({
   nextState: {
     fingerprint: "runtime::6",
     requestKey: "runtime::6::0",
+    freshResultRequestKey: "",
     rows: [{ channelV2: "Display" }],
     hasMore: true,
     loading: true,
@@ -332,6 +347,7 @@ assert.deepEqual(buildPendingReportRuntimePreviewRowsState({
 }), {
   fingerprint: "runtime::first-drill",
   requestKey: "runtime::first-drill::0",
+  freshResultRequestKey: "",
   rows: [{ channelV2: "Display" }, { channelV2: "CTV" }],
   hasMore: true,
   loading: true,
@@ -354,6 +370,7 @@ assert.deepEqual(buildPendingReportRuntimePreviewRowsState({
 }), {
   fingerprint: "runtime::second-drill",
   requestKey: "runtime::second-drill::0",
+  freshResultRequestKey: "",
   rows: [{ channelV2: "Drilled Display" }],
   hasMore: false,
   loading: true,
@@ -369,6 +386,7 @@ assert.deepEqual(buildPendingReportRuntimePreviewRowsState({
 }), {
   fingerprint: "runtime::first-drill-no-seed",
   requestKey: "runtime::first-drill-no-seed::0",
+  freshResultRequestKey: "",
   rows: [],
   hasMore: false,
   loading: true,
@@ -394,6 +412,7 @@ assert.deepEqual(resolveReportRuntimePreviewRowsStateTransition({
   nextState: {
     fingerprint: "runtime::first-drill",
     requestKey: "runtime::first-drill::0",
+    freshResultRequestKey: "",
     rows: [{ channelV2: "Display" }],
     hasMore: false,
     loading: true,
