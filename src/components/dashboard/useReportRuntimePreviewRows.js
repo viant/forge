@@ -15,6 +15,10 @@ import {
   resolveReportRuntimePreviewRowsDispatchPlan,
   resolveReportRuntimePreviewRowsSettlementPlan,
 } from "./reportRuntimePreviewRowsLifecycle.js";
+import {
+  buildReportRuntimePreviewFreshnessError,
+  resolveReportRuntimePreviewFreshnessRecovery,
+} from "./reportRuntimePreviewFreshnessRecovery.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -59,6 +63,131 @@ export function buildReportRuntimePreviewRequestKey(
     parts.push(normalizedResultContractFingerprint);
   }
   return parts.join("::");
+}
+
+export function resolveReportRuntimePreviewRowsFetchState({
+  body = null,
+  fingerprint = "",
+  requestKey = "",
+  previousState = null,
+  rows = [],
+  hasMore = false,
+} = {}) {
+  const previousRows = Array.isArray(previousState?.rows) ? previousState.rows : [];
+  const deferredCacheHit = isDeferredCacheHitEnvelope(body);
+  const shouldPreserveRows = deferredCacheHit && previousRows.length > 0 && rows.length === 0;
+  return buildResolvedReportRuntimePreviewRowsState({
+    fingerprint,
+    requestKey,
+    rows: shouldPreserveRows ? previousRows : rows,
+    hasMore: shouldPreserveRows ? !!previousState?.hasMore : hasMore,
+    fresh: !deferredCacheHit,
+  });
+}
+
+export async function fetchReportRuntimePreviewRowsFreshResult({
+  fetchRecords = null,
+  request = null,
+  requestKind = "runtimePreview",
+  requestKey = "",
+  shouldContinue = null,
+} = {}) {
+  if (typeof fetchRecords !== "function") {
+    throw new Error("A runtime preview row fetch function is required.");
+  }
+  const fetchCurrentRows = () => fetchRecords({ parameters: request, requestKind });
+  let body = await fetchCurrentRows();
+  let recoveryPlan = resolveReportRuntimePreviewFreshnessRecovery({
+    deferred: isDeferredCacheHitEnvelope(body),
+    requestKey,
+  });
+  if (recoveryPlan.action === "retry") {
+    if (typeof shouldContinue === "function" && shouldContinue() !== true) {
+      return { cancelled: true, body: null };
+    }
+    body = await fetchCurrentRows();
+    recoveryPlan = resolveReportRuntimePreviewFreshnessRecovery({
+      deferred: isDeferredCacheHitEnvelope(body),
+      requestKey,
+      recoveryState: recoveryPlan.recoveryState,
+    });
+  }
+  if (recoveryPlan.action === "fail") {
+    throw buildReportRuntimePreviewFreshnessError({
+      requestKey,
+      scope: "runtime preview rows",
+    });
+  }
+  return { cancelled: false, body };
+}
+
+export async function executeReportRuntimePreviewRowsFetchLifecycle({
+  fetchRecords = null,
+  request = null,
+  requestKind = "runtimePreview",
+  requestKey = "",
+  fingerprint = "",
+  resolveFetchResult = null,
+  hydrateRows = null,
+  getCurrentState = null,
+  shouldContinue = null,
+} = {}) {
+  const currentState = () => (
+    typeof getCurrentState === "function" ? getCurrentState() : {}
+  );
+  try {
+    const fetched = await fetchReportRuntimePreviewRowsFreshResult({
+      fetchRecords,
+      request,
+      requestKind,
+      requestKey,
+      shouldContinue,
+    });
+    if (fetched.cancelled) {
+      return { cancelled: true, nextState: null };
+    }
+    if (typeof resolveFetchResult !== "function") {
+      throw new Error("A runtime preview row result resolver is required.");
+    }
+    const resolvedPayload = resolveFetchResult(fetched.body);
+    let { rows, hasMore } = resolvedPayload;
+    if (typeof hydrateRows === "function" && Array.isArray(rows) && rows.length > 0) {
+      try {
+        const hydratedRows = await hydrateRows({
+          rows,
+          request,
+          requestKey,
+          requestKind,
+        });
+        if (Array.isArray(hydratedRows)) {
+          rows = hydratedRows;
+        }
+      } catch (hydrationError) {
+        console.warn("reportRuntime preview row hydration failed", hydrationError);
+      }
+    }
+    return {
+      cancelled: false,
+      nextState: resolveReportRuntimePreviewRowsFetchState({
+        body: fetched.body,
+        fingerprint,
+        requestKey,
+        previousState: currentState(),
+        rows,
+        hasMore,
+      }),
+    };
+  } catch (fetchError) {
+    return {
+      cancelled: false,
+      nextState: buildRejectedReportRuntimePreviewRowsState({
+        fingerprint,
+        requestKey,
+        currentState: currentState(),
+        error: fetchError,
+      }),
+    };
+  }
 }
 
 export function useReportRuntimePreviewRows({
@@ -131,8 +260,28 @@ export function useReportRuntimePreviewRows({
     }
     const requestedRequestKey = requestKey;
     const requestGeneration = dispatchPlan.requestGeneration;
-    fetchRecords({ parameters: request, requestKind })
-      .then(async (body) => {
+    executeReportRuntimePreviewRowsFetchLifecycle({
+      fetchRecords,
+      request,
+      requestKind,
+      requestKey: requestedRequestKey,
+      fingerprint,
+      resolveFetchResult,
+      hydrateRows,
+      getCurrentState: () => stateRef.current,
+      shouldContinue: () => resolveReportRuntimePreviewRowsSettlementPlan({
+        mounted: mountedRef.current,
+        currentRequestKey: currentRequestKeyRef.current,
+        requestedRequestKey,
+        currentGeneration: generationRef.current,
+        requestGeneration,
+        inFlightRequestKey: inFlightRequestKeyRef.current,
+      }).shouldApply,
+    })
+      .then(({ cancelled, nextState }) => {
+        if (cancelled) {
+          return;
+        }
         const settlementPlan = resolveReportRuntimePreviewRowsSettlementPlan({
           mounted: mountedRef.current,
           currentRequestKey: currentRequestKeyRef.current,
@@ -144,53 +293,7 @@ export function useReportRuntimePreviewRows({
         if (!settlementPlan.shouldApply) {
           return;
         }
-        const resolvedPayload = resolveFetchResult(body);
-        let { rows, hasMore } = resolvedPayload;
-        if (typeof hydrateRows === "function" && Array.isArray(rows) && rows.length > 0) {
-          try {
-            const hydratedRows = await hydrateRows({
-              rows,
-              request,
-              requestKey: requestedRequestKey,
-              requestKind,
-            });
-            if (Array.isArray(hydratedRows)) {
-              rows = hydratedRows;
-            }
-          } catch (hydrationError) {
-            console.warn("reportRuntime preview row hydration failed", hydrationError);
-          }
-        }
-        const previousRows = Array.isArray(stateRef.current?.rows) ? stateRef.current.rows : [];
-        const shouldPreserveRows = isDeferredCacheHitEnvelope(body) && previousRows.length > 0 && rows.length === 0;
-        setState(buildResolvedReportRuntimePreviewRowsState({
-          fingerprint,
-          requestKey: requestedRequestKey,
-          rows: shouldPreserveRows ? previousRows : rows,
-          hasMore: shouldPreserveRows ? !!stateRef.current?.hasMore : hasMore,
-        }));
-        if (settlementPlan.shouldReleaseInFlight) {
-          inFlightRequestKeyRef.current = "";
-        }
-      })
-      .catch((fetchError) => {
-        const settlementPlan = resolveReportRuntimePreviewRowsSettlementPlan({
-          mounted: mountedRef.current,
-          currentRequestKey: currentRequestKeyRef.current,
-          requestedRequestKey,
-          currentGeneration: generationRef.current,
-          requestGeneration,
-          inFlightRequestKey: inFlightRequestKeyRef.current,
-        });
-        if (!settlementPlan.shouldApply) {
-          return;
-        }
-        setState((current) => buildRejectedReportRuntimePreviewRowsState({
-          fingerprint,
-          requestKey: requestedRequestKey,
-          currentState: current,
-          error: fetchError,
-        }));
+        setState(nextState);
         if (settlementPlan.shouldReleaseInFlight) {
           inFlightRequestKeyRef.current = "";
         }

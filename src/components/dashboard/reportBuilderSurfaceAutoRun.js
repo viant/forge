@@ -51,6 +51,7 @@ export function shouldAutoRunReportBuilderSurface({
 export function resolveReportBuilderSurfaceAutoRunAction({
     workspaceMode = "design",
     requestFingerprint = "",
+    hostedExecuteOnOpen = false,
     deferForPrefill = false,
     canRunReport = false,
     currentRequestShouldFetch = false,
@@ -63,6 +64,9 @@ export function resolveReportBuilderSurfaceAutoRunAction({
     currentRequestDispatchFingerprint = "",
     requestDispatchFingerprint = "",
 } = {}) {
+    if (hostedExecuteOnOpen === true) {
+        return { type: "skip" };
+    }
     const normalizedAutoRunKey = normalizeString(autoRunKey);
     const normalizedConsumedAutoRunKey = normalizeString(consumedAutoRunKey);
     const normalizedCurrentDispatchFingerprint = normalizeString(currentRequestDispatchFingerprint);

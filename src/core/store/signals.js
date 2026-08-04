@@ -581,6 +581,7 @@ export const restoreWindowsFromSnapshot = (snapshot) => {
     activeWindows.value = windows.map((win) => ({
         windowTitle: win?.windowTitle || win?.windowKey || '',
         windowId: win?.windowId || '',
+        hostOpenState: 'historical_replay',
         conversationId: win?.conversationId || null,
         parentKey: win?.parentKey || null,
         windowKey: win?.windowKey || '',
@@ -643,6 +644,17 @@ const computeWindowTitle = (baseTitle, autoIndex, instanceIndex) => {
 
 const normalizeHostedRegionKey = (value) => String(value || '').trim().toLowerCase();
 
+const resolveWindowHostOpenState = (options = {}) => {
+    if (!Object.prototype.hasOwnProperty.call(options || {}, 'hostOpenState')) {
+        return 'fresh';
+    }
+    const requested = String(options?.hostOpenState || '').trim().toLowerCase();
+    if (requested === 'fresh' || requested === 'historical_replay') {
+        return requested;
+    }
+    return 'unknown';
+};
+
 const currentMainChatConversationId = (windows = []) => {
     const mainChat = (Array.isArray(windows) ? windows : []).find((win) => String(win?.windowId || '').trim() === 'chat/new');
     if (!mainChat || typeof mainChat !== 'object') {
@@ -704,6 +716,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
     const forceNewInstance = options && options.newInstance === true;
     const instanceIndex = nextInstanceIndex(activeWindows.peek(), windowKey);
     const windowId = explicitWindowId || computeWindowId(scopedBaseWindowId, forceNewInstance, instanceIndex);
+    const hostOpenState = resolveWindowHostOpenState(options);
 
 
     const existingWindow = forceNewInstance
@@ -719,6 +732,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
         let newWindow = {
             windowTitle: computedTitle,
             windowId,
+            hostOpenState,
             conversationId: String(options.conversationId || '').trim() || undefined,
             parentKey,
             windowKey,
@@ -777,6 +791,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
             ...existingWindow,
             windowId,
             windowTitle: computedTitle,
+            hostOpenState,
             conversationId: nextConversationId,
             parentKey,
             windowKey,
