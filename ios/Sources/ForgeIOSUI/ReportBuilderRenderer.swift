@@ -7,7 +7,7 @@ public struct ReportBuilderRenderer: View {
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
     private let container: ContainerDef
-    private let config: DashboardReportBuilderDef
+    private let baseConfig: DashboardReportBuilderDef?
 
     @State private var rows: [[String: JSONValue]] = []
     @State private var selectedMeasures: [String] = []
@@ -23,6 +23,7 @@ public struct ReportBuilderRenderer: View {
     @State private var windowActionsCode: String? = nil
     @State private var windowNamespace: String = ""
     @State private var restoredStoredState = false
+    @State private var restoredStateKey = ""
     @State private var windowFormValues: [String: JSONValue] = [:]
     @State private var appliedPrefillSignature = ""
     @State private var requestBridgeGeneration = 0
@@ -33,15 +34,25 @@ public struct ReportBuilderRenderer: View {
     @State private var hasResolvedRows = false
     @State private var dataSourceControlState = ControlState()
 
-    public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef, config: DashboardReportBuilderDef) {
+    public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef, config: DashboardReportBuilderDef? = nil) {
         self.runtime = runtime
         self.window = window
         self.container = container
-        self.config = config
+        self.baseConfig = config
     }
 
     public var body: some View {
-        layoutView
+        Group {
+            if resolvedVariant.missing {
+                Text("Report builder variant not found: \(resolvedVariant.builderRef)")
+                    .foregroundStyle(.secondary)
+            } else if resolvedVariant.config == nil {
+                Text("Missing report builder config")
+                    .foregroundStyle(.secondary)
+            } else {
+                layoutView
+            }
+        }
         .task(id: taskKey) {
             await loadRows()
         }
@@ -61,13 +72,13 @@ public struct ReportBuilderRenderer: View {
             await applyWindowFormPrefillIfNeeded()
         }
         .onChange(of: persistenceSignature) {
-            guard restoredStoredState else { return }
+            guard hydratedForCurrentVariant else { return }
             Task {
                 await persistStoredState()
             }
         }
         .onChange(of: requestSignature) {
-            guard restoredStoredState else { return }
+            guard hydratedForCurrentVariant else { return }
             requestBridgeGeneration += 1
         }
         .onChange(of: settingsHash) {
@@ -92,9 +103,25 @@ public struct ReportBuilderRenderer: View {
             lastAutoAppliedRequestSignature = completedRequestSignature
         }
         .task(id: requestBridgeGeneration) {
-            guard restoredStoredState else { return }
+            guard hydratedForCurrentVariant else { return }
             await bridgeRequestToDataSource()
         }
+    }
+
+    private var resolvedVariant: ResolvedReportBuilderVariant {
+        Self.resolveReportBuilderVariant(
+            container: container,
+            windowForm: windowFormValues,
+            fallbackConfig: baseConfig
+        )
+    }
+
+    private var config: DashboardReportBuilderDef {
+        resolvedVariant.config ?? DashboardReportBuilderDef()
+    }
+
+    private var effectiveDataSourceRef: String? {
+        resolvedVariant.dataSourceRef ?? container.dataSourceRef
     }
 
     private var layoutView: ReportBuilderLayoutView {
@@ -111,11 +138,15 @@ public struct ReportBuilderRenderer: View {
     }
 
     private var taskKey: String {
-        [window?.windowID ?? "", container.id ?? "", container.dataSourceRef ?? ""].joined(separator: ":")
+        [window?.windowID ?? "", container.id ?? "", effectiveDataSourceRef ?? ""].joined(separator: ":")
     }
 
     private var hydrationTaskKey: String {
-        [window?.windowID ?? "", builderStateKey ?? "", container.dataSourceRef ?? ""].joined(separator: ":")
+        [window?.windowID ?? "", builderStateKey ?? "", effectiveDataSourceRef ?? ""].joined(separator: ":")
+    }
+
+    private var hydratedForCurrentVariant: Bool {
+        restoredStoredState && restoredStateKey == hydrationTaskKey
     }
 
     private var windowFormTaskKey: String {
@@ -785,7 +816,7 @@ public struct ReportBuilderRenderer: View {
     }
 
     private func loadRows() async {
-        guard let runtime, let window, let dataSourceRef = container.dataSourceRef, !dataSourceRef.isEmpty else {
+        guard let runtime, let window, let dataSourceRef = effectiveDataSourceRef, !dataSourceRef.isEmpty else {
             rows = []
             hasResolvedRows = true
             dataSourceControlState = ControlState()
@@ -797,7 +828,7 @@ public struct ReportBuilderRenderer: View {
     }
 
     private func observeDataSourceRows() async {
-        guard let runtime, let window, let dataSourceRef = container.dataSourceRef, !dataSourceRef.isEmpty else {
+        guard let runtime, let window, let dataSourceRef = effectiveDataSourceRef, !dataSourceRef.isEmpty else {
             await MainActor.run {
                 rows = []
                 hasResolvedRows = true
@@ -814,7 +845,7 @@ public struct ReportBuilderRenderer: View {
     }
 
     private func observeDataSourceControl() async {
-        guard let runtime, let window, let dataSourceRef = container.dataSourceRef, !dataSourceRef.isEmpty else {
+        guard let runtime, let window, let dataSourceRef = effectiveDataSourceRef, !dataSourceRef.isEmpty else {
             await MainActor.run {
                 dataSourceControlState = ControlState()
             }
@@ -834,10 +865,13 @@ public struct ReportBuilderRenderer: View {
 
     @MainActor
     private func hydrateInitialStateIfNeeded() async {
-        guard !restoredStoredState else { return }
+        let stateKey = hydrationTaskKey
+        guard restoredStateKey != stateKey else { return }
+        resetReportBuilderStateForHydration()
         defer {
             refreshStoredPresets()
             restoredStoredState = true
+            restoredStateKey = stateKey
             requestBridgeGeneration += 1
         }
 
@@ -936,7 +970,7 @@ public struct ReportBuilderRenderer: View {
     @MainActor
     private func applyWindowFormPrefillIfNeeded() async {
         let signature = currentPrefillSignature
-        guard restoredStoredState,
+        guard hydratedForCurrentVariant,
               !signature.isEmpty,
               signature != appliedPrefillSignature else {
             return
@@ -1035,7 +1069,7 @@ public struct ReportBuilderRenderer: View {
     private func bridgeRequestToDataSource() async {
         guard let runtime else { return }
         guard let window else { return }
-        let resolvedDataSourceRef = container.dataSourceRef ?? ""
+        let resolvedDataSourceRef = effectiveDataSourceRef ?? ""
         if resolvedDataSourceRef.isEmpty { return }
         await runtime.setDataSourceInputParameters(
             windowID: window.windowID,
@@ -1240,6 +1274,28 @@ public struct ReportBuilderRenderer: View {
     }
 
     @MainActor
+    private func resetReportBuilderStateForHydration() {
+        restoredStoredState = false
+        rows = []
+        selectedMeasures = []
+        selectedDimensions = []
+        chartSpec = nil
+        viewMode = "table"
+        selectedPreviousTitle = ""
+        storedPresets = []
+        staticFilters = [:]
+        dynamicGroups = [:]
+        dynamicFilterDrafts = [:]
+        appliedPrefillSignature = ""
+        completedRequestSignature = ""
+        lastAutoAppliedRequestSignature = ""
+        filtersExpanded = true
+        lastAutoCollapsedRequestSignature = ""
+        hasResolvedRows = false
+        dataSourceControlState = ControlState()
+    }
+
+    @MainActor
     private func apply(restored state: StoredReportBuilderState) {
         selectedMeasures = state.selectedMeasures
         selectedDimensions = state.selectedDimensions
@@ -1252,13 +1308,26 @@ public struct ReportBuilderRenderer: View {
 
     private var storageKey: String? {
         guard let id = container.id, !id.isEmpty else { return nil }
-        return "reportBuilder.chartPresets.\(id)"
+        return "reportBuilder.chartPresets.\(Self.reportBuilderVariantStateKey(baseKey: id, builderRef: resolvedVariant.builderRef))"
     }
 
     private var builderStateKey: String? {
         let key = (container.stateKey ?? container.id ?? "reportBuilder")
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        return key.isEmpty ? nil : key
+        return key.isEmpty ? nil : Self.reportBuilderVariantStateKey(baseKey: key, builderRef: resolvedVariant.builderRef)
+    }
+
+    internal static func reportBuilderVariantStateKey(baseKey: String, builderRef: String) -> String {
+        let base = baseKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let ref = builderRef.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !base.isEmpty, !ref.isEmpty else { return base }
+        let suffix = ref.unicodeScalars.map { scalar in
+            CharacterSet.alphanumerics.contains(scalar) ? String(scalar) : "_"
+        }
+        .joined()
+        .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+        guard !suffix.isEmpty else { return base }
+        return "\(base).\(suffix)"
     }
 
     private static func toggle(_ current: [String], key: String) -> [String] {
@@ -2040,6 +2109,46 @@ private struct ReportBuilderLookupDescriptor {
     var dialogID: String?
     var parameters: [String: JSONValue]
     var selectionMode: String
+}
+
+struct ResolvedReportBuilderVariant {
+    let builderRef: String
+    let dataSourceRef: String?
+    let config: DashboardReportBuilderDef?
+    let missing: Bool
+}
+
+extension ReportBuilderRenderer {
+    static func resolveReportBuilderVariant(
+        container: ContainerDef,
+        windowForm: [String: JSONValue],
+        fallbackConfig: DashboardReportBuilderDef?
+    ) -> ResolvedReportBuilderVariant {
+        let requestedRef = windowForm["reportBuilderRef"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let containerDefaultRef = container.reportBuilderRef?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let dashboardDefaultRef = container.dashboard?.reportBuilderRef?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let defaultRef = containerDefaultRef.isEmpty ? dashboardDefaultRef : containerDefaultRef
+        let builderRef = requestedRef.isEmpty ? defaultRef : requestedRef
+        let variants = container.reportBuilders.isEmpty ? (container.dashboard?.reportBuilders ?? [:]) : container.reportBuilders
+        let variant = builderRef.isEmpty ? nil : variants[builderRef]
+
+        if !requestedRef.isEmpty, requestedRef != defaultRef, variant == nil, !variants.isEmpty {
+            return ResolvedReportBuilderVariant(
+                builderRef: requestedRef,
+                dataSourceRef: nil,
+                config: nil,
+                missing: true
+            )
+        }
+
+        let variantDataSourceRef = variant?.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return ResolvedReportBuilderVariant(
+            builderRef: builderRef,
+            dataSourceRef: variantDataSourceRef?.isEmpty == false ? variantDataSourceRef : container.dataSourceRef,
+            config: variant?.reportBuilder ?? fallbackConfig,
+            missing: false
+        )
+    }
 }
 
 private extension JSONValue {

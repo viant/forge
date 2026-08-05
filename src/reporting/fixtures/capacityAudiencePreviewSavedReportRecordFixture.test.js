@@ -42,10 +42,10 @@ assert.deepEqual(exportRequest.reportPrint.pages.map((page) => page.number), [1,
 assert.deepEqual(exportRequest.reportPrint.bookmarks.find((bookmark) => bookmark.id === "bookmark.comparisonTable"), {
   id: "bookmark.comparisonTable",
   title: "Delivery Comparison",
-  pageNumber: 1,
+  pageNumber: 2,
   level: 1,
   elementId: "comparisonTable__title_0",
-  y: 524,
+  y: 84,
 });
 assert.equal(
   exportRequest.reportPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.headlineKpi" && bookmark.pageNumber === 1),

@@ -50,7 +50,7 @@ assert.deepEqual(exportRequest.reportPrint.bookmarks.find((bookmark) => bookmark
   y: 252,
 });
 assert.equal(
-  exportRequest.reportPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.headlineKpi" && bookmark.pageNumber === 1),
+  exportRequest.reportPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.headlineKpi" && bookmark.pageNumber === 2),
   true,
 );
 assert.equal(resolveReportBuilderReopenCompatibility(

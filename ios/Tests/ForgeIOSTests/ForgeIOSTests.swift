@@ -534,6 +534,304 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(reportBuilder.groupBy?.options.first?.paramValue, .string("date"))
     }
 
+    func testWindowMetadataDecodesReportBuilderVariants() throws {
+        let payload = """
+        {
+          "view": {
+            "content": {
+              "kind": "dashboard.reportBuilder",
+              "id": "reportBuilder",
+              "dataSourceRef": "metrics_report",
+              "reportBuilderRef": "metricsCubeBuilder",
+              "reportBuilders": {
+                "metricsCubeBuilder": {
+                  "label": "Metrics",
+                  "dataSourceRef": "metrics_report",
+                  "reportBuilder": {
+                    "measures": [
+                      { "id": "spend", "key": "spend", "label": "Spend" }
+                    ]
+                  }
+                },
+                "forecastingCubeBuilder": {
+                  "label": "Forecasting",
+                  "dataSourceRef": "forecast_report",
+                  "reportBuilder": {
+                    "measures": [
+                      { "id": "avails", "key": "avails", "label": "Avails" }
+                    ],
+                    "dimensions": [
+                      { "id": "eventDate", "key": "eventDate", "label": "Date" }
+                    ]
+                  }
+                }
+              },
+              "reportBuilder": {
+                "measures": [
+                  { "id": "fallback", "key": "fallback", "label": "Fallback" }
+                ]
+              }
+            }
+          }
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let container = try XCTUnwrap(metadata.view?.content?.containers.first)
+        let forecasting = try XCTUnwrap(container.reportBuilders["forecastingCubeBuilder"])
+
+        XCTAssertEqual(container.reportBuilderRef, "metricsCubeBuilder")
+        XCTAssertEqual(container.reportBuilders.count, 2)
+        XCTAssertEqual(forecasting.label, "Forecasting")
+        XCTAssertEqual(forecasting.dataSourceRef, "forecast_report")
+        XCTAssertEqual(forecasting.reportBuilder?.measures.first?.key, "avails")
+        XCTAssertEqual(forecasting.reportBuilder?.dimensions.first?.key, "eventDate")
+    }
+
+    func testWindowMetadataDecodesDashboardReportBuilderVariants() throws {
+        let payload = """
+        {
+          "view": {
+            "content": {
+              "kind": "dashboard.reportBuilder",
+              "id": "reportBuilder",
+              "dataSourceRef": "metrics_report",
+              "dashboard": {
+                "reportBuilderRef": "metricsCubeBuilder",
+                "reportBuilders": {
+                  "forecastingCubeBuilder": {
+                    "label": "Forecasting",
+                    "dataSourceRef": "forecast_report",
+                    "reportBuilder": {
+                      "measures": [
+                        { "id": "avails", "key": "avails", "label": "Avails" }
+                      ]
+                    }
+                  }
+                },
+                "reportBuilder": {
+                  "measures": [
+                    { "id": "spend", "key": "spend", "label": "Spend" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let container = try XCTUnwrap(metadata.view?.content?.containers.first)
+        let forecasting = try XCTUnwrap(container.dashboard?.reportBuilders["forecastingCubeBuilder"])
+
+        XCTAssertEqual(container.dashboard?.reportBuilderRef, "metricsCubeBuilder")
+        XCTAssertEqual(forecasting.dataSourceRef, "forecast_report")
+        XCTAssertEqual(forecasting.reportBuilder?.measures.first?.key, "avails")
+    }
+
+    func testReportBuilderVariantResolutionUsesWindowFormRef() throws {
+        let fallback = DashboardReportBuilderDef(
+            measures: [
+                ReportBuilderMeasureDef(id: "spend", key: "spend", label: "Spend", format: nil, paramPath: nil, defaultValue: nil, color: nil, hidden: nil)
+            ]
+        )
+        let forecast = DashboardReportBuilderDef(
+            title: "Forecast Inventory",
+            subtitle: "Build a normalized forecasting stack.",
+            measures: [
+                ReportBuilderMeasureDef(id: "avails", key: "avails", label: "Avails", format: nil, paramPath: nil, defaultValue: nil, color: nil, hidden: nil)
+            ]
+        )
+        let container = ContainerDef(
+            kind: "dashboard.reportBuilder",
+            dataSourceRef: "metrics_report",
+            dashboard: DashboardDef(reportBuilder: fallback),
+            reportBuilderRef: "metricsCubeBuilder",
+            reportBuilders: [
+                "forecastingCubeBuilder": DashboardReportBuilderVariantDef(
+                    dataSourceRef: "forecast_report",
+                    reportBuilder: forecast
+                )
+            ]
+        )
+
+        let resolved = ReportBuilderRenderer.resolveReportBuilderVariant(
+            container: container,
+            windowForm: ["reportBuilderRef": .string("forecastingCubeBuilder")],
+            fallbackConfig: fallback
+        )
+
+        XCTAssertFalse(resolved.missing)
+        XCTAssertEqual(resolved.builderRef, "forecastingCubeBuilder")
+        XCTAssertEqual(resolved.dataSourceRef, "forecast_report")
+        XCTAssertEqual(resolved.config?.title, "Forecast Inventory")
+        XCTAssertEqual(resolved.config?.subtitle, "Build a normalized forecasting stack.")
+        XCTAssertEqual(resolved.config?.measures.first?.key, "avails")
+    }
+
+    func testReportBuilderVariantResolutionUsesDashboardSchema() throws {
+        let fallback = DashboardReportBuilderDef(
+            measures: [
+                ReportBuilderMeasureDef(id: "spend", key: "spend", label: "Spend", format: nil, paramPath: nil, defaultValue: nil, color: nil, hidden: nil)
+            ]
+        )
+        let forecast = DashboardReportBuilderDef(
+            measures: [
+                ReportBuilderMeasureDef(id: "avails", key: "avails", label: "Avails", format: nil, paramPath: nil, defaultValue: nil, color: nil, hidden: nil)
+            ]
+        )
+        let container = ContainerDef(
+            kind: "dashboard.reportBuilder",
+            dataSourceRef: "metrics_report",
+            dashboard: DashboardDef(
+                reportBuilderRef: "metricsCubeBuilder",
+                reportBuilders: [
+                    "forecastingCubeBuilder": DashboardReportBuilderVariantDef(
+                        dataSourceRef: "forecast_report",
+                        reportBuilder: forecast
+                    )
+                ],
+                reportBuilder: fallback
+            )
+        )
+
+        let resolved = ReportBuilderRenderer.resolveReportBuilderVariant(
+            container: container,
+            windowForm: ["reportBuilderRef": .string("forecastingCubeBuilder")],
+            fallbackConfig: fallback
+        )
+
+        XCTAssertFalse(resolved.missing)
+        XCTAssertEqual(resolved.builderRef, "forecastingCubeBuilder")
+        XCTAssertEqual(resolved.dataSourceRef, "forecast_report")
+        XCTAssertEqual(resolved.config?.measures.first?.key, "avails")
+    }
+
+    func testReportBuilderVariantResolutionDoesNotRequireLegacyFallback() throws {
+        let forecast = DashboardReportBuilderDef(
+            title: "Forecast Inventory",
+            measures: [
+                ReportBuilderMeasureDef(id: "avails", key: "avails", label: "Avails", format: nil, paramPath: nil, defaultValue: nil, color: nil, hidden: nil)
+            ]
+        )
+        let container = ContainerDef(
+            kind: "dashboard.reportBuilder",
+            dataSourceRef: "metrics_report",
+            reportBuilderRef: "forecastingCubeBuilder",
+            reportBuilders: [
+                "forecastingCubeBuilder": DashboardReportBuilderVariantDef(
+                    dataSourceRef: "forecast_report",
+                    reportBuilder: forecast
+                )
+            ]
+        )
+
+        let resolved = ReportBuilderRenderer.resolveReportBuilderVariant(
+            container: container,
+            windowForm: [:],
+            fallbackConfig: nil
+        )
+
+        XCTAssertFalse(resolved.missing)
+        XCTAssertEqual(resolved.builderRef, "forecastingCubeBuilder")
+        XCTAssertEqual(resolved.dataSourceRef, "forecast_report")
+        XCTAssertEqual(resolved.config?.title, "Forecast Inventory")
+        XCTAssertEqual(resolved.config?.measures.first?.key, "avails")
+    }
+
+    func testReportBuilderVariantResolutionFallsBackWhenRequestedRefIsDefault() throws {
+        let fallback = DashboardReportBuilderDef(
+            measures: [
+                ReportBuilderMeasureDef(id: "spend", key: "spend", label: "Spend", format: nil, paramPath: nil, defaultValue: nil, color: nil, hidden: nil)
+            ]
+        )
+        let forecast = DashboardReportBuilderDef(
+            measures: [
+                ReportBuilderMeasureDef(id: "avails", key: "avails", label: "Avails", format: nil, paramPath: nil, defaultValue: nil, color: nil, hidden: nil)
+            ]
+        )
+        let container = ContainerDef(
+            kind: "dashboard.reportBuilder",
+            dataSourceRef: "metrics_report",
+            dashboard: DashboardDef(reportBuilder: fallback),
+            reportBuilderRef: "metricsCubeBuilder",
+            reportBuilders: [
+                "forecastingCubeBuilder": DashboardReportBuilderVariantDef(
+                    dataSourceRef: "forecast_report",
+                    reportBuilder: forecast
+                )
+            ]
+        )
+
+        let resolved = ReportBuilderRenderer.resolveReportBuilderVariant(
+            container: container,
+            windowForm: ["reportBuilderRef": .string("metricsCubeBuilder")],
+            fallbackConfig: fallback
+        )
+
+        XCTAssertFalse(resolved.missing)
+        XCTAssertEqual(resolved.builderRef, "metricsCubeBuilder")
+        XCTAssertEqual(resolved.dataSourceRef, "metrics_report")
+        XCTAssertEqual(resolved.config?.measures.first?.key, "spend")
+    }
+
+    func testReportBuilderVariantResolutionReportsMissingRequestedRef() throws {
+        let fallback = DashboardReportBuilderDef()
+        let container = ContainerDef(
+            kind: "dashboard.reportBuilder",
+            dataSourceRef: "metrics_report",
+            dashboard: DashboardDef(reportBuilder: fallback),
+            reportBuilders: [
+                "metricsCubeBuilder": DashboardReportBuilderVariantDef(
+                    dataSourceRef: "metrics_report",
+                    reportBuilder: fallback
+                )
+            ]
+        )
+
+        let resolved = ReportBuilderRenderer.resolveReportBuilderVariant(
+            container: container,
+            windowForm: ["reportBuilderRef": .string("forecastingCubeBuilder")],
+            fallbackConfig: fallback
+        )
+
+        XCTAssertTrue(resolved.missing)
+        XCTAssertEqual(resolved.builderRef, "forecastingCubeBuilder")
+        XCTAssertNil(resolved.dataSourceRef)
+        XCTAssertNil(resolved.config)
+    }
+
+    func testReportBuilderVariantStateKeySeparatesSharedContainerVariants() throws {
+        XCTAssertEqual(
+            ReportBuilderRenderer.reportBuilderVariantStateKey(
+                baseKey: "reportBuilder",
+                builderRef: "metricsCubeBuilder"
+            ),
+            "reportBuilder.metricsCubeBuilder"
+        )
+        XCTAssertEqual(
+            ReportBuilderRenderer.reportBuilderVariantStateKey(
+                baseKey: "reportBuilder",
+                builderRef: "forecastingCubeBuilder"
+            ),
+            "reportBuilder.forecastingCubeBuilder"
+        )
+        XCTAssertEqual(
+            ReportBuilderRenderer.reportBuilderVariantStateKey(
+                baseKey: "reportBuilder",
+                builderRef: ""
+            ),
+            "reportBuilder"
+        )
+        XCTAssertEqual(
+            ReportBuilderRenderer.reportBuilderVariantStateKey(
+                baseKey: "reportBuilder",
+                builderRef: "forecasting/cube.builder"
+            ),
+            "reportBuilder.forecasting_cube_builder"
+        )
+    }
+
     func testDashboardReportBuilderDecodesLegacyForecastCategories() throws {
         let payload = """
         {
@@ -1795,6 +2093,54 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(content?.containers.map(\.id), ["base"])
         XCTAssertEqual(content?.containers.first?.title, "Base")
         XCTAssertTrue(content?.targetOverrides.isEmpty == true)
+    }
+
+    func testMetadataResolverAppliesNestedReportBuilderVariantOverrides() throws {
+        let payload = """
+        {
+          "view": {
+            "content": {
+              "kind": "dashboard.reportBuilder",
+              "id": "reportBuilder",
+              "reportBuilders": {
+                "forecasting": {
+                  "dataSourceRef": "forecasting_data",
+                  "reportBuilder": {
+                    "filterPresentation": "rail-left",
+                    "unifiedFamilyRows": false
+                  },
+                  "targetOverrides": {
+                    "mobile": {
+                      "reportBuilder": {
+                        "filterPresentation": "drawer-left"
+                      }
+                    },
+                    "phone": {
+                      "reportBuilder": {
+                        "unifiedFamilyRows": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let decodedContainer = try XCTUnwrap(metadata.view?.content?.containers.first)
+        XCTAssertNotNil(decodedContainer.reportBuilders["forecasting"]?.targetOverrides["phone"])
+        let resolved = MetadataResolver.resolve(
+            metadata,
+            for: ForgeTargetContext(platform: "ios", formFactor: "phone", surface: "app")
+        )
+        let container = try XCTUnwrap(resolved.view?.content?.containers.first)
+        let forecasting = try XCTUnwrap(container.reportBuilders["forecasting"])
+
+        XCTAssertEqual(forecasting.dataSourceRef, "forecasting_data")
+        XCTAssertEqual(forecasting.reportBuilder?.filterPresentation, "drawer-left")
+        XCTAssertEqual(forecasting.reportBuilder?.unifiedFamilyRows, true)
     }
 
     func testWindowMetadataDecodesActionsCodeAndDatasourceAlias() throws {

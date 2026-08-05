@@ -50,7 +50,7 @@ assert.deepEqual(exportRequest.reportPrint.bookmarks.find((bookmark) => bookmark
   y: 84,
 });
 assert.equal(
-  exportRequest.reportPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.comparisonTable" && bookmark.pageNumber === 2),
+  exportRequest.reportPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.comparisonTable" && bookmark.pageNumber === 3),
   true,
 );
 const primaryChartTitle = exportRequest.reportPrint.pages
@@ -70,15 +70,15 @@ assert.deepEqual(primaryChartTitle?.box, {
 });
 assert.equal(primaryChartTitle?.text, "Avails + HH Uniques by Date");
 assert.deepEqual(headlineKpiTitle?.box, {
-  x: 36,
-  y: 388,
-  width: 720,
-  height: 20,
+  x: 46,
+  y: 414,
+  width: 700,
+  height: 16,
 });
 assert.equal(headlineKpiTitle?.text, "Headline KPI");
 assert.deepEqual(comparisonTableTitle?.box, {
   x: 36,
-  y: 484,
+  y: 84,
   width: 720,
   height: 20,
 });

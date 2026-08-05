@@ -635,11 +635,11 @@ function resolveDocumentTemplateIdentity(state = {}) {
   };
 }
 
-// Source-contract field metadata (Datly/Steward unified cube) persisted on the
-// primary dataset catalog: request param paths, runtime-filter wiring,
-// selection defaults, and semantic/governance descriptors. Restoring these
-// keeps a reconstructed builder config faithful to the source contract when
-// the embedded config was stripped.
+// Source-contract field metadata persisted on the primary dataset catalog:
+// request param paths, runtime-filter wiring, selection defaults, and
+// semantic/governance descriptors. Restoring these keeps a reconstructed
+// builder config faithful to the source contract when the embedded config was
+// stripped.
 function buildPrimaryDatasetFieldContract(entry = {}) {
   const paramPath = normalizeString(entry?.paramPath);
   const rawId = normalizeString(entry?.rawId);

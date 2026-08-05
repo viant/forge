@@ -22,6 +22,10 @@ const expectedReportPrintSignature = {
   })),
   diagnostics: exportRequestFixture.reportPrint.diagnostics || [],
 };
+const expectedChartSvgId = exportRequestFixture.reportPrint.pages
+  ?.flatMap((page) => page.elements || [])
+  ?.find((element) => element?.kind === "svg" && String(element?.id || "").startsWith("channelTrend__svg_page_"))
+  ?.id || "channelTrend__svg_page_";
 
 assert.equal(scenario.baseUrl, "http://127.0.0.1:5175");
 assert.deepEqual(scenario.viewport, {
@@ -111,10 +115,10 @@ const injectedOptionIndex = scenario.steps.findIndex((step, index) => index > re
 const selectInjectedIndex = scenario.steps.findIndex((step, index) => index > injectedOptionIndex && step?.type === "selectSelector" && step?.value === "authoredLandscapePreview");
 const reopenedExportVisibleIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("Review export") && String(step?.expression || "").includes("Inspect export"));
 const inspectExportIndex = findStepIndex((step) => step?.type === "eval" && String(step?.expression || "").includes("Inspect export button not found in landscape reopened section."));
-const geometrySummaryIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("JSON.stringify(signature) ===") && String(step?.expression || "").includes("channelTrend__svg_page_1") && String(step?.expression || "").includes("Authored Landscape Report"));
+const geometrySummaryIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("JSON.stringify(signature) ===") && String(step?.expression || "").includes(expectedChartSvgId) && String(step?.expression || "").includes("Authored Landscape Report"));
 const downloadExportIndex = findStepIndex((step) => step?.type === "eval" && String(step?.expression || "").includes("Download export request button not found."));
 const downloadedReadyIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("Authored Landscape Report-savedPayload-pdf-export-request.json"));
-const geometryDownloadedIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("window.__artifactDownloadCapture?.payloadReady") && String(step?.expression || "").includes("JSON.stringify(signature) ===") && String(step?.expression || "").includes("channelTrend__svg_page_1") && String(step?.expression || "").includes("Authored Landscape Report"));
+const geometryDownloadedIndex = findStepIndex((step) => step?.type === "waitForEval" && String(step?.expression || "").includes("window.__artifactDownloadCapture?.payloadReady") && String(step?.expression || "").includes("JSON.stringify(signature) ===") && String(step?.expression || "").includes(expectedChartSvgId) && String(step?.expression || "").includes("Authored Landscape Report"));
 
 assert.notEqual(preInjectionListIndex, -1);
 assert.notEqual(preInjectionAbsentIndex, -1);

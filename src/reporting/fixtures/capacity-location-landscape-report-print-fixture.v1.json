@@ -2,9 +2,9 @@
   "version": 1,
   "kind": "reportPrint",
   "specVersion": 1,
-  "specHash": "fnv1a:7bd4cb22",
+  "specHash": "fnv1a:c9e3016e",
   "fillVersion": 1,
-  "fillHash": "fnv1a:aee0519e",
+  "fillHash": "fnv1a:2bcdfee4",
   "source": {
     "kind": "dashboard.reportBuilder",
     "containerId": "demoReportBuilder",
@@ -86,29 +86,31 @@
           "box": {
             "x": 42,
             "y": 168,
-            "width": 348,
+            "width": 270.1052631578947,
             "height": 16
           },
           "text": "Market",
-          "fontSize": 11,
+          "fontSize": 9,
           "fontWeight": "600",
           "color": "#101828",
-          "align": "left"
+          "align": "left",
+          "wrap": true
         },
         {
           "id": "primaryTable__header__avails__page_1",
           "kind": "text",
           "box": {
-            "x": 402,
+            "x": 324.1052631578947,
             "y": 168,
-            "width": 348,
+            "width": 425.89473684210526,
             "height": 16
           },
           "text": "Available Impressions",
-          "fontSize": 11,
+          "fontSize": 9,
           "fontWeight": "600",
           "color": "#101828",
-          "align": "right"
+          "align": "right",
+          "wrap": true
         },
         {
           "id": "primaryTable__row_rule_0",
@@ -128,28 +130,32 @@
           "box": {
             "x": 42,
             "y": 192,
-            "width": 348,
+            "width": 270.1052631578947,
             "height": 16
           },
           "rowKey": "row_1",
           "columnKey": "country",
           "text": "US",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_1__avails__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
+            "x": 324.1052631578947,
             "y": 192,
-            "width": 348,
+            "width": 425.89473684210526,
             "height": 16
           },
           "rowKey": "row_1",
           "columnKey": "avails",
-          "text": "153 100",
+          "text": "153K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_rule_1",
@@ -169,28 +175,32 @@
           "box": {
             "x": 42,
             "y": 216,
-            "width": 348,
+            "width": 270.1052631578947,
             "height": 16
           },
           "rowKey": "row_2",
           "columnKey": "country",
           "text": "CA",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_2__avails__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
+            "x": 324.1052631578947,
             "y": 216,
-            "width": 348,
+            "width": 425.89473684210526,
             "height": 16
           },
           "rowKey": "row_2",
           "columnKey": "avails",
-          "text": "143 500",
+          "text": "144K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryChart__title_0",
@@ -215,114 +225,7 @@
             "width": 720,
             "height": 164
           },
-          "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 164\" width=\"720\" height=\"164\">\n      \n    <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"116\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n\n    <line x1=\"310.66666666666663\" y1=\"16\" x2=\"310.66666666666663\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"310.66666666666663\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">51K</text>\n  \n\n    <line x1=\"505.3333333333333\" y1=\"16\" x2=\"505.3333333333333\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"505.3333333333333\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">102.1K</text>\n  \n\n    <line x1=\"700\" y1=\"16\" x2=\"700\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"700\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">153.1K</text>\n  \n      \n      <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <text x=\"108\" y=\"34\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">US</text>\n    \n\n      <text x=\"108\" y=\"72\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">CA</text>\n    \n      \n        <rect x=\"116\" y=\"16\" width=\"584\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"706\" y=\"42\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">153 100</text>\n      \n\n        <rect x=\"116\" y=\"54\" width=\"547.3807968647942\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        <text x=\"669.3807968647942\" y=\"80\" text-anchor=\"start\" font-size=\"10\" fill=\"#667085\">143 500</text>\n      \n      \n      \n      <rect x=\"12\" y=\"137\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"148\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n    </svg>"
-        },
-        {
-          "id": "narrativeIntro__title_0",
-          "kind": "text",
-          "box": {
-            "x": 36,
-            "y": 456,
-            "width": 348,
-            "height": 20
-          },
-          "text": "Location Outlook",
-          "fontSize": 14,
-          "fontWeight": "600",
-          "color": "#101828"
-        },
-        {
-          "id": "narrativeIntro__line_0",
-          "kind": "text",
-          "box": {
-            "x": 36,
-            "y": 480,
-            "width": 348,
-            "height": 16
-          },
-          "text": "Location Outlook",
-          "fontSize": 12,
-          "color": "#344054"
-        },
-        {
-          "id": "narrativeIntro__line_1",
-          "kind": "text",
-          "box": {
-            "x": 36,
-            "y": 496,
-            "width": 348,
-            "height": 16
-          },
-          "text": "Start at Market, then drill deeper through Region",
-          "fontSize": 12,
-          "color": "#344054"
-        },
-        {
-          "id": "narrativeIntro__line_2",
-          "kind": "text",
-          "box": {
-            "x": 36,
-            "y": 512,
-            "width": 348,
-            "height": 16
-          },
-          "text": "and Metro Area.",
-          "fontSize": 12,
-          "color": "#344054"
-        },
-        {
-          "id": "headlineKpi__title_0",
-          "kind": "text",
-          "box": {
-            "x": 408,
-            "y": 456,
-            "width": 348,
-            "height": 20
-          },
-          "text": "Top Market KPI",
-          "fontSize": 14,
-          "fontWeight": "600",
-          "color": "#101828"
-        },
-        {
-          "id": "headlineKpi__value_0",
-          "kind": "text",
-          "box": {
-            "x": 408,
-            "y": 480,
-            "width": 348,
-            "height": 24
-          },
-          "text": "Avails: 153 100",
-          "fontSize": 20,
-          "fontWeight": "700",
-          "color": "#101828"
-        },
-        {
-          "id": "headlineKpi__detail_0",
-          "kind": "text",
-          "box": {
-            "x": 408,
-            "y": 504,
-            "width": 348,
-            "height": 16
-          },
-          "text": "Market: US",
-          "fontSize": 12,
-          "color": "#344054"
-        },
-        {
-          "id": "headlineKpi__detail_1",
-          "kind": "text",
-          "box": {
-            "x": 408,
-            "y": 520,
-            "width": 348,
-            "height": 16
-          },
-          "text": "Highlights the leading market row before drilling",
-          "fontSize": 12,
-          "color": "#344054"
+          "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 164\" width=\"720\" height=\"164\">\n      \n    <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"116\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n\n    <line x1=\"310.66666666666663\" y1=\"16\" x2=\"310.66666666666663\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"310.66666666666663\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">51K</text>\n  \n\n    <line x1=\"505.3333333333333\" y1=\"16\" x2=\"505.3333333333333\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"505.3333333333333\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">102.1K</text>\n  \n\n    <line x1=\"700\" y1=\"16\" x2=\"700\" y2=\"96\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"700\" y=\"114\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">153.1K</text>\n  \n      \n      <line x1=\"116\" y1=\"16\" x2=\"116\" y2=\"96\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <text x=\"108\" y=\"34\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">US</text>\n    \n\n      <text x=\"108\" y=\"72\" text-anchor=\"end\" font-size=\"10\" fill=\"#344054\">CA</text>\n    \n      \n        <rect x=\"116\" y=\"16\" width=\"584\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        \n      \n\n        <rect x=\"116\" y=\"54\" width=\"547.3807968647942\" height=\"28\" rx=\"2\" fill=\"#1f77b4\" />\n        \n      \n      \n      \n      <rect x=\"12\" y=\"137\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"148\" font-size=\"11\" fill=\"#344054\">Available Impressions</text>\n    \n    </svg>"
         }
       ],
       "headerElements": [
@@ -386,16 +289,138 @@
       "number": 2,
       "elements": [
         {
-          "id": "headlineKpi__detail_2",
+          "id": "narrativeIntro__title_0",
           "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 84,
+            "width": 348,
+            "height": 20
+          },
+          "text": "Location Outlook",
+          "fontSize": 14,
+          "fontWeight": "600",
+          "color": "#101828"
+        },
+        {
+          "id": "narrativeIntro__line_0",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 108,
+            "width": 348,
+            "height": 16
+          },
+          "text": "Location Outlook",
+          "fontSize": 12,
+          "color": "#344054"
+        },
+        {
+          "id": "narrativeIntro__line_1",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 124,
+            "width": 348,
+            "height": 16
+          },
+          "text": "Start at Market, then drill deeper through Region",
+          "fontSize": 12,
+          "color": "#344054"
+        },
+        {
+          "id": "narrativeIntro__line_2",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 140,
+            "width": 348,
+            "height": 16
+          },
+          "text": "and Metro Area.",
+          "fontSize": 12,
+          "color": "#344054"
+        },
+        {
+          "id": "headlineKpi__card",
+          "kind": "rect",
           "box": {
             "x": 408,
             "y": 84,
             "width": 348,
+            "height": 106
+          },
+          "fillColor": "#ffffff",
+          "strokeColor": "#d8e2ec",
+          "strokeWidth": 1,
+          "radius": 7
+        },
+        {
+          "id": "headlineKpi__title_0",
+          "kind": "text",
+          "box": {
+            "x": 418,
+            "y": 94,
+            "width": 328,
             "height": 16
           },
-          "text": "deeper.",
+          "text": "Top Market KPI",
           "fontSize": 12,
+          "fontWeight": "600",
+          "color": "#101828"
+        },
+        {
+          "id": "headlineKpi__value_label_0",
+          "kind": "text",
+          "box": {
+            "x": 418,
+            "y": 110,
+            "width": 328,
+            "height": 12
+          },
+          "text": "AVAILS",
+          "fontSize": 8,
+          "fontWeight": "600",
+          "color": "#667085"
+        },
+        {
+          "id": "headlineKpi__value_0",
+          "kind": "text",
+          "box": {
+            "x": 418,
+            "y": 122,
+            "width": 328,
+            "height": 24
+          },
+          "text": "153K",
+          "fontSize": 20,
+          "fontWeight": "700",
+          "color": "#101828"
+        },
+        {
+          "id": "headlineKpi__detail_0",
+          "kind": "text",
+          "box": {
+            "x": 418,
+            "y": 150,
+            "width": 328,
+            "height": 14
+          },
+          "text": "Market: US",
+          "fontSize": 10,
+          "color": "#344054"
+        },
+        {
+          "id": "headlineKpi__detail_1",
+          "kind": "text",
+          "box": {
+            "x": 418,
+            "y": 164,
+            "width": 328,
+            "height": 14
+          },
+          "text": "Highlights the leading market row before drilling deeper.",
+          "fontSize": 10,
           "color": "#344054"
         }
       ],
@@ -485,18 +510,18 @@
     {
       "id": "bookmark.narrativeIntro",
       "title": "Location Outlook",
-      "pageNumber": 1,
+      "pageNumber": 2,
       "level": 1,
       "elementId": "narrativeIntro__title_0",
-      "y": 456
+      "y": 84
     },
     {
       "id": "bookmark.headlineKpi",
       "title": "Top Market KPI",
-      "pageNumber": 1,
+      "pageNumber": 2,
       "level": 1,
       "elementId": "headlineKpi__title_0",
-      "y": 456
+      "y": 94
     }
   ],
   "diagnostics": []

@@ -1,7 +1,10 @@
 package com.viant.forgeandroid.ui
 
 import com.viant.forgeandroid.runtime.ForgeRuntime
+import com.viant.forgeandroid.runtime.ContainerDef
+import com.viant.forgeandroid.runtime.DashboardDef
 import com.viant.forgeandroid.runtime.DashboardReportBuilderDef
+import com.viant.forgeandroid.runtime.DashboardReportBuilderVariantDef
 import com.viant.forgeandroid.runtime.ReportBuilderChartSpecDef
 import com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterDef
 import com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterGroupDef
@@ -14,10 +17,154 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ReportBuilderStateStorageTest {
+    @Test
+    fun resolvesReportBuilderVariantFromWindowFormRef() {
+        val fallback = DashboardReportBuilderDef(measures = listOf(ReportBuilderMeasureDef(id = "spend", key = "spend")))
+        val forecast = DashboardReportBuilderDef(
+            title = "Forecast Inventory",
+            subtitle = "Build a normalized forecasting stack.",
+            measures = listOf(ReportBuilderMeasureDef(id = "avails", key = "avails"))
+        )
+        val container = ContainerDef(
+            kind = "dashboard.reportBuilder",
+            dataSourceRef = "metrics",
+            reportBuilderRef = "metricsCubeBuilder",
+            reportBuilders = mapOf(
+                "forecastingCubeBuilder" to DashboardReportBuilderVariantDef(
+                    dataSourceRef = "forecasting",
+                    reportBuilder = forecast
+                )
+            ),
+            dashboard = DashboardDef(reportBuilder = fallback)
+        )
+
+        val resolved = resolveReportBuilderVariant(
+            container,
+            mapOf("reportBuilderRef" to "forecastingCubeBuilder")
+        )
+
+        assertFalse(resolved.missing)
+        assertEquals("forecastingCubeBuilder", resolved.builderRef)
+        assertEquals("forecasting", resolved.dataSourceRef)
+        assertEquals("Forecast Inventory", resolved.config?.title)
+        assertEquals("Build a normalized forecasting stack.", resolved.config?.subtitle)
+        assertEquals("avails", resolved.config?.measures?.singleOrNull()?.key)
+    }
+
+    @Test
+    fun resolvesReportBuilderVariantFromDashboardSchema() {
+        val fallback = DashboardReportBuilderDef(measures = listOf(ReportBuilderMeasureDef(id = "spend", key = "spend")))
+        val forecast = DashboardReportBuilderDef(measures = listOf(ReportBuilderMeasureDef(id = "avails", key = "avails")))
+        val container = ContainerDef(
+            kind = "dashboard.reportBuilder",
+            dataSourceRef = "metrics",
+            dashboard = DashboardDef(
+                reportBuilderRef = "metricsCubeBuilder",
+                reportBuilders = mapOf(
+                    "forecastingCubeBuilder" to DashboardReportBuilderVariantDef(
+                        dataSourceRef = "forecasting",
+                        reportBuilder = forecast
+                    )
+                ),
+                reportBuilder = fallback
+            )
+        )
+
+        val resolved = resolveReportBuilderVariant(
+            container,
+            mapOf("reportBuilderRef" to "forecastingCubeBuilder")
+        )
+
+        assertFalse(resolved.missing)
+        assertEquals("forecastingCubeBuilder", resolved.builderRef)
+        assertEquals("forecasting", resolved.dataSourceRef)
+        assertEquals("avails", resolved.config?.measures?.singleOrNull()?.key)
+    }
+
+    @Test
+    fun fallsBackToDefaultReportBuilderWhenRequestedRefIsDefault() {
+        val fallback = DashboardReportBuilderDef(measures = listOf(ReportBuilderMeasureDef(id = "spend", key = "spend")))
+        val forecast = DashboardReportBuilderDef(measures = listOf(ReportBuilderMeasureDef(id = "avails", key = "avails")))
+        val container = ContainerDef(
+            kind = "dashboard.reportBuilder",
+            dataSourceRef = "metrics",
+            reportBuilderRef = "metricsCubeBuilder",
+            reportBuilders = mapOf(
+                "forecastingCubeBuilder" to DashboardReportBuilderVariantDef(
+                    dataSourceRef = "forecasting",
+                    reportBuilder = forecast
+                )
+            ),
+            dashboard = DashboardDef(reportBuilder = fallback)
+        )
+
+        val resolved = resolveReportBuilderVariant(
+            container,
+            mapOf("reportBuilderRef" to "metricsCubeBuilder")
+        )
+
+        assertFalse(resolved.missing)
+        assertEquals("metricsCubeBuilder", resolved.builderRef)
+        assertEquals("metrics", resolved.dataSourceRef)
+        assertEquals("spend", resolved.config?.measures?.singleOrNull()?.key)
+    }
+
+    @Test
+    fun resolvesReportBuilderVariantWithoutLegacyFallbackConfig() {
+        val forecast = DashboardReportBuilderDef(
+            title = "Forecast Inventory",
+            measures = listOf(ReportBuilderMeasureDef(id = "avails", key = "avails"))
+        )
+        val container = ContainerDef(
+            kind = "dashboard.reportBuilder",
+            dataSourceRef = "metrics",
+            reportBuilderRef = "forecastingCubeBuilder",
+            reportBuilders = mapOf(
+                "forecastingCubeBuilder" to DashboardReportBuilderVariantDef(
+                    dataSourceRef = "forecasting",
+                    reportBuilder = forecast
+                )
+            )
+        )
+
+        val resolved = resolveReportBuilderVariant(container, emptyMap())
+
+        assertFalse(resolved.missing)
+        assertEquals("forecastingCubeBuilder", resolved.builderRef)
+        assertEquals("forecasting", resolved.dataSourceRef)
+        assertEquals("Forecast Inventory", resolved.config?.title)
+        assertEquals("avails", resolved.config?.measures?.singleOrNull()?.key)
+    }
+
+    @Test
+    fun reportsMissingRequestedReportBuilderVariant() {
+        val container = ContainerDef(
+            kind = "dashboard.reportBuilder",
+            dataSourceRef = "metrics",
+            reportBuilders = mapOf(
+                "metricsCubeBuilder" to DashboardReportBuilderVariantDef(
+                    dataSourceRef = "metrics",
+                    reportBuilder = DashboardReportBuilderDef()
+                )
+            ),
+            dashboard = DashboardDef(reportBuilder = DashboardReportBuilderDef())
+        )
+
+        val resolved = resolveReportBuilderVariant(
+            container,
+            mapOf("reportBuilderRef" to "forecastingCubeBuilder")
+        )
+
+        assertTrue(resolved.missing)
+        assertEquals("forecastingCubeBuilder", resolved.builderRef)
+    }
+
     @Test
     fun shouldAutoCollapseReportBuilderFiltersOnlyOncePerCompletedResult() {
         assertEquals(
@@ -152,6 +299,26 @@ class ReportBuilderStateStorageTest {
         assertEquals("Website", loaded.dynamicFilterValues["includeSiteType"])
         assertEquals("includeSiteType", loaded.dynamicGroups["include"]?.firstOrNull()?.filterId)
         assertEquals(listOf("includeSiteType"), loaded.activeDynamicFilterKeys)
+    }
+
+    @Test
+    fun reportBuilderVariantStateKeySeparatesSharedContainerVariants() {
+        assertEquals(
+            "reportBuilder.metricsCubeBuilder",
+            reportBuilderVariantStateKey("reportBuilder", "metricsCubeBuilder")
+        )
+        assertEquals(
+            "reportBuilder.forecastingCubeBuilder",
+            reportBuilderVariantStateKey("reportBuilder", "forecastingCubeBuilder")
+        )
+        assertEquals(
+            "reportBuilder",
+            reportBuilderVariantStateKey("reportBuilder", "")
+        )
+        assertEquals(
+            "reportBuilder.forecasting_cube_builder",
+            reportBuilderVariantStateKey("reportBuilder", "forecasting/cube.builder")
+        )
     }
 
     @Test

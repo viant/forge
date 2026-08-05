@@ -62,7 +62,7 @@
             "width": 720,
             "height": 16
           },
-          "text": "Channels: —",
+          "text": "Channels: All (Display, CTV)",
           "fontSize": 12,
           "color": "#344054"
         },
@@ -112,29 +112,31 @@
           "box": {
             "x": 42,
             "y": 200,
-            "width": 348,
+            "width": 270.1052631578947,
             "height": 16
           },
           "text": "Market",
-          "fontSize": 11,
+          "fontSize": 9,
           "fontWeight": "600",
           "color": "#101828",
-          "align": "left"
+          "align": "left",
+          "wrap": true
         },
         {
           "id": "primaryTable__header__audienceIndex__page_1",
           "kind": "text",
           "box": {
-            "x": 402,
+            "x": 324.1052631578947,
             "y": 200,
-            "width": 348,
+            "width": 425.89473684210526,
             "height": 16
           },
           "text": "Audience Index",
-          "fontSize": 11,
+          "fontSize": 9,
           "fontWeight": "600",
           "color": "#101828",
-          "align": "right"
+          "align": "right",
+          "wrap": true
         },
         {
           "id": "primaryTable__row_rule_0",
@@ -154,28 +156,32 @@
           "box": {
             "x": 42,
             "y": 224,
-            "width": 348,
+            "width": 270.1052631578947,
             "height": 16
           },
           "rowKey": "row_1",
           "columnKey": "country",
           "text": "US",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_1__audienceIndex__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
+            "x": 324.1052631578947,
             "y": 224,
-            "width": 348,
+            "width": 425.89473684210526,
             "height": 16
           },
           "rowKey": "row_1",
           "columnKey": "audienceIndex",
-          "text": "0.00000",
+          "text": "0",
           "format": "number",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_rule_1",
@@ -195,28 +201,32 @@
           "box": {
             "x": 42,
             "y": 248,
-            "width": 348,
+            "width": 270.1052631578947,
             "height": 16
           },
           "rowKey": "row_2",
           "columnKey": "country",
           "text": "US",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_2__audienceIndex__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
+            "x": 324.1052631578947,
             "y": 248,
-            "width": 348,
+            "width": 425.89473684210526,
             "height": 16
           },
           "rowKey": "row_2",
           "columnKey": "audienceIndex",
-          "text": "0.00000",
+          "text": "0",
           "format": "number",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_rule_2",
@@ -236,28 +246,32 @@
           "box": {
             "x": 42,
             "y": 272,
-            "width": 348,
+            "width": 270.1052631578947,
             "height": 16
           },
           "rowKey": "row_3",
           "columnKey": "country",
           "text": "US",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_3__audienceIndex__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
+            "x": 324.1052631578947,
             "y": 272,
-            "width": 348,
+            "width": 425.89473684210526,
             "height": 16
           },
           "rowKey": "row_3",
           "columnKey": "audienceIndex",
-          "text": "0.00000",
+          "text": "0",
           "format": "number",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_rule_3",
@@ -277,28 +291,32 @@
           "box": {
             "x": 42,
             "y": 296,
-            "width": 348,
+            "width": 270.1052631578947,
             "height": 16
           },
           "rowKey": "row_4",
           "columnKey": "country",
           "text": "US",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_4__audienceIndex__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
+            "x": 324.1052631578947,
             "y": 296,
-            "width": 348,
+            "width": 425.89473684210526,
             "height": 16
           },
           "rowKey": "row_4",
           "columnKey": "audienceIndex",
-          "text": "0.00000",
+          "text": "0",
           "format": "number",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_rule_4",
@@ -318,28 +336,32 @@
           "box": {
             "x": 42,
             "y": 320,
-            "width": 348,
+            "width": 270.1052631578947,
             "height": 16
           },
           "rowKey": "row_5",
           "columnKey": "country",
           "text": "CA",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_5__audienceIndex__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
+            "x": 324.1052631578947,
             "y": 320,
-            "width": 348,
+            "width": 425.89473684210526,
             "height": 16
           },
           "rowKey": "row_5",
           "columnKey": "audienceIndex",
-          "text": "0.00000",
+          "text": "0",
           "format": "number",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_rule_5",
@@ -359,28 +381,32 @@
           "box": {
             "x": 42,
             "y": 344,
-            "width": 348,
+            "width": 270.1052631578947,
             "height": 16
           },
           "rowKey": "row_6",
           "columnKey": "country",
           "text": "CA",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_6__audienceIndex__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
+            "x": 324.1052631578947,
             "y": 344,
-            "width": 348,
+            "width": 425.89473684210526,
             "height": 16
           },
           "rowKey": "row_6",
           "columnKey": "audienceIndex",
-          "text": "0.00000",
+          "text": "0",
           "format": "number",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_rule_6",
@@ -400,28 +426,32 @@
           "box": {
             "x": 42,
             "y": 368,
-            "width": 348,
+            "width": 270.1052631578947,
             "height": 16
           },
           "rowKey": "row_7",
           "columnKey": "country",
           "text": "CA",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_7__audienceIndex__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
+            "x": 324.1052631578947,
             "y": 368,
-            "width": 348,
+            "width": 425.89473684210526,
             "height": 16
           },
           "rowKey": "row_7",
           "columnKey": "audienceIndex",
-          "text": "0.00000",
+          "text": "0",
           "format": "number",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_rule_7",
@@ -441,53 +471,85 @@
           "box": {
             "x": 42,
             "y": 392,
-            "width": 348,
+            "width": 270.1052631578947,
             "height": 16
           },
           "rowKey": "row_8",
           "columnKey": "country",
           "text": "CA",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_8__audienceIndex__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
+            "x": 324.1052631578947,
             "y": 392,
-            "width": 348,
+            "width": 425.89473684210526,
             "height": 16
           },
           "rowKey": "row_8",
           "columnKey": "audienceIndex",
-          "text": "0.00000",
+          "text": "0",
           "format": "number",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
+        },
+        {
+          "id": "headlineKpi__card",
+          "kind": "rect",
+          "box": {
+            "x": 36,
+            "y": 428,
+            "width": 720,
+            "height": 106
+          },
+          "fillColor": "#ffffff",
+          "strokeColor": "#d8e2ec",
+          "strokeWidth": 1,
+          "radius": 7
         },
         {
           "id": "headlineKpi__title_0",
           "kind": "text",
           "box": {
-            "x": 36,
-            "y": 428,
-            "width": 720,
-            "height": 20
+            "x": 46,
+            "y": 438,
+            "width": 700,
+            "height": 16
           },
           "text": "Headline KPI",
-          "fontSize": 14,
+          "fontSize": 12,
           "fontWeight": "600",
           "color": "#101828"
+        },
+        {
+          "id": "headlineKpi__value_label_0",
+          "kind": "text",
+          "box": {
+            "x": 46,
+            "y": 454,
+            "width": 700,
+            "height": 12
+          },
+          "text": "AVAILABLE IMPRESSIONS",
+          "fontSize": 8,
+          "fontWeight": "600",
+          "color": "#667085"
         },
         {
           "id": "headlineKpi__value_0",
           "kind": "text",
           "box": {
-            "x": 36,
-            "y": 452,
-            "width": 720,
+            "x": 46,
+            "y": 466,
+            "width": 700,
             "height": 24
           },
-          "text": "Available Impressions: 40 400",
+          "text": "40.4K",
           "fontSize": 20,
           "fontWeight": "700",
           "color": "#101828"
@@ -496,41 +558,27 @@
           "id": "headlineKpi__detail_0",
           "kind": "text",
           "box": {
-            "x": 36,
-            "y": 476,
-            "width": 720,
-            "height": 16
+            "x": 46,
+            "y": 494,
+            "width": 700,
+            "height": 14
           },
           "text": "Channel: Display",
-          "fontSize": 12,
+          "fontSize": 10,
           "color": "#344054"
         },
         {
           "id": "headlineKpi__detail_1",
           "kind": "text",
           "box": {
-            "x": 36,
-            "y": 492,
-            "width": 720,
-            "height": 16
+            "x": 46,
+            "y": 508,
+            "width": 700,
+            "height": 14
           },
           "text": "Generic KPI block resolved from the first authored runtime row.",
-          "fontSize": 12,
+          "fontSize": 10,
           "color": "#344054"
-        },
-        {
-          "id": "comparisonTable__title_0",
-          "kind": "text",
-          "box": {
-            "x": 36,
-            "y": 524,
-            "width": 720,
-            "height": 20
-          },
-          "text": "Delivery Comparison",
-          "fontSize": 14,
-          "fontWeight": "600",
-          "color": "#101828"
         }
       ],
       "headerElements": [
@@ -594,11 +642,25 @@
       "number": 2,
       "elements": [
         {
+          "id": "comparisonTable__title_0",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 84,
+            "width": 720,
+            "height": 20
+          },
+          "text": "Delivery Comparison",
+          "fontSize": 14,
+          "fontWeight": "600",
+          "color": "#101828"
+        },
+        {
           "id": "comparisonTable__header_bg__page_2",
           "kind": "rect",
           "box": {
             "x": 36,
-            "y": 84,
+            "y": 108,
             "width": 720,
             "height": 24
           },
@@ -611,67 +673,71 @@
           "kind": "text",
           "box": {
             "x": 42,
-            "y": 88,
-            "width": 168,
+            "y": 112,
+            "width": 197.82857142857142,
             "height": 16
           },
           "text": "Date",
-          "fontSize": 11,
+          "fontSize": 9,
           "fontWeight": "600",
           "color": "#101828",
-          "align": "left"
+          "align": "left",
+          "wrap": true
         },
         {
           "id": "comparisonTable__header__channelV2__page_2",
           "kind": "text",
           "box": {
-            "x": 222,
-            "y": 88,
-            "width": 168,
+            "x": 251.82857142857142,
+            "y": 112,
+            "width": 144.8,
             "height": 16
           },
           "text": "Channel",
-          "fontSize": 11,
+          "fontSize": 9,
           "fontWeight": "600",
           "color": "#101828",
-          "align": "left"
+          "align": "left",
+          "wrap": true
         },
         {
           "id": "comparisonTable__header__avails__page_2",
           "kind": "text",
           "box": {
-            "x": 402,
-            "y": 88,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 112,
+            "width": 144.8,
             "height": 16
           },
           "text": "Avails",
-          "fontSize": 11,
+          "fontSize": 9,
           "fontWeight": "600",
           "color": "#101828",
-          "align": "left"
+          "align": "left",
+          "wrap": true
         },
         {
           "id": "comparisonTable__header__hhUniqs__page_2",
           "kind": "text",
           "box": {
-            "x": 582,
-            "y": 88,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 112,
+            "width": 184.57142857142856,
             "height": 16
           },
           "text": "HH Uniques",
-          "fontSize": 11,
+          "fontSize": 9,
           "fontWeight": "600",
           "color": "#101828",
-          "align": "left"
+          "align": "left",
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_rule_0",
           "kind": "line",
           "box": {
             "x": 36,
-            "y": 132,
+            "y": 156,
             "width": 720,
             "height": 0
           },
@@ -683,22 +749,24 @@
           "kind": "tableCellText",
           "box": {
             "x": 42,
-            "y": 112,
-            "width": 168,
+            "y": 136,
+            "width": 197.82857142857142,
             "height": 16
           },
           "rowKey": "row_1",
           "columnKey": "eventDate",
-          "text": "2026-05-01",
+          "text": "May 1, 2026",
           "format": "date",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_1__channelV2__badge",
           "kind": "tableCellBadge",
           "box": {
-            "x": 222,
-            "y": 112,
+            "x": 251.82857142857142,
+            "y": 136,
             "width": 69,
             "height": 16
           },
@@ -714,9 +782,9 @@
           "id": "comparisonTable__row_1__avails__bar_track",
           "kind": "rect",
           "box": {
-            "x": 402,
-            "y": 112,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 136,
+            "width": 144.8,
             "height": 16
           },
           "fillColor": "#dbeafe",
@@ -726,9 +794,9 @@
           "id": "comparisonTable__row_1__avails__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 402,
-            "y": 112,
-            "width": 131.8709677419355,
+            "x": 408.62857142857143,
+            "y": 136,
+            "width": 113.66021505376345,
             "height": 16
           },
           "rowKey": "row_1",
@@ -743,24 +811,26 @@
           "id": "comparisonTable__row_1__avails__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
-            "y": 112,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 136,
+            "width": 144.8,
             "height": 16
           },
           "rowKey": "row_1",
           "columnKey": "avails",
-          "text": "40 400",
+          "text": "40.4K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_1__hhUniqs__bar_track",
           "kind": "rect",
           "box": {
-            "x": 582,
-            "y": 112,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 136,
+            "width": 184.57142857142856,
             "height": 16
           },
           "fillColor": "#dcfce7",
@@ -770,9 +840,9 @@
           "id": "comparisonTable__row_1__hhUniqs__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 582,
-            "y": 112,
-            "width": 129.6,
+            "x": 565.4285714285714,
+            "y": 136,
+            "width": 142.38367346938776,
             "height": 16
           },
           "rowKey": "row_1",
@@ -787,23 +857,25 @@
           "id": "comparisonTable__row_1__hhUniqs__text",
           "kind": "tableCellText",
           "box": {
-            "x": 582,
-            "y": 112,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 136,
+            "width": 184.57142857142856,
             "height": 16
           },
           "rowKey": "row_1",
           "columnKey": "hhUniqs",
-          "text": "16 500",
+          "text": "16.5K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_rule_1",
           "kind": "line",
           "box": {
             "x": 36,
-            "y": 156,
+            "y": 180,
             "width": 720,
             "height": 0
           },
@@ -815,22 +887,24 @@
           "kind": "tableCellText",
           "box": {
             "x": 42,
-            "y": 136,
-            "width": 168,
+            "y": 160,
+            "width": 197.82857142857142,
             "height": 16
           },
           "rowKey": "row_2",
           "columnKey": "eventDate",
-          "text": "2026-05-01",
+          "text": "May 1, 2026",
           "format": "date",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_2__channelV2__badge",
           "kind": "tableCellBadge",
           "box": {
-            "x": 222,
-            "y": 136,
+            "x": 251.82857142857142,
+            "y": 160,
             "width": 41,
             "height": 16
           },
@@ -846,9 +920,9 @@
           "id": "comparisonTable__row_2__avails__bar_track",
           "kind": "rect",
           "box": {
-            "x": 402,
-            "y": 136,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 160,
+            "width": 144.8,
             "height": 16
           },
           "fillColor": "#dbeafe",
@@ -858,9 +932,9 @@
           "id": "comparisonTable__row_2__avails__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 402,
-            "y": 136,
-            "width": 21.677419354838708,
+            "x": 408.62857142857143,
+            "y": 160,
+            "width": 18.683870967741935,
             "height": 16
           },
           "rowKey": "row_2",
@@ -875,24 +949,26 @@
           "id": "comparisonTable__row_2__avails__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
-            "y": 136,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 160,
+            "width": 144.8,
             "height": 16
           },
           "rowKey": "row_2",
           "columnKey": "avails",
-          "text": "34 300",
+          "text": "34.3K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_2__hhUniqs__bar_track",
           "kind": "rect",
           "box": {
-            "x": 582,
-            "y": 136,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 160,
+            "width": 184.57142857142856,
             "height": 16
           },
           "fillColor": "#dcfce7",
@@ -902,9 +978,9 @@
           "id": "comparisonTable__row_2__hhUniqs__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 582,
-            "y": 136,
-            "width": 43.199999999999996,
+            "x": 565.4285714285714,
+            "y": 160,
+            "width": 47.46122448979591,
             "height": 16
           },
           "rowKey": "row_2",
@@ -919,23 +995,25 @@
           "id": "comparisonTable__row_2__hhUniqs__text",
           "kind": "tableCellText",
           "box": {
-            "x": 582,
-            "y": 136,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 160,
+            "width": 184.57142857142856,
             "height": 16
           },
           "rowKey": "row_2",
           "columnKey": "hhUniqs",
-          "text": "14 700",
+          "text": "14.7K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_rule_2",
           "kind": "line",
           "box": {
             "x": 36,
-            "y": 180,
+            "y": 204,
             "width": 720,
             "height": 0
           },
@@ -947,22 +1025,24 @@
           "kind": "tableCellText",
           "box": {
             "x": 42,
-            "y": 160,
-            "width": 168,
+            "y": 184,
+            "width": 197.82857142857142,
             "height": 16
           },
           "rowKey": "row_3",
           "columnKey": "eventDate",
-          "text": "2026-05-02",
+          "text": "May 2, 2026",
           "format": "date",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_3__channelV2__badge",
           "kind": "tableCellBadge",
           "box": {
-            "x": 222,
-            "y": 160,
+            "x": 251.82857142857142,
+            "y": 184,
             "width": 69,
             "height": 16
           },
@@ -978,9 +1058,9 @@
           "id": "comparisonTable__row_3__avails__bar_track",
           "kind": "rect",
           "box": {
-            "x": 402,
-            "y": 160,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 184,
+            "width": 144.8,
             "height": 16
           },
           "fillColor": "#dbeafe",
@@ -990,9 +1070,9 @@
           "id": "comparisonTable__row_3__avails__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 402,
-            "y": 160,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 184,
+            "width": 144.8,
             "height": 16
           },
           "rowKey": "row_3",
@@ -1007,24 +1087,26 @@
           "id": "comparisonTable__row_3__avails__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
-            "y": 160,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 184,
+            "width": 144.8,
             "height": 16
           },
           "rowKey": "row_3",
           "columnKey": "avails",
-          "text": "42 400",
+          "text": "42.4K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_3__hhUniqs__bar_track",
           "kind": "rect",
           "box": {
-            "x": 582,
-            "y": 160,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 184,
+            "width": 184.57142857142856,
             "height": 16
           },
           "fillColor": "#dcfce7",
@@ -1034,9 +1116,9 @@
           "id": "comparisonTable__row_3__hhUniqs__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 582,
-            "y": 160,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 184,
+            "width": 184.57142857142856,
             "height": 16
           },
           "rowKey": "row_3",
@@ -1051,23 +1133,25 @@
           "id": "comparisonTable__row_3__hhUniqs__text",
           "kind": "tableCellText",
           "box": {
-            "x": 582,
-            "y": 160,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 184,
+            "width": 184.57142857142856,
             "height": 16
           },
           "rowKey": "row_3",
           "columnKey": "hhUniqs",
-          "text": "17 300",
+          "text": "17.3K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_rule_3",
           "kind": "line",
           "box": {
             "x": 36,
-            "y": 204,
+            "y": 228,
             "width": 720,
             "height": 0
           },
@@ -1079,22 +1163,24 @@
           "kind": "tableCellText",
           "box": {
             "x": 42,
-            "y": 184,
-            "width": 168,
+            "y": 208,
+            "width": 197.82857142857142,
             "height": 16
           },
           "rowKey": "row_4",
           "columnKey": "eventDate",
-          "text": "2026-05-02",
+          "text": "May 2, 2026",
           "format": "date",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_4__channelV2__badge",
           "kind": "tableCellBadge",
           "box": {
-            "x": 222,
-            "y": 184,
+            "x": 251.82857142857142,
+            "y": 208,
             "width": 41,
             "height": 16
           },
@@ -1110,9 +1196,9 @@
           "id": "comparisonTable__row_4__avails__bar_track",
           "kind": "rect",
           "box": {
-            "x": 402,
-            "y": 184,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 208,
+            "width": 144.8,
             "height": 16
           },
           "fillColor": "#dbeafe",
@@ -1122,9 +1208,9 @@
           "id": "comparisonTable__row_4__avails__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 402,
-            "y": 184,
-            "width": 52.38709677419355,
+            "x": 408.62857142857143,
+            "y": 208,
+            "width": 45.152688172043014,
             "height": 16
           },
           "rowKey": "row_4",
@@ -1139,24 +1225,26 @@
           "id": "comparisonTable__row_4__avails__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
-            "y": 184,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 208,
+            "width": 144.8,
             "height": 16
           },
           "rowKey": "row_4",
           "columnKey": "avails",
-          "text": "36 000",
+          "text": "36K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_4__hhUniqs__bar_track",
           "kind": "rect",
           "box": {
-            "x": 582,
-            "y": 184,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 208,
+            "width": 184.57142857142856,
             "height": 16
           },
           "fillColor": "#dcfce7",
@@ -1166,9 +1254,9 @@
           "id": "comparisonTable__row_4__hhUniqs__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 582,
-            "y": 184,
-            "width": 72,
+            "x": 565.4285714285714,
+            "y": 208,
+            "width": 79.10204081632652,
             "height": 16
           },
           "rowKey": "row_4",
@@ -1183,23 +1271,25 @@
           "id": "comparisonTable__row_4__hhUniqs__text",
           "kind": "tableCellText",
           "box": {
-            "x": 582,
-            "y": 184,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 208,
+            "width": 184.57142857142856,
             "height": 16
           },
           "rowKey": "row_4",
           "columnKey": "hhUniqs",
-          "text": "15 300",
+          "text": "15.3K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_rule_4",
           "kind": "line",
           "box": {
             "x": 36,
-            "y": 228,
+            "y": 252,
             "width": 720,
             "height": 0
           },
@@ -1211,22 +1301,24 @@
           "kind": "tableCellText",
           "box": {
             "x": 42,
-            "y": 208,
-            "width": 168,
+            "y": 232,
+            "width": 197.82857142857142,
             "height": 16
           },
           "rowKey": "row_5",
           "columnKey": "eventDate",
-          "text": "2026-05-03",
+          "text": "May 3, 2026",
           "format": "date",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_5__channelV2__badge",
           "kind": "tableCellBadge",
           "box": {
-            "x": 222,
-            "y": 208,
+            "x": 251.82857142857142,
+            "y": 232,
             "width": 69,
             "height": 16
           },
@@ -1242,9 +1334,9 @@
           "id": "comparisonTable__row_5__avails__bar_track",
           "kind": "rect",
           "box": {
-            "x": 402,
-            "y": 208,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 232,
+            "width": 144.8,
             "height": 16
           },
           "fillColor": "#dbeafe",
@@ -1254,9 +1346,9 @@
           "id": "comparisonTable__row_5__avails__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 402,
-            "y": 208,
-            "width": 63.225806451612904,
+            "x": 408.62857142857143,
+            "y": 232,
+            "width": 54.49462365591398,
             "height": 16
           },
           "rowKey": "row_5",
@@ -1271,24 +1363,26 @@
           "id": "comparisonTable__row_5__avails__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
-            "y": 208,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 232,
+            "width": 144.8,
             "height": 16
           },
           "rowKey": "row_5",
           "columnKey": "avails",
-          "text": "36 600",
+          "text": "36.6K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_5__hhUniqs__bar_track",
           "kind": "rect",
           "box": {
-            "x": 582,
-            "y": 208,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 232,
+            "width": 184.57142857142856,
             "height": 16
           },
           "fillColor": "#dcfce7",
@@ -1298,9 +1392,9 @@
           "id": "comparisonTable__row_5__hhUniqs__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 582,
-            "y": 208,
-            "width": 67.2,
+            "x": 565.4285714285714,
+            "y": 232,
+            "width": 73.82857142857142,
             "height": 16
           },
           "rowKey": "row_5",
@@ -1315,23 +1409,25 @@
           "id": "comparisonTable__row_5__hhUniqs__text",
           "kind": "tableCellText",
           "box": {
-            "x": 582,
-            "y": 208,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 232,
+            "width": 184.57142857142856,
             "height": 16
           },
           "rowKey": "row_5",
           "columnKey": "hhUniqs",
-          "text": "15 200",
+          "text": "15.2K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_rule_5",
           "kind": "line",
           "box": {
             "x": 36,
-            "y": 252,
+            "y": 276,
             "width": 720,
             "height": 0
           },
@@ -1343,22 +1439,24 @@
           "kind": "tableCellText",
           "box": {
             "x": 42,
-            "y": 232,
-            "width": 168,
+            "y": 256,
+            "width": 197.82857142857142,
             "height": 16
           },
           "rowKey": "row_6",
           "columnKey": "eventDate",
-          "text": "2026-05-03",
+          "text": "May 3, 2026",
           "format": "date",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_6__channelV2__badge",
           "kind": "tableCellBadge",
           "box": {
-            "x": 222,
-            "y": 232,
+            "x": 251.82857142857142,
+            "y": 256,
             "width": 41,
             "height": 16
           },
@@ -1374,9 +1472,9 @@
           "id": "comparisonTable__row_6__avails__bar_track",
           "kind": "rect",
           "box": {
-            "x": 402,
-            "y": 232,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 256,
+            "width": 144.8,
             "height": 16
           },
           "fillColor": "#dbeafe",
@@ -1386,8 +1484,8 @@
           "id": "comparisonTable__row_6__avails__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 402,
-            "y": 232,
+            "x": 408.62857142857143,
+            "y": 256,
             "width": 0,
             "height": 16
           },
@@ -1403,24 +1501,26 @@
           "id": "comparisonTable__row_6__avails__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
-            "y": 232,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 256,
+            "width": 144.8,
             "height": 16
           },
           "rowKey": "row_6",
           "columnKey": "avails",
-          "text": "33 100",
+          "text": "33.1K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_6__hhUniqs__bar_track",
           "kind": "rect",
           "box": {
-            "x": 582,
-            "y": 232,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 256,
+            "width": 184.57142857142856,
             "height": 16
           },
           "fillColor": "#dcfce7",
@@ -1430,8 +1530,8 @@
           "id": "comparisonTable__row_6__hhUniqs__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 582,
-            "y": 232,
+            "x": 565.4285714285714,
+            "y": 256,
             "width": 0,
             "height": 16
           },
@@ -1447,23 +1547,25 @@
           "id": "comparisonTable__row_6__hhUniqs__text",
           "kind": "tableCellText",
           "box": {
-            "x": 582,
-            "y": 232,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 256,
+            "width": 184.57142857142856,
             "height": 16
           },
           "rowKey": "row_6",
           "columnKey": "hhUniqs",
-          "text": "13 800",
+          "text": "13.8K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_rule_6",
           "kind": "line",
           "box": {
             "x": 36,
-            "y": 276,
+            "y": 300,
             "width": 720,
             "height": 0
           },
@@ -1475,22 +1577,24 @@
           "kind": "tableCellText",
           "box": {
             "x": 42,
-            "y": 256,
-            "width": 168,
+            "y": 280,
+            "width": 197.82857142857142,
             "height": 16
           },
           "rowKey": "row_7",
           "columnKey": "eventDate",
-          "text": "2026-05-04",
+          "text": "May 4, 2026",
           "format": "date",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_7__channelV2__badge",
           "kind": "tableCellBadge",
           "box": {
-            "x": 222,
-            "y": 256,
+            "x": 251.82857142857142,
+            "y": 280,
             "width": 69,
             "height": 16
           },
@@ -1506,9 +1610,9 @@
           "id": "comparisonTable__row_7__avails__bar_track",
           "kind": "rect",
           "box": {
-            "x": 402,
-            "y": 256,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 280,
+            "width": 144.8,
             "height": 16
           },
           "fillColor": "#dbeafe",
@@ -1518,9 +1622,9 @@
           "id": "comparisonTable__row_7__avails__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 402,
-            "y": 256,
-            "width": 106.58064516129032,
+            "x": 408.62857142857143,
+            "y": 280,
+            "width": 91.86236559139786,
             "height": 16
           },
           "rowKey": "row_7",
@@ -1535,24 +1639,26 @@
           "id": "comparisonTable__row_7__avails__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
-            "y": 256,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 280,
+            "width": 144.8,
             "height": 16
           },
           "rowKey": "row_7",
           "columnKey": "avails",
-          "text": "39 000",
+          "text": "39K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_7__hhUniqs__bar_track",
           "kind": "rect",
           "box": {
-            "x": 582,
-            "y": 256,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 280,
+            "width": 184.57142857142856,
             "height": 16
           },
           "fillColor": "#dcfce7",
@@ -1562,9 +1668,9 @@
           "id": "comparisonTable__row_7__hhUniqs__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 582,
-            "y": 256,
-            "width": 100.8,
+            "x": 565.4285714285714,
+            "y": 280,
+            "width": 110.74285714285713,
             "height": 16
           },
           "rowKey": "row_7",
@@ -1579,23 +1685,25 @@
           "id": "comparisonTable__row_7__hhUniqs__text",
           "kind": "tableCellText",
           "box": {
-            "x": 582,
-            "y": 256,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 280,
+            "width": 184.57142857142856,
             "height": 16
           },
           "rowKey": "row_7",
           "columnKey": "hhUniqs",
-          "text": "15 900",
+          "text": "15.9K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_rule_7",
           "kind": "line",
           "box": {
             "x": 36,
-            "y": 300,
+            "y": 324,
             "width": 720,
             "height": 0
           },
@@ -1607,22 +1715,24 @@
           "kind": "tableCellText",
           "box": {
             "x": 42,
-            "y": 280,
-            "width": 168,
+            "y": 304,
+            "width": 197.82857142857142,
             "height": 16
           },
           "rowKey": "row_8",
           "columnKey": "eventDate",
-          "text": "2026-05-04",
+          "text": "May 4, 2026",
           "format": "date",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_8__channelV2__badge",
           "kind": "tableCellBadge",
           "box": {
-            "x": 222,
-            "y": 280,
+            "x": 251.82857142857142,
+            "y": 304,
             "width": 41,
             "height": 16
           },
@@ -1638,9 +1748,9 @@
           "id": "comparisonTable__row_8__avails__bar_track",
           "kind": "rect",
           "box": {
-            "x": 402,
-            "y": 280,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 304,
+            "width": 144.8,
             "height": 16
           },
           "fillColor": "#dbeafe",
@@ -1650,9 +1760,9 @@
           "id": "comparisonTable__row_8__avails__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 402,
-            "y": 280,
-            "width": 30.70967741935484,
+            "x": 408.62857142857143,
+            "y": 304,
+            "width": 26.46881720430108,
             "height": 16
           },
           "rowKey": "row_8",
@@ -1667,24 +1777,26 @@
           "id": "comparisonTable__row_8__avails__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
-            "y": 280,
-            "width": 168,
+            "x": 408.62857142857143,
+            "y": 304,
+            "width": 144.8,
             "height": 16
           },
           "rowKey": "row_8",
           "columnKey": "avails",
-          "text": "34 800",
+          "text": "34.8K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "comparisonTable__row_8__hhUniqs__bar_track",
           "kind": "rect",
           "box": {
-            "x": 582,
-            "y": 280,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 304,
+            "width": 184.57142857142856,
             "height": 16
           },
           "fillColor": "#dcfce7",
@@ -1694,9 +1806,9 @@
           "id": "comparisonTable__row_8__hhUniqs__bar",
           "kind": "tableCellDataBar",
           "box": {
-            "x": 582,
-            "y": 280,
-            "width": 33.6,
+            "x": 565.4285714285714,
+            "y": 304,
+            "width": 36.91428571428571,
             "height": 16
           },
           "rowKey": "row_8",
@@ -1711,16 +1823,18 @@
           "id": "comparisonTable__row_8__hhUniqs__text",
           "kind": "tableCellText",
           "box": {
-            "x": 582,
-            "y": 280,
-            "width": 168,
+            "x": 565.4285714285714,
+            "y": 304,
+            "width": 184.57142857142856,
             "height": 16
           },
           "rowKey": "row_8",
           "columnKey": "hhUniqs",
-          "text": "14 500",
+          "text": "14.5K",
           "format": "compactNumber",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         }
       ],
       "headerElements": [
@@ -1804,15 +1918,15 @@
       "pageNumber": 1,
       "level": 1,
       "elementId": "headlineKpi__title_0",
-      "y": 428
+      "y": 438
     },
     {
       "id": "bookmark.comparisonTable",
       "title": "Delivery Comparison",
-      "pageNumber": 1,
+      "pageNumber": 2,
       "level": 1,
       "elementId": "comparisonTable__title_0",
-      "y": 524
+      "y": 84
     }
   ],
   "diagnostics": []

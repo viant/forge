@@ -10,11 +10,13 @@ function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
+export const REPORT_STORE_CHANGED_EVENT = "forge:report-store-changed";
+
 function notifyReportStoreChanged(detail = {}) {
     if (typeof globalThis?.dispatchEvent !== "function" || typeof globalThis?.CustomEvent !== "function") {
         return;
     }
-    globalThis.dispatchEvent(new globalThis.CustomEvent("agently:report-store-changed", { detail }));
+    globalThis.dispatchEvent(new globalThis.CustomEvent(REPORT_STORE_CHANGED_EVENT, { detail }));
 }
 
 function resolveBearerToken(auth = {}) {

@@ -200,7 +200,7 @@ private fun DashboardRenderer(runtime: ForgeRuntime, window: WindowContext, cont
                 Text("Dashboard table requires columns and data source.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        "dashboard.reportBuilder" -> DashboardPanel(runtime, window, container) { ReportBuilderRenderer(runtime, window, container) }
+        "dashboard.reportBuilder" -> ReportBuilderRenderer(runtime, window, container)
         "dashboard.feed" -> DashboardPanel(runtime, window, container) {
             DashboardFeedBlock(window, container, dashboardRoot, filters, selection)
         }

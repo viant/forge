@@ -22,6 +22,7 @@ import {
     normalizeReportCatalogPageSize,
     paginateReportCatalogEntries,
 } from "./reportCatalogPagination.js";
+import { REPORT_STORE_CHANGED_EVENT } from "./reportBuilderHostServices.js";
 import "./ReportCatalog.css";
 
 const SCOPES = [
@@ -216,7 +217,7 @@ function ReportCard({
                 </div>
                 <div>
                     <dt>Owner</dt>
-                    <dd>{isPreset ? "Steward" : (report.ownerId || "You")}</dd>
+                    <dd>{isPreset ? "Workspace" : (report.ownerId || "You")}</dd>
                 </div>
             </dl>
 
@@ -308,8 +309,8 @@ export default function ReportCatalog({container, context}) {
 
     useEffect(() => {
         const refresh = () => loadReports({ silent: true });
-        globalThis.addEventListener?.("agently:report-store-changed", refresh);
-        return () => globalThis.removeEventListener?.("agently:report-store-changed", refresh);
+        globalThis.addEventListener?.(REPORT_STORE_CHANGED_EVENT, refresh);
+        return () => globalThis.removeEventListener?.(REPORT_STORE_CHANGED_EVENT, refresh);
     }, [loadReports]);
 
     const entries = useMemo(() => {
