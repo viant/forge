@@ -638,7 +638,8 @@
           "chartModel": {
             "type": "line",
             "xAxis": {
-              "dataKey": "eventDate"
+              "dataKey": "eventDate",
+              "label": "Date"
             },
             "yAxis": {
               "format": "currency"
@@ -912,7 +913,8 @@
           "chartModel": {
             "type": "line",
             "xAxis": {
-              "dataKey": "eventDate"
+              "dataKey": "eventDate",
+              "label": "Date"
             },
             "yAxis": {
               "format": "currency"
@@ -1000,7 +1002,7 @@
       "version": 1,
       "kind": "reportFill",
       "specVersion": 1,
-      "specHash": "fnv1a:924c44bf",
+      "specHash": "fnv1a:004641bb",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "authoredLandscapeMixedBuilder",
@@ -1360,7 +1362,8 @@
           "chartModel": {
             "type": "line",
             "xAxis": {
-              "dataKey": "eventDate"
+              "dataKey": "eventDate",
+              "label": "Date"
             },
             "yAxis": {
               "format": "currency"
@@ -1404,7 +1407,8 @@
             "chartModel": {
               "type": "line",
               "xAxis": {
-                "dataKey": "eventDate"
+                "dataKey": "eventDate",
+                "label": "Date"
               },
               "yAxis": {
                 "format": "currency"
@@ -1649,9 +1653,9 @@
       "version": 1,
       "kind": "reportPrint",
       "specVersion": 1,
-      "specHash": "fnv1a:924c44bf",
+      "specHash": "fnv1a:004641bb",
       "fillVersion": 1,
-      "fillHash": "fnv1a:fc319277",
+      "fillHash": "fnv1a:6570ff8e",
       "source": {
         "kind": "dashboard.reportBuilder",
         "containerId": "authoredLandscapeMixedBuilder",
@@ -1706,59 +1710,63 @@
               "box": {
                 "x": 42,
                 "y": 112,
-                "width": 168,
+                "width": 182.87179487179486,
                 "height": 16
               },
               "text": "Date",
-              "fontSize": 11,
+              "fontSize": 9,
               "fontWeight": "600",
               "color": "#101828",
-              "align": "left"
+              "align": "left",
+              "wrap": true
             },
             {
               "id": "primaryTable__header__channelId__page_1",
               "kind": "text",
               "box": {
-                "x": 222,
+                "x": 236.87179487179486,
                 "y": 112,
-                "width": 168,
+                "width": 135.28205128205127,
                 "height": 16
               },
               "text": "Channel",
-              "fontSize": 11,
+              "fontSize": 9,
               "fontWeight": "600",
               "color": "#101828",
-              "align": "left"
+              "align": "left",
+              "wrap": true
             },
             {
               "id": "primaryTable__header__totalSpend__page_1",
               "kind": "text",
               "box": {
-                "x": 402,
+                "x": 384.15384615384613,
                 "y": 112,
-                "width": 168,
+                "width": 170.97435897435895,
                 "height": 16
               },
               "text": "Spend",
-              "fontSize": 11,
+              "fontSize": 9,
               "fontWeight": "600",
               "color": "#101828",
-              "align": "right"
+              "align": "right",
+              "wrap": true
             },
             {
               "id": "primaryTable__header__impressions__page_1",
               "kind": "text",
               "box": {
-                "x": 582,
+                "x": 567.1282051282051,
                 "y": 112,
-                "width": 168,
+                "width": 182.87179487179486,
                 "height": 16
               },
               "text": "Impressions",
-              "fontSize": 11,
+              "fontSize": 9,
               "fontWeight": "600",
               "color": "#101828",
-              "align": "right"
+              "align": "right",
+              "wrap": true
             },
             {
               "id": "primaryTable__row_rule_0",
@@ -1778,58 +1786,66 @@
               "box": {
                 "x": 42,
                 "y": 136,
-                "width": 168,
+                "width": 182.87179487179486,
                 "height": 16
               },
               "rowKey": "row_1",
               "columnKey": "eventDate",
-              "text": "2026-05-01",
+              "text": "May 1, 2026",
               "format": "date",
-              "align": "left"
+              "align": "left",
+              "fontSize": 9,
+              "wrap": true
             },
             {
               "id": "primaryTable__row_1__channelId__text",
               "kind": "tableCellText",
               "box": {
-                "x": 222,
+                "x": 236.87179487179486,
                 "y": 136,
-                "width": 168,
+                "width": 135.28205128205127,
                 "height": 16
               },
               "rowKey": "row_1",
               "columnKey": "channelId",
               "text": "Display",
-              "align": "left"
+              "align": "left",
+              "fontSize": 9,
+              "wrap": true
             },
             {
               "id": "primaryTable__row_1__totalSpend__text",
               "kind": "tableCellText",
               "box": {
-                "x": 402,
+                "x": 384.15384615384613,
                 "y": 136,
-                "width": 168,
+                "width": 170.97435897435895,
                 "height": 16
               },
               "rowKey": "row_1",
               "columnKey": "totalSpend",
               "text": "$40,400.00",
               "format": "currency",
-              "align": "right"
+              "align": "right",
+              "fontSize": 9,
+              "wrap": true
             },
             {
               "id": "primaryTable__row_1__impressions__text",
               "kind": "tableCellText",
               "box": {
-                "x": 582,
+                "x": 567.1282051282051,
                 "y": 136,
-                "width": 168,
+                "width": 182.87179487179486,
                 "height": 16
               },
               "rowKey": "row_1",
               "columnKey": "impressions",
-              "text": "16 500",
+              "text": "16.5K",
               "format": "compactNumber",
-              "align": "right"
+              "align": "right",
+              "fontSize": 9,
+              "wrap": true
             },
             {
               "id": "primaryTable__row_rule_1",
@@ -1849,58 +1865,66 @@
               "box": {
                 "x": 42,
                 "y": 160,
-                "width": 168,
+                "width": 182.87179487179486,
                 "height": 16
               },
               "rowKey": "row_2",
               "columnKey": "eventDate",
-              "text": "2026-05-02",
+              "text": "May 2, 2026",
               "format": "date",
-              "align": "left"
+              "align": "left",
+              "fontSize": 9,
+              "wrap": true
             },
             {
               "id": "primaryTable__row_2__channelId__text",
               "kind": "tableCellText",
               "box": {
-                "x": 222,
+                "x": 236.87179487179486,
                 "y": 160,
-                "width": 168,
+                "width": 135.28205128205127,
                 "height": 16
               },
               "rowKey": "row_2",
               "columnKey": "channelId",
               "text": "CTV",
-              "align": "left"
+              "align": "left",
+              "fontSize": 9,
+              "wrap": true
             },
             {
               "id": "primaryTable__row_2__totalSpend__text",
               "kind": "tableCellText",
               "box": {
-                "x": 402,
+                "x": 384.15384615384613,
                 "y": 160,
-                "width": 168,
+                "width": 170.97435897435895,
                 "height": 16
               },
               "rowKey": "row_2",
               "columnKey": "totalSpend",
               "text": "$34,300.00",
               "format": "currency",
-              "align": "right"
+              "align": "right",
+              "fontSize": 9,
+              "wrap": true
             },
             {
               "id": "primaryTable__row_2__impressions__text",
               "kind": "tableCellText",
               "box": {
-                "x": 582,
+                "x": 567.1282051282051,
                 "y": 160,
-                "width": 168,
+                "width": 182.87179487179486,
                 "height": 16
               },
               "rowKey": "row_2",
               "columnKey": "impressions",
-              "text": "14 700",
+              "text": "14.7K",
               "format": "compactNumber",
-              "align": "right"
+              "align": "right",
+              "fontSize": 9,
+              "wrap": true
             },
             {
               "id": "primaryTable__row_rule_2",
@@ -1920,58 +1944,66 @@
               "box": {
                 "x": 42,
                 "y": 184,
-                "width": 168,
+                "width": 182.87179487179486,
                 "height": 16
               },
               "rowKey": "row_3",
               "columnKey": "eventDate",
-              "text": "2026-05-03",
+              "text": "May 3, 2026",
               "format": "date",
-              "align": "left"
+              "align": "left",
+              "fontSize": 9,
+              "wrap": true
             },
             {
               "id": "primaryTable__row_3__channelId__text",
               "kind": "tableCellText",
               "box": {
-                "x": 222,
+                "x": 236.87179487179486,
                 "y": 184,
-                "width": 168,
+                "width": 135.28205128205127,
                 "height": 16
               },
               "rowKey": "row_3",
               "columnKey": "channelId",
               "text": "Display",
-              "align": "left"
+              "align": "left",
+              "fontSize": 9,
+              "wrap": true
             },
             {
               "id": "primaryTable__row_3__totalSpend__text",
               "kind": "tableCellText",
               "box": {
-                "x": 402,
+                "x": 384.15384615384613,
                 "y": 184,
-                "width": 168,
+                "width": 170.97435897435895,
                 "height": 16
               },
               "rowKey": "row_3",
               "columnKey": "totalSpend",
               "text": "$55,200.00",
               "format": "currency",
-              "align": "right"
+              "align": "right",
+              "fontSize": 9,
+              "wrap": true
             },
             {
               "id": "primaryTable__row_3__impressions__text",
               "kind": "tableCellText",
               "box": {
-                "x": 582,
+                "x": 567.1282051282051,
                 "y": 184,
-                "width": 168,
+                "width": 182.87179487179486,
                 "height": 16
               },
               "rowKey": "row_3",
               "columnKey": "impressions",
-              "text": "23 100",
+              "text": "23.1K",
               "format": "compactNumber",
-              "align": "right"
+              "align": "right",
+              "fontSize": 9,
+              "wrap": true
             },
             {
               "id": "primaryTable__row_rule_3",
@@ -1991,83 +2023,66 @@
               "box": {
                 "x": 42,
                 "y": 208,
-                "width": 168,
+                "width": 182.87179487179486,
                 "height": 16
               },
               "rowKey": "row_4",
               "columnKey": "eventDate",
-              "text": "2026-05-04",
+              "text": "May 4, 2026",
               "format": "date",
-              "align": "left"
+              "align": "left",
+              "fontSize": 9,
+              "wrap": true
             },
             {
               "id": "primaryTable__row_4__channelId__text",
               "kind": "tableCellText",
               "box": {
-                "x": 222,
+                "x": 236.87179487179486,
                 "y": 208,
-                "width": 168,
+                "width": 135.28205128205127,
                 "height": 16
               },
               "rowKey": "row_4",
               "columnKey": "channelId",
               "text": "CTV",
-              "align": "left"
+              "align": "left",
+              "fontSize": 9,
+              "wrap": true
             },
             {
               "id": "primaryTable__row_4__totalSpend__text",
               "kind": "tableCellText",
               "box": {
-                "x": 402,
+                "x": 384.15384615384613,
                 "y": 208,
-                "width": 168,
+                "width": 170.97435897435895,
                 "height": 16
               },
               "rowKey": "row_4",
               "columnKey": "totalSpend",
               "text": "$48,800.00",
               "format": "currency",
-              "align": "right"
+              "align": "right",
+              "fontSize": 9,
+              "wrap": true
             },
             {
               "id": "primaryTable__row_4__impressions__text",
               "kind": "tableCellText",
               "box": {
-                "x": 582,
+                "x": 567.1282051282051,
                 "y": 208,
-                "width": 168,
+                "width": 182.87179487179486,
                 "height": 16
               },
               "rowKey": "row_4",
               "columnKey": "impressions",
-              "text": "20 800",
+              "text": "20.8K",
               "format": "compactNumber",
-              "align": "right"
-            },
-            {
-              "id": "channelTrend__title_0",
-              "kind": "text",
-              "box": {
-                "x": 36,
-                "y": 244,
-                "width": 720,
-                "height": 20
-              },
-              "text": "Channel Trend",
-              "fontSize": 14,
-              "fontWeight": "600",
-              "color": "#101828"
-            },
-            {
-              "id": "channelTrend__svg_page_1",
-              "kind": "svg",
-              "box": {
-                "x": 36,
-                "y": 268,
-                "width": 720,
-                "height": 264
-              },
-              "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 264\" width=\"720\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"704\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">55,200</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"704\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">36,800</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"704\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">18,400</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      \n      <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M52,64.2608695652174 L486.6666666666667,16\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"64.2608695652174\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"486.6666666666667\" cy=\"16\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n      \n    \n\n      <path d=\"M269.33333333333337,84.15217391304348 L704,36.869565217391305\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" />\n      \n      <circle cx=\"269.33333333333337\" cy=\"84.15217391304348\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"704\" cy=\"36.869565217391305\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n      \n    \n      \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n\n      <text x=\"269.33333333333337\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-02</text>\n    \n\n      <text x=\"486.6666666666667\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-03</text>\n    \n\n      <text x=\"704\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-04</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"172\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"232\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
+              "align": "right",
+              "fontSize": 9,
+              "wrap": true
             }
           ],
           "headerElements": [
@@ -2131,7 +2146,7 @@
           "number": 2,
           "elements": [
             {
-              "id": "stateGeo__title_0",
+              "id": "channelTrend__title_0",
               "kind": "text",
               "box": {
                 "x": 36,
@@ -2139,128 +2154,21 @@
                 "width": 720,
                 "height": 20
               },
-              "text": "State Performance",
+              "text": "Channel Trend",
               "fontSize": 14,
               "fontWeight": "600",
               "color": "#101828"
             },
             {
-              "id": "stateGeo__svg_page_2",
+              "id": "channelTrend__svg_page_2",
               "kind": "svg",
               "box": {
                 "x": 36,
                 "y": 108,
                 "width": 720,
-                "height": 232
+                "height": 280
               },
-              "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 232\" width=\"720\" height=\"232\">\n      \n    <text x=\"0\" y=\"12\" font-size=\"11\" fill=\"#667085\">2 Regions</text>\n    <text x=\"120\" y=\"12\" font-size=\"11\" fill=\"#667085\">Total State Spend: $4,360,000</text>\n    <text x=\"580\" y=\"12\" font-size=\"11\" fill=\"#667085\">Top: CA</text>\n  \n      \n      <rect x=\"0\" y=\"24\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"39\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AK</text>\n    \n\n      <rect x=\"286\" y=\"24\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"297\" y=\"39\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">ME</text>\n    \n\n      <rect x=\"234\" y=\"50\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"65\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">VT</text>\n    \n\n      <rect x=\"260\" y=\"50\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"271\" y=\"65\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NH</text>\n    \n\n      <rect x=\"286\" y=\"50\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"297\" y=\"65\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MA</text>\n    \n\n      <rect x=\"0\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#d9f0ea\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WA</text>\n    \n\n      <rect x=\"26\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">ID</text>\n    \n\n      <rect x=\"52\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MT</text>\n    \n\n      <rect x=\"78\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">ND</text>\n    \n\n      <rect x=\"104\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MN</text>\n    \n\n      <rect x=\"130\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">IL</text>\n    \n\n      <rect x=\"156\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WI</text>\n    \n\n      <rect x=\"182\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MI</text>\n    \n\n      <rect x=\"234\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NY</text>\n    \n\n      <rect x=\"260\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"271\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">RI</text>\n    \n\n      <rect x=\"286\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"297\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">CT</text>\n    \n\n      <rect x=\"0\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">OR</text>\n    \n\n      <rect x=\"26\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NV</text>\n    \n\n      <rect x=\"52\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WY</text>\n    \n\n      <rect x=\"78\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">SD</text>\n    \n\n      <rect x=\"104\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">IA</text>\n    \n\n      <rect x=\"130\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">IN</text>\n    \n\n      <rect x=\"156\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">OH</text>\n    \n\n      <rect x=\"182\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">PA</text>\n    \n\n      <rect x=\"234\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NJ</text>\n    \n\n      <rect x=\"0\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#db3737\" stroke=\"#101828\" stroke-width=\"1.5\" />\n      <text x=\"11\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">CA</text>\n    \n\n      <rect x=\"26\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">UT</text>\n    \n\n      <rect x=\"52\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">CO</text>\n    \n\n      <rect x=\"78\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NE</text>\n    \n\n      <rect x=\"104\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MO</text>\n    \n\n      <rect x=\"130\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">KY</text>\n    \n\n      <rect x=\"156\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WV</text>\n    \n\n      <rect x=\"182\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">VA</text>\n    \n\n      <rect x=\"208\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"219\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MD</text>\n    \n\n      <rect x=\"234\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">DE</text>\n    \n\n      <rect x=\"26\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AZ</text>\n    \n\n      <rect x=\"52\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NM</text>\n    \n\n      <rect x=\"78\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">KS</text>\n    \n\n      <rect x=\"104\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AR</text>\n    \n\n      <rect x=\"130\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">TN</text>\n    \n\n      <rect x=\"156\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NC</text>\n    \n\n      <rect x=\"182\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">SC</text>\n    \n\n      <rect x=\"208\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"219\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">DC</text>\n    \n\n      <rect x=\"0\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">HI</text>\n    \n\n      <rect x=\"78\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">OK</text>\n    \n\n      <rect x=\"104\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">LA</text>\n    \n\n      <rect x=\"130\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MS</text>\n    \n\n      <rect x=\"156\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AL</text>\n    \n\n      <rect x=\"182\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">GA</text>\n    \n\n      <rect x=\"78\" y=\"206\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"221\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">TX</text>\n    \n\n      <rect x=\"208\" y=\"206\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"219\" y=\"221\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">FL</text>\n    \n      \n    <text x=\"384\" y=\"40\" font-size=\"11\" fill=\"#667085\">Selected Area</text>\n    <text x=\"384\" y=\"58\" font-size=\"14\" font-weight=\"600\" fill=\"#101828\">California (CA)</text>\n    <text x=\"384\" y=\"76\" font-size=\"11\" fill=\"#344054\">State Spend: $2,400,000</text>\n    <rect x=\"384\" y=\"86\" width=\"56\" height=\"18\" rx=\"9\" fill=\"#db3737\" opacity=\"0.18\" />\n    <text x=\"394\" y=\"99\" font-size=\"10\" fill=\"#db3737\">Critical</text>\n  \n      \n        <rect x=\"384\" y=\"123\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#db3737\" />\n        <text x=\"402\" y=\"134\" font-size=\"11\" fill=\"#344054\">Critical</text>\n      \n\n        <rect x=\"384\" y=\"141\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#d9f0ea\" />\n        <text x=\"402\" y=\"152\" font-size=\"11\" fill=\"#344054\">Healthy</text>\n      \n      <text x=\"384\" y=\"170\" font-size=\"11\" fill=\"#667085\">Top Regions</text>\n      \n      <text x=\"384\" y=\"189\" font-size=\"10\" fill=\"#344054\">CA</text>\n      <rect x=\"430\" y=\"180\" width=\"228\" height=\"8\" rx=\"4\" fill=\"#eaecf0\" />\n      <rect x=\"430\" y=\"180\" width=\"228\" height=\"8\" rx=\"4\" fill=\"#db3737\" />\n      <text x=\"664\" y=\"189\" font-size=\"10\" fill=\"#667085\">$2,400,000</text>\n    \n\n      <text x=\"384\" y=\"207\" font-size=\"10\" fill=\"#344054\">WA</text>\n      <rect x=\"430\" y=\"198\" width=\"228\" height=\"8\" rx=\"4\" fill=\"#eaecf0\" />\n      <rect x=\"430\" y=\"198\" width=\"186.2\" height=\"8\" rx=\"4\" fill=\"#d9f0ea\" />\n      <text x=\"664\" y=\"207\" font-size=\"10\" fill=\"#667085\">$1,960,000</text>\n    \n    </svg>"
-            },
-            {
-              "id": "narrativeIntro__title_0",
-              "kind": "text",
-              "box": {
-                "x": 36,
-                "y": 356,
-                "width": 348,
-                "height": 20
-              },
-              "text": "Executive Summary",
-              "fontSize": 14,
-              "fontWeight": "600",
-              "color": "#101828"
-            },
-            {
-              "id": "narrativeIntro__line_0",
-              "kind": "text",
-              "box": {
-                "x": 36,
-                "y": 380,
-                "width": 348,
-                "height": 16
-              },
-              "text": "Executive Summary",
-              "fontSize": 12,
-              "color": "#344054"
-            },
-            {
-              "id": "narrativeIntro__line_1",
-              "kind": "text",
-              "box": {
-                "x": 36,
-                "y": 396,
-                "width": 348,
-                "height": 16
-              },
-              "text": "The report opens with a short narrative block.",
-              "fontSize": 12,
-              "color": "#344054"
-            },
-            {
-              "id": "headlineKpi__title_0",
-              "kind": "text",
-              "box": {
-                "x": 408,
-                "y": 356,
-                "width": 348,
-                "height": 20
-              },
-              "text": "Headline KPI",
-              "fontSize": 14,
-              "fontWeight": "600",
-              "color": "#101828"
-            },
-            {
-              "id": "headlineKpi__value_0",
-              "kind": "text",
-              "box": {
-                "x": 408,
-                "y": 380,
-                "width": 348,
-                "height": 24
-              },
-              "text": "Spend / Impression: 2.45000",
-              "fontSize": 20,
-              "fontWeight": "700",
-              "color": "#101828"
-            },
-            {
-              "id": "headlineKpi__detail_0",
-              "kind": "text",
-              "box": {
-                "x": 408,
-                "y": 404,
-                "width": 348,
-                "height": 16
-              },
-              "text": "Channel: Display",
-              "fontSize": 12,
-              "color": "#344054"
-            },
-            {
-              "id": "headlineKpi__detail_1",
-              "kind": "text",
-              "box": {
-                "x": 408,
-                "y": 420,
-                "width": 348,
-                "height": 16
-              },
-              "text": "Summarizes the first authored runtime row with a",
-              "fontSize": 12,
-              "color": "#344054"
-            },
-            {
-              "id": "headlineKpi__detail_2",
-              "kind": "text",
-              "box": {
-                "x": 408,
-                "y": 436,
-                "width": 348,
-                "height": 16
-              },
-              "text": "non-selected derived measure.",
-              "fontSize": 12,
-              "color": "#344054"
+              "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 280\" width=\"720\" height=\"280\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"704\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">55.2K</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"704\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">36.8K</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"704\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">18.4K</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      \n      <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M52,64.2608695652174 L486.6666666666667,16\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />\n      \n      <circle cx=\"52\" cy=\"64.2608695652174\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"486.6666666666667\" cy=\"16\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n      \n    \n\n      <path d=\"M269.33333333333337,84.15217391304348 L704,36.869565217391305\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />\n      \n      <circle cx=\"269.33333333333337\" cy=\"84.15217391304348\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"704\" cy=\"36.869565217391305\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n      \n    \n      \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-01</text>\n    \n\n      <text x=\"269.33333333333337\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-02</text>\n    \n\n      <text x=\"486.6666666666667\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-03</text>\n    \n\n      <text x=\"704\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">2026-05-04</text>\n    \n      <text x=\"378\" y=\"232\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"600\" fill=\"#475467\">Date</text>\n      \n      <rect x=\"12\" y=\"237\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"248\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"172\" y=\"237\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"248\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
             }
           ],
           "headerElements": [
@@ -2319,6 +2227,227 @@
               "align": "right"
             }
           ]
+        },
+        {
+          "number": 3,
+          "elements": [
+            {
+              "id": "stateGeo__title_0",
+              "kind": "text",
+              "box": {
+                "x": 36,
+                "y": 84,
+                "width": 720,
+                "height": 20
+              },
+              "text": "State Performance",
+              "fontSize": 14,
+              "fontWeight": "600",
+              "color": "#101828"
+            },
+            {
+              "id": "stateGeo__svg_page_3",
+              "kind": "svg",
+              "box": {
+                "x": 36,
+                "y": 108,
+                "width": 720,
+                "height": 232
+              },
+              "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 232\" width=\"720\" height=\"232\">\n      \n    <text x=\"0\" y=\"12\" font-size=\"11\" fill=\"#667085\">2 Regions</text>\n    <text x=\"120\" y=\"12\" font-size=\"11\" fill=\"#667085\">Total State Spend: $4,360,000</text>\n    <text x=\"580\" y=\"12\" font-size=\"11\" fill=\"#667085\">Top: CA</text>\n  \n      \n      <rect x=\"0\" y=\"24\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"39\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AK</text>\n    \n\n      <rect x=\"286\" y=\"24\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"297\" y=\"39\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">ME</text>\n    \n\n      <rect x=\"234\" y=\"50\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"65\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">VT</text>\n    \n\n      <rect x=\"260\" y=\"50\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"271\" y=\"65\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NH</text>\n    \n\n      <rect x=\"286\" y=\"50\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"297\" y=\"65\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MA</text>\n    \n\n      <rect x=\"0\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#d9f0ea\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WA</text>\n    \n\n      <rect x=\"26\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">ID</text>\n    \n\n      <rect x=\"52\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MT</text>\n    \n\n      <rect x=\"78\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">ND</text>\n    \n\n      <rect x=\"104\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MN</text>\n    \n\n      <rect x=\"130\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">IL</text>\n    \n\n      <rect x=\"156\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WI</text>\n    \n\n      <rect x=\"182\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MI</text>\n    \n\n      <rect x=\"234\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NY</text>\n    \n\n      <rect x=\"260\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"271\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">RI</text>\n    \n\n      <rect x=\"286\" y=\"76\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"297\" y=\"91\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">CT</text>\n    \n\n      <rect x=\"0\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">OR</text>\n    \n\n      <rect x=\"26\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NV</text>\n    \n\n      <rect x=\"52\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WY</text>\n    \n\n      <rect x=\"78\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">SD</text>\n    \n\n      <rect x=\"104\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">IA</text>\n    \n\n      <rect x=\"130\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">IN</text>\n    \n\n      <rect x=\"156\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">OH</text>\n    \n\n      <rect x=\"182\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">PA</text>\n    \n\n      <rect x=\"234\" y=\"102\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"117\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NJ</text>\n    \n\n      <rect x=\"0\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#db3737\" stroke=\"#101828\" stroke-width=\"1.5\" />\n      <text x=\"11\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">CA</text>\n    \n\n      <rect x=\"26\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">UT</text>\n    \n\n      <rect x=\"52\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">CO</text>\n    \n\n      <rect x=\"78\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NE</text>\n    \n\n      <rect x=\"104\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MO</text>\n    \n\n      <rect x=\"130\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">KY</text>\n    \n\n      <rect x=\"156\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">WV</text>\n    \n\n      <rect x=\"182\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">VA</text>\n    \n\n      <rect x=\"208\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"219\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MD</text>\n    \n\n      <rect x=\"234\" y=\"128\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"245\" y=\"143\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">DE</text>\n    \n\n      <rect x=\"26\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"37\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AZ</text>\n    \n\n      <rect x=\"52\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"63\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NM</text>\n    \n\n      <rect x=\"78\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">KS</text>\n    \n\n      <rect x=\"104\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AR</text>\n    \n\n      <rect x=\"130\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">TN</text>\n    \n\n      <rect x=\"156\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">NC</text>\n    \n\n      <rect x=\"182\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">SC</text>\n    \n\n      <rect x=\"208\" y=\"154\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"219\" y=\"169\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">DC</text>\n    \n\n      <rect x=\"0\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"11\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">HI</text>\n    \n\n      <rect x=\"78\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">OK</text>\n    \n\n      <rect x=\"104\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"115\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">LA</text>\n    \n\n      <rect x=\"130\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"141\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">MS</text>\n    \n\n      <rect x=\"156\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"167\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">AL</text>\n    \n\n      <rect x=\"182\" y=\"180\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"193\" y=\"195\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">GA</text>\n    \n\n      <rect x=\"78\" y=\"206\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"89\" y=\"221\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">TX</text>\n    \n\n      <rect x=\"208\" y=\"206\" width=\"22\" height=\"22\" rx=\"4\" fill=\"#eef3f8\" stroke=\"#d0d5dd\" stroke-width=\"1\" />\n      <text x=\"219\" y=\"221\" text-anchor=\"middle\" font-size=\"8.36\" fill=\"#ffffff\">FL</text>\n    \n      \n    <text x=\"384\" y=\"40\" font-size=\"11\" fill=\"#667085\">Selected Area</text>\n    <text x=\"384\" y=\"58\" font-size=\"14\" font-weight=\"600\" fill=\"#101828\">California (CA)</text>\n    <text x=\"384\" y=\"76\" font-size=\"11\" fill=\"#344054\">State Spend: $2,400,000</text>\n    <rect x=\"384\" y=\"86\" width=\"56\" height=\"18\" rx=\"9\" fill=\"#db3737\" opacity=\"0.18\" />\n    <text x=\"394\" y=\"99\" font-size=\"10\" fill=\"#db3737\">Critical</text>\n  \n      \n        <rect x=\"384\" y=\"123\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#db3737\" />\n        <text x=\"402\" y=\"134\" font-size=\"11\" fill=\"#344054\">Critical</text>\n      \n\n        <rect x=\"384\" y=\"141\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#d9f0ea\" />\n        <text x=\"402\" y=\"152\" font-size=\"11\" fill=\"#344054\">Healthy</text>\n      \n      <text x=\"384\" y=\"170\" font-size=\"11\" fill=\"#667085\">Top Regions</text>\n      \n      <text x=\"384\" y=\"189\" font-size=\"10\" fill=\"#344054\">CA</text>\n      <rect x=\"430\" y=\"180\" width=\"228\" height=\"8\" rx=\"4\" fill=\"#eaecf0\" />\n      <rect x=\"430\" y=\"180\" width=\"228\" height=\"8\" rx=\"4\" fill=\"#db3737\" />\n      <text x=\"664\" y=\"189\" font-size=\"10\" fill=\"#667085\">$2,400,000</text>\n    \n\n      <text x=\"384\" y=\"207\" font-size=\"10\" fill=\"#344054\">WA</text>\n      <rect x=\"430\" y=\"198\" width=\"228\" height=\"8\" rx=\"4\" fill=\"#eaecf0\" />\n      <rect x=\"430\" y=\"198\" width=\"186.2\" height=\"8\" rx=\"4\" fill=\"#d9f0ea\" />\n      <text x=\"664\" y=\"207\" font-size=\"10\" fill=\"#667085\">$1,960,000</text>\n    \n    </svg>"
+            },
+            {
+              "id": "narrativeIntro__title_0",
+              "kind": "text",
+              "box": {
+                "x": 36,
+                "y": 356,
+                "width": 348,
+                "height": 20
+              },
+              "text": "Executive Summary",
+              "fontSize": 14,
+              "fontWeight": "600",
+              "color": "#101828"
+            },
+            {
+              "id": "narrativeIntro__line_0",
+              "kind": "text",
+              "box": {
+                "x": 36,
+                "y": 380,
+                "width": 348,
+                "height": 16
+              },
+              "text": "Executive Summary",
+              "fontSize": 12,
+              "color": "#344054"
+            },
+            {
+              "id": "narrativeIntro__line_1",
+              "kind": "text",
+              "box": {
+                "x": 36,
+                "y": 396,
+                "width": 348,
+                "height": 16
+              },
+              "text": "The report opens with a short narrative block.",
+              "fontSize": 12,
+              "color": "#344054"
+            },
+            {
+              "id": "headlineKpi__card",
+              "kind": "rect",
+              "box": {
+                "x": 408,
+                "y": 356,
+                "width": 348,
+                "height": 120
+              },
+              "fillColor": "#ffffff",
+              "strokeColor": "#d8e2ec",
+              "strokeWidth": 1,
+              "radius": 7
+            },
+            {
+              "id": "headlineKpi__title_0",
+              "kind": "text",
+              "box": {
+                "x": 418,
+                "y": 366,
+                "width": 328,
+                "height": 16
+              },
+              "text": "Headline KPI",
+              "fontSize": 12,
+              "fontWeight": "600",
+              "color": "#101828"
+            },
+            {
+              "id": "headlineKpi__value_label_0",
+              "kind": "text",
+              "box": {
+                "x": 418,
+                "y": 382,
+                "width": 328,
+                "height": 12
+              },
+              "text": "SPEND / IMPRESSION",
+              "fontSize": 8,
+              "fontWeight": "600",
+              "color": "#667085"
+            },
+            {
+              "id": "headlineKpi__value_0",
+              "kind": "text",
+              "box": {
+                "x": 418,
+                "y": 394,
+                "width": 328,
+                "height": 24
+              },
+              "text": "2.45",
+              "fontSize": 20,
+              "fontWeight": "700",
+              "color": "#101828"
+            },
+            {
+              "id": "headlineKpi__detail_0",
+              "kind": "text",
+              "box": {
+                "x": 418,
+                "y": 422,
+                "width": 328,
+                "height": 14
+              },
+              "text": "Channel: Display",
+              "fontSize": 10,
+              "color": "#344054"
+            },
+            {
+              "id": "headlineKpi__detail_1",
+              "kind": "text",
+              "box": {
+                "x": 418,
+                "y": 436,
+                "width": 328,
+                "height": 14
+              },
+              "text": "Summarizes the first authored runtime row with a",
+              "fontSize": 10,
+              "color": "#344054"
+            },
+            {
+              "id": "headlineKpi__detail_2",
+              "kind": "text",
+              "box": {
+                "x": 418,
+                "y": 450,
+                "width": 328,
+                "height": 14
+              },
+              "text": "non-selected derived measure.",
+              "fontSize": 10,
+              "color": "#344054"
+            }
+          ],
+          "headerElements": [
+            {
+              "id": "page_3__header_title",
+              "kind": "text",
+              "box": {
+                "x": 36,
+                "y": 36,
+                "width": 720,
+                "height": 28
+              },
+              "text": "Authored Landscape Mixed Report",
+              "fontSize": 18,
+              "fontWeight": "700",
+              "color": "#101828"
+            },
+            {
+              "id": "page_3__header_rule",
+              "kind": "line",
+              "box": {
+                "x": 36,
+                "y": 70,
+                "width": 720,
+                "height": 0
+              },
+              "strokeColor": "#d0d5dd",
+              "strokeWidth": 1
+            }
+          ],
+          "footerElements": [
+            {
+              "id": "page_3__footer_rule",
+              "kind": "line",
+              "box": {
+                "x": 36,
+                "y": 554,
+                "width": 720,
+                "height": 0
+              },
+              "strokeColor": "#d0d5dd",
+              "strokeWidth": 1
+            },
+            {
+              "id": "page_3__footer_page_number",
+              "kind": "text",
+              "box": {
+                "x": 36,
+                "y": 558,
+                "width": 720,
+                "height": 16
+              },
+              "text": "Page 3",
+              "fontSize": 11,
+              "color": "#667085",
+              "align": "right"
+            }
+          ]
         }
       ],
       "bookmarks": [
@@ -2333,15 +2462,15 @@
         {
           "id": "bookmark.channelTrend",
           "title": "Channel Trend",
-          "pageNumber": 1,
+          "pageNumber": 2,
           "level": 1,
           "elementId": "channelTrend__title_0",
-          "y": 244
+          "y": 84
         },
         {
           "id": "bookmark.stateGeo",
           "title": "State Performance",
-          "pageNumber": 2,
+          "pageNumber": 3,
           "level": 1,
           "elementId": "stateGeo__title_0",
           "y": 84
@@ -2349,7 +2478,7 @@
         {
           "id": "bookmark.narrativeIntro",
           "title": "Executive Summary",
-          "pageNumber": 2,
+          "pageNumber": 3,
           "level": 1,
           "elementId": "narrativeIntro__title_0",
           "y": 356
@@ -2357,10 +2486,10 @@
         {
           "id": "bookmark.headlineKpi",
           "title": "Headline KPI",
-          "pageNumber": 2,
+          "pageNumber": 3,
           "level": 1,
           "elementId": "headlineKpi__title_0",
-          "y": 356
+          "y": 366
         }
       ],
       "diagnostics": []

@@ -146,7 +146,8 @@
         "chartModel": {
           "type": "line",
           "xAxis": {
-            "dataKey": "country"
+            "dataKey": "country",
+            "label": "Market"
           },
           "yAxis": {
             "format": "percent"
@@ -213,7 +214,7 @@
     "version": 1,
     "kind": "reportFill",
     "specVersion": 1,
-    "specHash": "fnv1a:22422e2f",
+    "specHash": "fnv1a:38bfe023",
     "source": {
       "kind": "dashboard.reportBuilder",
       "containerId": "authoredDerivedCompactBuilder",
@@ -452,7 +453,8 @@
         "chartModel": {
           "type": "line",
           "xAxis": {
-            "dataKey": "country"
+            "dataKey": "country",
+            "label": "Market"
           },
           "yAxis": {
             "format": "percent"
@@ -496,7 +498,8 @@
           "chartModel": {
             "type": "line",
             "xAxis": {
-              "dataKey": "country"
+              "dataKey": "country",
+              "label": "Market"
             },
             "yAxis": {
               "format": "percent"
@@ -733,9 +736,9 @@
     "version": 1,
     "kind": "reportPrint",
     "specVersion": 1,
-    "specHash": "fnv1a:22422e2f",
+    "specHash": "fnv1a:38bfe023",
     "fillVersion": 1,
-    "fillHash": "fnv1a:7a472f79",
+    "fillHash": "fnv1a:16ceb041",
     "source": {
       "kind": "dashboard.reportBuilder",
       "containerId": "authoredDerivedCompactBuilder",
@@ -790,29 +793,31 @@
             "box": {
               "x": 42,
               "y": 112,
-              "width": 348,
+              "width": 295.7647058823529,
               "height": 16
             },
             "text": "Market",
-            "fontSize": 11,
+            "fontSize": 9,
             "fontWeight": "600",
             "color": "#101828",
-            "align": "left"
+            "align": "left",
+            "wrap": true
           },
           {
             "id": "primaryTable__header__totalSpend__page_1",
             "kind": "text",
             "box": {
-              "x": 402,
+              "x": 349.7647058823529,
               "y": 112,
-              "width": 348,
+              "width": 400.2352941176471,
               "height": 16
             },
             "text": "Spend",
-            "fontSize": 11,
+            "fontSize": 9,
             "fontWeight": "600",
             "color": "#101828",
-            "align": "right"
+            "align": "right",
+            "wrap": true
           },
           {
             "id": "primaryTable__row_rule_0",
@@ -832,28 +837,32 @@
             "box": {
               "x": 42,
               "y": 136,
-              "width": 348,
+              "width": 295.7647058823529,
               "height": 16
             },
             "rowKey": "row_1",
             "columnKey": "country",
             "text": "US",
-            "align": "left"
+            "align": "left",
+            "fontSize": 9,
+            "wrap": true
           },
           {
             "id": "primaryTable__row_1__totalSpend__text",
             "kind": "tableCellText",
             "box": {
-              "x": 402,
+              "x": 349.7647058823529,
               "y": 136,
-              "width": 348,
+              "width": 400.2352941176471,
               "height": 16
             },
             "rowKey": "row_1",
             "columnKey": "totalSpend",
             "text": "$82,800.00",
             "format": "currency",
-            "align": "right"
+            "align": "right",
+            "fontSize": 9,
+            "wrap": true
           },
           {
             "id": "primaryTable__row_rule_1",
@@ -873,28 +882,32 @@
             "box": {
               "x": 42,
               "y": 160,
-              "width": 348,
+              "width": 295.7647058823529,
               "height": 16
             },
             "rowKey": "row_2",
             "columnKey": "country",
             "text": "US",
-            "align": "left"
+            "align": "left",
+            "fontSize": 9,
+            "wrap": true
           },
           {
             "id": "primaryTable__row_2__totalSpend__text",
             "kind": "tableCellText",
             "box": {
-              "x": 402,
+              "x": 349.7647058823529,
               "y": 160,
-              "width": 348,
+              "width": 400.2352941176471,
               "height": 16
             },
             "rowKey": "row_2",
             "columnKey": "totalSpend",
             "text": "$70,300.00",
             "format": "currency",
-            "align": "right"
+            "align": "right",
+            "fontSize": 9,
+            "wrap": true
           },
           {
             "id": "primaryTable__row_rule_2",
@@ -914,28 +927,32 @@
             "box": {
               "x": 42,
               "y": 184,
-              "width": 348,
+              "width": 295.7647058823529,
               "height": 16
             },
             "rowKey": "row_3",
             "columnKey": "country",
             "text": "CA",
-            "align": "left"
+            "align": "left",
+            "fontSize": 9,
+            "wrap": true
           },
           {
             "id": "primaryTable__row_3__totalSpend__text",
             "kind": "tableCellText",
             "box": {
-              "x": 402,
+              "x": 349.7647058823529,
               "y": 184,
-              "width": 348,
+              "width": 400.2352941176471,
               "height": 16
             },
             "rowKey": "row_3",
             "columnKey": "totalSpend",
             "text": "$75,800.00",
             "format": "currency",
-            "align": "right"
+            "align": "right",
+            "fontSize": 9,
+            "wrap": true
           },
           {
             "id": "primaryTable__row_rule_3",
@@ -955,53 +972,32 @@
             "box": {
               "x": 42,
               "y": 208,
-              "width": 348,
+              "width": 295.7647058823529,
               "height": 16
             },
             "rowKey": "row_4",
             "columnKey": "country",
             "text": "CA",
-            "align": "left"
+            "align": "left",
+            "fontSize": 9,
+            "wrap": true
           },
           {
             "id": "primaryTable__row_4__totalSpend__text",
             "kind": "tableCellText",
             "box": {
-              "x": 402,
+              "x": 349.7647058823529,
               "y": 208,
-              "width": 348,
+              "width": 400.2352941176471,
               "height": 16
             },
             "rowKey": "row_4",
             "columnKey": "totalSpend",
             "text": "$67,700.00",
             "format": "currency",
-            "align": "right"
-          },
-          {
-            "id": "reachRateTrend__title_0",
-            "kind": "text",
-            "box": {
-              "x": 36,
-              "y": 244,
-              "width": 720,
-              "height": 20
-            },
-            "text": "Reach Rate by Market",
-            "fontSize": 14,
-            "fontWeight": "600",
-            "color": "#101828"
-          },
-          {
-            "id": "reachRateTrend__svg_page_1",
-            "kind": "svg",
-            "box": {
-              "x": 36,
-              "y": 268,
-              "width": 720,
-              "height": 264
-            },
-            "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 264\" width=\"720\" height=\"264\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"704\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">42.8</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"704\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">28.5</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"704\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">14.3</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      \n      <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M52,24.407286314806164 L704,23.524521251751516\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"24.407286314806164\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"704\" cy=\"23.524521251751516\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n      \n    \n\n      <path d=\"M52,16 L704,20.28771602055116\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" />\n      \n      <circle cx=\"52\" cy=\"16\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"704\" cy=\"20.28771602055116\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n      \n    \n      \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">US</text>\n    \n\n      <text x=\"704\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">CA</text>\n    \n      \n      <rect x=\"12\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"232\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"172\" y=\"221\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"232\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
+            "align": "right",
+            "fontSize": 9,
+            "wrap": true
           }
         ],
         "headerElements": [
@@ -1065,11 +1061,36 @@
         "number": 2,
         "elements": [
           {
-            "id": "reachRateTable__title_0",
+            "id": "reachRateTrend__title_0",
             "kind": "text",
             "box": {
               "x": 36,
               "y": 84,
+              "width": 720,
+              "height": 20
+            },
+            "text": "Reach Rate by Market",
+            "fontSize": 14,
+            "fontWeight": "600",
+            "color": "#101828"
+          },
+          {
+            "id": "reachRateTrend__svg_page_2",
+            "kind": "svg",
+            "box": {
+              "x": 36,
+              "y": 108,
+              "width": 720,
+              "height": 280
+            },
+            "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 280\" width=\"720\" height=\"280\">\n      \n    <line x1=\"52\" y1=\"16\" x2=\"704\" y2=\"16\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"20\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">42.82</text>\n  \n\n    <line x1=\"52\" y1=\"76\" x2=\"704\" y2=\"76\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"80\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">28.55</text>\n  \n\n    <line x1=\"52\" y1=\"136\" x2=\"704\" y2=\"136\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"140\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">14.27</text>\n  \n\n    <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#eaecf0\" stroke-width=\"1\" />\n    <text x=\"44\" y=\"200\" text-anchor=\"end\" font-size=\"10\" fill=\"#667085\">0</text>\n  \n      \n      <line x1=\"52\" y1=\"196\" x2=\"704\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      <line x1=\"52\" y1=\"16\" x2=\"52\" y2=\"196\" stroke=\"#98a2b3\" stroke-width=\"1\" />\n      \n      <path d=\"M52,24.407286314806164 L704,23.524521251751516\" fill=\"none\" stroke=\"#1f77b4\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />\n      \n      <circle cx=\"52\" cy=\"24.407286314806164\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n\n      <circle cx=\"704\" cy=\"23.524521251751516\" r=\"2.5\" fill=\"#1f77b4\" />\n    \n      \n    \n\n      <path d=\"M52,16 L704,20.28771602055116\" fill=\"none\" stroke=\"#ff7f0e\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />\n      \n      <circle cx=\"52\" cy=\"16\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n\n      <circle cx=\"704\" cy=\"20.28771602055116\" r=\"2.5\" fill=\"#ff7f0e\" />\n    \n      \n    \n      \n      \n      <text x=\"52\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">US</text>\n    \n\n      <text x=\"704\" y=\"214\" text-anchor=\"middle\" font-size=\"10\" fill=\"#667085\">CA</text>\n    \n      <text x=\"378\" y=\"232\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"600\" fill=\"#475467\">Market</text>\n      \n      <rect x=\"12\" y=\"237\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#1f77b4\" />\n      <text x=\"30\" y=\"248\" font-size=\"11\" fill=\"#344054\">Display</text>\n    \n\n      <rect x=\"172\" y=\"237\" width=\"12\" height=\"12\" rx=\"2\" fill=\"#ff7f0e\" />\n      <text x=\"190\" y=\"248\" font-size=\"11\" fill=\"#344054\">CTV</text>\n    \n    </svg>"
+          },
+          {
+            "id": "reachRateTable__title_0",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 404,
               "width": 720,
               "height": 20
             },
@@ -1083,7 +1104,7 @@
             "kind": "rect",
             "box": {
               "x": 36,
-              "y": 108,
+              "y": 428,
               "width": 720,
               "height": 24
             },
@@ -1096,52 +1117,55 @@
             "kind": "text",
             "box": {
               "x": 42,
-              "y": 112,
-              "width": 228,
+              "y": 432,
+              "width": 206,
               "height": 16
             },
             "text": "Market",
-            "fontSize": 11,
+            "fontSize": 9,
             "fontWeight": "600",
             "color": "#101828",
-            "align": "left"
+            "align": "left",
+            "wrap": true
           },
           {
             "id": "reachRateTable__header__channelId__page_2",
             "kind": "text",
             "box": {
-              "x": 282,
-              "y": 112,
-              "width": 228,
+              "x": 260,
+              "y": 432,
+              "width": 206,
               "height": 16
             },
             "text": "Channel",
-            "fontSize": 11,
+            "fontSize": 9,
             "fontWeight": "600",
             "color": "#101828",
-            "align": "left"
+            "align": "left",
+            "wrap": true
           },
           {
             "id": "reachRateTable__header__reachRate__page_2",
             "kind": "text",
             "box": {
-              "x": 522,
-              "y": 112,
-              "width": 228,
+              "x": 478,
+              "y": 432,
+              "width": 272,
               "height": 16
             },
             "text": "Reach Rate",
-            "fontSize": 11,
+            "fontSize": 9,
             "fontWeight": "600",
             "color": "#101828",
-            "align": "left"
+            "align": "left",
+            "wrap": true
           },
           {
             "id": "reachRateTable__row_rule_0",
             "kind": "line",
             "box": {
               "x": 36,
-              "y": 156,
+              "y": 476,
               "width": 720,
               "height": 0
             },
@@ -1153,50 +1177,56 @@
             "kind": "tableCellText",
             "box": {
               "x": 42,
-              "y": 136,
-              "width": 228,
+              "y": 456,
+              "width": 206,
               "height": 16
             },
             "rowKey": "row_1",
             "columnKey": "country",
             "text": "US",
-            "align": "left"
+            "align": "left",
+            "fontSize": 9,
+            "wrap": true
           },
           {
             "id": "reachRateTable__row_1__channelId__text",
             "kind": "tableCellText",
             "box": {
-              "x": 282,
-              "y": 136,
-              "width": 228,
+              "x": 260,
+              "y": 456,
+              "width": 206,
               "height": 16
             },
             "rowKey": "row_1",
             "columnKey": "channelId",
             "text": "Display",
-            "align": "left"
+            "align": "left",
+            "fontSize": 9,
+            "wrap": true
           },
           {
             "id": "reachRateTable__row_1__reachRate__text",
             "kind": "tableCellText",
             "box": {
-              "x": 522,
-              "y": 136,
-              "width": 228,
+              "x": 478,
+              "y": 456,
+              "width": 272,
               "height": 16
             },
             "rowKey": "row_1",
             "columnKey": "reachRate",
             "text": "40.8%",
             "format": "percent",
-            "align": "right"
+            "align": "right",
+            "fontSize": 9,
+            "wrap": true
           },
           {
             "id": "reachRateTable__row_rule_1",
             "kind": "line",
             "box": {
               "x": 36,
-              "y": 180,
+              "y": 500,
               "width": 720,
               "height": 0
             },
@@ -1208,50 +1238,56 @@
             "kind": "tableCellText",
             "box": {
               "x": 42,
-              "y": 160,
-              "width": 228,
+              "y": 480,
+              "width": 206,
               "height": 16
             },
             "rowKey": "row_2",
             "columnKey": "country",
             "text": "US",
-            "align": "left"
+            "align": "left",
+            "fontSize": 9,
+            "wrap": true
           },
           {
             "id": "reachRateTable__row_2__channelId__text",
             "kind": "tableCellText",
             "box": {
-              "x": 282,
-              "y": 160,
-              "width": 228,
+              "x": 260,
+              "y": 480,
+              "width": 206,
               "height": 16
             },
             "rowKey": "row_2",
             "columnKey": "channelId",
             "text": "CTV",
-            "align": "left"
+            "align": "left",
+            "fontSize": 9,
+            "wrap": true
           },
           {
             "id": "reachRateTable__row_2__reachRate__text",
             "kind": "tableCellText",
             "box": {
-              "x": 522,
-              "y": 160,
-              "width": 228,
+              "x": 478,
+              "y": 480,
+              "width": 272,
               "height": 16
             },
             "rowKey": "row_2",
             "columnKey": "reachRate",
             "text": "42.8%",
             "format": "percent",
-            "align": "right"
+            "align": "right",
+            "fontSize": 9,
+            "wrap": true
           },
           {
             "id": "reachRateTable__row_rule_2",
             "kind": "line",
             "box": {
               "x": 36,
-              "y": 204,
+              "y": 524,
               "width": 720,
               "height": 0
             },
@@ -1263,98 +1299,49 @@
             "kind": "tableCellText",
             "box": {
               "x": 42,
-              "y": 184,
-              "width": 228,
+              "y": 504,
+              "width": 206,
               "height": 16
             },
             "rowKey": "row_3",
             "columnKey": "country",
             "text": "CA",
-            "align": "left"
+            "align": "left",
+            "fontSize": 9,
+            "wrap": true
           },
           {
             "id": "reachRateTable__row_3__channelId__text",
             "kind": "tableCellText",
             "box": {
-              "x": 282,
-              "y": 184,
-              "width": 228,
+              "x": 260,
+              "y": 504,
+              "width": 206,
               "height": 16
             },
             "rowKey": "row_3",
             "columnKey": "channelId",
             "text": "Display",
-            "align": "left"
+            "align": "left",
+            "fontSize": 9,
+            "wrap": true
           },
           {
             "id": "reachRateTable__row_3__reachRate__text",
             "kind": "tableCellText",
             "box": {
-              "x": 522,
-              "y": 184,
-              "width": 228,
+              "x": 478,
+              "y": 504,
+              "width": 272,
               "height": 16
             },
             "rowKey": "row_3",
             "columnKey": "reachRate",
             "text": "41.0%",
             "format": "percent",
-            "align": "right"
-          },
-          {
-            "id": "reachRateTable__row_rule_3",
-            "kind": "line",
-            "box": {
-              "x": 36,
-              "y": 228,
-              "width": 720,
-              "height": 0
-            },
-            "strokeColor": "#d0d5dd",
-            "strokeWidth": 1
-          },
-          {
-            "id": "reachRateTable__row_4__country__text",
-            "kind": "tableCellText",
-            "box": {
-              "x": 42,
-              "y": 208,
-              "width": 228,
-              "height": 16
-            },
-            "rowKey": "row_4",
-            "columnKey": "country",
-            "text": "CA",
-            "align": "left"
-          },
-          {
-            "id": "reachRateTable__row_4__channelId__text",
-            "kind": "tableCellText",
-            "box": {
-              "x": 282,
-              "y": 208,
-              "width": 228,
-              "height": 16
-            },
-            "rowKey": "row_4",
-            "columnKey": "channelId",
-            "text": "CTV",
-            "align": "left"
-          },
-          {
-            "id": "reachRateTable__row_4__reachRate__text",
-            "kind": "tableCellText",
-            "box": {
-              "x": 522,
-              "y": 208,
-              "width": 228,
-              "height": 16
-            },
-            "rowKey": "row_4",
-            "columnKey": "reachRate",
-            "text": "41.8%",
-            "format": "percent",
-            "align": "right"
+            "align": "right",
+            "fontSize": 9,
+            "wrap": true
           }
         ],
         "headerElements": [
@@ -1413,6 +1400,189 @@
             "align": "right"
           }
         ]
+      },
+      {
+        "number": 3,
+        "elements": [
+          {
+            "id": "reachRateTable__header_bg__page_3",
+            "kind": "rect",
+            "box": {
+              "x": 36,
+              "y": 84,
+              "width": 720,
+              "height": 24
+            },
+            "fillColor": "#f8fafc",
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "reachRateTable__header__country__page_3",
+            "kind": "text",
+            "box": {
+              "x": 42,
+              "y": 88,
+              "width": 206,
+              "height": 16
+            },
+            "text": "Market",
+            "fontSize": 9,
+            "fontWeight": "600",
+            "color": "#101828",
+            "align": "left",
+            "wrap": true
+          },
+          {
+            "id": "reachRateTable__header__channelId__page_3",
+            "kind": "text",
+            "box": {
+              "x": 260,
+              "y": 88,
+              "width": 206,
+              "height": 16
+            },
+            "text": "Channel",
+            "fontSize": 9,
+            "fontWeight": "600",
+            "color": "#101828",
+            "align": "left",
+            "wrap": true
+          },
+          {
+            "id": "reachRateTable__header__reachRate__page_3",
+            "kind": "text",
+            "box": {
+              "x": 478,
+              "y": 88,
+              "width": 272,
+              "height": 16
+            },
+            "text": "Reach Rate",
+            "fontSize": 9,
+            "fontWeight": "600",
+            "color": "#101828",
+            "align": "left",
+            "wrap": true
+          },
+          {
+            "id": "reachRateTable__row_rule_3",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 132,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "reachRateTable__row_4__country__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 42,
+              "y": 112,
+              "width": 206,
+              "height": 16
+            },
+            "rowKey": "row_4",
+            "columnKey": "country",
+            "text": "CA",
+            "align": "left",
+            "fontSize": 9,
+            "wrap": true
+          },
+          {
+            "id": "reachRateTable__row_4__channelId__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 260,
+              "y": 112,
+              "width": 206,
+              "height": 16
+            },
+            "rowKey": "row_4",
+            "columnKey": "channelId",
+            "text": "CTV",
+            "align": "left",
+            "fontSize": 9,
+            "wrap": true
+          },
+          {
+            "id": "reachRateTable__row_4__reachRate__text",
+            "kind": "tableCellText",
+            "box": {
+              "x": 478,
+              "y": 112,
+              "width": 272,
+              "height": 16
+            },
+            "rowKey": "row_4",
+            "columnKey": "reachRate",
+            "text": "41.8%",
+            "format": "percent",
+            "align": "right",
+            "fontSize": 9,
+            "wrap": true
+          }
+        ],
+        "headerElements": [
+          {
+            "id": "page_3__header_title",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 36,
+              "width": 720,
+              "height": 28
+            },
+            "text": "Authored Derived Compact Report",
+            "fontSize": 18,
+            "fontWeight": "700",
+            "color": "#101828"
+          },
+          {
+            "id": "page_3__header_rule",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 70,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          }
+        ],
+        "footerElements": [
+          {
+            "id": "page_3__footer_rule",
+            "kind": "line",
+            "box": {
+              "x": 36,
+              "y": 554,
+              "width": 720,
+              "height": 0
+            },
+            "strokeColor": "#d0d5dd",
+            "strokeWidth": 1
+          },
+          {
+            "id": "page_3__footer_page_number",
+            "kind": "text",
+            "box": {
+              "x": 36,
+              "y": 558,
+              "width": 720,
+              "height": 16
+            },
+            "text": "Page 3",
+            "fontSize": 11,
+            "color": "#667085",
+            "align": "right"
+          }
+        ]
       }
     ],
     "bookmarks": [
@@ -1427,10 +1597,10 @@
       {
         "id": "bookmark.reachRateTrend",
         "title": "Reach Rate by Market",
-        "pageNumber": 1,
+        "pageNumber": 2,
         "level": 1,
         "elementId": "reachRateTrend__title_0",
-        "y": 244
+        "y": 84
       },
       {
         "id": "bookmark.reachRateTable",
@@ -1438,7 +1608,7 @@
         "pageNumber": 2,
         "level": 1,
         "elementId": "reachRateTable__title_0",
-        "y": 84
+        "y": 404
       }
     ],
     "diagnostics": []

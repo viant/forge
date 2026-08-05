@@ -55,7 +55,7 @@ assert.deepEqual(exportRequest.reportPrint.bookmarks.find((bookmark) => bookmark
   y: 268,
 });
 assert.equal(
-  exportRequest.reportPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.headlineKpi" && bookmark.pageNumber === 1),
+  exportRequest.reportPrint.bookmarks.some((bookmark) => bookmark.id === "bookmark.headlineKpi" && bookmark.pageNumber === 2),
   true,
 );
 const primaryChartTitle = exportRequest.reportPrint.pages
@@ -72,10 +72,10 @@ assert.deepEqual(primaryChartTitle?.box, {
 });
 assert.equal(primaryChartTitle?.text, "Inventory · Top Channels");
 assert.deepEqual(headlineKpiTitle?.box, {
-  x: 408,
-  y: 472,
-  width: 348,
-  height: 20,
+  x: 418,
+  y: 94,
+  width: 328,
+  height: 16,
 });
 assert.equal(headlineKpiTitle?.text, "Top Channel KPI");
 assert.equal(resolveReportBuilderReopenCompatibility(

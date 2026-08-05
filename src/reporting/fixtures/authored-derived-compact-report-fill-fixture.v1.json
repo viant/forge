@@ -2,7 +2,7 @@
   "version": 1,
   "kind": "reportFill",
   "specVersion": 1,
-  "specHash": "fnv1a:22422e2f",
+  "specHash": "fnv1a:38bfe023",
   "source": {
     "kind": "dashboard.reportBuilder",
     "containerId": "authoredDerivedCompactBuilder",
@@ -241,7 +241,8 @@
       "chartModel": {
         "type": "line",
         "xAxis": {
-          "dataKey": "country"
+          "dataKey": "country",
+          "label": "Market"
         },
         "yAxis": {
           "format": "percent"
@@ -285,7 +286,8 @@
         "chartModel": {
           "type": "line",
           "xAxis": {
-            "dataKey": "country"
+            "dataKey": "country",
+            "label": "Market"
           },
           "yAxis": {
             "format": "percent"

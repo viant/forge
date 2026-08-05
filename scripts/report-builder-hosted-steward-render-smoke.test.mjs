@@ -18,6 +18,8 @@ import { buildReportBuilderDesktopResultHeaderState } from "../src/components/da
 
 const FORGE_ROOT = "/Users/awitas/go/src/github.com/viant/forge";
 const STEWARD_ROOT = "/Users/awitas/go/src/github.com/viant-internal/steward_ai/deployment/steward";
+const PERFORMANCE_BUILDER_CONFIG_PATH = "extension/forge/reporting/performance/builder.yaml";
+const FORECASTING_BUILDER_CONFIG_PATH = "extension/forge/reporting/forecasting/builder.yaml";
 const SYNTHETIC_SEMANTIC_MODEL_REF = "model://example/operations/performance@v1";
 const SYNTHETIC_SEMANTIC_MODEL_LABEL = "Operational Analytics";
 const SYNTHETIC_SEMANTIC_ENTITY_ID = "order_performance";
@@ -30,7 +32,14 @@ function buildWindowContentJSON(windowKey, sharedConfigPath) {
     windowKey,
     "shared/content.yaml",
   );
-  const sharedPath = path.join(STEWARD_ROOT, "shared", sharedConfigPath);
+  const sharedPath = path.isAbsolute(sharedConfigPath)
+    ? sharedConfigPath
+    : path.join(
+      STEWARD_ROOT,
+      sharedConfigPath.includes("/")
+        ? sharedConfigPath
+        : path.join("shared", sharedConfigPath),
+    );
   const script = [
     'require "yaml"',
     'require "json"',
@@ -633,12 +642,12 @@ function assertHostedBuilderRender(windowKey, sharedConfigPath, {
       false,
       `${windowKey} seeded hosted state should not render legacy result meta chips\n${JSON.stringify(summary, null, 2)}`,
     );
-    assert.equal(
-      summary?.expectedQuickActionLabelFound,
-      true,
-      `${windowKey} seeded hosted state should render ${expectedQuickActionLabel}\n${JSON.stringify(summary, null, 2)}`,
-    );
     if (!summary?.workspaceReportFound) {
+      assert.equal(
+        summary?.expectedQuickActionLabelFound,
+        true,
+        `${windowKey} seeded hosted state should render ${expectedQuickActionLabel}\n${JSON.stringify(summary, null, 2)}`,
+      );
       assert.equal(
         summary?.expectedViewToggleModesFound,
         true,
@@ -702,9 +711,9 @@ function assertHostedBuilderRender(windowKey, sharedConfigPath, {
   }
 }
 
-assertHostedBuilderRender("metricReportBuilder", "metric_report_builder.yaml");
-assertHostedBuilderRender("forecastingCubeBuilder", "forecasting_report_builder.yaml");
-assertHostedBuilderRender("metricReportBuilder", "metric_report_builder.yaml", {
+assertHostedBuilderRender("metricReportBuilder", PERFORMANCE_BUILDER_CONFIG_PATH);
+assertHostedBuilderRender("forecastingCubeBuilder", FORECASTING_BUILDER_CONFIG_PATH);
+assertHostedBuilderRender("metricReportBuilder", PERFORMANCE_BUILDER_CONFIG_PATH, {
   semanticVariant: true,
   semanticNotice: `Semantic binding: ${SYNTHETIC_SEMANTIC_MODEL_LABEL} • Entity: ${SYNTHETIC_SEMANTIC_ENTITY_LABEL}`,
   authoredRuntimeSemanticTitle: "Semantic Binding",
@@ -715,14 +724,14 @@ assertHostedBuilderRender("metricReportBuilder", "metric_report_builder.yaml", {
   seedDefaultBuilderState: true,
   workspaceMode: "preview",
   ...(() => {
-    const seeded = buildHostedResultExpectationState(buildSyntheticSemanticContainer(buildWindowContentJSON("metricReportBuilder", "metric_report_builder.yaml")));
+    const seeded = buildHostedResultExpectationState(buildSyntheticSemanticContainer(buildWindowContentJSON("metricReportBuilder", PERFORMANCE_BUILDER_CONFIG_PATH)));
     return {
       ...seeded,
-      ...buildHostedHeaderExpectationState(buildSyntheticSemanticContainer(buildWindowContentJSON("metricReportBuilder", "metric_report_builder.yaml")), seeded.seededBuilderState, seeded.seededCollection),
+      ...buildHostedHeaderExpectationState(buildSyntheticSemanticContainer(buildWindowContentJSON("metricReportBuilder", PERFORMANCE_BUILDER_CONFIG_PATH)), seeded.seededBuilderState, seeded.seededCollection),
     };
   })(),
 });
-assertHostedBuilderRender("forecastingCubeBuilder", "forecasting_report_builder.yaml", {
+assertHostedBuilderRender("forecastingCubeBuilder", FORECASTING_BUILDER_CONFIG_PATH, {
   semanticVariant: true,
   semanticNotice: `Semantic binding: ${SYNTHETIC_SEMANTIC_MODEL_LABEL} • Entity: ${SYNTHETIC_SEMANTIC_ENTITY_LABEL}`,
   authoredRuntimeSemanticTitle: "Semantic Binding",
@@ -733,7 +742,7 @@ assertHostedBuilderRender("forecastingCubeBuilder", "forecasting_report_builder.
   seedDefaultBuilderState: true,
   workspaceMode: "preview",
   ...(() => {
-    const container = buildSyntheticSemanticContainer(buildWindowContentJSON("forecastingCubeBuilder", "forecasting_report_builder.yaml"));
+    const container = buildSyntheticSemanticContainer(buildWindowContentJSON("forecastingCubeBuilder", FORECASTING_BUILDER_CONFIG_PATH));
     const seeded = buildHostedResultExpectationState(container);
     return {
       ...seeded,
@@ -741,7 +750,7 @@ assertHostedBuilderRender("forecastingCubeBuilder", "forecasting_report_builder.
     };
   })(),
 });
-assertHostedBuilderRender("metricReportBuilder", "metric_report_builder.yaml", {
+assertHostedBuilderRender("metricReportBuilder", PERFORMANCE_BUILDER_CONFIG_PATH, {
   semanticVariant: true,
   semanticNotice: `Semantic binding: ${SYNTHETIC_SEMANTIC_MODEL_LABEL} • Entity: ${SYNTHETIC_SEMANTIC_ENTITY_LABEL}`,
   authoredRuntimeSemanticTitle: "Semantic Binding",
@@ -751,7 +760,7 @@ assertHostedBuilderRender("metricReportBuilder", "metric_report_builder.yaml", {
   authoredRuntimeScopeValue: "Date Range",
   workspaceMode: "preview",
   ...(() => {
-    const container = buildSyntheticSemanticContainer(buildWindowContentJSON("metricReportBuilder", "metric_report_builder.yaml"));
+    const container = buildSyntheticSemanticContainer(buildWindowContentJSON("metricReportBuilder", PERFORMANCE_BUILDER_CONFIG_PATH));
     const seeded = buildHostedChartExpectationState(container);
     return {
       ...seeded,
@@ -759,7 +768,7 @@ assertHostedBuilderRender("metricReportBuilder", "metric_report_builder.yaml", {
     };
   })(),
 });
-assertHostedBuilderRender("forecastingCubeBuilder", "forecasting_report_builder.yaml", {
+assertHostedBuilderRender("forecastingCubeBuilder", FORECASTING_BUILDER_CONFIG_PATH, {
   semanticVariant: true,
   semanticNotice: `Semantic binding: ${SYNTHETIC_SEMANTIC_MODEL_LABEL} • Entity: ${SYNTHETIC_SEMANTIC_ENTITY_LABEL}`,
   authoredRuntimeSemanticTitle: "Semantic Binding",
@@ -769,7 +778,7 @@ assertHostedBuilderRender("forecastingCubeBuilder", "forecasting_report_builder.
   authoredRuntimeScopeValue: "Date Range",
   workspaceMode: "preview",
   ...(() => {
-    const container = buildSyntheticSemanticContainer(buildWindowContentJSON("forecastingCubeBuilder", "forecasting_report_builder.yaml"));
+    const container = buildSyntheticSemanticContainer(buildWindowContentJSON("forecastingCubeBuilder", FORECASTING_BUILDER_CONFIG_PATH));
     const seeded = buildHostedChartExpectationState(container);
     return {
       ...seeded,

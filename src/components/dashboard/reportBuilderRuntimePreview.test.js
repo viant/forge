@@ -1532,7 +1532,7 @@ const authoredGeoSvg = authoredGeoPreview.reportPrint.pages
   .flatMap((page) => page.elements || [])
   .find((element) => element.kind === "svg" && element.id.includes("stateGeo"))?.svg || "";
 assert.equal(authoredGeoSvg.includes("2 Regions"), true);
-assert.equal(authoredGeoSvg.includes("Total Avails: 2,180,000"), true);
+assert.equal(authoredGeoSvg.includes("Total Avails: 2.2M"), true);
 assert.equal(authoredGeoSvg.includes("Top Regions"), true);
 assert.equal(authoredGeoSvg.includes("CA"), true);
 assert.equal(authoredGeoSvg.includes("WA"), true);

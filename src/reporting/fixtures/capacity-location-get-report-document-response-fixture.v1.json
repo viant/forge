@@ -1259,7 +1259,8 @@
         "chartModel": {
           "type": "horizontal_bar",
           "xAxis": {
-            "dataKey": "country"
+            "dataKey": "country",
+            "label": "Market"
           },
           "yAxis": {
             "format": "compactNumber"

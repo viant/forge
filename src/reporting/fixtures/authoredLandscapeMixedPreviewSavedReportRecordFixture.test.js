@@ -27,14 +27,16 @@ const primaryBuilderBlock = record.savedReportPayload.reportDocument.blocks
 const pages = Array.isArray(record.exportRequest.reportPrint?.pages) ? record.exportRequest.reportPrint.pages : [];
 const pageOne = pages.find((page) => page?.number === 1) || null;
 const pageTwo = pages.find((page) => page?.number === 2) || null;
+const pageThree = pages.find((page) => page?.number === 3) || null;
 const pageOneElements = Array.isArray(pageOne?.elements) ? pageOne.elements : [];
 const pageTwoElements = Array.isArray(pageTwo?.elements) ? pageTwo.elements : [];
+const pageThreeElements = Array.isArray(pageThree?.elements) ? pageThree.elements : [];
 const primaryRequest = record.savedReportPayload.reportSpec?.datasets?.find((dataset) => dataset?.id === "primary")?.request || {};
 const primaryTable = pageOneElements.find((element) => element?.id === "primaryTable__title_0") || null;
-const channelTrend = pageOneElements.find((element) => element?.id === "channelTrend__title_0") || null;
-const stateGeo = pageTwoElements.find((element) => element?.id === "stateGeo__title_0") || null;
-const narrative = pageTwoElements.find((element) => element?.id === "narrativeIntro__title_0") || null;
-const kpi = pageTwoElements.find((element) => element?.id === "headlineKpi__title_0") || null;
+const channelTrend = pageTwoElements.find((element) => element?.id === "channelTrend__title_0") || null;
+const stateGeo = pageThreeElements.find((element) => element?.id === "stateGeo__title_0") || null;
+const narrative = pageThreeElements.find((element) => element?.id === "narrativeIntro__title_0") || null;
+const kpi = pageThreeElements.find((element) => element?.id === "headlineKpi__title_0") || null;
 
 assert.equal(record.savedReportPayload.reportDocument.id, "authoredLandscapeMixedPreview");
 assert.ok(primaryBuilderBlock);
@@ -44,7 +46,7 @@ assert.equal(record.exportRequest.reportPrint.pageGeometry.width, 792);
 assert.equal(record.exportRequest.reportPrint.pageGeometry.height, 612);
 assert.equal(record.exportRequest.reportPrint.diagnostics.length, 0);
 assert.equal(validateReportExportRequest(record.exportRequest).valid, true);
-assert.equal(pages.length, 2);
+assert.equal(pages.length, 3);
 assert.deepEqual(primaryBuilderBlock.state.selectedMeasures, ["totalSpend", "impressions"]);
 assert.equal(primaryRequest.measures?.totalSpend, true);
 assert.equal(primaryRequest.measures?.impressions, true);
@@ -59,18 +61,18 @@ assert.equal(record.savedReportPayload.reportSpec.calculatedFields.some((field) 
 assert.equal(primaryTable?.box?.x, 36);
 assert.equal(primaryTable?.box?.y, 84);
 assert.equal(channelTrend?.box?.x, 36);
-assert.equal(channelTrend?.box?.y, 244);
+assert.equal(channelTrend?.box?.y, 84);
 assert.equal(stateGeo?.box?.x, 36);
 assert.equal(stateGeo?.box?.y, 84);
 assert.equal(narrative?.box?.x, 36);
 assert.equal(narrative?.box?.y, 356);
 assert.equal(narrative?.box?.width, 348);
-assert.equal(kpi?.box?.x, 408);
-assert.equal(kpi?.box?.y, 356);
-assert.equal(kpi?.box?.width, 348);
+assert.equal(kpi?.box?.x, 418);
+assert.equal(kpi?.box?.y, 366);
+assert.equal(kpi?.box?.width, 328);
 assert.equal(record.exportRequest.reportFill.blocks.find((block) => block.id === "headlineKpi")?.content?.valueField, "spendPerImpression");
 assert.equal(record.exportRequest.reportFill.blocks.find((block) => block.id === "headlineKpi")?.content?.value, 2.45);
-assert.equal(pageTwoElements.find((element) => element?.id === "headlineKpi__value_0")?.text, "Spend / Impression: 2.45000");
+assert.equal(pageThreeElements.find((element) => element?.id === "headlineKpi__value_0")?.text, "2.45");
 assert.equal(resolveReportBuilderReopenCompatibility(
   primaryBuilderBlock.source,
   {
@@ -127,7 +129,7 @@ const reopenedPreview = buildReportBuilderRuntimePreview({
   pageGeometry: record.exportRequest.reportPrint.pageGeometry,
 });
 assert.equal(reopenedPreview.reportFill.blocks.find((block) => block.id === "headlineKpi")?.content?.value, 2.45);
-assert.equal(reopenedPreview.reportPrint.pages.flatMap((page) => page.elements || []).find((element) => element?.id === "headlineKpi__value_0")?.text, "Spend / Impression: 2.45000");
+assert.equal(reopenedPreview.reportPrint.pages.flatMap((page) => page.elements || []).find((element) => element?.id === "headlineKpi__value_0")?.text, "2.45");
 assert.equal(reopenedPreview.reportPrint.diagnostics.length, 0);
 assert.deepEqual(reopenedModel.reportSpec, record.exportRequest.reportSpec);
 assert.deepEqual(reopenedPreview.reportFill, record.exportRequest.reportFill);

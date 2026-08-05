@@ -165,18 +165,63 @@ private data class DynamicFamilyRow(
     val optionKey: String
 )
 
+internal data class ResolvedReportBuilderVariant(
+    val builderRef: String,
+    val dataSourceRef: String?,
+    val config: DashboardReportBuilderDef?,
+    val missing: Boolean = false
+)
+
+internal fun resolveReportBuilderVariant(
+    container: ContainerDef,
+    windowForm: Map<String, Any?>
+): ResolvedReportBuilderVariant {
+    val variants = container.reportBuilders.ifEmpty { container.dashboard?.reportBuilders.orEmpty() }
+    val requestedRef = windowForm["reportBuilderRef"]?.toString()?.trim().orEmpty()
+    val defaultRef = container.reportBuilderRef?.trim()
+        ?.takeIf { it.isNotBlank() }
+        ?: container.dashboard?.reportBuilderRef?.trim().orEmpty()
+    val builderRef = requestedRef.ifBlank { defaultRef }
+    val variant = builderRef.takeIf { it.isNotBlank() }?.let(variants::get)
+
+    if (requestedRef.isNotBlank() && requestedRef != defaultRef && variant == null && variants.isNotEmpty()) {
+        return ResolvedReportBuilderVariant(
+            builderRef = requestedRef,
+            dataSourceRef = null,
+            config = null,
+            missing = true
+        )
+    }
+
+    return ResolvedReportBuilderVariant(
+        builderRef = builderRef,
+        dataSourceRef = variant?.dataSourceRef?.takeIf { it.isNotBlank() } ?: container.dataSourceRef,
+        config = variant?.reportBuilder ?: container.dashboard?.reportBuilder,
+        missing = false
+    )
+}
+
 @Composable
 fun ReportBuilderRenderer(
     runtime: ForgeRuntime,
     window: com.viant.forgeandroid.runtime.WindowContext,
     container: ContainerDef
 ) {
-    val config = container.dashboard?.reportBuilder
+    val windowFormSignal = window.windowFormSignal()
+    val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
+    val variant = remember(container, windowForm) {
+        resolveReportBuilderVariant(container, windowForm)
+    }
+    if (variant.missing) {
+        ReportBuilderPlaceholder(container, "Report builder variant not found: ${variant.builderRef}")
+        return
+    }
+    val config = variant.config
     if (config == null) {
         ReportBuilderPlaceholder(container, "Missing report builder config")
         return
     }
-    val dataSourceRef = container.dataSourceRef
+    val dataSourceRef = variant.dataSourceRef
     if (dataSourceRef.isNullOrBlank()) {
         ReportBuilderPlaceholder(container, "Missing dataSourceRef")
         return
@@ -190,8 +235,6 @@ fun ReportBuilderRenderer(
     LaunchedEffect(dataSourceRef) {
         context.fetchCollection()
     }
-    val windowFormSignal = window.windowFormSignal()
-    val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
 
     val allMeasures = remember(config) { config.measures + config.computedMeasures }
     val visibleMeasures = remember(config) { allMeasures.filter { it.hidden != true } }
@@ -201,22 +244,31 @@ fun ReportBuilderRenderer(
         if (hidden.isEmpty()) config.dynamicFilterGroups else config.dynamicFilterGroups.filter { (it.id ?: it.label ?: "") !in hidden }
     }
     val explicitChartMode = remember(config) { config.result?.chartCreationMode == "explicit" }
-    var selectedMeasures by remember(config) { mutableStateOf(defaultMeasureKeys(visibleMeasures, config.primaryMeasure)) }
-    var selectedDimensions by remember(config) { mutableStateOf(defaultDimensionKeys(visibleDimensions)) }
-    var chartSpec by remember { mutableStateOf<ReportBuilderChartSpecDef?>(null) }
-    var viewMode by remember(config) { mutableStateOf(if (explicitChartMode) "table" else (config.result?.defaultMode ?: "chart")) }
+    val baseBuilderStateKey = remember(container.stateKey, container.id) {
+        (container.stateKey ?: container.id ?: "reportBuilder").trim().ifBlank { "reportBuilder" }
+    }
+    val builderStateKey = remember(baseBuilderStateKey, variant.builderRef) {
+        reportBuilderVariantStateKey(baseBuilderStateKey, variant.builderRef)
+    }
+    val presetStorageKey = remember(container.id, variant.builderRef) {
+        reportBuilderVariantStateKey(container.id ?: "reportBuilder", variant.builderRef)
+    }
+    var selectedMeasures by remember(config, builderStateKey) { mutableStateOf(defaultMeasureKeys(visibleMeasures, config.primaryMeasure)) }
+    var selectedDimensions by remember(config, builderStateKey) { mutableStateOf(defaultDimensionKeys(visibleDimensions)) }
+    var chartSpec by remember(config, builderStateKey) { mutableStateOf<ReportBuilderChartSpecDef?>(null) }
+    var viewMode by remember(config, builderStateKey) { mutableStateOf(if (explicitChartMode) "table" else (config.result?.defaultMode ?: "chart")) }
     var previousMenuExpanded by remember { mutableStateOf(false) }
-    var staticFilters by remember(config) { mutableStateOf(defaultStaticFilters(config.staticFilters)) }
-    var dynamicGroups by remember(config) { mutableStateOf(emptyMap<String, List<ReportBuilderDynamicRowState>>()) }
-    var dynamicFilterDrafts by remember(config) { mutableStateOf(emptyMap<String, String>()) }
-    var restoredStoredState by remember(config, window.windowId) { mutableStateOf(false) }
-    var appliedPrefillSignature by remember(config, window.windowId) { mutableStateOf("") }
-    var pendingAutoChartRequestSignature by remember(config, window.windowId) { mutableStateOf("") }
-    var lastAutoAppliedChartRequestSignature by remember(config, window.windowId) { mutableStateOf("") }
-    var lastObservedChartLoading by remember(config, window.windowId) { mutableStateOf(false) }
-    var filtersExpanded by remember(config, window.windowId) { mutableStateOf(true) }
-    var lastObservedFilterLoading by remember(config, window.windowId) { mutableStateOf(false) }
-    var lastAutoCollapsedRequestSignature by remember(config, window.windowId) { mutableStateOf("") }
+    var staticFilters by remember(config, builderStateKey) { mutableStateOf(defaultStaticFilters(config.staticFilters)) }
+    var dynamicGroups by remember(config, builderStateKey) { mutableStateOf(emptyMap<String, List<ReportBuilderDynamicRowState>>()) }
+    var dynamicFilterDrafts by remember(config, builderStateKey) { mutableStateOf(emptyMap<String, String>()) }
+    var restoredStoredState by remember(config, window.windowId, builderStateKey) { mutableStateOf(false) }
+    var appliedPrefillSignature by remember(config, window.windowId, builderStateKey) { mutableStateOf("") }
+    var pendingAutoChartRequestSignature by remember(config, window.windowId, builderStateKey) { mutableStateOf("") }
+    var lastAutoAppliedChartRequestSignature by remember(config, window.windowId, builderStateKey) { mutableStateOf("") }
+    var lastObservedChartLoading by remember(config, window.windowId, builderStateKey) { mutableStateOf(false) }
+    var filtersExpanded by remember(config, window.windowId, builderStateKey) { mutableStateOf(true) }
+    var lastObservedFilterLoading by remember(config, window.windowId, builderStateKey) { mutableStateOf(false) }
+    var lastAutoCollapsedRequestSignature by remember(config, window.windowId, builderStateKey) { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
     val settingsHash = remember(selectedDimensions, selectedMeasures) { buildSettingsHash(selectedDimensions, selectedMeasures) }
     val stateValues = remember(selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts) {
@@ -272,11 +324,8 @@ fun ReportBuilderRenderer(
         }
     }
     val preferences = LocalContext.current.getSharedPreferences(REPORT_BUILDER_PRESET_STORAGE, Context.MODE_PRIVATE)
-    val builderStateKey = remember(container.stateKey, container.id) {
-        (container.stateKey ?: container.id ?: "reportBuilder").trim().ifBlank { "reportBuilder" }
-    }
-    var storedPresets by remember(settingsHash, container.id) {
-        mutableStateOf(loadStoredPresets(preferences, container.id ?: "reportBuilder").filter { it.settingsHash == settingsHash })
+    var storedPresets by remember(settingsHash, presetStorageKey) {
+        mutableStateOf(loadStoredPresets(preferences, presetStorageKey).filter { it.settingsHash == settingsHash })
     }
     val currentPrefillSignature = remember(windowForm) { reportBuilderPrefillSignature(windowForm) }
     val requestSignature = remember(requestPayload) { JsonUtil.anyToElement(requestPayload).toString() }
@@ -368,7 +417,7 @@ fun ReportBuilderRenderer(
         viewMode = "chart"
         if (persist) {
             val updated = upsertPreset(
-                loadStoredPresets(preferences, container.id ?: "reportBuilder"),
+                loadStoredPresets(preferences, presetStorageKey),
                 StoredReportBuilderChartPreset(
                     title = next.title ?: generatedTitle(next, visibleMeasures, visibleDimensions),
                     settingsHash = settingsHash,
@@ -376,7 +425,7 @@ fun ReportBuilderRenderer(
                     updatedAt = System.currentTimeMillis()
                 )
             )
-            saveStoredPresets(preferences, container.id ?: "reportBuilder", updated)
+            saveStoredPresets(preferences, presetStorageKey, updated)
             storedPresets = updated.filter { it.settingsHash == settingsHash }
         }
     }
@@ -446,7 +495,10 @@ fun ReportBuilderRenderer(
         }
     }
 
-    ReportBuilderPanel(container) {
+    ReportBuilderPanel(
+        title = config.title?.takeIf { it.isNotBlank() } ?: container.title,
+        subtitle = config.subtitle?.takeIf { it.isNotBlank() } ?: container.subtitle
+    ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ChipSection(
                 title = "Measures",
@@ -1350,7 +1402,11 @@ private fun StaticFilterSection(
 }
 
 @Composable
-private fun ReportBuilderPanel(container: ContainerDef, content: @Composable () -> Unit) {
+private fun ReportBuilderPanel(
+    title: String?,
+    subtitle: String?,
+    content: @Composable () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -1361,10 +1417,10 @@ private fun ReportBuilderPanel(container: ContainerDef, content: @Composable () 
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            container.title?.takeIf { it.isNotBlank() }?.let {
+            title?.takeIf { it.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
-            container.subtitle?.takeIf { it.isNotBlank() }?.let {
+            subtitle?.takeIf { it.isNotBlank() }?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF6A7280))
             }
             content()
@@ -1374,7 +1430,7 @@ private fun ReportBuilderPanel(container: ContainerDef, content: @Composable () 
 
 @Composable
 private fun ReportBuilderPlaceholder(container: ContainerDef, message: String) {
-    ReportBuilderPanel(container) {
+    ReportBuilderPanel(title = container.title, subtitle = container.subtitle) {
         Text(message, color = Color(0xFF6A7280))
     }
 }
@@ -2521,6 +2577,22 @@ internal fun persistStoredStateToWindowForm(
         )
     )
     runtime.setWindowFormValue(windowId, payload)
+}
+
+internal fun reportBuilderVariantStateKey(baseKey: String, builderRef: String?): String {
+    val base = baseKey.trim()
+    val ref = builderRef?.trim().orEmpty()
+    if (base.isBlank() || ref.isBlank()) {
+        return base
+    }
+    val suffix = ref
+        .map { char -> if (char.isLetterOrDigit()) char else '_' }
+        .joinToString("")
+        .trim('_')
+    if (suffix.isBlank()) {
+        return base
+    }
+    return "$base.$suffix"
 }
 
 private fun upsertPreset(

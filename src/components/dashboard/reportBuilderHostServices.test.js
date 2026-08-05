@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 
-import { buildReportBuilderHostServices } from "./reportBuilderHostServices.js";
+import {
+  REPORT_STORE_CHANGED_EVENT,
+  buildReportBuilderHostServices,
+} from "./reportBuilderHostServices.js";
 
 const calls = [];
 const originalFetch = global.fetch;
@@ -106,6 +109,26 @@ assert.deepEqual(reports, { reports: [{ artifactId: "report-1", title: "Forecast
 const listReportsCall = calls.find((call) => call.url.includes("reporting%3Alist_reports"));
 assert.equal(listReportsCall?.url, "http://localhost:9191/v1/tools/reporting%3Alist_reports/execute?conversationId=conv-123");
 assert.deepEqual(listReportsCall?.body, { limit: 10 });
+
+const events = [];
+const originalDispatchEvent = globalThis.dispatchEvent;
+const originalCustomEvent = globalThis.CustomEvent;
+globalThis.CustomEvent = class {
+  constructor(type, init = {}) {
+    this.type = type;
+    this.detail = init.detail;
+  }
+};
+globalThis.dispatchEvent = (event) => {
+  events.push(event);
+  return true;
+};
+await synthesized.reportStore.saveReport({ title: "Saved report" });
+assert.equal(events.length, 1);
+assert.equal(events[0].type, REPORT_STORE_CHANGED_EVENT);
+assert.equal(events[0].detail.action, "saved");
+globalThis.dispatchEvent = originalDispatchEvent;
+globalThis.CustomEvent = originalCustomEvent;
 
 const explicitSubmit = async () => ({ ok: "explicit" });
 const explicit = buildReportBuilderHostServices({

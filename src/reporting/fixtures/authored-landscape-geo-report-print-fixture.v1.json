@@ -59,29 +59,31 @@
           "box": {
             "x": 42,
             "y": 112,
-            "width": 348,
+            "width": 259.2,
             "height": 16
           },
           "text": "State",
-          "fontSize": 11,
+          "fontSize": 9,
           "fontWeight": "600",
           "color": "#101828",
-          "align": "left"
+          "align": "left",
+          "wrap": true
         },
         {
           "id": "primaryTable__header__spend__page_1",
           "kind": "text",
           "box": {
-            "x": 402,
+            "x": 313.2,
             "y": 112,
-            "width": 348,
+            "width": 436.8,
             "height": 16
           },
           "text": "Spend",
-          "fontSize": 11,
+          "fontSize": 9,
           "fontWeight": "600",
           "color": "#101828",
-          "align": "right"
+          "align": "right",
+          "wrap": true
         },
         {
           "id": "primaryTable__row_rule_0",
@@ -101,28 +103,32 @@
           "box": {
             "x": 42,
             "y": 136,
-            "width": 348,
+            "width": 259.2,
             "height": 16
           },
           "rowKey": "row_1",
           "columnKey": "stateCode",
           "text": "CA",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_1__spend__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
+            "x": 313.2,
             "y": 136,
-            "width": 348,
+            "width": 436.8,
             "height": 16
           },
           "rowKey": "row_1",
           "columnKey": "spend",
           "text": "$1,200,000.00",
           "format": "currency",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_rule_1",
@@ -142,28 +148,32 @@
           "box": {
             "x": 42,
             "y": 160,
-            "width": 348,
+            "width": 259.2,
             "height": 16
           },
           "rowKey": "row_2",
           "columnKey": "stateCode",
           "text": "WA",
-          "align": "left"
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "primaryTable__row_2__spend__text",
           "kind": "tableCellText",
           "box": {
-            "x": 402,
+            "x": 313.2,
             "y": 160,
-            "width": 348,
+            "width": 436.8,
             "height": 16
           },
           "rowKey": "row_2",
           "columnKey": "spend",
           "text": "$980,000.00",
           "format": "currency",
-          "align": "right"
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
         },
         {
           "id": "stateGeo__title_0",

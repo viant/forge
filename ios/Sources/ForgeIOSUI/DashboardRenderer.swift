@@ -181,15 +181,15 @@ public struct DashboardRenderer: View {
                     unsupportedBlock("dashboard table has no columns")
                 })
             case "dashboard.reportBuilder":
-                if let reportBuilder = container.dashboard?.reportBuilder {
-                    let effectiveContainer = dashboardContainerInheritingDataSource(container, dashboardRoot: dashboardRoot)
-                    return AnyView(dashboardPanel(container) {
-                        ReportBuilderRenderer(runtime: runtime, window: window, container: effectiveContainer, config: reportBuilder)
-                    })
-                }
-                return AnyView(dashboardPanel(container) {
-                    unsupportedBlock("dashboard report builder has no config")
-                })
+                let effectiveContainer = dashboardContainerInheritingDataSource(container, dashboardRoot: dashboardRoot)
+                return AnyView(
+                    ReportBuilderRenderer(
+                        runtime: runtime,
+                        window: window,
+                        container: effectiveContainer,
+                        config: container.dashboard?.reportBuilder
+                    )
+                )
             case "dashboard.feed":
                 return AnyView(dashboardPanel(container) {
                     feedBlock(

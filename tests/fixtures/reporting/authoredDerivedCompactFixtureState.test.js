@@ -9,7 +9,7 @@ assert.equal(fixtureState.savedReportRecord.savedReportPayload.reportDocument.id
 assert.equal(fixtureState.reportPrint.kind, "reportPrint");
 assert.equal(fixtureState.pdfReportPrint.kind, "reportPrint");
 assert.equal(fixtureState.reportPrint.title, "Authored Derived Compact Report");
-assert.equal(fixtureState.reportPrint.pages.length, 2);
+assert.equal(fixtureState.reportPrint.pages.length, 3);
 assert.equal(fixtureState.reportPrint.bookmarks.length, 3);
 assert.equal(fixtureState.exportRequest.target.format, "pdf");
 assert.equal(fixtureState.pdfExportRequest.target.format, "pdf");

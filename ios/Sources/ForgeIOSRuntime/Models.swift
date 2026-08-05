@@ -562,6 +562,8 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
     public let terminal: TerminalDef?
     public let actions: [ActionDef]
     public let on: [ExecutionDef]
+    public let reportBuilderRef: String?
+    public let reportBuilders: [String: DashboardReportBuilderVariantDef]
     public let fetchData: Bool?
     public let target: JSONValue?
     public let targetOverrides: [String: JSONValue]
@@ -634,6 +636,8 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         case terminal
         case actions
         case on
+        case reportBuilderRef
+        case reportBuilders
         case fetchData
         case target
         case targetOverrides
@@ -698,6 +702,8 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         terminal: TerminalDef? = nil,
         actions: [ActionDef] = [],
         on: [ExecutionDef] = [],
+        reportBuilderRef: String? = nil,
+        reportBuilders: [String: DashboardReportBuilderVariantDef] = [:],
         fetchData: Bool? = nil,
         target: JSONValue? = nil,
         targetOverrides: [String: JSONValue] = [:]
@@ -756,6 +762,8 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         self.terminal = terminal
         self.actions = actions
         self.on = on
+        self.reportBuilderRef = reportBuilderRef
+        self.reportBuilders = reportBuilders
         self.fetchData = fetchData
         self.target = target
         self.targetOverrides = targetOverrides
@@ -829,6 +837,8 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         terminal = try container.decodeIfPresent(TerminalDef.self, forKey: .terminal)
         actions = try container.decodeIfPresent([ActionDef].self, forKey: .actions) ?? []
         on = try container.decodeIfPresent([ExecutionDef].self, forKey: .on) ?? []
+        reportBuilderRef = try container.decodeIfPresent(String.self, forKey: .reportBuilderRef)
+        reportBuilders = try container.decodeIfPresent([String: DashboardReportBuilderVariantDef].self, forKey: .reportBuilders) ?? [:]
         fetchData = try container.decodeIfPresent(Bool.self, forKey: .fetchData)
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
         targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
@@ -890,6 +900,8 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         try container.encodeIfPresent(terminal, forKey: .terminal)
         try container.encode(actions, forKey: .actions)
         try container.encode(on, forKey: .on)
+        try container.encodeIfPresent(reportBuilderRef, forKey: .reportBuilderRef)
+        try container.encode(reportBuilders, forKey: .reportBuilders)
         try container.encodeIfPresent(fetchData, forKey: .fetchData)
         try container.encodeIfPresent(target, forKey: .target)
         try container.encode(targetOverrides, forKey: .targetOverrides)
@@ -1243,9 +1255,32 @@ public struct DashboardDef: Codable, Sendable {
     public let feed: DashboardFeedDef?
     public let badges: DashboardBadgesDef?
     public let report: DashboardReportDef?
+    public let reportBuilderRef: String?
+    public let reportBuilders: [String: DashboardReportBuilderVariantDef]
     public let reportBuilder: DashboardReportBuilderDef?
     public let reportRuntime: JSONValue?
     public let detail: DashboardDetailDef?
+
+    private enum CodingKeys: String, CodingKey {
+        case key
+        case visibleWhen
+        case summary
+        case compare
+        case kpiTable
+        case filters
+        case timeline
+        case dimensions
+        case messages
+        case status
+        case feed
+        case badges
+        case report
+        case reportBuilderRef
+        case reportBuilders
+        case reportBuilder
+        case reportRuntime
+        case detail
+    }
 
     public init(
         key: String? = nil,
@@ -1261,6 +1296,8 @@ public struct DashboardDef: Codable, Sendable {
         feed: DashboardFeedDef? = nil,
         badges: DashboardBadgesDef? = nil,
         report: DashboardReportDef? = nil,
+        reportBuilderRef: String? = nil,
+        reportBuilders: [String: DashboardReportBuilderVariantDef] = [:],
         reportBuilder: DashboardReportBuilderDef? = nil,
         reportRuntime: JSONValue? = nil,
         detail: DashboardDetailDef? = nil
@@ -1278,13 +1315,39 @@ public struct DashboardDef: Codable, Sendable {
         self.feed = feed
         self.badges = badges
         self.report = report
+        self.reportBuilderRef = reportBuilderRef
+        self.reportBuilders = reportBuilders
         self.reportBuilder = reportBuilder
         self.reportRuntime = reportRuntime
         self.detail = detail
     }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        key = try container.decodeIfPresent(String.self, forKey: .key)
+        visibleWhen = try container.decodeIfPresent(DashboardConditionDef.self, forKey: .visibleWhen)
+        summary = try container.decodeIfPresent(DashboardSummaryDef.self, forKey: .summary)
+        compare = try container.decodeIfPresent(DashboardCompareDef.self, forKey: .compare)
+        kpiTable = try container.decodeIfPresent(DashboardKPITableDef.self, forKey: .kpiTable)
+        filters = try container.decodeIfPresent(DashboardFiltersDef.self, forKey: .filters)
+        timeline = try container.decodeIfPresent(DashboardTimelineDef.self, forKey: .timeline)
+        dimensions = try container.decodeIfPresent(DashboardDimensionsDef.self, forKey: .dimensions)
+        messages = try container.decodeIfPresent(DashboardMessagesDef.self, forKey: .messages)
+        status = try container.decodeIfPresent(DashboardStatusDef.self, forKey: .status)
+        feed = try container.decodeIfPresent(DashboardFeedDef.self, forKey: .feed)
+        badges = try container.decodeIfPresent(DashboardBadgesDef.self, forKey: .badges)
+        report = try container.decodeIfPresent(DashboardReportDef.self, forKey: .report)
+        reportBuilderRef = try container.decodeIfPresent(String.self, forKey: .reportBuilderRef)
+        reportBuilders = try container.decodeIfPresent([String: DashboardReportBuilderVariantDef].self, forKey: .reportBuilders) ?? [:]
+        reportBuilder = try container.decodeIfPresent(DashboardReportBuilderDef.self, forKey: .reportBuilder)
+        reportRuntime = try container.decodeIfPresent(JSONValue.self, forKey: .reportRuntime)
+        detail = try container.decodeIfPresent(DashboardDetailDef.self, forKey: .detail)
+    }
 }
 
 public struct DashboardReportBuilderDef: Codable, Sendable {
+    public let title: String?
+    public let subtitle: String?
     public let hooks: ReportBuilderHooksDef?
     public let filterPresentation: String?
     public let showFilterCategoryBar: Bool?
@@ -1305,6 +1368,8 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
     public let result: ReportBuilderResultDef?
 
     enum CodingKeys: String, CodingKey {
+        case title
+        case subtitle
         case hooks
         case filterPresentation
         case showFilterCategoryBar
@@ -1330,6 +1395,8 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
     }
 
     public init(
+        title: String? = nil,
+        subtitle: String? = nil,
         hooks: ReportBuilderHooksDef? = nil,
         filterPresentation: String? = nil,
         showFilterCategoryBar: Bool? = nil,
@@ -1349,6 +1416,8 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         showResultHeader: Bool? = nil,
         result: ReportBuilderResultDef? = nil
     ) {
+        self.title = title
+        self.subtitle = subtitle
         self.hooks = hooks
         self.filterPresentation = filterPresentation
         self.showFilterCategoryBar = showFilterCategoryBar
@@ -1371,6 +1440,8 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        subtitle = try container.decodeIfPresent(String.self, forKey: .subtitle)
         hooks = try container.decodeIfPresent(ReportBuilderHooksDef.self, forKey: .hooks)
         filterPresentation = try container.decodeIfPresent(String.self, forKey: .filterPresentation)
         showFilterCategoryBar = try container.decodeIfPresent(Bool.self, forKey: .showFilterCategoryBar)
@@ -1392,6 +1463,40 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         unifiedFamilyRows = try container.decodeIfPresent(Bool.self, forKey: .unifiedFamilyRows) ?? false
         showResultHeader = try container.decodeIfPresent(Bool.self, forKey: .showResultHeader)
         result = try container.decodeIfPresent(ReportBuilderResultDef.self, forKey: .result)
+    }
+}
+
+public struct DashboardReportBuilderVariantDef: Codable, Sendable {
+    public let label: String?
+    public let dataSourceRef: String?
+    public let reportBuilder: DashboardReportBuilderDef?
+    public let targetOverrides: [String: JSONValue]
+
+    private enum CodingKeys: String, CodingKey {
+        case label
+        case dataSourceRef
+        case reportBuilder
+        case targetOverrides
+    }
+
+    public init(
+        label: String? = nil,
+        dataSourceRef: String? = nil,
+        reportBuilder: DashboardReportBuilderDef? = nil,
+        targetOverrides: [String: JSONValue] = [:]
+    ) {
+        self.label = label
+        self.dataSourceRef = dataSourceRef
+        self.reportBuilder = reportBuilder
+        self.targetOverrides = targetOverrides
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        label = try container.decodeIfPresent(String.self, forKey: .label)
+        dataSourceRef = try container.decodeIfPresent(String.self, forKey: .dataSourceRef)
+        reportBuilder = try container.decodeIfPresent(DashboardReportBuilderDef.self, forKey: .reportBuilder)
+        targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
     }
 }
 

@@ -168,6 +168,54 @@ class TargetingTest {
     }
 
     @Test
+    fun appliesNestedReportBuilderVariantOverridesForMobileTargets() {
+        val payload = Json.parseToJsonElement(
+            """
+            {
+              "view": {
+                "content": {
+                  "kind": "dashboard.reportBuilder",
+                  "id": "builder",
+                  "reportBuilders": {
+                    "forecasting": {
+                      "dataSourceRef": "forecasting_data",
+                      "reportBuilder": {
+                        "filterPresentation": "rail-left",
+                        "unifiedFamilyRows": false
+                      },
+                      "targetOverrides": {
+                        "mobile": {
+                          "reportBuilder": {
+                            "filterPresentation": "drawer-left"
+                          }
+                        },
+                        "phone": {
+                          "reportBuilder": {
+                            "unifiedFamilyRows": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            """.trimIndent()
+        )
+
+        val resolved = MetadataResolver.resolve(
+            payload,
+            ForgeTargetContext(platform = "android", formFactor = "phone", surface = "app")
+        )!!.jsonObject["view"]!!.jsonObject["content"]!!.jsonObject
+        val forecasting = resolved["reportBuilders"]!!.jsonObject["forecasting"]!!.jsonObject
+        val builder = forecasting["reportBuilder"]!!.jsonObject
+
+        assertEquals("drawer-left", builder["filterPresentation"]!!.jsonPrimitive.content)
+        assertEquals(true, builder["unifiedFamilyRows"]!!.jsonPrimitive.boolean)
+        assertEquals(null, forecasting["targetOverrides"])
+    }
+
+    @Test
     fun treatsFoldableFormFactorAsMobileForBroadOverrides() {
         val payload = Json.parseToJsonElement(
             """

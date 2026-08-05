@@ -1261,7 +1261,8 @@
         "chartModel": {
           "type": "horizontal_bar",
           "xAxis": {
-            "dataKey": "channelV2"
+            "dataKey": "channelV2",
+            "label": "Channel"
           },
           "yAxis": {
             "format": "compactNumber"

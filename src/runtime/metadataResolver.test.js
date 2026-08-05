@@ -177,6 +177,45 @@ assert.equal(resolvedWebDesktopWithoutOverride.view.content.layout.mode, 'deskto
 assert.equal(typeof resolvedWebDesktopWithoutOverride.view.content.layout.density, 'undefined');
 assert.equal(typeof resolvedWebDesktopWithoutOverride.view.content.targetOverrides, 'undefined');
 
+const nestedReportBuilderVariantOverrideMetadata = {
+    view: {
+        content: {
+            kind: 'dashboard.reportBuilder',
+            id: 'reportBuilder',
+            reportBuilders: {
+                forecasting: {
+                    dataSourceRef: 'forecasting_data',
+                    reportBuilder: {
+                        filterPresentation: 'rail-left',
+                        unifiedFamilyRows: false
+                    },
+                    targetOverrides: {
+                        mobile: {
+                            reportBuilder: {
+                                filterPresentation: 'drawer-left'
+                            }
+                        },
+                        phone: {
+                            reportBuilder: {
+                                unifiedFamilyRows: true
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+};
+
+const resolvedNestedVariantPhone = resolveMetadataForTarget(nestedReportBuilderVariantOverrideMetadata, {
+    platform: 'ios',
+    formFactor: 'phone'
+});
+const resolvedNestedVariant = resolvedNestedVariantPhone.view.content.reportBuilders.forecasting;
+assert.equal(resolvedNestedVariant.reportBuilder.filterPresentation, 'drawer-left');
+assert.equal(resolvedNestedVariant.reportBuilder.unifiedFamilyRows, true);
+assert.equal(typeof resolvedNestedVariant.targetOverrides, 'undefined');
+
 const foldableOverrideMetadata = {
     view: {
         content: {

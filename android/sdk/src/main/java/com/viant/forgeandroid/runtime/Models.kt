@@ -117,6 +117,8 @@ data class ContainerDef(
     val terminal: TerminalDef? = null,
     val items: List<ItemDef> = emptyList(),
     val containers: List<ContainerDef> = emptyList(),
+    val reportBuilderRef: String? = null,
+    val reportBuilders: Map<String, DashboardReportBuilderVariantDef> = emptyMap(),
     val tabs: TabsDef? = null,
     val layout: LayoutDef? = null,
     val chat: ChatDef? = null,
@@ -224,6 +226,8 @@ data class DashboardDef(
     val status: DashboardStatusDef? = null,
     val feed: DashboardFeedDef? = null,
     val report: DashboardReportDef? = null,
+    val reportBuilderRef: String? = null,
+    val reportBuilders: Map<String, DashboardReportBuilderVariantDef> = emptyMap(),
     val reportBuilder: DashboardReportBuilderDef? = null,
     val reportRuntime: JsonElement? = null,
     val badges: DashboardBadgesDef? = null,
@@ -232,6 +236,8 @@ data class DashboardDef(
 
 @Serializable
 data class DashboardReportBuilderDef(
+    val title: String? = null,
+    val subtitle: String? = null,
     val hooks: ReportBuilderHooksDef? = null,
     val filterPresentation: String? = null,
     val showFilterCategoryBar: Boolean? = null,
@@ -252,6 +258,14 @@ data class DashboardReportBuilderDef(
     val unifiedFamilyRows: Boolean = false,
     val showResultHeader: Boolean? = null,
     val result: ReportBuilderResultDef? = null
+)
+
+@Serializable
+data class DashboardReportBuilderVariantDef(
+    val label: String? = null,
+    val dataSourceRef: String? = null,
+    val reportBuilder: DashboardReportBuilderDef? = null,
+    val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
