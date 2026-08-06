@@ -5658,6 +5658,76 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(windowForm["__forge"]?.objectValue?["prefillRevision"], .number(2))
     }
 
+    func testReportBuilderHookResultAcceptsRuntimeShapedFilters() throws {
+        let fallback = StoredReportBuilderState(
+            selectedMeasures: ["impressions"],
+            selectedDimensions: ["date"],
+            chartSpec: nil,
+            viewMode: "table",
+            staticFilters: [
+                "country": StoredStaticFilterValue.list(["CA"]),
+                "dateRange": StoredStaticFilterValue.dateRange(start: "2026-01-01", end: "2026-01-02")
+            ],
+            dynamicGroups: [:],
+            dynamicFilterDrafts: [
+                "publisher": "old"
+            ]
+        )
+
+        let merged = ReportBuilderRenderer.reportBuilderState(
+            fromHookResult: .object([
+                "selectedMeasures": .array([.string("avails")]),
+                "staticFilters": .object([
+                    "country": .array([.string("US")]),
+                    "deals": .array([.number(90473), .number(90476)]),
+                    "dateRange": .object([
+                        "start": .string("2026-06-03"),
+                        "end": .string("2026-06-05")
+                    ])
+                ]),
+                "dynamicGroups": .object([
+                    "inventory": .array([
+                        .object([
+                            "id": .string("row-1"),
+                            "filterId": .string("deals"),
+                            "enabled": .bool(true),
+                            "selections": .array([
+                                .object([
+                                    "value": .number(90473),
+                                    "label": .string("Deal 90473")
+                                ])
+                            ])
+                        ])
+                    ])
+                ]),
+                "dynamicFilterDrafts": .object([
+                    "publisher": .number(7288336),
+                    "query": .string("Legacy Ford")
+                ])
+            ]),
+            fallback: fallback
+        )
+
+        XCTAssertEqual(merged.selectedMeasures, ["avails"])
+        XCTAssertEqual(merged.dynamicFilterDrafts["publisher"], "7288336")
+        XCTAssertEqual(merged.dynamicFilterDrafts["query"], "Legacy Ford")
+        let selection = try XCTUnwrap(merged.dynamicGroups["inventory"]?.first?.selections.first)
+        XCTAssertEqual(selection.group, "")
+        XCTAssertNil(selection.record)
+
+        let hookState = try XCTUnwrap(ReportBuilderRenderer.reportBuilderHookStateValue(from: merged)?.objectValue)
+        let staticFilters = try XCTUnwrap(hookState["staticFilters"]?.objectValue)
+        XCTAssertEqual(staticFilters["country"], .array([.string("US")]))
+        XCTAssertEqual(staticFilters["deals"], .array([.string("90473"), .string("90476")]))
+        XCTAssertEqual(
+            staticFilters["dateRange"],
+            .object([
+                "start": .string("2026-06-03"),
+                "end": .string("2026-06-05")
+            ])
+        )
+    }
+
     func testParameterResolverResolvesWindowFormSelectors() {
         let context = ParameterResolver.ResolutionContext(
             identityDataSourceRef: "default",
