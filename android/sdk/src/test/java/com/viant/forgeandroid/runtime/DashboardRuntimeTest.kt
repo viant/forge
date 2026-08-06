@@ -1782,4 +1782,47 @@ class DashboardRuntimeTest {
         assertFalse(byId.containsKey(" status "))
         assertEquals("NA", byField["region"])
     }
+
+    @Test
+    fun dashboardReportRuntimeExportExecutionCarriesPrintablePayload() {
+        val container = ContainerDef(
+            id = "runtime",
+            title = "Performance",
+            kind = "dashboard.reportRuntime",
+            reportRuntime = JsonObject(
+                mapOf(
+                    "reportSpec" to JsonObject(
+                        mapOf(
+                            "kind" to JsonPrimitive("reportSpec"),
+                            "title" to JsonPrimitive("Performance Report"),
+                            "source" to JsonObject(
+                                mapOf(
+                                    "kind" to JsonPrimitive("dashboard.reportBuilder"),
+                                    "dataSourceRef" to JsonPrimitive("performance")
+                                )
+                            )
+                        )
+                    ),
+                    "reportFill" to JsonObject(mapOf("kind" to JsonPrimitive("reportFill"))),
+                    "reportPrint" to JsonObject(
+                        mapOf(
+                            "kind" to JsonPrimitive("reportPrint"),
+                            "title" to JsonPrimitive("Performance Report")
+                        )
+                    )
+                )
+            )
+        )
+
+        val execution = dashboardReportRuntimeExportExecution(container)
+        val payload = dashboardReportRuntimeActionExecutionPayload(execution!!)
+        val exportRequest = payload["exportRequest"] as Map<*, *>
+
+        assertEquals("reportRuntime.exportPdf", execution.id)
+        assertEquals("Download PDF", execution.label)
+        assertEquals("exportPdf", payload["kind"])
+        assertEquals("pdf", exportRequest["format"])
+        assertEquals("Performance Report", exportRequest["title"])
+        assertTrue(exportRequest["reportPrint"] is Map<*, *>)
+    }
 }
