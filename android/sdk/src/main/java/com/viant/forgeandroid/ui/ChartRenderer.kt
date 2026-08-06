@@ -34,6 +34,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -54,6 +56,7 @@ import kotlin.math.atan2
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
+import kotlin.math.sign
 import kotlin.math.sqrt
 
 private val ChartCanvasColor = Color(0xFFF8FAFC)
@@ -430,37 +433,40 @@ private fun MultiSeriesCartesianChart(
 
             drawGridLines(width, height)
             prepared.series.forEach { series ->
-                val linePath = Path()
-                val areaPath = Path()
-                prepared.points.forEachIndexed { index, point ->
+                val seriesPoints = prepared.points.mapIndexed { index, point ->
                     val value = point.values.firstOrNull { it.key == series.key }?.value ?: 0.0
                     val x = (width / max(prepared.points.size - 1, 1)) * index
                     val y = height - (height * (value / prepared.maxValue).toFloat().coerceIn(0f, 1f))
-                    if (index == 0) {
-                        linePath.moveTo(x, y)
-                        if (type == "area") {
-                            areaPath.moveTo(x, height)
-                            areaPath.lineTo(x, y)
-                        }
-                    } else {
-                        linePath.lineTo(x, y)
-                        if (type == "area") {
-                            areaPath.lineTo(x, y)
-                        }
-                    }
+                    Offset(x, y)
+                }
+                val linePath = monotoneCartesianPath(seriesPoints)
+                prepared.points.forEachIndexed { index, point ->
+                    val seriesPoint = seriesPoints[index]
                     val selected = selection?.matches(point.label, series.key) == true
                     drawCircle(
                         color = if (selected) series.color.copy(alpha = 0.82f) else series.color,
                         radius = if (selected) 5.dp.toPx() else 4.dp.toPx(),
-                        center = Offset(x, y)
+                        center = seriesPoint
                     )
                 }
-                if (type == "area" && prepared.points.isNotEmpty()) {
+                if (type == "area" && seriesPoints.isNotEmpty()) {
+                    val areaPath = Path()
+                    areaPath.moveTo(seriesPoints.first().x, height)
+                    areaPath.lineTo(seriesPoints.first().x, seriesPoints.first().y)
+                    areaPath.addPath(linePath)
                     areaPath.lineTo(width, height)
                     areaPath.close()
                     drawPath(path = areaPath, color = series.color.copy(alpha = 0.16f), style = Fill)
                 }
-                drawPath(path = linePath, color = series.color, style = Stroke(width = 3.dp.toPx()))
+                drawPath(
+                    path = linePath,
+                    color = series.color,
+                    style = Stroke(
+                        width = 3.dp.toPx(),
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round
+                    )
+                )
             }
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -479,6 +485,54 @@ private fun MultiSeriesCartesianChart(
             ChartLegend(prepared.series)
         }
     }
+}
+
+private fun monotoneCartesianPath(points: List<Offset>): Path {
+    val path = Path()
+    if (points.isEmpty()) {
+        return path
+    }
+    path.moveTo(points.first().x, points.first().y)
+    if (points.size < 3) {
+        points.drop(1).forEach { point ->
+            path.lineTo(point.x, point.y)
+        }
+        return path
+    }
+    val slopes = points.zipWithNext { point, next ->
+        val deltaX = next.x - point.x
+        if (deltaX == 0f) 0f else (next.y - point.y) / deltaX
+    }
+    val tangents = points.mapIndexed { index, _ ->
+        when (index) {
+            0 -> slopes.first()
+            points.lastIndex -> slopes.last()
+            else -> {
+                val previous = slopes[index - 1]
+                val next = slopes[index]
+                if (previous == 0f || next == 0f || previous.sign != next.sign) {
+                    0f
+                } else {
+                    (2f * previous * next) / (previous + next)
+                }
+            }
+        }
+    }
+    for (index in 0 until points.lastIndex) {
+        val point = points[index]
+        val next = points[index + 1]
+        val deltaX = next.x - point.x
+        val controlOffset = deltaX / 3f
+        path.cubicTo(
+            point.x + controlOffset,
+            point.y + tangents[index] * controlOffset,
+            next.x - controlOffset,
+            next.y - tangents[index + 1] * controlOffset,
+            next.x,
+            next.y
+        )
+    }
+    return path
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGridLines(width: Float, height: Float) {
