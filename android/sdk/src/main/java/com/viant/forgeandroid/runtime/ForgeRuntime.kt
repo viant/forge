@@ -532,6 +532,13 @@ class ExecutionEngine(
                     handlerName = "reportRuntime.redoRefinements"
                     forwardedArgs = emptyMap()
                 }
+                "exportPdf" -> {
+                    val exportRequest = JsonUtil.asStringMap(execution["exportRequest"])
+                        .takeIf { it.isNotEmpty() }
+                        ?: return@handler null
+                    handlerName = "reportRuntime.exportPdf"
+                    forwardedArgs = mapOf("exportRequest" to exportRequest)
+                }
                 else -> return@handler null
             }
             val handler = handlers.resolve(handlerName)

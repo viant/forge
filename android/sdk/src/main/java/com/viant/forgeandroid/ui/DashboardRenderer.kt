@@ -69,6 +69,7 @@ import com.viant.forgeandroid.runtime.dashboardCompositionChart
 import com.viant.forgeandroid.runtime.dashboardDefaultGeoPalette
 import com.viant.forgeandroid.runtime.dashboardGeoTileRegions
 import com.viant.forgeandroid.runtime.dashboardReportRuntimeActionExecutionPayload
+import com.viant.forgeandroid.runtime.dashboardReportRuntimeExportExecution
 import com.viant.forgeandroid.runtime.dashboardReportRuntimeSummary
 import com.viant.forgeandroid.runtime.dashboardReportRuntimeBlockVisible
 import com.viant.forgeandroid.runtime.dashboardReportRuntimeTableActionExecutions
@@ -1555,6 +1556,7 @@ private fun DashboardReportBlock(
 private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowContext, container: ContainerDef, dashboardRoot: ContainerDef, filters: Map<String, Any?>, selection: DashboardSelectionState) {
     val summary = dashboardReportRuntimeSummary(container)
     val blockById = summary.blocks.associateBy { it.id }
+    val exportExecution = dashboardReportRuntimeExportExecution(container)
     val tabSectionIds = summary.blocks
         .filter { it.kind == "tabGroupBlock" }
         .flatMap { reportRuntimeReferenceIds(it.content, "sectionIds", "sections") }
@@ -1571,11 +1573,25 @@ private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowCon
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Text(
-            text = summary.title ?: container.title ?: "Report runtime",
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = summary.title ?: container.title ?: "Report runtime",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (exportExecution != null) {
+                OutlinedButton(
+                    onClick = { executeReportRuntimeAction(runtime, window, dashboardRoot, exportExecution) }
+                ) {
+                    Text("Download PDF")
+                }
+            }
+        }
         summary.subtitle?.let {
             Text(
                 text = it,

@@ -268,7 +268,8 @@ data class DashboardReportRuntimeActionExecution(
     val refinement: DashboardReportRuntimeActionRefinement? = null,
     val transition: DashboardReportRuntimeActionTransition? = null,
     val detailRequest: DashboardReportRuntimeDetailRequest? = null,
-    val selection: DashboardSelectionState? = null
+    val selection: DashboardSelectionState? = null,
+    val exportRequest: Map<String, Any?>? = null
 )
 
 data class DashboardReportRuntimeChartSelection(
@@ -398,6 +399,40 @@ fun dashboardReportRuntimeSummary(container: ContainerDef): DashboardReportRunti
         blockCount = blocks.size,
         blocks = blocks,
         diagnostics = diagnostics
+    )
+}
+
+fun dashboardReportRuntimeExportExecution(container: ContainerDef): DashboardReportRuntimeActionExecution? {
+    val config = dashboardReportRuntimeConfig(container) ?: return null
+    val reportPrint = config["reportPrint"] as? JsonObject ?: return null
+    val reportSpec = config["reportSpec"] as? JsonObject
+    val reportFill = config["reportFill"] as? JsonObject
+    val title = firstNonBlank(
+        jsonString(reportPrint["title"]),
+        jsonString(reportSpec?.get("title")),
+        jsonString(config["title"]),
+        container.title
+    ) ?: "Report"
+    val source = (reportSpec?.get("source") as? JsonObject)
+    val artifactRef = firstNonBlank(
+        jsonString(source?.get("artifactRef")),
+        jsonString(source?.get("artifactID")),
+        jsonString(source?.get("artifactId")),
+        jsonString(reportPrint["artifactRef"])
+    ) ?: "report://runtime/${title.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').ifBlank { "report" }}"
+    val exportRequest = buildMap<String, Any?> {
+        put("format", "pdf")
+        put("artifactRef", artifactRef)
+        put("title", title)
+        reportSpec?.let { put("reportSpec", JsonUtil.elementToAny(it)) }
+        reportFill?.let { put("reportFill", JsonUtil.elementToAny(it)) }
+        put("reportPrint", JsonUtil.elementToAny(reportPrint))
+    }
+    return DashboardReportRuntimeActionExecution(
+        id = "reportRuntime.exportPdf",
+        label = "Download PDF",
+        kind = "exportPdf",
+        exportRequest = exportRequest
     )
 }
 
@@ -971,6 +1006,9 @@ fun dashboardReportRuntimeActionExecutionPayload(
                     "sourceBlockId" to detailRequest.sourceBlockId
                 )
             )
+        }
+        execution.exportRequest?.let { exportRequest ->
+            put("exportRequest", exportRequest)
         }
     }
 }
