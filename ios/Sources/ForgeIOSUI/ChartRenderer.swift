@@ -192,6 +192,7 @@ public struct ChartRenderer: View {
                             y: .value("Value", item.value),
                             series: .value("Series", item.seriesKey)
                         )
+                        .interpolationMethod(.monotone)
                         .foregroundStyle(by: .value("Series", item.seriesKey))
                     }
                 case "bar":
@@ -213,6 +214,7 @@ public struct ChartRenderer: View {
                         y: .value("Value", item.value),
                         series: .value("Series", item.seriesKey)
                     )
+                    .interpolationMethod(.monotone)
                     .foregroundStyle(by: .value("Series", item.seriesKey))
                 }
                 if item.category == selectedCategory, type != "bar", type != "stacked_bar" {
