@@ -459,6 +459,7 @@ public struct DashboardReportRuntimeActionExecution: Sendable, Equatable, Identi
     public let transition: DashboardReportRuntimeActionTransition?
     public let detailRequest: DashboardReportRuntimeDetailRequest?
     public let selection: DashboardSelectionState?
+    public let exportRequest: [String: JSONValue]?
 
     public init(
         id: String,
@@ -467,7 +468,8 @@ public struct DashboardReportRuntimeActionExecution: Sendable, Equatable, Identi
         refinement: DashboardReportRuntimeActionRefinement? = nil,
         transition: DashboardReportRuntimeActionTransition? = nil,
         detailRequest: DashboardReportRuntimeDetailRequest? = nil,
-        selection: DashboardSelectionState? = nil
+        selection: DashboardSelectionState? = nil,
+        exportRequest: [String: JSONValue]? = nil
     ) {
         self.id = id
         self.label = label
@@ -476,6 +478,7 @@ public struct DashboardReportRuntimeActionExecution: Sendable, Equatable, Identi
         self.transition = transition
         self.detailRequest = detailRequest
         self.selection = selection
+        self.exportRequest = exportRequest
     }
 }
 
@@ -777,6 +780,44 @@ public enum DashboardRuntime {
             blockCount: blocks.count,
             blocks: blocks,
             diagnostics: diagnostics
+        )
+    }
+
+    public static func dashboardReportRuntimeExportExecution(_ container: ContainerDef) -> DashboardReportRuntimeActionExecution? {
+        guard let config = dashboardReportRuntimeConfig(container)?.objectValue,
+              let reportPrint = config["reportPrint"]?.objectValue else {
+            return nil
+        }
+        let reportSpec = config["reportSpec"]?.objectValue
+        let reportFill = config["reportFill"]?.objectValue
+        let title = nonBlank(reportPrint["title"]?.stringValue)
+            ?? nonBlank(reportSpec?["title"]?.stringValue)
+            ?? nonBlank(config["title"]?.stringValue)
+            ?? nonBlank(container.title)
+            ?? "Report"
+        let source = reportSpec?["source"]?.objectValue
+        let artifactRef = nonBlank(source?["artifactRef"]?.stringValue)
+            ?? nonBlank(source?["artifactID"]?.stringValue)
+            ?? nonBlank(source?["artifactId"]?.stringValue)
+            ?? nonBlank(reportPrint["artifactRef"]?.stringValue)
+            ?? "report://runtime/\(dashboardReportRuntimeSlug(title))"
+        var exportRequest: [String: JSONValue] = [
+            "format": .string("pdf"),
+            "artifactRef": .string(artifactRef),
+            "title": .string(title),
+            "reportPrint": .object(reportPrint)
+        ]
+        if let reportSpec {
+            exportRequest["reportSpec"] = .object(reportSpec)
+        }
+        if let reportFill {
+            exportRequest["reportFill"] = .object(reportFill)
+        }
+        return DashboardReportRuntimeActionExecution(
+            id: "reportRuntime.exportPdf",
+            label: "Download PDF",
+            kind: "exportPdf",
+            exportRequest: exportRequest
         )
     }
 
@@ -1389,6 +1430,9 @@ public enum DashboardRuntime {
                 "sourceBlockId": detailRequest.sourceBlockID.map(JSONValue.string) ?? .null
             ])
         }
+        if let exportRequest = execution.exportRequest {
+            object["exportRequest"] = .object(exportRequest)
+        }
         return .object(object)
     }
 
@@ -1528,6 +1572,23 @@ public enum DashboardRuntime {
             return "\(kind):\(blockID):\(fieldValueKey)"
         }
         return "\(kind):\(fieldValueKey)"
+    }
+
+    private static func dashboardReportRuntimeSlug(_ value: String) -> String {
+        let allowed = CharacterSet.alphanumerics
+        var output = ""
+        var previousWasDash = false
+        for scalar in value.lowercased().unicodeScalars {
+            if allowed.contains(scalar) {
+                output.unicodeScalars.append(scalar)
+                previousWasDash = false
+            } else if !previousWasDash {
+                output.append("-")
+                previousWasDash = true
+            }
+        }
+        let trimmed = output.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        return trimmed.isEmpty ? "report" : trimmed
     }
 
     private static func dashboardReportRuntimeDatasetDimensions(
