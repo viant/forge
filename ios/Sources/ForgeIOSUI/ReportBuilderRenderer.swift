@@ -950,22 +950,18 @@ public struct ReportBuilderRenderer: View {
         } else {
             formValue = await runtime.windowFormJSONValue(windowID: window.windowID)
         }
-        guard let stateValue = Self.jsonValue(from: currentStoredState()) else { return }
+        await refreshAvailableDialogs()
+        let fallbackState = currentStoredState()
+        guard let stateValue = Self.reportBuilderHookStateValue(from: fallbackState) else { return }
         let props = Self.objectValue([
             "state": stateValue,
             "windowForm": .object(formValue),
             "config": Self.jsonValue(from: config)
         ])
-        guard let result = invokeHook(functionName: hookName, props: props),
-              let data = try? JSONEncoder().encode(result) else {
+        guard let result = invokeHook(functionName: hookName, props: props) else {
             return
         }
-        let next: StoredReportBuilderState
-        do {
-            next = try JSONDecoder().decode(StoredReportBuilderState.self, from: data)
-        } catch {
-            return
-        }
+        let next = Self.reportBuilderState(fromHookResult: result, fallback: fallbackState)
         apply(restored: next)
     }
 
@@ -1370,6 +1366,165 @@ public struct ReportBuilderRenderer: View {
                 result[entry.key] = value
             }
         })
+    }
+
+    static func reportBuilderHookStateValue(from state: StoredReportBuilderState) -> JSONValue? {
+        var object: [String: JSONValue] = [
+            "selectedMeasures": .array(state.selectedMeasures.map(JSONValue.string)),
+            "selectedDimensions": .array(state.selectedDimensions.map(JSONValue.string)),
+            "viewMode": .string(state.viewMode),
+            "staticFilters": .object(state.staticFilters.mapValues { staticFilterJSONValue($0.runtimeValue) }),
+            "dynamicFilterValues": .object(legacyDynamicFilterValues(state.dynamicGroups).mapValues(JSONValue.string)),
+            "activeDynamicFilterKeys": .array(legacyActiveDynamicFilterKeys(state.dynamicGroups).map(JSONValue.string)),
+            "dynamicGroups": synthesizeDynamicGroups(state.dynamicGroups)
+        ]
+        if let chartSpec = state.chartSpec, let chartValue = jsonValue(from: chartSpec) {
+            object["chartSpec"] = chartValue
+        }
+        return .object(object)
+    }
+
+    static func reportBuilderState(
+        fromHookResult result: JSONValue,
+        fallback: StoredReportBuilderState
+    ) -> StoredReportBuilderState {
+        guard let object = result.objectValue else { return fallback }
+        return StoredReportBuilderState(
+            selectedMeasures: stringArray(object["selectedMeasures"]) ?? fallback.selectedMeasures,
+            selectedDimensions: stringArray(object["selectedDimensions"]) ?? fallback.selectedDimensions,
+            chartSpec: object.keys.contains("chartSpec")
+                ? (decodeJSONValue(object["chartSpec"], as: ReportBuilderChartSpecDef.self) ?? fallback.chartSpec)
+                : fallback.chartSpec,
+            viewMode: object["viewMode"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                ? object["viewMode"]?.stringValue ?? fallback.viewMode
+                : fallback.viewMode,
+            staticFilters: object.keys.contains("staticFilters")
+                ? (staticFilters(fromHookValue: object["staticFilters"]) ?? fallback.staticFilters)
+                : fallback.staticFilters,
+            dynamicGroups: object.keys.contains("dynamicGroups")
+                ? (decodeJSONValue(object["dynamicGroups"], as: [String: [ReportBuilderDynamicRowState]].self) ?? fallback.dynamicGroups)
+                : fallback.dynamicGroups,
+            dynamicFilterDrafts: object.keys.contains("dynamicFilterDrafts")
+                ? (stringMap(from: object["dynamicFilterDrafts"]) ?? fallback.dynamicFilterDrafts)
+                : fallback.dynamicFilterDrafts
+        )
+    }
+
+    private static func decodeJSONValue<T: Decodable>(_ value: JSONValue?, as type: T.Type) -> T? {
+        guard let value, let data = try? JSONEncoder().encode(value) else { return nil }
+        return try? JSONDecoder().decode(type, from: data)
+    }
+
+    private static func stringArray(_ value: JSONValue?) -> [String]? {
+        guard let array = value?.arrayValue else { return nil }
+        return array.compactMap { entry in
+            entry.stringValue
+            ?? entry.intValue.map { String($0) }
+            ?? entry.doubleLike.map { String($0) }
+        }
+    }
+
+    private static func staticFilterJSONValue(_ value: ReportBuilderStaticFilterValue) -> JSONValue {
+        switch value {
+        case .list(let values):
+            return .array(values.map(JSONValue.string))
+        case .dateRange(let start, let end):
+            return .object([
+                "start": .string(start),
+                "end": .string(end)
+            ])
+        }
+    }
+
+    private static func staticFilters(fromHookValue value: JSONValue?) -> [String: StoredStaticFilterValue]? {
+        guard let object = value?.objectValue else { return nil }
+        var result: [String: StoredStaticFilterValue] = [:]
+        for (key, rawValue) in object {
+            if let stored = decodeJSONValue(rawValue, as: StoredStaticFilterValue.self) {
+                result[key] = stored
+            } else if let list = stringArray(rawValue) {
+                result[key] = .list(list)
+            } else if let range = rawValue.objectValue,
+                      range.keys.contains("start") || range.keys.contains("end") {
+                result[key] = .dateRange(
+                    start: range["start"]?.stringValue ?? range["start"]?.intValue.map { String($0) } ?? "",
+                    end: range["end"]?.stringValue ?? range["end"]?.intValue.map { String($0) } ?? ""
+                )
+            } else if let scalar = rawValue.stringValue ?? rawValue.intValue.map({ String($0) }) ?? rawValue.doubleLike.map({ String($0) }) {
+                result[key] = .list([scalar])
+            }
+        }
+        return result
+    }
+
+    private static func stringMap(from value: JSONValue?) -> [String: String]? {
+        guard let object = value?.objectValue else { return nil }
+        var result: [String: String] = [:]
+        for (key, rawValue) in object {
+            if let string = rawValue.stringValue {
+                result[key] = string
+            } else if let int = rawValue.intValue {
+                result[key] = String(int)
+            } else if let double = rawValue.doubleLike {
+                result[key] = String(double)
+            } else if rawValue != .null {
+                result[key] = rawValue.signature
+            }
+        }
+        return result
+    }
+
+    private static func synthesizeDynamicGroups(
+        _ dynamicGroups: [String: [ReportBuilderDynamicRowState]]
+    ) -> JSONValue {
+        .object(dynamicGroups.mapValues { rows in
+            .array(rows.map { row in
+                .object([
+                    "id": .string(row.id),
+                    "filterId": .string(row.filterId),
+                    "enabled": .bool(row.enabled),
+                    "selections": .array(row.selections.map { selection in
+                        var record: [String: JSONValue] = [
+                            "value": selection.value,
+                            "label": .string(selection.label),
+                            "group": .string(selection.group)
+                        ]
+                        if let compactRecord = selection.record {
+                            record["record"] = .object(compactRecord)
+                        }
+                        return .object(record)
+                    })
+                ])
+            })
+        })
+    }
+
+    private static func legacyDynamicFilterValues(
+        _ dynamicGroups: [String: [ReportBuilderDynamicRowState]]
+    ) -> [String: String] {
+        var result: [String: String] = [:]
+        for row in dynamicGroups.values.flatMap({ $0 }) {
+            result[row.filterId] = row.selections
+                .map { dynamicSelectionValueText($0.value) }
+                .joined(separator: ",")
+        }
+        return result
+    }
+
+    private static func legacyActiveDynamicFilterKeys(
+        _ dynamicGroups: [String: [ReportBuilderDynamicRowState]]
+    ) -> [String] {
+        let keys = dynamicGroups.values.reduce(into: [String]()) { result, rows in
+            result.append(contentsOf: rows.map(\.filterId))
+        }
+        return Array(NSOrderedSet(array: keys)) as? [String] ?? []
+    }
+
+    private static func dynamicSelectionValueText(_ value: JSONValue) -> String {
+        value.stringValue
+        ?? value.intValue.map { String($0) }
+        ?? value.doubleLike.map { String($0) }
+        ?? value.signature
     }
 
     private static func staticFilterSignature(_ value: ReportBuilderStaticFilterValue?) -> String {
@@ -2048,7 +2203,7 @@ internal func reportBuilderChartStateFeedback(
     )
 }
 
-private struct StoredReportBuilderState: Codable, Sendable {
+struct StoredReportBuilderState: Codable, Sendable {
     let selectedMeasures: [String]
     let selectedDimensions: [String]
     let chartSpec: ReportBuilderChartSpecDef?
@@ -2105,6 +2260,41 @@ struct ReportBuilderDynamicSelectionState: Codable, Sendable, Equatable {
     let label: String
     let group: String
     let record: [String: JSONValue]?
+
+    private enum CodingKeys: String, CodingKey {
+        case value
+        case label
+        case group
+        case record
+    }
+
+    init(
+        value: JSONValue,
+        label: String,
+        group: String = "",
+        record: [String: JSONValue]? = nil
+    ) {
+        self.value = value
+        self.label = label
+        self.group = group
+        self.record = record
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.value = try container.decode(JSONValue.self, forKey: .value)
+        self.label = try container.decode(String.self, forKey: .label)
+        self.group = try container.decodeIfPresent(String.self, forKey: .group) ?? ""
+        self.record = try container.decodeIfPresent([String: JSONValue].self, forKey: .record)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(value, forKey: .value)
+        try container.encode(label, forKey: .label)
+        try container.encode(group, forKey: .group)
+        try container.encodeIfPresent(record, forKey: .record)
+    }
 }
 
 private struct ReportBuilderLookupDescriptor {
@@ -2172,11 +2362,11 @@ private extension JSONValue {
     }
 }
 
-private enum StoredStaticFilterValue: Codable, Sendable {
+enum StoredStaticFilterValue: Codable, Sendable {
     case list([String])
     case dateRange(start: String, end: String)
 
-    init(runtimeValue: ReportBuilderStaticFilterValue) {
+    fileprivate init(runtimeValue: ReportBuilderStaticFilterValue) {
         switch runtimeValue {
         case .list(let values):
             self = .list(values)
@@ -2185,7 +2375,7 @@ private enum StoredStaticFilterValue: Codable, Sendable {
         }
     }
 
-    var runtimeValue: ReportBuilderStaticFilterValue {
+    fileprivate var runtimeValue: ReportBuilderStaticFilterValue {
         switch self {
         case .list(let values):
             return .list(values)
