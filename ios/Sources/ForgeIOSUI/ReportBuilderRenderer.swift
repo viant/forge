@@ -790,12 +790,14 @@ public struct ReportBuilderRenderer: View {
                         x: .value("X", point.x),
                         y: .value("Value", point.value)
                     )
+                    .interpolationMethod(.monotone)
                     .foregroundStyle(by: .value("Series", point.series))
                 default:
                     LineMark(
                         x: .value("X", point.x),
                         y: .value("Value", point.value)
                     )
+                    .interpolationMethod(.monotone)
                     .foregroundStyle(by: .value("Series", point.series))
                 }
             }
