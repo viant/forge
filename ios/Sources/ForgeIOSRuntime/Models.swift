@@ -1361,6 +1361,9 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
     public let staticFilters: [ReportBuilderStaticFilterDef]
     public let dynamicFilterGroups: [ReportBuilderDynamicFilterGroupDef]
     public let dynamicFilterFamilies: [ReportBuilderDynamicFilterFamilyDef]
+    public let predicateBuckets: [ReportBuilderPredicateBucketDef]
+    public let predicateGroups: [ReportBuilderPredicateGroupDef]
+    public let predicates: [ReportBuilderPredicateDef]
     public let resultCategories: [String]
     public let groupBy: ReportBuilderGroupByDef?
     public let unifiedFamilyRows: Bool
@@ -1383,6 +1386,9 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         case staticFilters
         case dynamicFilterGroups
         case dynamicFilterFamilies
+        case predicateBuckets
+        case predicateGroups
+        case predicates
         case resultCategories
         case groupBy
         case unifiedFamilyRows
@@ -1410,6 +1416,9 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         staticFilters: [ReportBuilderStaticFilterDef] = [],
         dynamicFilterGroups: [ReportBuilderDynamicFilterGroupDef] = [],
         dynamicFilterFamilies: [ReportBuilderDynamicFilterFamilyDef] = [],
+        predicateBuckets: [ReportBuilderPredicateBucketDef] = [],
+        predicateGroups: [ReportBuilderPredicateGroupDef] = [],
+        predicates: [ReportBuilderPredicateDef] = [],
         resultCategories: [String] = [],
         groupBy: ReportBuilderGroupByDef? = nil,
         unifiedFamilyRows: Bool = false,
@@ -1431,6 +1440,9 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         self.staticFilters = staticFilters
         self.dynamicFilterGroups = dynamicFilterGroups
         self.dynamicFilterFamilies = dynamicFilterFamilies
+        self.predicateBuckets = predicateBuckets
+        self.predicateGroups = predicateGroups
+        self.predicates = predicates
         self.resultCategories = resultCategories
         self.groupBy = groupBy
         self.unifiedFamilyRows = unifiedFamilyRows
@@ -1455,6 +1467,9 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         staticFilters = try container.decodeIfPresent([ReportBuilderStaticFilterDef].self, forKey: .staticFilters) ?? []
         dynamicFilterGroups = try container.decodeIfPresent([ReportBuilderDynamicFilterGroupDef].self, forKey: .dynamicFilterGroups) ?? []
         dynamicFilterFamilies = try container.decodeIfPresent([ReportBuilderDynamicFilterFamilyDef].self, forKey: .dynamicFilterFamilies) ?? []
+        predicateBuckets = try container.decodeIfPresent([ReportBuilderPredicateBucketDef].self, forKey: .predicateBuckets) ?? []
+        predicateGroups = try container.decodeIfPresent([ReportBuilderPredicateGroupDef].self, forKey: .predicateGroups) ?? []
+        predicates = try container.decodeIfPresent([ReportBuilderPredicateDef].self, forKey: .predicates) ?? []
         let legacyContainer = try decoder.container(keyedBy: LegacyCodingKeys.self)
         resultCategories = try container.decodeIfPresent([String].self, forKey: .resultCategories)
             ?? legacyContainer.decodeIfPresent([String].self, forKey: .forecastCategories)
@@ -1910,6 +1925,162 @@ public struct ReportBuilderStaticFilterOptionDef: Codable, Sendable, Identifiabl
     }
 
     public var id: String { value?.stringValue ?? label ?? UUID().uuidString }
+}
+
+public struct ReportBuilderPredicateBucketDef: Codable, Sendable, Identifiable {
+    public let id: String?
+    public let label: String?
+    public let description: String?
+    public let order: Double?
+
+    public init(
+        id: String? = nil,
+        label: String? = nil,
+        description: String? = nil,
+        order: Double? = nil
+    ) {
+        self.id = id
+        self.label = label
+        self.description = description
+        self.order = order
+    }
+}
+
+public struct ReportBuilderPredicateGroupDef: Codable, Sendable, Identifiable {
+    public let id: String?
+    public let label: String?
+    public let description: String?
+    public let icon: String?
+    public let order: Double?
+
+    public init(
+        id: String? = nil,
+        label: String? = nil,
+        description: String? = nil,
+        icon: String? = nil,
+        order: Double? = nil
+    ) {
+        self.id = id
+        self.label = label
+        self.description = description
+        self.icon = icon
+        self.order = order
+    }
+}
+
+public struct ReportBuilderPredicateDef: Codable, Sendable, Identifiable {
+    public let id: String?
+    public let label: String?
+    public let description: String?
+    public let group: String?
+    public let kind: String?
+    public let pinned: Bool?
+    public let required: Bool?
+    public let multiple: Bool?
+    public let presentation: String?
+    public let semanticRef: String?
+    public let options: [ReportBuilderStaticFilterOptionDef]
+    public let defaultValue: JSONValue?
+    public let paramPath: String?
+    public let includeParamPath: String?
+    public let excludeParamPath: String?
+    public let startParamPath: String?
+    public let endParamPath: String?
+    public let bucket: String?
+    public let include: JSONValue?
+    public let exclude: JSONValue?
+    public let dialogId: String?
+    public let multipleEntry: Bool?
+    public let emitArray: Bool?
+    public let manualEntry: Bool?
+    public let manualValueType: String?
+    public let manualPlaceholder: String?
+    public let placeholder: String?
+    public let valueSelector: String?
+    public let labelSelector: String?
+    public let recordSelectors: [String]
+    public let groupSelector: String?
+    public let targetingFeatureKey: String?
+    public let lookup: JSONValue?
+    public let requestMapping: String?
+    public let handledByHook: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case label
+        case description
+        case group
+        case kind
+        case pinned
+        case required
+        case multiple
+        case presentation
+        case semanticRef
+        case options
+        case defaultValue = "default"
+        case paramPath
+        case includeParamPath
+        case excludeParamPath
+        case startParamPath
+        case endParamPath
+        case bucket
+        case include
+        case exclude
+        case dialogId
+        case multipleEntry
+        case emitArray
+        case manualEntry
+        case manualValueType
+        case manualPlaceholder
+        case placeholder
+        case valueSelector
+        case labelSelector
+        case recordSelectors
+        case groupSelector
+        case targetingFeatureKey
+        case lookup
+        case requestMapping
+        case handledByHook
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id)
+        label = try container.decodeIfPresent(String.self, forKey: .label)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        group = try container.decodeIfPresent(String.self, forKey: .group)
+        kind = try container.decodeIfPresent(String.self, forKey: .kind)
+        pinned = try container.decodeIfPresent(Bool.self, forKey: .pinned)
+        required = try container.decodeIfPresent(Bool.self, forKey: .required)
+        multiple = try container.decodeIfPresent(Bool.self, forKey: .multiple)
+        presentation = try container.decodeIfPresent(String.self, forKey: .presentation)
+        semanticRef = try container.decodeIfPresent(String.self, forKey: .semanticRef)
+        options = try container.decodeIfPresent([ReportBuilderStaticFilterOptionDef].self, forKey: .options) ?? []
+        defaultValue = try container.decodeIfPresent(JSONValue.self, forKey: .defaultValue)
+        paramPath = try container.decodeIfPresent(String.self, forKey: .paramPath)
+        includeParamPath = try container.decodeIfPresent(String.self, forKey: .includeParamPath)
+        excludeParamPath = try container.decodeIfPresent(String.self, forKey: .excludeParamPath)
+        startParamPath = try container.decodeIfPresent(String.self, forKey: .startParamPath)
+        endParamPath = try container.decodeIfPresent(String.self, forKey: .endParamPath)
+        bucket = try container.decodeIfPresent(String.self, forKey: .bucket)
+        include = try container.decodeIfPresent(JSONValue.self, forKey: .include)
+        exclude = try container.decodeIfPresent(JSONValue.self, forKey: .exclude)
+        dialogId = try container.decodeIfPresent(String.self, forKey: .dialogId)
+        multipleEntry = try container.decodeIfPresent(Bool.self, forKey: .multipleEntry)
+        emitArray = try container.decodeIfPresent(Bool.self, forKey: .emitArray)
+        manualEntry = try container.decodeIfPresent(Bool.self, forKey: .manualEntry)
+        manualValueType = try container.decodeIfPresent(String.self, forKey: .manualValueType)
+        manualPlaceholder = try container.decodeIfPresent(String.self, forKey: .manualPlaceholder)
+        placeholder = try container.decodeIfPresent(String.self, forKey: .placeholder)
+        valueSelector = try container.decodeIfPresent(String.self, forKey: .valueSelector)
+        labelSelector = try container.decodeIfPresent(String.self, forKey: .labelSelector)
+        recordSelectors = try container.decodeIfPresent([String].self, forKey: .recordSelectors) ?? []
+        groupSelector = try container.decodeIfPresent(String.self, forKey: .groupSelector)
+        targetingFeatureKey = try container.decodeIfPresent(String.self, forKey: .targetingFeatureKey)
+        lookup = try container.decodeIfPresent(JSONValue.self, forKey: .lookup)
+        requestMapping = try container.decodeIfPresent(String.self, forKey: .requestMapping)
+        handledByHook = try container.decodeIfPresent(Bool.self, forKey: .handledByHook)
+    }
 }
 
 public struct ReportBuilderDynamicFilterGroupDef: Codable, Sendable, Identifiable {

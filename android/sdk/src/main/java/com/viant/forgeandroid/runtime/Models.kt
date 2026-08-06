@@ -251,6 +251,9 @@ data class DashboardReportBuilderDef(
     val staticFilters: List<ReportBuilderStaticFilterDef> = emptyList(),
     val dynamicFilterGroups: List<ReportBuilderDynamicFilterGroupDef> = emptyList(),
     val dynamicFilterFamilies: List<ReportBuilderDynamicFilterFamilyDef> = emptyList(),
+    val predicateBuckets: List<ReportBuilderPredicateBucketDef> = emptyList(),
+    val predicateGroups: List<ReportBuilderPredicateGroupDef> = emptyList(),
+    val predicates: List<ReportBuilderPredicateDef> = emptyList(),
     @OptIn(ExperimentalSerializationApi::class)
     @JsonNames("forecastCategories")
     val resultCategories: List<String> = emptyList(),
@@ -396,6 +399,63 @@ data class ReportBuilderStaticFilterDef(
     val options: List<ReportBuilderStaticFilterOptionDef> = emptyList(),
     @SerialName("default")
     val defaultValue: JsonElement? = null
+)
+
+@Serializable
+data class ReportBuilderPredicateBucketDef(
+    val id: String? = null,
+    val label: String? = null,
+    val description: String? = null,
+    val order: Double? = null
+)
+
+@Serializable
+data class ReportBuilderPredicateGroupDef(
+    val id: String? = null,
+    val label: String? = null,
+    val description: String? = null,
+    val icon: String? = null,
+    val order: Double? = null
+)
+
+@Serializable
+data class ReportBuilderPredicateDef(
+    val id: String? = null,
+    val label: String? = null,
+    val description: String? = null,
+    val group: String? = null,
+    val kind: String? = null,
+    val pinned: Boolean? = null,
+    val required: Boolean? = null,
+    val multiple: Boolean? = null,
+    val presentation: String? = null,
+    val semanticRef: String? = null,
+    val options: List<ReportBuilderStaticFilterOptionDef> = emptyList(),
+    @SerialName("default")
+    val defaultValue: JsonElement? = null,
+    val paramPath: String? = null,
+    val includeParamPath: String? = null,
+    val excludeParamPath: String? = null,
+    val startParamPath: String? = null,
+    val endParamPath: String? = null,
+    val bucket: String? = null,
+    val include: JsonElement? = null,
+    val exclude: JsonElement? = null,
+    val dialogId: String? = null,
+    val multipleEntry: Boolean? = null,
+    val emitArray: Boolean? = null,
+    val manualEntry: Boolean? = null,
+    val manualValueType: String? = null,
+    val manualPlaceholder: String? = null,
+    val placeholder: String? = null,
+    val valueSelector: String? = null,
+    val labelSelector: String? = null,
+    val recordSelectors: List<String> = emptyList(),
+    val groupSelector: String? = null,
+    val targetingFeatureKey: String? = null,
+    val lookup: JsonElement? = null,
+    val requestMapping: String? = null,
+    val handledByHook: Boolean? = null
 )
 
 @Serializable

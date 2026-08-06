@@ -534,6 +534,70 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(reportBuilder.groupBy?.options.first?.paramValue, .string("date"))
     }
 
+    func testReportBuilderPredicateLoweringDerivesFiltersGroupsAndFamilies() throws {
+        let payload = """
+        {
+          "predicates": [
+            {
+              "id": "dateRange",
+              "label": "Date Range",
+              "kind": "dateRange",
+              "required": true,
+              "startParamPath": "filters.from",
+              "endParamPath": "filters.to"
+            },
+            {
+              "id": "publisher",
+              "label": "Publisher",
+              "group": "inventory",
+              "include": true,
+              "exclude": { "paramPath": "filters.excludePublisherId" },
+              "dialogId": "publisherPicker",
+              "manualEntry": true,
+              "manualValueType": "int",
+              "valueSelector": "publisherId",
+              "labelSelector": "publisherName",
+              "recordSelectors": ["publisherId", "publisherName"]
+            },
+            {
+              "id": "audienceIds",
+              "label": "Audience",
+              "bucket": "scope",
+              "paramPath": "filters.audienceIds",
+              "manualEntry": true,
+              "manualValueType": "int"
+            }
+          ],
+          "predicateBuckets": [
+            { "id": "scope", "label": "Context" }
+          ],
+          "predicateGroups": [
+            { "id": "inventory", "label": "Inventory" }
+          ]
+        }
+        """
+        let config = try JSONDecoder().decode(DashboardReportBuilderDef.self, from: Data(payload.utf8))
+
+        let lowered = lowerReportBuilderPredicates(config)
+
+        XCTAssertEqual(lowered.staticFilters.compactMap(\.id), ["dateRange"])
+        XCTAssertEqual(lowered.staticFilters.first?.startParamPath, "filters.from")
+
+        let include = try XCTUnwrap(lowered.dynamicFilterGroups.first { $0.id == "include" })
+        let exclude = try XCTUnwrap(lowered.dynamicFilterGroups.first { $0.id == "exclude" })
+        let scope = try XCTUnwrap(lowered.dynamicFilterGroups.first { $0.id == "scope" })
+
+        XCTAssertEqual(include.filters.first?.id, "includePublisher")
+        XCTAssertEqual(include.filters.first?.paramPath, "filters.includePublisher")
+        XCTAssertEqual(exclude.filters.first?.id, "excludePublisher")
+        XCTAssertEqual(exclude.filters.first?.paramPath, "filters.excludePublisherId")
+        XCTAssertEqual(scope.filters.first?.id, "audienceIds")
+
+        let family = try XCTUnwrap(lowered.dynamicFilterFamilies.first { $0.id == "inventory" })
+        XCTAssertEqual(family.includeFilterIds, ["includePublisher"])
+        XCTAssertEqual(family.excludeFilterIds, ["excludePublisher"])
+    }
+
     func testWindowMetadataDecodesReportBuilderVariants() throws {
         let payload = """
         {

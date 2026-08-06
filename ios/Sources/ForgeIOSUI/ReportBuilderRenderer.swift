@@ -117,7 +117,7 @@ public struct ReportBuilderRenderer: View {
     }
 
     private var config: DashboardReportBuilderDef {
-        resolvedVariant.config ?? DashboardReportBuilderDef()
+        lowerReportBuilderPredicates(resolvedVariant.config ?? DashboardReportBuilderDef())
     }
 
     private var effectiveDataSourceRef: String? {
@@ -415,6 +415,7 @@ public struct ReportBuilderRenderer: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Filters")
                         .font(.subheadline.weight(.semibold))
+                        .accessibilityIdentifier("forge-report-builder-filter-summary")
                     Text(filterSummaryText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -570,6 +571,7 @@ public struct ReportBuilderRenderer: View {
                         Text(filter.label ?? key)
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
+                            .accessibilityIdentifier("forge-report-builder-static-filter-\(key)")
                         if (filter.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "daterange" {
                             let current = staticFilters[key] ?? .dateRange(start: "", end: "")
                             HStack(spacing: 8) {

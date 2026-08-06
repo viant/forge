@@ -18,8 +18,10 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 
 class ActionHookRuntimeTest {
     @BeforeTest
@@ -149,10 +151,11 @@ class ActionHookRuntimeTest {
         }
 
         val state = runtime.openWindow("reportWindow", "Report Review")
-        delay(50)
-        val metadata = runtime.metadataSignal(state.windowId).peek()
+        val metadata = withTimeout(1_000) {
+            runtime.metadataSignal(state.windowId).flow.filterNotNull().first()
+        }
 
-        assertEquals("reportRoot", metadata?.view?.content?.containers?.firstOrNull()?.id)
+        assertEquals("reportRoot", metadata.view?.content?.containers?.firstOrNull()?.id)
     }
 
     @Test
