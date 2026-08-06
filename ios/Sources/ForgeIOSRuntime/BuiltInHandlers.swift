@@ -282,6 +282,10 @@ extension ForgeRuntime {
                 guard let detailRequest = execution["detailRequest"]?.objectValue else { return nil }
                 handlerName = "reportRuntime.openDetailTarget"
                 forwardedArgs = ["detailRequest": .object(detailRequest)]
+            case "exportPdf":
+                guard let exportRequest = execution["exportRequest"]?.objectValue else { return nil }
+                handlerName = "reportRuntime.exportPdf"
+                forwardedArgs = ["exportRequest": .object(exportRequest)]
             case "removeRefinement":
                 let refinementID = execution["refinementId"] ?? execution["refinementID"] ?? .null
                 guard refinementID.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {

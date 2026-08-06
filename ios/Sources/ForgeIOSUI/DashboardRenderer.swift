@@ -1080,9 +1080,20 @@ public struct DashboardRenderer: View {
     private func reportRuntimeBlock(_ container: ContainerDef) -> some View {
         let summary = DashboardRuntime.dashboardReportRuntimeSummary(container)
         let nestedBlockIDs = reportRuntimeNestedTabBlockIDs(summary.blocks)
+        let exportExecution = DashboardRuntime.dashboardReportRuntimeExportExecution(container)
         VStack(alignment: .leading, spacing: 8) {
-            Text(summary.title ?? container.title ?? "Report runtime")
-                .font(.body.weight(.semibold))
+            HStack(alignment: .center, spacing: 8) {
+                Text(summary.title ?? container.title ?? "Report runtime")
+                    .font(.body.weight(.semibold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let exportExecution {
+                    Button("Download PDF") {
+                        executeReportRuntimeAction(exportExecution)
+                    }
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.bordered)
+                }
+            }
             if let subtitle = summary.subtitle {
                 Text(subtitle)
                     .font(.caption)

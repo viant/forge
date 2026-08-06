@@ -4524,6 +4524,83 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(result?.objectValue?["refinement"]?.objectValue?["value"], .string("US"))
     }
 
+    func testReportRuntimeExportExecutionCarriesPrintablePayload() throws {
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data("""
+        {
+          "view": {
+            "content": {
+              "containers": [
+                {
+                  "kind": "dashboard.reportRuntime",
+                  "title": "Performance",
+                  "reportRuntime": {
+                    "title": "Runtime Report",
+                    "reportSpec": {
+                      "title": "Performance Report",
+                      "source": { "artifactRef": "report://performance" }
+                    },
+                    "reportFill": {
+                      "datasets": []
+                    },
+                    "reportPrint": {
+                      "kind": "reportPrint",
+                      "title": "Printable Performance"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+        """.utf8))
+        let container = try XCTUnwrap(metadata.view?.content?.containers.first)
+
+        let execution = try XCTUnwrap(DashboardRuntime.dashboardReportRuntimeExportExecution(container))
+        let payload = DashboardRuntime.dashboardReportRuntimeActionExecutionPayload(execution)
+        let object = try XCTUnwrap(payload.objectValue)
+        let exportRequest = try XCTUnwrap(object["exportRequest"]?.objectValue)
+
+        XCTAssertEqual(execution.id, "reportRuntime.exportPdf")
+        XCTAssertEqual(execution.label, "Download PDF")
+        XCTAssertEqual(object["kind"], .string("exportPdf"))
+        XCTAssertEqual(exportRequest["format"], .string("pdf"))
+        XCTAssertEqual(exportRequest["artifactRef"], .string("report://performance"))
+        XCTAssertEqual(exportRequest["title"], .string("Printable Performance"))
+        XCTAssertNotNil(exportRequest["reportSpec"]?.objectValue)
+        XCTAssertNotNil(exportRequest["reportFill"]?.objectValue)
+        XCTAssertNotNil(exportRequest["reportPrint"]?.objectValue)
+    }
+
+    func testReportRuntimeExecuteActionDispatchesExportPdfHandler() async throws {
+        let runtime = ForgeRuntime()
+        await runtime.registerHandler("reportRuntime.exportPdf") { args in
+            args.args["exportRequest"]
+        }
+        let payload = DashboardRuntime.dashboardReportRuntimeActionExecutionPayload(
+            DashboardReportRuntimeActionExecution(
+                id: "reportRuntime.exportPdf",
+                label: "Download PDF",
+                kind: "exportPdf",
+                exportRequest: [
+                    "format": .string("pdf"),
+                    "artifactRef": .string("report://performance"),
+                    "title": .string("Performance Report"),
+                    "reportPrint": .object(["kind": .string("reportPrint")])
+                ]
+            )
+        )
+
+        let result = await runtime.execute(
+            ExecutionDef(action: "reportRuntime.executeAction"),
+            args: ["execution": payload]
+        )
+
+        XCTAssertEqual(result?.objectValue?["format"], .string("pdf"))
+        XCTAssertEqual(result?.objectValue?["artifactRef"], .string("report://performance"))
+        XCTAssertEqual(result?.objectValue?["title"], .string("Performance Report"))
+        XCTAssertEqual(result?.objectValue?["reportPrint"]?.objectValue?["kind"], .string("reportPrint"))
+    }
+
     func testSetDataSourceFilterRefreshesCollection() async throws {
         let runtime = ForgeRuntime()
         let window = await runtime.openWindowInline(
