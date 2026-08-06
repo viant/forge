@@ -29,6 +29,7 @@ struct ReportBuilderDynamicFiltersView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Advanced filters")
                     .font(.subheadline.weight(.semibold))
+                    .accessibilityIdentifier("forge-report-builder-dynamic-filters")
                 Text("Add one filter line at a time. Committed values become request parameters for the report datasource.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -67,6 +68,7 @@ struct ReportBuilderDynamicFiltersView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
+                    .accessibilityIdentifier("forge-report-builder-dynamic-family-\(family.identityKey)")
                 if let description = family.description, !description.isEmpty {
                     Text(description)
                         .font(.caption)
@@ -95,6 +97,7 @@ struct ReportBuilderDynamicFiltersView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
+                        .accessibilityIdentifier("forge-report-builder-dynamic-family-\(family.identityKey)")
                     if let description = family.description, !description.isEmpty {
                         Text(description)
                             .font(.caption2)
@@ -115,6 +118,7 @@ struct ReportBuilderDynamicFiltersView: View {
                     .padding(.vertical, 7)
                     .background(Color(red: 0.96, green: 0.98, blue: 1.0), in: RoundedRectangle(cornerRadius: 10))
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(red: 0.79, green: 0.84, blue: 0.95), lineWidth: 1))
+                    .accessibilityIdentifier("forge-report-builder-add-line-\(family.identityKey)")
                 }
             }
 
@@ -439,6 +443,7 @@ struct ReportBuilderDynamicFiltersView: View {
                             .font(.caption.weight(.medium))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("forge-report-builder-add-line-\(groupID)")
                 }
             }
 

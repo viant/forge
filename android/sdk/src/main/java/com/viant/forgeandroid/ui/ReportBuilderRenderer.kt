@@ -72,6 +72,7 @@ import com.viant.forgeandroid.runtime.SelectorUtil
 import com.viant.forgeandroid.runtime.WindowMetadata
 import com.viant.forgeandroid.runtime.invokeReportBuilderHook
 import com.viant.forgeandroid.runtime.lookupReportBuilderDescriptor
+import com.viant.forgeandroid.runtime.lowerReportBuilderPredicates
 import com.viant.forgeandroid.runtime.setWindowFormValue
 import com.viant.forgeandroid.runtime.windowFormValue
 import kotlinx.serialization.Serializable
@@ -216,11 +217,12 @@ fun ReportBuilderRenderer(
         ReportBuilderPlaceholder(container, "Report builder variant not found: ${variant.builderRef}")
         return
     }
-    val config = variant.config
-    if (config == null) {
+    val rawConfig = variant.config
+    if (rawConfig == null) {
         ReportBuilderPlaceholder(container, "Missing report builder config")
         return
     }
+    val config = remember(rawConfig) { lowerReportBuilderPredicates(rawConfig) }
     val dataSourceRef = variant.dataSourceRef
     if (dataSourceRef.isNullOrBlank()) {
         ReportBuilderPlaceholder(container, "Missing dataSourceRef")
@@ -1731,9 +1733,9 @@ private fun aggregateRows(
         }
         val existing = grouped.getOrPut(bucket) { linkedMapOf() }
         dimensions.forEach { key -> existing[key] = displayDimensionValue(row, dimensionsByKey[key], key) }
-        measures.forEach { key ->
+        measures.forEach measureLoop@{ key ->
             if (measuresByKey[key]?.compute != null) {
-                return@forEach
+                return@measureLoop
             }
             val raw = SelectorUtil.resolve(row, key)
             val numeric = (raw as? Number)?.toDouble() ?: raw?.toString()?.toDoubleOrNull() ?: 0.0
