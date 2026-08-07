@@ -116,6 +116,33 @@ class ActionHookRuntimeTest {
     }
 
     @Test
+    fun invokeCanReuseOneJavaScriptIsolate() = runBlocking {
+        val quickJs = QuickJs.create(Dispatchers.Default)
+        ActionHookRuntime.testScriptEvaluator = { script -> quickJs.evaluate<String>(script) }
+        val code = """
+            (() => ({ value: (props = {}) => props.value }))()
+        """.trimIndent()
+
+        try {
+            val first = ActionHookRuntime.invoke(
+                code = code,
+                functionName = "value",
+                props = buildJsonObject { put("value", JsonPrimitive("first")) }
+            )
+            val second = ActionHookRuntime.invoke(
+                code = code,
+                functionName = "value",
+                props = buildJsonObject { put("value", JsonPrimitive("second")) }
+            )
+
+            assertEquals(JsonPrimitive("first"), first)
+            assertEquals(JsonPrimitive("second"), second)
+        } finally {
+            quickJs.close()
+        }
+    }
+
+    @Test
     fun windowMetadataDecodesPluralDataSourcesAlias() {
         val metadata = Json { ignoreUnknownKeys = true }.decodeFromString(
             WindowMetadata.serializer(),
