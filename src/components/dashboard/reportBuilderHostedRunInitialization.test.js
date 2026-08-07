@@ -4,6 +4,7 @@ import * as reportBuilderHooksModule from "./reportBuilderHooks.js";
 import * as reportBuilderRunPersistenceModule from "./reportBuilderRunPersistence.js";
 import {
     activeWindows,
+    getFormSignal,
     restoreWindowsFromSnapshot,
 } from "../../core/store/signals.js";
 import { runUICommand } from "../../core/ui/commands.js";
@@ -17,6 +18,7 @@ import {
     captureReportRunSettlementEvent,
     classifyReportRunSupersede,
     completeAndActivateReportRun,
+    coordinateCompletedReportRunConversation,
     matchesHostedReportRunInitializationFreshnessFailure,
     resolveAuthoredRuntimeSettlementDecision,
     resolveAuthoredRuntimeSettlementReadiness,
@@ -311,6 +313,76 @@ assert.deepEqual({
     replayBegin: 0,
     replayDispatch: 0,
 }, "fresh host delivery executes once while historical replay performs no run lifecycle mutation");
+
+for (const endpointMode of ["enabled", "unmounted"]) {
+    const windowId = `reportBuilder__t5b-standalone-${endpointMode}`;
+    await runUICommand({
+        method: "ui.window.open",
+        params: {
+            windowId,
+            windowKey: `reportBuilder-t5b-${endpointMode}`,
+            windowTitle: "Standalone report builder",
+            parameters: { mode: "design" },
+        },
+    });
+    const lifecycleCalls = [];
+    const handler = {
+        complete: async (input) => {
+            lifecycleCalls.push(["complete", input.reportRunId]);
+            return { reportRunId: input.reportRunId, revision: 2, status: "completed" };
+        },
+        adopt: async () => {
+            lifecycleCalls.push(["adopt"]);
+            return endpointMode === "enabled"
+                ? { run: {}, context: {} }
+                : { enabled: false };
+        },
+    };
+    const runStandaloneSelection = async (reportRunId, advertiserId) => {
+        await runUICommand({
+            method: "ui.window.setFormData",
+            params: { windowId, values: { advertiserId } },
+        });
+        const currentParameters = getFormSignal(`${windowId}:windowForm`).peek();
+        const invocation = buildSnapshot({
+            request: { advertiserId: currentParameters.advertiserId },
+            rows: [{ advertiserId: currentParameters.advertiserId }],
+            origin: "manual",
+            conversationId: "",
+            turnId: "",
+            windowId,
+        });
+        const completedRun = await completeAndActivateReportRun(handler, bindReportRunInvocation({
+            runId: reportRunId,
+            reportRunId,
+            revision: 1,
+            contextRevision: 0,
+            conversationId: "",
+            turnId: "",
+            windowId,
+            origin: "manual",
+            durable: true,
+            status: "running",
+        }, invocation), invocation.materializedExportRequest, {
+            trustedConversationId: "",
+        });
+        const reconciliation = await coordinateCompletedReportRunConversation({
+            handler,
+            activeRun: completedRun,
+            trustedConversationId: "",
+        });
+        assert.equal(reconciliation.classification.type, "reject");
+        return completedRun;
+    };
+    const standaloneR1 = await runStandaloneSelection(`${endpointMode}-r1`, 731);
+    const standaloneR2 = await runStandaloneSelection(`${endpointMode}-r2`, 990);
+    assert.deepEqual(lifecycleCalls, [
+        ["complete", `${endpointMode}-r1`],
+        ["complete", `${endpointMode}-r2`],
+    ], `standalone R1/R2 must not adopt without a trusted conversation when adoption is ${endpointMode}`);
+    assert.deepEqual([standaloneR1.status, standaloneR2.status], ["completed", "completed"]);
+    assert.equal(getFormSignal(`${windowId}:windowForm`).peek().advertiserId, 990);
+}
 
 const earlySnapshot = buildSnapshot();
 const finalRows = [{ inventoryId: 11, available: 42 }];
