@@ -518,11 +518,12 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range • Channels • Audience Segment",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
         {
             id: "channelsFilter",
@@ -531,6 +532,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         {
             id: "audienceSegmentFilter",
             label: "Audience Segment",
+            value: "Young Adults",
         },
     ],
 });
@@ -647,11 +649,12 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range • Channels • Audience Segment",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
         {
             id: "channelsFilter",
@@ -660,6 +663,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         {
             id: "audienceSegmentFilter",
             label: "Audience Segment",
+            value: "Young Adults",
         },
     ],
 });
@@ -953,11 +957,12 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range • Channels • Audience Segment",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
         {
             id: "channelsFilter",
@@ -966,6 +971,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         {
             id: "audienceSegmentFilter",
             label: "Audience Segment",
+            value: "Young Adults",
         },
     ],
 });
@@ -1064,11 +1070,12 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range • Channels • Audience Segment",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
         {
             id: "channelsFilter",
@@ -1077,6 +1084,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         {
             id: "audienceSegmentFilter",
             label: "Audience Segment",
+            value: "Young Adults",
         },
     ],
 });
@@ -1179,11 +1187,12 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range • Channels • Audience Segment",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
         {
             id: "channelsFilter",
@@ -1192,6 +1201,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         {
             id: "audienceSegmentFilter",
             label: "Audience Segment",
+            value: "Young Adults",
         },
     ],
 });
@@ -1273,11 +1283,12 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range • Channels • Audience Segment",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
         {
             id: "channelsFilter",
@@ -1286,6 +1297,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         {
             id: "audienceSegmentFilter",
             label: "Audience Segment",
+            value: "Young Adults",
         },
     ],
 });
@@ -1385,11 +1397,12 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range • Channels • Audience Segment",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
         {
             id: "channelsFilter",
@@ -1398,6 +1411,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         {
             id: "audienceSegmentFilter",
             label: "Audience Segment",
+            value: "Young Adults",
         },
     ],
 });
@@ -1491,11 +1505,12 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range • Channels • Audience Segment",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
         {
             id: "channelsFilter",
@@ -1504,6 +1519,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         {
             id: "audienceSegmentFilter",
             label: "Audience Segment",
+            value: "Young Adults",
         },
     ],
 });
@@ -1607,11 +1623,12 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Reporting Window",
+    scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Reporting Window",
+            value: "2026-05-01 – 2026-05-04",
             description: "Embedded feedback scope metadata.",
         },
     ],
@@ -1700,11 +1717,12 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range • Channels • Audience Segment",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
         {
             id: "channelsFilter",
@@ -1713,6 +1731,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         {
             id: "audienceSegmentFilter",
             label: "Audience Segment",
+            value: "Young Adults",
         },
     ],
 });
@@ -2049,11 +2068,12 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range • Channels • Audience Segment",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
         {
             id: "channelsFilter",
@@ -2062,6 +2082,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         {
             id: "audienceSegmentFilter",
             label: "Audience Segment",
+            value: "Young Adults",
         },
     ],
 });
@@ -2149,11 +2170,12 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range • Channels • Audience Segment",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
         {
             id: "channelsFilter",
@@ -2162,6 +2184,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         {
             id: "audienceSegmentFilter",
             label: "Audience Segment",
+            value: "Young Adults",
         },
     ],
 });
@@ -2277,11 +2300,12 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range • Channels • Audience Segment",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
         {
             id: "channelsFilter",
@@ -2290,6 +2314,7 @@ assert.deepEqual(buildReportBuilderImportFeedback({
         {
             id: "audienceSegmentFilter",
             label: "Audience Segment",
+            value: "Young Adults",
         },
     ],
 });

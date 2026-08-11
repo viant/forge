@@ -525,7 +525,7 @@ const audienceReopenDiagnostic = buildReportBuilderHydratedReportDocumentDiagnos
 );
 assert.equal(audienceReopenDiagnostic.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(audienceReopenDiagnostic.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(audienceReopenDiagnostic.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(audienceReopenDiagnostic.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(
     audienceReopenDiagnostic.semanticBindingFieldGroups[1].fields[0].definitionRef,
     "harmonizer://feature/user.segment.index",
@@ -609,7 +609,7 @@ const embeddedDocumentOnlyDiagnostic = buildReportBuilderHydratedReportDocumentD
     },
 });
 assert.equal(embeddedDocumentOnlyDiagnostic.semanticBindingChips.includes("Dimensions Delivery Date, Channel"), true);
-assert.equal(embeddedDocumentOnlyDiagnostic.scopeSummaryText, "Reporting Window");
+assert.equal(embeddedDocumentOnlyDiagnostic.scopeSummaryText, "Reporting Window: 2026-05-01 – 2026-05-04");
 assert.equal(embeddedDocumentOnlyDiagnostic.scopeSummaryItems[0].description, "Embedded diagnostic scope metadata.");
 
 const embeddedDocumentEmptySpecDiagnostic = buildReportBuilderHydratedReportDocumentDiagnostic({
@@ -687,7 +687,7 @@ const embeddedDocumentEmptySpecDiagnostic = buildReportBuilderHydratedReportDocu
     },
 });
 assert.equal(embeddedDocumentEmptySpecDiagnostic.semanticBindingChips.includes("Dimensions Delivery Date, Channel"), true);
-assert.equal(embeddedDocumentEmptySpecDiagnostic.scopeSummaryText, "Reporting Window");
+assert.equal(embeddedDocumentEmptySpecDiagnostic.scopeSummaryText, "Reporting Window: 2026-05-01 – 2026-05-04");
 assert.equal(embeddedDocumentEmptySpecDiagnostic.scopeSummaryItems[0].description, "Embedded diagnostic scope metadata.");
 
 const listDiagnostic = buildReportBuilderListReportDocumentsEntryDiagnostic({
@@ -858,7 +858,7 @@ const embeddedListDiagnostic = buildReportBuilderListReportDocumentsEntryDiagnos
     ],
 });
 assert.equal(embeddedListDiagnostic.semanticBindingChips.includes("Dimensions Delivery Date, Channel"), true);
-assert.equal(embeddedListDiagnostic.scopeSummaryText, "Reporting Window");
+assert.equal(embeddedListDiagnostic.scopeSummaryText, "Reporting Window: 2026-05-01 – 2026-05-04");
 
 const audienceThinSavedPayload = {
     ...audienceArtifactFixture.legacySavedReportPayload,
@@ -892,7 +892,7 @@ const audienceThinListDiagnostic = buildReportBuilderListReportDocumentsEntryDia
 });
 assert.equal(audienceThinListDiagnostic.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(audienceThinListDiagnostic.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(audienceThinListDiagnostic.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(audienceThinListDiagnostic.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(
     audienceThinListDiagnostic.semanticBindingFieldGroups[2].fields.some((field) => field.definitionRef === "harmonizer://feature/user.segment"),
     false,

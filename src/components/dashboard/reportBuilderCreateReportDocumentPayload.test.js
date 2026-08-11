@@ -203,11 +203,12 @@ assert.deepEqual(buildReportBuilderCreateReportDocumentPayloadSummary(payload), 
         "Measures Net Revenue",
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Reporting Window",
+    scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Reporting Window",
+            value: "2026-05-01 – 2026-05-04",
             description: "Approved reporting window for create payload metadata.",
         },
     ],
@@ -364,11 +365,12 @@ assert.deepEqual(buildReportBuilderCreateReportDocumentPayloadInspectorState(pay
         "Measures Net Revenue",
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Reporting Window",
+    scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Reporting Window",
+            value: "2026-05-01 – 2026-05-04",
             description: "Approved reporting window for create payload metadata.",
         },
     ],
@@ -915,7 +917,7 @@ assert.equal(
 );
 assert.equal(
     buildReportBuilderCreateReportDocumentPayloadInspectorState(embeddedSemanticCreatePayload).scopeSummaryText,
-    "Reporting Window",
+    "Reporting Window: 2026-05-01 – 2026-05-04",
 );
 
 assert.equal(buildReportBuilderCreateReportDocumentPayload(null), null);
@@ -1556,6 +1558,6 @@ assert.equal(audienceCreatePayload.document.semanticSummary.selectedParameters[1
 assert.equal(audienceCreatePayload.document.semanticSummary.selectedParameters[1].category, "Audience");
 assert.equal(buildReportBuilderCreateReportDocumentPayloadSummary(audienceCreatePayload).semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(buildReportBuilderCreateReportDocumentPayloadSummary(audienceCreatePayload).semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(buildReportBuilderCreateReportDocumentPayloadSummary(audienceCreatePayload).scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(buildReportBuilderCreateReportDocumentPayloadSummary(audienceCreatePayload).scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 
 console.log("reportBuilderCreateReportDocumentPayload ✓ adapts saved builder payloads into createReportDocument requests");

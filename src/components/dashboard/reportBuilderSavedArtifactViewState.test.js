@@ -1574,9 +1574,7 @@ assert.deepEqual(buildReportBuilderSelectedListEntryExportJobPanelState({
     title: "Capacity Q3",
     error: "",
     metaChips: [
-        "job-3",
-        "succeeded",
-        "artifact-1",
+        "Ready",
         "saved",
         "catalog",
         "published snapshot",

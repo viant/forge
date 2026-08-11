@@ -549,7 +549,7 @@ delete audienceDocumentScopePayload.reportSpec.scope;
 const audienceSavedPayloadSummary = buildReportBuilderSavedReportPayloadSummary(audienceDocumentScopePayload);
 assert.equal(audienceSavedPayloadSummary.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(audienceSavedPayloadSummary.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(audienceSavedPayloadSummary.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(audienceSavedPayloadSummary.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(audienceSavedPayloadSummary.authoredBlockCount, 4);
 assert.equal(audienceSavedPayloadSummary.authoredBlockSummaryText, "4 authored blocks: 1 Filter Bar, 1 Kpi, 1 Refinement Bar, 1 Table");
 assert.equal(audienceSavedPayloadSummary.drillHierarchyCount, 2);
@@ -648,7 +648,7 @@ const embeddedSavedPayloadSummary = buildReportBuilderSavedReportPayloadSummary(
     },
 });
 assert.equal(embeddedSavedPayloadSummary.semanticBindingChips.includes("Dimensions Delivery Date, Channel"), true);
-assert.equal(embeddedSavedPayloadSummary.scopeSummaryText, "Reporting Window");
+assert.equal(embeddedSavedPayloadSummary.scopeSummaryText, "Reporting Window: 2026-05-01 – 2026-05-04");
 
 const runtimeScopedSavedPayload = buildReportBuilderSavedReportPayloadFromBuilderState({
     kind: "reportBuilder.savedReportPayload",
@@ -1026,7 +1026,7 @@ const embeddedSavedPayloadSummaryWithEmptySpecScope = buildReportBuilderSavedRep
     },
 });
 assert.equal(embeddedSavedPayloadSummaryWithEmptySpecScope.semanticBindingChips.includes("Dimensions Delivery Date, Channel"), true);
-assert.equal(embeddedSavedPayloadSummaryWithEmptySpecScope.scopeSummaryText, "Reporting Window");
+assert.equal(embeddedSavedPayloadSummaryWithEmptySpecScope.scopeSummaryText, "Reporting Window: 2026-05-01 – 2026-05-04");
 
 assert.deepEqual(buildReportBuilderSavedReportPayloadDownload(payload), {
     filename: "Exploration Demo.forge-report.json",

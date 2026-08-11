@@ -529,7 +529,7 @@ assert.equal(buildReportBuilderGetReportDocumentRequestSummary(audienceRequest, 
 }).semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
 assert.equal(buildReportBuilderGetReportDocumentRequestSummary(audienceRequest, {
     metadata: audienceMetadata,
-}).scopeSummaryText, "Date Range • Channels • Audience Segment");
+}).scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 
 const embeddedMetadataRequest = buildReportBuilderGetReportDocumentRequest(listResponse, {
     entryReportId: "capacityQ3",
@@ -610,7 +610,7 @@ assert.equal(
     buildReportBuilderGetReportDocumentRequestSummary(embeddedMetadataRequest, {
         metadata: embeddedMetadataContext,
     }).scopeSummaryText,
-    "Reporting Window",
+    "Reporting Window: 2026-05-01 – 2026-05-04",
 );
 assert.equal(
     buildReportBuilderGetReportDocumentRequestInspectorState(embeddedMetadataRequest, {

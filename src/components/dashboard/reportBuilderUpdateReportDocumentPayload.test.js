@@ -1490,6 +1490,6 @@ assert.equal(audienceUpdatePayload.document.semanticSummary.selectedParameters[1
 assert.equal(audienceUpdatePayload.document.semanticSummary.selectedParameters[1].category, "Audience");
 assert.equal(buildReportBuilderUpdateReportDocumentPayloadSummary(audienceUpdatePayload).semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(buildReportBuilderUpdateReportDocumentPayloadSummary(audienceUpdatePayload).semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(buildReportBuilderUpdateReportDocumentPayloadSummary(audienceUpdatePayload).scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(buildReportBuilderUpdateReportDocumentPayloadSummary(audienceUpdatePayload).scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 
 console.log("reportBuilderUpdateReportDocumentPayload ✓ adapts saved builder payloads into updateReportDocument requests with explicit expected versions");

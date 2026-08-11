@@ -554,7 +554,7 @@ const audienceRuntimePreviewState = buildReportBuilderAuthoredRuntimePreviewStat
 assert.equal(audienceRuntimePreviewState.title, "Capacity Audience Segment Index Q3");
 assert.equal(audienceRuntimePreviewState.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(audienceRuntimePreviewState.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(audienceRuntimePreviewState.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(audienceRuntimePreviewState.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(
     audienceRuntimePreviewState.semanticBindingFieldGroups[1].fields[0].definitionRef,
     "harmonizer://feature/user.segment.index",
@@ -591,7 +591,7 @@ const audienceRuntimePreviewStateWithEmptySpec = buildReportBuilderAuthoredRunti
 });
 assert.equal(audienceRuntimePreviewStateWithEmptySpec.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(audienceRuntimePreviewStateWithEmptySpec.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(audienceRuntimePreviewStateWithEmptySpec.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(audienceRuntimePreviewStateWithEmptySpec.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 
 const runtimePreviewStateFromCarriedSemanticBinding = buildReportBuilderAuthoredRuntimePreviewState({
     runtimePreviewEnabled: true,
@@ -844,7 +844,7 @@ assert.deepEqual(
     carriedSemanticValidationRetryRecoveredPreviewState.semanticBindingFieldGroups,
 );
 assert.equal(carriedSemanticValidationRetryErroredPreviewState.scopeSummaryTitle, "Filters");
-assert.equal(carriedSemanticValidationRetryErroredPreviewState.scopeSummaryText, "Reporting Window");
+assert.equal(carriedSemanticValidationRetryErroredPreviewState.scopeSummaryText, "Reporting Window: 2026-05-01 – 2026-05-04");
 assert.deepEqual(
     carriedSemanticValidationRetryErroredPreviewState.scopeSummaryItems,
     carriedSemanticValidationRetryRecoveredPreviewState.scopeSummaryItems,
@@ -1441,7 +1441,7 @@ assert.deepEqual(
     semanticValidationRetryRecoveredPreviewState.semanticBindingFieldGroups,
 );
 assert.equal(semanticValidationRetryErroredPreviewState.scopeSummaryTitle, "Filters");
-assert.equal(semanticValidationRetryErroredPreviewState.scopeSummaryText, "Reporting Window");
+assert.equal(semanticValidationRetryErroredPreviewState.scopeSummaryText, "Reporting Window: 2026-05-01 – 2026-05-04");
 assert.deepEqual(
     semanticValidationRetryErroredPreviewState.scopeSummaryItems,
     semanticValidationRetryRecoveredPreviewState.scopeSummaryItems,

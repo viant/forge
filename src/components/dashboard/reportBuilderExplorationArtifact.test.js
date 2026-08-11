@@ -116,11 +116,12 @@ assert.deepEqual(buildReportBuilderExplorationArtifactSummary(artifact), {
     blockCount: 1,
     datasetCount: 1,
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
     ],
 });
@@ -147,11 +148,12 @@ assert.deepEqual(buildReportBuilderExplorationArtifactInspectorState(artifact), 
     blockCount: 1,
     datasetCount: 1,
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
     ],
     payload: serializeReportBuilderExplorationArtifact(artifact),
@@ -244,11 +246,12 @@ assert.deepEqual(buildReportBuilderExplorationArtifactSummary(semanticArtifact),
     blockCount: 1,
     datasetCount: 1,
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
     ],
     semanticBindingTitle: "Semantic Binding",
@@ -286,11 +289,12 @@ assert.deepEqual(buildReportBuilderExplorationArtifactInspectorState(semanticArt
     blockCount: 1,
     datasetCount: 1,
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Date Range",
+    scopeSummaryText: "Date Range: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Date Range",
+            value: "2026-05-01 – 2026-05-04",
         },
     ],
     semanticBindingTitle: "Semantic Binding",
@@ -546,7 +550,7 @@ const embeddedSemanticArtifactSummary = buildReportBuilderExplorationArtifactSum
     },
 });
 assert.equal(embeddedSemanticArtifactSummary.semanticBindingChips.includes("Dimensions Event Date, Channel"), true);
-assert.equal(embeddedSemanticArtifactSummary.scopeSummaryText, "Date Range");
+assert.equal(embeddedSemanticArtifactSummary.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04");
 
 const carriedSemanticExplorationArtifactSummary = buildReportBuilderExplorationArtifactSummary({
     version: 1,
@@ -769,6 +773,6 @@ const embeddedSemanticArtifactSummaryWithEmptySpecScope = buildReportBuilderExpl
     },
 });
 assert.equal(embeddedSemanticArtifactSummaryWithEmptySpecScope.semanticBindingChips.includes("Dimensions Event Date, Channel"), true);
-assert.equal(embeddedSemanticArtifactSummaryWithEmptySpecScope.scopeSummaryText, "Date Range");
+assert.equal(embeddedSemanticArtifactSummaryWithEmptySpecScope.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04");
 
 console.log("reportBuilderExplorationArtifact ✓ builds saved exploration artifacts from forked builder state");
