@@ -294,7 +294,7 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("Show details"),
+  source.includes("Review issues"),
   true,
   "ReportBuilder should collapse multi-issue authored validation into a compact summary with an explicit details toggle.",
 );

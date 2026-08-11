@@ -50,13 +50,20 @@ import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.ColumnDef
 import com.viant.forgeandroid.runtime.DataSourceContext
 import com.viant.forgeandroid.runtime.ForgeRuntime
+import com.viant.forgeandroid.runtime.SelectionState
 import com.viant.forgeandroid.runtime.SelectorUtil
 import com.viant.forgeandroid.runtime.TableDef
 import com.viant.forgeandroid.runtime.formatDashboardValue
 import kotlinx.coroutines.launch
 
 @Composable
-fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: TableDef, rowsOverride: List<Map<String, Any?>>? = null) {
+fun TableRenderer(
+    runtime: ForgeRuntime,
+    context: DataSourceContext,
+    table: TableDef,
+    rowsOverride: List<Map<String, Any?>>? = null,
+    selectionModeOverride: String? = null
+) {
     val datasourceRows by context.collection.flow.collectAsState(initial = emptyList())
     val rows = rowsOverride ?: datasourceRows
     val form by context.form.flow.collectAsState(initial = context.form.peek())
@@ -125,9 +132,9 @@ fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: Tabl
                         itemsIndexed(sortedRows) { _, indexed ->
                             val row = indexed.row
                             val rowIndex = indexed.originalIndex
-                            val isSelected = selection.rowIndex == rowIndex
+                            val isSelected = tableRowIsSelected(selection, row, rowIndex)
                             MobileTableCard(runtime, context, table, row, rowIndex, isSelected, form, metrics, windowForm) {
-                                coroutineScope.launch { context.toggleSelection(row, rowIndex) }
+                                coroutineScope.launch { context.toggleSelection(row, rowIndex, selectionModeOverride) }
                             }
                         }
                     }
@@ -162,9 +169,9 @@ fun TableRenderer(runtime: ForgeRuntime, context: DataSourceContext, table: Tabl
                             itemsIndexed(sortedRows) { displayIndex, indexed ->
                                 val row = indexed.row
                                 val rowIndex = indexed.originalIndex
-                                val isSelected = selection.rowIndex == rowIndex
+                                val isSelected = tableRowIsSelected(selection, row, rowIndex)
                                 DesktopTableRow(runtime, context, table, row, rowIndex, displayIndex, isSelected, form, metrics, windowForm) {
-                                    coroutineScope.launch { context.toggleSelection(row, rowIndex) }
+                                    coroutineScope.launch { context.toggleSelection(row, rowIndex, selectionModeOverride) }
                                 }
                             }
                         }
@@ -286,6 +293,7 @@ private fun MobileTableCard(
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) Color(0xFFF4F7FF) else Color.White
         ),
+        border = if (isSelected) BorderStroke(2.dp, Color(0xFF2563EB)) else BorderStroke(1.dp, Color(0xFFE7ECF3)),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 3.dp else 1.dp)
     ) {
@@ -506,6 +514,14 @@ private fun RowScope.ValueColumnCell(
 }
 
 private fun Int.isEven(): Boolean = this % 2 == 0
+
+internal fun tableRowIsSelected(
+    selection: SelectionState,
+    row: Map<String, Any?>,
+    rowIndex: Int
+): Boolean = selection.rowIndex == rowIndex ||
+    selection.selected == row ||
+    selection.selection.any { it == row }
 
 private fun displayColumns(table: TableDef): List<ColumnDef> {
     return table.columns.filter { col -> col.type != "button" && col.type != "icon" }

@@ -3,6 +3,7 @@ package com.viant.forgeandroid.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
@@ -23,6 +24,7 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -58,6 +60,12 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sign
 import kotlin.math.sqrt
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 private val ChartCanvasColor = Color(0xFFF8FAFC)
 private val ChartGridColor = Color(0xFFE4E7EC)
@@ -87,7 +95,8 @@ fun ChartRenderer(
     reportRuntimeBlockId: String? = null,
     reportRuntimeActionFields: List<DashboardReportRuntimeActionField> = emptyList(),
     reportRuntimeActionDescriptors: List<DashboardReportRuntimeActionDescriptor> = emptyList(),
-    onReportRuntimeAction: ((DashboardReportRuntimeActionExecution) -> Unit)? = null
+    onReportRuntimeAction: ((DashboardReportRuntimeActionExecution) -> Unit)? = null,
+    showDataFallback: Boolean = true
 ) {
     val prepared = prepareChartData(rows, chart)
     val type = chartType(chart)
@@ -105,18 +114,24 @@ fun ChartRenderer(
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val regularWidth = maxWidth >= 720.dp
-        val panelPadding = if (regularWidth) 10.dp else 12.dp
+        val panelPadding = if (regularWidth) 10.dp else 0.dp
         val chartHeight = when {
-            type == "pie" || type == "donut" -> if (regularWidth) 196.dp else 220.dp
+            type == "pie" || type == "donut" -> if (regularWidth) 196.dp else 236.dp
             regularWidth -> 184.dp
-            else -> 220.dp
+            else -> 236.dp
         }
 
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White, RoundedCornerShape(16.dp))
-                .padding(panelPadding),
+            modifier = Modifier.fillMaxWidth().then(
+                if (regularWidth) {
+                    Modifier
+                        .background(Color(0xFFFCFEFF), RoundedCornerShape(16.dp))
+                        .border(1.dp, Color(0xFFDBE5EC), RoundedCornerShape(16.dp))
+                        .padding(panelPadding)
+                } else {
+                    Modifier
+                }
+            ),
             verticalArrangement = Arrangement.spacedBy(if (regularWidth) 10.dp else 12.dp)
         ) {
             chartDisplayTitle(chart.title, containerTitle)?.let {
@@ -129,6 +144,7 @@ fun ChartRenderer(
                 ChartSeriesSelector(
                     series = prepared.series,
                     selectedKeys = selectedSeriesKeys,
+                    compact = !regularWidth,
                     onToggle = { key ->
                         val next = selectedSeriesKeys.toMutableSet().apply {
                             if (!add(key)) remove(key)
@@ -193,14 +209,18 @@ fun ChartRenderer(
                         selection = selection,
                         onSelect = { selection = it },
                         chartHeight = chartHeight,
-                        maximumAxisLabels = if (regularWidth) 6 else 4
+                        maximumAxisLabels = if (regularWidth) 6 else 4,
+                        xTickFormat = chart.xAxis?.tickFormat
                     )
                 }
             }
-            ChartDataFallback(
-                rows = chartAccessibleDataRows(activePrepared, type, limit = 8),
-                totalCount = chartAccessibleDataValueCount(activePrepared, type)
-            )
+            if (showDataFallback) {
+                ChartDataFallback(
+                    rows = chartAccessibleDataRows(activePrepared, type, limit = 8),
+                    totalCount = chartAccessibleDataValueCount(activePrepared, type),
+                    collapsedByDefault = !regularWidth
+                )
+            }
         }
     }
 }
@@ -227,13 +247,10 @@ internal fun FenceChartRenderer(spec: FenceChartSpec) {
 private fun ChartSeriesSelector(
     series: List<ChartSeriesDisplay>,
     selectedKeys: Set<String>,
+    compact: Boolean,
     onToggle: (String) -> Unit
 ) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    val content: @Composable () -> Unit = {
         series.forEach { entry ->
             val selected = selectedKeys.contains(entry.key)
             Surface(
@@ -271,6 +288,18 @@ private fun ChartSeriesSelector(
                 }
             }
         }
+    }
+    if (compact) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+        ) { content() }
+    } else {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) { content() }
     }
 }
 
@@ -403,7 +432,8 @@ private fun MultiSeriesCartesianChart(
     selection: ChartSelection?,
     onSelect: (ChartSelection?) -> Unit,
     chartHeight: androidx.compose.ui.unit.Dp,
-    maximumAxisLabels: Int
+    maximumAxisLabels: Int,
+    xTickFormat: String?
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Canvas(
@@ -433,36 +463,34 @@ private fun MultiSeriesCartesianChart(
 
             drawGridLines(width, height)
             prepared.series.forEach { series ->
+                val seriesMaximum = prepared.maximumForSeries(series.key)
                 val seriesPoints = prepared.points.mapIndexed { index, point ->
                     val value = point.values.firstOrNull { it.key == series.key }?.value ?: 0.0
                     val x = (width / max(prepared.points.size - 1, 1)) * index
-                    val y = height - (height * (value / prepared.maxValue).toFloat().coerceIn(0f, 1f))
+                    val y = height - (height * (value / seriesMaximum).toFloat().coerceIn(0f, 1f))
                     Offset(x, y)
                 }
                 val linePath = monotoneCartesianPath(seriesPoints)
                 prepared.points.forEachIndexed { index, point ->
                     val seriesPoint = seriesPoints[index]
                     val selected = selection?.matches(point.label, series.key) == true
-                    drawCircle(
-                        color = if (selected) series.color.copy(alpha = 0.82f) else series.color,
-                        radius = if (selected) 5.dp.toPx() else 4.dp.toPx(),
-                        center = seriesPoint
-                    )
+                    if (selected || prepared.points.size <= 14) {
+                        drawCircle(
+                            color = if (selected) series.color.copy(alpha = 0.82f) else series.color,
+                            radius = if (selected) 4.5.dp.toPx() else 3.dp.toPx(),
+                            center = seriesPoint
+                        )
+                    }
                 }
-                if (type == "area" && seriesPoints.isNotEmpty()) {
-                    val areaPath = Path()
-                    areaPath.moveTo(seriesPoints.first().x, height)
-                    areaPath.lineTo(seriesPoints.first().x, seriesPoints.first().y)
-                    areaPath.addPath(linePath)
-                    areaPath.lineTo(width, height)
-                    areaPath.close()
+                if ((type == "area" || series.type == "area") && seriesPoints.isNotEmpty()) {
+                    val areaPath = monotoneCartesianAreaPath(seriesPoints, height)
                     drawPath(path = areaPath, color = series.color.copy(alpha = 0.16f), style = Fill)
                 }
                 drawPath(
                     path = linePath,
                     color = series.color,
                     style = Stroke(
-                        width = 3.dp.toPx(),
+                        width = 2.5.dp.toPx(),
                         cap = StrokeCap.Round,
                         join = StrokeJoin.Round
                     )
@@ -472,7 +500,7 @@ private fun MultiSeriesCartesianChart(
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             sampledChartAxisLabels(prepared.points.map { it.label }, maximumAxisLabels).forEach { label ->
                 Text(
-                    text = label,
+                    text = formatChartAxisLabel(label, xTickFormat),
                     style = MaterialTheme.typography.labelSmall,
                     color = ChartMutedText,
                     modifier = Modifier.weight(1f),
@@ -534,6 +562,73 @@ private fun monotoneCartesianPath(points: List<Offset>): Path {
     }
     return path
 }
+
+private fun monotoneCartesianAreaPath(points: List<Offset>, baseline: Float): Path {
+    val path = Path()
+    if (points.isEmpty()) return path
+    path.moveTo(points.first().x, baseline)
+    path.lineTo(points.first().x, points.first().y)
+    appendMonotoneCartesianSegments(path, points)
+    path.lineTo(points.last().x, baseline)
+    path.close()
+    return path
+}
+
+private fun appendMonotoneCartesianSegments(path: Path, points: List<Offset>) {
+    if (points.size < 3) {
+        points.drop(1).forEach { point -> path.lineTo(point.x, point.y) }
+        return
+    }
+    val slopes = points.zipWithNext { point, next ->
+        val deltaX = next.x - point.x
+        if (deltaX == 0f) 0f else (next.y - point.y) / deltaX
+    }
+    val tangents = points.mapIndexed { index, _ ->
+        when (index) {
+            0 -> slopes.first()
+            points.lastIndex -> slopes.last()
+            else -> {
+                val previous = slopes[index - 1]
+                val next = slopes[index]
+                if (previous == 0f || next == 0f || previous.sign != next.sign) 0f
+                else (2f * previous * next) / (previous + next)
+            }
+        }
+    }
+    for (index in 0 until points.lastIndex) {
+        val point = points[index]
+        val next = points[index + 1]
+        val controlOffset = (next.x - point.x) / 3f
+        path.cubicTo(
+            point.x + controlOffset,
+            point.y + tangents[index] * controlOffset,
+            next.x - controlOffset,
+            next.y - tangents[index + 1] * controlOffset,
+            next.x,
+            next.y
+        )
+    }
+}
+
+internal fun formatChartAxisLabel(raw: String, tickFormat: String?): String {
+    val format = tickFormat?.trim()?.lowercase().orEmpty()
+    val instant = chartTemporalInstant(raw) ?: return raw
+    val pattern = when (format) {
+        "" -> "MM/dd"
+        "mm/dd", "shortdate", "short_date" -> "MM/dd"
+        "ha", "hour", "hour12" -> "ha"
+        else -> tickFormat ?: return raw
+    }
+    return runCatching {
+        DateTimeFormatter.ofPattern(pattern).withZone(ZoneOffset.UTC).format(instant)
+    }.getOrDefault(raw)
+}
+
+internal fun chartTemporalInstant(raw: String): Instant? =
+    runCatching { Instant.parse(raw) }.getOrNull()
+        ?: runCatching { OffsetDateTime.parse(raw).toInstant() }.getOrNull()
+        ?: runCatching { LocalDateTime.parse(raw).toInstant(ZoneOffset.UTC) }.getOrNull()
+        ?: runCatching { LocalDate.parse(raw).atStartOfDay().toInstant(ZoneOffset.UTC) }.getOrNull()
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGridLines(width: Float, height: Float) {
     repeat(5) { index ->
@@ -633,9 +728,17 @@ private fun ChartLegend(series: List<ChartSeriesDisplay>) {
 @Composable
 private fun ChartDataFallback(
     rows: List<ChartAccessibleDataRow>,
-    totalCount: Int
+    totalCount: Int,
+    collapsedByDefault: Boolean = false
 ) {
     if (rows.isEmpty()) {
+        return
+    }
+    var expanded by remember(rows, totalCount) { mutableStateOf(!collapsedByDefault) }
+    if (!expanded) {
+        TextButton(onClick = { expanded = true }) {
+            Text("Show chart data ($totalCount)")
+        }
         return
     }
     Surface(
@@ -655,6 +758,11 @@ private fun ChartDataFallback(
                 color = ChartMutedText,
                 fontWeight = FontWeight.SemiBold
             )
+            if (collapsedByDefault) {
+                TextButton(onClick = { expanded = false }) {
+                    Text("Hide chart data")
+                }
+            }
             rows.forEach { row ->
                 Row(
                     modifier = Modifier
@@ -700,7 +808,10 @@ private fun ChartDataFallback(
 internal data class ChartSeriesDisplay(
     val key: String,
     val label: String,
-    val color: Color
+    val color: Color,
+    val type: String = "line",
+    val axis: String = "default",
+    val format: String? = null
 )
 
 internal data class ChartSeriesValue(
@@ -742,8 +853,14 @@ internal data class ChartDataStateFeedback(
 internal data class PreparedChartData(
     val points: List<ChartPoint>,
     val series: List<ChartSeriesDisplay>,
-    val maxValue: Double
-)
+    val maxValue: Double,
+    val maxValuesByAxis: Map<String, Double> = emptyMap()
+) {
+    fun maximumForSeries(seriesKey: String): Double {
+        val axis = series.firstOrNull { it.key == seriesKey }?.axis ?: "default"
+        return maxValuesByAxis[axis]?.coerceAtLeast(1.0) ?: maxValue.coerceAtLeast(1.0)
+    }
+}
 
 internal data class ChartSelection(
     val rowIndex: Int,
@@ -764,7 +881,7 @@ internal fun prepareChartData(rows: List<Map<String, Any?>>, chart: ChartDef): P
         ?: chart.xKey?.takeIf { it.isNotBlank() }
         ?: chart.nameKey?.takeIf { it.isNotBlank() }
         ?: chart.xAxis?.dataKey.orEmpty()
-    val points = rows.mapIndexedNotNull { index, row ->
+    val sourcePoints = rows.mapIndexedNotNull { index, row ->
         val label = row[labelKey]?.toString()?.takeIf { it.isNotBlank() } ?: "Item ${index + 1}"
         val values = seriesDefs.mapNotNull { series ->
             val value = (row[series.key] as? Number)?.toDouble()
@@ -779,12 +896,27 @@ internal fun prepareChartData(rows: List<Map<String, Any?>>, chart: ChartDef): P
         }
         if (values.isEmpty()) null else ChartPoint(rowIndex = index, label = label, values = values)
     }
-    val maxValue = when (chartType(chart)) {
+    val type = chartType(chart)
+    val points = if (
+        type in setOf("line", "area", "composed") &&
+        sourcePoints.isNotEmpty() &&
+        sourcePoints.all { chartTemporalInstant(it.label) != null }
+    ) {
+        sourcePoints.sortedBy { chartTemporalInstant(it.label) }
+    } else {
+        sourcePoints
+    }
+    val maxValue = when (type) {
         "bar", "stacked_bar" -> points.maxOfOrNull { it.total }
         "pie", "donut" -> points.maxOfOrNull { point -> point.values.maxOfOrNull { it.value } ?: 0.0 }
         else -> points.maxOfOrNull { point -> point.values.maxOfOrNull { it.value } ?: 0.0 }
     } ?: 0.0
-    return PreparedChartData(points = points, series = seriesDefs, maxValue = maxValue.coerceAtLeast(1.0))
+    return PreparedChartData(
+        points = points,
+        series = seriesDefs,
+        maxValue = maxValue.coerceAtLeast(1.0),
+        maxValuesByAxis = chartAxisMaximums(points, seriesDefs)
+    )
 }
 
 internal fun sampledChartAxisLabels(labels: List<String>, maximum: Int): List<String> {
@@ -912,8 +1044,19 @@ internal fun filterPreparedChartData(
     return PreparedChartData(
         points = filteredPoints,
         series = filteredSeries,
-        maxValue = maxValue
+        maxValue = maxValue,
+        maxValuesByAxis = chartAxisMaximums(filteredPoints, filteredSeries)
     )
+}
+
+private fun chartAxisMaximums(
+    points: List<ChartPoint>,
+    series: List<ChartSeriesDisplay>
+): Map<String, Double> = series.groupBy { it.axis }.mapValues { (_, axisSeries) ->
+    val keys = axisSeries.mapTo(mutableSetOf()) { it.key }
+    points.maxOfOrNull { point ->
+        point.values.filter { it.key in keys }.maxOfOrNull { it.value } ?: 0.0
+    }?.coerceAtLeast(1.0) ?: 1.0
 }
 
 private fun resolveSeriesDefinitions(chart: ChartDef): List<ChartSeriesDisplay> {
@@ -926,12 +1069,20 @@ private fun resolveSeriesDefinitions(chart: ChartDef): List<ChartSeriesDisplay> 
         !chart.valueKey.isNullOrBlank() -> listOf(ChartValueOption(name = chart.valueKey, value = chart.valueKey))
         else -> emptyList()
     }
+    val composed = chartType(chart) == "composed"
     return candidates.mapIndexedNotNull { index, item ->
         val key = item.value?.takeIf { it.isNotBlank() } ?: return@mapIndexedNotNull null
+        val explicitAxis = item.axis?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+        val explicitType = item.type?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
         ChartSeriesDisplay(
             key = key,
-            label = item.name?.takeIf { it.isNotBlank() } ?: key,
-            color = parseChartColor(palette.getOrNull(index % palette.size))
+            label = item.label?.takeIf { it.isNotBlank() }
+                ?: item.name?.takeIf { it.isNotBlank() }
+                ?: key,
+            color = parseChartColor(item.color?.takeIf { it.isNotBlank() } ?: palette.getOrNull(index % palette.size)),
+            type = explicitType ?: if (composed && index == 0) "area" else "line",
+            axis = explicitAxis ?: if (composed && candidates.size > 1) "series:$key" else "default",
+            format = item.format
         )
     }
 }
@@ -950,7 +1101,7 @@ internal fun findCartesianSelection(
     prepared.points.forEachIndexed { index, point ->
         val x = (width / max(prepared.points.size - 1, 1)) * index
         point.values.forEach { value ->
-            val y = height - (height * (value.value / prepared.maxValue).toFloat().coerceIn(0f, 1f))
+            val y = height - (height * (value.value / prepared.maximumForSeries(value.key)).toFloat().coerceIn(0f, 1f))
             val distance = sqrt((tap.x - x).pow(2) + (tap.y - y).pow(2))
             if (nearest == null || distance < nearest!!.third) {
                 nearest = Triple(point, value, distance)

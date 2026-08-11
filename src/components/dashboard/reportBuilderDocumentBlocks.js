@@ -3007,7 +3007,7 @@ export function buildReportBuilderDocumentCompileValidation(diagnostics = []) {
         diagnostics: normalizedDiagnostics,
         blockingDiagnostics,
         message: blockingDiagnostics.length > 0
-            ? "Resolve authored block validation issues before preparing writable ReportDocument payloads."
+            ? "Some report fields are no longer available. Update the affected sections before saving or exporting."
             : "",
     };
 }

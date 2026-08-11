@@ -1,6 +1,12 @@
 import SwiftUI
 import ForgeIOSRuntime
 
+private struct ReportRuntimeFlatSection: Identifiable {
+    let id: String
+    let title: String
+    let blocks: [DashboardReportRuntimeBlockSummary]
+}
+
 public struct DashboardRenderer: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.forgePresentationDensity) private var presentationDensity
@@ -1080,6 +1086,9 @@ public struct DashboardRenderer: View {
     private func reportRuntimeBlock(_ container: ContainerDef) -> some View {
         let summary = DashboardRuntime.dashboardReportRuntimeSummary(container)
         let nestedBlockIDs = reportRuntimeNestedTabBlockIDs(summary.blocks)
+        let topLevelBlocks = summary.blocks.filter { !nestedBlockIDs.contains($0.id) }
+        let flatSections = reportRuntimeFlatSections(topLevelBlocks)
+        let hasExplicitTabGroup = topLevelBlocks.contains { $0.kind == "tabGroupBlock" }
         let exportExecution = DashboardRuntime.dashboardReportRuntimeExportExecution(container)
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 8) {
@@ -1106,17 +1115,24 @@ public struct DashboardRenderer: View {
             if !summaryDiagnostics.isEmpty {
                 reportRuntimeDiagnosticsPreview(summaryDiagnostics)
             }
-            ForEach(summary.blocks.filter { !nestedBlockIDs.contains($0.id) }) { block in
-                if DashboardRuntime.dashboardReportRuntimeBlockVisible(
-                    block,
-                    metrics: reportRuntimeBlockMetrics(block),
-                    filters: dashboardFilters.mapValues(dashboardJSONAny),
-                    selection: dashboardSelection
-                ) {
-                    if block.kind == "tabGroupBlock" {
-                        reportRuntimeTabGroup(block, blocks: summary.blocks)
-                    } else {
-                        reportRuntimeAuthoredBlock(block)
+            if flatSections.count > 1 && !hasExplicitTabGroup {
+                reportRuntimeFlatSectionTabs(
+                    flatSections,
+                    selectionKey: container.id ?? "report-runtime"
+                )
+            } else {
+                ForEach(topLevelBlocks) { block in
+                    if DashboardRuntime.dashboardReportRuntimeBlockVisible(
+                        block,
+                        metrics: reportRuntimeBlockMetrics(block),
+                        filters: dashboardFilters.mapValues(dashboardJSONAny),
+                        selection: dashboardSelection
+                    ) {
+                        if block.kind == "tabGroupBlock" {
+                            reportRuntimeTabGroup(block, blocks: summary.blocks)
+                        } else {
+                            reportRuntimeAuthoredBlock(block)
+                        }
                     }
                 }
             }
@@ -1146,9 +1162,92 @@ public struct DashboardRenderer: View {
             .filter { $0.kind == "tabGroupBlock" }
             .flatMap { reportRuntimeReferenceIDs($0.content, keys: ["sectionIds", "sections"]) }
         let childIDs = sectionIDs.compactMap { blockByID[$0] }.flatMap {
-            reportRuntimeReferenceIDs($0.content, keys: ["childBlockIds", "blockIds", "children"])
+            reportRuntimeSectionChildren($0, blocks: blocks).map(\.id)
         }
         return Set(sectionIDs + childIDs)
+    }
+
+    private func reportRuntimeFlatSections(
+        _ blocks: [DashboardReportRuntimeBlockSummary]
+    ) -> [ReportRuntimeFlatSection] {
+        var result: [ReportRuntimeFlatSection] = []
+        var current: [DashboardReportRuntimeBlockSummary] = []
+        func flush() {
+            guard !current.isEmpty else { return }
+            let header = current.first { $0.kind == "sectionBlock" }
+            result.append(ReportRuntimeFlatSection(
+                id: header?.id ?? "report-section-\(result.count)",
+                title: header.map(\.title).flatMap { $0.isEmpty ? nil : $0 } ?? "Overview",
+                blocks: current
+            ))
+            current = []
+        }
+        for block in blocks {
+            if block.kind == "sectionBlock", !current.isEmpty { flush() }
+            current.append(block)
+        }
+        flush()
+        return result
+    }
+
+    @ViewBuilder
+    private func reportRuntimeFlatSectionTabs(
+        _ sections: [ReportRuntimeFlatSection],
+        selectionKey: String
+    ) -> some View {
+        let selectedID = reportRuntimeTabSelections[selectionKey]
+            .flatMap { candidate in sections.contains(where: { $0.id == candidate }) ? candidate : nil }
+            ?? sections.first?.id
+        if let selectedID, let selected = sections.first(where: { $0.id == selectedID }) {
+            VStack(alignment: .leading, spacing: 8) {
+                reportRuntimeSectionSelector(
+                    sections.map { ($0.id, $0.title) },
+                    selectedID: selectedID,
+                    onSelect: { reportRuntimeTabSelections[selectionKey] = $0 }
+                )
+                ForEach(selected.blocks.filter { $0.kind != "sectionBlock" }) { block in
+                    if DashboardRuntime.dashboardReportRuntimeBlockVisible(
+                        block,
+                        metrics: reportRuntimeBlockMetrics(block),
+                        filters: dashboardFilters.mapValues(dashboardJSONAny),
+                        selection: dashboardSelection
+                    ) {
+                        reportRuntimeAuthoredBlock(block)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func reportRuntimeSectionSelector(
+        _ entries: [(id: String, title: String)],
+        selectedID: String,
+        onSelect: @escaping (String) -> Void
+    ) -> some View {
+        if horizontalSizeClass == .compact && entries.count > 3 {
+            Picker(
+                "Report section",
+                selection: Binding(get: { selectedID }, set: onSelect)
+            ) {
+                ForEach(entries, id: \.id) { entry in Text(entry.title).tag(entry.id) }
+            }
+            .pickerStyle(.menu)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("forge-report-runtime-section-selector")
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(entries, id: \.id) { entry in
+                        Button(entry.title) { onSelect(entry.id) }
+                            .font(.caption.weight(.semibold))
+                            .buttonStyle(.bordered)
+                            .tint(entry.id == selectedID ? Color.accentColor : Color.secondary)
+                            .accessibilityIdentifier("forge-report-runtime-section-\(entry.id)")
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -1200,11 +1299,7 @@ public struct DashboardRenderer: View {
 
                 reportRuntimeAuthoredBlock(selectedSection)
 
-                let childIDs = reportRuntimeReferenceIDs(
-                    selectedSection.content,
-                    keys: ["childBlockIds", "blockIds", "children"]
-                )
-                ForEach(childIDs.compactMap { blockByID[$0] }) { child in
+                ForEach(reportRuntimeSectionChildren(selectedSection, blocks: blocks)) { child in
                     if DashboardRuntime.dashboardReportRuntimeBlockVisible(
                         child,
                         metrics: reportRuntimeBlockMetrics(child),
@@ -1216,6 +1311,22 @@ public struct DashboardRenderer: View {
                 }
             }
         }
+    }
+
+    private func reportRuntimeSectionChildren(
+        _ section: DashboardReportRuntimeBlockSummary,
+        blocks: [DashboardReportRuntimeBlockSummary]
+    ) -> [DashboardReportRuntimeBlockSummary] {
+        let blockByID = Dictionary(uniqueKeysWithValues: blocks.map { ($0.id, $0) })
+        let explicit = reportRuntimeReferenceIDs(
+            section.content,
+            keys: ["childBlockIds", "blockIds", "children"]
+        ).compactMap { blockByID[$0] }
+        if !explicit.isEmpty { return explicit }
+        guard let index = blocks.firstIndex(where: { $0.id == section.id }) else { return [] }
+        return Array(blocks.dropFirst(index + 1).prefix {
+            $0.kind != "sectionBlock" && $0.kind != "tabGroupBlock"
+        })
     }
 
     private func reportRuntimeReferenceIDs(

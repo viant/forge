@@ -33,7 +33,34 @@ assert.deepEqual(
         observedLoading: false,
         targetDispatchFingerprint: "",
         minVisibleUntil: 1300,
+        expiresAt: 15100,
     },
+);
+
+const bounded = beginQuickPresetActivation({
+    title: "Overview",
+    awaitingFetch: true,
+    targetDispatchFingerprint: "request::fetch",
+    nowMs: 100,
+    minVisibleMs: 0,
+    maxVisibleMs: 15000,
+});
+assert.equal(bounded.targetDispatchFingerprint, "request::fetch");
+assert.equal(
+    shouldScheduleQuickPresetActivationRelease(bounded, {
+        loading: false,
+        currentDispatchFingerprint: "different::fetch",
+        nowMs: 100,
+    }),
+    15000,
+);
+assert.equal(
+    updateQuickPresetActivationForLoading(bounded, {
+        loading: false,
+        error: new Error("invalid input"),
+        nowMs: 200,
+    }),
+    null,
 );
 
 assert.deepEqual(

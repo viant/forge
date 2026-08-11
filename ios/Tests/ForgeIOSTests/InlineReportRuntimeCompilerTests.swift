@@ -33,7 +33,13 @@ final class InlineReportRuntimeCompilerTests: XCTestCase {
                     "id": .string("findings"), "kind": .string("collectionBlock"), "datasetRef": .string("rows"),
                     "itemTitleField": .string("channel"), "bodyTemplate": .string("${spend}")
                 ]),
-                .object(["id": .string("timeline"), "kind": .string("timelineBlock"), "datasetRef": .string("rows")]),
+                .object([
+                    "id": .string("timeline"), "kind": .string("timelineBlock"),
+                    "datasetRef": .string("timelineRows"),
+                    "timeField": .string("timestamp"), "titleField": .string("event"),
+                    "descriptionField": .string("detail"),
+                    "columns": .array([.object(["key": .string("impact"), "label": .string("Impact")])])
+                ]),
                 .object(["id": .string("markdown"), "kind": .string("markdownBlock"), "markdown": .string("## Summary")]),
                 .object(["id": .string("filters"), "kind": .string("filterBarBlock")]),
                 .object(["id": .string("refinements"), "kind": .string("refinementBarBlock")]),
@@ -56,6 +62,16 @@ final class InlineReportRuntimeCompilerTests: XCTestCase {
                     id: "rows",
                     format: "json",
                     payload: .array([.object(["channel": .string("CTV"), "state": .string("CA"), "spend": .number(125)])])
+                ),
+                "timelineRows": TranscriptCanonicalData(
+                    id: "timelineRows",
+                    format: "json",
+                    payload: .array([.object([
+                        "timestamp": .string("2026-08-09"),
+                        "event": .string("Pacing mode changed"),
+                        "detail": .string("ASAP changed to spend-evenly."),
+                        "impact": .string("Primary incident contributor")
+                    ])])
                 )
             ]
         )
@@ -69,6 +85,11 @@ final class InlineReportRuntimeCompilerTests: XCTestCase {
         XCTAssertEqual(reportFill["datasets"]?.arrayValue?.first?.objectValue?["rows"]?.arrayValue?.count, 1)
         let kpi = reportFill["blocks"]?.arrayValue?.first { $0.objectValue?["id"]?.stringValue == "kpi" }
         XCTAssertEqual(kpi?.objectValue?["content"]?.objectValue?["value"], .number(125))
+        let timeline = reportFill["blocks"]?.arrayValue?.first { $0.objectValue?["id"]?.stringValue == "timeline" }
+        let event = timeline?.objectValue?["content"]?.objectValue?["events"]?.arrayValue?.first?.objectValue
+        XCTAssertEqual(event?["date"], .string("2026-08-09"))
+        XCTAssertEqual(event?["title"], .string("Pacing mode changed"))
+        XCTAssertEqual(event?["body"], .string("ASAP changed to spend-evenly.\n\nImpact: Primary incident contributor"))
         XCTAssertEqual(DashboardRuntime.dashboardReportRuntimeSummary(artifact.metadata.view!.content!.containers[0]).blockCount, 17)
     }
 

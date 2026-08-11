@@ -2598,7 +2598,7 @@ assert.deepEqual(buildReportBuilderDocumentCompileValidation([
             message: "Headline KPI references unavailable KPI value field 'avails'.",
         },
     ],
-    message: "Resolve authored block validation issues before preparing writable ReportDocument payloads.",
+    message: "Some report fields are no longer available. Update the affected sections before saving or exporting.",
 });
 
 assert.deepEqual(

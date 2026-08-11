@@ -8,6 +8,9 @@ import com.viant.forgeandroid.runtime.DashboardReportBuilderDef
 import com.viant.forgeandroid.runtime.ReportBuilderHooksDef
 import com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterDef
 import com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterGroupDef
+import com.viant.forgeandroid.runtime.ReportBuilderChartSpecDef
+import com.viant.forgeandroid.runtime.ReportBuilderDimensionDef
+import com.viant.forgeandroid.runtime.ReportBuilderMeasureDef
 import com.viant.forgeandroid.runtime.ReportBuilderResultDef
 import com.viant.forgeandroid.runtime.WindowMetadata
 import kotlinx.coroutines.Dispatchers
@@ -118,6 +121,102 @@ class ReportBuilderRequestPayloadTest {
 
         assertEquals(listOf("Website", "Application"), includeSiteType)
         assertFalse((siteTypes ?: emptyMap<Any?, Any?>()).containsKey("includeIris"))
+    }
+
+    @Test
+    fun restoredEmptySelectionsUseChartFieldsAndProduceAValidDatasourceRequest() {
+        val config = DashboardReportBuilderDef(
+            primaryMeasure = "totalSpend",
+            measures = listOf(
+                ReportBuilderMeasureDef(
+                    id = "totalSpend",
+                    key = "totalSpend",
+                    paramPath = "measures.totalSpend",
+                    defaultValue = true
+                )
+            ),
+            dimensions = listOf(
+                ReportBuilderDimensionDef(
+                    id = "eventDate",
+                    key = "eventDate",
+                    paramPath = "dimensions.eventDate",
+                    defaultValue = true
+                )
+            )
+        )
+        val restored = StoredReportBuilderState(
+            selectedMeasures = emptyList(),
+            selectedDimensions = emptyList(),
+            chartSpec = ReportBuilderChartSpecDef(
+                type = "line",
+                xField = "eventDate",
+                yFields = listOf("totalSpend")
+            ),
+            viewMode = "chart"
+        ).toReportBuilderStateValues(config)
+
+        val payload = buildReportBuilderRequestPayload(
+            config = config,
+            selectedMeasures = restored.selectedMeasures,
+            selectedDimensions = restored.selectedDimensions,
+            staticFilters = restored.staticFilters,
+            dynamicGroups = restored.dynamicGroups,
+            hookState = emptyMap(),
+            hookInvoker = { _, _ -> null }
+        )
+
+        assertEquals(listOf("totalSpend"), restored.selectedMeasures)
+        assertEquals(listOf("eventDate"), restored.selectedDimensions)
+        assertEquals(mapOf("totalSpend" to true), payload["measures"])
+        assertEquals(mapOf("eventDate" to true), payload["dimensions"])
+    }
+
+    @Test
+    fun mergeReportBuilderPrefillBoundsRestoredReportByDateAndOrder() {
+        val config = DashboardReportBuilderDef(
+            staticFilters = listOf(
+                com.viant.forgeandroid.runtime.ReportBuilderStaticFilterDef(
+                    id = "dateRange",
+                    type = "dateRange",
+                    startParamPath = "filters.From",
+                    endParamPath = "filters.To"
+                )
+            ),
+            dynamicFilterGroups = listOf(
+                ReportBuilderDynamicFilterGroupDef(
+                    id = "scope",
+                    filters = listOf(
+                        ReportBuilderDynamicFilterDef(
+                            id = "orderIds",
+                            paramPath = "filters.orderIds",
+                            multiple = true,
+                            emitArray = true
+                        )
+                    )
+                )
+            )
+        )
+
+        val request = mergeReportBuilderPrefillIntoRequest(
+            config = config,
+            request = mapOf("measures" to mapOf("totalSpend" to true)),
+            windowForm = mapOf(
+                "prefill" to mapOf(
+                    "from" to "2026-07-27",
+                    "to" to "2026-08-03",
+                    "orderIds" to listOf(2672373)
+                )
+            )
+        )
+
+        assertEquals(
+            mapOf(
+                "From" to "2026-07-27",
+                "To" to "2026-08-03",
+                "orderIds" to listOf(2672373)
+            ),
+            request["filters"]
+        )
     }
 
     @Test

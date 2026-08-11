@@ -219,72 +219,36 @@ private fun SummaryList(
     container: ContainerDef,
     items: List<ItemDef>
 ) {
-    BoxWithConstraints(
+    StaticGrid(
+        items = items,
+        minCellWidth = 82.dp,
+        minimumColumns = 2,
         modifier = Modifier
             .fillMaxWidth()
             .padding(8.dp)
-    ) {
-        if (maxWidth < 340.dp) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items.forEach { item ->
-                    val dataContext = resolveMenuListContext(window, baseContext, container, item)
-                    val windowFormSignal = window.windowFormSignal()
-                    val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
-                    val form by if (dataContext != null) {
-                        dataContext.form.flow.collectAsState(initial = dataContext.form.peek())
-                    } else {
-                        androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
-                    }
-                    val metrics by if (dataContext != null) {
-                        dataContext.metrics.flow.collectAsState(initial = dataContext.metrics.peek())
-                    } else {
-                        androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
-                    }
-                    val rows by if (dataContext != null) {
-                        dataContext.collection.flow.collectAsState(initial = dataContext.collection.peek())
-                    } else {
-                        androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyList()) }
-                    }
-                    val key = itemValueKey(item) ?: return@forEach
-                    if (isItemVisible(item, form, metrics, windowForm, rows)) {
-                        val value = resolveItemValue(item, key, form, metrics, windowForm, rows)
-                        SummaryCard(item.label ?: key, value)
-                    }
-                }
-            }
+    ) { item ->
+        val dataContext = resolveMenuListContext(window, baseContext, container, item)
+        val windowFormSignal = window.windowFormSignal()
+        val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
+        val form by if (dataContext != null) {
+            dataContext.form.flow.collectAsState(initial = dataContext.form.peek())
         } else {
-            StaticGrid(
-                items = items,
-                minCellWidth = 180.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) { item ->
-                val dataContext = resolveMenuListContext(window, baseContext, container, item)
-                val windowFormSignal = window.windowFormSignal()
-                val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
-                val form by if (dataContext != null) {
-                    dataContext.form.flow.collectAsState(initial = dataContext.form.peek())
-                } else {
-                    androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
-                }
-                val metrics by if (dataContext != null) {
-                    dataContext.metrics.flow.collectAsState(initial = dataContext.metrics.peek())
-                } else {
-                    androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
-                }
-                val rows by if (dataContext != null) {
-                    dataContext.collection.flow.collectAsState(initial = dataContext.collection.peek())
-                } else {
-                    androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyList()) }
-                }
-                val key = itemValueKey(item) ?: return@StaticGrid
-                if (isItemVisible(item, form, metrics, windowForm, rows)) {
-                    val value = resolveItemValue(item, key, form, metrics, windowForm, rows)
-                    SummaryCard(item.label ?: key, value)
-                }
-            }
+            androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
+        }
+        val metrics by if (dataContext != null) {
+            dataContext.metrics.flow.collectAsState(initial = dataContext.metrics.peek())
+        } else {
+            androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
+        }
+        val rows by if (dataContext != null) {
+            dataContext.collection.flow.collectAsState(initial = dataContext.collection.peek())
+        } else {
+            androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyList()) }
+        }
+        val key = itemValueKey(item) ?: return@StaticGrid
+        if (isItemVisible(item, form, metrics, windowForm, rows)) {
+            val value = resolveItemValue(item, key, form, metrics, windowForm, rows)
+            SummaryCard(item.label ?: key, value)
         }
     }
 }
@@ -431,23 +395,29 @@ private fun SummaryCard(label: String, value: String) {
         shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp)
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = normalizeValue(value),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(top = 6.dp)
-            )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val compact = maxWidth < 120.dp
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = if (compact) 9.dp else 14.dp,
+                        vertical = if (compact) 9.dp else 12.dp
+                    )
+            ) {
+                Text(
+                    text = label,
+                    style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = normalizeValue(value),
+                    style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(top = if (compact) 4.dp else 6.dp)
+                )
+            }
         }
     }
 }

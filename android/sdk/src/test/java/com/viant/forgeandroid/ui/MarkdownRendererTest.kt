@@ -1,10 +1,19 @@
 package com.viant.forgeandroid.ui
 
+import androidx.compose.ui.text.font.FontWeight
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class MarkdownRendererTest {
+
+    @Test
+    fun `inline markdown preserves emphasis while removing transport markers`() {
+        val text = inlineMarkdownAnnotatedString("Delivery is **blocked**; inspect `bid_count`.")
+
+        assertEquals("Delivery is blocked; inspect bid_count.", text.text)
+        assertTrue(text.spanStyles.any { it.item.fontWeight == FontWeight.Bold })
+    }
 
     @Test
     fun `markdownCodeHighlightRuns classifies json tokens`() {

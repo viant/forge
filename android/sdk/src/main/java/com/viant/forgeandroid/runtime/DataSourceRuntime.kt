@@ -1,6 +1,7 @@
 package com.viant.forgeandroid.runtime
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -38,43 +39,44 @@ class DataSourceRuntime(
     }
 
     fun attach(window: WindowContext, dataSourceRef: String): DataSourceContext {
-        val dsId = window.identity.dataSourceId(dataSourceRef)
-        val dataSource = window.metadata.peek()?.dataSources?.get(dataSourceRef)
-            ?: error("DataSource not found: $dataSourceRef")
+        return attachConfigured(window, dataSourceRef, dataSourceRef)
+    }
 
-        val selectionMode = dataSource.selectionMode ?: "single"
-        val initialSelection = if (selectionMode == "multi") SelectionState(selection = emptyList()) else SelectionState()
-
-        val ctx = DataSourceContext(
-            window = window,
-            dataSourceRef = dataSourceRef,
-            dataSource = dataSource,
-            collection = signals.collection(dsId),
-            form = signals.form(dsId),
-            selection = signals.selection(dsId, initialSelection),
-            input = signals.input(dsId),
-            control = signals.control(dsId),
-            metrics = signals.metrics(dsId),
-            eventDispatcher = { execution, args -> executor?.invoke(execution, this, args) },
-            selectionHook = { row, rowIndex -> applySelectionHook(this, row, rowIndex) }
-        )
-        applyInitialParameters(ctx)
-
-        if (!jobs.containsKey(dsId)) {
-            jobs[dsId] = scope.launch(Dispatchers.IO) {
-                ctx.input.flow.collectLatest { input ->
-                    if (input.fetch) {
-                        fetchCollection(ctx)
-                    }
-                }
-            }
-        }
-        return ctx
+    /**
+     * Attaches an independently addressable request to a configured data source.
+     * Report documents can reference several logical datasets backed by the same
+     * service; using the logical dataset id keeps their input, rows and loading
+     * state isolated without changing metadata/parameter resolution semantics.
+     */
+    fun attachConfigured(
+        window: WindowContext,
+        instanceRef: String,
+        dataSourceRef: String
+    ): DataSourceContext {
+        return attachInternal(window, instanceRef, dataSourceRef, required = true)!!
     }
 
     fun attachOrNull(window: WindowContext, dataSourceRef: String): DataSourceContext? {
-        val dsId = window.identity.dataSourceId(dataSourceRef)
-        val dataSource = window.metadata.peek()?.dataSources?.get(dataSourceRef) ?: return null
+        return attachInternal(window, dataSourceRef, dataSourceRef, required = false)
+    }
+
+    fun attachConfiguredOrNull(
+        window: WindowContext,
+        instanceRef: String,
+        dataSourceRef: String
+    ): DataSourceContext? {
+        return attachInternal(window, instanceRef, dataSourceRef, required = false)
+    }
+
+    private fun attachInternal(
+        window: WindowContext,
+        instanceRef: String,
+        dataSourceRef: String,
+        required: Boolean
+    ): DataSourceContext? {
+        val dsId = window.identity.dataSourceId(instanceRef)
+        val dataSource = window.metadata.peek()?.dataSources?.get(dataSourceRef)
+            ?: if (required) error("DataSource not found: $dataSourceRef") else return null
 
         val selectionMode = dataSource.selectionMode ?: "single"
         val initialSelection = if (selectionMode == "multi") SelectionState(selection = emptyList()) else SelectionState()
@@ -92,9 +94,8 @@ class DataSourceRuntime(
             eventDispatcher = { execution, args -> executor?.invoke(execution, this, args) },
             selectionHook = { row, rowIndex -> applySelectionHook(this, row, rowIndex) }
         )
-        applyInitialParameters(ctx)
-
         if (!jobs.containsKey(dsId)) {
+            applyInitialParameters(ctx)
             jobs[dsId] = scope.launch(Dispatchers.IO) {
                 ctx.input.flow.collectLatest { input ->
                     if (input.fetch) {
@@ -172,6 +173,8 @@ class DataSourceRuntime(
             trigger(ctx, "onFetch", mapOf("collection" to data, "response" to response))
             trigger(ctx, "onSuccess", mapOf("collection" to data, "response" to response))
             finishFetch(ctx)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             trigger(ctx, "onError", mapOf("error" to (e.message ?: "Unknown error")))
             finishFetch(ctx, error = e.message)

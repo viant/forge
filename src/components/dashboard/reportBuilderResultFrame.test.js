@@ -2069,7 +2069,7 @@ assert.equal(drillRefreshSettledWithRetainedRowsPreviewState.updatingNotice, nul
 assert.deepEqual(buildReportBuilderCompileDiagnosticsNotice({
     compileValidation: {
         valid: false,
-        message: "Resolve authored block validation issues before preparing writable ReportDocument payloads.",
+        message: "Some report fields are no longer available. Update the affected sections before saving or exporting.",
         diagnostics: [
             {
                 code: "missingSemanticRef",
@@ -2085,7 +2085,7 @@ assert.deepEqual(buildReportBuilderCompileDiagnosticsNotice({
 }), {
     level: "danger",
     title: "Reopened compile diagnostics",
-    description: "Resolve authored block validation issues before preparing writable ReportDocument payloads.",
+    description: "Some report fields are no longer available. Update the affected sections before saving or exporting.",
     diagnostics: [
         {
             id: "missingSemanticRef_1",

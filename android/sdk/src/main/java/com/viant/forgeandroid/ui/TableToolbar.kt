@@ -29,7 +29,7 @@ fun TableToolbar(runtime: ForgeRuntime, context: DataSourceContext, toolbar: Too
             .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        toolbar.items.forEach { item ->
+        actionableToolbarItems(toolbar).forEach { item ->
             val label = item.label ?: item.icon ?: item.id ?: ""
             val readonly = remember(item.on, selection, form) {
                 item.on
@@ -47,4 +47,8 @@ fun TableToolbar(runtime: ForgeRuntime, context: DataSourceContext, toolbar: Too
             }
         }
     }
+}
+
+internal fun actionableToolbarItems(toolbar: ToolbarDef) = toolbar.items.filter { item ->
+    item.on.any { execution -> execution.event == "onClick" }
 }
