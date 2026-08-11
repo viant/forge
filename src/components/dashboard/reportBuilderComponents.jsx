@@ -819,6 +819,9 @@ export function ReportBuilderScopeSummary({
                         }}
                     >
                         <div style={{ fontSize: 12, fontWeight: 700, color: "#183247" }}>{String(item?.label || item?.id || "").trim()}</div>
+                        {String(item?.value || "").trim() ? (
+                            <div style={{ fontSize: 12, lineHeight: 1.45, color: "#304e63" }}>{String(item.value).trim()}</div>
+                        ) : null}
                         {String(item?.description || "").trim() ? (
                             <div style={{ fontSize: 11, lineHeight: 1.45, color: "#5f6b7c" }}>{String(item?.description || "").trim()}</div>
                         ) : null}

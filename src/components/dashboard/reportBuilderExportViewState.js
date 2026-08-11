@@ -15,6 +15,23 @@ function buildArtifactDownloadLabel(jobSummary = null, artifactLoading = false) 
     return formatLabel ? `Download ${formatLabel}` : "Download artifact";
 }
 
+function buildExportStatusChip(jobSummary = null) {
+    const status = normalizeString(jobSummary?.status).toLowerCase();
+    if (status === "succeeded") {
+        return "Ready";
+    }
+    if (status === "failed") {
+        return "Failed";
+    }
+    if (status === "queued") {
+        return "Queued";
+    }
+    if (status === "running" || status === "processing") {
+        return "Preparing";
+    }
+    return status ? capitalizeLabel(status) : "";
+}
+
 export function buildReportBuilderExportProvenanceMetaChips({
     backingState = "",
     backingSource = "",
@@ -149,9 +166,8 @@ export function buildReportBuilderExportJobPanelState({
         title: normalizeString(title) || "Report",
         error: normalizeString(jobSummary.error),
         metaChips: [
-            normalizeString(jobSummary.jobId),
-            normalizeString(jobSummary.status),
-            normalizeString(jobSummary.artifactId),
+            normalizeString(jobSummary.format).toUpperCase(),
+            buildExportStatusChip(jobSummary),
             ...(Array.isArray(additionalMetaChips) ? additionalMetaChips : []),
         ].filter(Boolean),
         ...(normalizeString(semanticBindingTitle) ? { semanticBindingTitle: normalizeString(semanticBindingTitle) } : {}),
@@ -201,9 +217,8 @@ export function buildReportBuilderExportFailureNotice(job = null, {
         title: normalizeString(job?.error || "Export failed") || "Export failed",
         error: normalizeString(job?.error),
         metaChips: [
-            normalizeString(job?.jobId),
-            normalizeString(job?.status),
-            normalizeString(job?.artifactId),
+            normalizeString(job?.format).toUpperCase(),
+            buildExportStatusChip(job),
             ...(Array.isArray(additionalMetaChips) ? additionalMetaChips : []),
         ].filter(Boolean),
         diagnostics,

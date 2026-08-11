@@ -242,6 +242,37 @@ assert.deepEqual(buildReportBuilderScopeSummaryFromParams([
     text: "Date Range • Channels",
 });
 
+assert.deepEqual(buildReportBuilderScopeSummaryFromParams([
+    {
+        id: "dateRange",
+        kind: "dateRange",
+        label: "Date Range",
+        value: { start: "2026-08-01", end: "2026-08-10" },
+    },
+    {
+        id: "channelsFilter",
+        kind: "multiSelect",
+        label: "Channels",
+        options: [
+            { value: "ctv", label: "CTV" },
+            { value: "audio", label: "Audio" },
+        ],
+        value: ["ctv", "audio"],
+    },
+    {
+        id: "advertiser",
+        label: "Advertiser",
+        value: "12632941-a91e-4099-9741-da4379dd8344",
+    },
+]), {
+    items: [
+        { id: "dateRange", label: "Date Range", value: "2026-08-01 – 2026-08-10" },
+        { id: "channelsFilter", label: "Channels", value: "CTV, Audio" },
+        { id: "advertiser", label: "Advertiser", value: "Selected" },
+    ],
+    text: "Date Range: 2026-08-01 – 2026-08-10 • Channels: CTV, Audio • Advertiser: Selected",
+});
+
 const refinementBarDraft = buildReportBuilderDocumentBlockDraft("refinementBarBlock");
 assert.deepEqual(refinementBarDraft, {
     kind: "refinementBarBlock",

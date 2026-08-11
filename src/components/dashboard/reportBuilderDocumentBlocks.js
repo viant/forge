@@ -948,17 +948,87 @@ export function buildReportBuilderScopeParamSummary(paramIds = [], scopeParamOpt
     };
 }
 
+function hasScopeParamValue(value) {
+    if (value == null || value === "") {
+        return false;
+    }
+    if (Array.isArray(value)) {
+        return value.length > 0;
+    }
+    if (typeof value === "object") {
+        return Object.values(value).some((entry) => hasScopeParamValue(entry));
+    }
+    return true;
+}
+
+function isOpaqueIdentifier(value = "") {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(normalizeString(value));
+}
+
+function resolveScopeParamOptionLabel(param = {}, value = null) {
+    const candidate = normalizeString(value);
+    if (!candidate) {
+        return "";
+    }
+    const option = (Array.isArray(param?.options) ? param.options : [])
+        .find((entry) => normalizeString(entry?.value ?? entry?.id) === candidate);
+    return normalizeString(option?.label || option?.name || option?.displayValue);
+}
+
+function formatScopeParamValue(param = {}) {
+    const value = param?.value;
+    if (!hasScopeParamValue(value)) {
+        return "";
+    }
+    if (normalizeString(param?.kind).toLowerCase() === "daterange" || (
+        value && typeof value === "object" && !Array.isArray(value)
+        && (Object.prototype.hasOwnProperty.call(value, "start") || Object.prototype.hasOwnProperty.call(value, "end"))
+    )) {
+        const start = normalizeString(value?.start);
+        const end = normalizeString(value?.end);
+        return start && end ? `${start} – ${end}` : (start || end);
+    }
+    const values = Array.isArray(value) ? value : [value];
+    const formatted = values.map((entry) => {
+        const optionLabel = resolveScopeParamOptionLabel(param, entry);
+        if (optionLabel) {
+            return optionLabel;
+        }
+        if (entry && typeof entry === "object") {
+            return "";
+        }
+        const normalized = normalizeString(entry);
+        return isOpaqueIdentifier(normalized) ? "Selected" : normalized;
+    }).filter(Boolean);
+    if (formatted.length === 0) {
+        return "";
+    }
+    if (formatted.every((entry) => entry === "Selected")) {
+        return formatted.length === 1 ? "Selected" : `${formatted.length} selected`;
+    }
+    return formatted.join(", ");
+}
+
 export function buildReportBuilderScopeSummaryFromParams(scopeParams = []) {
-    return buildReportBuilderScopeParamSummary(
-        (Array.isArray(scopeParams) ? scopeParams : [])
-            .map((param) => normalizeString(param?.id))
-            .filter(Boolean),
-        (Array.isArray(scopeParams) ? scopeParams : []).map((param) => ({
-            value: normalizeString(param?.id),
-            label: normalizeString(param?.label || param?.id),
-            description: normalizeString(param?.description),
-        })),
-    );
+    const items = (Array.isArray(scopeParams) ? scopeParams : []).map((param) => {
+        const id = normalizeString(param?.id);
+        const label = normalizeString(param?.label || id);
+        const value = formatScopeParamValue(param);
+        if (!id || !label) {
+            return null;
+        }
+        const description = normalizeString(param?.description);
+        return {
+            id,
+            label,
+            ...(value ? { value } : {}),
+            ...(description ? { description } : {}),
+        };
+    }).filter(Boolean);
+    return {
+        items,
+        text: items.map((item) => item.value ? `${item.label}: ${item.value}` : item.label).join(" • "),
+    };
 }
 
 function orderAuthoringFieldsBySelection(fields = [], selectedIds = new Set()) {
