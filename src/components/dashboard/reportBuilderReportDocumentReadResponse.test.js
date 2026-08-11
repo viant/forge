@@ -2352,11 +2352,12 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(getR
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Reporting Window",
+    scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Reporting Window",
+            value: "2026-05-01 – 2026-05-04",
             description: "Approved reporting window for semantic preview.",
         },
     ],
