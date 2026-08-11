@@ -659,7 +659,7 @@ assert.equal(
     importedAudienceSavedRecordPanelState.entries[0].semanticBindingFieldGroups[2].fields.some((field) => field.definitionRef === "harmonizer://feature/user.segment"),
     true,
 );
-assert.equal(importedAudienceSavedRecordPanelState.entries[0].scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(importedAudienceSavedRecordPanelState.entries[0].scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 
 const importedAudienceLegacyReopenablePanelState = buildImportedLocalReopenablePanelState({
     importedLocalGetReportDocumentResponses: [
@@ -682,7 +682,7 @@ assert.equal(
     importedAudienceLegacyReopenablePanelState.entries[0].semanticBindingFieldGroups[1].fields.some((field) => field.definitionRef === "harmonizer://feature/user.segment.index"),
     true,
 );
-assert.equal(importedAudienceLegacyReopenablePanelState.entries[0].scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(importedAudienceLegacyReopenablePanelState.entries[0].scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(importedAudienceLegacyReopenablePanelState.entries[0].authoredBlockCount, 4);
 assert.equal(importedAudienceLegacyReopenablePanelState.entries[0].authoredBlockSummaryText, "4 authored blocks: 1 Filter Bar, 1 Kpi, 1 Refinement Bar, 1 Table");
 assert.equal(importedAudienceLegacyReopenablePanelState.entries[0].drillHierarchyCount, 2);
@@ -710,7 +710,7 @@ assert.equal(
     importedAudienceLegacySavedRecordPanelState.entries[0].semanticBindingFieldGroups[2].fields.some((field) => field.definitionRef === "harmonizer://feature/user.segment"),
     true,
 );
-assert.equal(importedAudienceLegacySavedRecordPanelState.entries[0].scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(importedAudienceLegacySavedRecordPanelState.entries[0].scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(importedAudienceLegacySavedRecordPanelState.entries[0].authoredBlockCount, 4);
 assert.equal(importedAudienceLegacySavedRecordPanelState.entries[0].authoredBlockSummaryText, "4 authored blocks: 1 Filter Bar, 1 Kpi, 1 Refinement Bar, 1 Table");
 assert.equal(importedAudienceLegacySavedRecordPanelState.entries[0].drillHierarchyCount, 2);
@@ -823,7 +823,7 @@ assert.equal(
     structurallyThinAudienceSavedRecordPanelState.entries[0].semanticBindingFieldGroups[2].fields.some((field) => field.definitionRef === "harmonizer://feature/user.segment"),
     false,
 );
-assert.equal(structurallyThinAudienceSavedRecordPanelState.entries[0].scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(structurallyThinAudienceSavedRecordPanelState.entries[0].scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(structurallyThinAudienceSavedRecordPanelState.entries[0].authoredBlockCount, 4);
 assert.equal(structurallyThinAudienceSavedRecordPanelState.entries[0].drillHierarchyCount, 2);
 
@@ -1396,7 +1396,7 @@ const importedAudienceRuntimePanelStateWithEmptySpec = buildImportedPipelinePrev
 });
 assert.equal(importedAudienceRuntimePanelStateWithEmptySpec.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(importedAudienceRuntimePanelStateWithEmptySpec.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(importedAudienceRuntimePanelStateWithEmptySpec.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(importedAudienceRuntimePanelStateWithEmptySpec.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(importedAudienceRuntimePanelStateWithEmptySpec.authoredBlockCount, 4);
 assert.equal(importedAudienceRuntimePanelStateWithEmptySpec.authoredBlockSummaryText, "4 authored blocks: 1 Filter Bar, 1 Kpi, 1 Refinement Bar, 1 Table");
 assert.equal(importedAudienceRuntimePanelStateWithEmptySpec.drillHierarchyCount, 2);
@@ -1733,7 +1733,7 @@ const importedAudiencePipelineInspectorStateWithEmptySpec = buildImportedPipelin
 });
 assert.equal(importedAudiencePipelineInspectorStateWithEmptySpec.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(importedAudiencePipelineInspectorStateWithEmptySpec.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(importedAudiencePipelineInspectorStateWithEmptySpec.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(importedAudiencePipelineInspectorStateWithEmptySpec.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(importedAudiencePipelineInspectorStateWithEmptySpec.authoredBlockCount, 4);
 assert.equal(importedAudiencePipelineInspectorStateWithEmptySpec.authoredBlockSummaryText, "4 authored blocks: 1 Filter Bar, 1 Kpi, 1 Refinement Bar, 1 Table");
 assert.equal(importedAudiencePipelineInspectorStateWithEmptySpec.drillHierarchyCount, 2);
@@ -2093,7 +2093,7 @@ assert.equal(importedAudiencePrintPanelState.semanticBindingChips.includes("Meas
 assert.equal(importedAudiencePrintPanelState.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
 assert.equal(importedAudiencePrintPanelState.semanticBindingChips.includes("Categories Location, Audience +1"), true);
 assert.equal(importedAudiencePrintPanelState.semanticBindingChips.includes("Lineage harmonizer://feature/location +2"), true);
-assert.equal(importedAudiencePrintPanelState.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(importedAudiencePrintPanelState.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(importedAudiencePrintPanelState.expandedMetaChips.includes("ReportPrint"), true);
 
 assert.deepEqual(buildImportedStandaloneReportPrintInspectorState({
@@ -2832,7 +2832,7 @@ assert.equal(
 assert.equal(importedAudienceExportRequestPanelState.metaChips.includes("v13"), true);
 assert.equal(importedAudienceExportRequestPanelState.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(importedAudienceExportRequestPanelState.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(importedAudienceExportRequestPanelState.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(importedAudienceExportRequestPanelState.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(
     importedAudienceExportRequestPanelState.semanticBindingFieldGroups[1].fields[0].definitionRef,
     "harmonizer://feature/user.segment.index",
@@ -2862,7 +2862,7 @@ assert.equal(
 );
 assert.equal(
     importedAudienceExportRequestInspectorState.scopeSummaryText,
-    "Date Range • Channels • Audience Segment",
+    "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults",
 );
 
 const importedAudiencePDFExportRequestSummary = buildReportBuilderExportRequestSummary(
@@ -2876,7 +2876,7 @@ assert.equal(importedAudiencePDFExportRequestPanelState.description, "Source: sa
 assert.equal(importedAudiencePDFExportRequestPanelState.expandedMetaChips.includes("ReportPrint"), true);
 assert.equal(importedAudiencePDFExportRequestPanelState.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(importedAudiencePDFExportRequestPanelState.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(importedAudiencePDFExportRequestPanelState.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(importedAudiencePDFExportRequestPanelState.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 
 const importedAudiencePDFExportRequestInspectorState = buildImportedStandaloneExportRequestInspectorState({
     importedStandaloneExportRequestSummary: buildReportBuilderExportRequestInspectorState(

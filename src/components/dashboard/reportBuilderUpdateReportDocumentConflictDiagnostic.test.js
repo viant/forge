@@ -377,7 +377,7 @@ const audienceDiagnostic = buildReportBuilderUpdateReportDocumentConflictDiagnos
 });
 assert.equal(audienceDiagnostic.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(audienceDiagnostic.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(audienceDiagnostic.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(audienceDiagnostic.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(
     audienceDiagnostic.semanticBindingFieldGroups[1].fields[0].definitionRef,
     "harmonizer://feature/user.segment.index",
@@ -459,7 +459,7 @@ const embeddedConflictDiagnostic = buildReportBuilderUpdateReportDocumentConflic
     detectedAt: 9383,
 });
 assert.equal(embeddedConflictDiagnostic.semanticBindingChips.includes("Dimensions Delivery Date, Channel"), true);
-assert.equal(embeddedConflictDiagnostic.scopeSummaryText, "Reporting Window");
+assert.equal(embeddedConflictDiagnostic.scopeSummaryText, "Reporting Window: 2026-05-01 – 2026-05-04");
 assert.equal(embeddedConflictDiagnostic.scopeSummaryItems[0].description, "Embedded conflict scope metadata.");
 
 const embeddedConflictDiagnosticWithEmptySpecScope = buildReportBuilderUpdateReportDocumentConflictDiagnostic({
@@ -546,7 +546,7 @@ const embeddedConflictDiagnosticWithEmptySpecScope = buildReportBuilderUpdateRep
     detectedAt: 9384,
 });
 assert.equal(embeddedConflictDiagnosticWithEmptySpecScope.semanticBindingChips.includes("Dimensions Delivery Date, Channel"), true);
-assert.equal(embeddedConflictDiagnosticWithEmptySpecScope.scopeSummaryText, "Reporting Window");
+assert.equal(embeddedConflictDiagnosticWithEmptySpecScope.scopeSummaryText, "Reporting Window: 2026-05-01 – 2026-05-04");
 assert.equal(embeddedConflictDiagnosticWithEmptySpecScope.scopeSummaryItems[0].description, "Embedded conflict scope metadata.");
 
 assert.equal(buildReportBuilderUpdateReportDocumentConflictDiagnostic(updatePayload, { currentVersion: 7 }), null);

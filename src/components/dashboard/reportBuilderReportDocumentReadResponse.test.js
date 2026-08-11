@@ -703,11 +703,12 @@ assert.deepEqual(buildReportBuilderListReportDocumentsEntrySummary(semanticSpecL
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Reporting Window",
+    scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Reporting Window",
+            value: "2026-05-01 – 2026-05-04",
             description: "Approved reporting window for semantic preview.",
         },
     ],
@@ -850,11 +851,12 @@ assert.deepEqual(buildReportBuilderListReportDocumentsEntrySummary(semanticSpecL
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Reporting Window",
+    scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Reporting Window",
+            value: "2026-05-01 – 2026-05-04",
             description: "Approved reporting window for semantic preview.",
         },
     ],
@@ -1189,7 +1191,7 @@ const audienceListEntrySummary = buildReportBuilderListReportDocumentsEntrySumma
 });
 assert.equal(audienceListEntrySummary.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(audienceListEntrySummary.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(audienceListEntrySummary.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(audienceListEntrySummary.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(audienceListEntrySummary.authoredBlockCount, 4);
 assert.equal(audienceListEntrySummary.authoredBlockSummaryText, "4 authored blocks: 1 Filter Bar, 1 Kpi, 1 Refinement Bar, 1 Table");
 assert.equal(audienceListEntrySummary.drillHierarchyCount, 2);
@@ -1202,7 +1204,7 @@ const audienceDocumentOnlyGetResponse = {
 delete audienceDocumentOnlyGetResponse.reportSpec;
 assert.equal(
     buildReportBuilderGetReportDocumentResponseSummary(audienceDocumentOnlyGetResponse).scopeSummaryText,
-    "Date Range • Channels • Audience Segment",
+    "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults",
 );
 assert.equal(
     buildReportBuilderGetReportDocumentResponseSummary(audienceDocumentOnlyGetResponse).semanticBindingChips.includes("Measures Audience Index"),
@@ -1229,7 +1231,7 @@ const audienceDocumentOnlyListEntrySummary = buildReportBuilderListReportDocumen
         ],
     },
 );
-assert.equal(audienceDocumentOnlyListEntrySummary.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(audienceDocumentOnlyListEntrySummary.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(
     audienceDocumentOnlyListEntrySummary.semanticBindingChips.includes("Measures Audience Index"),
     true,
@@ -1245,7 +1247,7 @@ const audienceLegacySavedPayloadListResponse = buildReportBuilderListReportDocum
 const audienceLegacySavedPayloadListEntrySummary = buildReportBuilderListReportDocumentsEntrySummary(
     audienceLegacySavedPayloadListResponse.entries[0],
 );
-assert.equal(audienceLegacySavedPayloadListEntrySummary.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(audienceLegacySavedPayloadListEntrySummary.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(
     audienceLegacySavedPayloadListEntrySummary.semanticBindingChips.includes("Measures Audience Index"),
     true,
@@ -1277,7 +1279,7 @@ const audienceLegacyBackfilledListEntrySummary = buildReportBuilderListReportDoc
         ],
     },
 );
-assert.equal(audienceLegacyBackfilledListEntrySummary.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(audienceLegacyBackfilledListEntrySummary.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(
     audienceLegacyBackfilledListEntrySummary.semanticBindingChips.includes("Measures Audience Index"),
     true,
@@ -1319,7 +1321,7 @@ const structurallyThinAudienceListEntrySummary = buildReportBuilderListReportDoc
         ],
     },
 );
-assert.equal(structurallyThinAudienceListEntrySummary.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(structurallyThinAudienceListEntrySummary.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(
     structurallyThinAudienceListEntrySummary.semanticBindingChips.includes("Measures Audience Index"),
     true,
@@ -1477,7 +1479,7 @@ assert.equal(
 );
 assert.equal(
     buildReportBuilderGetReportDocumentResponseSummary(embeddedDocumentOnlyGetResponse).scopeSummaryText,
-    "Reporting Window",
+    "Reporting Window: 2026-05-01 – 2026-05-04",
 );
 assert.equal(
     buildReportBuilderReportDocumentReadResponseInspectorState(embeddedDocumentOnlyGetResponse).semanticBindingChips.includes("Measures Available Impressions"),
@@ -1494,7 +1496,7 @@ assert.equal(
 );
 assert.equal(
     buildReportBuilderGetReportDocumentResponseSummary(embeddedDocumentEmptySpecGetResponse).scopeSummaryText,
-    "Reporting Window",
+    "Reporting Window: 2026-05-01 – 2026-05-04",
 );
 assert.equal(
     buildReportBuilderReportDocumentReadResponseInspectorState(embeddedDocumentEmptySpecGetResponse).semanticBindingChips.includes("Measures Available Impressions"),
@@ -1521,7 +1523,7 @@ assert.equal(
 );
 assert.equal(
     buildReportBuilderListReportDocumentsEntrySummary(embeddedDocumentOnlyListResponse.entries[0]).scopeSummaryText,
-    "Reporting Window",
+    "Reporting Window: 2026-05-01 – 2026-05-04",
 );
 
 const embeddedDocumentEmptySpecListResponse = {
@@ -1545,7 +1547,7 @@ assert.equal(
 );
 assert.equal(
     buildReportBuilderListReportDocumentsEntrySummary(embeddedDocumentEmptySpecListResponse.entries[0]).scopeSummaryText,
-    "Reporting Window",
+    "Reporting Window: 2026-05-01 – 2026-05-04",
 );
 
 const hydratedDerivedSelectedGetResponse = buildHydratedReportBuilderDocument(derivedSelectedGetResponse, {
@@ -2185,11 +2187,12 @@ assert.deepEqual(buildReportBuilderGetReportDocumentResponseSummary(getResponse)
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Reporting Window",
+    scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Reporting Window",
+            value: "2026-05-01 – 2026-05-04",
             description: "Approved reporting window for semantic preview.",
         },
     ],
@@ -2281,11 +2284,12 @@ assert.deepEqual(buildReportBuilderGetReportDocumentResponseSummary(derivedGetRe
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "dateRange",
+    scopeSummaryText: "dateRange: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "dateRange",
+            value: "2026-05-01 – 2026-05-04",
         },
     ],
 });

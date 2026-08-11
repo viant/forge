@@ -281,7 +281,7 @@ assert.equal(
 assert.equal(audienceRequestPanelState.metaChips.includes("v13"), true);
 assert.equal(audienceRequestPanelState.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(audienceRequestPanelState.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(audienceRequestPanelState.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(audienceRequestPanelState.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(
     audienceRequestPanelState.semanticBindingFieldGroups[1].fields[0].definitionRef,
     "harmonizer://feature/user.segment.index",
