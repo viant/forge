@@ -95,14 +95,18 @@ function buildTemplateMetaChips({
 }
 
 function buildExportRequestSummaryContext(requestSummary = null) {
-    const scopeSummaryItems = Array.isArray(requestSummary?.scopeSummaryItems)
+    const scopeSummaryItems = (Array.isArray(requestSummary?.scopeSummaryItems)
         ? requestSummary.scopeSummaryItems
-        : [];
-    const scopeSummaryText = normalizeString(requestSummary?.scopeSummaryText);
+        : [])
+        .filter((item) => normalizeString(item?.value));
+    const scopeSummaryText = scopeSummaryItems
+        .map((item) => `${normalizeString(item?.label || item?.id)}: ${normalizeString(item?.value)}`)
+        .filter(Boolean)
+        .join(" • ");
     const exportScopeSummaryText = scopeSummaryItems.length > 0
         ? [
             scopeSummaryText,
-            "Read-only values captured for this export snapshot. Use the live Filters workspace to change targeting or date range.",
+            "Captured when this export was created. Change filters in the live report before creating another export.",
         ].filter(Boolean).join(" ")
         : "";
     return {
@@ -113,7 +117,7 @@ function buildExportRequestSummaryContext(requestSummary = null) {
         semanticBindingFieldGroups: Array.isArray(requestSummary?.semanticBindingFieldGroups)
             ? requestSummary.semanticBindingFieldGroups
             : [],
-        scopeSummaryTitle: scopeSummaryItems.length > 0 ? "Export Snapshot Filters" : "",
+        scopeSummaryTitle: scopeSummaryItems.length > 0 ? "Filters used for this export" : "",
         scopeSummaryText: exportScopeSummaryText,
         scopeSummaryItems,
     };

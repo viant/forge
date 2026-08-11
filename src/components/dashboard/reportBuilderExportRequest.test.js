@@ -557,7 +557,7 @@ const audienceExportSummary = buildReportBuilderExportRequestSummary(audienceArt
 assert.equal(audienceExportSummary.format, "CSV");
 assert.equal(audienceExportSummary.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(audienceExportSummary.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(audienceExportSummary.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(audienceExportSummary.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(
     buildReportBuilderExportRequestInspectorState(audienceArtifactFixture.reportExportRequest).semanticBindingFieldGroups[1].fields[0].definitionRef,
     "harmonizer://feature/user.segment.index",
@@ -588,7 +588,7 @@ const recoveredAudienceExportSummary = buildReportBuilderExportRequestSummary(th
 });
 assert.equal(recoveredAudienceExportSummary.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(recoveredAudienceExportSummary.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(recoveredAudienceExportSummary.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(recoveredAudienceExportSummary.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(
     buildReportBuilderExportRequestInspectorState(thinAudienceExportRequest, {
         localSavedPayloads: [
@@ -625,7 +625,7 @@ const structurallyRecoveredAudienceExportSummary = buildReportBuilderExportReque
 });
 assert.equal(structurallyRecoveredAudienceExportSummary.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(structurallyRecoveredAudienceExportSummary.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(structurallyRecoveredAudienceExportSummary.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(structurallyRecoveredAudienceExportSummary.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 assert.equal(
     buildReportBuilderExportRequestInspectorState(structurallyThinAudienceExportRequest, {
         localSavedPayloads: [

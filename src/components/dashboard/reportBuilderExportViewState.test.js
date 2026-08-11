@@ -303,7 +303,7 @@ assert.equal(audiencePDFRequestPanelState.metaChips.includes("reportPrint"), tru
 assert.equal(audiencePDFRequestPanelState.metaChips.includes("v13"), true);
 assert.equal(audiencePDFRequestPanelState.semanticBindingChips.includes("Measures Audience Index"), true);
 assert.equal(audiencePDFRequestPanelState.semanticBindingChips.includes("Parameters Date Range, Audience Segment"), true);
-assert.equal(audiencePDFRequestPanelState.scopeSummaryText, "Date Range • Channels • Audience Segment");
+assert.equal(audiencePDFRequestPanelState.scopeSummaryText, "Date Range: 2026-05-01 – 2026-05-04 • Channels • Audience Segment: Young Adults");
 
 assert.equal(buildReportBuilderExportRequestPanelState({
     requestInspector: {
@@ -354,7 +354,7 @@ assert.deepEqual(buildReportBuilderExportJobPanelState({
     label: "Draft export",
     title: "Capacity Trend Q3",
     error: "",
-    metaChips: ["job-1", "queued"],
+    metaChips: ["PDF", "Queued"],
     semanticBindingTitle: "Semantic Binding",
     semanticBindingChips: ["Model Ad Delivery"],
     semanticBindingFieldGroups: [
@@ -421,7 +421,7 @@ assert.deepEqual(buildReportBuilderExportJobPanelState({
     label: "Reopened export",
     title: "Report",
     error: "render failed",
-    metaChips: ["job-2", "failed", "artifact-7"],
+    metaChips: ["XLSX", "Failed"],
     semanticBindingTitle: "Semantic Binding",
     semanticBindingChips: ["Model Ad Delivery", "Entity Line Delivery"],
     semanticBindingFieldGroups: [
@@ -489,7 +489,7 @@ assert.deepEqual(buildReportBuilderExportJobPanelState({
     label: "Imported export",
     title: "Capacity Trend Q3",
     error: "",
-    metaChips: ["job-3", "succeeded", "artifact-9", "Attached ReportFill", "8 rows"],
+    metaChips: ["PDF", "Ready", "Attached ReportFill", "8 rows"],
     semanticBindingTitle: "Semantic Binding",
     semanticBindingChips: ["Model Ad Delivery"],
     semanticBindingFieldGroups: [
@@ -561,7 +561,7 @@ assert.deepEqual(buildReportBuilderExportFailureNotice({
     label: "Imported export",
     title: "render failed",
     error: "render failed",
-    metaChips: ["job-9", "failed", "artifact-11", "Market Brief", "template mismatch", "Attached ReportFill", "8 rows"],
+    metaChips: ["Failed", "Market Brief", "template mismatch", "Attached ReportFill", "8 rows"],
     diagnostics: [
         {
             id: "rendererUnavailable:0",
