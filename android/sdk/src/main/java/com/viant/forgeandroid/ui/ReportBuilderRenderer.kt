@@ -54,6 +54,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.ChartAxisDef
 import com.viant.forgeandroid.runtime.ChartDef
@@ -267,7 +269,9 @@ fun ReportBuilderRenderer(
     var chartSpec by remember(config, builderStateKey) { mutableStateOf<ReportBuilderChartSpecDef?>(null) }
     var viewMode by remember(config, builderStateKey) { mutableStateOf(if (explicitChartMode) "table" else (config.result?.defaultMode ?: "chart")) }
     var previousMenuExpanded by remember { mutableStateOf(false) }
-    var staticFilters by remember(config, builderStateKey) { mutableStateOf(defaultStaticFilters(config.staticFilters)) }
+    var staticFilters by remember(config, builderStateKey) {
+        mutableStateOf(defaultReportBuilderStaticFilters(config.staticFilters))
+    }
     var dynamicGroups by remember(config, builderStateKey) { mutableStateOf(emptyMap<String, List<ReportBuilderDynamicRowState>>()) }
     var dynamicFilterDrafts by remember(config, builderStateKey) { mutableStateOf(emptyMap<String, String>()) }
     var restoredStoredState by remember(config, window.windowId, builderStateKey) { mutableStateOf(false) }
@@ -348,8 +352,13 @@ fun ReportBuilderRenderer(
     val aggregatedRows = remember(filteredRows, selectedDimensions, selectedMeasures, config) {
         aggregateRows(filteredRows, selectedDimensions, selectedMeasures, config)
     }
-    val activeFilterCount = remember(config.staticFilters, staticFilters, dynamicGroups) {
-        activeReportBuilderFilterCount(config.staticFilters, staticFilters, dynamicGroups)
+    val activeFilterCount = remember(config.staticFilters, config.hiddenDynamicGroupIds, staticFilters, dynamicGroups) {
+        activeReportBuilderFilterCount(
+            staticFilters = config.staticFilters,
+            staticState = staticFilters,
+            dynamicGroups = dynamicGroups,
+            hiddenDynamicGroupIds = config.hiddenDynamicGroupIds.toSet()
+        )
     }
     val hasFilterControls = config.staticFilters.isNotEmpty() || config.dynamicFilterGroups.isNotEmpty() || config.dynamicFilterFamilies.isNotEmpty()
 
@@ -784,13 +793,23 @@ private fun ReportBuilderResultView(
             showDataFallback = false
         )
     } else {
-        SimpleReportTable(
-            rows = tableRows,
-            columns = tableColumns,
-            measureColumns = tableMeasureColumns,
-            columnLabels = tableColumnLabels,
-            compactPresentation = compactPresentation
-        )
+        when {
+            control.loading && tableRows.isEmpty() -> Text(
+                "Loading report data…",
+                color = Color(0xFF5F6B7C)
+            )
+            !control.error.isNullOrBlank() -> Text(
+                reportBuilderLoadErrorMessage(control.error),
+                color = Color(0xFFB42318)
+            )
+            else -> SimpleReportTable(
+                rows = tableRows,
+                columns = tableColumns,
+                measureColumns = tableMeasureColumns,
+                columnLabels = tableColumnLabels,
+                compactPresentation = compactPresentation
+            )
+        }
     }
 }
 
@@ -1474,7 +1493,7 @@ private fun ReportBuilderFilterSummary(
             )
         }
         OutlinedButton(onClick = onToggle) {
-            Text(if (expanded) "Hide Body" else "Show Body")
+            Text(if (expanded) "Hide filters" else "Show filters")
         }
     }
 }
@@ -1761,22 +1780,39 @@ private fun ChartTile(
             }
             if (defaults.isNotEmpty()) {
                 Text("Default charts", style = MaterialTheme.typography.labelMedium, color = Color(0xFF607080))
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     defaults.forEach { spec ->
-                        AssistChip(
+                        OutlinedButton(
                             onClick = { onDefault(spec) },
-                            label = { Text(spec.title ?: generatedTitle(spec, emptyList(), emptyList())) },
-                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = null) },
-                            colors = AssistChipDefaults.assistChipColors(containerColor = Color.White)
-                        )
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ShowChart, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                spec.title ?: generatedTitle(spec, emptyList(), emptyList()),
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.Start,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
         }
     }
+}
+
+internal fun reportBuilderLoadErrorMessage(error: String?): String {
+    val detail = error.orEmpty().trim()
+    if (detail.isBlank()) return "Unable to load report data."
+    if (detail.contains("timeout", ignoreCase = true) ||
+        detail.contains("timed out", ignoreCase = true)
+    ) {
+        return "The report service did not respond. Try again."
+    }
+    return "Unable to load report data: $detail"
 }
 
 @Composable
@@ -1921,16 +1957,24 @@ private fun defaultDimensionKeys(dimensions: List<ReportBuilderDimensionDef>): L
     return if (explicit.isNotEmpty()) explicit else dimensions.firstNotNullOfOrNull { it.key ?: it.id }?.let(::listOf).orEmpty()
 }
 
-private fun defaultStaticFilters(filters: List<ReportBuilderStaticFilterDef>): Map<String, Any?> {
+internal fun defaultReportBuilderStaticFilters(
+    filters: List<ReportBuilderStaticFilterDef>,
+    today: LocalDate = LocalDate.now()
+): Map<String, Any?> {
     val result = linkedMapOf<String, Any?>()
     filters.forEach { filter ->
         val key = filter.id ?: return@forEach
         if ((filter.type ?: "").trim().equals("dateRange", ignoreCase = true)) {
-            val raw = JsonUtil.asStringMap(filter.defaultValue)
-            result[key] = mapOf(
-                "start" to (raw["start"]?.toString() ?: ""),
-                "end" to (raw["end"]?.toString() ?: "")
-            )
+            val raw = JsonUtil.asStringMap(filter.defaultValue?.let(JsonUtil::elementToAny))
+            val explicitStart = raw["start"]?.toString().orEmpty()
+            val explicitEnd = raw["end"]?.toString().orEmpty()
+            val preset = raw["preset"]?.toString().orEmpty()
+            result[key] = if (explicitStart.isNotBlank() || explicitEnd.isNotBlank()) {
+                mapOf("start" to explicitStart, "end" to explicitEnd)
+            } else {
+                resolveReportBuilderRelativeDateRange(preset, today)
+                    ?: mapOf("start" to "", "end" to "")
+            }
         } else {
             val defaults = filter.options.filter { it.defaultValue == true }.mapNotNull { it.value?.toString()?.trim('"') }
             if (defaults.isNotEmpty()) {
@@ -1939,6 +1983,24 @@ private fun defaultStaticFilters(filters: List<ReportBuilderStaticFilterDef>): M
         }
     }
     return result
+}
+
+internal fun resolveReportBuilderRelativeDateRange(
+    preset: String,
+    today: LocalDate = LocalDate.now()
+): Map<String, String>? {
+    val normalized = preset.trim().lowercase().replace("_", "")
+    val startOffset = when (normalized) {
+        "today" -> 0L
+        "yesterday" -> 1L
+        "last3days", "3d" -> 2L
+        "last7days", "7d" -> 6L
+        "last30days", "30d" -> 29L
+        else -> return null
+    }
+    val end = if (normalized == "yesterday") today.minusDays(1) else today
+    val start = if (normalized == "yesterday") end else today.minusDays(startOffset)
+    return mapOf("start" to start.toString(), "end" to end.toString())
 }
 
 private fun defaultDynamicFilterKeys(): List<String> {
@@ -2794,13 +2856,15 @@ internal fun shouldAutoCollapseReportBuilderFilters(
 internal fun activeReportBuilderFilterCount(
     staticFilters: List<ReportBuilderStaticFilterDef>,
     staticState: Map<String, Any?>,
-    dynamicGroups: Map<String, List<ReportBuilderDynamicRowState>>
+    dynamicGroups: Map<String, List<ReportBuilderDynamicRowState>>,
+    hiddenDynamicGroupIds: Set<String> = emptySet()
 ): Int {
     val staticCount = staticFilters.sumOf { filter ->
         val key = filter.id?.trim().orEmpty()
         if (key.isEmpty()) 0 else configuredStaticFilterCount(filter, staticState[key])
     }
-    val dynamicCount = dynamicGroups.values.sumOf { rows ->
+    val hidden = hiddenDynamicGroupIds.map(String::trim).filter(String::isNotEmpty).toSet()
+    val dynamicCount = dynamicGroups.filterKeys { it !in hidden }.values.sumOf { rows ->
         rows.count { row -> row.selections.isNotEmpty() }
     }
     return staticCount + dynamicCount

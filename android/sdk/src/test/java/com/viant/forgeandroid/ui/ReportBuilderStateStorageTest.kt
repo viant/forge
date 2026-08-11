@@ -15,6 +15,9 @@ import com.viant.forgeandroid.runtime.ReportBuilderStaticFilterDef
 import com.viant.forgeandroid.runtime.WindowMetadata
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import java.time.LocalDate
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -23,6 +26,41 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ReportBuilderStateStorageTest {
+    @Test
+    fun reportDatasourceTimeoutIsPresentedWithoutRawTransportJargon() {
+        assertEquals(
+            "The report service did not respond. Try again.",
+            reportBuilderLoadErrorMessage("Read timed out")
+        )
+    }
+
+    @Test
+    fun nonTimeoutReportDatasourceErrorsRetainUsefulDetail() {
+        assertEquals(
+            "Unable to load report data: invalid response",
+            reportBuilderLoadErrorMessage("invalid response")
+        )
+    }
+
+    @Test
+    fun defaultStaticFiltersResolveRelativeDatePresetLikeWeb() {
+        val state = defaultReportBuilderStaticFilters(
+            filters = listOf(
+                ReportBuilderStaticFilterDef(
+                    id = "dateRange",
+                    type = "dateRange",
+                    defaultValue = buildJsonObject { put("preset", "last3Days") }
+                )
+            ),
+            today = LocalDate.of(2026, 8, 11)
+        )
+
+        assertEquals(
+            mapOf("start" to "2026-08-09", "end" to "2026-08-11"),
+            state["dateRange"]
+        )
+    }
+
     @Test
     fun resolvesReportBuilderVariantFromWindowFormRef() {
         val fallback = DashboardReportBuilderDef(measures = listOf(ReportBuilderMeasureDef(id = "spend", key = "spend")))
@@ -247,6 +285,45 @@ class ReportBuilderStateStorageTest {
         )
 
         assertEquals(4, count)
+    }
+
+    @Test
+    fun activeReportBuilderFilterCountExcludesHiddenScopeRows() {
+        val count = activeReportBuilderFilterCount(
+            staticFilters = listOf(ReportBuilderStaticFilterDef(id = "dateRange", type = "dateRange")),
+            staticState = mapOf(
+                "dateRange" to mapOf("start" to "2026-08-09", "end" to "2026-08-11")
+            ),
+            dynamicGroups = mapOf(
+                "scope" to listOf(
+                    ReportBuilderDynamicRowState(
+                        id = "scope-order",
+                        filterId = "adOrderIds",
+                        selections = listOf(
+                            ReportBuilderDynamicSelectionState(
+                                value = kotlinx.serialization.json.JsonPrimitive(2664518),
+                                label = "Local Forecast Order"
+                            )
+                        )
+                    )
+                ),
+                "location" to listOf(
+                    ReportBuilderDynamicRowState(
+                        id = "country",
+                        filterId = "country",
+                        selections = listOf(
+                            ReportBuilderDynamicSelectionState(
+                                value = kotlinx.serialization.json.JsonPrimitive("US"),
+                                label = "US"
+                            )
+                        )
+                    )
+                )
+            ),
+            hiddenDynamicGroupIds = setOf("scope")
+        )
+
+        assertEquals(2, count)
     }
 
     @Test
