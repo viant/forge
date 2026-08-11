@@ -157,6 +157,18 @@ fun ChartRenderer(
                 )
             }
             if (activePrepared.series.isEmpty()) {
+                if (rows.isEmpty()) {
+                    val feedback = chartDataStateFeedback(
+                        loading = control.loading,
+                        error = control.error,
+                        hasResolvedRows = hasResolvedRows,
+                        hasChartValues = false
+                    )
+                    if (feedback != null) {
+                        ChartDataStateMessage(feedback)
+                        return@Column
+                    }
+                }
                 Text("Select at least one measure", style = MaterialTheme.typography.bodyMedium, color = ChartMutedText)
                 return@Column
             }

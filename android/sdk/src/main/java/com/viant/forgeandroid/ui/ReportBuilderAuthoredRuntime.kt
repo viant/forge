@@ -174,7 +174,7 @@ internal fun ReportBuilderAuthoredResult(
         val error = controls.firstNotNullOfOrNull { it.error?.takeIf(String::isNotBlank) }
         if (error != null) {
             Text(
-                text = "Some report data could not be loaded: $error",
+                text = authoredReportLoadErrorMessage(error),
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFFB42318)
             )
@@ -182,5 +182,19 @@ internal fun ReportBuilderAuthoredResult(
         if (runtimeContainer != null) {
             DashboardReportRuntimeSurface(runtime, window, runtimeContainer, dashboardRoot)
         }
+    }
+}
+
+internal fun authoredReportLoadErrorMessage(error: String): String {
+    val detail = error.trim()
+    if (detail.contains("timeout", ignoreCase = true) ||
+        detail.contains("timed out", ignoreCase = true)
+    ) {
+        return "Some report data did not respond. Try refreshing."
+    }
+    return if (detail.isBlank()) {
+        "Some report data could not be loaded."
+    } else {
+        "Some report data could not be loaded: $detail"
     }
 }

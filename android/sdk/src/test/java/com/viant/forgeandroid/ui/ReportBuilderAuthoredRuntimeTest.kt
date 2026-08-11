@@ -12,6 +12,14 @@ import kotlin.test.assertTrue
 
 class ReportBuilderAuthoredRuntimeTest {
     @Test
+    fun authoredReportTimeoutUsesActionableCopy() {
+        assertEquals(
+            "Some report data did not respond. Try refreshing.",
+            authoredReportLoadErrorMessage("timeout")
+        )
+    }
+
+    @Test
     fun persistedDocumentPatchAndOnlyReferencedCatalogDatasetsAreResolved() {
         val document = mapOf(
             "title" to "Order performance",
