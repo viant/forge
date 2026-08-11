@@ -309,7 +309,7 @@ function renderBuilder(windowFormState, mode = "design") {
 }
 
 function extractAuthoredValidationSection(html) {
-  const start = html.indexOf("Authored Block Validation");
+  const start = html.indexOf("Report setup needs attention");
   const end = html.indexOf("forge-report-builder__body", start);
   if (start < 0 || end < 0) {
     return "";
@@ -552,12 +552,12 @@ const collapsedInvalidPreviewHtml = renderBuilder({
 }, "preview");
 const collapsedInvalidPreviewValidationHtml = extractAuthoredValidationSection(collapsedInvalidPreviewHtml);
 
-assert.ok(collapsedInvalidPreviewValidationHtml.includes("Authored Block Validation"));
-assert.ok(collapsedInvalidPreviewValidationHtml.includes("Show details"));
+assert.ok(collapsedInvalidPreviewValidationHtml.includes("Report setup needs attention"));
+assert.ok(collapsedInvalidPreviewValidationHtml.includes("Review issues"));
 assert.ok(collapsedInvalidPreviewValidationHtml.includes("5 issues"));
-assert.ok(collapsedInvalidPreviewValidationHtml.includes("2 blocks"));
+assert.ok(collapsedInvalidPreviewValidationHtml.includes("2 sections"));
 assert.ok(collapsedInvalidPreviewValidationHtml.includes("+4 more issues"));
-assert.equal(collapsedInvalidPreviewValidationHtml.split('<span class="bp6-button-text">Edit block</span>').length - 1, 1);
+assert.equal(collapsedInvalidPreviewValidationHtml.split('<span class="bp6-button-text">Fix section</span>').length - 1, 1);
 
 const singleIssuePreviewHtml = renderBuilder({
   ...state,
@@ -577,8 +577,8 @@ const singleIssuePreviewHtml = renderBuilder({
 }, "preview");
 const singleIssuePreviewValidationHtml = extractAuthoredValidationSection(singleIssuePreviewHtml);
 
-assert.ok(singleIssuePreviewValidationHtml.includes("Authored Block Validation"));
-assert.ok(!singleIssuePreviewValidationHtml.includes("Show details"));
-assert.equal(singleIssuePreviewValidationHtml.split('<span class="bp6-button-text">Edit block</span>').length - 1, 1);
+assert.ok(singleIssuePreviewValidationHtml.includes("Report setup needs attention"));
+assert.ok(!singleIssuePreviewValidationHtml.includes("Review issues"));
+assert.equal(singleIssuePreviewValidationHtml.split('<span class="bp6-button-text">Fix section</span>').length - 1, 1);
 
 console.log("reportBuilderDesignerRender ✓ keeps authored design trees block-first while preserving primary-result authoring for empty documents");

@@ -118,6 +118,14 @@ class WindowContext(
         return dataSourceRuntime.attachOrNull(this, dataSourceRef)
     }
 
+    fun contextForInstance(instanceRef: String, dataSourceRef: String): DataSourceContext {
+        return dataSourceRuntime.attachConfigured(this, instanceRef, dataSourceRef)
+    }
+
+    fun contextForInstanceOrNull(instanceRef: String, dataSourceRef: String): DataSourceContext? {
+        return dataSourceRuntime.attachConfiguredOrNull(this, instanceRef, dataSourceRef)
+    }
+
     fun dialogSignal(dialogId: String): Signal<DialogState> {
         return signals.dialog("${windowId}Dialog$dialogId")
     }

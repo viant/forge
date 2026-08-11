@@ -16,6 +16,36 @@ class DashboardModelsTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun decodesOrderReportCatalogForMobile() {
+        val payload = """
+            {
+              "view": {"content": {"containers": [{
+                "id": "reportsPane",
+                "title": "Reports",
+                "kind": "dashboard.reportCatalog",
+                "dashboard": {"reportCatalog": {
+                  "defaultBuilderWindow": "metricReportBuilder",
+                  "defaultPresetId": "performance_delivery_command_center",
+                  "presets": [{
+                    "id": "performance_delivery_command_center",
+                    "label": "Performance Delivery Command Center",
+                    "reportType": "Executive dashboard",
+                    "description": "Pacing, KPI, channel, publisher, site-type, and geography analysis."
+                  }]
+                }}
+              }]}}
+            }
+        """.trimIndent()
+
+        val metadata = json.decodeFromString(WindowMetadata.serializer(), payload)
+        val catalog = metadata.view?.content?.containers?.singleOrNull()?.dashboard?.reportCatalog
+
+        assertEquals("metricReportBuilder", catalog?.defaultBuilderWindow)
+        assertEquals("performance_delivery_command_center", catalog?.defaultPresetId)
+        assertEquals("Performance Delivery Command Center", catalog?.presets?.singleOrNull()?.label)
+    }
+
+    @Test
     fun decodesReportBuilderDynamicFilterGroupIcon() {
         val payload = """
             {
@@ -749,6 +779,37 @@ class DashboardModelsTest {
         assertEquals("avails", chart.series?.valueKey)
         assertTrue(chart.series?.palette?.isEmpty() == true)
         assertEquals(listOf("avails"), chart.series?.values?.map { it.value })
+    }
+
+    @Test
+    fun decodesPerSeriesVisualAndAxisMetadata() {
+        val chart = json.decodeFromString<ChartDef>(
+            """
+            {
+              "type": "composed",
+              "series": {
+                "values": [
+                  {
+                    "label": "Spend",
+                    "name": "Spend",
+                    "value": "spend",
+                    "type": "area",
+                    "axis": "left",
+                    "format": "currency",
+                    "color": "#2f6de1"
+                  }
+                ]
+              }
+            }
+            """.trimIndent()
+        )
+
+        val series = chart.series?.values?.single()
+        assertEquals("Spend", series?.label)
+        assertEquals("area", series?.type)
+        assertEquals("left", series?.axis)
+        assertEquals("currency", series?.format)
+        assertEquals("#2f6de1", series?.color)
     }
 
     @Test

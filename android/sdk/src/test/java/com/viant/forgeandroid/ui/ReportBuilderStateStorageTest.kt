@@ -291,9 +291,9 @@ class ReportBuilderStateStorageTest {
             activeDynamicFilterKeys = listOf("includeSiteType")
         )
 
-        persistStoredStateToWindowForm(runtime, state.windowId, "reportBuilder.analytics", stored)
+        persistStoredStateToWindowForm(runtime, state.windowId, "reportBuilder:analytics", stored)
 
-        val loaded = loadStoredStateFromWindowForm(runtime, state.windowId, "reportBuilder.analytics")
+        val loaded = loadStoredStateFromWindowForm(runtime, state.windowId, "reportBuilder:analytics")
         assertNotNull(loaded)
         assertEquals(listOf("avails"), loaded.selectedMeasures)
         assertEquals("Website", loaded.dynamicFilterValues["includeSiteType"])
@@ -304,11 +304,11 @@ class ReportBuilderStateStorageTest {
     @Test
     fun reportBuilderVariantStateKeySeparatesSharedContainerVariants() {
         assertEquals(
-            "reportBuilder.metricsCubeBuilder",
+            "reportBuilder:metricsCubeBuilder",
             reportBuilderVariantStateKey("reportBuilder", "metricsCubeBuilder")
         )
         assertEquals(
-            "reportBuilder.forecastingCubeBuilder",
+            "reportBuilder:forecastingCubeBuilder",
             reportBuilderVariantStateKey("reportBuilder", "forecastingCubeBuilder")
         )
         assertEquals(
@@ -316,9 +316,49 @@ class ReportBuilderStateStorageTest {
             reportBuilderVariantStateKey("reportBuilder", "")
         )
         assertEquals(
-            "reportBuilder.forecasting_cube_builder",
+            "reportBuilder:forecasting/cube.builder",
             reportBuilderVariantStateKey("reportBuilder", "forecasting/cube.builder")
         )
+    }
+
+    @Test
+    fun loadsWebCompatibleVariantStateFromConversationWindowForm() {
+        val runtime = ForgeRuntime(
+            endpoints = emptyMap(),
+            scope = CoroutineScope(Dispatchers.Unconfined)
+        )
+        val state = runtime.openWindowInline(
+            windowKey = "conversation-report",
+            title = "Order Performance Report",
+            metadata = WindowMetadata()
+        )
+        runtime.setWindowFormValues(
+            state.windowId,
+            mapOf(
+                "reportBuilderRef" to "metricsCubeBuilder",
+                "reportBuilder:metricsCubeBuilder" to mapOf(
+                    "selectedMeasures" to listOf("avails", "bids"),
+                    "selectedDimensions" to listOf("eventDate"),
+                    "viewMode" to "chart",
+                    "dynamicFilterValues" to mapOf("orderIds" to "2676237"),
+                    "activeDynamicFilterKeys" to listOf("orderIds")
+                )
+            ),
+            replace = true
+        )
+
+        val loaded = loadStoredStateFromWindowForm(
+            runtime,
+            state.windowId,
+            reportBuilderVariantStateKey("reportBuilder", "metricsCubeBuilder")
+        )
+
+        assertNotNull(loaded)
+        assertEquals(listOf("avails", "bids"), loaded.selectedMeasures)
+        assertEquals(listOf("eventDate"), loaded.selectedDimensions)
+        assertEquals("chart", loaded.viewMode)
+        assertEquals("2676237", loaded.dynamicFilterValues["orderIds"])
+        assertEquals(listOf("orderIds"), loaded.activeDynamicFilterKeys)
     }
 
     @Test

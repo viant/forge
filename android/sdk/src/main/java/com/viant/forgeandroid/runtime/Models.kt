@@ -230,8 +230,27 @@ data class DashboardDef(
     val reportBuilders: Map<String, DashboardReportBuilderVariantDef> = emptyMap(),
     val reportBuilder: DashboardReportBuilderDef? = null,
     val reportRuntime: JsonElement? = null,
+    val reportCatalog: DashboardReportCatalogDef? = null,
     val badges: DashboardBadgesDef? = null,
     val detail: DashboardDetailDef? = null
+)
+
+@Serializable
+data class DashboardReportCatalogDef(
+    val defaultBuilderWindow: String? = null,
+    val defaultPresetId: String? = null,
+    val builderWindowByRef: Map<String, String> = emptyMap(),
+    val presets: List<DashboardReportCatalogPresetDef> = emptyList()
+)
+
+@Serializable
+data class DashboardReportCatalogPresetDef(
+    val id: String,
+    val label: String? = null,
+    val title: String? = null,
+    val reportType: String? = null,
+    val builderWindow: String? = null,
+    val description: String? = null
 )
 
 @Serializable
@@ -243,6 +262,7 @@ data class DashboardReportBuilderDef(
     val showFilterCategoryBar: Boolean? = null,
     val hiddenDynamicGroupIds: List<String> = emptyList(),
     val notices: List<ReportBuilderNoticeDef> = emptyList(),
+    val dataSources: List<ReportBuilderPublishedDataSourceDef> = emptyList(),
     val primaryMeasure: String? = null,
     val measureSections: List<ReportBuilderMeasureSectionDef> = emptyList(),
     val measures: List<ReportBuilderMeasureDef> = emptyList(),
@@ -261,6 +281,14 @@ data class DashboardReportBuilderDef(
     val unifiedFamilyRows: Boolean = false,
     val showResultHeader: Boolean? = null,
     val result: ReportBuilderResultDef? = null
+)
+
+@Serializable
+data class ReportBuilderPublishedDataSourceDef(
+    val id: String,
+    val dataSourceRef: String,
+    val request: JsonObject = JsonObject(emptyMap()),
+    val scope: JsonObject = JsonObject(emptyMap())
 )
 
 @Serializable
@@ -786,8 +814,13 @@ data class ChartSeriesDef(
 
 @Serializable
 data class ChartValueOption(
+    val label: String? = null,
     val name: String? = null,
-    val value: String? = null
+    val value: String? = null,
+    val type: String? = null,
+    val axis: String? = null,
+    val format: String? = null,
+    val color: String? = null
 )
 
 object ChartSeriesDefSerializer : KSerializer<ChartSeriesDef> {
@@ -814,8 +847,13 @@ object ChartSeriesDefSerializer : KSerializer<ChartSeriesDef> {
                             ChartValueOption(value = value)
                         }
                         is JsonObject -> ChartValueOption(
+                            label = (item["label"] as? JsonPrimitive)?.contentOrNull,
                             name = (item["name"] as? JsonPrimitive)?.contentOrNull,
-                            value = (item["value"] as? JsonPrimitive)?.contentOrNull
+                            value = (item["value"] as? JsonPrimitive)?.contentOrNull,
+                            type = (item["type"] as? JsonPrimitive)?.contentOrNull,
+                            axis = (item["axis"] as? JsonPrimitive)?.contentOrNull,
+                            format = (item["format"] as? JsonPrimitive)?.contentOrNull,
+                            color = (item["color"] as? JsonPrimitive)?.contentOrNull
                         ).takeIf { !it.value.isNullOrBlank() }
                         else -> null
                     }
@@ -931,6 +969,7 @@ data class ColumnDef(
     val link: LinkDef? = null,
     val width: Int? = null,
     val icon: String? = null,
+    val cellVisual: JsonObject? = null,
     val on: List<ExecutionDef> = emptyList(),
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()

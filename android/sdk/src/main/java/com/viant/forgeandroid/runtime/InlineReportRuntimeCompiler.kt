@@ -149,9 +149,72 @@ object InlineReportRuntimeCompiler {
                 content["secondaryValue"] = secondaryField?.let { row?.get(it) } ?: JsonNull
                 content["rowCount"] = JsonPrimitive(datasets[datasetRef]?.size ?: 0)
             }
+            "badgesBlock" -> {
+                val datasetRef = string(source["datasetRef"]).orEmpty()
+                val rows = datasets[datasetRef].orEmpty()
+                val row = rows.firstOrNull() as? JsonObject
+                val items = ((source["items"] as? JsonArray) ?: (content["items"] as? JsonArray)).orEmpty()
+                content["items"] = JsonArray(items.mapNotNull { value ->
+                    materializeBadgeItem(value as? JsonObject ?: return@mapNotNull null, row)
+                })
+                content["rowCount"] = JsonPrimitive(rows.size)
+            }
+            "timelineBlock" -> {
+                val datasetRef = string(source["datasetRef"]).orEmpty()
+                val rows = datasets[datasetRef].orEmpty().mapNotNull { it as? JsonObject }
+                val timeField = string(source["timeField"]) ?: "timestamp"
+                val titleField = string(source["titleField"]) ?: "title"
+                val descriptionField = string(source["descriptionField"]) ?: "description"
+                val columns = (source["columns"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+                content["events"] = JsonArray(rows.map { row ->
+                    val details = buildList {
+                        string(row[descriptionField])?.takeIf { it.isNotBlank() }?.let(::add)
+                        columns.forEach { column ->
+                            val key = string(column["key"]) ?: return@forEach
+                            val value = row[key]?.let(JsonUtil::elementToAny)?.toString()
+                                ?.takeIf { it.isNotBlank() } ?: return@forEach
+                            val label = string(column["label"]) ?: key
+                            add("$label: $value")
+                        }
+                    }
+                    JsonObject(mapOf(
+                        "date" to (row[timeField] ?: JsonPrimitive("")),
+                        "title" to (row[titleField] ?: JsonPrimitive("Event")),
+                        "body" to JsonPrimitive(details.joinToString("\n\n"))
+                    ))
+                })
+                content["rowCount"] = JsonPrimitive(rows.size)
+            }
         }
         objectValue["content"] = JsonObject(content)
         return JsonObject(objectValue)
+    }
+
+    private fun materializeBadgeItem(item: JsonObject, row: JsonObject?): JsonObject? {
+        val label = string(item["label"])
+        val valueField = string(item["valueField"])
+        val rawValue = valueField?.let { row?.get(it) } ?: item["value"]
+        if (label == null && rawValue == null && valueField == null) return null
+        val matchedRule = (item["rules"] as? JsonArray).orEmpty()
+            .mapNotNull { it as? JsonObject }
+            .firstOrNull { rule ->
+                JsonUtil.elementToAny(rule["value"] ?: JsonNull) == JsonUtil.elementToAny(rawValue ?: JsonNull)
+            }
+        val displayKey = string(item["displayKey"])
+        val mappedDisplay = (item["displayValueMap"] as? JsonObject)
+            ?.get(JsonUtil.elementToAny(rawValue ?: JsonNull)?.toString().orEmpty())
+        val format = string(item["format"])
+        val displayValue = matchedRule?.get("label")
+            ?: displayKey?.let { row?.get(it) }
+            ?: mappedDisplay
+            ?: rawValue?.let { value ->
+                format?.let { JsonPrimitive(formatDashboardValue(JsonUtil.elementToAny(value), it)) } ?: value
+            }
+        return JsonObject(item.toMutableMap().apply {
+            rawValue?.let { put("value", it) }
+            displayValue?.let { put("displayValue", it) }
+            (matchedRule?.get("tone") ?: item["tone"])?.let { put("tone", it) }
+        })
     }
 
     private fun adaptDashboardBlocks(blocks: List<JsonElement>): List<JsonElement> = blocks.flatMap { block ->

@@ -168,6 +168,33 @@ public enum InlineReportRuntimeCompiler {
             content["secondaryValue"] = secondaryField.flatMap { row?[$0] } ?? .null
             content["rowCount"] = .number(Double(datasets[datasetRef]?.count ?? 0))
         }
+        if kind == "timelineBlock" {
+            let datasetRef = object["datasetRef"]?.stringValue ?? ""
+            let rows = datasets[datasetRef]?.compactMap(\.objectValue) ?? []
+            let timeField = nonEmpty(object["timeField"]?.stringValue) ?? "timestamp"
+            let titleField = nonEmpty(object["titleField"]?.stringValue) ?? "title"
+            let descriptionField = nonEmpty(object["descriptionField"]?.stringValue) ?? "description"
+            let columns = object["columns"]?.arrayValue?.compactMap(\.objectValue) ?? []
+            content["events"] = .array(rows.map { row in
+                var details: [String] = []
+                if let description = nonEmpty(row[descriptionField]?.stringValue) {
+                    details.append(description)
+                }
+                for column in columns {
+                    guard let key = nonEmpty(column["key"]?.stringValue),
+                          let value = DashboardRuntime.dashboardReportRuntimeValueText(row[key]),
+                          !value.isEmpty else { continue }
+                    let label = nonEmpty(column["label"]?.stringValue) ?? key
+                    details.append("\(label): \(value)")
+                }
+                return .object([
+                    "date": row[timeField] ?? .string(""),
+                    "title": row[titleField] ?? .string("Event"),
+                    "body": .string(details.joined(separator: "\n\n"))
+                ])
+            })
+            content["rowCount"] = .number(Double(rows.count))
+        }
         object["content"] = .object(content)
         return .object(object)
     }

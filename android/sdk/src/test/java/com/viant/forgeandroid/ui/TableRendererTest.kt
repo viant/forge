@@ -3,6 +3,10 @@ package com.viant.forgeandroid.ui
 import com.viant.forgeandroid.runtime.ColumnDef
 import com.viant.forgeandroid.runtime.LinkDef
 import com.viant.forgeandroid.runtime.TableDef
+import com.viant.forgeandroid.runtime.ToolbarDef
+import com.viant.forgeandroid.runtime.ToolbarItemDef
+import com.viant.forgeandroid.runtime.ExecutionDef
+import com.viant.forgeandroid.runtime.SelectionState
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
@@ -216,5 +220,31 @@ class TableRendererTest {
             TableRefreshFeedback(busy = false, message = null),
             tableRefreshFeedback(loading = false, error = "  ")
         )
+    }
+
+    @Test
+    fun `table row selection recognizes single and multi selection`() {
+        val row = mapOf<String, Any?>("adOrderId" to 2672373)
+
+        assertEquals(true, tableRowIsSelected(SelectionState(selected = row), row, 4))
+        assertEquals(true, tableRowIsSelected(SelectionState(selection = listOf(row)), row, 4))
+        assertEquals(true, tableRowIsSelected(SelectionState(rowIndex = 4), row, 4))
+        assertEquals(false, tableRowIsSelected(SelectionState(), row, 4))
+    }
+
+    @Test
+    fun `toolbar omits declarative pagination placeholders without click actions`() {
+        val toolbar = ToolbarDef(
+            items = listOf(
+                ToolbarItemDef(id = "pagination"),
+                ToolbarItemDef(
+                    id = "export",
+                    label = "Export",
+                    on = listOf(ExecutionDef(event = "onClick", handler = "report.export"))
+                )
+            )
+        )
+
+        assertEquals(listOf("export"), actionableToolbarItems(toolbar).map { it.id })
     }
 }

@@ -21,6 +21,30 @@ import kotlin.test.assertTrue
 class DataSourceHookRuntimeTest {
     private val server = MockWebServer()
 
+    @Test
+    fun configuredInstancesBackedBySameDatasourceKeepIndependentSignals() {
+        val signals = SignalRegistry()
+        val runtime = DataSourceRuntime(
+            signals,
+            RestClient(EndpointRegistry(emptyMap())),
+            CoroutineScope(Dispatchers.Unconfined)
+        )
+        val metadataSignal = signals.metadata("W1").also {
+            it.set(WindowMetadata(dataSources = mapOf("cube" to DataSourceDef())))
+        }
+        val window = WindowContext("W1", metadataSignal, signals, runtime)
+        val summary = runtime.attachConfigured(window, "summary", "cube")
+        val daily = runtime.attachConfigured(window, "daily", "cube")
+
+        summary.setInputParameters(mapOf("limit" to 1))
+        daily.setInputParameters(mapOf("limit" to 366))
+
+        assertEquals(mapOf("limit" to 1), summary.input.peek().parameters)
+        assertEquals(mapOf("limit" to 366), daily.input.peek().parameters)
+        assertEquals("cube", summary.dataSourceRef)
+        assertEquals("cube", daily.dataSourceRef)
+    }
+
     @BeforeTest
     fun installJvmEvaluator() {
         ActionHookRuntime.testScriptEvaluator = { script ->
@@ -712,5 +736,71 @@ class DataSourceHookRuntimeTest {
         assertNull(ctx.control.peek().error)
         assertEquals(false, ctx.input.peek().fetch)
         assertEquals(false, ctx.input.peek().refresh)
+    }
+
+    @Test
+    fun reattachingDatasourceDoesNotOverwriteActiveReportRequestWithWindowParameters() {
+        val signals = SignalRegistry()
+        val runtime = DataSourceRuntime(
+            signals,
+            RestClient(EndpointRegistry(emptyMap())),
+            CoroutineScope(Dispatchers.Unconfined)
+        )
+        val metadataSignal = signals.metadata("W1").also {
+            it.set(WindowMetadata(dataSources = mapOf("report" to DataSourceDef())))
+        }
+        val window = WindowContext(
+            windowId = "W1",
+            metadata = metadataSignal,
+            signals = signals,
+            dataSourceRuntime = runtime,
+            parameters = mapOf("prefill" to mapOf("orderIds" to listOf(2672373)))
+        )
+        val context = runtime.attachOrNull(window, "report")!!
+        val reportRequest = mapOf(
+            "measures" to mapOf("totalSpend" to true),
+            "dimensions" to mapOf("eventDate" to true),
+            "filters" to mapOf("orderIds" to listOf(2672373))
+        )
+        context.setInputParameters(reportRequest)
+
+        runtime.attachOrNull(window, "report")
+
+        assertEquals(reportRequest, context.input.peek().parameters)
+    }
+
+    @Test
+    fun supersededFetchCancellationDoesNotBecomeDatasourceError() = runBlocking {
+        val signals = SignalRegistry()
+        val runtime = DataSourceRuntime(
+            signals,
+            RestClient(EndpointRegistry(emptyMap())),
+            CoroutineScope(Dispatchers.Unconfined)
+        )
+        runtime.setCollectionLoader { context ->
+            val requestId = context.input.peek().parameters["requestId"] as Int
+            if (requestId == 1) delay(200) else delay(20)
+            DataSourceRuntime.LoaderResult(rows = listOf(mapOf("requestId" to requestId)))
+        }
+        val metadataSignal = signals.metadata("W1").also {
+            it.set(WindowMetadata(dataSources = mapOf("report" to DataSourceDef())))
+        }
+        val context = runtime.attachOrNull(
+            WindowContext(
+                windowId = "W1",
+                metadata = metadataSignal,
+                signals = signals,
+                dataSourceRuntime = runtime
+            ),
+            "report"
+        )!!
+
+        context.setInputParameters(mapOf("requestId" to 1), fetch = true)
+        delay(30)
+        context.setInputParameters(mapOf("requestId" to 2), fetch = true)
+        delay(150)
+
+        assertEquals(2, context.collection.peek().single()["requestId"])
+        assertNull(context.control.peek().error)
     }
 }

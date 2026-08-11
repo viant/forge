@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -37,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
@@ -57,6 +60,7 @@ import com.viant.forgeandroid.runtime.ChartDef
 import com.viant.forgeandroid.runtime.ChartSeriesDef
 import com.viant.forgeandroid.runtime.ChartValueOption
 import com.viant.forgeandroid.runtime.ContainerDef
+import com.viant.forgeandroid.runtime.ControlState
 import com.viant.forgeandroid.runtime.DashboardReportBuilderDef
 import com.viant.forgeandroid.runtime.DataSourceContext
 import com.viant.forgeandroid.runtime.ForgeRuntime
@@ -83,6 +87,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 import java.time.LocalDate
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -208,8 +213,13 @@ fun ReportBuilderRenderer(
     window: com.viant.forgeandroid.runtime.WindowContext,
     container: ContainerDef
 ) {
+    // Forge Android always renders inside a mobile application, including on
+    // tablets. Keep the result surface focused on one full-width view at a time
+    // and leave the desktop-only measure/breakdown editor to the web builder.
+    val compactPresentation = true
     val windowFormSignal = window.windowFormSignal()
     val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
+    val authoredDocument = remember(windowForm) { reportBuilderAuthoredDocument(windowForm) }
     val variant = remember(container, windowForm) {
         resolveReportBuilderVariant(container, windowForm)
     }
@@ -234,9 +244,6 @@ fun ReportBuilderRenderer(
     }
     val rows by context.collection.flow.collectAsState(initial = emptyList())
     val control by context.control.flow.collectAsState(initial = context.control.peek())
-    LaunchedEffect(dataSourceRef) {
-        context.fetchCollection()
-    }
 
     val allMeasures = remember(config) { config.measures + config.computedMeasures }
     val visibleMeasures = remember(config) { allMeasures.filter { it.hidden != true } }
@@ -268,7 +275,9 @@ fun ReportBuilderRenderer(
     var pendingAutoChartRequestSignature by remember(config, window.windowId, builderStateKey) { mutableStateOf("") }
     var lastAutoAppliedChartRequestSignature by remember(config, window.windowId, builderStateKey) { mutableStateOf("") }
     var lastObservedChartLoading by remember(config, window.windowId, builderStateKey) { mutableStateOf(false) }
-    var filtersExpanded by remember(config, window.windowId, builderStateKey) { mutableStateOf(true) }
+    var filtersExpanded by remember(config, window.windowId, builderStateKey, compactPresentation) {
+        mutableStateOf(!compactPresentation)
+    }
     var lastObservedFilterLoading by remember(config, window.windowId, builderStateKey) { mutableStateOf(false) }
     var lastAutoCollapsedRequestSignature by remember(config, window.windowId, builderStateKey) { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
@@ -298,9 +307,9 @@ fun ReportBuilderRenderer(
     }
     var requestPayload by remember { mutableStateOf<Map<String, Any?>>(emptyMap()) }
     var lookupDescriptors by remember(config) { mutableStateOf<Map<String, ReportBuilderLookupDescriptor>>(emptyMap()) }
-    LaunchedEffect(config, selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, hookState) {
+    LaunchedEffect(config, selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, hookState, windowForm) {
         requestPayload = withContext(Dispatchers.Default) {
-            applyReportBuilderChartDataPolicy(
+            val builderRequest = applyReportBuilderChartDataPolicy(
                 config = config,
                 request = buildReportBuilderRequestPayload(
                     config = config,
@@ -318,6 +327,7 @@ fun ReportBuilderRenderer(
                     }
                 )
             )
+            mergeReportBuilderPrefillIntoRequest(config, builderRequest, windowForm)
         }
     }
     LaunchedEffect(config, hookState) {
@@ -347,8 +357,14 @@ fun ReportBuilderRenderer(
     val chartRows = remember(aggregatedRows, currentChartSpec) {
         buildChartRows(aggregatedRows, currentChartSpec)
     }
-    val chartDef = remember(aggregatedRows, currentChartSpec) {
-        buildChartDef(aggregatedRows, currentChartSpec)
+    val chartDef = remember(aggregatedRows, currentChartSpec, visibleMeasures, visibleDimensions) {
+        buildChartDef(aggregatedRows, currentChartSpec, visibleMeasures, visibleDimensions)
+    }
+    val reportColumnLabels = remember(selectedDimensions, selectedMeasures, visibleDimensions, visibleMeasures) {
+        buildMap {
+            selectedDimensions.forEach { put(it, resolveDimensionLabel(it, visibleDimensions)) }
+            selectedMeasures.forEach { put(it, resolveMeasureLabel(it, visibleMeasures)) }
+        }
     }
 
     LaunchedEffect(config, window.windowId, builderStateKey) {
@@ -397,8 +413,8 @@ fun ReportBuilderRenderer(
         }
     }
 
-    LaunchedEffect(requestPayload) {
-        if (requestPayload.isNotEmpty()) {
+    LaunchedEffect(requestPayload, restoredStoredState) {
+        if (restoredStoredState && requestPayload.isNotEmpty()) {
             context.setInputParameters(requestPayload, fetch = true)
         }
     }
@@ -498,34 +514,39 @@ fun ReportBuilderRenderer(
     }
 
     ReportBuilderPanel(
-        title = config.title?.takeIf { it.isNotBlank() } ?: container.title,
-        subtitle = config.subtitle?.takeIf { it.isNotBlank() } ?: container.subtitle
+        // Authored report runtime owns its title and subtitle. Avoid the nested,
+        // duplicated heading visible in the previous phone layout.
+        title = if (authoredDocument == null) config.title?.takeIf { it.isNotBlank() } ?: container.title else null,
+        subtitle = if (authoredDocument == null) config.subtitle?.takeIf { it.isNotBlank() } ?: container.subtitle else null,
+        compactPresentation = compactPresentation
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            ChipSection(
-                title = "Measures",
-                items = visibleMeasures.map { reportBuilderMeasureLabel(it) to reportBuilderMeasureKey(it) },
-                selected = selectedMeasures,
-                onToggle = { key ->
-                    selectedMeasures = toggleKey(selectedMeasures, key).ifEmpty { listOf(key) }
-                }
-            )
-            BreakdownSection(
-                title = "Breakdowns",
-                items = visibleDimensions.map { reportBuilderDimensionLabel(it) to reportBuilderDimensionKey(it) },
-                selected = selectedDimensions,
-                onAdd = { key ->
-                    if (!selectedDimensions.contains(key)) {
-                        selectedDimensions = selectedDimensions + key
+            if (!compactPresentation) {
+                ChipSection(
+                    title = "Measures",
+                    items = visibleMeasures.map { reportBuilderMeasureLabel(it) to reportBuilderMeasureKey(it) },
+                    selected = selectedMeasures,
+                    onToggle = { key ->
+                        selectedMeasures = toggleKey(selectedMeasures, key).ifEmpty { listOf(key) }
                     }
-                },
-                onRemove = { key ->
-                    val next = selectedDimensions.filterNot { it == key }
-                    if (next.isNotEmpty()) {
-                        selectedDimensions = next
+                )
+                BreakdownSection(
+                    title = "Breakdowns",
+                    items = visibleDimensions.map { reportBuilderDimensionLabel(it) to reportBuilderDimensionKey(it) },
+                    selected = selectedDimensions,
+                    onAdd = { key ->
+                        if (!selectedDimensions.contains(key)) {
+                            selectedDimensions = selectedDimensions + key
+                        }
+                    },
+                    onRemove = { key ->
+                        val next = selectedDimensions.filterNot { it == key }
+                        if (next.isNotEmpty()) {
+                            selectedDimensions = next
+                        }
                     }
-                }
-            )
+                )
+            }
             if (hasFilterControls) {
                 ReportBuilderFilterSummary(
                     activeFilterCount = activeFilterCount,
@@ -665,7 +686,7 @@ fun ReportBuilderRenderer(
                 )
             }
 
-            if (config.result?.chartCreationMode == "explicit" && chartSpec == null) {
+            if (authoredDocument == null && config.result?.chartCreationMode == "explicit" && chartSpec == null) {
                 ChartTile(
                     title = "Create a chart from this table",
                     description = "Create a chart from the currently selected dimensions and measures.",
@@ -681,30 +702,133 @@ fun ReportBuilderRenderer(
                 )
             }
 
-            if (chartSpec != null) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { viewMode = "table" }) { Text("Table") }
-                    OutlinedButton(onClick = { viewMode = "chart" }) { Text("Chart") }
-                    OutlinedButton(onClick = {
-                        chartSpec = null
-                        viewMode = "table"
-                    }) {
-                        Icon(Icons.Filled.Delete, contentDescription = null)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Remove Chart")
+            if (authoredDocument == null && chartSpec != null) {
+                if (compactPresentation) {
+                    ReportBuilderCompactViewTabs(
+                        viewMode = viewMode,
+                        onViewModeChange = { viewMode = it }
+                    )
+                } else {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { viewMode = "table" }) { Text("Table") }
+                        OutlinedButton(onClick = { viewMode = "chart" }) { Text("Chart") }
+                        OutlinedButton(onClick = {
+                            chartSpec = null
+                            viewMode = "table"
+                        }) {
+                            Icon(Icons.Filled.Delete, contentDescription = null)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Remove Chart")
+                        }
                     }
                 }
             }
 
-            if (viewMode == "chart" && chartSpec != null && chartDef != null) {
-                ChartRenderer(
-                    rows = chartRows,
-                    chart = chartDef,
-                    control = control,
-                    hasResolvedRows = control.loading || control.resolved || rows.isNotEmpty()
+            if (authoredDocument != null) {
+                ReportBuilderAuthoredResult(
+                    runtime = runtime,
+                    window = window,
+                    dashboardRoot = container,
+                    config = config,
+                    document = authoredDocument,
+                    primaryRows = rows,
+                    primaryControl = control,
+                    primaryRequest = requestPayload
                 )
             } else {
-                SimpleReportTable(aggregatedRows, selectedDimensions + selectedMeasures)
+                ReportBuilderResultView(
+                    viewMode = viewMode,
+                    chartSpec = chartSpec,
+                    chartDef = chartDef,
+                    chartRows = chartRows,
+                    control = control,
+                    hasResolvedRows = control.loading || control.resolved || rows.isNotEmpty(),
+                    tableRows = aggregatedRows,
+                    tableColumns = selectedDimensions + selectedMeasures,
+                    tableMeasureColumns = selectedMeasures.toSet(),
+                    tableColumnLabels = reportColumnLabels,
+                    compactPresentation = compactPresentation
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Table and chart are deliberately separate result views. On Android only the
+ * selected view is composed, avoiding a desktop card-within-card layout and
+ * keeping large chart/table trees out of memory when their tab is inactive.
+ */
+@Composable
+private fun ReportBuilderResultView(
+    viewMode: String,
+    chartSpec: ReportBuilderChartSpecDef?,
+    chartDef: ChartDef?,
+    chartRows: List<Map<String, Any?>>,
+    control: ControlState,
+    hasResolvedRows: Boolean,
+    tableRows: List<AggregatedRow>,
+    tableColumns: List<String>,
+    tableMeasureColumns: Set<String>,
+    tableColumnLabels: Map<String, String>,
+    compactPresentation: Boolean
+) {
+    if (viewMode == "chart" && chartSpec != null && chartDef != null) {
+        ChartRenderer(
+            rows = chartRows,
+            chart = chartDef,
+            control = control,
+            hasResolvedRows = hasResolvedRows,
+            // The sibling Table tab is the complete accessible data view. Do
+            // not duplicate it beneath the chart and turn one tab into two.
+            showDataFallback = false
+        )
+    } else {
+        SimpleReportTable(
+            rows = tableRows,
+            columns = tableColumns,
+            measureColumns = tableMeasureColumns,
+            columnLabels = tableColumnLabels,
+            compactPresentation = compactPresentation
+        )
+    }
+}
+
+@Composable
+private fun ReportBuilderCompactViewTabs(
+    viewMode: String,
+    onViewModeChange: (String) -> Unit
+) {
+    Surface(
+        color = Color(0xFFF4F7FB),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, Color(0xFFDCE4EF), RoundedCornerShape(14.dp))
+            .padding(4.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            listOf("table" to "Table", "chart" to "Chart").forEach { (mode, label) ->
+                val selected = viewMode == mode
+                Surface(
+                    color = if (selected) Color.White else Color.Transparent,
+                    shape = RoundedCornerShape(11.dp),
+                    shadowElevation = if (selected) 1.dp else 0.dp,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onViewModeChange(mode) }
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                        color = if (selected) Color(0xFF3F51D7) else Color(0xFF667085),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                    )
+                }
             }
         }
     }
@@ -1018,6 +1142,7 @@ private fun DynamicFilterUnifiedFamilyRow(
         LookupSelectionControl(
             selections = item.row.selections,
             draft = drafts[item.row.id].orEmpty(),
+            lookupLabel = filter.label ?: filter.id ?: "Value",
             placeholder = filter.manualPlaceholder ?: filter.label ?: "Enter value",
             manualEntry = filter.manualEntry == true,
             lookupAvailable = isLookupAvailable(item.direction, filter),
@@ -1214,6 +1339,7 @@ private fun DynamicFilterGroupFields(
                 LookupSelectionControl(
                     selections = row.selections,
                     draft = drafts[rowId].orEmpty(),
+                    lookupLabel = filter.label ?: filter.id ?: "Value",
                     placeholder = filter.manualPlaceholder ?: filter.label ?: "Enter value",
                     manualEntry = filter.manualEntry == true,
                     lookupAvailable = lookupAvailable,
@@ -1232,6 +1358,7 @@ private fun DynamicFilterGroupFields(
 private fun LookupSelectionControl(
     selections: List<ReportBuilderDynamicSelectionState>,
     draft: String,
+    lookupLabel: String,
     placeholder: String,
     manualEntry: Boolean,
     lookupAvailable: Boolean,
@@ -1263,47 +1390,54 @@ private fun LookupSelectionControl(
             }
         }
 
-        if (manualEntry || lookupAvailable) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (manualEntry) {
-                    OutlinedTextField(
-                        value = draft,
-                        onValueChange = onDraftChange,
-                        modifier = Modifier.width(176.dp),
-                        placeholder = { Text(placeholder) },
-                        singleLine = true,
-                        enabled = enabled,
-                        shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp, topEnd = 8.dp, bottomEnd = 8.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFFEEF8F1),
-                            unfocusedContainerColor = Color(0xFFEEF8F1),
-                            disabledContainerColor = Color(0xFFE8F0EA),
-                            focusedBorderColor = Color(0xFFCFE0F0),
-                            unfocusedBorderColor = Color(0xFFCFE0F0)
-                        )
-                    )
-                } else {
-                    OutlinedButton(
-                        onClick = onPick,
-                        enabled = enabled && lookupAvailable,
-                        shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp, topEnd = 8.dp, bottomEnd = 8.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color(0xFFEEF8F1),
-                            contentColor = Color(0xFF1F3B2B),
-                            disabledContainerColor = Color(0xFFE8F0EA),
-                            disabledContentColor = Color(0xFF6A8273)
-                        )
-                    ) {
-                        Text(placeholder)
+        if (lookupAvailable) {
+            OutlinedButton(
+                onClick = onPick,
+                enabled = enabled,
+                modifier = Modifier.height(44.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color(0xFFEEF8F1),
+                    contentColor = Color(0xFF1F3B2B),
+                    disabledContainerColor = Color(0xFFE8F0EA),
+                    disabledContentColor = Color(0xFF6A8273)
+                )
+            ) {
+                Icon(Icons.Filled.Search, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Select $lookupLabel", maxLines = 1)
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
+        } else if (manualEntry) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                val inputShape = RoundedCornerShape(12.dp)
+                BasicTextField(
+                    value = draft,
+                    onValueChange = onDraftChange,
+                    enabled = enabled,
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color(0xFF1F3B2B)),
+                    modifier = Modifier
+                        .width(160.dp)
+                        .height(44.dp)
+                        .background(if (enabled) Color(0xFFEEF8F1) else Color(0xFFE8F0EA), inputShape)
+                        .border(1.dp, Color(0xFFCFE0F0), inputShape)
+                        .padding(horizontal = 12.dp, vertical = 11.dp),
+                    decorationBox = { innerTextField ->
+                        Box(contentAlignment = Alignment.CenterStart) {
+                            if (draft.isBlank()) {
+                                Text(placeholder, style = MaterialTheme.typography.bodySmall, color = Color(0xFF6A8273))
+                            }
+                            innerTextField()
+                        }
                     }
-                }
+                )
                 OutlinedButton(
-                    onClick = {
-                        if (lookupAvailable) onPick() else onCommitManual()
-                    },
-                    enabled = enabled && (lookupAvailable || draft.isNotBlank()),
-                    modifier = Modifier.height(56.dp).width(44.dp),
-                    shape = RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp, topEnd = 28.dp, bottomEnd = 28.dp),
+                    onClick = onCommitManual,
+                    enabled = enabled && draft.isNotBlank(),
+                    modifier = Modifier.height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = Color(0xFF187A4F),
                         contentColor = Color.White,
@@ -1311,7 +1445,9 @@ private fun LookupSelectionControl(
                         disabledContentColor = Color.White
                     )
                 ) {
-                    Icon(if (lookupAvailable) Icons.Filled.ArrowDropDown else Icons.Filled.Add, contentDescription = null)
+                    Icon(Icons.Filled.Add, contentDescription = "Add value")
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Add")
                 }
             }
         }
@@ -1407,8 +1543,21 @@ private fun StaticFilterSection(
 private fun ReportBuilderPanel(
     title: String?,
     subtitle: String?,
+    compactPresentation: Boolean = false,
     content: @Composable () -> Unit
 ) {
+    if (compactPresentation) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            title?.takeIf { it.isNotBlank() }?.let {
+                Text(it, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            }
+            content()
+        }
+        return
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -1631,46 +1780,131 @@ private fun ChartTile(
 }
 
 @Composable
-private fun SimpleReportTable(rows: List<AggregatedRow>, columns: List<String>) {
+private fun SimpleReportTable(
+    rows: List<AggregatedRow>,
+    columns: List<String>,
+    measureColumns: Set<String>,
+    columnLabels: Map<String, String>,
+    compactPresentation: Boolean
+) {
     if (rows.isEmpty()) {
         Text("No rows", color = Color(0xFF6A7280))
         return
     }
+    val visibleRows = if (compactPresentation) rows.take(MAX_COMPACT_REPORT_ROWS) else rows
+    val cellWidth = if (compactPresentation) 132.dp else 160.dp
+    val tableWidth = cellWidth * columns.size.coerceAtLeast(1)
+    val horizontalScrollState = rememberScrollState()
+    val measureMaximums = remember(rows, measureColumns) {
+        measureColumns.associateWith { column ->
+            rows.maxOfOrNull { row -> reportBuilderNumericValue(row.values[column]) ?: 0.0 } ?: 0.0
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFFF6F8FB), RoundedCornerShape(12.dp))
-                .padding(horizontal = 10.dp, vertical = 8.dp)
+                .horizontalScroll(horizontalScrollState)
         ) {
-            columns.forEach { column ->
-                Text(
-                    text = column,
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color(0xFF6A7280)
-                )
-            }
-        }
-        rows.forEachIndexed { index, row ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(if (index % 2 == 0) Color.White else Color(0xFFFBFDFF), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 10.dp, vertical = 10.dp)
+            Column(
+                modifier = Modifier.width(tableWidth),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                columns.forEach { column ->
-                    Text(
-                        text = formatValue(row.values[column]),
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1
-                    )
+                Row(
+                    modifier = Modifier
+                        .width(tableWidth)
+                        .background(Color(0xFFF6F8FB), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 10.dp, vertical = 8.dp)
+                ) {
+                    columns.forEach { column ->
+                        Text(
+                            text = columnLabels[column] ?: column,
+                            modifier = Modifier.width(cellWidth),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF6A7280),
+                            maxLines = 1
+                        )
+                    }
+                }
+                visibleRows.forEachIndexed { index, row ->
+                    Row(
+                        modifier = Modifier
+                            .width(tableWidth)
+                            .background(if (index % 2 == 0) Color.White else Color(0xFFFBFDFF), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 10.dp)
+                    ) {
+                        columns.forEach { column ->
+                            val value = row.values[column]
+                            val fraction = if (column in measureColumns) {
+                                reportRuntimeDataBarFraction(value, measureMaximums[column] ?: 0.0)
+                            } else {
+                                null
+                            }
+                            ReportBuilderTableCell(
+                                value = formatValue(value),
+                                fraction = fraction,
+                                modifier = Modifier.width(cellWidth)
+                            )
+                        }
+                    }
                 }
             }
         }
+        if (visibleRows.size < rows.size) {
+            Text(
+                text = "Showing ${visibleRows.size} of ${rows.size} rows",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF667085)
+            )
+        }
     }
 }
+
+@Composable
+private fun ReportBuilderTableCell(
+    value: String,
+    fraction: Float?,
+    modifier: Modifier = Modifier
+) {
+    Box(modifier = modifier) {
+        if (fraction != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(32.dp)
+                    .background(Color(0xFFF1F5F9), RoundedCornerShape(8.dp))
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction)
+                    .height(32.dp)
+                    .background(
+                        Brush.horizontalGradient(listOf(Color(0xFFCFE0FB), Color(0xFF3F73EA))),
+                        RoundedCornerShape(8.dp)
+                    )
+            )
+        }
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (fraction != null) FontWeight.SemiBold else FontWeight.Normal,
+            color = Color(0xFF18324A),
+            maxLines = 1,
+            modifier = Modifier.padding(
+                horizontal = if (fraction != null) 8.dp else 0.dp,
+                vertical = if (fraction != null) 6.dp else 0.dp
+            )
+        )
+    }
+}
+
+private fun reportBuilderNumericValue(value: Any?): Double? = when (value) {
+    is Number -> value.toDouble()
+    is String -> value.replace(",", "").trim().toDoubleOrNull()
+    else -> null
+}
+
+private const val MAX_COMPACT_REPORT_ROWS = 100
 
 private fun defaultMeasureKeys(measures: List<ReportBuilderMeasureDef>, primaryMeasure: String? = null): List<String> {
     val explicit = measures.filter { it.defaultValue == true }.mapNotNull { reportBuilderMeasureKey(it).takeIf(String::isNotBlank) }
@@ -2000,6 +2234,53 @@ internal fun applyReportBuilderChartDataPolicy(
     }.toMap()
 }
 
+internal fun mergeReportBuilderPrefillIntoRequest(
+    config: DashboardReportBuilderDef,
+    request: Map<String, Any?>,
+    windowForm: Map<String, Any?>
+): Map<String, Any?> {
+    val prefill = JsonUtil.asStringMap(windowForm["prefill"])
+    if (prefill.isEmpty()) return request
+
+    val next = request.toMutableMap()
+    config.staticFilters.forEach { filter ->
+        if (!(filter.type ?: "").equals("dateRange", ignoreCase = true)) return@forEach
+        val startPath = filter.startParamPath ?: "${filter.paramPath ?: "filters.${filter.id}"}.start"
+        val endPath = filter.endParamPath ?: "${filter.paramPath ?: "filters.${filter.id}"}.end"
+        val start = prefill["from"] ?: prefill["From"]
+        val end = prefill["to"] ?: prefill["To"]
+        if (resolveNestedValue(next, startPath) == null && start?.toString()?.isNotBlank() == true) {
+            setNestedValue(next, startPath, start.toString())
+        }
+        if (resolveNestedValue(next, endPath) == null && end?.toString()?.isNotBlank() == true) {
+            setNestedValue(next, endPath, end.toString())
+        }
+    }
+
+    val scopedPrefill = listOf("scope", "inventory")
+        .map { JsonUtil.asStringMap(prefill[it]) }
+    config.dynamicFilterGroups.flatMap { it.filters }.forEach { filter ->
+        val id = filter.id?.trim().orEmpty()
+        val path = filter.paramPath?.trim().orEmpty()
+        if (id.isEmpty() || path.isEmpty() || resolveNestedValue(next, path) != null) return@forEach
+        val singularId = id.removeSuffix("s")
+        val raw = sequenceOf(prefill[id], prefill[singularId])
+            .plus(scopedPrefill.asSequence().flatMap { scope -> sequenceOf(scope[id], scope[singularId]) })
+            .firstOrNull { value ->
+                when (value) {
+                    null -> false
+                    is Collection<*> -> value.isNotEmpty()
+                    else -> value.toString().isNotBlank()
+                }
+            } ?: return@forEach
+        val values = if (raw is Collection<*>) raw.filterNotNull() else listOf(raw)
+        if (values.isEmpty()) return@forEach
+        val mapped: Any? = if (filter.multiple == true || filter.emitArray == true) values else values.first()
+        setNestedValue(next, path, mapped)
+    }
+    return next.toMap()
+}
+
 private fun normalizeDynamicFilterValue(
     filter: com.viant.forgeandroid.runtime.ReportBuilderDynamicFilterDef,
     rawValue: String
@@ -2187,12 +2468,31 @@ private fun decodeDynamicGroups(
     }.getOrDefault(fallback)
 }
 
-private fun StoredReportBuilderState.toReportBuilderStateValues(
+internal fun StoredReportBuilderState.toReportBuilderStateValues(
     config: DashboardReportBuilderDef
 ): ReportBuilderStateValues {
+    val measureKeys = (config.measures + config.computedMeasures)
+        .map(::reportBuilderMeasureKey)
+        .filter(String::isNotBlank)
+        .toSet()
+    val dimensionKeys = config.dimensions
+        .map(::reportBuilderDimensionKey)
+        .filter(String::isNotBlank)
+        .toSet()
+    val restoredMeasures = selectedMeasures.filter(measureKeys::contains)
+    val restoredDimensions = selectedDimensions.filter(dimensionKeys::contains)
+    val chartMeasures = chartSpec?.yFields.orEmpty().filter(measureKeys::contains)
+    val chartDimensions = listOfNotNull(chartSpec?.xField, chartSpec?.seriesField)
+        .filter(dimensionKeys::contains)
+    val visibleMeasures = (config.measures + config.computedMeasures).filter { it.hidden != true }
+    val visibleDimensions = config.dimensions.filter { it.hidden != true }
     return ReportBuilderStateValues(
-        selectedMeasures = selectedMeasures,
-        selectedDimensions = selectedDimensions,
+        selectedMeasures = restoredMeasures.ifEmpty {
+            chartMeasures.ifEmpty { defaultMeasureKeys(visibleMeasures, config.primaryMeasure) }
+        },
+        selectedDimensions = restoredDimensions.ifEmpty {
+            chartDimensions.ifEmpty { defaultDimensionKeys(visibleDimensions) }
+        },
         chartSpec = chartSpec,
         viewMode = viewMode,
         staticFilters = staticFilters.mapValues { it.value.toRuntimeValue() },
@@ -2522,21 +2822,29 @@ private fun configuredStaticFilterCount(filter: ReportBuilderStaticFilterDef, va
     }
 }
 
-private fun buildChartDef(rows: List<AggregatedRow>, chartSpec: ReportBuilderChartSpecDef?): ChartDef? {
+private fun buildChartDef(
+    rows: List<AggregatedRow>,
+    chartSpec: ReportBuilderChartSpecDef?,
+    measures: List<ReportBuilderMeasureDef>,
+    dimensions: List<ReportBuilderDimensionDef>
+): ChartDef? {
     val spec = chartSpec ?: return null
     val xField = spec.xField ?: return null
     val yField = spec.yFields.firstOrNull() ?: return null
     val seriesField = spec.seriesField
     val values = if (seriesField.isNullOrBlank()) {
-        listOf(ChartValueOption(name = yField, value = yField))
+        val label = resolveMeasureLabel(yField, measures)
+        listOf(ChartValueOption(name = label, label = label, value = yField))
     } else {
         rows.mapNotNull { it.values[seriesField]?.toString() }.distinct().map { value ->
             ChartValueOption(name = value, value = value)
         }
     }
+    val xLabel = resolveDimensionLabel(xField, dimensions)
+    val yLabel = resolveMeasureLabel(yField, measures)
     return ChartDef(
-        xAxis = ChartAxisDef(dataKey = xField, label = xField),
-        yAxis = com.viant.forgeandroid.runtime.ChartAxisDef(label = yField),
+        xAxis = ChartAxisDef(dataKey = xField, label = xLabel),
+        yAxis = com.viant.forgeandroid.runtime.ChartAxisDef(label = yLabel),
         series = ChartSeriesDef(values = values),
         type = spec.type ?: "line"
     )
@@ -2587,14 +2895,10 @@ internal fun reportBuilderVariantStateKey(baseKey: String, builderRef: String?):
     if (base.isBlank() || ref.isBlank()) {
         return base
     }
-    val suffix = ref
-        .map { char -> if (char.isLetterOrDigit()) char else '_' }
-        .joinToString("")
-        .trim('_')
-    if (suffix.isBlank()) {
-        return base
-    }
-    return "$base.$suffix"
+    // Keep this key byte-for-byte compatible with Forge web. Hosted conversation
+    // snapshots are produced by the web runtime and use `base:builderRef`; using a
+    // dotted/sanitized Android-only key makes those authoritative states invisible.
+    return "$base:$ref"
 }
 
 private fun upsertPreset(
@@ -2615,13 +2919,13 @@ private fun StoredStaticFilterValue.toRuntimeValue(): Any = when (this) {
 
 private fun formatValue(value: Any?): String = when (value) {
     null -> "-"
-    is Double -> if (value >= 1000.0) String.format("%.1fK", value / 1000.0) else String.format("%.0f", value)
-    is Float -> if (value >= 1000f) String.format("%.1fK", value / 1000f) else String.format("%.0f", value)
+    is Double -> if (value >= 1000.0) String.format(Locale.US, "%.1fK", value / 1000.0) else String.format(Locale.US, "%.0f", value)
+    is Float -> if (value >= 1000f) String.format(Locale.US, "%.1fK", value / 1000f) else String.format(Locale.US, "%.0f", value)
     is Number -> {
         val numeric = value.toDouble()
-        if (numeric >= 1000.0) String.format("%.1fK", numeric / 1000.0) else String.format("%.0f", numeric)
+        if (numeric >= 1000.0) String.format(Locale.US, "%.1fK", numeric / 1000.0) else String.format(Locale.US, "%.0f", numeric)
     }
-    else -> value.toString()
+    else -> value.toString().let { formatChartAxisLabel(it, null) }
 }
 
 internal fun resolveNestedValue(values: Map<String, Any?>, path: String): Any? {

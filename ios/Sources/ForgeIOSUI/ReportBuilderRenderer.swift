@@ -126,8 +126,11 @@ public struct ReportBuilderRenderer: View {
 
     private var layoutView: ReportBuilderLayoutView {
         ReportBuilderLayoutView(
-            measuresSection: measuresSection,
-            dimensionsSection: dimensionsSection,
+            // The native client is a report viewer. Measure and breakdown
+            // authoring remains available in the web builder; omitting it here
+            // preserves the report's full width on both iPhone and iPad.
+            measuresSection: AnyView(EmptyView()),
+            dimensionsSection: AnyView(EmptyView()),
             filterSummarySection: filterSummarySectionView,
             staticFiltersSection: filtersExpanded ? staticFiltersSectionView : AnyView(EmptyView()),
             dynamicFiltersSection: filtersExpanded ? dynamicFiltersSectionView : AnyView(EmptyView()),
@@ -471,19 +474,12 @@ public struct ReportBuilderRenderer: View {
     @ViewBuilder
     private var chartModeSection: some View {
         if chartSpec != nil {
-            HStack(spacing: 8) {
-                Button("Table") { viewMode = "table" }
-                    .buttonStyle(.bordered)
-                Button("Chart") { viewMode = "chart" }
-                    .buttonStyle(.bordered)
-                Button(role: .destructive) {
-                    chartSpec = nil
-                    viewMode = "table"
-                } label: {
-                    Text("Remove Chart")
-                }
-                .buttonStyle(.bordered)
+            Picker("Report view", selection: $viewMode) {
+                Text("Table").tag("table")
+                Text("Chart").tag("chart")
             }
+            .pickerStyle(.segmented)
+            .accessibilityLabel("Report view")
         }
     }
 
@@ -1321,13 +1317,10 @@ public struct ReportBuilderRenderer: View {
         let base = baseKey.trimmingCharacters(in: .whitespacesAndNewlines)
         let ref = builderRef.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !base.isEmpty, !ref.isEmpty else { return base }
-        let suffix = ref.unicodeScalars.map { scalar in
-            CharacterSet.alphanumerics.contains(scalar) ? String(scalar) : "_"
-        }
-        .joined()
-        .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
-        guard !suffix.isEmpty else { return base }
-        return "\(base).\(suffix)"
+        // Conversation snapshots are authored by the web runtime with this
+        // exact colon-delimited key. Native clients must read and write the
+        // same key so restored filters, measures, and chart settings survive.
+        return "\(base):\(ref)"
     }
 
     private static func toggle(_ current: [String], key: String) -> [String] {

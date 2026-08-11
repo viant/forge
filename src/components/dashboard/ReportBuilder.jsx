@@ -2658,9 +2658,10 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     useEffect(() => {
         setQuickPresetActivation((current) => updateQuickPresetActivationForLoading(current, {
             loading,
+            error,
             currentDispatchFingerprint: requestFingerprintRef.current,
         }));
-    }, [loading]);
+    }, [error, loading]);
     useEffect(() => {
         const remainingMs = shouldScheduleQuickPresetActivationRelease(quickPresetActivation, {
             loading,
@@ -2678,6 +2679,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         title = "",
         kind = "chart",
         awaitingFetch = false,
+        targetDispatchFingerprint = "",
     } = {}) => {
         if (!awaitingFetch) {
             setQuickPresetActivation(null);
@@ -2688,7 +2690,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             kind,
             awaitingFetch,
             loading,
-            targetDispatchFingerprint: "",
+            targetDispatchFingerprint,
         }));
     }, [loading]);
     const quickPresetActionState = useMemo(
@@ -3885,7 +3887,8 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     }, [authoredDocumentBlocks]);
     const authoredDocumentCompileDiagnosticsNotice = useMemo(() => buildReportBuilderCompileDiagnosticsNotice({
         compileValidation: authoredDocumentCompileValidation,
-        title: "Authored Block Validation",
+        title: "Report setup needs attention",
+        description: "Some saved fields are no longer available. Update the affected sections before saving or exporting.",
     }), [authoredDocumentCompileValidation]);
     const dashboardAdapterDiagnosticsNotice = useMemo(() => {
         const diagnostics = Array.isArray(state?.reportDashboardAdapter?.diagnostics)
@@ -12330,14 +12333,14 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     }, [authoredDocumentBlocks, openAuthoredChartBlockDialog, openDocumentBlockDialog]);
     const resolveDocumentBlockDiagnosticActionLabel = React.useCallback((diagnostic = null) => {
         if (normalizeString(diagnostic?.code) !== "documentBlockTableEmpty") {
-            return "Edit block";
+            return "Fix section";
         }
         const targetBlockId = normalizeString(diagnostic?.blockId);
         if (!targetBlockId) {
-            return "Edit block";
+            return "Fix section";
         }
         const block = authoredDocumentBlocks.find((entry) => normalizeString(entry?.id) === targetBlockId) || null;
-        return buildRepairableDocumentBlockDraft(block) ? "Apply current fields" : "Edit block";
+        return buildRepairableDocumentBlockDraft(block) ? "Apply current fields" : "Fix section";
     }, [authoredDocumentBlocks, buildRepairableDocumentBlockDraft]);
     const handleDocumentBlockDiagnosticAction = React.useCallback((diagnostic = null) => {
         if (normalizeString(diagnostic?.code) === "documentBlockTableEmpty") {
@@ -15917,7 +15920,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         const summaryChips = [
             `${diagnostics.length} ${diagnostics.length === 1 ? "issue" : "issues"}`,
             affectedBlockCount > 0
-                ? `${affectedBlockCount} ${affectedBlockCount === 1 ? "block" : "blocks"}`
+                ? `${affectedBlockCount} ${affectedBlockCount === 1 ? "section" : "sections"}`
                 : "",
             !showExpandedList && hiddenDiagnosticCount > 0
                 ? `+${hiddenDiagnosticCount} more ${hiddenDiagnosticCount === 1 ? "issue" : "issues"}`
@@ -15957,7 +15960,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                                 minimal
                                 onClick={() => setAuthoredDiagnosticsExpanded((current) => !current)}
                             >
-                                {showExpandedList ? "Hide details" : "Show details"}
+                                {showExpandedList ? "Hide issues" : "Review issues"}
                             </Button>
                         ) : null}
                     </div>

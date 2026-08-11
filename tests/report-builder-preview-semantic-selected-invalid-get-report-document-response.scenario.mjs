@@ -77,7 +77,7 @@ export default {
     },
     {
       type: "waitForDomContains",
-      text: "Resolve authored block validation issues before preparing writable ReportDocument payloads.",
+      text: "Some report fields are no longer available. Update the affected sections before saving or exporting.",
       timeoutMs: 60000,
     },
     {

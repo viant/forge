@@ -46,6 +46,29 @@ assert.deepEqual(normalizeReportDocumentTableBlock({
 
 assert.deepEqual(normalizeReportBuilderDocumentBlocks([
   {
+    id: "deliveryStatus",
+    kind: "badgesBlock",
+    title: "Delivery status",
+    items: [
+      { id: "truncated", label: "Delivery status", valueField: "[MaxDepth]" },
+      { id: "valid", label: "Pacing", valueField: "pacingStatus" },
+    ],
+  },
+]), [
+  {
+    id: "deliveryStatus",
+    kind: "badgesBlock",
+    title: "Delivery status",
+    datasetRef: "primary",
+    items: [
+      { id: "truncated", label: "Delivery status" },
+      { id: "valid", label: "Pacing", valueField: "pacingStatus" },
+    ],
+  },
+]);
+
+assert.deepEqual(normalizeReportBuilderDocumentBlocks([
+  {
     id: "scopeFilters",
     kind: "filterBarBlock",
     title: "Filters",

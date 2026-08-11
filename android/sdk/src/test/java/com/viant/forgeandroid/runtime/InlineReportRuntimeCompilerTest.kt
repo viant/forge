@@ -26,11 +26,32 @@ class InlineReportRuntimeCompilerTest {
             block("chart", "chartBlock"),
             block("geo", "geoMapBlock"),
             block("findings", "collectionBlock"),
-            block("timeline", "timelineBlock"),
+            JsonObject(mapOf(
+                "id" to JsonPrimitive("timeline"), "kind" to JsonPrimitive("timelineBlock"),
+                "datasetRef" to JsonPrimitive("timelineRows"),
+                "timeField" to JsonPrimitive("timestamp"),
+                "titleField" to JsonPrimitive("event"),
+                "descriptionField" to JsonPrimitive("detail"),
+                "columns" to JsonArray(listOf(JsonObject(mapOf(
+                    "key" to JsonPrimitive("impact"), "label" to JsonPrimitive("Impact")
+                ))))
+            )),
             block("markdown", "markdownBlock"),
             block("filters", "filterBarBlock"),
             block("refinements", "refinementBarBlock"),
-            block("badges", "badgesBlock"),
+            JsonObject(mapOf(
+                "id" to JsonPrimitive("badges"), "kind" to JsonPrimitive("badgesBlock"),
+                "datasetRef" to JsonPrimitive("rows"),
+                "items" to JsonArray(listOf(JsonObject(mapOf(
+                    "label" to JsonPrimitive("Status"),
+                    "valueField" to JsonPrimitive("status"),
+                    "rules" to JsonArray(listOf(JsonObject(mapOf(
+                        "value" to JsonPrimitive("behind"),
+                        "label" to JsonPrimitive("Behind"),
+                        "tone" to JsonPrimitive("warning")
+                    ))))
+                ))))
+            )),
             block("composite", "compositeBlock"),
             block("stepper", "stepperBlock"),
             block("info", "infoPanelBlock"),
@@ -55,7 +76,17 @@ class InlineReportRuntimeCompilerTest {
                 "rows" to TranscriptCanonicalData(
                     id = "rows",
                     payload = JsonArray(listOf(JsonObject(mapOf(
-                        "channel" to JsonPrimitive("CTV"), "spend" to JsonPrimitive(125)
+                        "channel" to JsonPrimitive("CTV"), "spend" to JsonPrimitive(125),
+                        "status" to JsonPrimitive("behind")
+                    ))))
+                ),
+                "timelineRows" to TranscriptCanonicalData(
+                    id = "timelineRows",
+                    payload = JsonArray(listOf(JsonObject(mapOf(
+                        "timestamp" to JsonPrimitive("2026-08-09"),
+                        "event" to JsonPrimitive("Pacing mode changed"),
+                        "detail" to JsonPrimitive("ASAP changed to spend-evenly."),
+                        "impact" to JsonPrimitive("Primary incident contributor")
                     ))))
                 )
             )
@@ -71,6 +102,23 @@ class InlineReportRuntimeCompilerTest {
             .map { it as JsonObject }
             .single { it["id"] == JsonPrimitive("kpi") }
         assertEquals(JsonPrimitive(125), (kpi["content"] as JsonObject)["value"])
+        val badges = (artifact.reportFill["blocks"] as JsonArray)
+            .map { it as JsonObject }
+            .single { it["id"] == JsonPrimitive("badges") }
+        val badge = (((badges["content"] as JsonObject)["items"] as JsonArray).single() as JsonObject)
+        assertEquals(JsonPrimitive("behind"), badge["value"])
+        assertEquals(JsonPrimitive("Behind"), badge["displayValue"])
+        assertEquals(JsonPrimitive("warning"), badge["tone"])
+        val timeline = (artifact.reportFill["blocks"] as JsonArray)
+            .map { it as JsonObject }
+            .single { it["id"] == JsonPrimitive("timeline") }
+        val event = ((((timeline["content"] as JsonObject)["events"] as JsonArray).single()) as JsonObject)
+        assertEquals(JsonPrimitive("2026-08-09"), event["date"])
+        assertEquals(JsonPrimitive("Pacing mode changed"), event["title"])
+        assertEquals(
+            JsonPrimitive("ASAP changed to spend-evenly.\n\nImpact: Primary incident contributor"),
+            event["body"]
+        )
     }
 
     @Test

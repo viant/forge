@@ -32,6 +32,20 @@ class ChartRendererTest {
     }
 
     @Test
+    fun `chart axis formatter applies authored mobile date format`() {
+        assertEquals("07/11", formatChartAxisLabel("2026-07-11T00:00:00Z", "MM/dd"))
+        assertEquals("12AM", formatChartAxisLabel("2026-07-11T00:00:00Z", "ha"))
+        assertEquals("Unparsed", formatChartAxisLabel("Unparsed", "MM/dd"))
+    }
+
+    @Test
+    fun `chart axis formatter compacts unformatted ISO dates and local timestamps`() {
+        assertEquals("07/11", formatChartAxisLabel("2026-07-11", null))
+        assertEquals("07/11", formatChartAxisLabel("2026-07-11T14:30:00", null))
+        assertEquals("Category", formatChartAxisLabel("Category", null))
+    }
+
+    @Test
     fun `chartDisplayTitle trims blanks and suppresses duplicate container titles`() {
         assertEquals("Capacity Trend", chartDisplayTitle("  Capacity Trend  "))
         assertNull(chartDisplayTitle("   "))
@@ -65,6 +79,88 @@ class ChartRendererTest {
         assertEquals(2, prepared.points.size)
         assertEquals(2, prepared.points.first().values.size)
         assertEquals(14.0, prepared.maxValue)
+    }
+
+    @Test
+    fun `prepareChartData sorts temporal line points without reordering categorical charts`() {
+        val rows = listOf(
+            mapOf("day" to "2026-08-03", "spend" to 30),
+            mapOf("day" to "2026-07-28", "spend" to 10),
+            mapOf("day" to "2026-07-31", "spend" to 20)
+        )
+        val series = ChartSeriesDef(values = listOf(ChartValueOption(name = "Spend", value = "spend")))
+
+        val line = prepareChartData(
+            rows,
+            ChartDef(type = "line", xAxis = ChartAxisDef(dataKey = "day"), series = series)
+        )
+        val bar = prepareChartData(
+            rows,
+            ChartDef(type = "bar", xAxis = ChartAxisDef(dataKey = "day"), series = series)
+        )
+
+        assertEquals(listOf("2026-07-28", "2026-07-31", "2026-08-03"), line.points.map { it.label })
+        assertEquals(listOf("2026-08-03", "2026-07-28", "2026-07-31"), bar.points.map { it.label })
+        assertEquals(listOf(1, 2, 0), line.points.map { it.rowIndex })
+    }
+
+    @Test
+    fun `prepareChartData preserves composed series visuals and scales independent axes`() {
+        val chart = ChartDef(
+            type = "composed",
+            xAxis = ChartAxisDef(dataKey = "day"),
+            series = ChartSeriesDef(values = listOf(
+                ChartValueOption(
+                    label = "Spend",
+                    value = "spend",
+                    type = "area",
+                    axis = "left",
+                    color = "#2f6de1"
+                ),
+                ChartValueOption(
+                    label = "Impressions",
+                    value = "impressions",
+                    type = "line",
+                    axis = "right",
+                    color = "#2d8a5d"
+                )
+            ))
+        )
+
+        val prepared = prepareChartData(
+            rows = listOf(
+                mapOf("day" to "Aug 1", "spend" to 10.0, "impressions" to 1000),
+                mapOf("day" to "Aug 2", "spend" to 25.0, "impressions" to 4000)
+            ),
+            chart = chart
+        )
+
+        assertEquals(listOf("area", "line"), prepared.series.map { it.type })
+        assertEquals(listOf("left", "right"), prepared.series.map { it.axis })
+        assertEquals(25.0, prepared.maximumForSeries("spend"))
+        assertEquals(4000.0, prepared.maximumForSeries("impressions"))
+    }
+
+    @Test
+    fun `legacy composed charts use independent series scales and area line defaults`() {
+        val prepared = prepareChartData(
+            rows = listOf(
+                mapOf("day" to "Aug 1", "spend" to 12.0, "impressions" to 1200),
+                mapOf("day" to "Aug 2", "spend" to 30.0, "impressions" to 9000)
+            ),
+            chart = ChartDef(
+                type = "composed",
+                xAxis = ChartAxisDef(dataKey = "day"),
+                series = ChartSeriesDef(values = listOf(
+                    ChartValueOption(name = "Spend", value = "spend"),
+                    ChartValueOption(name = "Impressions", value = "impressions")
+                ))
+            )
+        )
+
+        assertEquals(listOf("area", "line"), prepared.series.map { it.type })
+        assertEquals(30.0, prepared.maximumForSeries("spend"))
+        assertEquals(9000.0, prepared.maximumForSeries("impressions"))
     }
 
     @Test

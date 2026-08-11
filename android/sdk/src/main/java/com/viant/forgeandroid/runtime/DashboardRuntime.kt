@@ -173,7 +173,8 @@ data class DashboardReportRuntimeKpiValue(
     val secondaryLabel: String?,
     val secondaryValueText: String?,
     val emptyLabel: String,
-    val rowCount: Int
+    val rowCount: Int,
+    val tone: String? = null
 )
 
 data class DashboardReportRuntimeFilterParamValue(
@@ -1209,7 +1210,8 @@ fun dashboardReportRuntimeColumns(values: List<JsonElement>): List<ColumnDef> {
                     label = jsonString(value["label"]) ?: id,
                     type = jsonString(value["type"]),
                     format = jsonString(value["format"]),
-                    emptyText = jsonString(value["emptyText"])
+                    emptyText = jsonString(value["emptyText"]),
+                    cellVisual = value["cellVisual"] as? JsonObject
                 )
             }
             else -> null
@@ -1234,7 +1236,8 @@ fun dashboardReportRuntimeKpi(content: Map<String, JsonElement>): DashboardRepor
         secondaryLabel = if (secondaryValueText == null) null else firstNonBlank(jsonString(content["secondaryLabel"]), secondaryField),
         secondaryValueText = if (secondaryField == null) null else secondaryValueText,
         emptyLabel = jsonString(content["emptyLabel"]) ?: "No KPI value available.",
-        rowCount = dashboardReportRuntimeInt(content["rowCount"]) ?: 0
+        rowCount = dashboardReportRuntimeInt(content["rowCount"]) ?: 0,
+        tone = jsonString(content["tone"])
     )
 }
 

@@ -57,7 +57,8 @@ fun FormRenderer(
     if (visibleItems.size >= 2 && visibleItems.all(::isSummaryLabelItem)) {
         StaticGrid(
             items = visibleItems,
-            minCellWidth = 180.dp,
+            minCellWidth = 82.dp,
+            minimumColumns = 2,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(8.dp)
@@ -111,15 +112,17 @@ internal fun <T> StaticGrid(
     modifier: Modifier = Modifier,
     horizontalSpacing: Dp = 12.dp,
     verticalSpacing: Dp = 12.dp,
+    minimumColumns: Int = 1,
     content: @Composable (T) -> Unit
 ) {
     BoxWithConstraints(modifier = modifier) {
         val maxWidthValue = maxWidth
-        val columns = if (maxWidthValue <= minCellWidth) {
+        val autoColumns = if (maxWidthValue <= minCellWidth) {
             1
         } else {
             (((maxWidthValue + horizontalSpacing) / (minCellWidth + horizontalSpacing)).toInt()).coerceAtLeast(1)
         }
+        val columns = autoColumns.coerceAtLeast(minimumColumns.coerceAtLeast(1))
 
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -340,23 +343,33 @@ private fun LabelItemCard(
         shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp)
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = value.ifBlank { "—" },
-                style = if (emphasized) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
-                fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(top = 6.dp)
-            )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val compact = maxWidth < 120.dp
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = if (compact) 9.dp else 14.dp,
+                        vertical = if (compact) 9.dp else 12.dp
+                    )
+            ) {
+                Text(
+                    text = label,
+                    style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = value.ifBlank { "—" },
+                    style = when {
+                        compact && emphasized -> MaterialTheme.typography.titleSmall
+                        emphasized -> MaterialTheme.typography.titleMedium
+                        else -> MaterialTheme.typography.bodyLarge
+                    },
+                    fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(top = if (compact) 4.dp else 6.dp)
+                )
+            }
         }
     }
 }

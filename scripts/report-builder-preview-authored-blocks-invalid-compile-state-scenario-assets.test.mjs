@@ -52,7 +52,7 @@ assert.equal(
   true,
 );
 assert.equal(
-  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Resolve authored block validation issues before preparing writable ReportDocument payloads.")),
+  scenario.steps.some((step) => step?.type === "waitForDomContains" && String(step.text || "").includes("Some report fields are no longer available. Update the affected sections before saving or exporting.")),
   true,
 );
 assert.equal(
@@ -109,7 +109,7 @@ const toggleMeasureIndex = findStepIndex((step) => step?.type === "eval" && Stri
 const beginDraftIndex = findStepIndex((step) => step?.type === "eval" && String(step?.expression || "").includes("beginStandaloneDraft"));
 const saveArtifactIndex = findStepIndex((step) => step?.type === "clickRole" && step?.name === "Save artifact");
 const preparePayloadIndex = findStepIndex((step) => step?.type === "clickRole" && step?.name === "Prepare report payload");
-const firstWarningIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("Resolve authored block validation issues before preparing writable ReportDocument payloads."));
+const firstWarningIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("Some report fields are no longer available. Update the affected sections before saving or exporting."));
 const prepareListIndex = findStepIndex((step) => step?.type === "clickRole" && step?.name === "Prepare list response");
 const selectEntryIndex = findStepIndex((step) => step?.type === "selectSelector" && step?.selector === "select[aria-label=\"List response entry\"]" && step?.value === "demoReportBuilder");
 const selectedWarningIndex = findStepIndex((step) => step?.type === "waitForDomContains" && String(step?.text || "").includes("Selected entry compile warning:"));

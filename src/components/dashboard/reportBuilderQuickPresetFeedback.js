@@ -10,6 +10,7 @@ export function beginQuickPresetActivation({
     targetDispatchFingerprint = "",
     nowMs = Date.now(),
     minVisibleMs = 1200,
+    maxVisibleMs = 15000,
 } = {}) {
     if (!awaitingFetch) {
         return null;
@@ -21,16 +22,21 @@ export function beginQuickPresetActivation({
         observedLoading: !!loading,
         targetDispatchFingerprint: normalizeString(targetDispatchFingerprint),
         minVisibleUntil: Number(nowMs || 0) + Math.max(0, Number(minVisibleMs || 0) || 0),
+        expiresAt: Number(nowMs || 0) + Math.max(1000, Number(maxVisibleMs || 0) || 0),
     };
 }
 
 export function updateQuickPresetActivationForLoading(current = null, {
     loading = false,
     currentDispatchFingerprint = "",
+    error = null,
     nowMs = Date.now(),
 } = {}) {
     if (!current?.awaitingFetch) {
         return current;
+    }
+    if (error || Number(current.expiresAt || 0) <= Number(nowMs || 0)) {
+        return null;
     }
     if (!current.observedLoading && loading) {
         return {
@@ -67,7 +73,7 @@ export function shouldScheduleQuickPresetActivationRelease(current = null, {
         && targetDispatchFingerprint !== ""
         && targetDispatchFingerprint === normalizedCurrentDispatchFingerprint;
     if (!current?.observedLoading && !requestSettledWithoutObservedLoading) {
-        return 0;
+        return Math.max(0, Number(current.expiresAt || 0) - Number(nowMs || 0));
     }
     return Math.max(0, Number(current.minVisibleUntil || 0) - Number(nowMs || 0));
 }

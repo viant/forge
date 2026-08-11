@@ -1894,12 +1894,16 @@ function normalizeReportDocumentBadgeItems(items = []) {
       if (!item || typeof item !== "object" || Array.isArray(item)) {
         return null;
       }
-      const legacyLabelField = normalizeString(item?.labelField);
-      const label = normalizeString(
+      const rawLegacyLabelField = normalizeString(item?.labelField);
+      const legacyLabelField = isTruncatedPlaceholder(rawLegacyLabelField) ? "" : rawLegacyLabelField;
+      const rawLabel = normalizeString(
         item?.label || (legacyLabelField ? humanizeReportDocumentFieldName(legacyLabelField) : ""),
       );
-      const value = normalizeString(item?.value);
-      const valueField = normalizeString(item?.valueField || legacyLabelField);
+      const label = isTruncatedPlaceholder(rawLabel) ? "" : rawLabel;
+      const rawValue = normalizeString(item?.value);
+      const value = isTruncatedPlaceholder(rawValue) ? "" : rawValue;
+      const rawValueField = normalizeString(item?.valueField || legacyLabelField);
+      const valueField = isTruncatedPlaceholder(rawValueField) ? "" : rawValueField;
       const format = normalizeString(item?.format);
       const displayKey = normalizeString(item?.displayKey);
       const labelMode = normalizeString(item?.labelMode).toLowerCase();

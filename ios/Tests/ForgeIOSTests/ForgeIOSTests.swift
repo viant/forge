@@ -871,14 +871,14 @@ final class ForgeIOSTests: XCTestCase {
                 baseKey: "reportBuilder",
                 builderRef: "metricsCubeBuilder"
             ),
-            "reportBuilder.metricsCubeBuilder"
+            "reportBuilder:metricsCubeBuilder"
         )
         XCTAssertEqual(
             ReportBuilderRenderer.reportBuilderVariantStateKey(
                 baseKey: "reportBuilder",
                 builderRef: "forecastingCubeBuilder"
             ),
-            "reportBuilder.forecastingCubeBuilder"
+            "reportBuilder:forecastingCubeBuilder"
         )
         XCTAssertEqual(
             ReportBuilderRenderer.reportBuilderVariantStateKey(
@@ -892,7 +892,7 @@ final class ForgeIOSTests: XCTestCase {
                 baseKey: "reportBuilder",
                 builderRef: "forecasting/cube.builder"
             ),
-            "reportBuilder.forecasting_cube_builder"
+            "reportBuilder:forecasting/cube.builder"
         )
     }
 

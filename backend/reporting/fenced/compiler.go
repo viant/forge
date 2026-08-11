@@ -364,9 +364,15 @@ func buildFillBlocks(blocks []map[string]any, datasets []any) []any {
 			}
 		case "compositeBlock":
 			block["content"] = map[string]any{"title": block["title"], "description": block["description"], "childBlockIds": block["childBlockIds"]}
-		case "infoPanelBlock", "calloutBlock":
+		case "infoPanelBlock":
 			block["content"] = map[string]any{
-				"title": block["title"], "eyebrow": block["eyebrow"], "icon": block["icon"],
+				"title": block["title"], "eyebrow": block["eyebrow"],
+				"description": block["description"], "tone": block["tone"],
+				"bodyFormat": block["bodyFormat"], "body": block["body"],
+			}
+		case "calloutBlock":
+			block["content"] = map[string]any{
+				"title": block["title"], "icon": block["icon"],
 				"description": block["description"], "tone": block["tone"],
 				"badges": block["badges"], "bodyFormat": block["bodyFormat"], "body": block["body"],
 			}
@@ -514,21 +520,62 @@ func buildPrint(title string, source map[string]any, specRaw, fillRaw json.RawMe
 			if len(items) == 0 {
 				continue
 			}
-			ensure(72)
+			postureLayout := strings.EqualFold(strings.TrimSpace(blockTitle), "Current posture")
+			columns := len(items)
+			rows := 1
+			if postureLayout {
+				columns = min(2, len(items))
+				rows = (len(items) + columns - 1) / columns
+			}
+			required := 72.0
+			if postureLayout {
+				required = 26.0 + float64(rows)*42
+			}
+			ensure(required)
 			titleID := id + "__title"
 			elements = append(elements, textElement(titleID, margin, y, width-2*margin, 20, blockTitle, 14, "600"))
 			bookmarks = append(bookmarks, bookmark(id, blockTitle, pageNumber, titleID, y))
 			y += 26
-			badgeWidth := (width - 2*margin - float64(len(items)-1)*8) / float64(len(items))
+			badgeWidth := (width - 2*margin - float64(columns-1)*8) / float64(columns)
 			for index, rawItem := range items {
 				badge := rawItem.(map[string]any)
 				x := margin + float64(index)*(badgeWidth+8)
-				elements = append(elements, rectElement(fmt.Sprintf("%s__badge_%d", id, index), x, y, badgeWidth, 34, "#f7faff"))
+				badgeY := y
+				if postureLayout {
+					x = margin + float64(index%columns)*(badgeWidth+8)
+					badgeY = y + float64(index/columns)*42
+				}
+				background, border, foreground := "#f7faff", "", ""
+				if postureLayout {
+					background, border, foreground = badgeToneColors(textValue(badge["tone"]))
+				}
+				badgeHeight, textInset, textTop := 34.0, 8.0, 9.0
+				if postureLayout {
+					badgeHeight, textInset, textTop = 32, 12, 8
+				}
+				rect := rectElement(fmt.Sprintf("%s__badge_%d", id, index), x, badgeY, badgeWidth, badgeHeight, background)
+				if postureLayout {
+					rect["strokeColor"] = border
+					rect["radius"] = 16
+				}
+				elements = append(elements, rect)
 				label := textValue(badge["label"])
 				value := textValue(badge["displayValue"])
-				elements = append(elements, textElement(fmt.Sprintf("%s__badge_text_%d", id, index), x+8, y+9, badgeWidth-16, 16, strings.TrimSpace(label+": "+value), 10, "600"))
+				badgeText := strings.TrimSpace(label + ": " + value)
+				if postureLayout {
+					badgeText = fitTableText(badgeText, badgeWidth-2*textInset, 10)
+				}
+				text := textElement(fmt.Sprintf("%s__badge_text_%d", id, index), x+textInset, badgeY+textTop, badgeWidth-2*textInset, 16, badgeText, 10, "600")
+				if postureLayout {
+					text["color"] = foreground
+				}
+				elements = append(elements, text)
 			}
-			y += 46
+			if postureLayout {
+				y += float64(rows)*42 + 8
+			} else {
+				y += 46
+			}
 		case "kpiBlock":
 			if pendingKPIs == 0 {
 				ensure(76)
@@ -652,10 +699,46 @@ func normalizeBadgeItems(value any, rows []map[string]any) []any {
 			value = rows[0][field]
 		}
 		next["value"] = value
-		next["displayValue"] = formatValue(value, textValue(next["format"]))
+		if rule := matchingBadgeRule(next["rules"], value); rule != nil {
+			if label := textValue(rule["label"]); label != "" {
+				next["displayValue"] = label
+			}
+			if tone := textValue(rule["tone"]); tone != "" {
+				next["tone"] = tone
+			}
+		}
+		if textValue(next["displayValue"]) == "" {
+			next["displayValue"] = formatValue(value, textValue(next["format"]))
+		}
 		result = append(result, next)
 	}
 	return result
+}
+
+func matchingBadgeRule(value any, actual any) map[string]any {
+	rules, _ := value.([]any)
+	for _, item := range rules {
+		rule, ok := item.(map[string]any)
+		if ok && fmt.Sprint(rule["value"]) == fmt.Sprint(actual) {
+			return rule
+		}
+	}
+	return nil
+}
+
+func badgeToneColors(tone string) (background, border, foreground string) {
+	switch strings.ToLower(strings.TrimSpace(tone)) {
+	case "success", "good":
+		return "#eef8f0", "#cfe7d6", "#0f6b3a"
+	case "warning", "caution":
+		return "#fff7e1", "#f5d28c", "#8a5d00"
+	case "danger", "error":
+		return "#fff1f0", "#f5c2c0", "#a82a2a"
+	case "info":
+		return "#eef4fb", "#cfdced", "#21538f"
+	default:
+		return "#f7fafc", "#d8e2eb", "#486581"
+	}
 }
 
 func stringSlice(value any) []string {

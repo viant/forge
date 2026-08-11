@@ -8,15 +8,23 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -25,9 +33,14 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,9 +50,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -59,6 +74,7 @@ import com.viant.forgeandroid.runtime.DashboardReportSectionDef
 import com.viant.forgeandroid.runtime.DashboardSelectionState
 import com.viant.forgeandroid.runtime.ExecutionDef
 import com.viant.forgeandroid.runtime.ForgeRuntime
+import com.viant.forgeandroid.runtime.JsonUtil
 import com.viant.forgeandroid.runtime.SelectorUtil
 import com.viant.forgeandroid.runtime.SelectionState
 import com.viant.forgeandroid.runtime.TableDef
@@ -188,7 +204,7 @@ private fun DashboardRenderer(runtime: ForgeRuntime, window: WindowContext, cont
         }
         "dashboard.badges" -> DashboardPanel(runtime, window, container) { DashboardBadgesBlock(container, metrics, filters, selection) }
         "dashboard.report" -> DashboardPanel(runtime, window, container) { DashboardReportBlock(container, metrics, filters, selection) }
-        "dashboard.reportRuntime" -> DashboardPanel(runtime, window, container) { DashboardReportRuntimeBlock(runtime, window, container, dashboardRoot, filters, selection) }
+        "dashboard.reportRuntime" -> DashboardReportRuntimeBlock(runtime, window, container, dashboardRoot, filters, selection)
         "dashboard.table", "planner.table" -> DashboardPanel(runtime, window, container) {
             val table = container.table ?: container.columns.takeIf { it.isNotEmpty() }?.let {
                 TableDef(title = container.title, columns = it)
@@ -202,6 +218,9 @@ private fun DashboardRenderer(runtime: ForgeRuntime, window: WindowContext, cont
             }
         }
         "dashboard.reportBuilder" -> ReportBuilderRenderer(runtime, window, container)
+        "dashboard.reportCatalog" -> DashboardPanel(runtime, window, container) {
+            DashboardReportCatalogBlock(runtime, window, container)
+        }
         "dashboard.feed" -> DashboardPanel(runtime, window, container) {
             DashboardFeedBlock(window, container, dashboardRoot, filters, selection)
         }
@@ -218,6 +237,101 @@ private fun DashboardRenderer(runtime: ForgeRuntime, window: WindowContext, cont
         }
         else -> DashboardPlaceholderBlock(container)
     }
+}
+
+@Composable
+private fun DashboardReportCatalogBlock(
+    runtime: ForgeRuntime,
+    window: WindowContext,
+    container: ContainerDef
+) {
+    val catalog = container.dashboard?.reportCatalog
+    val presets = catalog?.presets.orEmpty()
+    if (catalog == null || presets.isEmpty()) {
+        DashboardUnsupportedBlock("No report templates are configured.")
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            "Built-in report templates",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFF1D2939)
+        )
+        presets.forEach { preset ->
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFFFBFDFF),
+                border = BorderStroke(1.dp, Color(0xFFDBE5EC)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    Text(
+                        preset.label ?: preset.title ?: preset.id,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF1D2939)
+                    )
+                    preset.reportType?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, style = MaterialTheme.typography.labelMedium, color = Color(0xFF475467))
+                    }
+                    preset.description?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF475467))
+                    }
+                    OutlinedButton(onClick = {
+                        openDashboardReportCatalogPreset(runtime, window, catalog, preset)
+                    }) {
+                        Text("Open template")
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun openDashboardReportCatalogPreset(
+    runtime: ForgeRuntime,
+    window: WindowContext,
+    catalog: com.viant.forgeandroid.runtime.DashboardReportCatalogDef,
+    preset: com.viant.forgeandroid.runtime.DashboardReportCatalogPresetDef
+) {
+    val builderWindow = preset.builderWindow?.takeIf { it.isNotBlank() }
+        ?: catalog.defaultBuilderWindow?.takeIf { it.isNotBlank() }
+        ?: "metricReportBuilder"
+    val orderValue = window.parameters["AdOrderId"] ?: window.parameters["orderId"]
+    val orderId = when (orderValue) {
+        is List<*> -> orderValue.firstOrNull()
+        else -> orderValue
+    }
+    val parameters = mutableMapOf<String, Any?>(
+        "sourceKind" to "preset",
+        "sourceId" to preset.id,
+        "reportStarterId" to preset.id,
+        "mode" to "result",
+        "executeOnOpen" to false
+    )
+    if (orderId != null) {
+        parameters["orderId"] = orderId
+        parameters["orderIds"] = listOf(orderId)
+        parameters["prefill"] = mapOf("orderId" to orderId, "orderIds" to listOf(orderId))
+    }
+    val current = runtime.windowState(window.windowId)
+    runtime.openWindow(
+        windowKey = builderWindow,
+        title = preset.label ?: preset.title ?: "Performance report",
+        inTab = true,
+        parameters = parameters,
+        windowIdOverride = current?.windowId,
+        conversationId = current?.conversationId,
+        presentation = current?.presentation,
+        region = current?.region,
+        workspaceSharePct = current?.workspaceSharePct,
+        workspaceMinHeight = current?.workspaceMinHeight,
+        parentKey = current?.parentKey
+    )
 }
 
 private sealed class PlannerSubmitState {
@@ -248,20 +362,25 @@ private fun DashboardRoot(runtime: ForgeRuntime, window: WindowContext, containe
             }
         }
     }
+    val reportRuntimeOwnsHeader = container.containers.size == 1 &&
+        container.containers.firstOrNull()?.kind?.trim() == "dashboard.reportRuntime"
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(
+                horizontal = if (reportRuntimeOwnsHeader) 0.dp else 8.dp,
+                vertical = if (reportRuntimeOwnsHeader) 0.dp else 6.dp
+            ),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        container.title?.let {
+        container.title?.takeUnless { reportRuntimeOwnsHeader }?.let {
             Text(
                 text = it,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold
             )
         }
-        container.subtitle?.let {
+        container.subtitle?.takeUnless { reportRuntimeOwnsHeader }?.let {
             Text(
                 text = it,
                 style = MaterialTheme.typography.bodyMedium,
@@ -1562,17 +1681,24 @@ private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowCon
         .flatMap { reportRuntimeReferenceIds(it.content, "sectionIds", "sections") }
     val tabChildIds = tabSectionIds
         .mapNotNull(blockById::get)
-        .flatMap { reportRuntimeReferenceIds(it.content, "childBlockIds", "blockIds", "children") }
+        .flatMap { reportRuntimeSectionChildren(it, summary.blocks).map(DashboardReportRuntimeBlockSummary::id) }
     val nestedBlockIds = (tabSectionIds + tabChildIds).toSet()
     var selectedTabs by remember(summary.blocks) { mutableStateOf(emptyMap<String, String>()) }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFFFFFFF), RoundedCornerShape(12.dp))
-            .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(12.dp))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
+    var selectedMobileSection by remember(summary.blocks) { mutableStateOf<String?>(null) }
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 600.dp
+        Column(
+            modifier = if (compact) {
+                Modifier.fillMaxWidth()
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFFFFFFF), RoundedCornerShape(12.dp))
+                    .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            },
+            verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 6.dp)
+        ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1599,32 +1725,136 @@ private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowCon
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Text(
-            text = if (summary.blockCount == 1) "1 report block" else "${summary.blockCount} report blocks",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        if (!compact) {
+            Text(
+                text = if (summary.blockCount == 1) "1 report block" else "${summary.blockCount} report blocks",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         val summaryDiagnostics = summary.diagnostics.filter { it.blockId == null }
         if (summaryDiagnostics.isNotEmpty()) {
             DashboardReportRuntimeDiagnosticsPreview(summaryDiagnostics)
         }
-        summary.blocks.filterNot { it.id in nestedBlockIds }.forEach { block ->
-            val metrics = (block.table?.rows?.firstOrNull() ?: block.chart?.rows?.firstOrNull()).orEmpty()
-            if (dashboardReportRuntimeBlockVisible(block, metrics, filters, selection)) {
-                if (block.kind == "tabGroupBlock") {
-                    DashboardReportRuntimeTabGroup(
-                        runtime = runtime,
-                        window = window,
-                        dashboardRoot = dashboardRoot,
-                        tabGroup = block,
-                        blocks = summary.blocks,
-                        selectedId = selectedTabs[block.id],
-                        onSelect = { selectedTabs = selectedTabs + (block.id to it) },
-                        filters = filters,
-                        selection = selection
-                    )
-                } else {
-                    DashboardReportRuntimeAuthoredBlock(runtime, window, dashboardRoot, block)
+        val topLevelBlocks = summary.blocks.filterNot { it.id in nestedBlockIds }
+        val mobileSections = reportRuntimeMobileSections(topLevelBlocks)
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            if (mobileSections.size > 1 && topLevelBlocks.none { it.kind == "tabGroupBlock" }) {
+                DashboardReportRuntimeMobileSectionTabs(
+                    runtime = runtime,
+                    window = window,
+                    dashboardRoot = dashboardRoot,
+                    sections = mobileSections,
+                    selectedId = selectedMobileSection,
+                    onSelect = { selectedMobileSection = it },
+                    filters = filters,
+                    selection = selection
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    topLevelBlocks.forEach { block ->
+                        val metrics = (block.table?.rows?.firstOrNull() ?: block.chart?.rows?.firstOrNull()).orEmpty()
+                        if (dashboardReportRuntimeBlockVisible(block, metrics, filters, selection)) {
+                            if (block.kind == "tabGroupBlock") {
+                                DashboardReportRuntimeTabGroup(
+                                    runtime = runtime,
+                                    window = window,
+                                    dashboardRoot = dashboardRoot,
+                                    tabGroup = block,
+                                    blocks = summary.blocks,
+                                    selectedId = selectedTabs[block.id],
+                                    onSelect = { selectedTabs = selectedTabs + (block.id to it) },
+                                    filters = filters,
+                                    selection = selection
+                                )
+                            } else {
+                                DashboardReportRuntimeAuthoredBlock(runtime, window, dashboardRoot, block)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        }
+    }
+}
+
+@Composable
+internal fun DashboardReportRuntimeSurface(
+    runtime: ForgeRuntime,
+    window: WindowContext,
+    container: ContainerDef,
+    dashboardRoot: ContainerDef
+) {
+    DashboardReportRuntimeBlock(
+        runtime = runtime,
+        window = window,
+        container = container,
+        dashboardRoot = dashboardRoot,
+        filters = emptyMap(),
+        selection = DashboardSelectionState()
+    )
+}
+
+internal data class ReportRuntimeMobileSection(
+    val id: String,
+    val title: String,
+    val blocks: List<DashboardReportRuntimeBlockSummary>
+)
+
+internal fun reportRuntimeMobileSections(
+    blocks: List<DashboardReportRuntimeBlockSummary>
+): List<ReportRuntimeMobileSection> {
+    val sections = mutableListOf<ReportRuntimeMobileSection>()
+    var current = mutableListOf<DashboardReportRuntimeBlockSummary>()
+    fun flush() {
+        if (current.isEmpty()) return
+        val header = current.firstOrNull { it.kind == "sectionBlock" }
+        sections += ReportRuntimeMobileSection(
+            id = header?.id ?: "report-section-${sections.size}",
+            title = header?.title?.takeIf { it.isNotBlank() } ?: "Overview",
+            blocks = current.toList()
+        )
+        current = mutableListOf()
+    }
+    blocks.forEach { block ->
+        if (block.kind == "sectionBlock" && current.isNotEmpty()) flush()
+        current += block
+    }
+    flush()
+    return sections
+}
+
+@Composable
+private fun DashboardReportRuntimeMobileSectionTabs(
+    runtime: ForgeRuntime,
+    window: WindowContext,
+    dashboardRoot: ContainerDef,
+    sections: List<ReportRuntimeMobileSection>,
+    selectedId: String?,
+    onSelect: (String) -> Unit,
+    filters: Map<String, Any?>,
+    selection: DashboardSelectionState
+) {
+    val selectedSection = sections.firstOrNull { it.id == selectedId } ?: sections.first()
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val entries = sections.map { it.id to it.title }
+            if (maxWidth < 600.dp) {
+                CompactReportSectionPicker(entries, selectedSection.id, onSelect)
+            } else {
+                ReportSectionStrip(entries, selectedSection.id, onSelect)
+            }
+        }
+        key(selectedSection.id) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // The picker is the page title on phones. Repeating the authored
+                // section marker as a bordered card wastes a full row of space.
+                selectedSection.blocks.filterNot { it.kind == "sectionBlock" }.forEach { block ->
+                    val metrics = (block.table?.rows?.firstOrNull() ?: block.chart?.rows?.firstOrNull()).orEmpty()
+                    if (dashboardReportRuntimeBlockVisible(block, metrics, filters, selection)) {
+                        DashboardReportRuntimeAuthoredBlock(runtime, window, dashboardRoot, block)
+                    }
                 }
             }
         }
@@ -1653,34 +1883,152 @@ private fun DashboardReportRuntimeTabGroup(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            sections.forEach { section ->
-                FilterChip(
-                    selected = section.id == selectedSection.id,
-                    onClick = { onSelect(section.id) },
-                    label = { Text(section.title) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val entries = sections.map { it.id to it.title }
+            if (maxWidth < 600.dp) {
+                CompactReportSectionPicker(entries, selectedSection.id, onSelect)
+            } else {
+                ReportSectionStrip(entries, selectedSection.id, onSelect)
             }
         }
 
-        DashboardReportRuntimeAuthoredBlock(runtime, window, dashboardRoot, selectedSection)
-        reportRuntimeReferenceIds(
-            selectedSection.content,
-            "childBlockIds",
-            "blockIds",
-            "children"
-        ).mapNotNull(blockById::get).forEach { child ->
-            val metrics = (child.table?.rows?.firstOrNull() ?: child.chart?.rows?.firstOrNull()).orEmpty()
-            if (dashboardReportRuntimeBlockVisible(child, metrics, filters, selection)) {
-                DashboardReportRuntimeAuthoredBlock(runtime, window, dashboardRoot, child)
+        key(selectedSection.id) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                DashboardReportRuntimeAuthoredBlock(runtime, window, dashboardRoot, selectedSection)
+                reportRuntimeSectionChildren(selectedSection, blocks).forEach { child ->
+                    val metrics = (child.table?.rows?.firstOrNull() ?: child.chart?.rows?.firstOrNull()).orEmpty()
+                    if (dashboardReportRuntimeBlockVisible(child, metrics, filters, selection)) {
+                        DashboardReportRuntimeAuthoredBlock(runtime, window, dashboardRoot, child)
+                    }
+                }
+            }
+        }
+    }
+}
+
+internal fun reportRuntimeSectionChildren(
+    section: DashboardReportRuntimeBlockSummary,
+    blocks: List<DashboardReportRuntimeBlockSummary>
+): List<DashboardReportRuntimeBlockSummary> {
+    val blockById = blocks.associateBy { it.id }
+    val explicit = reportRuntimeReferenceIds(
+        section.content,
+        "childBlockIds",
+        "blockIds",
+        "children"
+    ).mapNotNull(blockById::get)
+    if (explicit.isNotEmpty()) return explicit
+
+    val sectionIndex = blocks.indexOfFirst { it.id == section.id }
+    if (sectionIndex < 0) return emptyList()
+    return blocks.drop(sectionIndex + 1).takeWhile { candidate ->
+        candidate.kind != "sectionBlock" && candidate.kind != "tabGroupBlock"
+    }
+}
+
+@Composable
+private fun CompactReportSectionPicker(
+    entries: List<Pair<String, String>>,
+    selectedId: String,
+    onSelect: (String) -> Unit
+) {
+    if (entries.size <= 3) {
+        ReportSectionStrip(entries, selectedId, onSelect)
+        return
+    }
+    var expanded by remember(entries, selectedId) { mutableStateOf(false) }
+    val selectedIndex = entries.indexOfFirst { it.first == selectedId }.coerceAtLeast(0)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color(0xFFF5F8FB),
+        border = BorderStroke(1.dp, ReportTabStripBorderColor),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                enabled = selectedIndex > 0,
+                onClick = { onSelect(entries[selectedIndex - 1].first) }
+            ) {
+                Text("‹", style = MaterialTheme.typography.headlineSmall)
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { expanded = true }
+                    .padding(horizontal = 6.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = entries.getOrNull(selectedIndex)?.second ?: "Report section",
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${selectedIndex + 1} of ${entries.size} · tap to choose",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = { expanded = true }) {
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = "Choose report section")
+            }
+            IconButton(
+                enabled = selectedIndex < entries.lastIndex,
+                onClick = { onSelect(entries[selectedIndex + 1].first) }
+            ) {
+                Text("›", style = MaterialTheme.typography.headlineSmall)
+            }
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            entries.forEachIndexed { index, entry ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = "${index + 1}. ${entry.second}",
+                            fontWeight = if (entry.first == selectedId) FontWeight.SemiBold else FontWeight.Normal
+                        )
+                    },
+                    onClick = {
+                        onSelect(entry.first)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReportSectionStrip(
+    entries: List<Pair<String, String>>,
+    selectedId: String,
+    onSelect: (String) -> Unit
+) {
+    Surface(
+        color = ReportTabStripColor,
+        border = BorderStroke(1.dp, ReportTabStripBorderColor),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            entries.forEach { entry ->
+                val selected = entry.first == selectedId
+                FilterChip(
+                    selected = selected,
+                    onClick = { onSelect(entry.first) },
+                    label = { Text(entry.second, maxLines = 1) },
+                    border = BorderStroke(1.dp, if (selected) ReportTabSelectedBorderColor else Color.Transparent),
+                    colors = reportTabChipColors()
+                )
             }
         }
     }
@@ -1722,70 +2070,49 @@ private fun DashboardReportRuntimeAuthoredBlock(runtime: ForgeRuntime, window: W
 @Composable
 private fun DashboardReportRuntimeAuthoredBlockBody(runtime: ForgeRuntime, window: WindowContext, dashboardRoot: ContainerDef, block: DashboardReportRuntimeBlockSummary) {
     when {
-        block.kind == "markdownBlock" && block.markdown != null -> Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+        block.kind == "markdownBlock" && block.markdown != null -> DashboardReportRuntimePanel(
+            title = block.title
         ) {
-            if (block.title.isNotBlank()) {
-                Text(
-                    text = block.title,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
             MarkdownRenderer(markdown = block.markdown, modifier = Modifier.fillMaxWidth())
         }
 
         block.kind == "kpiBlock" && block.kpi != null -> {
-            val tone = severityTone(
-                (block.content["tone"] as? JsonPrimitive)?.contentOrNull ?: "neutral"
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(tone.background, RoundedCornerShape(12.dp))
-                    .border(1.dp, tone.border, RoundedCornerShape(12.dp))
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-            Text(
-                text = block.title,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            block.kpi.description?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (block.kpi.rowCount == 0 || block.kpi.valueText == null) {
-                Text(
-                    text = block.kpi.emptyLabel,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                Text(
-                    text = block.kpi.valueLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = block.kpi.valueText,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                if (block.kpi.secondaryLabel != null && block.kpi.secondaryValueText != null) {
+            val tone = severityTone(block.kpi.tone ?: "neutral")
+            DashboardReportRuntimePanel(title = block.title, background = tone.background, border = tone.border) {
+                Spacer(modifier = Modifier.width(32.dp).height(4.dp).background(tone.text, RoundedCornerShape(999.dp)))
+                block.kpi.description?.let {
                     Text(
-                        text = "${block.kpi.secondaryLabel}: ${block.kpi.secondaryValueText}",
-                        style = MaterialTheme.typography.bodySmall,
+                        text = it,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                if (block.kpi.rowCount == 0 || block.kpi.valueText == null) {
+                    Text(
+                        text = block.kpi.emptyLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Text(
+                        text = block.kpi.valueLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = block.kpi.valueText,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (block.kpi.secondaryLabel != null && block.kpi.secondaryValueText != null) {
+                        Text(
+                            text = "${block.kpi.secondaryLabel}: ${block.kpi.secondaryValueText}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
-        }
         }
 
         block.kind == "filterBarBlock" && block.filterBar != null -> DashboardReportRuntimeFilterBarPreview(block)
@@ -1833,18 +2160,10 @@ private fun DashboardReportRuntimeAuthoredBlockBody(runtime: ForgeRuntime, windo
 private fun DashboardReportRuntimePresentationBlock(block: DashboardReportRuntimeBlockSummary) {
     val content = block.content
     val entries = reportRuntimePresentationEntries(block.kind, content)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
-            .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(12.dp))
-            .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp)
-    ) {
+    DashboardReportRuntimePanel(title = block.title) {
         reportRuntimeContentText(content["eyebrow"])?.let {
             Text(it.uppercase(Locale.US), style = MaterialTheme.typography.labelSmall, color = Color(0xFF526A82))
         }
-        Text(block.title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
         reportRuntimeContentText(content["subtitle"])?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF526A82))
         }
@@ -1854,12 +2173,15 @@ private fun DashboardReportRuntimePresentationBlock(block: DashboardReportRuntim
         reportRuntimeContentText(content["body"])?.takeIf { it.isNotBlank() }?.let {
             MarkdownRenderer(markdown = it, modifier = Modifier.fillMaxWidth())
         }
-        entries.forEach { entry ->
+        if (block.kind == "badgesBlock") {
+            DashboardReportRuntimeBadgePills(content)
+        } else entries.forEach { entry ->
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White, RoundedCornerShape(9.dp))
-                    .padding(horizontal = 9.dp, vertical = 7.dp),
+                    .background(Color(0xFFF7FAFC), RoundedCornerShape(10.dp))
+                    .border(1.dp, Color(0xFFD8E2EB), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 11.dp, vertical = 9.dp),
                 verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Text(entry.first, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
@@ -1869,6 +2191,120 @@ private fun DashboardReportRuntimePresentationBlock(block: DashboardReportRuntim
             }
         }
     }
+}
+
+@Composable
+private fun DashboardReportRuntimePanel(
+    title: String,
+    subtitle: String? = null,
+    background: Color = Color(0xFFFCFEFF),
+    border: Color = Color(0xFFDBE5EC),
+    content: @Composable () -> Unit
+) {
+    val panelContent: @Composable () -> Unit = {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (title.isNotBlank()) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF182026)
+                )
+            }
+            subtitle?.takeIf { it.isNotBlank() }?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF526A82))
+            }
+            content()
+        }
+    }
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val neutral = background == Color(0xFFFCFEFF) && border == Color(0xFFDBE5EC)
+        if (maxWidth < 600.dp && neutral) {
+            // On a phone the selected report section is already the containing
+            // surface. Neutral blocks become native page sections, avoiding the
+            // card-within-card layout while keeping semantic titles and spacing.
+            panelContent()
+        } else {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = background,
+                border = BorderStroke(1.dp, border),
+                shape = RoundedCornerShape(12.dp),
+                shadowElevation = 0.dp,
+                content = panelContent
+            )
+        }
+    }
+}
+
+internal data class ReportRuntimeBadgePresentation(
+    val label: String,
+    val displayValue: String,
+    val tone: String
+) {
+    val text: String get() = if (displayValue.isBlank()) label else "$label: $displayValue"
+}
+
+internal fun reportRuntimeBadgePresentations(content: Map<String, JsonElement>): List<ReportRuntimeBadgePresentation> =
+    ((content["items"] as? JsonArray).orEmpty()).mapNotNull { value ->
+        val item = value as? JsonObject ?: return@mapNotNull null
+        val label = reportRuntimeContentText(item["label"])
+            ?: reportRuntimeContentText(item["id"])
+            ?: return@mapNotNull null
+        val materializedDisplayValue = item["displayValue"]
+        val rawValue = item["value"]
+        val format = reportRuntimeContentText(item["format"])
+        val displayValue = when {
+            materializedDisplayValue != null -> reportRuntimeContentText(materializedDisplayValue).orEmpty()
+            rawValue == null -> ""
+            !format.isNullOrBlank() -> formatDashboardValue(JsonUtil.elementToAny(rawValue), format)
+            else -> reportRuntimeContentText(rawValue).orEmpty()
+        }
+        ReportRuntimeBadgePresentation(
+            label = label,
+            displayValue = displayValue,
+            tone = reportRuntimeContentText(item["tone"]).orEmpty().ifBlank { "info" }
+        )
+    }
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DashboardReportRuntimeBadgePills(content: Map<String, JsonElement>) {
+    val badges = reportRuntimeBadgePresentations(content)
+    if (badges.isEmpty()) {
+        Text("No pills configured.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF5F6B7C))
+        return
+    }
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        badges.forEach { badge ->
+            val tone = reportRuntimeBadgeTone(badge.tone)
+            Text(
+                text = badge.text,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = tone.text,
+                modifier = Modifier
+                    .background(tone.background, RoundedCornerShape(999.dp))
+                    .border(1.dp, tone.border, RoundedCornerShape(999.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            )
+        }
+    }
+}
+
+private fun reportRuntimeBadgeTone(tone: String): DashboardToneColors = when (tone.trim().lowercase()) {
+    "danger", "error" -> DashboardToneColors(Color(0xFFFFF1F0), Color(0xFFF5C2C0), Color(0xFFA82A2A))
+    "warning", "caution" -> DashboardToneColors(Color(0xFFFFF7E1), Color(0xFFF5D28C), Color(0xFF8A5D00))
+    "success", "good" -> DashboardToneColors(Color(0xFFEEF8F0), Color(0xFFCFE7D6), Color(0xFF0F6B3A))
+    "info" -> DashboardToneColors(Color(0xFFEEF4FB), Color(0xFFCFDCED), Color(0xFF21538F))
+    else -> DashboardToneColors(Color(0xFFF7FAFC), Color(0xFFD8E2EB), Color(0xFF486581))
 }
 
 private fun reportRuntimePresentationEntries(
@@ -1962,11 +2398,33 @@ private fun DashboardReportRuntimeDiagnosticsPreview(diagnostics: List<Dashboard
 @Composable
 private fun DashboardReportRuntimeFilterBarPreview(block: DashboardReportRuntimeBlockSummary) {
     val filterBar = block.filterBar ?: return
+    var expanded by remember(block.id) { mutableStateOf(false) }
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Text(filterBar.title, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+        OutlinedButton(
+            onClick = { expanded = !expanded },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(Icons.Outlined.FilterAlt, contentDescription = null)
+            Text(
+                text = filterBar.title,
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = if (filterBar.params.isEmpty()) "None" else "${filterBar.params.size}",
+                style = MaterialTheme.typography.labelSmall
+            )
+            Icon(
+                Icons.Filled.ArrowDropDown,
+                contentDescription = if (expanded) "Hide filters" else "Show filters"
+            )
+        }
+        if (!expanded) return@Column
         if (filterBar.params.isEmpty()) {
             Text("No shared scope parameters.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF6A7280))
         } else {
@@ -2078,52 +2536,184 @@ private fun DashboardReportRuntimeTablePreview(
         }
         return
     }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Text(
-            text = block.title,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            table.columns.forEach { column ->
-                Text(
-                    text = column.label ?: column.name ?: column.id.orEmpty(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.widthIn(min = 96.dp)
-                )
-            }
+    DashboardReportRuntimePanel(title = block.title) {
+        var visibleRowCount by remember(block.id, table.rows.size) { mutableStateOf(8) }
+        val visibleRows = table.rows.take(visibleRowCount)
+        val dataBarMaximums = table.columns.associateWith { column ->
+            if (!reportRuntimeColumnHasDataBar(column)) return@associateWith 0.0
+            val key = listOf(column.id, column.key, column.name)
+                .firstOrNull { !it.isNullOrBlank() }
+                .orEmpty()
+            table.rows.maxOfOrNull { reportRuntimeNumericValue(it[key]) ?: 0.0 } ?: 0.0
         }
-        table.rows.take(6).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                table.columns.forEach { column ->
-                    val key = listOf(column.id, column.key, column.name)
-                        .firstOrNull { !it.isNullOrBlank() }
-                        .orEmpty()
-                    Text(
-                        text = formatDashboardValue(row[key], column.format),
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.widthIn(min = 96.dp)
-                    )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            if (maxWidth < 600.dp) {
+                // A desktop grid forces the useful columns off-screen on a phone.
+                // Each record is its own responsive row view, while preserving the
+                // authored labels, formats, and quantitative data-bar treatment.
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Color(0xFFDBE5EC), RoundedCornerShape(12.dp)),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    visibleRows.forEachIndexed { index, row ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(if (index % 2 == 0) Color.White else Color(0xFFF7FAFC))
+                                .padding(horizontal = 11.dp, vertical = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            table.columns.forEachIndexed { columnIndex, column ->
+                                val key = reportRuntimeColumnKey(column)
+                                val fraction = reportRuntimeDataBarFraction(row[key], dataBarMaximums[column] ?: 0.0)
+                                ReportRuntimeTableCell(
+                                    label = column.label ?: column.name ?: column.id.orEmpty(),
+                                    value = reportRuntimeDisplayValue(row[key], column),
+                                    fraction = fraction,
+                                    primary = columnIndex == 0
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .border(1.dp, Color(0xFFDBE5EC), RoundedCornerShape(12.dp)),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.background(Color(0xFFF2F6FA)).padding(horizontal = 10.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        table.columns.forEach { column ->
+                            Text(
+                                text = column.label ?: column.name ?: column.id.orEmpty(),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF30404D),
+                                modifier = Modifier.widthIn(min = 112.dp, max = 184.dp)
+                            )
+                        }
+                    }
+                    visibleRows.forEachIndexed { index, row ->
+                        Row(
+                            modifier = Modifier
+                                .background(if (index % 2 == 0) Color.White else Color(0xFFFBFDFF))
+                                .padding(horizontal = 10.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            table.columns.forEach { column ->
+                                val key = reportRuntimeColumnKey(column)
+                                Box(modifier = Modifier.widthIn(min = 112.dp, max = 184.dp)) {
+                                    ReportRuntimeTableCell(
+                                        label = null,
+                                        value = reportRuntimeDisplayValue(row[key], column),
+                                        fraction = reportRuntimeDataBarFraction(row[key], dataBarMaximums[column] ?: 0.0),
+                                        primary = false
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
         if (table.rows.isEmpty()) {
+            Text("No rows available.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF5F6B7C))
+        } else if (table.rows.size > visibleRows.size) {
             Text(
-                text = "No rows available.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                "Showing ${visibleRows.size} of ${table.rows.size} rows",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF5F6B7C)
             )
+            OutlinedButton(
+                onClick = { visibleRowCount = (visibleRowCount + 8).coerceAtMost(table.rows.size) },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Show ${minOf(8, table.rows.size - visibleRows.size)} more")
+            }
         }
         DashboardReportRuntimeTableActionStrip(runtime, window, dashboardRoot, block, table)
     }
+}
+
+private fun reportRuntimeColumnKey(column: ColumnDef): String =
+    listOf(column.id, column.key, column.name).firstOrNull { !it.isNullOrBlank() }.orEmpty()
+
+private fun reportRuntimeDisplayValue(value: Any?, column: ColumnDef): String {
+    if (value == null) return column.emptyText ?: "—"
+    return formatDashboardValue(value, column.format)
+        .takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+        ?: column.emptyText
+        ?: "—"
+}
+
+@Composable
+private fun ReportRuntimeTableCell(
+    label: String?,
+    value: String,
+    fraction: Float?,
+    primary: Boolean
+) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        label?.takeIf { it.isNotBlank() }?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF526A82)
+            )
+        }
+        Box(modifier = Modifier.fillMaxWidth()) {
+            if (fraction != null) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(32.dp)
+                        .background(Color(0xFFF1F5F9), RoundedCornerShape(8.dp))
+                )
+                Box(
+                    modifier = Modifier.fillMaxWidth(fraction).height(32.dp)
+                        .background(
+                            Brush.horizontalGradient(listOf(Color(0xFFCFE0FB), Color(0xFF3F73EA))),
+                            RoundedCornerShape(8.dp)
+                        )
+                )
+            }
+            Text(
+                text = value,
+                style = if (primary) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+                fontWeight = if (primary || fraction != null) FontWeight.SemiBold else FontWeight.Normal,
+                color = Color(0xFF18324A),
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(
+                    horizontal = if (fraction != null) 8.dp else 0.dp,
+                    vertical = if (fraction != null) 7.dp else 0.dp
+                )
+            )
+        }
+    }
+}
+
+internal fun reportRuntimeColumnHasDataBar(column: ColumnDef): Boolean =
+    (column.cellVisual?.get("kind") as? JsonPrimitive)?.contentOrNull
+        ?.trim()
+        ?.lowercase() in setOf("databar", "progressbar", "sparkbar")
+
+internal fun reportRuntimeDataBarFraction(value: Any?, maximum: Double): Float? {
+    if (maximum <= 0.0) return null
+    val numeric = reportRuntimeNumericValue(value) ?: return null
+    return (numeric / maximum).coerceIn(0.0, 1.0).toFloat()
+}
+
+private fun reportRuntimeNumericValue(value: Any?): Double? = when (value) {
+    is Number -> value.toDouble()
+    is String -> value.replace(",", "").trim().toDoubleOrNull()
+    else -> null
 }
 
 @Composable

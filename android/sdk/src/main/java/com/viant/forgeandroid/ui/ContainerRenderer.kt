@@ -178,10 +178,10 @@ fun ContainerRenderer(
                             .fillMaxWidth()
                             .weight(1f, fill = true)
                     ) {
-                        TableRenderer(runtime, dsContext, container.table)
+                        TableRenderer(runtime, dsContext, container.table, selectionModeOverride = selectionModeOverride)
                     }
                 } else {
-                    TableRenderer(runtime, dsContext, container.table)
+                    TableRenderer(runtime, dsContext, container.table, selectionModeOverride = selectionModeOverride)
                 }
             }
         }

@@ -40,7 +40,7 @@ fun MarkdownRenderer(markdown: String, modifier: Modifier = Modifier) {
         blocks.forEach { block ->
             when (block.type) {
                 MarkdownBlockType.Heading -> Text(
-                    text = block.text,
+                    text = inlineMarkdownAnnotatedString(block.text),
                     style = when (block.level) {
                         1 -> MaterialTheme.typography.headlineSmall
                         2 -> MaterialTheme.typography.titleLarge
@@ -50,17 +50,23 @@ fun MarkdownRenderer(markdown: String, modifier: Modifier = Modifier) {
                 )
 
                 MarkdownBlockType.Bullet -> Text(
-                    text = "\u2022 ${block.text}",
+                    text = buildAnnotatedString {
+                        append("\u2022 ")
+                        append(inlineMarkdownAnnotatedString(block.text))
+                    },
                     style = MaterialTheme.typography.bodyMedium
                 )
 
                 MarkdownBlockType.Numbered -> Text(
-                    text = "${block.marker} ${block.text}",
+                    text = buildAnnotatedString {
+                        append("${block.marker} ")
+                        append(inlineMarkdownAnnotatedString(block.text))
+                    },
                     style = MaterialTheme.typography.bodyMedium
                 )
 
                 MarkdownBlockType.Quote -> Text(
-                    text = block.text,
+                    text = inlineMarkdownAnnotatedString(block.text),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -100,7 +106,7 @@ fun MarkdownRenderer(markdown: String, modifier: Modifier = Modifier) {
                 MarkdownBlockType.Table -> MarkdownTable(block)
 
                 MarkdownBlockType.Paragraph -> Text(
-                    text = block.text,
+                    text = inlineMarkdownAnnotatedString(block.text),
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -265,10 +271,41 @@ private fun parseMarkdown(markdown: String): List<MarkdownBlock> {
 }
 
 private fun inlineMarkdown(text: String): String {
+    // Keep inline tokens until composition so emphasis is represented visually
+    // instead of being flattened into indistinguishable plain text.
     return text
-        .replace(Regex("\\*\\*(.+?)\\*\\*"), "$1")
-        .replace(Regex("`(.+?)`"), "$1")
-        .replace(Regex("\\[(.+?)]\\((.+?)\\)"), "$1")
+}
+
+internal fun inlineMarkdownAnnotatedString(text: String): AnnotatedString = buildAnnotatedString {
+    var cursor = 0
+    val token = Regex("\\*\\*(.+?)\\*\\*|`(.+?)`|\\[(.+?)]\\((.+?)\\)")
+    token.findAll(text).forEach { match ->
+        if (match.range.first > cursor) append(text.substring(cursor, match.range.first))
+        when {
+            match.groups[1] != null -> {
+                pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
+                append(match.groups[1]?.value.orEmpty())
+                pop()
+            }
+            match.groups[2] != null -> {
+                pushStyle(
+                    SpanStyle(
+                        fontFamily = FontFamily.Monospace,
+                        background = Color(0xFFF1F5F9)
+                    )
+                )
+                append(match.groups[2]?.value.orEmpty())
+                pop()
+            }
+            else -> {
+                pushStyle(SpanStyle(color = Color(0xFF1D4ED8)))
+                append(match.groups[3]?.value.orEmpty())
+                pop()
+            }
+        }
+        cursor = match.range.last + 1
+    }
+    if (cursor < text.length) append(text.substring(cursor))
 }
 
 internal fun markdownCodeLanguageLabel(language: String): String {
