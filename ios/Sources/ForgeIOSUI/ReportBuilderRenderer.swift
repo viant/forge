@@ -767,6 +767,15 @@ public struct ReportBuilderRenderer: View {
                 Text(feedback.message)
                     .font(.footnote.weight(.medium))
                     .foregroundStyle(feedback.isError ? .red : .secondary)
+                if feedback.isError {
+                    Button {
+                        requestBridgeGeneration += 1
+                    } label: {
+                        Label("Retry", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("forge-report-builder-retry")
+                }
             }
             .frame(maxWidth: .infinity, minHeight: 220)
             .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 12))
@@ -2213,11 +2222,16 @@ internal func reportBuilderChartStateFeedback(
     hasResolvedRows: Bool,
     hasChartValues: Bool
 ) -> ChartDataStateFeedback? {
-    chartDataStateFeedback(
+    let feedback = chartDataStateFeedback(
         loading: control.loading,
         error: control.error,
         hasResolvedRows: hasResolvedRows,
         hasChartValues: hasChartValues
+    )
+    guard feedback?.isError == true else { return feedback }
+    return ChartDataStateFeedback(
+        message: "Report data is temporarily unavailable",
+        isError: true
     )
 }
 

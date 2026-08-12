@@ -400,7 +400,7 @@ final class ForgeIOSTests: XCTestCase {
                 hasChartValues: false
             ),
             ChartDataStateFeedback(
-                message: "Unable to load chart data",
+                message: "Report data is temporarily unavailable",
                 isError: true
             )
         )
@@ -2661,6 +2661,46 @@ final class ForgeIOSTests: XCTestCase {
         let control = await runtime.dataSourceControl(windowID: window.id, dataSourceRef: "list")
         XCTAssertNil(control.error)
         XCTAssertFalse(control.loading)
+    }
+
+    func testLatestDataSourceFetchWinsWhenRestoredFiltersOverlap() async throws {
+        let runtime = ForgeRuntime()
+        let window = await runtime.openWindowInline(
+            key: "w1",
+            title: "W1",
+            metadata: WindowMetadata(dataSources: ["list": DataSourceDef()])
+        )
+        await runtime.registerDataSourceLoader { request in
+            let value = request.input.parameters["value"]?.stringValue ?? ""
+            if value == "old" {
+                try await Task.sleep(for: .milliseconds(120))
+            } else {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            return ForgeRuntime.DataSourceFetchResult(rows: [["value": .string(value)]])
+        }
+
+        let oldFetch = Task {
+            await runtime.setDataSourceInputParameters(
+                windowID: window.id,
+                dataSourceRef: "list",
+                parameters: ["value": .string("old")],
+                fetch: true
+            )
+        }
+        try await Task.sleep(for: .milliseconds(20))
+        await runtime.setDataSourceInputParameters(
+            windowID: window.id,
+            dataSourceRef: "list",
+            parameters: ["value": .string("new")],
+            fetch: true
+        )
+        await oldFetch.value
+
+        let rows = await runtime.dataSourceCollection(windowID: window.id, dataSourceRef: "list")
+        let control = await runtime.dataSourceControl(windowID: window.id, dataSourceRef: "list")
+        XCTAssertEqual(rows, [["value": .string("new")]])
+        XCTAssertEqual(control, ControlState())
     }
 
     func testWindowOpensInline() async throws {
