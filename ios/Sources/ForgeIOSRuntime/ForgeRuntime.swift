@@ -98,6 +98,7 @@ public actor ForgeRuntime {
     public nonisolated let targetContext: ForgeTargetContext
     let signals: SignalRegistry
     let dataSourceRuntime: DataSourceRuntime
+    private var dataSourceFetchGenerations: [String: UInt64] = [:]
     private var windowMetadataEndpoint: URL?
     private var defaultDataSourceBaseURL: URL?
     private let session: URLSession
@@ -470,8 +471,14 @@ public actor ForgeRuntime {
         }
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
         let input = await dataSourceRuntime.input(dataSourceID: dataSourceID)
+        let fetchGeneration = (dataSourceFetchGenerations[dataSourceID] ?? 0) &+ 1
+        dataSourceFetchGenerations[dataSourceID] = fetchGeneration
 
         if let dataSourceLoader {
+            let loadingControl = ControlState(loading: true)
+            await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: loadingControl)
+            let loadingSignal = await signals.control(dataSourceID: dataSourceID)
+            await loadingSignal.set(loadingControl)
             do {
                 if let result = try await dataSourceLoader(
                     DataSourceFetchRequest(
@@ -491,6 +498,9 @@ public actor ForgeRuntime {
                         conversationID: windows.first { $0.id == windowID }?.conversationID
                     )
                 ) {
+                    guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration else {
+                        return
+                    }
                     let hookedRows = applyCollectionHook(metadata: metadata, rows: result.rows)
                     await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows)
                     await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: result.metrics)
@@ -532,6 +542,15 @@ public actor ForgeRuntime {
                 // a datasource failure and must not replace the next request's state
                 // with a visible error.
                 if Task.isCancelled || isForgeCancellationError(error) {
+                    if dataSourceFetchGenerations[dataSourceID] == fetchGeneration {
+                        let idleControl = ControlState()
+                        await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: idleControl)
+                        let controlSignal = await signals.control(dataSourceID: dataSourceID)
+                        await controlSignal.set(idleControl)
+                    }
+                    return
+                }
+                guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration else {
                     return
                 }
                 print("ForgeRuntime datasource load failed for \(dataSourceRef): \(error)")
