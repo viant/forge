@@ -155,14 +155,35 @@ private fun InlineList(
     container: ContainerDef,
     items: List<ItemDef>
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items.forEach { item ->
-            InlineItem(runtime, window, baseContext, container, item)
+    val phonePresentation = runtime.targetContext.formFactor
+        ?.trim()
+        ?.equals("phone", ignoreCase = true) == true
+    if (phonePresentation) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items.forEach { item ->
+                InlineItem(
+                    runtime = runtime,
+                    window = window,
+                    baseContext = baseContext,
+                    container = container,
+                    item = item,
+                    fillAvailableWidth = true
+                )
+            }
+        }
+    } else {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items.forEach { item ->
+                InlineItem(runtime, window, baseContext, container, item)
+            }
         }
     }
 }
@@ -247,7 +268,7 @@ private fun SummaryList(
         }
         val key = itemValueKey(item) ?: return@StaticGrid
         if (isItemVisible(item, form, metrics, windowForm, rows)) {
-            val value = resolveItemValue(item, key, form, metrics, windowForm, rows)
+            val value = resolveItemDisplayValue(item, key, form, metrics, windowForm, rows)
             SummaryCard(item.label ?: key, value)
         }
     }
@@ -285,7 +306,7 @@ private fun PlainList(
                 return@forEachIndexed
             }
             val key = itemValueKey(item) ?: ""
-            val value = if (key.isNotBlank()) resolveItemValue(item, key, form, metrics, windowForm, rows) else ""
+            val value = if (key.isNotBlank()) resolveItemDisplayValue(item, key, form, metrics, windowForm, rows) else ""
             val rawValue = if (key.isNotBlank()) resolveItemRawValue(item, key, form, metrics, windowForm, rows) else null
 
             Column(
@@ -336,7 +357,8 @@ private fun InlineItem(
     window: WindowContext,
     baseContext: DataSourceContext?,
     container: ContainerDef,
-    item: ItemDef
+    item: ItemDef,
+    fillAvailableWidth: Boolean = false
 ) {
     val dataContext = resolveMenuListContext(window, baseContext, container, item)
     val uriHandler = LocalUriHandler.current
@@ -365,24 +387,26 @@ private fun InlineItem(
     val value = normalizeValue(rawValue?.toString().orEmpty())
 
     Surface(
-        shape = RoundedCornerShape(999.dp),
+        shape = RoundedCornerShape(if (fillAvailableWidth) 14.dp else 999.dp),
         color = if (item.type?.trim()?.lowercase() == "link") Color(0xFFE8F1FF) else Color(0xFFF2F4F7),
-        modifier = Modifier.clickable {
-            if (item.type?.trim()?.lowercase() == "link" && item.link != null) {
-                val href = item.link.href?.trim().orEmpty()
-                if (href.isNotEmpty()) {
-                    uriHandler.openUri(href)
-                } else {
-                    openLinkedWindow(runtime, window, item, form, metrics, windowForm, rawValue)
+        modifier = (if (fillAvailableWidth) Modifier.fillMaxWidth() else Modifier).clickable {
+                if (item.type?.trim()?.lowercase() == "link" && item.link != null) {
+                    val href = item.link.href?.trim().orEmpty()
+                    if (href.isNotEmpty()) {
+                        uriHandler.openUri(href)
+                    } else {
+                        openLinkedWindow(runtime, window, item, form, metrics, windowForm, rawValue)
+                    }
                 }
             }
-        }
     ) {
         Text(
             text = value.ifBlank { item.label ?: item.id.orEmpty() },
             color = if (item.type?.trim()?.lowercase() == "link") Color(0xFF175CD3) else Color(0xFF475467),
             style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+            modifier = Modifier
+                .then(if (fillAvailableWidth) Modifier.fillMaxWidth() else Modifier)
+                .padding(horizontal = 12.dp, vertical = 9.dp)
         )
     }
 }

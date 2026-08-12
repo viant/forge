@@ -2268,6 +2268,15 @@ public enum DashboardRuntime {
                 formatter.maximumFractionDigits = 0
                 return formatter.string(from: NSNumber(value: number)) ?? String(describing: value)
             }
+        case "currency2":
+            if let number = numericValue(value) {
+                let formatter = NumberFormatter()
+                formatter.locale = locale
+                formatter.numberStyle = .currency
+                formatter.minimumFractionDigits = 2
+                formatter.maximumFractionDigits = 2
+                return formatter.string(from: NSNumber(value: number)) ?? String(describing: value)
+            }
         case "percent":
             if let number = numericValue(value) {
                 let formatter = NumberFormatter()
@@ -2307,6 +2316,16 @@ public enum DashboardRuntime {
                 formatter.usesGroupingSeparator = true
                 formatter.minimumFractionDigits = 0
                 formatter.maximumFractionDigits = 5
+                return formatter.string(from: NSNumber(value: number)) ?? String(number)
+            }
+        case "number2":
+            if let number = numericValue(value) {
+                let formatter = NumberFormatter()
+                formatter.locale = locale
+                formatter.numberStyle = .decimal
+                formatter.usesGroupingSeparator = true
+                formatter.minimumFractionDigits = 0
+                formatter.maximumFractionDigits = 2
                 return formatter.string(from: NSNumber(value: number)) ?? String(number)
             }
         case "number5":

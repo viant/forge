@@ -73,15 +73,23 @@ private val ChartMutedText = Color(0xFF6A7280)
 private val DefaultChartPalette = listOf("#2563EB", "#16A34A", "#EA580C", "#9333EA")
 
 @Composable
-fun ChartRenderer(context: DataSourceContext, chart: ChartDef, containerTitle: String? = null) {
+fun ChartRenderer(
+    context: DataSourceContext,
+    chart: ChartDef,
+    containerTitle: String? = null,
+    showDataFallback: Boolean = true
+) {
     val rows by context.collection.flow.collectAsState(initial = emptyList())
     val control by context.control.flow.collectAsState(initial = context.control.peek())
+    val metrics by context.metrics.flow.collectAsState(initial = context.metrics.peek())
     ChartRenderer(
         rows = rows,
         chart = chart,
         containerTitle = containerTitle,
         control = control,
-        hasResolvedRows = control.loading || control.resolved || rows.isNotEmpty()
+        hasResolvedRows = control.loading || control.resolved || rows.isNotEmpty(),
+        emptyMessage = chartEmptyStateMessage(metrics),
+        showDataFallback = showDataFallback
     )
 }
 
@@ -96,6 +104,7 @@ fun ChartRenderer(
     reportRuntimeActionFields: List<DashboardReportRuntimeActionField> = emptyList(),
     reportRuntimeActionDescriptors: List<DashboardReportRuntimeActionDescriptor> = emptyList(),
     onReportRuntimeAction: ((DashboardReportRuntimeActionExecution) -> Unit)? = null,
+    emptyMessage: String = "No chart data",
     showDataFallback: Boolean = true
 ) {
     val prepared = prepareChartData(rows, chart)
@@ -162,7 +171,8 @@ fun ChartRenderer(
                         loading = control.loading,
                         error = control.error,
                         hasResolvedRows = hasResolvedRows,
-                        hasChartValues = false
+                        hasChartValues = false,
+                        emptyMessage = emptyMessage
                     )
                     if (feedback != null) {
                         ChartDataStateMessage(feedback)
@@ -177,7 +187,8 @@ fun ChartRenderer(
                     loading = control.loading,
                     error = control.error,
                     hasResolvedRows = hasResolvedRows,
-                    hasChartValues = false
+                    hasChartValues = false,
+                    emptyMessage = emptyMessage
                 ) ?: return@Column
                 ChartDataStateMessage(feedback)
                 return@Column
@@ -1010,7 +1021,8 @@ internal fun chartDataStateFeedback(
     loading: Boolean,
     error: String?,
     hasResolvedRows: Boolean = true,
-    hasChartValues: Boolean
+    hasChartValues: Boolean,
+    emptyMessage: String = "No chart data"
 ): ChartDataStateFeedback? {
     if (hasChartValues) {
         return null
@@ -1024,7 +1036,22 @@ internal fun chartDataStateFeedback(
             isError = true
         )
     }
-    return ChartDataStateFeedback("No chart data")
+    return ChartDataStateFeedback(emptyMessage.trim().ifBlank { "No chart data" })
+}
+
+internal fun chartEmptyStateMessage(
+    metrics: Map<String, Any?>,
+    now: Instant = Instant.now()
+): String {
+    val start = metrics["startDate"]?.toString()?.trim().orEmpty()
+    val startInstant = runCatching { Instant.parse(start) }.getOrNull()
+    if (startInstant != null && startInstant.isAfter(now)) {
+        val date = DateTimeFormatter.ofPattern("MMM d, yyyy")
+            .withZone(ZoneOffset.UTC)
+            .format(startInstant)
+        return "Scheduled to start $date"
+    }
+    return "No activity in this period"
 }
 
 internal fun chartDisplayTitle(chartTitle: String?, containerTitle: String? = null): String? {
@@ -1161,7 +1188,7 @@ internal fun findPieSelection(
     return null
 }
 
-private fun parseChartColor(value: String?): Color {
+internal fun parseChartColor(value: String?): Color {
     val raw = value?.trim().orEmpty()
     if (raw.isBlank()) {
         return Color(0xFF2563EB)

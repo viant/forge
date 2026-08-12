@@ -782,6 +782,7 @@ data class ChartDef(
     val dataSourceRef: String? = null,
     val xAxis: ChartAxisDef? = null,
     val yAxis: ChartAxisDef? = null,
+    val axes: Map<String, ChartAxisDef> = emptyMap(),
     val series: ChartSeriesDef? = null,
     val dataSourceRefSource: String? = null,
     val dataSourceRefSelector: String? = null,
@@ -801,7 +802,11 @@ data class ChartDef(
 data class ChartAxisDef(
     val dataKey: String? = null,
     val label: String? = null,
-    val tickFormat: String? = null
+    val tickFormat: String? = null,
+    val tickFormatSource: String? = null,
+    val tickFormatSelector: String? = null,
+    val tickFormats: Map<String, String> = emptyMap(),
+    val format: String? = null
 )
 
 @Serializable(with = ChartSeriesDefSerializer::class)
@@ -889,7 +894,12 @@ object ChartSeriesDefSerializer : KSerializer<ChartSeriesDef> {
             obj["values"] = JsonArray(value.values.map { item ->
                 val entry = linkedMapOf<String, JsonElement>()
                 item.name?.let { entry["name"] = JsonPrimitive(it) }
+                item.label?.let { entry["label"] = JsonPrimitive(it) }
                 item.value?.let { entry["value"] = JsonPrimitive(it) }
+                item.type?.let { entry["type"] = JsonPrimitive(it) }
+                item.axis?.let { entry["axis"] = JsonPrimitive(it) }
+                item.format?.let { entry["format"] = JsonPrimitive(it) }
+                item.color?.let { entry["color"] = JsonPrimitive(it) }
                 JsonObject(entry)
             })
         }

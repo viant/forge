@@ -1,6 +1,7 @@
 package com.viant.forgeandroid.ui
 
 import com.viant.forgeandroid.runtime.ChartDef
+import com.viant.forgeandroid.runtime.ColumnDef
 import com.viant.forgeandroid.runtime.ContainerDef
 import com.viant.forgeandroid.runtime.DashboardReportRuntimeBlockSummary
 import kotlinx.serialization.json.JsonArray
@@ -10,6 +11,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class DashboardRendererSupportTest {
+
+    @Test
+    fun plannerTableNarrativeColumnsReceiveReadableWidthTreatment() {
+        assertEquals(true, plannerTableColumnIsNarrative(ColumnDef(key = "rationale", label = "Rationale")))
+        assertEquals(true, plannerTableColumnIsNarrative(ColumnDef(key = "changeReason", label = "Change reason")))
+        assertEquals(false, plannerTableColumnIsNarrative(ColumnDef(key = "site_id", label = "Site ID")))
+    }
 
     @Test
     fun dashboardUnsupportedBlockMessageNamesUnknownKind() {

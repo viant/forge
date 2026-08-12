@@ -70,6 +70,66 @@ func TestCompileProducesExportablePDFContract(t *testing.T) {
 	require.True(t, bytes.HasPrefix(rendered.Bytes, []byte("%PDF-")))
 }
 
+func TestCompileProducesExportableStaticReportWithoutDataFences(t *testing.T) {
+	content := "```forge-report\n" +
+		`{"version":1,"scope":"message","id":"static-report","sequence":1,"mode":"start","grammar":"report-document-v1","title":"Static diagnostic","blocks":[{"id":"summary","kind":"markdownBlock","title":"Summary","markdown":"Evidence is currently unavailable."},{"id":"posture","kind":"badgesBlock","title":"Diagnostic status","items":[{"id":"order","label":"Ad order","value":"2,664,518","tone":"info"},{"id":"diagnosis","label":"Diagnosis","value":"Unavailable","tone":"warning"},{"id":"confidence","label":"Confidence","value":"Insufficient evidence","tone":"danger"},{"id":"setup","label":"Setup state","value":"Not evaluated","tone":"neutral"}]},{"id":"next","kind":"calloutBlock","title":"Next step","tone":"info","body":"Validate the order state."}]}` +
+		"\n```\n```forge-report\n" +
+		`{"version":1,"scope":"message","id":"static-report","sequence":2,"mode":"commit"}` +
+		"\n```"
+
+	compiled, err := Compile(&CompileRequest{Content: content, ReportID: "static-report"})
+	require.NoError(t, err)
+	require.NotEmpty(t, compiled.ReportSpec)
+	require.NotEmpty(t, compiled.ReportFill)
+
+	var spec map[string]any
+	require.NoError(t, json.Unmarshal(compiled.ReportSpec, &spec))
+	datasets := spec["datasets"].([]any)
+	require.Len(t, datasets, 1)
+	require.Equal(t, "static-report", datasets[0].(map[string]any)["id"])
+	request := datasets[0].(map[string]any)["request"].(map[string]any)
+	require.Equal(t, []any{"_placeholder"}, request["columnKeys"])
+
+	var printArtifact map[string]any
+	require.NoError(t, json.Unmarshal(compiled.ReportPrint, &printArtifact))
+	pageElements := printArtifact["pages"].([]any)[0].(map[string]any)["elements"].([]any)
+	badges := map[string]map[string]any{}
+	for _, rawElement := range pageElements {
+		element := rawElement.(map[string]any)
+		id, _ := element["id"].(string)
+		if strings.HasPrefix(id, "posture__badge_") && !strings.Contains(id, "text") {
+			badges[id] = element
+		}
+	}
+	require.Len(t, badges, 4)
+	firstBox := badges["posture__badge_0"]["box"].(map[string]any)
+	secondBox := badges["posture__badge_1"]["box"].(map[string]any)
+	thirdBox := badges["posture__badge_2"]["box"].(map[string]any)
+	fourthBox := badges["posture__badge_3"]["box"].(map[string]any)
+	require.Equal(t, firstBox["y"], secondBox["y"])
+	require.Equal(t, thirdBox["y"], fourthBox["y"])
+	require.Greater(t, thirdBox["y"].(float64), firstBox["y"].(float64))
+	require.LessOrEqual(t, fourthBox["x"].(float64)+fourthBox["width"].(float64), 576.0)
+	require.NotEqual(t, badges["posture__badge_0"]["fillColor"], badges["posture__badge_1"]["fillColor"])
+
+	envelope, err := forgeexport.DecodeJSON(mustJSON(t, map[string]any{
+		"version": 1,
+		"kind":    "reportExportRequest",
+		"target":  map[string]any{"format": "pdf"},
+		"source": map[string]any{
+			"from": "draft", "artifactKind": "dashboard.reportBuilder",
+			"artifactRef": "dashboard.reportBuilder://static-report", "title": "Static diagnostic", "reportId": "static-report",
+		},
+		"reportSpec":  jsonRaw(compiled.ReportSpec),
+		"reportFill":  jsonRaw(compiled.ReportFill),
+		"reportPrint": jsonRaw(compiled.ReportPrint),
+	}))
+	require.NoError(t, err)
+	rendered, err := forgepdf.Render(envelope.ReportPrintModel(), forgepdf.Options{})
+	require.NoError(t, err)
+	require.True(t, bytes.HasPrefix(rendered.Bytes, []byte("%PDF-")))
+}
+
 func TestCompileProducesExportableMultiTabDashboard(t *testing.T) {
 	content := "```forge-report\n" +
 		`{"version":1,"scope":"message","id":"delivery","sequence":1,"mode":"start","grammar":"report-document-v1","title":"Order 2672373 delivery","blocks":[{"id":"tabs","kind":"tabGroupBlock","title":"Report sections","sectionIds":["posture","funnel"],"defaultSectionId":"posture"},{"id":"posture","kind":"sectionBlock","title":"Delivery posture","navigationLabel":"Delivery posture"},{"id":"spend","kind":"kpiBlock","datasetRef":"daily","valueField":"spend","valueFormat":"currency","title":"Spend"},{"id":"status","kind":"badgesBlock","datasetRef":"daily","title":"Current posture","items":[{"id":"pacing","label":"Pacing","value":"Behind","tone":"warning"}]},{"id":"trend","kind":"chartBlock","datasetRef":"daily","title":"Daily delivery","chartSpec":{"type":"line","xField":"date","yFields":["spend","impressions"]}},{"id":"funnel","kind":"sectionBlock","title":"Bid funnel","navigationLabel":"Bid funnel"},{"id":"funnel_table","kind":"tableBlock","datasetRef":"funnel","title":"Delivery funnel","columns":[{"key":"stage","label":"Stage"},{"key":"count","label":"Count","format":"integer","cellVisual":{"kind":"dataBar"}}]},{"id":"finding","kind":"markdownBlock","title":"Finding","markdown":"Spend is **behind plan**; allocated capacity was not exhausted."}]}` +

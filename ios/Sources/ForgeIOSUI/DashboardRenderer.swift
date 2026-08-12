@@ -19,6 +19,7 @@ public struct DashboardRenderer: View {
     @State private var dashboardCollections: [String: [[String: JSONValue]]] = [:]
     @State private var dashboardDimensionsModes: [String: String] = [:]
     @State private var reportRuntimeTabSelections: [String: String] = [:]
+    @State private var reportRuntimeExportExecutionID: String?
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef) {
         self.runtime = runtime
@@ -1096,11 +1097,22 @@ public struct DashboardRenderer: View {
                     .font(.body.weight(.semibold))
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if let exportExecution {
-                    Button("Download PDF") {
-                        executeReportRuntimeAction(exportExecution)
+                    Button {
+                        executeReportRuntimeExportAction(exportExecution)
+                    } label: {
+                        HStack(spacing: 6) {
+                            if reportRuntimeExportExecutionID == exportExecution.id {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Preparing PDF…")
+                            } else {
+                                Text("Download PDF")
+                            }
+                        }
                     }
                     .font(.caption.weight(.semibold))
                     .buttonStyle(.bordered)
+                    .disabled(reportRuntimeExportExecutionID != nil)
                 }
             }
             if let subtitle = summary.subtitle {
@@ -1648,6 +1660,23 @@ public struct DashboardRenderer: View {
                 context: context,
                 args: ["execution": payload]
             )
+        }
+    }
+
+    private func executeReportRuntimeExportAction(_ execution: DashboardReportRuntimeActionExecution) {
+        guard let runtime, reportRuntimeExportExecutionID == nil else { return }
+        let context = window.map {
+            ExecutionContext(windowID: $0.windowID, dataSourceRef: "")
+        }
+        let payload = DashboardRuntime.dashboardReportRuntimeActionExecutionPayload(execution)
+        reportRuntimeExportExecutionID = execution.id
+        Task {
+            _ = await runtime.execute(
+                ExecutionDef(action: "reportRuntime.executeAction"),
+                context: context,
+                args: ["execution": payload]
+            )
+            reportRuntimeExportExecutionID = nil
         }
     }
 

@@ -407,6 +407,24 @@ class ChartRendererTest {
     }
 
     @Test
+    fun `chart empty state explains future scheduled order`() {
+        assertEquals(
+            "Scheduled to start Aug 21, 2026",
+            chartEmptyStateMessage(
+                metrics = mapOf("startDate" to "2026-08-21T00:00:00Z"),
+                now = java.time.Instant.parse("2026-08-12T00:00:00Z")
+            )
+        )
+        assertEquals(
+            "No activity in this period",
+            chartEmptyStateMessage(
+                metrics = mapOf("startDate" to "2026-08-01T00:00:00Z"),
+                now = java.time.Instant.parse("2026-08-12T00:00:00Z")
+            )
+        )
+    }
+
+    @Test
     fun `findCartesianSelection picks nearest point`() {
         val chart = ChartDef(
             type = "line",

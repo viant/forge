@@ -2,6 +2,9 @@ package com.viant.forgeandroid.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -10,6 +13,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.ChartAxisDef
 import com.viant.forgeandroid.runtime.ChartDef
@@ -28,11 +33,28 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.coroutines.flow.first
 
 internal fun reportBuilderAuthoredDocument(windowForm: Map<String, Any?>): JsonObject? {
     fun obj(value: Any?): JsonObject? = JsonUtil.anyToElement(value) as? JsonObject
     val reportDefinition = obj(windowForm["reportDefinition"])
+    val definitionDocument = obj(reportDefinition?.get("documentPatch"))
+        ?: obj(reportDefinition?.get("reportDocument"))
+    // Conversation window snapshots depth-limit deeply nested reportDefinition
+    // values. The report-builder state carries the same authored blocks one
+    // level closer to the root, preserving chart fields and table columns. Web
+    // restores from that state as well, so prefer it when reopening on Android.
+    val stateBlocks = windowForm.values.asSequence()
+        .mapNotNull(::obj)
+        .mapNotNull { it["reportDocumentBlocks"] as? JsonArray }
+        .firstOrNull { it.isNotEmpty() }
+    val stateDocument = stateBlocks?.let { blocks ->
+        JsonObject((definitionDocument?.toMutableMap() ?: mutableMapOf()).apply {
+            put("blocks", blocks)
+        })
+    }
     val candidates = listOf(
+        stateDocument,
         reportDefinition?.get("documentPatch"),
         reportDefinition?.get("reportDocument"),
         windowForm["documentPatch"],
@@ -55,8 +77,27 @@ internal fun reportBuilderPublishedSources(
     config: DashboardReportBuilderDef,
     document: JsonObject
 ): List<ReportBuilderPublishedDataSourceDef> {
-    val referenced = reportBuilderAuthoredDatasetRefs(document) - "primary"
-    return config.dataSources.filter { it.id in referenced }
+    val referencedInDocumentOrder = (document["blocks"] as? JsonArray).orEmpty()
+        .mapNotNull { block ->
+            ((block as? JsonObject)?.get("datasetRef") as? JsonPrimitive)?.content
+                ?.trim()?.takeIf { it.isNotEmpty() && it != "primary" }
+        }
+        .distinct()
+    val order = referencedInDocumentOrder.withIndex().associate { it.value to it.index }
+    return config.dataSources
+        .filter { it.id in order }
+        .sortedWith(compareBy<ReportBuilderPublishedDataSourceDef>(
+            { reportBuilderPublishedFetchPriority(it) },
+            { order[it.id] ?: Int.MAX_VALUE }
+        ))
+}
+
+/** Fetch cheap aggregate cards before detailed chart/table datasets on mobile. */
+internal fun reportBuilderPublishedFetchPriority(source: ReportBuilderPublishedDataSourceDef): Int {
+    val request = source.request
+    val dimensions = request["dimensions"] as? JsonObject
+    val limit = (request["limit"] as? JsonPrimitive)?.content?.toIntOrNull()
+    return if (dimensions?.isEmpty() == true && limit != null && limit <= 1) 0 else 1
 }
 
 /** Catalog request fields define the dataset shape; active filters remain inherited. */
@@ -126,6 +167,7 @@ internal fun ReportBuilderAuthoredResult(
     primaryControl: ControlState,
     primaryRequest: Map<String, Any?>
 ) {
+    val referencedDatasetRefs = remember(document) { reportBuilderAuthoredDatasetRefs(document) }
     val declarations = remember(config, document) { reportBuilderPublishedSources(config, document) }
     val contexts = declarations.mapNotNull { declaration ->
         window.contextForInstanceOrNull(
@@ -133,18 +175,29 @@ internal fun ReportBuilderAuthoredResult(
             dataSourceRef = declaration.dataSourceRef
         )?.let { declaration to it }
     }
-    val rowsById = linkedMapOf("primary" to primaryRows)
-    val controls = mutableListOf(primaryControl)
+    val rowsById = linkedMapOf<String, List<Map<String, Any?>>>()
+    val controls = mutableListOf<ControlState>()
+    if ("primary" in referencedDatasetRefs) {
+        rowsById["primary"] = primaryRows
+        controls += primaryControl
+    }
     contexts.forEach { (declaration, context) ->
         val rows by context.collection.flow.collectAsState(initial = context.collection.peek())
         val control by context.control.flow.collectAsState(initial = context.control.peek())
         rowsById[declaration.id] = rows
         controls += control
-        val request = remember(primaryRequest, declaration) {
-            reportBuilderPublishedRequest(primaryRequest, declaration)
-        }
-        LaunchedEffect(request) {
-            if (request.isNotEmpty()) context.setInputParameters(request, fetch = true)
+    }
+    // A large authored report can reference many logical datasets backed by
+    // one expensive cube. Hydrate them in priority order so Android does not
+    // stampede the gateway with identical concurrent cube jobs. The first
+    // cheap aggregate normally unlocks the KPI overview immediately.
+    LaunchedEffect(primaryRequest, declarations) {
+        contexts.forEach { (declaration, context) ->
+            val request = reportBuilderPublishedRequest(primaryRequest, declaration)
+            if (request.isEmpty()) return@forEach
+            context.setInputParameters(request, fetch = true)
+            context.control.flow.first { it.loading || it.resolved }
+            context.control.flow.first { !it.loading && it.resolved }
         }
     }
 
@@ -170,6 +223,8 @@ internal fun ReportBuilderAuthoredResult(
     val runtimeContainer = remember(artifact.metadata) {
         artifact.metadata.view?.content?.containers?.firstOrNull()
     }
+    val pending = controls.any { it.loading || !it.resolved }
+    val hasMaterializedRows = rowsById.values.any { it.isNotEmpty() }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val error = controls.firstNotNullOfOrNull { it.error?.takeIf(String::isNotBlank) }
         if (error != null) {
@@ -179,7 +234,23 @@ internal fun ReportBuilderAuthoredResult(
                 color = Color(0xFFB42318)
             )
         }
-        if (runtimeContainer != null) {
+        if (pending) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                Text(
+                    text = "Loading report data…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        // Do not turn an unresolved dataset into a definitive empty KPI/card.
+        // Partial output remains useful after an explicit error, while a normal
+        // in-flight request gets one honest loading state.
+        if (runtimeContainer != null && (hasMaterializedRows || !pending || error != null)) {
             DashboardReportRuntimeSurface(runtime, window, runtimeContainer, dashboardRoot)
         }
     }
@@ -187,14 +258,13 @@ internal fun ReportBuilderAuthoredResult(
 
 internal fun authoredReportLoadErrorMessage(error: String): String {
     val detail = error.trim()
+    if (detail.contains("504") || detail.contains("gateway time-out", ignoreCase = true)) {
+        return "Report data took too long to load. Try refreshing."
+    }
     if (detail.contains("timeout", ignoreCase = true) ||
         detail.contains("timed out", ignoreCase = true)
     ) {
         return "Some report data did not respond. Try refreshing."
     }
-    return if (detail.isBlank()) {
-        "Some report data could not be loaded."
-    } else {
-        "Some report data could not be loaded: $detail"
-    }
+    return "Some report data could not be loaded. Try refreshing."
 }

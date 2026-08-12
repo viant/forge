@@ -345,6 +345,9 @@ fun ReportBuilderRenderer(
     }
     val currentPrefillSignature = remember(windowForm) { reportBuilderPrefillSignature(windowForm) }
     val requestSignature = remember(requestPayload) { JsonUtil.anyToElement(requestPayload).toString() }
+    val authoredNeedsPrimaryDataset = remember(authoredDocument) {
+        authoredDocument == null || "primary" in reportBuilderAuthoredDatasetRefs(authoredDocument)
+    }
 
     val filteredRows = remember(rows, staticFilters, config.staticFilters) {
         applyStaticFilters(rows, config.staticFilters, staticFilters)
@@ -423,7 +426,7 @@ fun ReportBuilderRenderer(
     }
 
     LaunchedEffect(requestPayload, restoredStoredState) {
-        if (restoredStoredState && requestPayload.isNotEmpty()) {
+        if (restoredStoredState && requestPayload.isNotEmpty() && authoredNeedsPrimaryDataset) {
             context.setInputParameters(requestPayload, fetch = true)
         }
     }

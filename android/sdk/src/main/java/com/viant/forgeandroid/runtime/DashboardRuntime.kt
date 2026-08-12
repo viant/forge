@@ -1602,6 +1602,12 @@ fun formatDashboardValue(value: Any?, format: String?): String {
                 maximumFractionDigits = 0
             }.format(it)
         } ?: value.toString()
+        "currency2" -> dashboardNumberValue(value)?.let {
+            NumberFormat.getCurrencyInstance(locale).apply {
+                minimumFractionDigits = 2
+                maximumFractionDigits = 2
+            }.format(it)
+        } ?: value.toString()
         "percent" -> dashboardNumberValue(value)?.let {
             "${NumberFormat.getNumberInstance(locale).apply { minimumFractionDigits = 1; maximumFractionDigits = 1 }.format(it)}%"
         } ?: value.toString()
@@ -1611,6 +1617,7 @@ fun formatDashboardValue(value: Any?, format: String?): String {
         "integer" -> dashboardNumberValue(value)?.let { NumberFormat.getIntegerInstance(locale).format(it.toLong()) } ?: value.toString()
         "compact", "compactnumber" -> dashboardNumberValue(value)?.let { formatCompactDashboardNumber(it, locale) } ?: value.toString()
         "number" -> dashboardNumberValue(value)?.let { formatDashboardGroupedNumber(it, 0, 5) } ?: value.toString()
+        "number2" -> dashboardNumberValue(value)?.let { formatDashboardGroupedNumber(it, 0, 2) } ?: value.toString()
         "number5" -> dashboardNumberValue(value)?.let { formatDashboardGroupedNumber(it, 5, 5) } ?: value.toString()
         else -> value.toString()
     }

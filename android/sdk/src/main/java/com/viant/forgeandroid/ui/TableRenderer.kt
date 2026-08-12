@@ -7,10 +7,12 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,7 +21,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -84,20 +86,21 @@ fun TableRenderer(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxWidth()) {
         table.toolbar?.let { tb ->
             TableToolbar(runtime, context, tb)
         }
         if (tableRefreshControlVisible(context.dataSourceRef, rowsOverride != null)) {
             Column(modifier = Modifier.padding(bottom = 8.dp)) {
-                Button(
+                OutlinedButton(
                     onClick = {
                         context.fetchCollection()
                     },
-                    enabled = !refreshFeedback.busy
+                    enabled = !refreshFeedback.busy,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null)
-                    Text(if (refreshFeedback.busy) "Refreshing" else "Refresh")
+                    Text(if (refreshFeedback.busy) "Refreshing…" else "Refresh")
                 }
                 refreshFeedback.message?.let { message ->
                     Text(
@@ -110,13 +113,13 @@ fun TableRenderer(
             }
         }
         BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f, fill = true)
+            modifier = Modifier.fillMaxWidth()
         ) {
             val compact = maxWidth < 720.dp
-            if (compact) {
-                Column(modifier = Modifier.fillMaxSize()) {
+            if (sortedRows.isEmpty() && !control.loading && control.error.isNullOrBlank()) {
+                EmptyTableState(context.dataSourceRef)
+            } else if (compact) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     CompactSortControls(table, sortColumnId, sortAscending) { columnId ->
                         if (sortColumnId == columnId) {
                             sortAscending = !sortAscending
@@ -125,11 +128,11 @@ fun TableRenderer(
                             sortAscending = true
                         }
                     }
-                    LazyColumn(
-                        modifier = Modifier.weight(1f, fill = true),
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        itemsIndexed(sortedRows) { _, indexed ->
+                        sortedRows.take(MOBILE_TABLE_ROW_LIMIT).forEach { indexed ->
                             val row = indexed.row
                             val rowIndex = indexed.originalIndex
                             val isSelected = tableRowIsSelected(selection, row, rowIndex)
@@ -137,13 +140,22 @@ fun TableRenderer(
                                 coroutineScope.launch { context.toggleSelection(row, rowIndex, selectionModeOverride) }
                             }
                         }
+                        if (sortedRows.size > MOBILE_TABLE_ROW_LIMIT) {
+                            Text(
+                                text = "Showing $MOBILE_TABLE_ROW_LIMIT of ${sortedRows.size} rows",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF667085),
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+                            )
+                        }
                     }
                 }
             } else {
                 val horizontalScroll = rememberScrollState()
                 Card(
                     modifier = Modifier
-                        .fillMaxSize(),
+                        .fillMaxWidth()
+                        .heightIn(min = 320.dp, max = 640.dp),
                     shape = RoundedCornerShape(18.dp),
                     border = BorderStroke(1.dp, Color(0xFFE7ECF3)),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -186,6 +198,37 @@ fun TableRenderer(
                 currentPage = input.page ?: 1
             )
         }
+    }
+}
+
+private const val MOBILE_TABLE_ROW_LIMIT = 50
+
+@Composable
+private fun EmptyTableState(dataSourceRef: String?) {
+    val subject = dataSourceRef
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?.replace('_', ' ')
+        ?.replace('-', ' ')
+        ?.lowercase()
+        ?: "rows"
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = "No $subject available",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFF344054)
+        )
+        Text(
+            text = "Try refreshing or changing the active filters.",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFF667085)
+        )
     }
 }
 

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.widthIn
@@ -29,6 +30,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Card
@@ -600,88 +602,173 @@ internal fun DashboardTableBlock(
                 )
             }
         }
-        rowsForDisplay.forEachIndexed { rowIndex, row ->
-            val plannerDisabled = isPlannerTable && plannerTableRowDisabled(row, plannerDisabledField)
-            val plannerSelected = plannerSelectedIndexes.contains(rowIndex)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, Color(0xFFE0E6EF), RoundedCornerShape(14.dp))
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (isPlannerTable) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Checkbox(
-                            checked = plannerSelected,
-                            enabled = !plannerDisabled,
-                            onCheckedChange = { checked ->
-                                val next = if (checked) {
-                                    plannerSelectedIndexes + rowIndex
-                                } else {
-                                    plannerSelectedIndexes - rowIndex
-                                }
-                                publishPlannerSelection(next)
-                            }
-                        )
-                        Text(
-                            text = if (plannerDisabled) "Locked" else if (plannerSelected) "Selected" else "Not selected",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (plannerDisabled) Color(0xFF98A2B3) else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 12.dp)
-                        )
-                    }
-                }
-                columns.forEachIndexed { index, column ->
-                    val key = dashboardTableColumnKey(column).orEmpty()
-                    val raw = row[key]
-                    val value = formatDashboardValue(raw, column.format).ifBlank { column.emptyText ?: "-" }
-                    val linkTarget = resolveColumnLinkTargetFromContext(
-                        column,
-                        LinkResolutionContext(
-                            row = row,
-                            value = raw,
-                            form = form,
-                            metrics = metrics,
-                            windowForm = windowForm
-                        )
-                    )
-                    val openLink: () -> Unit = {
-                        when (linkTarget) {
-                            is ExternalLinkTarget -> uriHandler.openUri(linkTarget.href)
-                            is WindowLinkTarget -> openResolvedWindowLink(runtime, context.window, linkTarget)
-                            null -> Unit
-                        }
-                    }
-                    if (index == 0) {
-                        Text(
-                            text = value,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (linkTarget != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
-                            textDecoration = if (linkTarget != null) TextDecoration.Underline else null,
-                            modifier = if (linkTarget != null) Modifier.clickable(onClick = openLink) else Modifier
-                        )
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text(
-                                text = column.label ?: key,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = Color(0xFF667085)
+        if (isPlannerTable) {
+            PlannerSelectionTable(
+                columns = columns,
+                rows = rowsForDisplay,
+                selectedIndexes = plannerSelectedIndexes,
+                disabledField = plannerDisabledField,
+                onSelectionChange = publishPlannerSelection
+            )
+        } else {
+            rowsForDisplay.forEach { row ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Color(0xFFE0E6EF), RoundedCornerShape(14.dp))
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    columns.forEachIndexed { index, column ->
+                        val key = dashboardTableColumnKey(column).orEmpty()
+                        val raw = row[key]
+                        val value = formatDashboardValue(raw, column.format).ifBlank { column.emptyText ?: "-" }
+                        val linkTarget = resolveColumnLinkTargetFromContext(
+                            column,
+                            LinkResolutionContext(
+                                row = row,
+                                value = raw,
+                                form = form,
+                                metrics = metrics,
+                                windowForm = windowForm
                             )
+                        )
+                        val openLink: () -> Unit = {
+                            when (linkTarget) {
+                                is ExternalLinkTarget -> uriHandler.openUri(linkTarget.href)
+                                is WindowLinkTarget -> openResolvedWindowLink(runtime, context.window, linkTarget)
+                                null -> Unit
+                            }
+                        }
+                        if (index == 0) {
                             Text(
                                 text = value,
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
                                 color = if (linkTarget != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
                                 textDecoration = if (linkTarget != null) TextDecoration.Underline else null,
                                 modifier = if (linkTarget != null) Modifier.clickable(onClick = openLink) else Modifier
                             )
+                        } else {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    text = column.label ?: key,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color(0xFF667085)
+                                )
+                                Text(
+                                    text = value,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (linkTarget != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                                    textDecoration = if (linkTarget != null) TextDecoration.Underline else null,
+                                    modifier = if (linkTarget != null) Modifier.clickable(onClick = openLink) else Modifier
+                                )
+                            }
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun PlannerSelectionTable(
+    columns: List<ColumnDef>,
+    rows: List<Map<String, Any?>>,
+    selectedIndexes: Set<Int>,
+    disabledField: String?,
+    onSelectionChange: (Set<Int>) -> Unit
+) {
+    val selectableIndexes = rows.indices.filterNot { plannerTableRowDisabled(rows[it], disabledField.orEmpty()) }.toSet()
+    val allSelected = selectableIndexes.isNotEmpty() && selectedIndexes.containsAll(selectableIndexes)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .border(1.dp, Color(0xFFD9E2EF), RoundedCornerShape(12.dp))
+    ) {
+        Row(
+            modifier = Modifier
+                .background(Color(0xFFF3F6FA))
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = allSelected,
+                onCheckedChange = { checked ->
+                    onSelectionChange(if (checked) selectedIndexes + selectableIndexes else selectedIndexes - selectableIndexes)
+                },
+                modifier = Modifier.width(52.dp)
+            )
+            columns.forEach { column ->
+                val key = dashboardTableColumnKey(column).orEmpty()
+                Text(
+                    text = column.label ?: key,
+                    modifier = Modifier
+                        .width(plannerTableColumnWidth(column))
+                        .padding(horizontal = 8.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF344054)
+                )
+            }
+        }
+        rows.forEachIndexed { rowIndex, row ->
+            val disabled = plannerTableRowDisabled(row, disabledField.orEmpty())
+            val selected = selectedIndexes.contains(rowIndex)
+            Row(
+                modifier = Modifier
+                    .background(
+                        when {
+                            selected -> Color(0xFFF0F5FF)
+                            rowIndex % 2 == 1 -> Color(0xFFF9FAFC)
+                            else -> Color.White
+                        }
+                    )
+                    .border(width = 0.5.dp, color = Color(0xFFE7ECF3))
+                    .padding(vertical = 5.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Checkbox(
+                    checked = selected,
+                    enabled = !disabled,
+                    onCheckedChange = { checked ->
+                        onSelectionChange(if (checked) selectedIndexes + rowIndex else selectedIndexes - rowIndex)
+                    },
+                    modifier = Modifier.width(52.dp)
+                )
+                columns.forEach { column ->
+                    val key = dashboardTableColumnKey(column).orEmpty()
+                    val value = formatDashboardValue(row[key], column.format).ifBlank { column.emptyText ?: "-" }
+                    Text(
+                        text = value,
+                        modifier = Modifier
+                            .width(plannerTableColumnWidth(column))
+                            .padding(horizontal = 8.dp, vertical = 7.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (disabled) Color(0xFF98A2B3) else Color(0xFF344054),
+                        maxLines = if (plannerTableColumnIsNarrative(column)) 4 else 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+internal fun plannerTableColumnIsNarrative(column: ColumnDef): Boolean {
+    val value = listOfNotNull(column.id, column.name, column.key, column.label)
+        .joinToString(" ")
+        .lowercase()
+    return listOf("rationale", "reason", "description", "summary", "note").any(value::contains)
+}
+
+private fun plannerTableColumnWidth(column: ColumnDef) = when {
+    plannerTableColumnIsNarrative(column) -> 280.dp
+    listOfNotNull(column.id, column.name, column.key, column.label)
+        .any { it.contains("publisher", ignoreCase = true) } -> 164.dp
+    else -> 124.dp
 }
 
 private fun dashboardTableColumnKey(column: ColumnDef): String? {
@@ -1685,6 +1772,8 @@ private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowCon
     val nestedBlockIds = (tabSectionIds + tabChildIds).toSet()
     var selectedTabs by remember(summary.blocks) { mutableStateOf(emptyMap<String, String>()) }
     var selectedMobileSection by remember(summary.blocks) { mutableStateOf<String?>(null) }
+    var pdfExporting by remember(window.windowId, container.id) { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val compact = maxWidth < 600.dp
         Column(
@@ -1712,9 +1801,30 @@ private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowCon
             )
             if (exportExecution != null) {
                 OutlinedButton(
-                    onClick = { executeReportRuntimeAction(runtime, window, dashboardRoot, exportExecution) }
+                    enabled = !pdfExporting,
+                    onClick = {
+                        if (pdfExporting) return@OutlinedButton
+                        pdfExporting = true
+                        val job = executeReportRuntimeAction(runtime, window, dashboardRoot, exportExecution)
+                        if (job == null) {
+                            pdfExporting = false
+                        } else {
+                            coroutineScope.launch {
+                                job.join()
+                                pdfExporting = false
+                            }
+                        }
+                    }
                 ) {
-                    Text("Download PDF")
+                    if (pdfExporting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Text("Preparing PDF…", modifier = Modifier.padding(start = 8.dp))
+                    } else {
+                        Text("Download PDF")
+                    }
                 }
             }
         }
@@ -2546,78 +2656,43 @@ private fun DashboardReportRuntimeTablePreview(
                 .orEmpty()
             table.rows.maxOfOrNull { reportRuntimeNumericValue(it[key]) ?: 0.0 } ?: 0.0
         }
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            if (maxWidth < 600.dp) {
-                // A desktop grid forces the useful columns off-screen on a phone.
-                // Each record is its own responsive row view, while preserving the
-                // authored labels, formats, and quantitative data-bar treatment.
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, Color(0xFFDBE5EC), RoundedCornerShape(12.dp)),
-                    verticalArrangement = Arrangement.spacedBy(0.dp)
-                ) {
-                    visibleRows.forEachIndexed { index, row ->
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(if (index % 2 == 0) Color.White else Color(0xFFF7FAFC))
-                                .padding(horizontal = 11.dp, vertical = 10.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            table.columns.forEachIndexed { columnIndex, column ->
-                                val key = reportRuntimeColumnKey(column)
-                                val fraction = reportRuntimeDataBarFraction(row[key], dataBarMaximums[column] ?: 0.0)
-                                ReportRuntimeTableCell(
-                                    label = column.label ?: column.name ?: column.id.orEmpty(),
-                                    value = reportRuntimeDisplayValue(row[key], column),
-                                    fraction = fraction,
-                                    primary = columnIndex == 0
-                                )
-                            }
-                        }
-                    }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .border(1.dp, Color(0xFFDBE5EC), RoundedCornerShape(12.dp)),
+            verticalArrangement = Arrangement.spacedBy(0.dp)
+        ) {
+            Row(
+                modifier = Modifier.background(Color(0xFFF2F6FA)).padding(horizontal = 10.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                table.columns.forEach { column ->
+                    Text(
+                        text = column.label ?: column.name ?: column.id.orEmpty(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF30404D),
+                        modifier = Modifier.widthIn(min = 104.dp, max = 176.dp)
+                    )
                 }
-            } else {
-                Column(
+            }
+            visibleRows.forEachIndexed { index, row ->
+                Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .border(1.dp, Color(0xFFDBE5EC), RoundedCornerShape(12.dp)),
-                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                        .background(if (index % 2 == 0) Color.White else Color(0xFFFBFDFF))
+                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.background(Color(0xFFF2F6FA)).padding(horizontal = 10.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        table.columns.forEach { column ->
-                            Text(
-                                text = column.label ?: column.name ?: column.id.orEmpty(),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF30404D),
-                                modifier = Modifier.widthIn(min = 112.dp, max = 184.dp)
+                    table.columns.forEach { column ->
+                        val key = reportRuntimeColumnKey(column)
+                        Box(modifier = Modifier.widthIn(min = 104.dp, max = 176.dp)) {
+                            ReportRuntimeTableCell(
+                                label = null,
+                                value = reportRuntimeDisplayValue(row[key], column),
+                                fraction = reportRuntimeDataBarFraction(row[key], dataBarMaximums[column] ?: 0.0),
+                                primary = false
                             )
-                        }
-                    }
-                    visibleRows.forEachIndexed { index, row ->
-                        Row(
-                            modifier = Modifier
-                                .background(if (index % 2 == 0) Color.White else Color(0xFFFBFDFF))
-                                .padding(horizontal = 10.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            table.columns.forEach { column ->
-                                val key = reportRuntimeColumnKey(column)
-                                Box(modifier = Modifier.widthIn(min = 112.dp, max = 184.dp)) {
-                                    ReportRuntimeTableCell(
-                                        label = null,
-                                        value = reportRuntimeDisplayValue(row[key], column),
-                                        fraction = reportRuntimeDataBarFraction(row[key], dataBarMaximums[column] ?: 0.0),
-                                        primary = false
-                                    )
-                                }
-                            }
                         }
                     }
                 }
@@ -2805,12 +2880,12 @@ private fun executeReportRuntimeAction(
     window: WindowContext,
     dashboardRoot: ContainerDef,
     execution: DashboardReportRuntimeActionExecution
-) {
+): kotlinx.coroutines.Job? {
     execution.selection?.let {
         window.dashboardSelectionSignal(dashboardRoot).set(it)
-        return
+        return null
     }
-    runtime.execute(
+    return runtime.execute(
         ExecutionDef(handler = "reportRuntime.executeAction"),
         context = null,
         args = mapOf(
