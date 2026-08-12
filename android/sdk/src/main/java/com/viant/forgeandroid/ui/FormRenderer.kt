@@ -36,6 +36,7 @@ import com.viant.forgeandroid.runtime.ForgeRuntime
 import com.viant.forgeandroid.runtime.ItemDef
 import com.viant.forgeandroid.runtime.ParameterDef
 import com.viant.forgeandroid.runtime.SelectorUtil
+import com.viant.forgeandroid.runtime.formatDashboardValue
 import com.viant.forgeandroid.runtime.valueKey
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -170,7 +171,10 @@ private fun FormItemRenderer(
     val value = resolveItemValue(item, key, form, metrics, windowForm)
     val validationError = validationErrors[key]
     when (item.type) {
-                "label" -> LabelItemCard(label = item.label ?: key, value = value)
+                "label" -> LabelItemCard(
+                    label = item.label ?: key,
+                    value = resolveItemDisplayValue(item, key, form, metrics, windowForm)
+                )
                 "markdown" -> {
                     val markdown = value.ifBlank {
                         (item.properties["value"] as? JsonPrimitive)?.contentOrNull.orEmpty()
@@ -327,7 +331,7 @@ private fun SummaryItemCard(
     val windowFormSignal = dataSourceContext.window.windowFormSignal()
     val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
     val key = itemValueKey(item) ?: return
-    val value = resolveItemValue(item, key, form, metrics, windowForm)
+    val value = resolveItemDisplayValue(item, key, form, metrics, windowForm)
     LabelItemCard(label = item.label ?: key, value = value, emphasized = true)
 }
 
@@ -530,6 +534,18 @@ internal fun resolveItemValue(
     collection: List<Map<String, Any?>> = emptyList()
 ): String {
     return resolveItemRawValue(item, key, form, metrics, windowForm, collection)?.toString().orEmpty()
+}
+
+internal fun resolveItemDisplayValue(
+    item: ItemDef,
+    key: String,
+    form: Map<String, Any?>,
+    metrics: Map<String, Any?>,
+    windowForm: Map<String, Any?>,
+    collection: List<Map<String, Any?>> = emptyList()
+): String {
+    val raw = resolveItemRawValue(item, key, form, metrics, windowForm, collection)
+    return if (raw == null) "" else formatDashboardValue(raw, item.format)
 }
 
 internal fun setScopedItemValue(

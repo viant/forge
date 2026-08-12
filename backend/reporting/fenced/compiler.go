@@ -70,6 +70,7 @@ func lowerAssembly(assembly *Assembly) (json.RawMessage, json.RawMessage, json.R
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
+	normalizeBlockDatasetRefs(blocks, primaryDataSourceRef(assembly))
 	blockOrder := make([]string, 0, len(blocks))
 	items := make([]any, 0, len(blocks))
 	layoutSizes := sourceLayoutSizes(assembly.Source)
@@ -225,24 +226,62 @@ func normalizeSpecBlocks(blocks []map[string]any) {
 	}
 }
 
+func normalizeBlockDatasetRefs(blocks []map[string]any, fallback string) {
+	if strings.TrimSpace(fallback) == "" {
+		return
+	}
+	dataBoundKinds := map[string]bool{
+		"tableBlock": true, "chartBlock": true, "kpiBlock": true,
+		"badgesBlock": true, "collectionBlock": true, "geoMapBlock": true,
+	}
+	for _, block := range blocks {
+		if dataBoundKinds[textValue(block["kind"])] && textValue(block["datasetRef"]) == "" {
+			block["datasetRef"] = fallback
+		}
+	}
+}
+
 func buildDatasets(assembly *Assembly) ([]any, []any, error) {
 	ids := make([]string, 0, len(assembly.DataSources))
 	for id := range assembly.DataSources {
 		ids = append(ids, id)
+	}
+	// Report documents may be entirely authored content (markdown, callouts,
+	// sections, and other static blocks). The canonical export contract still
+	// requires one dataset/source identity, so preserve those reports with an
+	// empty static dataset instead of rejecting PDF export.
+	if len(ids) == 0 {
+		ids = append(ids, assembly.ID)
 	}
 	sort.Strings(ids)
 	specDatasets := make([]any, 0, len(ids))
 	fillDatasets := make([]any, 0, len(ids))
 	for _, id := range ids {
 		var rows []map[string]any
-		if err := json.Unmarshal(assembly.DataSources[id], &rows); err != nil {
+		rawRows, exists := assembly.DataSources[id]
+		if !exists {
+			rows = []map[string]any{}
+		} else if err := json.Unmarshal(rawRows, &rows); err != nil {
 			return nil, nil, fmt.Errorf("datasource %q must contain a row array: %w", id, err)
 		}
 		keys := columnKeys(rows)
+		if len(keys) == 0 {
+			// The export envelope requires a non-empty static schema even when the
+			// authored report has no rows. This key is contract-only and is never
+			// rendered as report content.
+			keys = []string{"_placeholder"}
+		}
 		limit, offset, rowCount := max(1, len(rows)), 0, len(rows)
 		request := map[string]any{"kind": "staticJson", "format": "json", "rowCount": rowCount, "columnKeys": keys, "limit": limit, "offset": offset}
 		specDatasets = append(specDatasets, map[string]any{"id": id, "dataSourceRef": id, "request": request})
-		requestRaw, _ := json.Marshal(request)
+		requestForHash := cloneMap(request)
+		if len(keys) == 0 {
+			// RequestPayload intentionally omits an empty columnKeys slice while
+			// hashing, even though the decoded static request retains the required
+			// non-nil empty slice for validation.
+			delete(requestForHash, "columnKeys")
+		}
+		requestRaw, _ := json.Marshal(requestForHash)
 		fillDatasets = append(fillDatasets, map[string]any{
 			"id": id, "dataSourceRef": id, "request": request,
 			"provenance": map[string]any{"requestHash": hashStableJSON(requestRaw), "rowCount": len(rows), "truncated": false, "hasMore": false, "diagnostics": []any{}},
@@ -520,17 +559,9 @@ func buildPrint(title string, source map[string]any, specRaw, fillRaw json.RawMe
 			if len(items) == 0 {
 				continue
 			}
-			postureLayout := strings.EqualFold(strings.TrimSpace(blockTitle), "Current posture")
-			columns := len(items)
-			rows := 1
-			if postureLayout {
-				columns = min(2, len(items))
-				rows = (len(items) + columns - 1) / columns
-			}
-			required := 72.0
-			if postureLayout {
-				required = 26.0 + float64(rows)*42
-			}
+			columns := min(2, len(items))
+			rows := (len(items) + columns - 1) / columns
+			required := 26.0 + float64(rows)*42
 			ensure(required)
 			titleID := id + "__title"
 			elements = append(elements, textElement(titleID, margin, y, width-2*margin, 20, blockTitle, 14, "600"))
@@ -539,43 +570,23 @@ func buildPrint(title string, source map[string]any, specRaw, fillRaw json.RawMe
 			badgeWidth := (width - 2*margin - float64(columns-1)*8) / float64(columns)
 			for index, rawItem := range items {
 				badge := rawItem.(map[string]any)
-				x := margin + float64(index)*(badgeWidth+8)
-				badgeY := y
-				if postureLayout {
-					x = margin + float64(index%columns)*(badgeWidth+8)
-					badgeY = y + float64(index/columns)*42
-				}
-				background, border, foreground := "#f7faff", "", ""
-				if postureLayout {
-					background, border, foreground = badgeToneColors(textValue(badge["tone"]))
-				}
-				badgeHeight, textInset, textTop := 34.0, 8.0, 9.0
-				if postureLayout {
-					badgeHeight, textInset, textTop = 32, 12, 8
-				}
+				x := margin + float64(index%columns)*(badgeWidth+8)
+				badgeY := y + float64(index/columns)*42
+				background, border, foreground := badgeToneColors(textValue(badge["tone"]))
+				badgeHeight, textInset, textTop := 32.0, 12.0, 8.0
 				rect := rectElement(fmt.Sprintf("%s__badge_%d", id, index), x, badgeY, badgeWidth, badgeHeight, background)
-				if postureLayout {
-					rect["strokeColor"] = border
-					rect["radius"] = 16
-				}
+				rect["strokeColor"] = border
+				rect["radius"] = 16
 				elements = append(elements, rect)
 				label := textValue(badge["label"])
 				value := textValue(badge["displayValue"])
 				badgeText := strings.TrimSpace(label + ": " + value)
-				if postureLayout {
-					badgeText = fitTableText(badgeText, badgeWidth-2*textInset, 10)
-				}
+				badgeText = fitTableText(badgeText, badgeWidth-2*textInset, 10)
 				text := textElement(fmt.Sprintf("%s__badge_text_%d", id, index), x+textInset, badgeY+textTop, badgeWidth-2*textInset, 16, badgeText, 10, "600")
-				if postureLayout {
-					text["color"] = foreground
-				}
+				text["color"] = foreground
 				elements = append(elements, text)
 			}
-			if postureLayout {
-				y += float64(rows)*42 + 8
-			} else {
-				y += 46
-			}
+			y += float64(rows)*42 + 8
 		case "kpiBlock":
 			if pendingKPIs == 0 {
 				ensure(76)

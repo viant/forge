@@ -52,6 +52,7 @@ export function formatExportNumericValue(value, format = "", {
   const normalizedFormat = normalizeString(format).toLowerCase();
   switch (normalizedFormat) {
     case "currency":
+    case "currency2":
       return new Intl.NumberFormat("en-US", {
         style: "currency",
         currency: "USD",
@@ -87,6 +88,12 @@ export function formatExportNumericValue(value, format = "", {
       return new Intl.NumberFormat("en-US", {
         minimumFractionDigits: 0,
         maximumFractionDigits: axis ? (Number.isInteger(numeric) ? 0 : 1) : 5,
+        useGrouping: true,
+      }).format(numeric);
+    case "number2":
+      return new Intl.NumberFormat("en-US", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
         useGrouping: true,
       }).format(numeric);
     case "number5":

@@ -176,7 +176,7 @@ public struct ChartRenderer: View {
                 pieSliceSelector
             }
         } else {
-            Chart(chartSeriesData) { item in
+            Chart(displayChartSeriesData) { item in
                 switch type {
                 case "line", "composed", "area":
                     if singleCategory {
@@ -229,12 +229,14 @@ public struct ChartRenderer: View {
             .chartForegroundStyleScale(domain: seriesKeys, range: seriesColors)
             .chartXAxis {
                 AxisMarks(values: sampledChartAxisLabels(
-                    chartSeriesData.map(\.category),
+                    displayChartSeriesData.map(\.category),
                     maximum: isCompactPresentation ? 4 : 6
                 )) { value in
                     AxisGridLine()
                     AxisTick()
-                    AxisValueLabel()
+                    if let raw = value.as(String.self) {
+                        AxisValueLabel { Text(compactChartAxisLabel(raw)) }
+                    }
                 }
             }
             .chartXSelection(value: $selectedCategory)
@@ -340,7 +342,7 @@ public struct ChartRenderer: View {
         guard let selectedCategory, !selectedCategory.isEmpty else {
             return nil
         }
-        let selectedRows = uniqueChartSelectionRows(category: selectedCategory, data: chartSeriesData, rows: rows)
+        let selectedRows = uniqueChartSelectionRows(category: selectedCategory, data: rawChartSeriesData, rows: rows)
         guard let row = selectedRows.first else {
             return nil
         }
@@ -758,7 +760,7 @@ public struct ChartRenderer: View {
         }
     }
 
-    private var chartSeriesData: [SeriesDatum] {
+    private var rawChartSeriesData: [SeriesDatum] {
         let categoryKey = chart.xKey ?? chart.nameKey ?? seriesKeys.first ?? "label"
         let valueKeys = filteredSeriesKeys
         let displayByKey = Dictionary(uniqueKeysWithValues: seriesDisplays.map { ($0.key, $0) })
@@ -776,6 +778,17 @@ public struct ChartRenderer: View {
                 )
             }
         }
+    }
+
+    private var chartSeriesData: [SeriesDatum] {
+        aggregateDirectChartSeriesData(rawChartSeriesData)
+    }
+
+    private var displayChartSeriesData: [SeriesDatum] {
+        downsampleChartSeriesData(
+            chartSeriesData,
+            maximumPerSeries: isCompactPresentation ? 72 : 140
+        )
     }
 
     private func reconcileSeriesSelectionIfNeeded(force: Bool = false) {
@@ -818,6 +831,79 @@ internal func sampledChartAxisLabels(_ labels: [String], maximum: Int) -> [Strin
         let index = Int((Double(position) * Double(lastIndex) / Double(maximum - 1)).rounded())
         return orderedLabels[index]
     }
+}
+
+internal func downsampleChartSeriesData(
+    _ data: [SeriesDatum],
+    maximumPerSeries: Int
+) -> [SeriesDatum] {
+    guard maximumPerSeries > 1 else { return data }
+    let seriesOrder = data.reduce(into: [String]()) { result, item in
+        if !result.contains(item.seriesKey) { result.append(item.seriesKey) }
+    }
+    let selectedIDs = Set(seriesOrder.flatMap { key -> [String] in
+        let values = data.filter { $0.seriesKey == key }
+        guard values.count > maximumPerSeries else { return values.map(\.id) }
+        let lastIndex = values.count - 1
+        return (0..<maximumPerSeries).map { position in
+            let index = Int((Double(position) * Double(lastIndex) / Double(maximumPerSeries - 1)).rounded())
+            return values[index].id
+        }
+    })
+    return data.filter { selectedIDs.contains($0.id) }
+}
+
+/// Matches the web/PDF direct-series preparation contract: rows that share an
+/// x-axis category are one plotted point per series and numeric measures sum.
+/// The original rows remain available to selection/action handling.
+internal func aggregateDirectChartSeriesData(_ data: [SeriesDatum]) -> [SeriesDatum] {
+    var orderedKeys: [String] = []
+    var aggregated: [String: SeriesDatum] = [:]
+    for item in data {
+        let key = "\(item.category)\u{1F}\(item.seriesKey)"
+        if let existing = aggregated[key] {
+            aggregated[key] = SeriesDatum(
+                rowIndex: existing.rowIndex,
+                category: existing.category,
+                seriesKey: existing.seriesKey,
+                seriesLabel: existing.seriesLabel,
+                value: existing.value + item.value
+            )
+        } else {
+            orderedKeys.append(key)
+            aggregated[key] = item
+        }
+    }
+    return orderedKeys.compactMap { aggregated[$0] }
+}
+
+internal func compactChartAxisLabel(_ raw: String) -> String {
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return trimmed }
+    let iso = ISO8601DateFormatter()
+    iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    let date = iso.date(from: trimmed) ?? {
+        iso.formatOptions = [.withInternetDateTime]
+        return iso.date(from: trimmed)
+    }()
+    if let date {
+        let display = DateFormatter()
+        display.locale = Locale(identifier: "en_US_POSIX")
+        display.dateFormat = "MMM d"
+        return display.string(from: date)
+    }
+    if trimmed.count >= 10 {
+        let input = DateFormatter()
+        input.locale = Locale(identifier: "en_US_POSIX")
+        input.dateFormat = "yyyy-MM-dd"
+        if let date = input.date(from: String(trimmed.prefix(10))) {
+            let display = DateFormatter()
+            display.locale = Locale(identifier: "en_US_POSIX")
+            display.dateFormat = "MMM d"
+            return display.string(from: date)
+        }
+    }
+    return trimmed.count > 14 ? String(trimmed.prefix(12)) + "…" : trimmed
 }
 
 internal func chartSelectionSummary(category: String?, data: [SeriesDatum]) -> ChartSelectionSummary? {

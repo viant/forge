@@ -68,6 +68,13 @@ export const formatDisplayValue = (value, format, locale = 'en-US', options = {}
     switch (format) {
         case 'currency':
             return new Intl.NumberFormat(locale, {style: 'currency', currency: 'USD', maximumFractionDigits: 0}).format(numeric);
+        case 'currency2':
+            return new Intl.NumberFormat(locale, {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            }).format(numeric);
         case 'compact':
         case 'compactNumber':
             return new Intl.NumberFormat(locale, {notation: 'compact', maximumFractionDigits: 1}).format(numeric);
@@ -79,6 +86,12 @@ export const formatDisplayValue = (value, format, locale = 'en-US', options = {}
             return new Intl.NumberFormat(locale, {
                 minimumFractionDigits: 0,
                 maximumFractionDigits: 5,
+                useGrouping: true,
+            }).format(numeric);
+        case 'number2':
+            return new Intl.NumberFormat(locale, {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2,
                 useGrouping: true,
             }).format(numeric);
         case 'number5':

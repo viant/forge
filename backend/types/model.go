@@ -109,9 +109,12 @@ type Chart struct {
 }
 
 type ChartXAxis struct {
-	DataKey    string `json:"dataKey" yaml:"dataKey"`
-	Label      string `json:"label,omitempty" yaml:"label,omitempty"`
-	TickFormat string `json:"tickFormat,omitempty" yaml:"tickFormat,omitempty"`
+	DataKey            string            `json:"dataKey" yaml:"dataKey"`
+	Label              string            `json:"label,omitempty" yaml:"label,omitempty"`
+	TickFormat         string            `json:"tickFormat,omitempty" yaml:"tickFormat,omitempty"`
+	TickFormatSource   string            `json:"tickFormatSource,omitempty" yaml:"tickFormatSource,omitempty"`
+	TickFormatSelector string            `json:"tickFormatSelector,omitempty" yaml:"tickFormatSelector,omitempty"`
+	TickFormats        map[string]string `json:"tickFormats,omitempty" yaml:"tickFormats,omitempty"`
 }
 
 type ChartYAxis struct {
@@ -1296,6 +1299,7 @@ type Item struct {
 	Options              []Option                          `json:"options,omitempty" yaml:"options,omitempty"`
 	DateFnsFormat        string                            `json:"dateFnsFormat,omitempty" yaml:"dateFnsFormat,omitempty"`
 	NumericFormat        string                            `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
+	Format               string                            `json:"format,omitempty" yaml:"format,omitempty"`
 	Icon                 string                            `json:"icon,omitempty" yaml:"icon,omitempty"`
 	Type                 string                            `json:"type,omitempty" yaml:"type,omitempty"`
 	Widget               string                            `json:"widget,omitempty" yaml:"widget,omitempty"`

@@ -2640,6 +2640,29 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(rows.first?["region"], .string("EMEA"))
     }
 
+    func testCancelledDataSourceLoadDoesNotBecomeVisibleError() async {
+        let runtime = ForgeRuntime()
+        let window = await runtime.openWindowInline(
+            key: "w1",
+            title: "W1",
+            metadata: WindowMetadata(dataSources: ["list": DataSourceDef()])
+        )
+        await runtime.registerDataSourceLoader { _ in
+            throw URLError(.cancelled)
+        }
+
+        await runtime.setDataSourceInputParameters(
+            windowID: window.id,
+            dataSourceRef: "list",
+            parameters: ["input": .object(["query": .object([:])])],
+            fetch: true
+        )
+
+        let control = await runtime.dataSourceControl(windowID: window.id, dataSourceRef: "list")
+        XCTAssertNil(control.error)
+        XCTAssertFalse(control.loading)
+    }
+
     func testWindowOpensInline() async throws {
         let runtime = ForgeRuntime()
         let state = await runtime.openWindowInline(
@@ -4385,6 +4408,8 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(DashboardRuntime.formatDashboardValue(1250.0, format: "compact"), "1.2K")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue("1250", format: "compactNumber"), "1.2K")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue(126_329_231_621, format: "number"), "126,329,231,621")
+        XCTAssertEqual(DashboardRuntime.formatDashboardValue(3.5, format: "currency2"), "$3.50")
+        XCTAssertEqual(DashboardRuntime.formatDashboardValue(5.6922, format: "number2"), "5.69")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue(95.000000409, format: "number5"), "95.00000")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue(JSONPrimitive.string("0.1937"), format: "percentFraction"), "19.4%")
         XCTAssertEqual(DashboardRuntime.formatDashboardValue(nil, format: "number"), "n/a")
@@ -5034,6 +5059,40 @@ final class ForgeIOSTests: XCTestCase {
             sampledChartAxisLabels([" Q1 ", "Q1", "Q2"], maximum: 4),
             [" Q1 ", "Q1", "Q2"]
         )
+    }
+
+    func testCompactChartAxisLabelFormatsDatesAndTruncatesLongCategories() {
+        XCTAssertEqual(compactChartAxisLabel("2026-02-20T00:00:00Z"), "Feb 20")
+        XCTAssertEqual(compactChartAxisLabel("2026-06-30"), "Jun 30")
+        XCTAssertEqual(compactChartAxisLabel("A very long categorical label"), "A very long …")
+    }
+
+    func testChartDownsamplingPreservesSeriesBoundaries() {
+        let data = (0..<100).map {
+            SeriesDatum(rowIndex: $0, category: "\($0)", seriesKey: "spend", seriesLabel: "Spend", value: Double($0))
+        }
+        let sampled = downsampleChartSeriesData(data, maximumPerSeries: 12)
+
+        XCTAssertEqual(sampled.count, 12)
+        XCTAssertEqual(sampled.first?.category, "0")
+        XCTAssertEqual(sampled.last?.category, "99")
+    }
+
+    func testDirectChartSeriesAggregationMatchesWebAndPDF() {
+        let data = [
+            SeriesDatum(rowIndex: 0, category: "2026-08-10", seriesKey: "spend", seriesLabel: "Spend", value: 12),
+            SeriesDatum(rowIndex: 1, category: "2026-08-10", seriesKey: "spend", seriesLabel: "Spend", value: 8),
+            SeriesDatum(rowIndex: 1, category: "2026-08-10", seriesKey: "impressions", seriesLabel: "Impressions", value: 100),
+            SeriesDatum(rowIndex: 2, category: "2026-08-11", seriesKey: "spend", seriesLabel: "Spend", value: 7)
+        ]
+
+        let aggregated = aggregateDirectChartSeriesData(data)
+
+        XCTAssertEqual(aggregated.count, 3)
+        XCTAssertEqual(aggregated.map(\.category), ["2026-08-10", "2026-08-10", "2026-08-11"])
+        XCTAssertEqual(aggregated.map(\.seriesKey), ["spend", "impressions", "spend"])
+        XCTAssertEqual(aggregated.map(\.value), [20, 100, 7])
+        XCTAssertEqual(aggregated.first?.rowIndex, 0)
     }
 
     func testChartSelectionSummaryKeepsDuplicateSeriesLabelsDistinct() {

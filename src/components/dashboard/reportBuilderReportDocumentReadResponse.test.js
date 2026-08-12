@@ -2394,11 +2394,12 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(deri
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "dateRange",
+    scopeSummaryText: "dateRange: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "dateRange",
+            value: "2026-05-01 – 2026-05-04",
         },
     ],
     content: serializeReportBuilderReportDocumentReadResponse(derivedGetResponse),

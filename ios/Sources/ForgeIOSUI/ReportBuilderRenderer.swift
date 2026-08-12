@@ -480,6 +480,7 @@ public struct ReportBuilderRenderer: View {
             }
             .pickerStyle(.segmented)
             .accessibilityLabel("Report view")
+            .accessibilityIdentifier("forge-report-builder-view-mode")
         }
     }
 
@@ -636,6 +637,7 @@ public struct ReportBuilderRenderer: View {
                     }
                 }
             }
+            .accessibilityIdentifier("forge-report-builder-table")
         }
     }
 
@@ -801,13 +803,16 @@ public struct ReportBuilderRenderer: View {
                 AxisMarks(values: sampledChartAxisLabels(
                     points.map(\.x),
                     maximum: isCompactPresentation ? 4 : 6
-                )) {
+                )) { value in
                     AxisGridLine()
                     AxisTick()
-                    AxisValueLabel()
+                    if let raw = value.as(String.self) {
+                        AxisValueLabel { Text(compactChartAxisLabel(raw)) }
+                    }
                 }
             }
             .frame(height: 220)
+            .accessibilityIdentifier("forge-report-builder-chart")
         }
     }
 
@@ -1067,18 +1072,36 @@ public struct ReportBuilderRenderer: View {
         guard let window else { return }
         let resolvedDataSourceRef = effectiveDataSourceRef ?? ""
         if resolvedDataSourceRef.isEmpty { return }
-        await runtime.setDataSourceInputParameters(
-            windowID: window.windowID,
-            dataSourceRef: resolvedDataSourceRef,
-            parameters: requestPayload,
-            fetch: true
-        )
-        rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
-        let control = await runtime.dataSourceControl(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+        let windowID = window.windowID
+        let payload = requestPayload
+        let signature = requestSignature
+        // SwiftUI legitimately restarts the surrounding task while hydration and
+        // prefill settle. The datasource request must finish independently of that
+        // view-task lifecycle; otherwise URLSession cancels a valid long report.
+        let result = await Task.detached(priority: .userInitiated) {
+            await runtime.setDataSourceInputParameters(
+                windowID: windowID,
+                dataSourceRef: resolvedDataSourceRef,
+                parameters: payload,
+                fetch: true
+            )
+            let fetchedRows = await runtime.dataSourceCollection(
+                windowID: windowID,
+                dataSourceRef: resolvedDataSourceRef
+            )
+            let fetchedControl = await runtime.dataSourceControl(
+                windowID: windowID,
+                dataSourceRef: resolvedDataSourceRef
+            )
+            return (fetchedRows, fetchedControl)
+        }.value
+        guard !Task.isCancelled, signature == requestSignature else { return }
+        rows = result.0
+        let control = result.1
         dataSourceControlState = control
         hasResolvedRows = true
         if control.error == nil {
-            completedRequestSignature = requestSignature
+            completedRequestSignature = signature
         }
     }
 

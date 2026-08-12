@@ -527,6 +527,13 @@ public actor ForgeRuntime {
                     return
                 }
             } catch {
+                // SwiftUI restarts report tasks as restored filters and presets settle.
+                // URLSession reports the superseded request as cancelled; that is not
+                // a datasource failure and must not replace the next request's state
+                // with a visible error.
+                if Task.isCancelled || isForgeCancellationError(error) {
+                    return
+                }
                 print("ForgeRuntime datasource load failed for \(dataSourceRef): \(error)")
                 await dataSourceRuntime.setControl(
                     dataSourceID: dataSourceID,
@@ -534,6 +541,7 @@ public actor ForgeRuntime {
                 )
                 let controlSignal = await signals.control(dataSourceID: dataSourceID)
                 await controlSignal.set(ControlState(error: error.localizedDescription))
+                return
             }
         }
 
@@ -896,6 +904,14 @@ public actor ForgeRuntime {
         }
         return nil
     }
+}
+
+internal func isForgeCancellationError(_ error: Error) -> Bool {
+    if error is CancellationError {
+        return true
+    }
+    let nsError = error as NSError
+    return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
 }
 
 private struct WindowMetadataEnvelope: Decodable {

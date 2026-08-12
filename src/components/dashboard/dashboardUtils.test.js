@@ -294,6 +294,8 @@ assert.equal(formatDashboardValue(1234.5, 'number', 'de-DE'), '1.234,5');
 assert.equal(formatDashboardValue(126329231621, 'number', 'en-US'), '126,329,231,621');
 assert.equal(formatDashboardValue(95.000000409, 'number5', 'en-US'), '95.00000');
 assert.equal(formatDashboardValue(1234, 'currency', 'de-DE').includes('1.234'), true);
+assert.equal(formatDashboardValue(3.5, 'currency2', 'en-US'), '$3.50');
+assert.equal(formatDashboardValue(5.6922, 'number2', 'en-US'), '5.69');
 assert.equal(formatDashboardValue(19.37, 'percent', 'en-US'), '19.4%');
 assert.equal(formatDashboardValue(0.1937, 'percentFraction', 'en-US'), '19.4%');
 assert.equal(formatDashboardValue('2026-05-01T04:00:00Z', 'date', 'en-US').includes('2026'), true);

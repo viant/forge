@@ -175,6 +175,7 @@ function formatValueByFormat(value, formatType) {
     }
     switch (formatType) {
         case "currency":
+        case "currency2":
             return `$${numeric.toFixed(2)}`;
         case "compactNumber":
             return formatLargeNumber(numeric);

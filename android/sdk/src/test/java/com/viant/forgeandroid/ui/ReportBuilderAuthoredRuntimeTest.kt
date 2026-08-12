@@ -12,10 +12,58 @@ import kotlin.test.assertTrue
 
 class ReportBuilderAuthoredRuntimeTest {
     @Test
+    fun builderStateBlocksReplaceDepthLimitedDefinitionBlocks() {
+        val resolved = reportBuilderAuthoredDocument(
+            mapOf(
+                "reportDefinition" to mapOf(
+                    "documentPatch" to mapOf(
+                        "title" to "Performance",
+                        "blocks" to listOf(
+                            mapOf(
+                                "id" to "trend",
+                                "kind" to "chartBlock",
+                                "chartSpec" to mapOf("yFields" to listOf("[MaxDepth]"))
+                            )
+                        )
+                    )
+                ),
+                "reportBuilder:metricsCubeBuilder" to mapOf(
+                    "reportDocumentBlocks" to listOf(
+                        mapOf(
+                            "id" to "trend",
+                            "kind" to "chartBlock",
+                            "chartSpec" to mapOf("yFields" to listOf("totalSpend"))
+                        )
+                    )
+                )
+            )
+        )
+
+        assertNotNull(resolved)
+        assertEquals("Performance", (resolved["title"] as JsonPrimitive).content)
+        val block = (resolved["blocks"] as JsonArray).first() as JsonObject
+        val spec = block["chartSpec"] as JsonObject
+        assertEquals(
+            "totalSpend",
+            ((spec["yFields"] as JsonArray).first() as JsonPrimitive).content
+        )
+    }
+
+    @Test
     fun authoredReportTimeoutUsesActionableCopy() {
         assertEquals(
             "Some report data did not respond. Try refreshing.",
             authoredReportLoadErrorMessage("timeout")
+        )
+    }
+
+    @Test
+    fun authoredReportGatewayErrorDoesNotExposeUrlOrHtml() {
+        assertEquals(
+            "Report data took too long to load. Try refreshing.",
+            authoredReportLoadErrorMessage(
+                "POST https://example.test/fetch failed: 504: <html>Gateway Time-out</html>"
+            )
         )
     }
 
@@ -44,6 +92,40 @@ class ReportBuilderAuthoredRuntimeTest {
             resolved
         )
         assertEquals(listOf("delivery_summary_active_range"), sources.map { it.id })
+    }
+
+    @Test
+    fun aggregateDatasetIsHydratedBeforeDetailedDatasets() {
+        val document = JsonObject(mapOf(
+            "blocks" to JsonArray(listOf(
+                JsonObject(mapOf("datasetRef" to JsonPrimitive("daily"))),
+                JsonObject(mapOf("datasetRef" to JsonPrimitive("summary")))
+            ))
+        ))
+        val detailed = ReportBuilderPublishedDataSourceDef(
+            id = "daily",
+            dataSourceRef = "cube",
+            request = JsonObject(mapOf(
+                "dimensions" to JsonObject(mapOf("eventDate" to JsonPrimitive(true))),
+                "limit" to JsonPrimitive(366)
+            ))
+        )
+        val summary = ReportBuilderPublishedDataSourceDef(
+            id = "summary",
+            dataSourceRef = "cube",
+            request = JsonObject(mapOf(
+                "dimensions" to JsonObject(emptyMap()),
+                "limit" to JsonPrimitive(1)
+            ))
+        )
+
+        assertEquals(
+            listOf("summary", "daily"),
+            reportBuilderPublishedSources(
+                DashboardReportBuilderDef(dataSources = listOf(detailed, summary)),
+                document
+            ).map { it.id }
+        )
     }
 
     @Test

@@ -23,6 +23,7 @@ items:
     scope: noop
     hideLabel: true
     aggregate: sum
+    format: currency2
     visibleWhen:
       source: windowForm
       field: periodView
@@ -59,6 +60,9 @@ items:
 	if got := c.Items[0].Aggregate; got != "sum" {
 		t.Fatalf("expected item aggregate to survive, got %#v", got)
 	}
+	if got := c.Items[0].Format; got != "currency2" {
+		t.Fatalf("expected item format to survive, got %q (item=%#v)", got, c.Items[0])
+	}
 }
 
 func TestContainerUnmarshal_PreservesExtendedChartFields(t *testing.T) {
@@ -74,6 +78,10 @@ chart:
   xAxis:
     dataKey: advertiserTime
     tickFormat: ha
+    tickFormatSelector: granularity
+    tickFormats:
+      hour: MM/dd h a
+      day: MM/dd
   yAxis:
     label: Spend
     format: currency
@@ -110,6 +118,9 @@ chart:
 	}
 	if c.Chart.YAxis.Format != "currency" {
 		t.Fatalf("expected yAxis.format to survive, got %#v", c.Chart.YAxis)
+	}
+	if c.Chart.XAxis.TickFormatSelector != "granularity" || c.Chart.XAxis.TickFormats["hour"] != "MM/dd h a" {
+		t.Fatalf("expected mapped xAxis tick formats to survive, got %#v", c.Chart.XAxis)
 	}
 	if c.Chart.Axes == nil || c.Chart.Axes.Right == nil || c.Chart.Axes.Right.Format != "compactNumber" {
 		t.Fatalf("expected axes.right.format to survive, got %#v", c.Chart.Axes)
