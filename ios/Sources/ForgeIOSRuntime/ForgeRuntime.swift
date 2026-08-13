@@ -418,6 +418,70 @@ public actor ForgeRuntime {
         return await dataSourceRuntime.control(dataSourceID: dataSourceID)
     }
 
+    /// Loads one logical report dataset into an isolated instance while using
+    /// the declared datasource transport. Authored reports commonly reference
+    /// several date-window datasets backed by the same cube; storing them under
+    /// the declaration id prevents one response from overwriting another.
+    public func fetchDataSourceInstance(
+        windowID: String,
+        instanceRef: String,
+        dataSourceRef: String,
+        parameters: [String: JSONValue]
+    ) async {
+        let metadataSignal = await signals.metadata(windowID: windowID)
+        guard let metadata = await metadataSignal.peek(),
+              let dataSource = metadata.dataSources[dataSourceRef] else {
+            return
+        }
+        let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: instanceRef)
+        await dataSourceRuntime.setInputParameters(
+            dataSourceID: dataSourceID,
+            parameters: parameters,
+            fetch: true
+        )
+        let input = await dataSourceRuntime.input(dataSourceID: dataSourceID)
+        let generation = (dataSourceFetchGenerations[dataSourceID] ?? 0) &+ 1
+        dataSourceFetchGenerations[dataSourceID] = generation
+        let loading = ControlState(loading: true)
+        await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: loading)
+        await (await signals.control(dataSourceID: dataSourceID)).set(loading)
+
+        guard let dataSourceLoader else {
+            let error = ControlState(error: "A datasource loader is unavailable.")
+            await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: error)
+            await (await signals.control(dataSourceID: dataSourceID)).set(error)
+            return
+        }
+        do {
+            let result = try await dataSourceLoader(
+                DataSourceFetchRequest(
+                    windowID: windowID,
+                    dataSourceRef: dataSourceRef,
+                    dataSource: dataSource,
+                    input: input,
+                    resolvedInputs: parameters,
+                    conversationID: windows.first { $0.id == windowID }?.conversationID
+                )
+            )
+            guard dataSourceFetchGenerations[dataSourceID] == generation else { return }
+            let rows = applyCollectionHook(metadata: metadata, rows: result?.rows ?? [])
+            let control = ControlState()
+            await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: rows)
+            await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: result?.metrics ?? [:])
+            await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: control)
+            await (await signals.collection(dataSourceID: dataSourceID)).set(rows)
+            await (await signals.metrics(dataSourceID: dataSourceID)).set(result?.metrics ?? [:])
+            await (await signals.control(dataSourceID: dataSourceID)).set(control)
+        } catch {
+            guard dataSourceFetchGenerations[dataSourceID] == generation else { return }
+            let control = Task.isCancelled || isForgeCancellationError(error)
+                ? ControlState()
+                : ControlState(error: error.localizedDescription)
+            await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: control)
+            await (await signals.control(dataSourceID: dataSourceID)).set(control)
+        }
+    }
+
     public func setDataSourceMetrics(windowID: String, dataSourceRef: String, values: [String: JSONValue]) async {
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
         await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: values)
