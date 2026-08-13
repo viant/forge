@@ -1353,6 +1353,7 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
     public let showFilterCategoryBar: Bool?
     public let hiddenDynamicGroupIds: [String]
     public let notices: [ReportBuilderNoticeDef]
+    public let dataSources: [ReportBuilderPublishedDataSourceDef]
     public let primaryMeasure: String?
     public let measureSections: [ReportBuilderMeasureSectionDef]
     public let measures: [ReportBuilderMeasureDef]
@@ -1378,6 +1379,7 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         case showFilterCategoryBar
         case hiddenDynamicGroupIds
         case notices
+        case dataSources
         case primaryMeasure
         case measureSections
         case measures
@@ -1408,6 +1410,7 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         showFilterCategoryBar: Bool? = nil,
         hiddenDynamicGroupIds: [String] = [],
         notices: [ReportBuilderNoticeDef] = [],
+        dataSources: [ReportBuilderPublishedDataSourceDef] = [],
         primaryMeasure: String? = nil,
         measureSections: [ReportBuilderMeasureSectionDef] = [],
         measures: [ReportBuilderMeasureDef] = [],
@@ -1432,6 +1435,7 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         self.showFilterCategoryBar = showFilterCategoryBar
         self.hiddenDynamicGroupIds = hiddenDynamicGroupIds
         self.notices = notices
+        self.dataSources = dataSources
         self.primaryMeasure = primaryMeasure
         self.measureSections = measureSections
         self.measures = measures
@@ -1459,6 +1463,7 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         showFilterCategoryBar = try container.decodeIfPresent(Bool.self, forKey: .showFilterCategoryBar)
         hiddenDynamicGroupIds = try container.decodeIfPresent([String].self, forKey: .hiddenDynamicGroupIds) ?? []
         notices = try container.decodeIfPresent([ReportBuilderNoticeDef].self, forKey: .notices) ?? []
+        dataSources = try container.decodeIfPresent([ReportBuilderPublishedDataSourceDef].self, forKey: .dataSources) ?? []
         primaryMeasure = try container.decodeIfPresent(String.self, forKey: .primaryMeasure)
         measureSections = try container.decodeIfPresent([ReportBuilderMeasureSectionDef].self, forKey: .measureSections) ?? []
         measures = try container.decodeIfPresent([ReportBuilderMeasureDef].self, forKey: .measures) ?? []
@@ -1478,6 +1483,25 @@ public struct DashboardReportBuilderDef: Codable, Sendable {
         unifiedFamilyRows = try container.decodeIfPresent(Bool.self, forKey: .unifiedFamilyRows) ?? false
         showResultHeader = try container.decodeIfPresent(Bool.self, forKey: .showResultHeader)
         result = try container.decodeIfPresent(ReportBuilderResultDef.self, forKey: .result)
+    }
+}
+
+public struct ReportBuilderPublishedDataSourceDef: Codable, Sendable, Equatable {
+    public let id: String
+    public let dataSourceRef: String
+    public let request: [String: JSONValue]
+    public let scope: [String: JSONValue]
+
+    public init(
+        id: String,
+        dataSourceRef: String,
+        request: [String: JSONValue] = [:],
+        scope: [String: JSONValue] = [:]
+    ) {
+        self.id = id
+        self.dataSourceRef = dataSourceRef
+        self.request = request
+        self.scope = scope
     }
 }
 
