@@ -116,6 +116,15 @@ public struct ReportBuilderRenderer: View {
         )
     }
 
+    private var authoredDocument: [String: JSONValue]? {
+        reportBuilderAuthoredDocument(windowFormValues)
+    }
+
+    private var authoredNeedsPrimaryDataset: Bool {
+        guard let authoredDocument else { return true }
+        return reportBuilderAuthoredDatasetRefs(authoredDocument).contains("primary")
+    }
+
     private var config: DashboardReportBuilderDef {
         lowerReportBuilderPredicates(resolvedVariant.config ?? DashboardReportBuilderDef())
     }
@@ -134,8 +143,8 @@ public struct ReportBuilderRenderer: View {
             filterSummarySection: filterSummarySectionView,
             staticFiltersSection: filtersExpanded ? staticFiltersSectionView : AnyView(EmptyView()),
             dynamicFiltersSection: filtersExpanded ? dynamicFiltersSectionView : AnyView(EmptyView()),
-            chartCreationSection: chartCreationSectionView,
-            chartModeSection: chartModeSectionView,
+            chartCreationSection: authoredDocument == nil ? chartCreationSectionView : AnyView(EmptyView()),
+            chartModeSection: authoredDocument == nil ? chartModeSectionView : AnyView(EmptyView()),
             resultSection: resultSectionView
         )
     }
@@ -486,7 +495,20 @@ public struct ReportBuilderRenderer: View {
 
     @ViewBuilder
     private var resultSection: some View {
-        if viewMode == "chart", let spec = chartSpec {
+        if let authoredDocument,
+           let runtime,
+           let window {
+            ReportBuilderAuthoredResult(
+                runtime: runtime,
+                window: window,
+                dashboardRoot: container,
+                config: config,
+                document: authoredDocument,
+                primaryRows: rows,
+                primaryControl: dataSourceControlState,
+                primaryRequest: requestPayload
+            )
+        } else if viewMode == "chart", let spec = chartSpec {
             chartView(spec: spec)
         } else {
             tableView
@@ -1077,6 +1099,12 @@ public struct ReportBuilderRenderer: View {
     }
 
     private func bridgeRequestToDataSource() async {
+        guard authoredNeedsPrimaryDataset else {
+            rows = []
+            hasResolvedRows = true
+            dataSourceControlState = ControlState()
+            return
+        }
         guard let runtime else { return }
         guard let window else { return }
         let resolvedDataSourceRef = effectiveDataSourceRef ?? ""
