@@ -31,6 +31,7 @@ public struct ReportBuilderRenderer: View {
     @State private var lastAutoAppliedRequestSignature = ""
     @State private var filtersExpanded = true
     @State private var lastAutoCollapsedRequestSignature = ""
+    @State private var autoCollapsedAuthoredDocumentSignature = ""
     @State private var hasResolvedRows = false
     @State private var dataSourceControlState = ControlState()
 
@@ -70,6 +71,13 @@ public struct ReportBuilderRenderer: View {
         }
         .task(id: currentPrefillSignature) {
             await applyWindowFormPrefillIfNeeded()
+        }
+        .task(id: authoredDocument.map(JSONValue.object)?.jsonSignature ?? "") {
+            guard let signature = authoredDocument.map(JSONValue.object)?.jsonSignature,
+                  !signature.isEmpty,
+                  signature != autoCollapsedAuthoredDocumentSignature else { return }
+            autoCollapsedAuthoredDocumentSignature = signature
+            filtersExpanded = false
         }
         .onChange(of: persistenceSignature) {
             guard hydratedForCurrentVariant else { return }
@@ -278,9 +286,14 @@ public struct ReportBuilderRenderer: View {
             staticFilters: staticFilters,
             dynamicGroups: dynamicGroups
         )
+        let scoped = Self.applyWindowFormPrefill(
+            config: config,
+            request: applyBuildRequestHook(base),
+            windowForm: windowFormValues
+        )
         return Self.applyChartDataPolicy(
             config: config,
-            request: applyBuildRequestHook(base)
+            request: scoped
         )
     }
 
@@ -436,7 +449,7 @@ public struct ReportBuilderRenderer: View {
                 Button {
                     filtersExpanded.toggle()
                 } label: {
-                    Label(filtersExpanded ? "Hide Body" : "Show Body", systemImage: filtersExpanded ? "chevron.up" : "slider.horizontal.3")
+                    Label(filtersExpanded ? "Hide Filters" : "Show Filters", systemImage: filtersExpanded ? "chevron.up" : "slider.horizontal.3")
                 }
                 .buttonStyle(.bordered)
             }
@@ -495,7 +508,14 @@ public struct ReportBuilderRenderer: View {
 
     @ViewBuilder
     private var resultSection: some View {
-        if let authoredDocument,
+        if authoredDocument != nil, !hydratedForCurrentVariant {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("Preparing report…")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        } else if let authoredDocument,
            let runtime,
            let window {
             ReportBuilderAuthoredResult(
@@ -1345,8 +1365,9 @@ public struct ReportBuilderRenderer: View {
         appliedPrefillSignature = ""
         completedRequestSignature = ""
         lastAutoAppliedRequestSignature = ""
-        filtersExpanded = true
+        filtersExpanded = authoredDocument == nil
         lastAutoCollapsedRequestSignature = ""
+        autoCollapsedAuthoredDocumentSignature = ""
         hasResolvedRows = false
         dataSourceControlState = ControlState()
     }
@@ -1828,7 +1849,9 @@ public struct ReportBuilderRenderer: View {
                     continue
                 }
                 let paramPath = filter.paramPath ?? "filters.\(filter.identityKey)"
-                let values = row.selections.map(\.value)
+                let values = row.selections.compactMap { selection in
+                    coerceSelectionValue(filter: filter, rawValue: selection.value)
+                }
                 if values.isEmpty {
                     continue
                 }
@@ -1844,6 +1867,95 @@ public struct ReportBuilderRenderer: View {
             setNestedValue(&request, path: path, value: .array(uniqueDynamicValues(values)))
         }
         return request
+    }
+
+    static func applyWindowFormPrefill(
+        config: DashboardReportBuilderDef,
+        request: [String: JSONValue],
+        windowForm: [String: JSONValue]
+    ) -> [String: JSONValue] {
+        guard let prefill = windowForm["prefill"]?.objectValue, !prefill.isEmpty else {
+            return request
+        }
+        var next = request
+        for filter in config.staticFilters {
+            let kind = (filter.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if kind == "daterange" {
+                let startPath = filter.startParamPath ?? "filters.\(filter.identityKey).start"
+                let endPath = filter.endParamPath ?? "filters.\(filter.identityKey).end"
+                if value(at: startPath, in: next) == nil,
+                   let start = prefillValue(in: prefill, candidates: [startPath, "from", "start"]) {
+                    setNestedValue(&next, path: startPath, value: start)
+                }
+                if value(at: endPath, in: next) == nil,
+                   let end = prefillValue(in: prefill, candidates: [endPath, "to", "end"]) {
+                    setNestedValue(&next, path: endPath, value: end)
+                }
+                continue
+            }
+            let path = filter.paramPath ?? "filters.\(filter.identityKey)"
+            if value(at: path, in: next) == nil,
+               let value = prefillValue(in: prefill, candidates: [filter.identityKey, path]) {
+                setNestedValue(&next, path: path, value: value)
+            }
+        }
+        for group in config.dynamicFilterGroups {
+            for filter in group.filters {
+                let path = filter.paramPath ?? "filters.\(filter.identityKey)"
+                guard value(at: path, in: next) == nil,
+                      let raw = prefillValue(
+                        in: prefill,
+                        candidates: [filter.identityKey, path, "scope.\(filter.identityKey)"]
+                      ) else {
+                    continue
+                }
+                let rawValues = raw.arrayValue ?? [raw]
+                let values = rawValues.compactMap {
+                    coerceSelectionValue(filter: filter, rawValue: $0)
+                }
+                guard !values.isEmpty else { continue }
+                if filter.multiple == true || filter.emitArray == true {
+                    setNestedValue(&next, path: path, value: .array(uniqueDynamicValues(values)))
+                } else if let first = values.first {
+                    setNestedValue(&next, path: path, value: first)
+                }
+            }
+        }
+        return next
+    }
+
+    private static func prefillValue(
+        in prefill: [String: JSONValue],
+        candidates: [String]
+    ) -> JSONValue? {
+        for candidate in candidates {
+            let components = candidate
+                .split(separator: ".")
+                .map(String.init)
+                .filter { !$0.isEmpty && $0.lowercased() != "filters" }
+            guard !components.isEmpty else { continue }
+            var current: JSONValue = .object(prefill)
+            var resolved = true
+            for component in components {
+                guard let object = current.objectValue,
+                      let key = object.keys.first(where: {
+                        $0.caseInsensitiveCompare(component) == .orderedSame
+                      }),
+                      let value = object[key] else {
+                    resolved = false
+                    break
+                }
+                current = value
+            }
+            if resolved { return current }
+            if let last = components.last,
+               let key = prefill.keys.first(where: {
+                    $0.caseInsensitiveCompare(last) == .orderedSame
+               }) {
+                return prefill[key]
+            }
+        }
+        return nil
     }
 
     private static func coerceDynamicFilterValue(
@@ -2024,7 +2136,7 @@ public struct ReportBuilderRenderer: View {
         return jsonValueFromAny(resolved)
     }
 
-    private static func coerceSelectionValue(
+    static func coerceSelectionValue(
         filter: ReportBuilderDynamicFilterDef,
         rawValue: JSONValue?
     ) -> JSONValue? {

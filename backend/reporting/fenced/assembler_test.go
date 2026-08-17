@@ -238,6 +238,11 @@ func TestFitTableTextPreventsCellOverflow(t *testing.T) {
 	require.Equal(t, "a very lon…", fitTableText("a very long operational interpretation", 54, 9))
 }
 
+func TestTextElementUsesMissingValueMarkerForBlankText(t *testing.T) {
+	element := textElement("blank-cell", 0, 0, 100, 20, "  ", 10, "")
+	require.Equal(t, "—", element["text"])
+}
+
 func TestFormatValueDoesNotAddMeaninglessDecimalZeros(t *testing.T) {
 	require.Equal(t, "1", formatValue(float64(1), "number"))
 	require.Equal(t, "0.684", formatValue(0.684, "number"))

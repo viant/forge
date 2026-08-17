@@ -813,6 +813,14 @@ public enum DashboardRuntime {
         if let reportFill {
             exportRequest["reportFill"] = .object(reportFill)
         }
+        if let fences = config["fences"]?.arrayValue, !fences.isEmpty {
+            exportRequest["fences"] = .array(fences)
+            exportRequest["reportId"] = .string(
+                nonBlank(config["reportId"]?.stringValue)
+                    ?? nonBlank(reportSpec?["id"]?.stringValue)
+                    ?? dashboardReportRuntimeSlug(title)
+            )
+        }
         return DashboardReportRuntimeActionExecution(
             id: "reportRuntime.exportPdf",
             label: "Download PDF",

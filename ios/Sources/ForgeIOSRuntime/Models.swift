@@ -25,6 +25,7 @@ public struct WindowMetadata: Codable, Sendable {
 
     enum LegacyCodingKeys: String, CodingKey {
         case dataSource
+        case reportBuilder
     }
 
     public init(
@@ -66,6 +67,35 @@ public struct WindowMetadata: Codable, Sendable {
         if let decodedView,
            Self.isMeaningfulView(decodedView) {
             view = decodedView
+        } else if !Self.hasTopLevelContainerKeys(decoder),
+                  let publishedReportBuilder = try legacyContainer.decodeIfPresent(
+            DashboardReportBuilderDef.self,
+            forKey: .reportBuilder
+        ) {
+            let reference = try? legacyContainer.decode(
+                PublishedReportBuilderMetadata.self,
+                forKey: .reportBuilder
+            )
+            let contentReference = try? container.decode(
+                PublishedViewReference.self,
+                forKey: .view
+            )
+            let builderRef = reference?.builderRef?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let primaryDataSourceRef = publishedReportBuilder.dataSources.first(where: {
+                $0.id.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "primary"
+            })?.dataSourceRef
+            let contentID = contentReference?.contentId?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let root = ContainerDef(
+                id: contentID?.isEmpty == false ? contentID : "reportBuilder",
+                kind: "dashboard.reportBuilder",
+                dataSourceRef: primaryDataSourceRef,
+                dashboard: DashboardDef(
+                    reportBuilderRef: builderRef?.isEmpty == false ? builderRef : nil,
+                    reportBuilder: publishedReportBuilder
+                ),
+                reportBuilderRef: builderRef?.isEmpty == false ? builderRef : nil
+            )
+            view = ViewDef(content: ContentDef(containers: [root]))
         } else {
             do {
                 let topLevelContainer = try ContainerDef(from: decoder)
@@ -142,6 +172,14 @@ public struct WindowMetadata: Codable, Sendable {
 
     private static func isMeaningfulView(_ view: ViewDef) -> Bool {
         !(view.content?.containers.isEmpty ?? true)
+    }
+
+    private struct PublishedReportBuilderMetadata: Decodable {
+        let builderRef: String?
+    }
+
+    private struct PublishedViewReference: Decodable {
+        let contentId: String?
     }
 }
 
@@ -1491,17 +1529,42 @@ public struct ReportBuilderPublishedDataSourceDef: Codable, Sendable, Equatable 
     public let dataSourceRef: String
     public let request: [String: JSONValue]
     public let scope: [String: JSONValue]
+    public let fields: [[String: JSONValue]]
+    public let scopeParams: [[String: JSONValue]]
 
     public init(
         id: String,
         dataSourceRef: String,
         request: [String: JSONValue] = [:],
-        scope: [String: JSONValue] = [:]
+        scope: [String: JSONValue] = [:],
+        fields: [[String: JSONValue]] = [],
+        scopeParams: [[String: JSONValue]] = []
     ) {
         self.id = id
         self.dataSourceRef = dataSourceRef
         self.request = request
         self.scope = scope
+        self.fields = fields
+        self.scopeParams = scopeParams
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case dataSourceRef
+        case request
+        case scope
+        case fields
+        case scopeParams
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        dataSourceRef = try container.decode(String.self, forKey: .dataSourceRef)
+        request = try container.decodeIfPresent([String: JSONValue].self, forKey: .request) ?? [:]
+        scope = try container.decodeIfPresent([String: JSONValue].self, forKey: .scope) ?? [:]
+        fields = try container.decodeIfPresent([[String: JSONValue]].self, forKey: .fields) ?? []
+        scopeParams = try container.decodeIfPresent([[String: JSONValue]].self, forKey: .scopeParams) ?? []
     }
 }
 

@@ -1026,6 +1026,13 @@ func numberValue(value any) (float64, bool) {
 }
 
 func textElement(id string, x, y, width, height float64, text string, size float64, weight string) map[string]any {
+	// Authored tables can legitimately contain blank cells. ReportPrint text
+	// elements, however, require non-empty text. Render missing display values
+	// with the same em dash used by formatValue(nil, ...) so a sparse dataset
+	// cannot invalidate the entire PDF export.
+	if strings.TrimSpace(text) == "" {
+		text = "—"
+	}
 	result := map[string]any{"id": id, "kind": "text", "box": map[string]any{"x": x, "y": y, "width": width, "height": height}, "text": text, "fontSize": size, "color": "#101828"}
 	if weight != "" {
 		result["fontWeight"] = weight

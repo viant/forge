@@ -113,7 +113,13 @@ public enum InlineReportRuntimeCompiler {
         var runtime: [String: JSONValue] = [
             "title": .string(title),
             "reportSpec": reportSpec,
-            "reportFill": reportFill
+            "reportFill": reportFill,
+            "reportPrint": .object([
+                "kind": .string("reportPrint"),
+                "title": .string(title)
+            ]),
+            "reportId": .string(report.id),
+            "fences": .array(try exportFences(report))
         ]
         if let subtitle { runtime["subtitle"] = .string(subtitle) }
         let metadata = WindowMetadata(
@@ -131,11 +137,159 @@ public enum InlineReportRuntimeCompiler {
         return InlineReportRuntimeArtifact(reportSpec: reportSpec, reportFill: reportFill, metadata: metadata)
     }
 
+    public static func exportFences(_ report: TranscriptCanonicalReport) throws -> [JSONValue] {
+        guard let source = report.source.objectValue else {
+            throw InlineReportRuntimeCompilerError.invalidSource
+        }
+        let exportScope = nonEmpty(source["scope"]?.stringValue) ?? report.scope
+        var sequence = 1
+        var start = pdfSource(source)
+        start["version"] = .number(1)
+        start["scope"] = .string(exportScope)
+        start["id"] = .string(report.id)
+        start["sequence"] = .number(Double(sequence))
+        start["mode"] = .string("start")
+        start["grammar"] = .string(report.grammar)
+        sequence += 1
+        var fences: [JSONValue] = [exportFence(kind: "forge-report", index: 0, payload: start)]
+        var emittedDatasetIDs = Set<String>()
+        for (key, source) in report.dataSources.sorted(by: { $0.key < $1.key }) {
+            guard let payload = source.payload else { continue }
+            let datasetID = nonEmpty(key) ?? nonEmpty(source.id) ?? key
+            let materializedPayload = TranscriptEnvelope.materializeCanonicalPayload(
+                format: source.format,
+                payload: payload
+            )
+            let exportPayload = pdfDatasetPayload(materializedPayload ?? payload)
+            let data: [String: JSONValue] = [
+                "version": .number(Double(source.version ?? 2)),
+                "scope": .string(source.scope.flatMap(nonEmpty) ?? exportScope),
+                "reportRef": .string(source.reportRef.flatMap(nonEmpty) ?? report.id),
+                "sequence": .number(Double(sequence)),
+                "id": .string(datasetID),
+                "format": .string(materializedPayload == nil ? (nonEmpty(source.format) ?? "json") : "json"),
+                "mode": .string("replace"),
+                "data": exportPayload
+            ]
+            fences.append(exportFence(kind: "forge-data", index: fences.count, payload: data))
+            emittedDatasetIDs.insert(datasetID)
+            sequence += 1
+        }
+        let referencedDatasetIDs = Set((start["blocks"]?.arrayValue ?? []).compactMap {
+            nonEmpty($0.objectValue?["datasetRef"]?.stringValue)
+        })
+        for datasetID in referencedDatasetIDs.subtracting(emittedDatasetIDs).sorted() {
+            fences.append(exportFence(kind: "forge-data", index: fences.count, payload: [
+                "version": .number(2),
+                "scope": .string(exportScope),
+                "reportRef": .string(report.id),
+                "sequence": .number(Double(sequence)),
+                "id": .string(datasetID),
+                "format": .string("json"),
+                "mode": .string("replace"),
+                "data": .array([])
+            ]))
+            sequence += 1
+        }
+        fences.append(exportFence(kind: "forge-report", index: fences.count, payload: [
+            "version": .number(1),
+            "scope": .string(exportScope),
+            "id": .string(report.id),
+            "sequence": .number(Double(sequence)),
+            "mode": .string("commit")
+        ]))
+        return fences
+    }
+
+    private static func pdfDatasetPayload(_ value: JSONValue) -> JSONValue {
+        switch value {
+        case .string(let text):
+            // Blank table cells are valid live data, but the canonical Go
+            // ReportPrint model rejects empty text elements. Preserve the
+            // missing-value meaning with the standard display marker.
+            return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .string("—") : value
+        case .array(let values):
+            return .array(values.map(pdfDatasetPayload))
+        case .object(let object):
+            return .object(object.mapValues(pdfDatasetPayload))
+        case .number, .bool, .null:
+            return value
+        }
+    }
+
+    private static func exportFence(kind: String, index: Int, payload: [String: JSONValue]) -> JSONValue {
+        .object([
+            "kind": .string(kind),
+            "index": .number(Double(index)),
+            "payload": .object(payload)
+        ])
+    }
+
+    private static func pdfSource(_ source: [String: JSONValue]) -> [String: JSONValue] {
+        guard let blocks = source["blocks"]?.arrayValue else { return source }
+        var result = source
+        result["blocks"] = .array(blocks.enumerated().compactMap { index, value in
+            guard var block = value.objectValue else { return value }
+            switch block["kind"]?.stringValue {
+            case "filterBarBlock", "refinementBarBlock":
+                // Interactive controls belong to the live report. The PDF is a
+                // read-only snapshot and the Go report schema rejects empty
+                // control declarations, so omit them from export fences.
+                return nil
+            case "tableBlock":
+                block.removeValue(forKey: "description")
+            case "kpiBlock":
+                if block["description"] == nil, let subtitle = block["subtitle"] {
+                    block["description"] = subtitle
+                }
+                block.removeValue(forKey: "subtitle")
+                block.removeValue(forKey: "size")
+                block.removeValue(forKey: "suffix")
+                block.removeValue(forKey: "tone")
+            case "timelineBlock":
+                let timeField = nonEmpty(block.removeValue(forKey: "timeField")?.stringValue)
+                let titleField = nonEmpty(block.removeValue(forKey: "titleField")?.stringValue)
+                let descriptionField = nonEmpty(block.removeValue(forKey: "descriptionField")?.stringValue)
+                var columns: [JSONValue] = []
+                for (key, label) in [(timeField, "Time"), (titleField, "Event"), (descriptionField, "Detail")] {
+                    if let key {
+                        columns.append(.object(["key": .string(key), "label": .string(label)]))
+                    }
+                }
+                columns.append(contentsOf: block["columns"]?.arrayValue ?? [])
+                var seen = Set<String>()
+                block["kind"] = .string("tableBlock")
+                block["columns"] = .array(columns.filter { column in
+                    guard let key = nonEmpty(column.objectValue?["key"]?.stringValue) else { return false }
+                    return seen.insert(key).inserted
+                })
+            case "badgesBlock":
+                if let items = block["items"]?.arrayValue {
+                    block["items"] = .array(items.enumerated().map { itemIndex, item in
+                        guard var badge = item.objectValue, badge["id"] == nil else { return item }
+                        badge["id"] = .string("badge_\(itemIndex + 1)")
+                        return .object(badge)
+                    })
+                }
+            case "infoPanelBlock", "calloutBlock":
+                let id = block["id"] ?? .string("block_\(index + 1)")
+                let title = block["title"]
+                let markdown = block["body"] ?? block["description"] ?? .string("")
+                block = ["id": id, "kind": .string("markdownBlock"), "markdown": markdown]
+                if let title { block["title"] = title }
+            default:
+                break
+            }
+            return .object(block)
+        })
+        return result
+    }
+
     private static func normalizedDatasetRows(
         _ dataSources: [String: TranscriptCanonicalData]
     ) -> [String: [JSONValue]] {
         Dictionary(uniqueKeysWithValues: dataSources.map { key, source in
-            let id = nonEmpty(source.id) ?? key
+            let id = nonEmpty(key) ?? nonEmpty(source.id) ?? key
             let payload = TranscriptEnvelope.materializeCanonicalPayload(format: source.format, payload: source.payload)
             let rows: [JSONValue]
             if let array = payload?.arrayValue {

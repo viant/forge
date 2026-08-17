@@ -1842,10 +1842,8 @@ private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowCon
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        val summaryDiagnostics = summary.diagnostics.filter { it.blockId == null }
-        if (summaryDiagnostics.isNotEmpty()) {
-            DashboardReportRuntimeDiagnosticsPreview(summaryDiagnostics)
-        }
+        // Diagnostics describe authoring/schema repair work. Keep them in the
+        // runtime model, but do not expose codes or paths to viewers.
         val topLevelBlocks = summary.blocks.filterNot { it.id in nestedBlockIds }
         val mobileSections = reportRuntimeMobileSections(topLevelBlocks)
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -2170,9 +2168,6 @@ private fun DashboardReportRuntimeAuthoredBlock(runtime: ForgeRuntime, window: W
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        if (block.diagnostics.isNotEmpty()) {
-            DashboardReportRuntimeDiagnosticsPreview(block.diagnostics)
-        }
         DashboardReportRuntimeAuthoredBlockBody(runtime, window, dashboardRoot, block)
     }
 }
@@ -2452,57 +2447,6 @@ private fun reportRuntimeContentText(value: JsonElement?): String? = when (value
     is JsonPrimitive -> value.contentOrNull
     is JsonArray -> value.mapNotNull(::reportRuntimeContentText).joinToString(", ").takeIf { it.isNotBlank() }
     else -> value.toString()
-}
-
-@Composable
-private fun DashboardReportRuntimeDiagnosticsPreview(diagnostics: List<DashboardReportRuntimeDiagnostic>) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(5.dp)
-    ) {
-        diagnostics.forEach { diagnostic ->
-            val tone = severityTone(diagnostic.severity)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(tone.background, RoundedCornerShape(10.dp))
-                    .border(1.dp, tone.border, RoundedCornerShape(10.dp))
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = diagnostic.severity.uppercase(Locale.US),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = tone.text
-                    )
-                    Text(
-                        text = diagnostic.message,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                diagnostic.suggestedFix?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                val details = listOfNotNull(diagnostic.code, diagnostic.path).joinToString(" · ")
-                if (details.isNotBlank()) {
-                    Text(
-                        text = details,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-    }
 }
 
 @Composable
