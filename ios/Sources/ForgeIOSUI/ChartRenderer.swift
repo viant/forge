@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 import Charts
 import ForgeIOSRuntime
@@ -781,7 +782,9 @@ public struct ChartRenderer: View {
     }
 
     private var chartSeriesData: [SeriesDatum] {
-        aggregateDirectChartSeriesData(rawChartSeriesData)
+        chronologicallySortedChartSeriesData(
+            aggregateDirectChartSeriesData(rawChartSeriesData)
+        )
     }
 
     private var displayChartSeriesData: [SeriesDatum] {
@@ -877,31 +880,55 @@ internal func aggregateDirectChartSeriesData(_ data: [SeriesDatum]) -> [SeriesDa
     return orderedKeys.compactMap { aggregated[$0] }
 }
 
+/// Date-backed categories are semantic time axes even when the portable chart
+/// model represents them as strings. Sort only when every category is a date;
+/// ordinary categorical charts retain their authored/source order.
+internal func chronologicallySortedChartSeriesData(_ data: [SeriesDatum]) -> [SeriesDatum] {
+    var seenCategories: Set<String> = []
+    let categories = data.reduce(into: [String]()) { result, item in
+        if seenCategories.insert(item.category).inserted { result.append(item.category) }
+    }
+    let datedCategories = categories.compactMap { category -> (String, Date)? in
+        chartCategoryDate(category).map { (category, $0) }
+    }
+    guard !categories.isEmpty, datedCategories.count == categories.count else {
+        return data
+    }
+    let dates = Dictionary(uniqueKeysWithValues: datedCategories)
+    return data.enumerated().sorted { lhs, rhs in
+        let left = dates[lhs.element.category] ?? .distantPast
+        let right = dates[rhs.element.category] ?? .distantPast
+        if left != right { return left < right }
+        return lhs.offset < rhs.offset
+    }.map(\.element)
+}
+
+internal func chartCategoryDate(_ raw: String) -> Date? {
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    let iso = ISO8601DateFormatter()
+    iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    if let date = iso.date(from: trimmed) { return date }
+    iso.formatOptions = [.withInternetDateTime]
+    if let date = iso.date(from: trimmed) { return date }
+    guard trimmed.count >= 10 else { return nil }
+    let input = DateFormatter()
+    input.locale = Locale(identifier: "en_US_POSIX")
+    input.calendar = Calendar(identifier: .gregorian)
+    input.timeZone = TimeZone(secondsFromGMT: 0)
+    input.dateFormat = "yyyy-MM-dd"
+    return input.date(from: String(trimmed.prefix(10)))
+}
+
 internal func compactChartAxisLabel(_ raw: String) -> String {
     let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return trimmed }
-    let iso = ISO8601DateFormatter()
-    iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    let date = iso.date(from: trimmed) ?? {
-        iso.formatOptions = [.withInternetDateTime]
-        return iso.date(from: trimmed)
-    }()
-    if let date {
+    if let date = chartCategoryDate(trimmed) {
         let display = DateFormatter()
         display.locale = Locale(identifier: "en_US_POSIX")
+        display.timeZone = TimeZone(secondsFromGMT: 0)
         display.dateFormat = "MMM d"
         return display.string(from: date)
-    }
-    if trimmed.count >= 10 {
-        let input = DateFormatter()
-        input.locale = Locale(identifier: "en_US_POSIX")
-        input.dateFormat = "yyyy-MM-dd"
-        if let date = input.date(from: String(trimmed.prefix(10))) {
-            let display = DateFormatter()
-            display.locale = Locale(identifier: "en_US_POSIX")
-            display.dateFormat = "MMM d"
-            return display.string(from: date)
-        }
     }
     return trimmed.count > 14 ? String(trimmed.prefix(12)) + "…" : trimmed
 }

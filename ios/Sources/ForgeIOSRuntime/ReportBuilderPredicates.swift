@@ -144,6 +144,7 @@ public func lowerReportBuilderPredicates(_ config: DashboardReportBuilderDef) ->
         showFilterCategoryBar: config.showFilterCategoryBar,
         hiddenDynamicGroupIds: config.hiddenDynamicGroupIds,
         notices: config.notices,
+        dataSources: config.dataSources,
         primaryMeasure: config.primaryMeasure,
         measureSections: config.measureSections,
         measures: config.measures,

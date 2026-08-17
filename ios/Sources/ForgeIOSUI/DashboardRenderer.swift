@@ -1106,13 +1106,14 @@ public struct DashboardRenderer: View {
                                     .controlSize(.small)
                                 Text("Preparing PDF…")
                             } else {
-                                Text("Download PDF")
+                                Label("Open PDF", systemImage: "doc.richtext")
                             }
                         }
                     }
                     .font(.caption.weight(.semibold))
                     .buttonStyle(.bordered)
                     .disabled(reportRuntimeExportExecutionID != nil)
+                    .accessibilityIdentifier("forge-report-runtime-open-pdf")
                 }
             }
             if let subtitle = summary.subtitle {
@@ -1123,10 +1124,8 @@ public struct DashboardRenderer: View {
             Text(summary.blockCount == 1 ? "1 report block" : "\(summary.blockCount) report blocks")
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
-            let summaryDiagnostics = summary.diagnostics.filter { $0.blockID == nil }
-            if !summaryDiagnostics.isEmpty {
-                reportRuntimeDiagnosticsPreview(summaryDiagnostics)
-            }
+            // Diagnostics describe authoring/schema repair work. Keep them in
+            // the runtime model, but do not expose codes or paths to viewers.
             if flatSections.count > 1 && !hasExplicitTabGroup {
                 reportRuntimeFlatSectionTabs(
                     flatSections,
@@ -1279,7 +1278,7 @@ public struct DashboardRenderer: View {
         } else if let selectedID,
                   let selectedSection = blockByID[selectedID] {
             VStack(alignment: .leading, spacing: 8) {
-                if sections.count <= 4 {
+                if horizontalSizeClass != .compact && sections.count <= 4 {
                     Picker(
                         tabGroup.title,
                         selection: Binding(
@@ -1294,6 +1293,7 @@ public struct DashboardRenderer: View {
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .accessibilityLabel(tabGroup.title)
+                    .accessibilityIdentifier("forge-report-runtime-section-selector")
                 } else {
                     Picker(
                         tabGroup.title,
@@ -1307,6 +1307,7 @@ public struct DashboardRenderer: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .accessibilityIdentifier("forge-report-runtime-section-selector")
                 }
 
                 reportRuntimeAuthoredBlock(selectedSection)
@@ -1360,9 +1361,6 @@ public struct DashboardRenderer: View {
     @ViewBuilder
     private func reportRuntimeAuthoredBlock(_ block: DashboardReportRuntimeBlockSummary) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            if !block.diagnostics.isEmpty {
-                reportRuntimeDiagnosticsPreview(block.diagnostics)
-            }
             reportRuntimeAuthoredBlockBody(block)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1418,6 +1416,7 @@ public struct DashboardRenderer: View {
             reportRuntimeRefinementBarPreview(refinementBar)
         } else if block.kind == "tableBlock", let table = block.table {
             reportRuntimeTablePreview(block: block, table: table)
+                .accessibilityIdentifier("forge-report-runtime-table-\(block.id)")
         } else if block.kind == "chartBlock", let chart = block.chart {
             ChartRenderer(
                 runtime: runtime,
@@ -1435,6 +1434,7 @@ public struct DashboardRenderer: View {
                 reportRuntimeActionDescriptors: chart.actionDescriptors,
                 onReportRuntimeAction: executeReportRuntimeAction
             )
+            .accessibilityIdentifier("forge-report-runtime-chart-\(block.id)")
         } else if block.kind == "geoMapBlock", let geoMap = block.geoMap {
             reportRuntimeGeoMapPreview(block: block, geoMap: geoMap)
         } else if Self.reportRuntimePresentationKinds.contains(block.kind) {
@@ -1678,43 +1678,6 @@ public struct DashboardRenderer: View {
             )
             reportRuntimeExportExecutionID = nil
         }
-    }
-
-    @ViewBuilder
-    private func reportRuntimeDiagnosticsPreview(_ diagnostics: [DashboardReportRuntimeDiagnostic]) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            ForEach(diagnostics) { diagnostic in
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(diagnostic.severity.uppercased())
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(toneColor(diagnostic.severity))
-                        Text(diagnostic.message)
-                            .font(.caption)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    if let suggestedFix = diagnostic.suggestedFix {
-                        Text(suggestedFix)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    let details = [diagnostic.code, diagnostic.path].compactMap { $0 }.joined(separator: " · ")
-                    if !details.isEmpty {
-                        Text(details)
-                            .font(.caption2.monospaced())
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 6)
-                .padding(.horizontal, 8)
-                .background(RoundedRectangle(cornerRadius: 8).fill(toneBackground(diagnostic.severity)))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(toneBorder(diagnostic.severity), lineWidth: 1))
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder

@@ -143,10 +143,15 @@ public actor ForgeRuntime {
     /// Replaces the metadata for an existing inline window without allocating a
     /// second window during streamed transcript updates.
     @discardableResult
-    public func updateWindowInline(id: String, title: String, metadata: WindowMetadata) async -> WindowState? {
+    public func updateWindowInline(
+        id: String,
+        title: String,
+        metadata: WindowMetadata,
+        resolveMetadata: Bool = true
+    ) async -> WindowState? {
         guard let index = windows.firstIndex(where: { $0.id == id }) else { return nil }
         let current = windows[index]
-        let resolved = MetadataResolver.resolve(metadata, for: targetContext)
+        let resolved = resolveMetadata ? MetadataResolver.resolve(metadata, for: targetContext) : metadata
         let state = WindowState(
             id: current.id,
             key: current.key,
@@ -429,8 +434,8 @@ public actor ForgeRuntime {
         parameters: [String: JSONValue]
     ) async {
         let metadataSignal = await signals.metadata(windowID: windowID)
-        guard let metadata = await metadataSignal.peek(),
-              let dataSource = metadata.dataSources[dataSourceRef] else {
+        guard let metadata = await metadataSignal.peek() else { return }
+        guard let dataSource = metadata.dataSources[dataSourceRef] else {
             return
         }
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: instanceRef)

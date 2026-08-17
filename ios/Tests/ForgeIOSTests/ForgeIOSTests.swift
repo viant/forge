@@ -5135,6 +5135,32 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(aggregated.first?.rowIndex, 0)
     }
 
+    func testChartSeriesSortsCompleteDateAxisChronologically() {
+        let data = [
+            SeriesDatum(rowIndex: 0, category: "2026-07-30T00:00:00Z", seriesKey: "spend", seriesLabel: "Spend", value: 30),
+            SeriesDatum(rowIndex: 1, category: "2026-08-03T00:00:00Z", seriesKey: "spend", seriesLabel: "Spend", value: 3),
+            SeriesDatum(rowIndex: 2, category: "2026-07-28T00:00:00Z", seriesKey: "spend", seriesLabel: "Spend", value: 28)
+        ]
+
+        XCTAssertEqual(
+            chronologicallySortedChartSeriesData(data).map(\.category),
+            ["2026-07-28T00:00:00Z", "2026-07-30T00:00:00Z", "2026-08-03T00:00:00Z"]
+        )
+    }
+
+    func testChartSeriesPreservesAuthoredCategoricalOrder() {
+        let data = [
+            SeriesDatum(rowIndex: 0, category: "High", seriesKey: "count", seriesLabel: "Count", value: 3),
+            SeriesDatum(rowIndex: 1, category: "Low", seriesKey: "count", seriesLabel: "Count", value: 1),
+            SeriesDatum(rowIndex: 2, category: "Medium", seriesKey: "count", seriesLabel: "Count", value: 2)
+        ]
+
+        XCTAssertEqual(
+            chronologicallySortedChartSeriesData(data).map(\.category),
+            ["High", "Low", "Medium"]
+        )
+    }
+
     func testChartSelectionSummaryKeepsDuplicateSeriesLabelsDistinct() {
         let data = [
             SeriesDatum(rowIndex: 0, category: "Jan", seriesKey: "grossSpend", seriesLabel: "Spend", value: 12),
@@ -5394,6 +5420,44 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(root.dataSourceRef, "analytics_cube_report")
         XCTAssertEqual(root.dashboard?.reportBuilder?.unifiedFamilyRows, true)
         XCTAssertEqual(root.dashboard?.reportBuilder?.showResultHeader, false)
+    }
+
+    func testWindowMetadataSynthesizesPublishedReportBuilderViewReference() throws {
+        let payload = """
+        {
+          "namespace": "Steward",
+          "view": {
+            "contentId": "reportBuilder",
+            "controls": [],
+            "tabs": []
+          },
+          "reportBuilder": {
+            "builderRef": "metricsCubeBuilder",
+            "dataSources": [
+              {
+                "id": "primary",
+                "dataSourceRef": "metrics_ad_cube_report",
+                "label": "Performance Delivery"
+              },
+              {
+                "id": "today_delivery",
+                "dataSourceRef": "metrics_ad_cube_report",
+                "label": "Today"
+              }
+            ]
+          }
+        }
+        """
+
+        let metadata = try JSONDecoder().decode(WindowMetadata.self, from: Data(payload.utf8))
+        let root = try XCTUnwrap(metadata.view?.content?.containers.first)
+
+        XCTAssertEqual(root.id, "reportBuilder")
+        XCTAssertEqual(root.kind, "dashboard.reportBuilder")
+        XCTAssertEqual(root.dataSourceRef, "metrics_ad_cube_report")
+        XCTAssertEqual(root.reportBuilderRef, "metricsCubeBuilder")
+        XCTAssertEqual(root.dashboard?.reportBuilderRef, "metricsCubeBuilder")
+        XCTAssertEqual(root.dashboard?.reportBuilder?.dataSources.map(\.id), ["primary", "today_delivery"])
     }
 
     func testWindowMetadataWrapsSingleContainerInsideViewContent() throws {

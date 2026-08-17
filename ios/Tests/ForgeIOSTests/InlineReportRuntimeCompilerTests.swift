@@ -15,7 +15,8 @@ final class InlineReportRuntimeCompilerTests: XCTestCase {
                 .object(["id": .string("overview"), "kind": .string("sectionBlock"), "title": .string("Overview")]),
                 .object([
                     "id": .string("kpi"), "kind": .string("kpiBlock"), "title": .string("Spend"),
-                    "datasetRef": .string("rows"), "valueField": .string("spend"), "valueLabel": .string("Spend")
+                    "datasetRef": .string("rows"), "valueField": .string("spend"), "valueLabel": .string("Spend"),
+                    "subtitle": .string("Window spend"), "size": .string("large")
                 ]),
                 .object([
                     "id": .string("table"), "kind": .string("tableBlock"), "title": .string("Detail"),
@@ -24,6 +25,10 @@ final class InlineReportRuntimeCompilerTests: XCTestCase {
                 .object([
                     "id": .string("chart"), "kind": .string("chartBlock"), "datasetRef": .string("rows"),
                     "xField": .string("channel"), "measures": .array([.string("spend")])
+                ]),
+                .object([
+                    "id": .string("empty-chart"), "kind": .string("chartBlock"), "datasetRef": .string("not-yet-loaded"),
+                    "chartSpec": .object(["type": .string("line"), "xField": .string("date"), "yFields": .array([.string("spend")])])
                 ]),
                 .object([
                     "id": .string("geo"), "kind": .string("geoMapBlock"), "datasetRef": .string("rows"),
@@ -61,7 +66,10 @@ final class InlineReportRuntimeCompilerTests: XCTestCase {
                 "rows": TranscriptCanonicalData(
                     id: "rows",
                     format: "json",
-                    payload: .array([.object(["channel": .string("CTV"), "state": .string("CA"), "spend": .number(125)])])
+                    payload: .array([.object([
+                        "channel": .string("CTV"), "state": .string("CA"), "spend": .number(125),
+                        "optionalNote": .string("  ")
+                    ])])
                 ),
                 "timelineRows": TranscriptCanonicalData(
                     id: "timelineRows",
@@ -80,8 +88,36 @@ final class InlineReportRuntimeCompilerTests: XCTestCase {
         let runtime = try XCTUnwrap(artifact.metadata.view?.content?.containers.first?.reportRuntime?.objectValue)
         let reportSpec = try XCTUnwrap(runtime["reportSpec"]?.objectValue)
         let reportFill = try XCTUnwrap(runtime["reportFill"]?.objectValue)
+        let fences = try XCTUnwrap(runtime["fences"]?.arrayValue)
+        XCTAssertEqual(runtime["reportPrint"]?.objectValue?["kind"], .string("reportPrint"))
+        XCTAssertEqual(fences.count, 5)
+        XCTAssertEqual(fences.first?.objectValue?["kind"], .string("forge-report"))
+        XCTAssertEqual(fences.first?.objectValue?["payload"]?.objectValue?["version"], .number(1))
+        XCTAssertEqual(fences.last?.objectValue?["payload"]?.objectValue?["mode"], .string("commit"))
+        let exportKPI = fences.first?.objectValue?["payload"]?.objectValue?["blocks"]?.arrayValue?
+            .first { $0.objectValue?["id"]?.stringValue == "kpi" }?.objectValue
+        XCTAssertEqual(exportKPI?["description"], .string("Window spend"))
+        XCTAssertNil(exportKPI?["subtitle"])
+        XCTAssertNil(exportKPI?["size"])
+        let exportKinds = fences.first?.objectValue?["payload"]?.objectValue?["blocks"]?.arrayValue?
+            .compactMap { $0.objectValue?["kind"]?.stringValue }
+        XCTAssertFalse(exportKinds?.contains("filterBarBlock") ?? true)
+        XCTAssertFalse(exportKinds?.contains("refinementBarBlock") ?? true)
+        let emptyDataset = fences.first {
+            $0.objectValue?["kind"] == .string("forge-data") &&
+                $0.objectValue?["payload"]?.objectValue?["id"] == .string("not-yet-loaded")
+        }?.objectValue?["payload"]?.objectValue
+        XCTAssertEqual(emptyDataset?["data"], .array([]))
+        let rowsDataset = fences.first {
+            $0.objectValue?["kind"] == .string("forge-data") &&
+                $0.objectValue?["payload"]?.objectValue?["id"] == .string("rows")
+        }?.objectValue?["payload"]?.objectValue
+        XCTAssertEqual(
+            rowsDataset?["data"]?.arrayValue?.first?.objectValue?["optionalNote"],
+            .string("—")
+        )
         XCTAssertEqual(reportSpec["layoutIntent"]?.objectValue?["blockOrder"]?.arrayValue?.compactMap(\.stringValue), ["tabs", "kpi", "table"])
-        XCTAssertEqual(reportSpec["blocks"]?.arrayValue?.count, 17)
+        XCTAssertEqual(reportSpec["blocks"]?.arrayValue?.count, 18)
         XCTAssertEqual(reportFill["datasets"]?.arrayValue?.first?.objectValue?["rows"]?.arrayValue?.count, 1)
         let kpi = reportFill["blocks"]?.arrayValue?.first { $0.objectValue?["id"]?.stringValue == "kpi" }
         XCTAssertEqual(kpi?.objectValue?["content"]?.objectValue?["value"], .number(125))
@@ -90,7 +126,12 @@ final class InlineReportRuntimeCompilerTests: XCTestCase {
         XCTAssertEqual(event?["date"], .string("2026-08-09"))
         XCTAssertEqual(event?["title"], .string("Pacing mode changed"))
         XCTAssertEqual(event?["body"], .string("ASAP changed to spend-evenly.\n\nImpact: Primary incident contributor"))
-        XCTAssertEqual(DashboardRuntime.dashboardReportRuntimeSummary(artifact.metadata.view!.content!.containers[0]).blockCount, 17)
+        XCTAssertEqual(DashboardRuntime.dashboardReportRuntimeSummary(artifact.metadata.view!.content!.containers[0]).blockCount, 18)
+        let export = try XCTUnwrap(DashboardRuntime.dashboardReportRuntimeExportExecution(
+            artifact.metadata.view!.content!.containers[0]
+        ))
+        XCTAssertEqual(export.exportRequest?["reportId"], .string("delivery"))
+        XCTAssertEqual(export.exportRequest?["fences"]?.arrayValue?.count, 5)
     }
 
     func testExtractsUnmaterializedWorkspaceRequests() {
