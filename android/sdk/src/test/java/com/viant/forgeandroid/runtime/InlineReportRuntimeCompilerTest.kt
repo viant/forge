@@ -25,7 +25,18 @@ class InlineReportRuntimeCompilerTest {
             )),
             block("chart", "chartBlock"),
             block("geo", "geoMapBlock"),
-            block("findings", "collectionBlock"),
+            JsonObject(mapOf(
+                "id" to JsonPrimitive("findings"), "kind" to JsonPrimitive("collectionBlock"),
+                "datasetRef" to JsonPrimitive("findingRows"),
+                "itemTitleField" to JsonPrimitive("finding"),
+                "bodyTemplate" to JsonPrimitive("**Driver:** ${'$'}{row.driver}"),
+                "toneField" to JsonPrimitive("importance"),
+                "toneRules" to JsonArray(listOf(JsonObject(mapOf(
+                    "value" to JsonPrimitive("High"), "label" to JsonPrimitive("High"),
+                    "tone" to JsonPrimitive("danger"), "color" to JsonPrimitive("#b42318"),
+                    "background" to JsonPrimitive("#fff1f0")
+                ))))
+            )),
             JsonObject(mapOf(
                 "id" to JsonPrimitive("timeline"), "kind" to JsonPrimitive("timelineBlock"),
                 "datasetRef" to JsonPrimitive("timelineRows"),
@@ -88,6 +99,14 @@ class InlineReportRuntimeCompilerTest {
                         "detail" to JsonPrimitive("ASAP changed to spend-evenly."),
                         "impact" to JsonPrimitive("Primary incident contributor")
                     ))))
+                ),
+                "findingRows" to TranscriptCanonicalData(
+                    id = "findingRows",
+                    payload = JsonArray(listOf(JsonObject(mapOf(
+                        "importance" to JsonPrimitive("High"),
+                        "finding" to JsonPrimitive("Flight is inactive"),
+                        "driver" to JsonPrimitive("The flight ended")
+                    ))))
                 )
             )
         )
@@ -119,6 +138,14 @@ class InlineReportRuntimeCompilerTest {
             JsonPrimitive("ASAP changed to spend-evenly.\n\nImpact: Primary incident contributor"),
             event["body"]
         )
+        val findings = (artifact.reportFill["blocks"] as JsonArray)
+            .map { it as JsonObject }
+            .single { it["id"] == JsonPrimitive("findings") }
+        val finding = ((((findings["content"] as JsonObject)["items"] as JsonArray).single()) as JsonObject)
+        assertEquals(JsonPrimitive("Flight is inactive"), finding["title"])
+        assertEquals(JsonPrimitive("**Driver:** The flight ended"), finding["bodyMarkdown"])
+        assertEquals(JsonPrimitive("danger"), finding["tone"])
+        assertEquals(JsonPrimitive("#fff1f0"), finding["background"])
     }
 
     @Test

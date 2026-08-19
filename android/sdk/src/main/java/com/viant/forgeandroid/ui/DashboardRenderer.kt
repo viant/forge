@@ -2287,7 +2287,13 @@ private fun DashboardReportRuntimeAuthoredBlockBody(runtime: ForgeRuntime, windo
 private fun DashboardReportRuntimePresentationBlock(block: DashboardReportRuntimeBlockSummary) {
     val content = block.content
     val entries = reportRuntimePresentationEntries(block.kind, content)
-    DashboardReportRuntimePanel(title = block.title) {
+    val authoredTone = severityTone(reportRuntimeContentText(content["tone"]))
+    val useAuthoredTone = block.kind == "calloutBlock" && reportRuntimeContentText(content["tone"]) != null
+    DashboardReportRuntimePanel(
+        title = block.title,
+        background = if (useAuthoredTone) authoredTone.background else Color(0xFFFCFEFF),
+        border = if (useAuthoredTone) authoredTone.border else Color(0xFFDBE5EC)
+    ) {
         reportRuntimeContentText(content["eyebrow"])?.let {
             Text(it.uppercase(Locale.US), style = MaterialTheme.typography.labelSmall, color = Color(0xFF526A82))
         }
@@ -2302,6 +2308,8 @@ private fun DashboardReportRuntimePresentationBlock(block: DashboardReportRuntim
         }
         if (block.kind == "badgesBlock") {
             DashboardReportRuntimeBadgePills(content)
+        } else if (block.kind == "collectionBlock") {
+            DashboardReportRuntimeCollectionItems(content)
         } else entries.forEach { entry ->
             Column(
                 modifier = Modifier
@@ -2317,6 +2325,59 @@ private fun DashboardReportRuntimePresentationBlock(block: DashboardReportRuntim
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DashboardReportRuntimeCollectionItems(content: Map<String, JsonElement>) {
+    val items = (content["items"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+    items.forEach { item ->
+        val tone = severityTone(reportRuntimeContentText(item["tone"]))
+        val background = reportRuntimeAuthoredColor(item["background"], tone.background)
+        val foreground = reportRuntimeAuthoredColor(item["color"], tone.text)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(background, RoundedCornerShape(12.dp))
+                .border(1.dp, tone.border, RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 11.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Text(
+                    text = reportRuntimeContentText(item["title"]) ?: "Item",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = foreground,
+                    modifier = Modifier.weight(1f)
+                )
+                reportRuntimeContentText(item["toneLabel"])?.takeIf { it.isNotBlank() }?.let { label ->
+                    Text(
+                        text = label.uppercase(Locale.US),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = foreground
+                    )
+                }
+            }
+            reportRuntimeContentText(item["bodyMarkdown"])?.takeIf { it.isNotBlank() }?.let { body ->
+                MarkdownRenderer(markdown = body, modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
+}
+
+private fun reportRuntimeAuthoredColor(value: JsonElement?, fallback: Color): Color {
+    val text = reportRuntimeContentText(value)?.trim()?.removePrefix("#") ?: return fallback
+    val raw = text.toLongOrNull(16) ?: return fallback
+    return when (text.length) {
+        6 -> Color(0xFF000000L or raw)
+        8 -> Color(raw)
+        else -> fallback
     }
 }
 
