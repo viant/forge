@@ -185,6 +185,41 @@ object InlineReportRuntimeCompiler {
                 })
                 content["rowCount"] = JsonPrimitive(rows.size)
             }
+            "collectionBlock" -> {
+                val datasetRef = string(source["datasetRef"]).orEmpty()
+                val rows = datasets[datasetRef].orEmpty().mapNotNull { it as? JsonObject }
+                val titleField = string(source["itemTitleField"]) ?: "title"
+                val bodyField = string(source["bodyField"])
+                val bodyTemplate = string(source["bodyTemplate"])
+                val toneField = string(source["toneField"])
+                val toneRules = (source["toneRules"] as? JsonArray).orEmpty()
+                    .mapNotNull { it as? JsonObject }
+                val rowLimit = string(source["rowLimit"])?.toIntOrNull()
+                    ?: (source["rowLimit"] as? JsonPrimitive)?.content?.toIntOrNull()
+                    ?: rows.size
+                content["items"] = JsonArray(rows.take(rowLimit.coerceAtLeast(0)).map { row ->
+                    val rawTone = toneField?.let(row::get)
+                    val toneRule = toneRules.firstOrNull { rule ->
+                        JsonUtil.elementToAny(rule["value"] ?: JsonNull) ==
+                            JsonUtil.elementToAny(rawTone ?: JsonNull)
+                    }
+                    JsonObject(buildMap {
+                        put("title", row[titleField] ?: JsonPrimitive("Item"))
+                        val body = when {
+                            !bodyTemplate.isNullOrBlank() -> interpolateCollectionTemplate(bodyTemplate, row)
+                            !bodyField.isNullOrBlank() -> string(row[bodyField]).orEmpty()
+                            else -> ""
+                        }
+                        put("bodyMarkdown", JsonPrimitive(body))
+                        rawTone?.let { put("value", it) }
+                        (toneRule?.get("tone") ?: source["tone"])?.let { put("tone", it) }
+                        toneRule?.get("label")?.let { put("toneLabel", it) }
+                        toneRule?.get("color")?.let { put("color", it) }
+                        toneRule?.get("background")?.let { put("background", it) }
+                    })
+                })
+                content["rowCount"] = JsonPrimitive(rows.size)
+            }
         }
         objectValue["content"] = JsonObject(content)
         return JsonObject(objectValue)
@@ -215,6 +250,35 @@ object InlineReportRuntimeCompiler {
             displayValue?.let { put("displayValue", it) }
             (matchedRule?.get("tone") ?: item["tone"])?.let { put("tone", it) }
         })
+    }
+
+    private fun interpolateCollectionTemplate(template: String, row: JsonObject): String {
+        val prefix = "${'$'}{row."
+        val result = StringBuilder(template.length)
+        var cursor = 0
+        while (cursor < template.length) {
+            val start = template.indexOf(prefix, cursor)
+            if (start < 0) {
+                result.append(template, cursor, template.length)
+                break
+            }
+            result.append(template, cursor, start)
+            val end = template.indexOf('}', start + prefix.length)
+            if (end < 0) {
+                result.append(template, start, template.length)
+                break
+            }
+            val path = template.substring(start + prefix.length, end).split('.')
+            var value: JsonElement? = row
+            path.forEach { key -> value = (value as? JsonObject)?.get(key) }
+            result.append(when (value) {
+                null, JsonNull -> ""
+                is JsonPrimitive -> (value as JsonPrimitive).contentOrNull.orEmpty()
+                else -> JsonUtil.elementToAny(value!!)?.toString().orEmpty()
+            })
+            cursor = end + 1
+        }
+        return result.toString()
     }
 
     private fun adaptDashboardBlocks(blocks: List<JsonElement>): List<JsonElement> = blocks.flatMap { block ->
