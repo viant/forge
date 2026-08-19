@@ -1817,7 +1817,7 @@ private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowCon
                     ),
                     shape = RoundedCornerShape(18.dp),
                     onClick = {
-                        if (pdfExporting) return@OutlinedButton
+                        if (pdfExporting) return@Button
                         pdfExporting = true
                         val job = executeReportRuntimeAction(runtime, window, dashboardRoot, exportExecution)
                         if (job == null) {
