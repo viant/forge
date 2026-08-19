@@ -1100,18 +1100,16 @@ public struct DashboardRenderer: View {
                     Button {
                         executeReportRuntimeExportAction(exportExecution)
                     } label: {
-                        HStack(spacing: 6) {
-                            if reportRuntimeExportExecutionID == exportExecution.id {
-                                ProgressView()
-                                    .controlSize(.small)
-                                Text("Preparing PDF…")
-                            } else {
-                                Label("Open PDF", systemImage: "doc.richtext")
-                            }
-                        }
+                        ForgePillActionLabel(
+                            title: reportRuntimeExportExecutionID == exportExecution.id
+                                ? "Preparing PDF…"
+                                : "Open PDF",
+                            systemImage: "doc.richtext.fill",
+                            color: Color(red: 0.82, green: 0.25, blue: 0.34),
+                            isLoading: reportRuntimeExportExecutionID == exportExecution.id
+                        )
                     }
-                    .font(.caption.weight(.semibold))
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.plain)
                     .disabled(reportRuntimeExportExecutionID != nil)
                     .accessibilityIdentifier("forge-report-runtime-open-pdf")
                 }

@@ -449,9 +449,13 @@ public struct ReportBuilderRenderer: View {
                 Button {
                     filtersExpanded.toggle()
                 } label: {
-                    Label(filtersExpanded ? "Hide Filters" : "Show Filters", systemImage: filtersExpanded ? "chevron.up" : "slider.horizontal.3")
+                    ForgePillActionLabel(
+                        title: filtersExpanded ? "Hide Filters" : "Show Filters",
+                        systemImage: filtersExpanded ? "chevron.up" : "slider.horizontal.3",
+                        color: Color(red: 0.04, green: 0.62, blue: 0.61)
+                    )
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -553,9 +557,13 @@ public struct ReportBuilderRenderer: View {
                         applyChart(spec)
                     }
                 } label: {
-                    Label("Create Chart", systemImage: "plus")
+                    ForgePillActionLabel(
+                        title: "Create Chart",
+                        systemImage: "chart.xyaxis.line",
+                        color: Color(red: 0.10, green: 0.45, blue: 0.95)
+                    )
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.plain)
                 Menu {
                     if storedPresets.isEmpty {
                         Text("No matching saved charts")
@@ -568,9 +576,13 @@ public struct ReportBuilderRenderer: View {
                         }
                     }
                 } label: {
-                    Label("Previous", systemImage: "clock.arrow.circlepath")
+                    ForgePillActionLabel(
+                        title: "Previous",
+                        systemImage: "clock.arrow.circlepath",
+                        color: Color(red: 0.88, green: 0.54, blue: 0.12)
+                    )
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
             }
             if let result = config.result, !result.defaultChartSpecs.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {

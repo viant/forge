@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.outlined.FilterAlt
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -1496,6 +1498,12 @@ private fun ReportBuilderFilterSummary(
             )
         }
         OutlinedButton(onClick = onToggle) {
+            ForgeLayeredActionIcon(
+                icon = Icons.Outlined.FilterAlt,
+                contentDescription = null,
+                accent = Color(0xFF0A9B98)
+            )
+            Spacer(modifier = Modifier.width(7.dp))
             Text(if (expanded) "Hide filters" else "Show filters")
         }
     }
@@ -1754,13 +1762,31 @@ private fun ChartTile(
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(description, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF4C6172))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onCreate) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(6.dp))
+                Button(
+                    onClick = onCreate,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFEAF3FF),
+                        contentColor = Color(0xFF1A73F0)
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp, pressedElevation = 1.dp),
+                    shape = RoundedCornerShape(18.dp)
+                ) {
+                    ForgeLayeredActionIcon(
+                        icon = Icons.AutoMirrored.Filled.ShowChart,
+                        contentDescription = null,
+                        accent = Color(0xFF1A73F0)
+                    )
+                    Spacer(modifier = Modifier.width(7.dp))
                     Text("Create Chart")
                 }
                 Box {
                     OutlinedButton(onClick = { onExpandedChange(!expanded) }) {
+                        ForgeLayeredActionIcon(
+                            icon = Icons.Outlined.History,
+                            contentDescription = null,
+                            accent = Color(0xFFE08A1E)
+                        )
+                        Spacer(modifier = Modifier.width(7.dp))
                         Text("Previous")
                         Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
                     }
