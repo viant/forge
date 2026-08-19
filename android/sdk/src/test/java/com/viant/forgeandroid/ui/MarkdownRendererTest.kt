@@ -41,4 +41,24 @@ class MarkdownRendererTest {
         assertEquals("Copy typescript code block", markdownCodeCopyAccessibilityLabel("ts"))
         assertEquals("Copy code block", markdownCodeCopyAccessibilityLabel(""))
     }
+
+    @Test
+    fun `two column markdown tables fit the mobile viewport`() {
+        assertTrue(markdownTableFitsViewport(2))
+        assertEquals(1.35f, markdownTableColumnWeight(0, 2))
+        assertEquals(0.85f, markdownTableColumnWeight(1, 2))
+        assertTrue(!markdownTableFitsViewport(3))
+    }
+
+    @Test
+    fun `markdown table rows are padded to the header width`() {
+        assertEquals(
+            listOf("Agriculture", "`1476373`"),
+            normalizedMarkdownTableRow(listOf("Agriculture", "`1476373`"), 2)
+        )
+        assertEquals(
+            listOf("Agriculture", ""),
+            normalizedMarkdownTableRow(listOf("Agriculture"), 2)
+        )
+    }
 }

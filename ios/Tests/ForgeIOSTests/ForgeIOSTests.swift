@@ -2750,6 +2750,37 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(blocks[2], .markdown("After"))
     }
 
+    func testParseMarkdownBlocksExtractsResponsivePipeTable() {
+        let source = """
+        ## Agriculture
+
+        | Targeting option | ID |
+        | --- | --- |
+        | Agriculture | `1476373` |
+        | Farming and Agriculture | `606965` |
+
+        Follow-up text.
+        """
+
+        let blocks = parseMarkdownBlocks(source)
+
+        XCTAssertEqual(blocks.count, 3)
+        XCTAssertEqual(blocks[0], .markdown("## Agriculture"))
+        XCTAssertEqual(
+            blocks[1],
+            .table(
+                MarkdownTableModel(
+                    headers: ["Targeting option", "ID"],
+                    rows: [
+                        ["Agriculture", "`1476373`"],
+                        ["Farming and Agriculture", "`606965`"]
+                    ]
+                )
+            )
+        )
+        XCTAssertEqual(blocks[2], .markdown("Follow-up text."))
+    }
+
     func testMarkdownCodeAccessibilityLabelsIncludeLanguageAndLineCount() {
         XCTAssertEqual(
             markdownCodeAccessibilityLabel(language: " Swift ", body: "let a = 1\nlet b = 2"),
