@@ -1,26 +1,33 @@
 package com.viant.forgeandroid.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -1115,41 +1122,99 @@ private fun MarkdownTable(block: MarkdownBlock) {
     val horizontal = rememberScrollState()
     val columnCount = rows.maxOfOrNull { it.size } ?: header.size
     val columnWidth = preferredTableColumnWidth(columnCount)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
-            .horizontalScroll(horizontal)
-            .padding(1.dp)
-    ) {
-        MarkdownTableRow(
-            cells = header,
-            header = true,
-            columnWidth = columnWidth
-        )
-        dataRows.forEach { row ->
-            MarkdownTableRow(cells = row, columnWidth = columnWidth)
+    val fitViewport = markdownTableFitsViewport(columnCount)
+    val tableShape = RoundedCornerShape(14.dp)
+    val tableContent: @Composable () -> Unit = {
+        Column(
+            modifier = Modifier
+                .then(if (fitViewport) Modifier.fillMaxWidth() else Modifier)
+                .clip(tableShape)
+                .border(1.dp, Color(0xFFD7E0EC), tableShape)
+        ) {
+            MarkdownTableRow(
+                cells = normalizedMarkdownTableRow(header, columnCount),
+                header = true,
+                columnWidth = columnWidth,
+                fitViewport = fitViewport,
+                rowIndex = -1
+            )
+            dataRows.forEachIndexed { index, row ->
+                HorizontalDivider(color = Color(0xFFE2E8F0), thickness = 1.dp)
+                MarkdownTableRow(
+                    cells = normalizedMarkdownTableRow(row, columnCount),
+                    columnWidth = columnWidth,
+                    fitViewport = fitViewport,
+                    rowIndex = index
+                )
+            }
+        }
+    }
+    if (fitViewport) {
+        tableContent()
+    } else {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(horizontal)
+        ) {
+            tableContent()
         }
     }
 }
 
 @Composable
-private fun MarkdownTableRow(cells: List<String>, header: Boolean = false, columnWidth: Dp) {
+private fun MarkdownTableRow(
+    cells: List<String>,
+    header: Boolean = false,
+    columnWidth: Dp,
+    fitViewport: Boolean,
+    rowIndex: Int
+) {
     Row(
         modifier = Modifier
-            .background(if (header) Color(0xFFEFF3F8) else Color.White)
+            .then(if (fitViewport) Modifier.fillMaxWidth() else Modifier)
+            .height(IntrinsicSize.Min)
+            .background(
+                when {
+                    header -> Color(0xFFEAF2FF)
+                    rowIndex % 2 == 1 -> Color(0xFFF8FAFD)
+                    else -> Color.White
+                }
+            )
     ) {
-        cells.forEach { cell ->
+        cells.forEachIndexed { index, cell ->
             Text(
-                text = cell,
+                text = inlineMarkdownAnnotatedString(cell),
                 style = if (header) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodySmall,
                 fontWeight = if (header) FontWeight.SemiBold else FontWeight.Normal,
-                modifier = Modifier
-                    .widthIn(min = columnWidth)
+                color = if (header) Color(0xFF1849A9) else Color(0xFF243247),
+                modifier = (if (fitViewport) {
+                    Modifier.weight(markdownTableColumnWeight(index, cells.size))
+                } else {
+                    Modifier.widthIn(min = columnWidth, max = columnWidth)
+                })
                     .padding(horizontal = 12.dp, vertical = 10.dp)
             )
+            if (index < cells.lastIndex) {
+                VerticalDivider(
+                    modifier = Modifier.fillMaxHeight(),
+                    color = Color(0xFFE2E8F0),
+                    thickness = 1.dp
+                )
+            }
         }
     }
+}
+
+internal fun markdownTableFitsViewport(columnCount: Int): Boolean = columnCount in 1..2
+
+internal fun normalizedMarkdownTableRow(cells: List<String>, columnCount: Int): List<String> =
+    List(columnCount.coerceAtLeast(0)) { index -> cells.getOrElse(index) { "" } }
+
+internal fun markdownTableColumnWeight(index: Int, columnCount: Int): Float = when {
+    columnCount == 2 && index == 0 -> 1.35f
+    columnCount == 2 -> 0.85f
+    else -> 1f
 }
 
 private fun preferredTableColumnWidth(columnCount: Int): Dp {

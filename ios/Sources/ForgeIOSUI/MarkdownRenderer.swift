@@ -26,6 +26,8 @@ public struct MarkdownRenderer: View {
                     MermaidRenderer(source: source)
                 case .code(let language, let body):
                     MarkdownCodeBlock(language: language, code: body)
+                case .table(let table):
+                    MarkdownPipeTable(table: table)
                 }
             }
         }
@@ -37,6 +39,12 @@ enum MarkdownBlock: Equatable {
     case markdown(String)
     case mermaid(String)
     case code(language: String, body: String)
+    case table(MarkdownTableModel)
+}
+
+struct MarkdownTableModel: Equatable {
+    let headers: [String]
+    let rows: [[String]]
 }
 
 internal enum MarkdownCodeHighlightKind: Equatable {
@@ -212,6 +220,93 @@ private struct MarkdownCodeBlock: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .contain)
+    }
+}
+
+private struct MarkdownPipeTable: View {
+    let table: MarkdownTableModel
+
+    var body: some View {
+        let columnCount = max(table.headers.count, table.rows.map(\.count).max() ?? 0)
+        let fitsViewport = columnCount <= 2
+        Group {
+            if fitsViewport {
+                tableGrid(columnCount: columnCount, fitsViewport: true)
+            } else {
+                ScrollView(.horizontal, showsIndicators: true) {
+                    tableGrid(columnCount: columnCount, fitsViewport: false)
+                }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color(red: 0.84, green: 0.88, blue: 0.93), lineWidth: 1)
+        )
+        .accessibilityElement(children: .contain)
+    }
+
+    private func tableGrid(columnCount: Int, fitsViewport: Bool) -> some View {
+        Grid(horizontalSpacing: 0, verticalSpacing: 0) {
+            markdownTableGridRow(
+                cells: normalizedMarkdownTableRow(table.headers, columnCount: columnCount),
+                header: true,
+                rowIndex: -1,
+                fitsViewport: fitsViewport
+            )
+            ForEach(Array(table.rows.enumerated()), id: \.offset) { index, row in
+                Divider()
+                    .gridCellColumns(columnCount)
+                markdownTableGridRow(
+                    cells: normalizedMarkdownTableRow(row, columnCount: columnCount),
+                    header: false,
+                    rowIndex: index,
+                    fitsViewport: fitsViewport
+                )
+            }
+        }
+        .frame(maxWidth: fitsViewport ? .infinity : nil, alignment: .leading)
+    }
+
+    private func markdownTableGridRow(
+        cells: [String],
+        header: Bool,
+        rowIndex: Int,
+        fitsViewport: Bool
+    ) -> some View {
+        GridRow {
+            ForEach(Array(cells.enumerated()), id: \.offset) { index, cell in
+                Text(.init(cell))
+                    .font(header ? .caption.weight(.semibold) : .subheadline)
+                    .foregroundStyle(
+                        header
+                            ? Color(red: 0.09, green: 0.29, blue: 0.66)
+                            : Color(red: 0.14, green: 0.20, blue: 0.28)
+                    )
+                    .frame(
+                        minWidth: fitsViewport ? 0 : 132,
+                        maxWidth: fitsViewport ? .infinity : 220,
+                        maxHeight: .infinity,
+                        alignment: .leading
+                    )
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(
+                        header
+                            ? Color(red: 0.92, green: 0.95, blue: 1.0)
+                            : (rowIndex.isMultiple(of: 2)
+                                ? Color.white
+                                : Color(red: 0.97, green: 0.98, blue: 0.99))
+                    )
+                    .overlay(alignment: .trailing) {
+                        if index < cells.count - 1 {
+                            Rectangle()
+                                .fill(Color(red: 0.89, green: 0.91, blue: 0.94))
+                                .frame(width: 1)
+                        }
+                    }
+            }
+        }
     }
 }
 
@@ -401,10 +496,7 @@ internal func parseMarkdownBlocks(_ source: String) -> [MarkdownBlock] {
     var fenceBuffer: [String] = []
 
     func flushMarkdown() {
-        let text = markdownBuffer.joined(separator: "\n")
-        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            blocks.append(.markdown(text))
-        }
+        blocks.append(contentsOf: parseMarkdownContentBlocks(markdownBuffer))
         markdownBuffer.removeAll()
     }
 
@@ -447,6 +539,73 @@ internal func parseMarkdownBlocks(_ source: String) -> [MarkdownBlock] {
     }
 
     return blocks.isEmpty ? [.markdown(source)] : blocks
+}
+
+internal func parseMarkdownContentBlocks(_ lines: [String]) -> [MarkdownBlock] {
+    var blocks: [MarkdownBlock] = []
+    var textBuffer: [String] = []
+    var index = 0
+
+    func flushText() {
+        let text = textBuffer
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .newlines)
+        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            blocks.append(.markdown(text))
+        }
+        textBuffer.removeAll()
+    }
+
+    while index < lines.count {
+        let header = parseMarkdownTableRow(lines[index])
+        let divider = index + 1 < lines.count ? parseMarkdownTableRow(lines[index + 1]) : nil
+        if let header,
+           let divider,
+           header.count >= 2,
+           markdownTableDividerRow(divider, columnCount: header.count) {
+            flushText()
+            index += 2
+            var rows: [[String]] = []
+            while index < lines.count,
+                  !lines[index].trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  let row = parseMarkdownTableRow(lines[index]) {
+                rows.append(normalizedMarkdownTableRow(row, columnCount: header.count))
+                index += 1
+            }
+            blocks.append(.table(MarkdownTableModel(headers: header, rows: rows)))
+            continue
+        }
+        textBuffer.append(lines[index])
+        index += 1
+    }
+    flushText()
+    return blocks
+}
+
+internal func parseMarkdownTableRow(_ line: String) -> [String]? {
+    let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard trimmed.contains("|") else { return nil }
+    var value = trimmed
+    if value.hasPrefix("|") { value.removeFirst() }
+    if value.hasSuffix("|") { value.removeLast() }
+    let cells = value
+        .split(separator: "|", omittingEmptySubsequences: false)
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+    return cells.count >= 2 ? cells : nil
+}
+
+internal func markdownTableDividerRow(_ cells: [String], columnCount: Int) -> Bool {
+    guard cells.count == columnCount else { return false }
+    return cells.allSatisfy { cell in
+        cell.range(of: #"^:?-{3,}:?$"#, options: .regularExpression) != nil
+    }
+}
+
+internal func normalizedMarkdownTableRow(_ cells: [String], columnCount: Int) -> [String] {
+    guard columnCount > 0 else { return [] }
+    return (0..<columnCount).map { index in
+        index < cells.count ? cells[index] : ""
+    }
 }
 
 internal func normalizedMarkdownFenceLanguage(_ rawValue: String?) -> String {
