@@ -193,8 +193,14 @@ func normalizeSpecBlocks(blocks []map[string]any) {
 				block["valueLabel"] = title
 			}
 		case "tableBlock":
+			// Interactive navigation metadata has no meaning in a static export and
+			// is intentionally outside the strict Go reportSpec schema.
+			delete(block, "link")
+			delete(block, "description")
 			block["columns"] = normalizeColumns(block["columns"])
 		case "chartBlock":
+			delete(block, "description")
+			delete(block, "link")
 			chartSpec, _ := block["chartSpec"].(map[string]any)
 			if chartSpec == nil {
 				chartSpec = map[string]any{}
@@ -222,6 +228,9 @@ func normalizeSpecBlocks(blocks []map[string]any) {
 			if textValue(block["navigationLabel"]) == "" {
 				block["navigationLabel"] = title
 			}
+		case "geoMapBlock":
+			delete(block, "description")
+			delete(block, "link")
 		}
 	}
 }
@@ -678,16 +687,33 @@ func columnKeys(rows []map[string]any) []string {
 func normalizeColumns(value any) []map[string]any {
 	raw, _ := value.([]any)
 	if typed, ok := value.([]map[string]any); ok {
-		return typed
+		raw = make([]any, len(typed))
+		for index := range typed {
+			raw[index] = typed[index]
+		}
 	}
 	result := make([]map[string]any, 0, len(raw))
+	allowed := map[string]bool{
+		"key": true, "sourceKey": true, "displayKey": true, "label": true,
+		"kind": true, "format": true, "align": true, "cellVisual": true,
+		"runtimeFilterable": true,
+	}
 	for _, item := range raw {
 		if column, ok := item.(map[string]any); ok {
-			key := textValue(column["key"])
-			if textValue(column["label"]) == "" {
-				column["label"] = humanize(key)
+			normalized := map[string]any{}
+			for key, itemValue := range column {
+				if allowed[key] {
+					normalized[key] = itemValue
+				}
 			}
-			result = append(result, column)
+			if _, exists := normalized["kind"]; !exists && column["type"] != nil {
+				normalized["kind"] = column["type"]
+			}
+			key := textValue(normalized["key"])
+			if textValue(normalized["label"]) == "" {
+				normalized["label"] = humanize(key)
+			}
+			result = append(result, normalized)
 		}
 	}
 	return result
