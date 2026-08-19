@@ -26,9 +26,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.outlined.FilterAlt
+import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -1800,8 +1802,20 @@ private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowCon
                 fontWeight = FontWeight.SemiBold
             )
             if (exportExecution != null) {
-                OutlinedButton(
+                Button(
                     enabled = !pdfExporting,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFFEEF0),
+                        contentColor = Color(0xFFB4233A),
+                        disabledContainerColor = Color(0xFFFFF4F5),
+                        disabledContentColor = Color(0xFFD34B5F)
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 3.dp,
+                        pressedElevation = 1.dp,
+                        disabledElevation = 1.dp
+                    ),
+                    shape = RoundedCornerShape(18.dp),
                     onClick = {
                         if (pdfExporting) return@OutlinedButton
                         pdfExporting = true
@@ -1817,12 +1831,20 @@ private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowCon
                     }
                 ) {
                     if (pdfExporting) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp
+                        ForgeLayeredActionIcon(
+                            icon = Icons.Outlined.PictureAsPdf,
+                            contentDescription = null,
+                            accent = Color(0xFFD34B5F),
+                            loading = true
                         )
                         Text("Preparing PDF…", modifier = Modifier.padding(start = 8.dp))
                     } else {
+                        ForgeLayeredActionIcon(
+                            icon = Icons.Outlined.PictureAsPdf,
+                            contentDescription = null,
+                            accent = Color(0xFFD34B5F)
+                        )
+                        Spacer(modifier = Modifier.width(7.dp))
                         Text("Download PDF")
                     }
                 }
