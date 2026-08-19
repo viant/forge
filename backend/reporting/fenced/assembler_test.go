@@ -41,7 +41,7 @@ func TestCompileProducesExportablePDFContract(t *testing.T) {
 		"\n```\n```forge-data\n" +
 		`{"version":2,"scope":"message","id":"metrics","reportRef":"demo","sequence":2,"format":"json","mode":"replace","data":[{"name":"Display","spend":12.5},{"name":"CTV","spend":8.25}]}` +
 		"\n```\n```forge-report\n" +
-		`{"version":1,"scope":"message","id":"demo","sequence":3,"mode":"append","blocks":[{"id":"spend","kind":"kpiBlock","datasetRef":"metrics","valueField":"spend","valueFormat":"currency","title":"Spend"},{"id":"detail","kind":"tableBlock","datasetRef":"metrics","title":"Delivery","columns":[{"key":"name","label":"Channel"},{"key":"spend","label":"Spend","format":"currency"}]},{"id":"finding","kind":"markdownBlock","title":"Finding","markdown":"**Display** led spend."}]}` +
+		`{"version":1,"scope":"message","id":"demo","sequence":3,"mode":"append","blocks":[{"id":"spend","kind":"kpiBlock","datasetRef":"metrics","valueField":"spend","valueFormat":"currency","title":"Spend"},{"id":"detail","kind":"tableBlock","datasetRef":"metrics","title":"Delivery","description":"Interactive detail","link":{"href":"detailUrl"},"columns":[{"key":"name","label":"Channel","type":"link","link":{"href":"detailUrl"}},{"key":"spend","label":"Spend","format":"currency"}]},{"id":"finding","kind":"markdownBlock","title":"Finding","markdown":"**Display** led spend."}]}` +
 		"\n```\n```forge-report\n" +
 		`{"version":1,"scope":"message","id":"demo","sequence":4,"mode":"commit"}` +
 		"\n```"

@@ -80,6 +80,7 @@ object TranscriptEnvelope {
             when (part) {
                 is MarkdownFencePart.Text -> part.value
                 is MarkdownFencePart.Fence -> when {
+                    !part.closed && part.language in setOf("forge-report", "forge-data") -> ""
                     !part.closed -> part.raw
                     part.language == "forge-report" -> ""
                     part.language == "forge-data" && isProgressiveDataBody(part.body) -> ""

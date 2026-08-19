@@ -23,6 +23,16 @@ class TranscriptEnvelopeTest {
     }
 
     @Test
+    fun `suppresses incomplete progressive transport while streaming`() {
+        val partial = """Checking evidence.
+
+```forge-data
+{"version":2,"scope":"forecast","id":"states","data":[{"stateCode":"CA"}"""
+
+        assertEquals("Checking evidence.", TranscriptEnvelope.suppressProgressiveTransport(partial).trim())
+    }
+
+    @Test
     fun `materializes quoted multiline CSV`() {
         val parts = TranscriptEnvelope.parse("""
             ```forge-data id=rows format=csv
