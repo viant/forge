@@ -14,6 +14,10 @@ private struct ForgePresentationDensityKey: EnvironmentKey {
     static let defaultValue = ForgePresentationDensity.standard
 }
 
+private struct ForgeDedicatedReportScreenKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
 extension EnvironmentValues {
     var forgeEmbeddedNonScrolling: Bool {
         get { self[ForgeEmbeddedNonScrollingKey.self] }
@@ -23,6 +27,12 @@ extension EnvironmentValues {
     public var forgePresentationDensity: ForgePresentationDensity {
         get { self[ForgePresentationDensityKey.self] }
         set { self[ForgePresentationDensityKey.self] = newValue }
+    }
+
+
+    public var forgeDedicatedReportScreen: Bool {
+        get { self[ForgeDedicatedReportScreenKey.self] }
+        set { self[ForgeDedicatedReportScreenKey.self] = newValue }
     }
 }
 

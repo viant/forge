@@ -20,6 +20,20 @@ final class TranscriptEnvelopeTests: XCTestCase {
         )
     }
 
+    func testSuppressesIncompleteProgressiveTransportWhileStreaming() {
+        let partial = """
+        Checking delivery evidence.
+        ```forge-report
+        {"version":1,"scope":"delivery","id":"review","blocks":[
+        """
+
+        XCTAssertEqual(
+            TranscriptEnvelope.suppressProgressiveTransport(in: partial)
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+            "Checking delivery evidence."
+        )
+    }
+
     func testMaterializesLegacyDataHeadersAndAppendModeBeforeUI() {
         let content = """
         before

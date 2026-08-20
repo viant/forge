@@ -128,6 +128,9 @@ public enum TranscriptEnvelope {
             case .text(let value):
                 return value
             case .fence(let raw, let language, _, let body, let closed):
+                if !closed, ["forge-report", "forge-data"].contains(language) {
+                    return ""
+                }
                 guard closed else { return raw }
                 if language == "forge-report" {
                     return ""

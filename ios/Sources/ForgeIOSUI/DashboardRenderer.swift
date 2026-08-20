@@ -10,6 +10,7 @@ private struct ReportRuntimeFlatSection: Identifiable {
 public struct DashboardRenderer: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.forgePresentationDensity) private var presentationDensity
+    @Environment(\.forgeDedicatedReportScreen) private var dedicatedReportScreen
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
     private let container: ContainerDef
@@ -1086,42 +1087,50 @@ public struct DashboardRenderer: View {
     @ViewBuilder
     private func reportRuntimeBlock(_ container: ContainerDef) -> some View {
         let summary = DashboardRuntime.dashboardReportRuntimeSummary(container)
+        let repeatsContainerTitle = normalizedReportHeading(summary.title) == normalizedReportHeading(container.title)
+        let repeatsContainerSubtitle = normalizedReportHeading(summary.subtitle) == normalizedReportHeading(container.subtitle)
         let nestedBlockIDs = reportRuntimeNestedTabBlockIDs(summary.blocks)
         let topLevelBlocks = summary.blocks.filter { !nestedBlockIDs.contains($0.id) }
         let flatSections = reportRuntimeFlatSections(topLevelBlocks)
         let hasExplicitTabGroup = topLevelBlocks.contains { $0.kind == "tabGroupBlock" }
         let exportExecution = DashboardRuntime.dashboardReportRuntimeExportExecution(container)
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 8) {
-                Text(summary.title ?? container.title ?? "Report runtime")
-                    .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if let exportExecution {
-                    Button {
-                        executeReportRuntimeExportAction(exportExecution)
-                    } label: {
-                        ForgePillActionLabel(
-                            title: reportRuntimeExportExecutionID == exportExecution.id
-                                ? "Preparing PDF…"
-                                : "Open PDF",
-                            systemImage: "doc.richtext.fill",
-                            color: Color(red: 0.82, green: 0.25, blue: 0.34),
-                            isLoading: reportRuntimeExportExecutionID == exportExecution.id
-                        )
+            if !dedicatedReportScreen {
+                HStack(alignment: .center, spacing: 8) {
+                    if !repeatsContainerTitle {
+                        Text(summary.title ?? container.title ?? "Report runtime")
+                            .font(.body.weight(.semibold))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        Spacer(minLength: 0)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(reportRuntimeExportExecutionID != nil)
-                    .accessibilityIdentifier("forge-report-runtime-open-pdf")
+                    if let exportExecution {
+                        Button {
+                            executeReportRuntimeExportAction(exportExecution)
+                        } label: {
+                            ForgePillActionLabel(
+                                title: reportRuntimeExportExecutionID == exportExecution.id
+                                    ? "Preparing PDF…"
+                                    : "Open PDF",
+                                systemImage: "doc.richtext.fill",
+                                color: Color(red: 0.82, green: 0.25, blue: 0.34),
+                                isLoading: reportRuntimeExportExecutionID == exportExecution.id
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(reportRuntimeExportExecutionID != nil)
+                        .accessibilityIdentifier("forge-report-runtime-open-pdf")
+                    }
                 }
-            }
-            if let subtitle = summary.subtitle {
-                Text(subtitle)
-                    .font(.caption)
+                if let subtitle = summary.subtitle, !repeatsContainerSubtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Text(summary.blockCount == 1 ? "1 report block" : "\(summary.blockCount) report blocks")
+                    .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
-            Text(summary.blockCount == 1 ? "1 report block" : "\(summary.blockCount) report blocks")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
             // Diagnostics describe authoring/schema repair work. Keep them in
             // the runtime model, but do not expose codes or paths to viewers.
             if flatSections.count > 1 && !hasExplicitTabGroup {
@@ -1147,15 +1156,22 @@ public struct DashboardRenderer: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
+        .padding(dedicatedReportScreen ? 0 : 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.secondary.opacity(0.06))
+                .fill(dedicatedReportScreen ? Color.clear : Color.secondary.opacity(0.06))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                .stroke(dedicatedReportScreen ? Color.clear : Color.black.opacity(0.06), lineWidth: 1)
         )
+    }
+
+    private func normalizedReportHeading(_ value: String?) -> String {
+        value?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .lowercased() ?? ""
     }
 
     private func reportRuntimeBlockMetrics(_ block: DashboardReportRuntimeBlockSummary) -> [String: Any] {
@@ -1234,15 +1250,48 @@ public struct DashboardRenderer: View {
         selectedID: String,
         onSelect: @escaping (String) -> Void
     ) -> some View {
-        if horizontalSizeClass == .compact && entries.count > 3 {
-            Picker(
-                "Report section",
-                selection: Binding(get: { selectedID }, set: onSelect)
-            ) {
-                ForEach(entries, id: \.id) { entry in Text(entry.title).tag(entry.id) }
+        if horizontalSizeClass == .compact {
+            let selectedIndex = entries.firstIndex(where: { $0.id == selectedID }) ?? 0
+            HStack(spacing: 8) {
+                Button {
+                    guard selectedIndex > 0 else { return }
+                    onSelect(entries[selectedIndex - 1].id)
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.plain)
+                .disabled(selectedIndex == 0)
+                Menu {
+                    ForEach(entries, id: \.id) { entry in
+                        Button(entry.title) { onSelect(entry.id) }
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(entries[selectedIndex].title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        Text("\(selectedIndex + 1) of \(entries.count) · tap to choose")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                Button {
+                    guard selectedIndex + 1 < entries.count else { return }
+                    onSelect(entries[selectedIndex + 1].id)
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.plain)
+                .disabled(selectedIndex + 1 >= entries.count)
             }
-            .pickerStyle(.menu)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.secondary.opacity(0.14), lineWidth: 1))
             .accessibilityIdentifier("forge-report-runtime-section-selector")
         } else {
             ScrollView(.horizontal, showsIndicators: false) {
@@ -1293,19 +1342,11 @@ public struct DashboardRenderer: View {
                     .accessibilityLabel(tabGroup.title)
                     .accessibilityIdentifier("forge-report-runtime-section-selector")
                 } else {
-                    Picker(
-                        tabGroup.title,
-                        selection: Binding(
-                            get: { selectedID },
-                            set: { reportRuntimeTabSelections[tabGroup.id] = $0 }
-                        )
-                    ) {
-                        ForEach(sections) { section in
-                            Text(section.title).tag(section.id)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .accessibilityIdentifier("forge-report-runtime-section-selector")
+                    reportRuntimeSectionSelector(
+                        sections.map { ($0.id, $0.title) },
+                        selectedID: selectedID,
+                        onSelect: { reportRuntimeTabSelections[tabGroup.id] = $0 }
+                    )
                 }
 
                 reportRuntimeAuthoredBlock(selectedSection)
@@ -1456,8 +1497,14 @@ public struct DashboardRenderer: View {
     ]
 
     private func reportRuntimePresentationBlock(_ block: DashboardReportRuntimeBlockSummary) -> some View {
+        if block.kind == "badgesBlock" {
+            return AnyView(reportRuntimeBadgesBlock(block))
+        }
         let entries = reportRuntimePresentationEntries(kind: block.kind, content: block.content)
-        return VStack(alignment: .leading, spacing: 7) {
+        let authoredToneValue = block.content["tone"]?.stringValue
+        let authoredTone = toneStyle(authoredToneValue)
+        let usesAuthoredTone = block.kind == "calloutBlock" && authoredToneValue?.isEmpty == false
+        return AnyView(VStack(alignment: .leading, spacing: 7) {
             if let eyebrow = block.content["eyebrow"]?.stringValue, !eyebrow.isEmpty {
                 Text(eyebrow.uppercased())
                     .font(.caption2.weight(.semibold))
@@ -1488,8 +1535,52 @@ public struct DashboardRenderer: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Color.secondary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.black.opacity(0.06), lineWidth: 1))
+        .background(
+            usesAuthoredTone ? authoredTone.background : Color.secondary.opacity(0.05),
+            in: RoundedRectangle(cornerRadius: 12)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(usesAuthoredTone ? authoredTone.border : Color.black.opacity(0.06), lineWidth: 1)
+        )
+        .overlay(alignment: .leading) {
+            if usesAuthoredTone {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(authoredTone.text)
+                    .frame(width: 4)
+                    .padding(.vertical, 1)
+            }
+        })
+    }
+
+    private func reportRuntimeBadgesBlock(_ block: DashboardReportRuntimeBlockSummary) -> some View {
+        let items = block.content["items"]?.arrayValue?.compactMap(\.objectValue) ?? []
+        return VStack(alignment: .leading, spacing: 8) {
+            if !block.title.isEmpty {
+                Text(block.title).font(.headline)
+            }
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 132), spacing: 8, alignment: .leading)],
+                alignment: .leading,
+                spacing: 8
+            ) {
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    let label = item["label"]?.stringValue ?? item["id"]?.stringValue ?? "Value"
+                    let value = item["displayValue"]?.stringValue
+                        ?? DashboardRuntime.dashboardReportRuntimeValueText(item["value"])
+                        ?? ""
+                    let tone = item["tone"]?.stringValue ?? item["severity"]?.stringValue ?? "info"
+                    Text(value.isEmpty ? label : "\(label): \(value)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(toneColor(tone))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(toneBackground(tone)))
+                        .overlay(Capsule().stroke(toneBorder(tone), lineWidth: 1))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func reportRuntimePresentationEntries(
