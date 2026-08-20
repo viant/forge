@@ -351,6 +351,7 @@ private func reportBuilderRelativeDateRange(
           let end = calendar.date(byAdding: .day, value: offsets.1, to: today) else { return nil }
     let formatter = DateFormatter()
     formatter.calendar = calendar
+    formatter.timeZone = calendar.timeZone
     formatter.locale = Locale(identifier: "en_US_POSIX")
     formatter.dateFormat = "yyyy-MM-dd"
     return (formatter.string(from: start), formatter.string(from: end))

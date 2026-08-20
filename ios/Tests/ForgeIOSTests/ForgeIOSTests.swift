@@ -2765,7 +2765,7 @@ final class ForgeIOSTests: XCTestCase {
         let blocks = parseMarkdownBlocks(source)
 
         XCTAssertEqual(blocks.count, 3)
-        XCTAssertEqual(blocks[0], .markdown("## Agriculture"))
+        XCTAssertEqual(blocks[0], .heading(level: 2, text: "Agriculture"))
         XCTAssertEqual(
             blocks[1],
             .table(
@@ -2779,6 +2779,18 @@ final class ForgeIOSTests: XCTestCase {
             )
         )
         XCTAssertEqual(blocks[2], .markdown("Follow-up text."))
+    }
+
+    func testParseMarkdownBlocksRendersATXHeadingWithoutLiteralHashes() {
+        let blocks = parseMarkdownBlocks("### Agriculture\n\nBody")
+
+        XCTAssertEqual(
+            blocks,
+            [
+                .heading(level: 3, text: "Agriculture"),
+                .markdown("Body")
+            ]
+        )
     }
 
     func testMarkdownCodeAccessibilityLabelsIncludeLanguageAndLineCount() {

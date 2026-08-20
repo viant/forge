@@ -22,6 +22,11 @@ public struct MarkdownRenderer: View {
                         Text(.init(text))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                case .heading(let level, let text):
+                    Text(.init(text))
+                        .font(markdownHeadingFont(level: level))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityAddTraits(.isHeader)
                 case .mermaid(let source):
                     MermaidRenderer(source: source)
                 case .code(let language, let body):
@@ -37,6 +42,7 @@ public struct MarkdownRenderer: View {
 
 enum MarkdownBlock: Equatable {
     case markdown(String)
+    case heading(level: Int, text: String)
     case mermaid(String)
     case code(language: String, body: String)
     case table(MarkdownTableModel)
@@ -557,6 +563,12 @@ internal func parseMarkdownContentBlocks(_ lines: [String]) -> [MarkdownBlock] {
     }
 
     while index < lines.count {
+        if let heading = parseMarkdownHeadingLine(lines[index]) {
+            flushText()
+            blocks.append(.heading(level: heading.level, text: heading.text))
+            index += 1
+            continue
+        }
         let header = parseMarkdownTableRow(lines[index])
         let divider = index + 1 < lines.count ? parseMarkdownTableRow(lines[index + 1]) : nil
         if let header,
@@ -580,6 +592,33 @@ internal func parseMarkdownContentBlocks(_ lines: [String]) -> [MarkdownBlock] {
     }
     flushText()
     return blocks
+}
+
+internal func parseMarkdownHeadingLine(_ line: String) -> (level: Int, text: String)? {
+    let value = line.trimmingCharacters(in: .whitespaces)
+    var level = 0
+    for character in value {
+        guard character == "#" else { break }
+        level += 1
+    }
+    guard (1...6).contains(level) else { return nil }
+    let markerEnd = value.index(value.startIndex, offsetBy: level)
+    guard markerEnd == value.endIndex || value[markerEnd].isWhitespace else { return nil }
+    let text = value[markerEnd...]
+        .trimmingCharacters(in: .whitespaces)
+    guard !text.isEmpty else { return nil }
+    return (level, text)
+}
+
+private func markdownHeadingFont(level: Int) -> Font {
+    switch level {
+    case 1: return .largeTitle.bold()
+    case 2: return .title.bold()
+    case 3: return .title2.weight(.semibold)
+    case 4: return .title3.weight(.semibold)
+    case 5: return .headline
+    default: return .subheadline.weight(.semibold)
+    }
 }
 
 internal func parseMarkdownTableRow(_ line: String) -> [String]? {
