@@ -170,7 +170,7 @@ func TestCompileProducesExportableMultiTabDashboard(t *testing.T) {
 
 func TestCompileProducesInfoPanelAndCalloutFill(t *testing.T) {
 	content := "```forge-report\n" +
-		`{"version":1,"scope":"message","id":"panels","sequence":1,"mode":"start","grammar":"report-document-v1","title":"Panels","blocks":[{"id":"context","kind":"infoPanelBlock","title":"Context","eyebrow":"Read first","tone":"info","body":"Capacity detail"},{"id":"action","kind":"calloutBlock","title":"Action","icon":"warning","tone":"warning","badges":["Validated"],"body":"Restore pacing"}]}` +
+		`{"version":1,"scope":"message","id":"panels","sequence":1,"mode":"start","grammar":"report-document-v1","title":"Panels","blocks":[{"id":"context","kind":"infoPanelBlock","title":"Context","eyebrow":"Read first","tone":"info","body":"Capacity detail"},{"id":"action","kind":"calloutBlock","title":"Action","icon":"warning","tone":"warning","badges":["Validated"],"body":"Restore pacing"},{"id":"validation","kind":"calloutBlock","title":"Validation","tone":"info","body":"Compare before and after."},{"id":"limitations","kind":"calloutBlock","title":"Limitations","tone":"neutral","body":"Evidence remains partial."}]}` +
 		"\n```\n```forge-data\n" +
 		`{"version":2,"scope":"message","id":"rows","reportRef":"panels","sequence":2,"format":"json","mode":"replace","data":[{"status":"ready"}]}` +
 		"\n```\n```forge-report\n" +
@@ -180,6 +180,41 @@ func TestCompileProducesInfoPanelAndCalloutFill(t *testing.T) {
 	compiled, err := Compile(&CompileRequest{Content: content, ReportID: "panels"})
 	require.NoError(t, err)
 	require.NotEmpty(t, compiled.ReportFill)
+
+	var printArtifact map[string]any
+	require.NoError(t, json.Unmarshal(compiled.ReportPrint, &printArtifact))
+	pages := printArtifact["pages"].([]any)
+	elements := pages[0].(map[string]any)["elements"].([]any)
+	byID := map[string]map[string]any{}
+	for _, item := range elements {
+		element := item.(map[string]any)
+		byID[element["id"].(string)] = element
+	}
+	require.Equal(t, "#fff8e3", byID["action__panel"]["fillColor"])
+	require.Equal(t, "#f2d98b", byID["action__panel"]["strokeColor"])
+	require.Equal(t, "#92620c", byID["action__accent"]["fillColor"])
+	require.Equal(t, "Action", byID["action__title"]["text"])
+	require.Equal(t, "Restore pacing", byID["action__line_0"]["text"])
+	require.Equal(t, "#f0eeff", byID["validation__panel"]["fillColor"])
+	require.Equal(t, "#c8c4f5", byID["validation__panel"]["strokeColor"])
+	require.Equal(t, "#5147a6", byID["validation__accent"]["fillColor"])
+	require.Equal(t, "#f2f4f7", byID["limitations__panel"]["fillColor"])
+	require.Equal(t, "#d8dee6", byID["limitations__panel"]["strokeColor"])
+
+	request, err := forgeexport.DecodeJSON(mustJSON(t, map[string]any{
+		"version": 1,
+		"kind":    "reportExportRequest",
+		"target":  map[string]any{"format": "pdf"},
+		"source": map[string]any{
+			"from": "draft", "artifactKind": "dashboard.reportBuilder",
+			"artifactRef": "dashboard.reportBuilder://panels", "title": "Panels", "reportId": "panels",
+		},
+		"reportSpec": jsonRaw(compiled.ReportSpec), "reportFill": jsonRaw(compiled.ReportFill), "reportPrint": jsonRaw(compiled.ReportPrint),
+	}))
+	require.NoError(t, err)
+	rendered, err := forgepdf.Render(request.ReportPrintModel(), forgepdf.Options{})
+	require.NoError(t, err)
+	require.True(t, bytes.HasPrefix(rendered.Bytes, []byte("%PDF-")))
 }
 
 func TestCompilePrintGroupsKPIsAndFormatsCounts(t *testing.T) {

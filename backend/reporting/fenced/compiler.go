@@ -620,6 +620,39 @@ func buildPrint(title string, source map[string]any, specRaw, fillRaw json.RawMe
 				y += 76
 				pendingKPIs = 0
 			}
+		case "calloutBlock":
+			body := textValue(block["body"])
+			if body == "" {
+				body = textValue(block["description"])
+			}
+			lines := wrapPlain(stripMarkdown(body), 76)
+			if len(lines) == 0 {
+				lines = []string{"No additional detail."}
+			}
+			panelHeight := 54.0 + float64(len(lines))*15
+			ensure(panelHeight + 12)
+			background, border, accent := calloutToneColors(textValue(block["tone"]))
+			panel := rectElement(id+"__panel", margin, y, width-2*margin, panelHeight, background)
+			panel["strokeColor"] = border
+			panel["radius"] = 12
+			elements = append(elements, panel)
+			accentRule := rectElement(id+"__accent", margin, y, 5, panelHeight, accent)
+			accentRule["strokeColor"] = accent
+			accentRule["radius"] = 3
+			elements = append(elements, accentRule)
+			titleID := id + "__title"
+			titleText := textElement(titleID, margin+18, y+12, width-2*margin-34, 22, blockTitle, 14, "600")
+			titleText["color"] = "#182026"
+			elements = append(elements, titleText)
+			bookmarks = append(bookmarks, bookmark(id, blockTitle, pageNumber, titleID, y))
+			textY := y + 39
+			for index, line := range lines {
+				lineText := textElement(fmt.Sprintf("%s__line_%d", id, index), margin+18, textY, width-2*margin-34, 14, line, 10, "")
+				lineText["color"] = "#30404d"
+				elements = append(elements, lineText)
+				textY += 15
+			}
+			y += panelHeight + 12
 		default:
 			body := textValue(block["markdown"])
 			if body == "" {
@@ -775,6 +808,21 @@ func badgeToneColors(tone string) (background, border, foreground string) {
 		return "#eef4fb", "#cfdced", "#21538f"
 	default:
 		return "#f7fafc", "#d8e2eb", "#486581"
+	}
+}
+
+func calloutToneColors(tone string) (background, border, accent string) {
+	switch strings.ToLower(strings.TrimSpace(tone)) {
+	case "success", "good":
+		return "#eef9ef", "#b6e2be", "#1e6e37"
+	case "warning", "caution":
+		return "#fff8e3", "#f2d98b", "#92620c"
+	case "danger", "error":
+		return "#fdeded", "#f0bbbb", "#99293a"
+	case "info", "setup", "restriction", "accent":
+		return "#f0eeff", "#c8c4f5", "#5147a6"
+	default:
+		return "#f2f4f7", "#d8dee6", "#475467"
 	}
 }
 
