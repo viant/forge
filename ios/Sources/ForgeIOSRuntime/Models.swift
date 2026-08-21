@@ -3853,6 +3853,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
     public let link: LinkDef?
     public let width: Int?
     public let icon: String?
+    public let cellVisual: JSONValue?
     public let on: [ExecutionDef]
     public let target: JSONValue?
     public let targetOverrides: [String: JSONValue]
@@ -3869,6 +3870,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         case link
         case width
         case icon
+        case cellVisual
         case on
         case target
         case targetOverrides
@@ -3886,6 +3888,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         link: LinkDef? = nil,
         width: Int? = nil,
         icon: String? = nil,
+        cellVisual: JSONValue? = nil,
         on: [ExecutionDef] = [],
         target: JSONValue? = nil,
         targetOverrides: [String: JSONValue] = [:]
@@ -3901,6 +3904,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         self.link = link
         self.width = width
         self.icon = icon
+        self.cellVisual = cellVisual
         self.on = on
         self.target = target
         self.targetOverrides = targetOverrides
@@ -3921,6 +3925,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
             self.link = nil
             self.width = nil
             self.icon = nil
+            self.cellVisual = nil
             self.on = []
             self.target = nil
             self.targetOverrides = [:]
@@ -3941,6 +3946,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         link = try container.decodeIfPresent(LinkDef.self, forKey: .link)
         width = try container.decodeIfPresent(Int.self, forKey: .width)
         icon = try container.decodeIfPresent(String.self, forKey: .icon)
+        cellVisual = try container.decodeIfPresent(JSONValue.self, forKey: .cellVisual)
         on = try container.decodeIfPresent([ExecutionDef].self, forKey: .on) ?? []
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
         targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
@@ -3959,6 +3965,7 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         try container.encodeIfPresent(link, forKey: .link)
         try container.encodeIfPresent(width, forKey: .width)
         try container.encodeIfPresent(icon, forKey: .icon)
+        try container.encodeIfPresent(cellVisual, forKey: .cellVisual)
         try container.encode(on, forKey: .on)
         try container.encodeIfPresent(target, forKey: .target)
         try container.encode(targetOverrides, forKey: .targetOverrides)

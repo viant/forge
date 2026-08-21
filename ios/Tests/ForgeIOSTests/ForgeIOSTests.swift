@@ -2350,6 +2350,23 @@ final class ForgeIOSTests: XCTestCase {
             ),
             .regularGrid
         )
+        XCTAssertEqual(
+            TableRenderer.resolvePresentationMode(
+                targetContext: ForgeTargetContext(platform: "ios", formFactor: "phone"),
+                horizontalSizeClass: .compact,
+                containerKind: "dashboard.table",
+                hasProvidedRows: true
+            ),
+            .regularGrid
+        )
+    }
+
+    func testColumnDefPreservesReportCellVisual() throws {
+        let data = Data(##"{"key":"count","label":"Count","cellVisual":{"kind":"dataBar","valueField":"count","palette":["#dbeafe","#2563eb"]}}"##.utf8)
+        let column = try JSONDecoder().decode(ColumnDef.self, from: data)
+
+        XCTAssertEqual(column.cellVisual?.objectValue?["kind"]?.stringValue, "dataBar")
+        XCTAssertEqual(column.cellVisual?.objectValue?["valueField"]?.stringValue, "count")
     }
 
     func testTableRefreshControlVisibleOnlyForRuntimeDatasourceRows() {

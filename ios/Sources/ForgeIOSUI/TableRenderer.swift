@@ -384,7 +384,9 @@ public struct TableRenderer: View {
     private var presentationMode: TablePresentationMode {
         Self.resolvePresentationMode(
             targetContext: nil,
-            horizontalSizeClass: horizontalSizeClass
+            horizontalSizeClass: horizontalSizeClass,
+            containerKind: container.kind,
+            hasProvidedRows: providedRows != nil
         )
     }
 
@@ -980,7 +982,25 @@ public struct TableRenderer: View {
     @ViewBuilder
     private func valueLabel(row: [String: JSONValue], column: ColumnDef, fallback: String? = nil, font: Font, color: Color) -> some View {
         let text = displayValue(row[columnKey(column)], column: column, fallback: fallback)
-        if let resolved = resolvedLinkTarget(for: column, row: row) {
+        if let fraction = dataBarFraction(row: row, column: column) {
+            ZStack(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 9)
+                    .fill(Color.secondary.opacity(0.06))
+                GeometryReader { proxy in
+                    RoundedRectangle(cornerRadius: 9)
+                        .fill(dataBarGradient(column: column))
+                        .frame(width: max(3, proxy.size.width * fraction))
+                }
+                Text(text)
+                    .font(font.weight(.semibold))
+                    .foregroundStyle(color)
+                    .lineLimit(1)
+                    .padding(.horizontal, 8)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 30)
+            .accessibilityLabel(text)
+        } else if let resolved = resolvedLinkTarget(for: column, row: row) {
             switch resolved {
             case .external(let destination):
                 Link(text, destination: destination)
@@ -1006,6 +1026,29 @@ public struct TableRenderer: View {
                 .foregroundStyle(color)
                 .lineLimit(2)
         }
+    }
+
+    private func dataBarFraction(row: [String: JSONValue], column: ColumnDef) -> CGFloat? {
+        guard let visual = column.cellVisual?.objectValue,
+              visual["kind"]?.stringValue?.lowercased() == "databar" else {
+            return nil
+        }
+        let valueField = visual["valueField"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = valueField?.isEmpty == false ? valueField! : columnKey(column)
+        guard let value = tableNumericValue(row[key]) else { return nil }
+        let maximum = rows.compactMap { tableNumericValue($0[key]).map(abs) }.max() ?? 0
+        guard maximum > 0 else { return 0 }
+        return CGFloat(min(1, max(0, abs(value) / maximum)))
+    }
+
+    private func dataBarGradient(column: ColumnDef) -> LinearGradient {
+        let palette = column.cellVisual?.objectValue?["palette"]?.arrayValue?
+            .compactMap(\.stringValue)
+            .compactMap(tableColor) ?? []
+        let colors = palette.isEmpty
+            ? [Color.blue.opacity(0.18), Color.blue.opacity(0.82)]
+            : palette
+        return LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing)
     }
 
     private func resolvedLinkTarget(for column: ColumnDef, row: [String: JSONValue]) -> ResolvedLinkTarget? {
@@ -1037,8 +1080,14 @@ public struct TableRenderer: View {
 extension TableRenderer {
     static func resolvePresentationMode(
         targetContext: ForgeTargetContext?,
-        horizontalSizeClass: UserInterfaceSizeClass?
+        horizontalSizeClass: UserInterfaceSizeClass?,
+        containerKind: String? = nil,
+        hasProvidedRows: Bool = false
     ) -> TablePresentationMode {
+        if hasProvidedRows,
+           containerKind?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "dashboard.table" {
+            return .regularGrid
+        }
         if let formFactor = targetContext?.formFactor.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !formFactor.isEmpty {
             if formFactor == "tablet" || formFactor == "desktop" {
                 return .regularGrid
@@ -1058,6 +1107,28 @@ extension TableRenderer {
         let base = max(120, min(260, column.displayLabel.count * 11))
         return CGFloat(base)
     }
+}
+
+private func tableNumericValue(_ value: JSONValue?) -> Double? {
+    switch value {
+    case .number(let number):
+        return number
+    case .string(let text):
+        return Double(text.trimmingCharacters(in: .whitespacesAndNewlines))
+    default:
+        return nil
+    }
+}
+
+private func tableColor(_ rawValue: String) -> Color? {
+    var value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    if value.hasPrefix("#") { value.removeFirst() }
+    guard value.count == 6, let integer = UInt64(value, radix: 16) else { return nil }
+    return Color(
+        red: Double((integer >> 16) & 0xff) / 255,
+        green: Double((integer >> 8) & 0xff) / 255,
+        blue: Double(integer & 0xff) / 255
+    )
 }
 
 enum TablePresentationMode: Equatable {
