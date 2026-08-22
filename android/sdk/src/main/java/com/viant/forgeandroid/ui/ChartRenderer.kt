@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
@@ -32,6 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -43,6 +45,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.ChartDef
 import com.viant.forgeandroid.runtime.ChartValueOption
@@ -53,6 +56,7 @@ import com.viant.forgeandroid.runtime.DashboardReportRuntimeActionExecution
 import com.viant.forgeandroid.runtime.DashboardReportRuntimeActionField
 import com.viant.forgeandroid.runtime.DashboardReportRuntimeChartSelection
 import com.viant.forgeandroid.runtime.dashboardReportRuntimeChartActionExecutions
+import com.viant.forgeandroid.runtime.formatDashboardValue
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.max
@@ -286,8 +290,8 @@ private fun ChartSeriesSelector(
                 modifier = Modifier.clickable { onToggle(entry.key) }
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
                 ) {
                     if (selected) {
                         Text(
@@ -300,11 +304,11 @@ private fun ChartSeriesSelector(
                     Box(
                         modifier = Modifier
                             .background(entry.color, RoundedCornerShape(999.dp))
-                            .padding(horizontal = 5.dp, vertical = 5.dp)
+                            .padding(horizontal = 4.dp, vertical = 4.dp)
                     )
                     Text(
                         text = entry.label,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.labelMedium,
                         color = if (selected) MaterialTheme.colorScheme.onSurface else ChartMutedText,
                         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
                     )
@@ -459,9 +463,14 @@ private fun MultiSeriesCartesianChart(
     xTickFormat: String?
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
+        val axes = prepared.series.map { it.axis.ifBlank { "default" } }.distinct()
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            axes.firstOrNull()?.let { axis ->
+                ChartYAxisLabels(prepared, axis, chartHeight, TextAlign.End)
+            }
+            Canvas(
+                modifier = Modifier
+                .weight(1f)
                 .height(chartHeight)
                 .background(ChartCanvasColor, RoundedCornerShape(14.dp))
                 .padding(12.dp)
@@ -470,7 +479,7 @@ private fun MultiSeriesCartesianChart(
                         onSelect(findCartesianSelection(tap, size.width.toFloat(), size.height.toFloat(), prepared))
                     }
                 }
-        ) {
+            ) {
             val width = size.width
             val height = size.height
             if (prepared.points.size == 1 && prepared.series.size == 1) {
@@ -519,8 +528,12 @@ private fun MultiSeriesCartesianChart(
                     )
                 )
             }
+            }
+            axes.drop(1).firstOrNull()?.let { axis ->
+                ChartYAxisLabels(prepared, axis, chartHeight, TextAlign.Start)
+            }
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = if (axes.size > 1) 52.dp else 26.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             sampledChartAxisLabels(prepared.points.map { it.label }, maximumAxisLabels).forEach { label ->
                 Text(
                     text = formatChartAxisLabel(label, xTickFormat),
@@ -534,6 +547,32 @@ private fun MultiSeriesCartesianChart(
         }
         if (prepared.series.size <= 1) {
             ChartLegend(prepared.series)
+        }
+    }
+}
+
+@Composable
+private fun ChartYAxisLabels(
+    prepared: PreparedChartData,
+    axis: String,
+    chartHeight: androidx.compose.ui.unit.Dp,
+    textAlign: TextAlign
+) {
+    val maximum = prepared.maxValuesByAxis[axis]?.coerceAtLeast(1.0) ?: prepared.maxValue.coerceAtLeast(1.0)
+    val format = prepared.series.firstOrNull { it.axis.ifBlank { "default" } == axis }?.format ?: "compactNumber"
+    Column(
+        modifier = Modifier.width(52.dp).height(chartHeight).padding(vertical = 10.dp, horizontal = 3.dp),
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        listOf(maximum, maximum / 2.0, 0.0).forEach { value ->
+            Text(
+                text = formatDashboardValue(value, format),
+                style = MaterialTheme.typography.labelSmall,
+                color = ChartMutedText,
+                textAlign = textAlign,
+                maxLines = 1,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }

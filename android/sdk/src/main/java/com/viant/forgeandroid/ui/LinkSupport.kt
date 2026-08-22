@@ -43,9 +43,6 @@ internal fun resolveColumnLinkTargetFromContext(
     column: ColumnDef,
     context: LinkResolutionContext
 ): ResolvedLinkTarget? {
-    if (column.type?.trim()?.lowercase() != "link") {
-        return null
-    }
     val link = column.link ?: return null
     val windowKey = link.windowKey?.trim().orEmpty()
     val kind = link.kind?.trim()?.lowercase().orEmpty()

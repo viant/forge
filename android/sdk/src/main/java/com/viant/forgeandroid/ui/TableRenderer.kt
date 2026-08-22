@@ -7,7 +7,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,7 +20,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -91,25 +89,18 @@ fun TableRenderer(
             TableToolbar(runtime, context, tb)
         }
         if (tableRefreshControlVisible(context.dataSourceRef, rowsOverride != null)) {
-            Column(modifier = Modifier.padding(bottom = 8.dp)) {
-                OutlinedButton(
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                IconButton(
                     onClick = {
                         context.fetchCollection()
                     },
-                    enabled = !refreshFeedback.busy,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                    enabled = !refreshFeedback.busy
                 ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
-                    Text(if (refreshFeedback.busy) "Refreshing…" else "Refresh")
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh table")
                 }
-                refreshFeedback.message?.let { message ->
-                    Text(
-                        text = message,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
+            }
+            refreshFeedback.message?.let { message ->
+                Text(text = message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
         }
         BoxWithConstraints(
@@ -340,7 +331,7 @@ private fun MobileTableCard(
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 3.dp else 1.dp)
     ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             displayColumns(table).forEachIndexed { fieldIndex, col ->
                 val key = tableColumnKey(col) ?: return@forEachIndexed
                 val value = formatTableValue(row[key], col)
@@ -357,24 +348,22 @@ private fun MobileTableCard(
                 if (fieldIndex == 0) {
                     Text(
                         text = value.ifBlank { col.label ?: key },
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = if (linkTarget != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
-                        textDecoration = if (linkTarget != null) TextDecoration.Underline else null,
                         modifier = if (linkTarget != null) Modifier.clickable { openLink(linkTarget) } else Modifier
                     )
                 } else {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
                             text = col.label ?: col.name ?: key,
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFF6A7280)
                         )
                         Text(
                             text = value.ifBlank { "-" },
                             style = MaterialTheme.typography.bodyMedium,
                             color = if (linkTarget != null) MaterialTheme.colorScheme.primary else Color.Unspecified,
-                            textDecoration = if (linkTarget != null) TextDecoration.Underline else null,
                             modifier = if (linkTarget != null) Modifier.clickable { openLink(linkTarget) } else Modifier
                         )
                     }

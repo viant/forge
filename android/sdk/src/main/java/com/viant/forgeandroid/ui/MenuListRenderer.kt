@@ -117,12 +117,15 @@ fun MenuListRenderer(
 
     val useTiles = visibleItems.any { it.properties["tile"].asString() == "true" }
     val useSummaryCards = visibleItems.size >= 2 && visibleItems.all(::isSummaryLabelItem)
+    val useHeading = visibleItems.size == 1 &&
+        visibleItems.first().appearance?.trim()?.lowercase() == "heading"
     val useInlineRow = visibleItems.isNotEmpty() && visibleItems.all {
         it.appearance?.trim()?.lowercase().orEmpty() == "inline"
     }
 
     when {
         useTiles -> TileList(runtime, window, visibleItems)
+        useHeading -> InlineItem(runtime, window, baseContext, container, visibleItems.first())
         useInlineRow -> InlineList(runtime, window, baseContext, container, visibleItems)
         useSummaryCards -> SummaryList(window, baseContext, container, visibleItems)
         else -> PlainList(runtime, window, baseContext, container, visibleItems)
@@ -155,35 +158,14 @@ private fun InlineList(
     container: ContainerDef,
     items: List<ItemDef>
 ) {
-    val phonePresentation = runtime.targetContext.formFactor
-        ?.trim()
-        ?.equals("phone", ignoreCase = true) == true
-    if (phonePresentation) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items.forEach { item ->
-                InlineItem(
-                    runtime = runtime,
-                    window = window,
-                    baseContext = baseContext,
-                    container = container,
-                    item = item,
-                    fillAvailableWidth = true
-                )
-            }
-        }
-    } else {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items.forEach { item ->
-                InlineItem(runtime, window, baseContext, container, item)
-            }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items.forEach { item ->
+            InlineItem(runtime, window, baseContext, container, item)
         }
     }
 }
@@ -385,6 +367,22 @@ private fun InlineItem(
     val key = itemValueKey(item) ?: ""
     val rawValue = if (key.isNotBlank()) resolveItemRawValue(item, key, form, metrics, windowForm, rows) else null
     val value = normalizeValue(rawValue?.toString().orEmpty())
+    val displayValue = if (item.type?.trim()?.lowercase() == "link") {
+        item.link?.text?.trim().takeUnless { it.isNullOrEmpty() } ?: value
+    } else {
+        value
+    }
+
+    if (item.appearance?.trim()?.lowercase() == "heading") {
+        Text(
+            text = displayValue.ifBlank { item.label ?: item.id.orEmpty() },
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 6.dp)
+        )
+        return
+    }
 
     Surface(
         shape = RoundedCornerShape(if (fillAvailableWidth) 14.dp else 999.dp),
@@ -401,7 +399,7 @@ private fun InlineItem(
             }
     ) {
         Text(
-            text = value.ifBlank { item.label ?: item.id.orEmpty() },
+            text = displayValue.ifBlank { item.label ?: item.id.orEmpty() },
             color = if (item.type?.trim()?.lowercase() == "link") Color(0xFF175CD3) else Color(0xFF475467),
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier

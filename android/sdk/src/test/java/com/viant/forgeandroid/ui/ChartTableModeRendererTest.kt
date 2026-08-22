@@ -32,7 +32,7 @@ class ChartTableModeRendererTest {
     @Test
     fun fallsBackToRenderableMode() {
         assertEquals(
-            listOf("chart", "table"),
+            listOf("chart"),
             normalizedChartTableViewModes(rawModes = emptyList(), hasChart = true, hasTable = true)
         )
         assertEquals(

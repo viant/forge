@@ -1,6 +1,7 @@
 package com.viant.forgeandroid.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,10 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -72,18 +72,27 @@ internal fun ChartTableModeRenderer(
     ) {
         if (modes.size > 1) {
             Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0xFFF1F4F8))
+                    .padding(3.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 modes.forEach { option ->
-                    if (option == mode) {
-                        Button(onClick = { selectedMode = option }) {
-                            Text(chartTableModeLabel(option))
-                        }
-                    } else {
-                        OutlinedButton(onClick = { selectedMode = option }) {
-                            Text(chartTableModeLabel(option))
-                        }
+                    val selected = option == mode
+                    Surface(
+                        color = if (selected) Color.White else Color.Transparent,
+                        shape = RoundedCornerShape(8.dp),
+                        shadowElevation = if (selected) 1.dp else 0.dp,
+                        modifier = Modifier.clickable { selectedMode = option }
+                    ) {
+                        Text(
+                            text = chartTableModeLabel(option),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                        )
                     }
                 }
             }
@@ -104,14 +113,14 @@ internal fun ChartTableModeRenderer(
                     rows,
                     resolvedChart,
                     containerTitle = container.title,
-                    showDataFallback = modes.size <= 1
+                    showDataFallback = false
                 )
             } else {
                 ChartRenderer(
                     context,
                     resolvedChart,
                     containerTitle = container.title,
-                    showDataFallback = modes.size <= 1
+                    showDataFallback = false
                 )
             }
         }
@@ -367,7 +376,6 @@ internal fun normalizedChartTableViewModes(
         return requested
     }
     return when {
-        hasChart && hasTable -> listOf("chart", "table")
         hasChart -> listOf("chart")
         hasTable -> listOf("table")
         else -> emptyList()

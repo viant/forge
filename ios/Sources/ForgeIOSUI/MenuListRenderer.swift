@@ -118,6 +118,8 @@ public struct MenuListRenderer: View {
                 linkItem(item)
             case "button":
                 buttonItem(item)
+            case "select", "dropdown":
+                selectMenuItem(item)
             default:
                 labelItem(item)
             }
@@ -129,7 +131,13 @@ public struct MenuListRenderer: View {
         let title = item.label ?? item.title ?? item.id ?? "Item"
         let value = normalizedItemDisplayValue(item)
         let isInline = (item.appearance ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "inline"
-        if isInline {
+        let isHeading = (item.appearance ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "heading"
+        if isHeading {
+            Text(value == "No data" ? title : value)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(.primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else if isInline {
             Text(value == "No data" ? title : value)
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(.secondary)
@@ -271,6 +279,40 @@ public struct MenuListRenderer: View {
         .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.black.opacity(0.05), lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private func selectMenuItem(_ item: ItemDef) -> some View {
+        let title = item.label ?? item.title ?? item.id ?? "Select"
+        let selectedValue = resolvedItemDisplayValue(item)
+            ?? item.value?.displayString
+            ?? item.options.first(where: { $0.default == true })?.value
+            ?? item.options.first?.value
+            ?? ""
+
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Picker(title, selection: Binding(
+                get: { selectedValue },
+                set: { applyOptionSelection($0, for: item) }
+            )) {
+                ForEach(item.options, id: \.value) { option in
+                    Text(option.label ?? option.value ?? "").tag(option.value ?? "")
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.black.opacity(0.05), lineWidth: 1)
         )
     }
@@ -809,8 +851,7 @@ public struct MenuListRenderer: View {
             return false
         }
         let type = (item.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let scope = (item.scope ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return scope == "windowform" || type == "buttongroup" || type == "button_group" || type == "button-group" || type == "radio"
+        return type == "buttongroup" || type == "button_group" || type == "button-group" || type == "radio"
     }
 
     private func applyOptionSelection(_ value: String, for item: ItemDef) {
