@@ -17,6 +17,19 @@ import kotlin.test.assertNull
 class TableRendererTest {
 
     @Test
+    fun `link metadata is sufficient without redundant link column type`() {
+        val target = resolveColumnLinkTargetFromContext(
+            column = ColumnDef(
+                id = "name",
+                link = LinkDef(kind = "window", windowKey = "detail")
+            ),
+            context = LinkResolutionContext(value = "Open detail")
+        )
+
+        assertEquals("detail", assertIs<WindowLinkTarget>(target).windowKey)
+    }
+
+    @Test
     fun `resolveColumnLinkTargetFromContext builds window target from row metadata`() {
         val column = ColumnDef(
             id = "adOrderName",
