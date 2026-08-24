@@ -16,6 +16,7 @@ public struct MenuListRenderer: View {
     @State private var formValuesByDataSource: [String: [String: JSONValue]] = [:]
     @State private var metricsValuesByDataSource: [String: [String: JSONValue]] = [:]
     @State private var collectionValuesByDataSource: [String: [[String: JSONValue]]] = [:]
+    @State private var expandedSummaryValue: ExpandedMenuSummaryValue?
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef, items: [ItemDef]) {
         self.runtime = runtime
@@ -72,6 +73,13 @@ public struct MenuListRenderer: View {
         }
         .task(id: window?.windowID ?? "") {
             await observeWindowForm()
+        }
+        .alert(item: $expandedSummaryValue) { expanded in
+            Alert(
+                title: Text(expanded.label),
+                message: Text(expanded.value),
+                dismissButton: .default(Text("Done"))
+            )
         }
     }
 
@@ -229,6 +237,11 @@ public struct MenuListRenderer: View {
             RoundedRectangle(cornerRadius: 16)
                 .stroke(Color.black.opacity(0.05), lineWidth: 1)
         )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            expandedSummaryValue = ExpandedMenuSummaryValue(label: title, value: value)
+        }
+        .accessibilityHint("Double tap to show the complete value")
     }
 
     @ViewBuilder
@@ -663,7 +676,7 @@ public struct MenuListRenderer: View {
     }
 
     private func resolvedItemDisplayValue(_ item: ItemDef) -> String? {
-        resolvedItemValue(item)?.displayString
+        menuListFormattedValue(resolvedItemValue(item), format: item.format)
     }
 
     private func resolvedLinkDisplayText(_ item: ItemDef) -> String {
@@ -855,7 +868,7 @@ public struct MenuListRenderer: View {
     }
 
     private var summaryColumns: [GridItem] {
-        let minimumWidth: CGFloat = horizontalSizeClass == .regular ? 132 : 150
+        let minimumWidth = menuListSummaryMinimumWidth(isRegular: horizontalSizeClass == .regular)
         return [GridItem(.adaptive(minimum: minimumWidth), spacing: 12, alignment: .top)]
     }
 
@@ -909,6 +922,12 @@ public struct MenuListRenderer: View {
     }
 }
 
+private struct ExpandedMenuSummaryValue: Identifiable {
+    let id = UUID()
+    let label: String
+    let value: String
+}
+
 internal func mergedMenuListDataSourceRefs(
     containerDataSourceRef: String?,
     itemDataSourceRefs: [String?]
@@ -922,6 +941,30 @@ internal func mergedMenuListDataSourceRefs(
         }
     }
     return result
+}
+
+internal func menuListSummaryMinimumWidth(isRegular: Bool) -> CGFloat {
+    isRegular ? 132 : 82
+}
+
+internal func menuListFormattedValue(_ value: JSONValue?, format: String?) -> String? {
+    guard let value else { return nil }
+    let normalizedFormat = format?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    guard !normalizedFormat.isEmpty else { return value.displayString }
+    return DashboardRuntime.formatDashboardValue(value.menuListAnyValue, format: normalizedFormat)
+}
+
+private extension JSONValue {
+    var menuListAnyValue: Any? {
+        switch self {
+        case .string(let value): return value
+        case .number(let value): return value
+        case .bool(let value): return value
+        case .array(let value): return value.map(\.menuListAnyValue)
+        case .object(let value): return value.mapValues(\.menuListAnyValue)
+        case .null: return nil
+        }
+    }
 }
 
 internal func menuItemsUseCompactSelectGrid(_ items: [ItemDef]) -> Bool {

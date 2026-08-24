@@ -1,5 +1,6 @@
 package com.viant.forgeandroid.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -23,6 +25,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -62,6 +65,7 @@ fun FormRenderer(
 ) {
     val visibleItems = items.filter(::shouldRenderItem)
     if (visibleItems.isEmpty()) return
+    var expandedSummary by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     val compactSelectGrid = visibleItems.size >= 2 && visibleItems.all { item ->
         item.type?.trim()?.lowercase() in setOf("select", "dropdown")
@@ -91,7 +95,9 @@ fun FormRenderer(
                 .fillMaxWidth()
                 .padding(8.dp)
         ) { item ->
-            SummaryItemCard(context = context, item = item)
+            SummaryItemCard(context = context, item = item) { label, value ->
+                expandedSummary = label to value
+            }
         }
     } else {
         Column(modifier = Modifier.padding(8.dp)) {
@@ -104,6 +110,16 @@ fun FormRenderer(
                 )
             }
         }
+    }
+    expandedSummary?.let { (label, value) ->
+        AlertDialog(
+            onDismissRequest = { expandedSummary = null },
+            title = { Text(label) },
+            text = { Text(value) },
+            confirmButton = {
+                TextButton(onClick = { expandedSummary = null }) { Text("Done") }
+            }
+        )
     }
 }
 
@@ -408,7 +424,8 @@ private fun FormItemRenderer(
 @Composable
 private fun SummaryItemCard(
     context: DataSourceContext,
-    item: ItemDef
+    item: ItemDef,
+    onExpand: (String, String) -> Unit
 ) {
     val dataSourceContext = resolveItemDataSourceContext(context, item)
     val form by dataSourceContext.form.flow.collectAsState(initial = emptyMap())
@@ -417,20 +434,28 @@ private fun SummaryItemCard(
     val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
     val key = itemValueKey(item) ?: return
     val value = resolveItemDisplayValue(item, key, form, metrics, windowForm)
-    LabelItemCard(label = item.label ?: key, value = value, emphasized = true)
+    LabelItemCard(
+        label = item.label ?: key,
+        value = value,
+        emphasized = true,
+        onClick = { onExpand(item.label ?: key, value.ifBlank { "—" }) }
+    )
 }
 
 @Composable
 private fun LabelItemCard(
     label: String,
     value: String,
-    emphasized: Boolean = false
+    emphasized: Boolean = false,
+    onClick: (() -> Unit)? = null
 ) {
     Surface(
         tonalElevation = 1.dp,
         shadowElevation = if (emphasized) 1.dp else 0.dp,
         shape = MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val compact = maxWidth < 120.dp
