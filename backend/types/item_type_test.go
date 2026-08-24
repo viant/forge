@@ -132,3 +132,28 @@ chart:
 		t.Fatalf("expected extended series fields to survive, got %#v", c.Chart.Series.Values[0])
 	}
 }
+
+func TestContainerUnmarshal_PreservesChartTableViewModes(t *testing.T) {
+	input := []byte(`
+id: deliveryTrend
+viewModes: [chart, table]
+chart:
+  type: line
+  xAxis:
+    dataKey: day
+  yAxis:
+    label: Spend
+  series:
+    values:
+      - label: Spend
+        value: spend
+`)
+
+	var c Container
+	if err := yaml.Unmarshal(input, &c); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+	if len(c.ViewModes) != 2 || c.ViewModes[0] != "chart" || c.ViewModes[1] != "table" {
+		t.Fatalf("expected chart/table view modes to survive, got %#v", c.ViewModes)
+	}
+}

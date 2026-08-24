@@ -454,6 +454,7 @@ type Container struct {
 	ColumnSpan        int                               `json:"columnSpan,omitempty" yaml:"columnSpan,omitempty"`
 	RowSpan           int                               `json:"rowSpan,omitempty" yaml:"rowSpan,omitempty"`
 	DefaultMode       string                            `json:"defaultMode,omitempty" yaml:"defaultMode,omitempty"`
+	ViewModes         []string                          `json:"viewModes,omitempty" yaml:"viewModes,omitempty"`
 	Layout            *Layout                           `json:"layout,omitempty" yaml:"layout,omitempty"`
 	Style             *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
 	VisibleWhen       map[string]interface{}            `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`

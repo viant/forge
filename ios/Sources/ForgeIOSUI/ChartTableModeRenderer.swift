@@ -44,7 +44,14 @@ struct ChartTableModeRenderer: View {
             if mode == "table", let table {
                 TableRenderer(runtime: runtime, window: window, container: container, table: table, rows: rows)
             } else {
-                ChartRenderer(runtime: runtime, window: window, container: container, chart: chart, rows: rows)
+                ChartRenderer(
+                    runtime: runtime,
+                    window: window,
+                    container: container,
+                    chart: chart,
+                    rows: rows,
+                    showDataFallback: false
+                )
             }
         }
         .onChange(of: modes) {

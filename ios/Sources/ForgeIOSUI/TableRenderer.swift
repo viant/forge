@@ -61,7 +61,11 @@ public struct TableRenderer: View {
                 plannerToolbar
             }
             if rows.isEmpty {
-                placeholderTable
+                if currentTableRefreshFeedback.busy {
+                    tableLoadingState
+                } else if currentTableRefreshFeedback.message == nil {
+                    emptyTableState
+                }
             } else {
                 contentTable
             }
@@ -191,20 +195,26 @@ public struct TableRenderer: View {
     @ViewBuilder
     private var tableRefreshControl: some View {
         let feedback = currentTableRefreshFeedback
-        Button {
-            refreshRows()
-        } label: {
-            if feedback.busy {
-                ProgressView()
-                    .controlSize(.small)
-            } else {
-                Label("Refresh", systemImage: "arrow.clockwise")
+        HStack {
+            Spacer(minLength: 0)
+            Button {
+                refreshRows()
+            } label: {
+                if feedback.busy {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 18, height: 18)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(width: 18, height: 18)
+                }
             }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(feedback.busy)
+            .accessibilityLabel(feedback.busy ? "Refreshing table" : "Refresh table")
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-        .disabled(feedback.busy)
-        .accessibilityLabel(feedback.busy ? "Refreshing table" : "Refresh table")
     }
 
     private var currentTableRefreshFeedback: TableRefreshFeedback {
@@ -401,24 +411,31 @@ public struct TableRenderer: View {
         }
     }
 
-    private var placeholderTable: some View {
-        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 12, verticalSpacing: 8) {
-            GridRow {
-                ForEach(displayColumns, id: \.identityKey) { column in
-                    Text(column.displayLabel)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            Divider()
-            GridRow {
-                ForEach(displayColumns, id: \.identityKey) { _ in
-                    Text("—")
-                        .font(.footnote)
-                        .foregroundStyle(.tertiary)
-                }
-            }
+    private var tableLoadingState: some View {
+        HStack(spacing: 10) {
+            ProgressView()
+                .controlSize(.small)
+            Text("Loading table")
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 24)
+    }
+
+    private var emptyTableState: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(tableEmptyStateTitle(dataSourceRef: resolvedDataSourceRef))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary.opacity(0.84))
+            Text("Try refreshing or changing the active filters.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 24)
     }
 
     private var compactCardTable: some View {
@@ -1232,6 +1249,15 @@ func tablePaginationState(
 
 func tableRefreshControlVisible(dataSourceRef: String, usesProvidedRows: Bool) -> Bool {
     !usesProvidedRows && !dataSourceRef.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+}
+
+func tableEmptyStateTitle(dataSourceRef: String) -> String {
+    let subject = dataSourceRef
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .replacingOccurrences(of: "_", with: " ")
+        .replacingOccurrences(of: "-", with: " ")
+        .lowercased()
+    return "No \(subject.isEmpty ? "rows" : subject) available"
 }
 
 struct TableRefreshFeedback: Equatable {

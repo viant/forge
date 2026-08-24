@@ -12,6 +12,7 @@ public struct ChartRenderer: View {
     private let container: ContainerDef
     private let chart: ChartDef
     private let providedRows: [[String: JSONValue]]?
+    private let showDataFallback: Bool
     private let reportRuntimeBlockID: String?
     private let reportRuntimeActionFields: [DashboardReportRuntimeActionField]
     private let reportRuntimeActionDescriptors: [DashboardReportRuntimeActionDescriptor]
@@ -32,6 +33,7 @@ public struct ChartRenderer: View {
         container: ContainerDef,
         chart: ChartDef,
         rows: [[String: JSONValue]]? = nil,
+        showDataFallback: Bool = true,
         reportRuntimeBlockID: String? = nil,
         reportRuntimeActionFields: [DashboardReportRuntimeActionField] = [],
         reportRuntimeActionDescriptors: [DashboardReportRuntimeActionDescriptor] = [],
@@ -42,6 +44,7 @@ public struct ChartRenderer: View {
         self.container = container
         self.chart = chart
         self.providedRows = rows
+        self.showDataFallback = showDataFallback
         self.reportRuntimeBlockID = reportRuntimeBlockID
         self.reportRuntimeActionFields = reportRuntimeActionFields
         self.reportRuntimeActionDescriptors = reportRuntimeActionDescriptors
@@ -54,6 +57,11 @@ public struct ChartRenderer: View {
                 Text(title)
                     .font((isCompactPresentation ? Font.footnote : .subheadline).weight(.semibold))
                     .foregroundStyle(.primary.opacity(0.9))
+            }
+            if let axisLabel = nonEmptyChartString(chart.yAxis?.label) {
+                Text(axisLabel)
+                    .font((isCompactPresentation ? Font.caption : .footnote).weight(.medium))
+                    .foregroundStyle(.secondary)
             }
             let chartStateFeedback = chartDataStateFeedback(
                 loading: controlState.loading,
@@ -96,7 +104,9 @@ public struct ChartRenderer: View {
                     .frame(height: compactChartHeight)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 2)
-                chartDataFallback
+                if showDataFallback {
+                    chartDataFallback
+                }
             }
         }
         .padding(isCompactPresentation ? 10 : 12)
@@ -177,51 +187,69 @@ public struct ChartRenderer: View {
                 pieSliceSelector
             }
         } else {
+            let displayByKey = Dictionary(uniqueKeysWithValues: seriesDisplays.map { ($0.key, $0) })
             Chart(displayChartSeriesData) { item in
-                switch type {
-                case "line", "composed", "area":
-                    if singleCategory {
+                let series = displayByKey[item.seriesKey]
+                let seriesType = series?.type ?? type
+                if singleCategory && seriesType != "bar" && seriesType != "stacked_bar" {
+                    BarMark(
+                        x: .value("Category", item.category),
+                        y: .value("Value", item.chartValue)
+                    )
+                    .foregroundStyle(by: .value("Series", item.seriesKey))
+                    .position(by: .value("Series", item.seriesKey))
+                } else {
+                    switch seriesType {
+                    case "area":
+                        AreaMark(
+                            x: .value("Category", item.category),
+                            y: .value("Value", item.chartValue),
+                            series: .value("Series", item.seriesKey)
+                        )
+                        .interpolationMethod(.monotone)
+                        .foregroundStyle((series?.color ?? Color.accentColor).opacity(0.14))
+                        LineMark(
+                            x: .value("Category", item.category),
+                            y: .value("Value", item.chartValue),
+                            series: .value("Series", item.seriesKey)
+                        )
+                        .interpolationMethod(.monotone)
+                        .foregroundStyle(by: .value("Series", item.seriesKey))
+                    case "line", "composed":
+                        LineMark(
+                            x: .value("Category", item.category),
+                            y: .value("Value", item.chartValue),
+                            series: .value("Series", item.seriesKey)
+                        )
+                        .interpolationMethod(.monotone)
+                        .foregroundStyle(by: .value("Series", item.seriesKey))
+                    case "bar":
                         BarMark(
                             x: .value("Category", item.category),
-                            y: .value("Value", item.value)
+                            y: .value("Value", item.chartValue)
                         )
                         .foregroundStyle(by: .value("Series", item.seriesKey))
                         .position(by: .value("Series", item.seriesKey))
-                    } else {
+                    case "stacked_bar":
+                        BarMark(
+                            x: .value("Category", item.category),
+                            y: .value("Value", item.chartValue)
+                        )
+                        .foregroundStyle(by: .value("Series", item.seriesKey))
+                    default:
                         LineMark(
                             x: .value("Category", item.category),
-                            y: .value("Value", item.value),
+                            y: .value("Value", item.chartValue),
                             series: .value("Series", item.seriesKey)
                         )
                         .interpolationMethod(.monotone)
                         .foregroundStyle(by: .value("Series", item.seriesKey))
                     }
-                case "bar":
-                    BarMark(
-                        x: .value("Category", item.category),
-                        y: .value("Value", item.value)
-                    )
-                    .foregroundStyle(by: .value("Series", item.seriesKey))
-                    .position(by: .value("Series", item.seriesKey))
-                case "stacked_bar":
-                    BarMark(
-                        x: .value("Category", item.category),
-                        y: .value("Value", item.value)
-                    )
-                    .foregroundStyle(by: .value("Series", item.seriesKey))
-                default:
-                    LineMark(
-                        x: .value("Category", item.category),
-                        y: .value("Value", item.value),
-                        series: .value("Series", item.seriesKey)
-                    )
-                    .interpolationMethod(.monotone)
-                    .foregroundStyle(by: .value("Series", item.seriesKey))
                 }
                 if item.category == selectedCategory, type != "bar", type != "stacked_bar" {
                     PointMark(
                         x: .value("Category", item.category),
-                        y: .value("Value", item.value)
+                        y: .value("Value", item.chartValue)
                     )
                     .foregroundStyle(by: .value("Series", item.seriesKey))
                     .symbolSize(72)
@@ -236,7 +264,42 @@ public struct ChartRenderer: View {
                     AxisGridLine()
                     AxisTick()
                     if let raw = value.as(String.self) {
-                        AxisValueLabel { Text(compactChartAxisLabel(raw)) }
+                        AxisValueLabel { Text(formatChartAxisLabel(raw, tickFormat: resolvedXTickFormat)) }
+                    }
+                }
+            }
+            .chartYAxis {
+                if chartAxisOrder.count > 1 {
+                    if let axis = chartAxisOrder.first {
+                        AxisMarks(position: .leading, values: [0.0, 0.5, 1.0]) { value in
+                            AxisGridLine()
+                            AxisTick()
+                            if let normalized = value.as(Double.self) {
+                                AxisValueLabel {
+                                    Text(formattedChartAxisValue(normalized, axis: axis))
+                                }
+                            }
+                        }
+                    }
+                    if let axis = chartAxisOrder.dropFirst().first {
+                        AxisMarks(position: .trailing, values: [0.0, 0.5, 1.0]) { value in
+                            AxisTick()
+                            if let normalized = value.as(Double.self) {
+                                AxisValueLabel {
+                                    Text(formattedChartAxisValue(normalized, axis: axis))
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    AxisMarks(position: .leading) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        if let raw = value.as(Double.self) {
+                            AxisValueLabel {
+                                Text(formatChartValue(raw, format: seriesDisplays.first?.format))
+                            }
+                        }
                     }
                 }
             }
@@ -411,16 +474,29 @@ public struct ChartRenderer: View {
         let options = resolvedChartSeriesOptions
         let palette = chart.seriesDef?.palette.compactMap(chartColor(from:)) ?? []
         let fallbackPalette = [Color.blue, Color.green, Color.orange, Color.purple, Color.pink]
+        let composed = normalizedChartType == "composed"
         var seen: Set<String> = []
         return options.enumerated().compactMap { index, option in
             guard let key = nonEmptyChartString(option.value), seen.insert(key).inserted else {
                 return nil
             }
-            let color = palette[safe: index] ?? fallbackPalette[index % fallbackPalette.count]
+            let color = nonEmptyChartString(option.color).flatMap(chartColor(from:))
+                ?? palette[safe: index]
+                ?? fallbackPalette[index % fallbackPalette.count]
+            let axis = nonEmptyChartString(option.axis)?.lowercased()
+                ?? (composed && options.count > 1 ? "series:\(key)" : "default")
             return ChartSeriesDisplay(
                 key: key,
-                label: nonEmptyChartString(option.name) ?? titleizedSeriesKey(key),
-                color: color
+                label: nonEmptyChartString(option.label)
+                    ?? nonEmptyChartString(option.name)
+                    ?? titleizedSeriesKey(key),
+                color: color,
+                type: nonEmptyChartString(option.type)?.lowercased()
+                    ?? (composed && index == 0 ? "area" : "line"),
+                axis: axis,
+                format: nonEmptyChartString(option.format)
+                    ?? nonEmptyChartString(chart.axes[axis]?.format)
+                    ?? (axis == "default" || axis == "left" ? nonEmptyChartString(chart.yAxis?.format) : nil)
             )
         }
     }
@@ -436,29 +512,39 @@ public struct ChartRenderer: View {
 
     @ViewBuilder
     private var chartSeriesSelector: some View {
-        LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: isCompactPresentation ? 104 : 120), spacing: 8)],
-            alignment: .leading,
-            spacing: 8
-        ) {
-            ForEach(Array(seriesDisplays.enumerated()), id: \.element.key) { _, series in
-                let checked = selectedSeriesKeys.contains(series.key)
-                Button {
-                    selectedSeriesKeys = toggledChartSeriesSelection(current: selectedSeriesKeys, key: series.key)
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: checked ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(checked ? Color.accentColor : Color.secondary)
-                        Circle()
-                            .fill(series.color)
-                            .frame(width: 8, height: 8)
-                        Text(series.label)
-                            .font(isCompactPresentation ? .caption : .footnote)
-                            .foregroundStyle(checked ? .primary : .secondary)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(seriesDisplays) { series in
+                    let checked = selectedSeriesKeys.contains(series.key)
+                    Button {
+                        selectedSeriesKeys = toggledChartSeriesSelection(current: selectedSeriesKeys, key: series.key)
+                    } label: {
+                        HStack(spacing: 6) {
+                            if checked {
+                                Image(systemName: "checkmark")
+                                    .font(.caption2.weight(.bold))
+                            }
+                            Circle()
+                                .fill(series.color)
+                                .frame(width: 8, height: 8)
+                            Text(series.label)
+                                .font((isCompactPresentation ? Font.caption : .footnote).weight(checked ? .semibold : .medium))
+                                .lineLimit(1)
+                        }
+                        .foregroundStyle(checked ? Color.primary : Color.secondary)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(checked ? series.color.opacity(0.12) : Color.forgeSecondarySystemBackground)
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(checked ? series.color.opacity(0.45) : Color.black.opacity(0.06), lineWidth: 1)
+                        )
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -755,7 +841,7 @@ public struct ChartRenderer: View {
                     seriesKey: key,
                     seriesLabel: seriesLabel,
                     value: value,
-                    valueLabel: formatChartValue(value)
+                    valueLabel: formatChartValue(value, format: display?.format)
                 )
             }
         }
@@ -775,7 +861,8 @@ public struct ChartRenderer: View {
                     category: category,
                     seriesKey: key,
                     seriesLabel: display?.label ?? titleizedSeriesKey(key),
-                    value: value
+                    value: value,
+                    format: display?.format
                 )
             }
         }
@@ -787,11 +874,50 @@ public struct ChartRenderer: View {
         )
     }
 
+    private var chartAxisBySeries: [String: String] {
+        Dictionary(uniqueKeysWithValues: seriesDisplays.map { ($0.key, $0.axis) })
+    }
+
+    private var chartAxisOrder: [String] {
+        seriesDisplays.reduce(into: [String]()) { result, series in
+            if !result.contains(series.axis) {
+                result.append(series.axis)
+            }
+        }
+    }
+
+    private var chartAxisMaxima: [String: Double] {
+        chartAxisMaximums(data: chartSeriesData, axisBySeries: chartAxisBySeries)
+    }
+
+    private var plottedChartSeriesData: [SeriesDatum] {
+        normalizedChartSeriesDataByAxis(data: chartSeriesData, axisBySeries: chartAxisBySeries)
+    }
+
     private var displayChartSeriesData: [SeriesDatum] {
         downsampleChartSeriesData(
-            chartSeriesData,
+            plottedChartSeriesData,
             maximumPerSeries: isCompactPresentation ? 72 : 140
         )
+    }
+
+    private var resolvedXTickFormat: String? {
+        guard let axis = chart.xAxis else {
+            return nil
+        }
+        let selector = axis.tickFormatSelector?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let source = axis.tickFormatSource?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        guard !selector.isEmpty, !axis.tickFormats.isEmpty, source.isEmpty || source == "windowform" else {
+            return axis.tickFormat
+        }
+        let selected = chartSelectorStringValue(from: SelectorUtil.resolve(chartWindowForm, selector: selector)) ?? ""
+        return axis.tickFormats[selected] ?? axis.tickFormat
+    }
+
+    private func formattedChartAxisValue(_ normalized: Double, axis: String) -> String {
+        let maximum = chartAxisMaxima[axis] ?? 1
+        let format = seriesDisplays.first(where: { $0.axis == axis })?.format
+        return formatChartValue(normalized * maximum, format: format)
     }
 
     private func reconcileSeriesSelectionIfNeeded(force: Bool = false) {
@@ -870,7 +996,8 @@ internal func aggregateDirectChartSeriesData(_ data: [SeriesDatum]) -> [SeriesDa
                 category: existing.category,
                 seriesKey: existing.seriesKey,
                 seriesLabel: existing.seriesLabel,
-                value: existing.value + item.value
+                value: existing.value + item.value,
+                format: existing.format
             )
         } else {
             orderedKeys.append(key)
@@ -933,6 +1060,62 @@ internal func compactChartAxisLabel(_ raw: String) -> String {
     return trimmed.count > 14 ? String(trimmed.prefix(12)) + "…" : trimmed
 }
 
+internal func formatChartAxisLabel(_ raw: String, tickFormat: String?) -> String {
+    guard let date = chartCategoryDate(raw) else {
+        return compactChartAxisLabel(raw)
+    }
+    let normalized = tickFormat?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+    let pattern: String
+    switch normalized {
+    case "", "shortdate", "short_date":
+        pattern = "MM/dd"
+    case "hour", "hour12", "ha":
+        pattern = "ha"
+    default:
+        pattern = tickFormat ?? "MM/dd"
+    }
+    let display = DateFormatter()
+    display.locale = Locale(identifier: "en_US_POSIX")
+    display.calendar = Calendar(identifier: .gregorian)
+    display.timeZone = TimeZone(secondsFromGMT: 0)
+    display.dateFormat = pattern
+    return display.string(from: date)
+}
+
+internal func chartAxisMaximums(
+    data: [SeriesDatum],
+    axisBySeries: [String: String]
+) -> [String: Double] {
+    data.reduce(into: [String: Double]()) { result, item in
+        let axis = axisBySeries[item.seriesKey] ?? "default"
+        result[axis] = max(result[axis] ?? 1, item.value, 1)
+    }
+}
+
+internal func normalizedChartSeriesDataByAxis(
+    data: [SeriesDatum],
+    axisBySeries: [String: String]
+) -> [SeriesDatum] {
+    let axes = Set(data.map { axisBySeries[$0.seriesKey] ?? "default" })
+    guard axes.count > 1 else {
+        return data
+    }
+    let maxima = chartAxisMaximums(data: data, axisBySeries: axisBySeries)
+    return data.map { item in
+        let axis = axisBySeries[item.seriesKey] ?? "default"
+        let maximum = maxima[axis] ?? 1
+        return SeriesDatum(
+            rowIndex: item.rowIndex,
+            category: item.category,
+            seriesKey: item.seriesKey,
+            seriesLabel: item.seriesLabel,
+            value: item.value,
+            format: item.format,
+            plottedValue: item.value / maximum
+        )
+    }
+}
+
 internal func chartSelectionSummary(category: String?, data: [SeriesDatum]) -> ChartSelectionSummary? {
     guard let category, !category.isEmpty else {
         return nil
@@ -944,7 +1127,7 @@ internal func chartSelectionSummary(category: String?, data: [SeriesDatum]) -> C
                 seriesKey: $0.seriesKey,
                 seriesLabel: $0.seriesLabel,
                 value: $0.value,
-                valueLabel: formatChartValue($0.value)
+                valueLabel: formatChartValue($0.value, format: $0.format)
             )
         }
     guard !values.isEmpty else {
@@ -1030,6 +1213,28 @@ internal struct SeriesDatum: Identifiable {
     let seriesKey: String
     let seriesLabel: String
     let value: Double
+    let format: String?
+    let plottedValue: Double?
+
+    init(
+        rowIndex: Int,
+        category: String,
+        seriesKey: String,
+        seriesLabel: String,
+        value: Double,
+        format: String? = nil,
+        plottedValue: Double? = nil
+    ) {
+        self.rowIndex = rowIndex
+        self.category = category
+        self.seriesKey = seriesKey
+        self.seriesLabel = seriesLabel
+        self.value = value
+        self.format = format
+        self.plottedValue = plottedValue
+    }
+
+    var chartValue: Double { plottedValue ?? value }
 
     var id: String {
         "\(rowIndex)|\(category)|\(seriesKey)"
@@ -1099,7 +1304,7 @@ internal func chartAccessibleDataRows(
                 id: "series-\(index)-\(datum.id)",
                 category: datum.category,
                 seriesLabel: datum.seriesLabel,
-                valueLabel: formatChartValue(datum.value)
+                valueLabel: formatChartValue(datum.value, format: datum.format)
             )
         }
     }
@@ -1155,6 +1360,9 @@ private struct ChartSeriesDisplay: Identifiable {
     let key: String
     let label: String
     let color: Color
+    let type: String
+    let axis: String
+    let format: String?
 }
 
 private func nonEmptyChartString(_ value: String?) -> String? {
@@ -1206,7 +1414,10 @@ private func titleizedSeriesKey(_ key: String) -> String {
     return spaced.prefix(1).uppercased() + spaced.dropFirst()
 }
 
-internal func formatChartValue(_ value: Double) -> String {
+internal func formatChartValue(_ value: Double, format: String? = nil) -> String {
+    if let format = nonEmptyChartString(format) {
+        return DashboardRuntime.formatDashboardValue(value, format: format)
+    }
     if value.rounded(.towardZero) == value {
         return String(Int(value))
     }
