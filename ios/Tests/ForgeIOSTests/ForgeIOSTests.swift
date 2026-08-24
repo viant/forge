@@ -6180,6 +6180,20 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(resolved["granularity"], .string("hour"))
     }
 
+    func testParameterResolverPreservesWholeWindowFormArray() {
+        let resolved = ParameterResolver.resolve(
+            parameters: [
+                ParameterDef(name: "AdOrderId", input: "windowForm", location: .string("AdOrderId"))
+            ],
+            context: ParameterResolver.ResolutionContext(
+                identityDataSourceRef: "order_header_lookup",
+                windowForm: ["AdOrderId": .array([.number(2626512)])]
+            )
+        )
+
+        XCTAssertEqual(resolved["AdOrderId"], .array([.number(2626512)]))
+    }
+
     func testSelectorUtilResolvesNestedJSONValueObjectsAndArrays() {
         let metrics: [String: JSONValue] = [
             "periodSummary": .object([
