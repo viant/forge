@@ -6806,6 +6806,16 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertThrowsError(try JSONDecoder().decode(WindowMetadata.self, from: payload))
     }
 
+    func testMenuListDatasourceRefreshIncludesContainerDatasource() {
+        XCTAssertEqual(
+            mergedMenuListDataSourceRefs(
+                containerDataSourceRef: "order_header_lookup",
+                itemDataSourceRefs: [nil, "order_header_lookup", "campaign_header_lookup"]
+            ),
+            ["order_header_lookup", "campaign_header_lookup"]
+        )
+    }
+
     func testDirectContainerLegacyMapRejectsNestedDataSourceAlias() throws {
         let payload = """
         {

@@ -109,9 +109,9 @@ public struct MenuListRenderer: View {
     }
 
     private var relevantDataSourceRefs: [String] {
-        orderedUnique(
-            ([container.dataSourceRef].compactMap { $0 } + items.compactMap(resolveItemDataSourceRef(_:)))
-                .filter { !$0.isEmpty }
+        mergedMenuListDataSourceRefs(
+            containerDataSourceRef: container.dataSourceRef,
+            itemDataSourceRefs: items.map(resolveItemDataSourceRef(_:))
         )
     }
 
@@ -582,9 +582,9 @@ public struct MenuListRenderer: View {
     }
 
     private func relevantDataSourceRefs(for windowFormValues: [String: JSONValue]) -> [String] {
-        orderedUnique(
-            items.compactMap { resolveItemDataSourceRef($0, windowFormValues: windowFormValues) }
-                .filter { !$0.isEmpty }
+        mergedMenuListDataSourceRefs(
+            containerDataSourceRef: container.dataSourceRef,
+            itemDataSourceRefs: items.map { resolveItemDataSourceRef($0, windowFormValues: windowFormValues) }
         )
     }
 
@@ -903,6 +903,21 @@ public struct MenuListRenderer: View {
     private func normalizedSummaryTitle(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
+}
+
+internal func mergedMenuListDataSourceRefs(
+    containerDataSourceRef: String?,
+    itemDataSourceRefs: [String?]
+) -> [String] {
+    var seen = Set<String>()
+    var result: [String] = []
+    for candidate in [containerDataSourceRef] + itemDataSourceRefs {
+        let normalized = candidate?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !normalized.isEmpty, seen.insert(normalized).inserted {
+            result.append(normalized)
+        }
+    }
+    return result
 }
 
 internal func menuItemsUseCompactSelectGrid(_ items: [ItemDef]) -> Bool {
