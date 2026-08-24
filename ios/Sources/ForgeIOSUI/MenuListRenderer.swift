@@ -402,7 +402,11 @@ public struct MenuListRenderer: View {
         guard let runtime, let window else {
             return
         }
-        windowFormValues = await runtime.windowFormJSONValue(windowID: window.windowID)
+        let initialWindowForm = await runtime.windowFormJSONValue(windowID: window.windowID)
+        await MainActor.run {
+            windowFormValues = initialWindowForm
+        }
+        await refreshWindowFormDrivenDataSources(windowFormValues: initialWindowForm)
         let stream = await runtime.windowFormUpdates(windowID: window.windowID)
         for await next in stream {
             await MainActor.run {
