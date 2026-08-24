@@ -524,7 +524,7 @@ public enum ParameterResolver {
 
     private static func jsonValue(any value: Any?) -> JSONValue? {
         guard let value else {
-            return .null
+            return nil
         }
         switch value {
         case let value as JSONValue:

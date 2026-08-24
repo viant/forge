@@ -3,6 +3,14 @@ import ForgeIOSRuntime
 
 private let hostedWorkspaceDidOpenNotification = Notification.Name("forgeHostedWorkspaceDidOpen")
 
+internal func tableShouldAutoFetch(
+    fetchData: Bool?,
+    usesProvidedRows: Bool,
+    rowsAreEmpty: Bool
+) -> Bool {
+    fetchData != false && !usesProvidedRows && rowsAreEmpty
+}
+
 public struct TableRenderer: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.forgeEmbeddedNonScrolling) private var forgeEmbeddedNonScrolling
@@ -288,6 +296,19 @@ public struct TableRenderer: View {
         seedPlannerSelectionIfNeeded(rows)
         guard rows.isEmpty else {
             return
+        }
+        if tableShouldAutoFetch(
+            fetchData: container.fetchData,
+            usesProvidedRows: providedRows != nil,
+            rowsAreEmpty: rows.isEmpty
+        ) {
+            await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+            let fetchedRows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+            if !fetchedRows.isEmpty {
+                rows = fetchedRows
+                seedPlannerSelectionIfNeeded(fetchedRows)
+                return
+            }
         }
         // Hosted mobile windows can be presented immediately after bridge open,
         // before the async datasource refresh has populated local collection

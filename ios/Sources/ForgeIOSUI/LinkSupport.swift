@@ -27,8 +27,7 @@ func resolveColumnLinkTargetFromContext(
     column: ColumnDef,
     context: LinkResolutionContext
 ) -> ResolvedLinkTarget? {
-    let type = (column.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    guard type == "link", let link = column.link else {
+    guard let link = column.link else {
         return nil
     }
     let windowKey = (link.windowKey ?? "").trimmingCharacters(in: .whitespacesAndNewlines)

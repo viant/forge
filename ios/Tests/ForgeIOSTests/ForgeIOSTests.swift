@@ -2413,6 +2413,39 @@ final class ForgeIOSTests: XCTestCase {
         )
     }
 
+    func testColumnWindowLinkDoesNotRequireRedundantLinkType() throws {
+        let column = ColumnDef(
+            id: "name",
+            name: "Line",
+            link: LinkDef(
+                kind: "window",
+                windowKey: "line",
+                parameters: [
+                    "AudienceId": .object([
+                        "source": .string("row"),
+                        "selector": .string("audienceId"),
+                        "wrap": .string("array")
+                    ])
+                ]
+            )
+        )
+        let resolved = try XCTUnwrap(
+            resolveColumnLinkTargetFromContext(
+                column: column,
+                context: LinkResolutionContext(
+                    row: ["audienceId": .number(7160902), "name": .string("Default Line")],
+                    value: .string("Default Line")
+                )
+            )
+        )
+
+        guard case .window(let target) = resolved else {
+            return XCTFail("expected a window link")
+        }
+        XCTAssertEqual(target.windowKey, "line")
+        XCTAssertEqual(target.parameters["AudienceId"], JSONValue.array([.number(7160902)]))
+    }
+
     func testTableRefreshFeedbackUsesDatasourceControlState() {
         XCTAssertEqual(
             tableRefreshFeedback(control: ControlState(loading: true), isRefreshing: false),
@@ -2426,6 +2459,14 @@ final class ForgeIOSTests: XCTestCase {
             tableRefreshFeedback(control: ControlState(), isRefreshing: true),
             TableRefreshFeedback(busy: true, message: nil)
         )
+    }
+
+    func testRuntimeBackedAuthoredTableAutoFetchesWhenEmpty() {
+        XCTAssertTrue(tableShouldAutoFetch(fetchData: true, usesProvidedRows: false, rowsAreEmpty: true))
+        XCTAssertTrue(tableShouldAutoFetch(fetchData: nil, usesProvidedRows: false, rowsAreEmpty: true))
+        XCTAssertFalse(tableShouldAutoFetch(fetchData: false, usesProvidedRows: false, rowsAreEmpty: true))
+        XCTAssertFalse(tableShouldAutoFetch(fetchData: true, usesProvidedRows: true, rowsAreEmpty: true))
+        XCTAssertFalse(tableShouldAutoFetch(fetchData: true, usesProvidedRows: false, rowsAreEmpty: false))
     }
 
     func testTableRowAccessibilityLabelSummarizesVisibleColumns() {
@@ -6194,6 +6235,22 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(resolved["AdOrderId"], .array([.number(2626512)]))
     }
 
+    func testParameterResolverMissingFallbackDoesNotOverwriteResolvedValue() {
+        let resolved = ParameterResolver.resolve(
+            parameters: [
+                ParameterDef(name: "AdOrderId", input: "windowForm", location: .string("AdOrderId")),
+                ParameterDef(name: "AdOrderId", input: "metrics", location: .string("line_header_lookup.adOrderId"))
+            ],
+            context: ParameterResolver.ResolutionContext(
+                identityDataSourceRef: "order_header_lookup",
+                dataSources: ["line_header_lookup": ParameterResolver.DataSourceSnapshot(metrics: [:])],
+                windowForm: ["AdOrderId": .array([.number(2626512)])]
+            )
+        )
+
+        XCTAssertEqual(resolved["AdOrderId"], .array([.number(2626512)]))
+    }
+
     func testSelectorUtilResolvesNestedJSONValueObjectsAndArrays() {
         let metrics: [String: JSONValue] = [
             "periodSummary": .object([
@@ -6828,6 +6885,17 @@ final class ForgeIOSTests: XCTestCase {
             ),
             ["order_header_lookup", "campaign_header_lookup"]
         )
+    }
+
+    func testMenuListCompactSummaryCardsFitThreeAcrossPhone() {
+        XCTAssertEqual(menuListSummaryMinimumWidth(isRegular: false), 82)
+        XCTAssertEqual(menuListSummaryMinimumWidth(isRegular: true), 132)
+    }
+
+    func testMenuListSummaryUsesAuthoredNumberFormats() {
+        XCTAssertEqual(menuListFormattedValue(.number(12988.5), format: "currency"), "$12,988")
+        XCTAssertEqual(menuListFormattedValue(.number(5), format: "percentFraction"), "500.0%")
+        XCTAssertEqual(menuListFormattedValue(.number(0.2062), format: "percentFraction"), "20.6%")
     }
 
     func testDirectContainerLegacyMapRejectsNestedDataSourceAlias() throws {

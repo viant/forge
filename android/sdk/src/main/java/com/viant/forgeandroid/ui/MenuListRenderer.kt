@@ -12,14 +12,18 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
@@ -51,6 +55,7 @@ fun MenuListRenderer(
     items: List<ItemDef>,
     baseContext: DataSourceContext? = null
 ) {
+    var expandedSummary by remember { mutableStateOf<Pair<String, String>?>(null) }
     val windowFormSignal = window.windowFormSignal()
     val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
     val baseMetrics by if (baseContext != null) {
@@ -129,8 +134,18 @@ fun MenuListRenderer(
         useTiles -> TileList(runtime, window, visibleItems)
         useHeading -> InlineItem(runtime, window, baseContext, container, visibleItems.first())
         useInlineRow -> InlineList(runtime, window, baseContext, container, visibleItems)
-        useSummaryCards -> SummaryList(window, baseContext, container, visibleItems)
+        useSummaryCards -> SummaryList(window, baseContext, container, visibleItems) { label, value ->
+            expandedSummary = label to value
+        }
         else -> PlainList(runtime, window, baseContext, container, visibleItems)
+    }
+    expandedSummary?.let { (label, value) ->
+        AlertDialog(
+            onDismissRequest = { expandedSummary = null },
+            title = { Text(label) },
+            text = { Text(value) },
+            confirmButton = { TextButton(onClick = { expandedSummary = null }) { Text("Done") } }
+        )
     }
 }
 
@@ -222,7 +237,8 @@ private fun SummaryList(
     window: WindowContext,
     baseContext: DataSourceContext?,
     container: ContainerDef,
-    items: List<ItemDef>
+    items: List<ItemDef>,
+    onExpand: (String, String) -> Unit
 ) {
     StaticGrid(
         items = items,
@@ -253,7 +269,7 @@ private fun SummaryList(
         val key = itemValueKey(item) ?: return@StaticGrid
         if (isItemVisible(item, form, metrics, windowForm, rows)) {
             val value = resolveItemDisplayValue(item, key, form, metrics, windowForm, rows)
-            SummaryCard(item.label ?: key, value)
+            SummaryCard(item.label ?: key, value) { onExpand(item.label ?: key, normalizeValue(value)) }
         }
     }
 }
@@ -415,12 +431,12 @@ private fun InlineItem(
 }
 
 @Composable
-private fun SummaryCard(label: String, value: String) {
+private fun SummaryCard(label: String, value: String, onClick: () -> Unit) {
     Surface(
         tonalElevation = 1.dp,
         shadowElevation = 1.dp,
         shape = MaterialTheme.shapes.large,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val compact = maxWidth < 120.dp
