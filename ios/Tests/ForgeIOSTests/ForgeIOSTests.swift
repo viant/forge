@@ -2375,6 +2375,44 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertFalse(tableRefreshControlVisible(dataSourceRef: "  ", usesProvidedRows: false))
     }
 
+    func testTableEmptyStateUsesReadableDatasourceName() {
+        XCTAssertEqual(tableEmptyStateTitle(dataSourceRef: "order_lines"), "No order lines available")
+        XCTAssertEqual(tableEmptyStateTitle(dataSourceRef: "  "), "No rows available")
+    }
+
+    func testPhoneMenuUsesCompactGridForTwoSelects() throws {
+        let items = try JSONDecoder().decode([ItemDef].self, from: Data("""
+        [
+          {"id":"periodView","type":"select"},
+          {"id":"granularity","type":"dropdown"}
+        ]
+        """.utf8))
+
+        XCTAssertTrue(menuItemsUseCompactSelectGrid(items))
+        XCTAssertFalse(menuItemsUseCompactSelectGrid(Array(items.prefix(1))))
+    }
+
+    func testAuthoredLinkTextWinsWhileDatasourceIsPending() {
+        XCTAssertEqual(
+            menuLinkDisplayText(
+                resolved: "No data",
+                linkText: "↑ Order",
+                fallback: "Order",
+                windowFallback: "order"
+            ),
+            "↑ Order"
+        )
+        XCTAssertEqual(
+            menuLinkDisplayText(
+                resolved: "Campaign 42",
+                linkText: nil,
+                fallback: "Campaign",
+                windowFallback: "campaign"
+            ),
+            "Campaign 42"
+        )
+    }
+
     func testTableRefreshFeedbackUsesDatasourceControlState() {
         XCTAssertEqual(
             tableRefreshFeedback(control: ControlState(loading: true), isRefreshing: false),
@@ -5074,6 +5112,73 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(chart.targetOverrides["ios:phone"]?.objectValue?["height"], .number(260))
     }
 
+    func testChartDefPreservesAuthoredMobileSeriesAndAxisMetadata() throws {
+        let payload = """
+        {
+          "type": "composed",
+          "xAxis": {
+            "dataKey": "advertiserTime",
+            "tickFormat": "MM/dd",
+            "tickFormatSelector": "granularity",
+            "tickFormats": {
+              "hour": "MM/dd h a",
+              "day": "MM/dd"
+            }
+          },
+          "yAxis": {
+            "label": "Spend",
+            "format": "currency"
+          },
+          "axes": {
+            "right": {
+              "label": "Delivery",
+              "format": "compactNumber"
+            }
+          },
+          "series": {
+            "values": [
+              {
+                "label": "Spend",
+                "name": "Spend",
+                "value": "spend",
+                "type": "area",
+                "axis": "left",
+                "format": "currency",
+                "color": "#2f6de1"
+              },
+              {
+                "label": "Impressions",
+                "name": "Impressions",
+                "value": "impressions",
+                "type": "line",
+                "axis": "right",
+                "format": "compactNumber",
+                "color": "#2d8a5d"
+              }
+            ]
+          }
+        }
+        """
+
+        let chart = try JSONDecoder().decode(ChartDef.self, from: Data(payload.utf8))
+        let spend = try XCTUnwrap(chart.seriesDef?.values.first)
+        let impressions = try XCTUnwrap(chart.seriesDef?.values.last)
+
+        XCTAssertEqual(chart.xAxis?.tickFormatSelector, "granularity")
+        XCTAssertEqual(chart.xAxis?.tickFormats["hour"], "MM/dd h a")
+        XCTAssertEqual(chart.yAxis?.format, "currency")
+        XCTAssertEqual(chart.axes["right"]?.format, "compactNumber")
+        XCTAssertEqual(spend.label, "Spend")
+        XCTAssertEqual(spend.type, "area")
+        XCTAssertEqual(spend.axis, "left")
+        XCTAssertEqual(spend.format, "currency")
+        XCTAssertEqual(spend.color, "#2f6de1")
+        XCTAssertEqual(impressions.type, "line")
+        XCTAssertEqual(impressions.axis, "right")
+        XCTAssertEqual(impressions.format, "compactNumber")
+        XCTAssertEqual(impressions.color, "#2d8a5d")
+    }
+
     func testChartDefKeepsDuplicateSeriesLabelsByDistinctKeys() throws {
         let payload = """
         {
@@ -5165,6 +5270,29 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(compactChartAxisLabel("2026-02-20T00:00:00Z"), "Feb 20")
         XCTAssertEqual(compactChartAxisLabel("2026-06-30"), "Jun 30")
         XCTAssertEqual(compactChartAxisLabel("A very long categorical label"), "A very long …")
+    }
+
+    func testChartAxisLabelHonorsAuthoredResolutionFormat() {
+        XCTAssertEqual(formatChartAxisLabel("2026-08-21T14:00:00Z", tickFormat: "MM/dd h a"), "08/21 2 PM")
+        XCTAssertEqual(formatChartAxisLabel("2026-08-21T14:00:00Z", tickFormat: "MM/dd"), "08/21")
+    }
+
+    func testChartSeriesNormalizesIndependentAxesWithoutChangingValues() {
+        let data = [
+            SeriesDatum(rowIndex: 0, category: "Aug 20", seriesKey: "spend", seriesLabel: "Spend", value: 100, format: "currency"),
+            SeriesDatum(rowIndex: 0, category: "Aug 20", seriesKey: "impressions", seriesLabel: "Impressions", value: 10_000, format: "compactNumber"),
+            SeriesDatum(rowIndex: 1, category: "Aug 21", seriesKey: "spend", seriesLabel: "Spend", value: 50, format: "currency"),
+            SeriesDatum(rowIndex: 1, category: "Aug 21", seriesKey: "impressions", seriesLabel: "Impressions", value: 5_000, format: "compactNumber")
+        ]
+        let axes = ["spend": "left", "impressions": "right"]
+
+        let maxima = chartAxisMaximums(data: data, axisBySeries: axes)
+        let normalized = normalizedChartSeriesDataByAxis(data: data, axisBySeries: axes)
+
+        XCTAssertEqual(maxima["left"], 100)
+        XCTAssertEqual(maxima["right"], 10_000)
+        XCTAssertEqual(normalized.map(\.value), [100, 10_000, 50, 5_000])
+        XCTAssertEqual(normalized.map(\.chartValue), [1, 1, 0.5, 0.5])
     }
 
     func testChartDownsamplingPreservesSeriesBoundaries() {

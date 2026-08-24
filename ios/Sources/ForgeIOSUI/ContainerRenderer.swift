@@ -49,6 +49,8 @@ public struct ContainerRenderer: View {
         let effectiveContainer = resolvedContainer()
         if let renderer = rendererRegistry.renderer(for: effectiveContainer.kind) {
             customRendererBody(renderer, container: effectiveContainer)
+        } else if effectiveContainer.kind?.lowercased() == "mobile.controlsheet" {
+            MobileControlSheetRenderer(runtime: runtime, window: window, container: effectiveContainer)
         } else if effectiveContainer.kind == "dashboard" || effectiveContainer.kind?.starts(with: "dashboard.") == true {
             DashboardRenderer(runtime: runtime, window: window, container: effectiveContainer)
         } else if effectiveContainer.schemaBasedForm != nil {

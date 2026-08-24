@@ -86,6 +86,14 @@ fun ContainerRenderer(
         return
     }
 
+    if (kind.equals("mobile.controlSheet", ignoreCase = true)) {
+        val controlContext = resolveContainerItemsContext(window, container, chartDataSourceRef)
+        if (controlContext != null) {
+            MobileControlSheetRenderer(runtime, controlContext, container.items, container.title)
+        }
+        return
+    }
+
     val usesContainerChrome = container.card != null || container.section != null
 
         if (kind == "dashboard" || kind.startsWith("dashboard.")) {

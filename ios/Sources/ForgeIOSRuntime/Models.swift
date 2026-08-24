@@ -3188,11 +3188,48 @@ public struct ChartAxisDef: Codable, Sendable, Equatable {
     public let dataKey: String?
     public let label: String?
     public let tickFormat: String?
+    public let tickFormatSource: String?
+    public let tickFormatSelector: String?
+    public let tickFormats: [String: String]
+    public let format: String?
 
-    public init(dataKey: String? = nil, label: String? = nil, tickFormat: String? = nil) {
+    enum CodingKeys: String, CodingKey {
+        case dataKey
+        case label
+        case tickFormat
+        case tickFormatSource
+        case tickFormatSelector
+        case tickFormats
+        case format
+    }
+
+    public init(
+        dataKey: String? = nil,
+        label: String? = nil,
+        tickFormat: String? = nil,
+        tickFormatSource: String? = nil,
+        tickFormatSelector: String? = nil,
+        tickFormats: [String: String] = [:],
+        format: String? = nil
+    ) {
         self.dataKey = dataKey
         self.label = label
         self.tickFormat = tickFormat
+        self.tickFormatSource = tickFormatSource
+        self.tickFormatSelector = tickFormatSelector
+        self.tickFormats = tickFormats
+        self.format = format
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        dataKey = try container.decodeIfPresent(String.self, forKey: .dataKey)
+        label = try container.decodeIfPresent(String.self, forKey: .label)
+        tickFormat = try container.decodeIfPresent(String.self, forKey: .tickFormat)
+        tickFormatSource = try container.decodeIfPresent(String.self, forKey: .tickFormatSource)
+        tickFormatSelector = try container.decodeIfPresent(String.self, forKey: .tickFormatSelector)
+        tickFormats = try container.decodeIfPresent([String: String].self, forKey: .tickFormats) ?? [:]
+        format = try container.decodeIfPresent(String.self, forKey: .format)
     }
 }
 
@@ -3211,6 +3248,7 @@ public struct ChartDef: Codable, Sendable {
     public let seriesDef: ChartSeriesDef?
     public let xAxis: ChartAxisDef?
     public let yAxis: ChartAxisDef?
+    public let axes: [String: ChartAxisDef]
     public let width: JSONValue?
     public let height: JSONValue?
     public let target: JSONValue?
@@ -3233,6 +3271,7 @@ public struct ChartDef: Codable, Sendable {
         case series
         case xAxis
         case yAxis
+        case axes
         case width
         case height
         case target
@@ -3254,6 +3293,7 @@ public struct ChartDef: Codable, Sendable {
         seriesDef: ChartSeriesDef? = nil,
         xAxis: ChartAxisDef? = nil,
         yAxis: ChartAxisDef? = nil,
+        axes: [String: ChartAxisDef] = [:],
         width: JSONValue? = nil,
         height: JSONValue? = nil,
         target: JSONValue? = nil,
@@ -3273,6 +3313,7 @@ public struct ChartDef: Codable, Sendable {
         self.series = series.isEmpty ? seriesDef?.valueKeys ?? [] : series
         self.xAxis = xAxis
         self.yAxis = yAxis
+        self.axes = axes
         self.width = width
         self.height = height
         self.target = target
@@ -3291,6 +3332,7 @@ public struct ChartDef: Codable, Sendable {
 
         xAxis = try container.decodeIfPresent(ChartAxisDef.self, forKey: .xAxis)
         yAxis = try container.decodeIfPresent(ChartAxisDef.self, forKey: .yAxis)
+        axes = try container.decodeIfPresent([String: ChartAxisDef].self, forKey: .axes) ?? [:]
         width = try container.decodeIfPresent(JSONValue.self, forKey: .width)
         height = try container.decodeIfPresent(JSONValue.self, forKey: .height)
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
@@ -3359,6 +3401,7 @@ public struct ChartDef: Codable, Sendable {
         try container.encodeIfPresent(nameKey, forKey: .nameKey)
         try container.encodeIfPresent(xAxis, forKey: .xAxis)
         try container.encodeIfPresent(yAxis, forKey: .yAxis)
+        try container.encode(axes, forKey: .axes)
         try container.encodeIfPresent(width, forKey: .width)
         try container.encodeIfPresent(height, forKey: .height)
         try container.encodeIfPresent(target, forKey: .target)
@@ -3380,7 +3423,7 @@ public struct ChartDef: Codable, Sendable {
         case .array(let items):
             let options = items.compactMap(chartValueOption(from:))
             let values = options.compactMap(\.value)
-            let definition = options.contains { $0.name != nil }
+            let definition = options.contains { $0.hasStructuredMetadata }
                 ? ChartSeriesDef(values: options)
                 : nil
             return (values, values.first, nil, definition)
@@ -3428,8 +3471,13 @@ public struct ChartDef: Codable, Sendable {
             return nil
         }
         return ChartValueOption(
+            label: nonEmpty(object["label"]?.stringValue),
             name: nonEmpty(object["name"]?.stringValue) ?? nonEmpty(object["label"]?.stringValue),
-            value: key
+            value: key,
+            type: nonEmpty(object["type"]?.stringValue),
+            axis: nonEmpty(object["axis"]?.stringValue),
+            format: nonEmpty(object["format"]?.stringValue),
+            color: nonEmpty(object["color"]?.stringValue)
         )
     }
 
@@ -3525,12 +3573,34 @@ public struct FileBrowserDef: Codable, Sendable {
 }
 
 public struct ChartValueOption: Codable, Sendable, Equatable {
+    public let label: String?
     public let name: String?
     public let value: String?
+    public let type: String?
+    public let axis: String?
+    public let format: String?
+    public let color: String?
 
-    public init(name: String? = nil, value: String? = nil) {
+    public init(
+        label: String? = nil,
+        name: String? = nil,
+        value: String? = nil,
+        type: String? = nil,
+        axis: String? = nil,
+        format: String? = nil,
+        color: String? = nil
+    ) {
+        self.label = label
         self.name = name
         self.value = value
+        self.type = type
+        self.axis = axis
+        self.format = format
+        self.color = color
+    }
+
+    fileprivate var hasStructuredMetadata: Bool {
+        label != nil || name != nil || type != nil || axis != nil || format != nil || color != nil
     }
 }
 

@@ -26,7 +26,16 @@ public struct MenuListRenderer: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if shouldUseInlineRow {
+            if shouldUseCompactSelectGrid {
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)],
+                    spacing: 8
+                ) {
+                    ForEach(visibleItems) { item in
+                        renderedItem(item)
+                    }
+                }
+            } else if shouldUseInlineRow {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(visibleItems) { item in
@@ -93,6 +102,10 @@ public struct MenuListRenderer: View {
         visibleItems.filter { item in
             !isPlaceholderSummaryValue(resolvedItemDisplayValue(item) ?? item.value?.displayString)
         }
+    }
+
+    private var shouldUseCompactSelectGrid: Bool {
+        menuItemsUseCompactSelectGrid(visibleItems)
     }
 
     private var relevantDataSourceRefs: [String] {
@@ -654,8 +667,12 @@ public struct MenuListRenderer: View {
         let linkText = item.link?.text?.trimmingCharacters(in: .whitespacesAndNewlines)
         let fallback = item.label ?? item.title ?? item.id
         let windowFallback = item.link?.windowTitle ?? item.link?.windowKey
-        let raw = resolved ?? linkText ?? fallback ?? windowFallback ?? "Open"
-        return isPlaceholderSummaryValue(raw) ? "No data" : raw
+        return menuLinkDisplayText(
+            resolved: resolved,
+            linkText: linkText,
+            fallback: fallback,
+            windowFallback: windowFallback
+        )
     }
 
     private func normalizedItemDisplayValue(_ item: ItemDef) -> String {
@@ -886,6 +903,27 @@ public struct MenuListRenderer: View {
     private func normalizedSummaryTitle(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
+}
+
+internal func menuItemsUseCompactSelectGrid(_ items: [ItemDef]) -> Bool {
+    items.count >= 2 && items.allSatisfy { item in
+        let type = item.type?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        return type == "select" || type == "dropdown"
+    }
+}
+
+internal func menuLinkDisplayText(
+    resolved: String?,
+    linkText: String?,
+    fallback: String?,
+    windowFallback: String?
+) -> String {
+    if let authored = linkText?.trimmingCharacters(in: .whitespacesAndNewlines), !authored.isEmpty {
+        return authored
+    }
+    let raw = resolved ?? fallback ?? windowFallback ?? "Open"
+    let normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    return normalized.isEmpty || ["-", "—", "/", "n/a", "na", "null"].contains(normalized) ? "No data" : raw
 }
 
 private func dataSourceDependsOnWindowForm(_ dataSource: DataSourceDef?) -> Bool {
