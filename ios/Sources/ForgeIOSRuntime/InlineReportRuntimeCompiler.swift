@@ -349,9 +349,152 @@ public enum InlineReportRuntimeCompiler {
             })
             content["rowCount"] = .number(Double(rows.count))
         }
-        object["content"] = .object(content)
+        let datasetRef = nonEmpty(object["datasetRef"]?.stringValue)
+            ?? nonEmpty(content["datasetRef"]?.stringValue)
+            ?? ""
+        object["content"] = materializeReportTemplates(
+            .object(content),
+            datasetRef: datasetRef,
+            datasets: datasets
+        )
         return .object(object)
     }
+
+    private static func materializeReportTemplates(
+        _ value: JSONValue,
+        datasetRef: String,
+        datasets: [String: [JSONValue]]
+    ) -> JSONValue {
+        switch value {
+        case .object(let object):
+            return .object(object.mapValues { materializeReportTemplates($0, datasetRef: datasetRef, datasets: datasets) })
+        case .array(let values):
+            return .array(values.map { materializeReportTemplates($0, datasetRef: datasetRef, datasets: datasets) })
+        case .string(let text):
+            return .string(resolveReportTemplate(text, datasetRef: datasetRef, datasets: datasets))
+        default:
+            return value
+        }
+    }
+
+    private static func resolveReportTemplate(
+        _ template: String,
+        datasetRef: String,
+        datasets: [String: [JSONValue]]
+    ) -> String {
+        guard template.contains("${") || template.contains("{{") else { return template }
+        let canonical = replaceTemplateMatches(in: template, regex: dollarTemplate) { token in
+            resolveReportTemplateToken(token, datasetRef: datasetRef, datasets: datasets)
+        }
+        return replaceTemplateMatches(in: canonical, regex: handlebarsTemplate) { token in
+            resolveReportTemplateToken(token, datasetRef: datasetRef, datasets: datasets)
+        }
+    }
+
+    private static func replaceTemplateMatches(
+        in source: String,
+        regex: NSRegularExpression,
+        resolve: (String) -> String
+    ) -> String {
+        var output = source
+        let sourceRange = NSRange(source.startIndex..<source.endIndex, in: source)
+        for match in regex.matches(in: source, range: sourceRange).reversed() {
+            guard let tokenRange = Range(match.range(at: 1), in: source),
+                  let wholeRange = Range(match.range(at: 0), in: output) else { continue }
+            output.replaceSubrange(wholeRange, with: resolve(String(source[tokenRange])))
+        }
+        return output
+    }
+
+    private static func resolveReportTemplateToken(
+        _ rawToken: String,
+        datasetRef: String,
+        datasets: [String: [JSONValue]]
+    ) -> String {
+        let token = rawToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty else { return "—" }
+        let function = firstMatch(formatFunction, in: token)
+        let spaced = firstMatch(formatSpace, in: token)
+        let helper = function?.0 ?? spaced?.0
+        let valueToken = function?.1 ?? spaced?.1 ?? token
+        guard let value = resolveReportTemplateValue(valueToken, datasetRef: datasetRef, datasets: datasets) else {
+            return "—"
+        }
+        if let helper {
+            let format: String
+            switch helper.lowercased() {
+            case "compact": format = "compactNumber"
+            case "percentfraction": format = "percentFraction"
+            default: format = helper
+            }
+            return DashboardRuntime.formatDashboardValue(reportTemplateAnyValue(value), format: format)
+        }
+        switch value {
+        case .string(let text): return text
+        case .number(let number): return number.rounded() == number ? String(Int(number)) : String(number)
+        case .bool(let flag): return flag ? "true" : "false"
+        case .null: return "—"
+        default: return String(describing: reportTemplateAnyValue(value) ?? "—")
+        }
+    }
+
+    private static func firstMatch(_ regex: NSRegularExpression, in value: String) -> (String, String)? {
+        let range = NSRange(value.startIndex..<value.endIndex, in: value)
+        guard let match = regex.firstMatch(in: value, range: range),
+              match.range == range,
+              let helperRange = Range(match.range(at: 1), in: value),
+              let valueRange = Range(match.range(at: 2), in: value) else { return nil }
+        return (String(value[helperRange]), String(value[valueRange]))
+    }
+
+    private static func resolveReportTemplateValue(
+        _ rawPath: String,
+        datasetRef: String,
+        datasets: [String: [JSONValue]]
+    ) -> JSONValue? {
+        var path = rawPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        if path.hasPrefix("row.") { path.removeFirst(4) }
+        let absolute = path.split(separator: ".", maxSplits: 1).map(String.init)
+        if absolute.count == 2, datasets[absolute[0]] != nil {
+            let nestedPath = absolute[1].hasPrefix("row.") ? String(absolute[1].dropFirst(4)) : absolute[1]
+            return resolveReportTemplatePath(datasets[absolute[0]]?.first, path: nestedPath)
+        }
+        if let value = resolveReportTemplatePath(datasets[datasetRef]?.first, path: path) { return value }
+        for (id, rows) in datasets where id != datasetRef {
+            if let value = resolveReportTemplatePath(rows.first, path: path) { return value }
+        }
+        return nil
+    }
+
+    private static func resolveReportTemplatePath(_ root: JSONValue?, path: String) -> JSONValue? {
+        guard var current = root else { return nil }
+        for segment in path.split(separator: ".").map(String.init).filter({ !$0.isEmpty }) {
+            guard let next = current.objectValue?[segment] else { return nil }
+            current = next
+        }
+        if case .null = current { return nil }
+        return current
+    }
+
+    private static func reportTemplateAnyValue(_ value: JSONValue) -> Any? {
+        switch value {
+        case .string(let text): return text
+        case .number(let number): return number
+        case .bool(let flag): return flag
+        case .null: return nil
+        case .array(let values): return values.map(reportTemplateAnyValue)
+        case .object(let object): return object.mapValues(reportTemplateAnyValue)
+        }
+    }
+
+    private static let dollarTemplate = try! NSRegularExpression(pattern: #"\$\{\s*([^}]+?)\s*\}"#)
+    private static let handlebarsTemplate = try! NSRegularExpression(pattern: #"\{\{\s*(.+?)\s*\}\}"#)
+    private static let formatFunction = try! NSRegularExpression(
+        pattern: #"(?i)^fmt\.(compact|compactNumber|currency|currency2|percent|percentFraction|number|number2|number5)\((.+)\)$"#
+    )
+    private static let formatSpace = try! NSRegularExpression(
+        pattern: #"(?i)^fmt\.(compact|compactNumber|currency|currency2|percent|percentFraction|number|number2|number5)\s+(.+)$"#
+    )
 
     private static func adaptDashboardBlocks(_ blocks: [JSONValue]) -> [JSONValue] {
         blocks.flatMap { block -> [JSONValue] in

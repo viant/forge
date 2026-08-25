@@ -181,4 +181,55 @@ final class InlineReportRuntimeCompilerTests: XCTestCase {
         XCTAssertEqual(rows[0].objectValue?["channel"], .string("CTV, Premium"))
         XCTAssertEqual(rows[0].objectValue?["spend"], .number(125))
     }
+
+    func testMaterializesHandlebarsAndCanonicalMarkdownMacrosWithoutLeakingTokens() throws {
+        let report = TranscriptCanonicalReport(
+            scope: "message",
+            id: "delivery-findings",
+            grammar: "report-document-v1",
+            status: "committed",
+            source: .object([
+                "blocks": .array([.object([
+                    "id": .string("findings"),
+                    "kind": .string("markdownBlock"),
+                    "datasetRef": .string("delivery_today"),
+                    "markdown": .string(
+                        "Behind: {{dailyPacingBehind}} / {{flightPacingBehind}}\n" +
+                        "Shortfall: {{fmt.currency dailySpendShortfall}}\n" +
+                        "Efficiency: {{fmt.percent ctr}}\n" +
+                        "Scale: {{fmt.compact bids}}\n" +
+                        "Spend: ${fmt.currency(row.totalSpend)}\n" +
+                        "Missing: {{notAvailable}}"
+                    )
+                ])])
+            ]),
+            dataSources: [
+                "delivery_today": TranscriptCanonicalData(
+                    id: "delivery_today",
+                    format: "json",
+                    payload: .array([.object([
+                        "dailyPacingBehind": .number(3),
+                        "flightPacingBehind": .number(2),
+                        "dailySpendShortfall": .number(1235),
+                        "ctr": .number(4.25),
+                        "bids": .number(1_250_000),
+                        "totalSpend": .number(9876),
+                    ])])
+                )
+            ]
+        )
+
+        let artifact = try InlineReportRuntimeCompiler.compile(report)
+        let markdown = try XCTUnwrap(
+            artifact.reportFill.objectValue?["blocks"]?.arrayValue?.first?.objectValue?["content"]?.objectValue?["markdown"]?.stringValue
+        )
+        XCTAssertFalse(markdown.contains("{{"))
+        XCTAssertFalse(markdown.contains("${"))
+        XCTAssertTrue(markdown.contains("Behind: 3 / 2"))
+        XCTAssertTrue(markdown.contains("Shortfall: $1,235"))
+        XCTAssertTrue(markdown.contains("Efficiency: 4.2%"))
+        XCTAssertTrue(markdown.contains("Scale: 1.2M"))
+        XCTAssertTrue(markdown.contains("Spend: $9,876"))
+        XCTAssertTrue(markdown.contains("Missing: —"))
+    }
 }

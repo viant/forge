@@ -221,8 +221,106 @@ object InlineReportRuntimeCompiler {
                 content["rowCount"] = JsonPrimitive(rows.size)
             }
         }
-        objectValue["content"] = JsonObject(content)
+        val datasetRef = string(source["datasetRef"])
+            ?: string(content["datasetRef"])
+            ?: ""
+        val materializedContent = materializeReportTemplates(
+            JsonObject(content),
+            datasetRef = datasetRef,
+            datasets = datasets
+        ) as JsonObject
+        objectValue["content"] = materializedContent
         return JsonObject(objectValue)
+    }
+
+    private fun materializeReportTemplates(
+        value: JsonElement,
+        datasetRef: String,
+        datasets: Map<String, List<JsonElement>>
+    ): JsonElement = when (value) {
+        is JsonObject -> JsonObject(value.mapValues { (_, child) ->
+            materializeReportTemplates(child, datasetRef, datasets)
+        })
+        is JsonArray -> JsonArray(value.map { child ->
+            materializeReportTemplates(child, datasetRef, datasets)
+        })
+        is JsonPrimitive -> if (value.isString) {
+            JsonPrimitive(resolveReportTemplate(value.content, datasetRef, datasets))
+        } else value
+        else -> value
+    }
+
+    private fun resolveReportTemplate(
+        template: String,
+        datasetRef: String,
+        datasets: Map<String, List<JsonElement>>
+    ): String {
+        if (!template.contains("${'$'}{") && !template.contains("{{")) return template
+        fun replaceToken(match: MatchResult): String = resolveReportTemplateToken(
+            match.groupValues[1],
+            datasetRef,
+            datasets
+        )
+        return HANDLEBARS_TEMPLATE.replace(
+            DOLLAR_TEMPLATE.replace(template, ::replaceToken),
+            ::replaceToken
+        )
+    }
+
+    private fun resolveReportTemplateToken(
+        rawToken: String,
+        datasetRef: String,
+        datasets: Map<String, List<JsonElement>>
+    ): String {
+        val token = rawToken.trim()
+        if (token.isEmpty()) return "—"
+        val functionHelper = FORMAT_FUNCTION.matchEntire(token)
+        val spaceHelper = FORMAT_SPACE.matchEntire(token)
+        val helper = functionHelper?.groupValues?.get(1) ?: spaceHelper?.groupValues?.get(1)
+        val valueToken = functionHelper?.groupValues?.get(2) ?: spaceHelper?.groupValues?.get(2) ?: token
+        val value = resolveReportTemplateValue(valueToken.trim(), datasetRef, datasets)
+            ?: return "—"
+        if (helper != null) {
+            val format = when (helper.lowercase()) {
+                "compact" -> "compactNumber"
+                "percentfraction" -> "percentFraction"
+                else -> helper
+            }
+            return formatDashboardValue(JsonUtil.elementToAny(value), format)
+        }
+        return when (value) {
+            is JsonPrimitive -> value.contentOrNull ?: value.toString()
+            else -> JsonUtil.elementToAny(value)?.toString() ?: "—"
+        }
+    }
+
+    private fun resolveReportTemplateValue(
+        rawPath: String,
+        datasetRef: String,
+        datasets: Map<String, List<JsonElement>>
+    ): JsonElement? {
+        var path = rawPath.trim()
+        if (path.startsWith("row.")) path = path.removePrefix("row.")
+        val absolute = path.split('.', limit = 2)
+        if (absolute.size == 2 && datasets.containsKey(absolute[0])) {
+            val nestedPath = absolute[1].removePrefix("row.")
+            return resolveReportTemplatePath(datasets[absolute[0]]?.firstOrNull(), nestedPath)
+        }
+        val preferredRows = datasets[datasetRef].orEmpty()
+        resolveReportTemplatePath(preferredRows.firstOrNull(), path)?.let { return it }
+        for ((id, rows) in datasets) {
+            if (id == datasetRef) continue
+            resolveReportTemplatePath(rows.firstOrNull(), path)?.let { return it }
+        }
+        return null
+    }
+
+    private fun resolveReportTemplatePath(root: JsonElement?, path: String): JsonElement? {
+        var current = root ?: return null
+        for (segment in path.split('.').filter(String::isNotBlank)) {
+            current = (current as? JsonObject)?.get(segment) ?: return null
+        }
+        return current.takeUnless { it == JsonNull }
     }
 
     private fun materializeBadgeItem(item: JsonObject, row: JsonObject?): JsonObject? {
@@ -280,6 +378,15 @@ object InlineReportRuntimeCompiler {
         }
         return result.toString()
     }
+
+    private val DOLLAR_TEMPLATE = Regex("""\$\{\s*([^}]+?)\s*}""")
+    private val HANDLEBARS_TEMPLATE = Regex("""\{\{\s*(.+?)\s*}}""")
+    private val FORMAT_FUNCTION = Regex(
+        """(?i)^fmt\.(compact|compactNumber|currency|currency2|percent|percentFraction|number|number2|number5)\((.+)\)$"""
+    )
+    private val FORMAT_SPACE = Regex(
+        """(?i)^fmt\.(compact|compactNumber|currency|currency2|percent|percentFraction|number|number2|number5)\s+(.+)$"""
+    )
 
     private fun adaptDashboardBlocks(blocks: List<JsonElement>): List<JsonElement> = blocks.flatMap { block ->
         val source = block as? JsonObject ?: return@flatMap emptyList()

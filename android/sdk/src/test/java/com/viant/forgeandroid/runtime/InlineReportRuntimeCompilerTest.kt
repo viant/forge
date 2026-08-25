@@ -200,6 +200,56 @@ class InlineReportRuntimeCompilerTest {
         assertEquals(JsonPrimitive(125), (rows[0] as JsonObject)["spend"])
     }
 
+    @Test
+    fun materializesHandlebarsAndCanonicalMarkdownMacrosWithoutLeakingTokens() {
+        val report = TranscriptCanonicalReport(
+            scope = "message",
+            id = "delivery-findings",
+            grammar = "report-document-v1",
+            status = "committed",
+            source = JsonObject(mapOf(
+                "blocks" to JsonArray(listOf(JsonObject(mapOf(
+                    "id" to JsonPrimitive("findings"),
+                    "kind" to JsonPrimitive("markdownBlock"),
+                    "datasetRef" to JsonPrimitive("delivery_today"),
+                    "markdown" to JsonPrimitive(
+                        """Behind: {{dailyPacingBehind}} / {{flightPacingBehind}}\n""" +
+                            "Shortfall: {{fmt.currency dailySpendShortfall}}\n" +
+                            "Efficiency: {{fmt.percent ctr}}\n" +
+                            "Scale: {{fmt.compact bids}}\n" +
+                            "Spend: ${'$'}{fmt.currency(row.totalSpend)}\n" +
+                            "Missing: {{notAvailable}}"
+                    )
+                ))))
+            )),
+            dataSources = mapOf(
+                "delivery_today" to TranscriptCanonicalData(
+                    id = "delivery_today",
+                    payload = JsonArray(listOf(JsonObject(mapOf(
+                        "dailyPacingBehind" to JsonPrimitive(3),
+                        "flightPacingBehind" to JsonPrimitive(2),
+                        "dailySpendShortfall" to JsonPrimitive(1235),
+                        "ctr" to JsonPrimitive(4.25),
+                        "bids" to JsonPrimitive(1_250_000),
+                        "totalSpend" to JsonPrimitive(9876),
+                    ))))
+                )
+            )
+        )
+
+        val artifact = InlineReportRuntimeCompiler.compile(report)
+        val findings = (artifact.reportFill["blocks"] as JsonArray).single() as JsonObject
+        val markdown = ((findings["content"] as JsonObject)["markdown"] as JsonPrimitive).content
+        assertEquals(false, markdown.contains("{{"))
+        assertEquals(false, markdown.contains("${'$'}{"))
+        assertEquals(true, markdown.contains("Behind: 3 / 2"))
+        assertEquals(true, markdown.contains("Shortfall: $1,235"))
+        assertEquals(true, markdown.contains("Efficiency: 4.2%"))
+        assertEquals(true, markdown.contains("Scale: 1.2M"))
+        assertEquals(true, markdown.contains("Spend: $9,876"))
+        assertEquals(true, markdown.contains("Missing: —"))
+    }
+
     private fun block(id: String, kind: String) = JsonObject(mapOf(
         "id" to JsonPrimitive(id), "kind" to JsonPrimitive(kind)
     ))
