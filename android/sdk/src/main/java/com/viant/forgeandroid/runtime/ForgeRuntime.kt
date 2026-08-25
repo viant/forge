@@ -15,6 +15,7 @@ class ForgeRuntime(
     val targetContext: ForgeTargetContext = ForgeTargetContext(platform = "android"),
     private val windowMetadataBaseUri: String = "forge/window"
 ) {
+    data class FilePreviewContent(val current: String = "", val previous: String = "", val diff: String = "")
     data class DataSourceFetchRequest(
         val windowId: String,
         val conversationId: String? = null,
@@ -46,6 +47,8 @@ class ForgeRuntime(
     private val pendingDialogResults = mutableMapOf<String, CompletableDeferred<Map<String, Any?>?>>()
     private val pendingWindows = mutableMapOf<String, PendingWindow>()
     private var windowMetadataLoader: (suspend (String) -> WindowMetadata?)? = null
+    private var fileTextLoader: (suspend (String) -> String)? = null
+    private var filePreviewLoader: (suspend (String, String) -> FilePreviewContent)? = null
 
     val windows = windowRuntime.windows()
 
@@ -89,6 +92,15 @@ class ForgeRuntime(
     fun registerHandler(name: String, handler: Handler) {
         handlers.register(name, handler)
     }
+
+    fun registerFileTextLoader(loader: suspend (String) -> String) {
+        fileTextLoader = loader
+    }
+
+    suspend fun loadFileText(uri: String): String = fileTextLoader?.invoke(uri).orEmpty()
+
+    fun registerFilePreviewLoader(loader: suspend (String, String) -> FilePreviewContent) { filePreviewLoader = loader }
+    suspend fun loadFilePreview(tool: String, uri: String): FilePreviewContent? = filePreviewLoader?.invoke(tool, uri)
 
     fun openWindow(
         windowKey: String,

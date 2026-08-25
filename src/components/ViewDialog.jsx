@@ -179,7 +179,7 @@ export function resolveDialogSelectionMode(dialog = {}, callerProps = {}) {
     return "";
 }
 
-const ViewDialog = ({context, dialog}) => {
+const ViewDialog = ({context, dialog, focusRequest = 0}) => {
     useSignals();
     const log = getLogger('dialog');
     const {handlers} = context
@@ -195,7 +195,17 @@ const ViewDialog = ({context, dialog}) => {
     const quickFilterSpecs = useMemo(() => normalizeQuickFilterSpecs(dialog), [quickFilterConfigKey]);
 
     const dialogOpen = handlers.dialog.isOpen();
+    const focusClassName = `forge-dialog-focus-${String(context?.identity?.windowId || 'window').replace(/[^a-zA-Z0-9_-]/g, '-')}-${String(dialog?.id || 'dialog').replace(/[^a-zA-Z0-9_-]/g, '-')}`;
     const previousOpenRef = useRef(false);
+    useEffect(() => {
+        if (!dialogOpen || Number(focusRequest || 0) <= 0 || typeof document === 'undefined') return;
+        const timer = setTimeout(() => {
+            const root = document.querySelector(`.${focusClassName}`);
+            const target = root?.querySelector('input, textarea, select, button, [tabindex]:not([tabindex="-1"])') || root;
+            try { target?.focus?.(); } catch (_) {}
+        }, 0);
+        return () => clearTimeout(timer);
+    }, [dialogOpen, focusClassName, focusRequest]);
     useEffect(() => {
         const isDialogOpen = dialogOpen;
         const wasOpen = previousOpenRef.current;
@@ -408,6 +418,7 @@ const ViewDialog = ({context, dialog}) => {
     const dialogStyle = {...style};
     const dialogClassName = [
         "forge-view-dialog",
+        focusClassName,
         selectionModeOverride ? "forge-lookup-dialog" : "",
         dialog.className,
         dialog?.properties?.className,

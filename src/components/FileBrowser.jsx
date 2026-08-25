@@ -20,6 +20,64 @@ const getNodeAtPath = (nodes, path) => {
     return node;
 };
 
+export const resolveFilePreviewPayload = (preview = {}, row = {}) => {
+    const currentField = String(preview?.currentField || 'url').trim();
+    const previousField = String(preview?.previousField || 'origUrl').trim();
+    const diffField = String(preview?.diffField || 'diff').trim();
+    return {
+        kind: String(preview?.kind || 'file').trim(),
+        tool: String(preview?.tool || '').trim(),
+        modes: Array.isArray(preview?.modes) ? preview.modes.map(String) : ['current'],
+        currentUri: String(row?.[currentField] || row?.uri || row?.url || '').trim(),
+        previousUri: String(row?.[previousField] || row?.origUri || row?.origUrl || '').trim(),
+        diff: String(row?.[diffField] || row?.diff || ''),
+        row,
+        preview,
+    };
+};
+
+export const dedupeFileBrowserRows = (rows = [], field = '') => {
+    const key = String(field || '').trim();
+    if (!key || !Array.isArray(rows)) return Array.isArray(rows) ? rows : [];
+    const deduped = new Map();
+    for (const row of rows) {
+        const value = String(row?.[key] || '').trim();
+        if (!value) continue;
+        deduped.set(value, row);
+    }
+    return Array.from(deduped.values());
+};
+
+export const buildFileBrowserTreeRows = (rows = [], pathField = 'url') => {
+    const entries = (Array.isArray(rows) ? rows : []).map((row) => ({
+        row,
+        parts: String(row?.[pathField] || row?.url || row?.uri || '').split('/').filter(Boolean),
+    })).filter((entry) => entry.parts.length > 0);
+    if (entries.length === 0) return [];
+    let common = 0;
+    while (entries.every((entry) => entry.parts[common] && entry.parts[common] === entries[0].parts[common])) common += 1;
+    const roots = [];
+    const folders = new Map();
+    for (const entry of entries) {
+        const relative = entry.parts.slice(common);
+        const parts = relative.length ? relative : [entry.parts[entry.parts.length - 1]];
+        let children = roots;
+        let folderPath = '';
+        for (const part of parts.slice(0, -1)) {
+            folderPath = folderPath ? `${folderPath}/${part}` : part;
+            let folder = folders.get(folderPath);
+            if (!folder) {
+                folder = { uri: `/${folderPath}`, name: part, isFolder: true, isExpanded: true, childNodes: [] };
+                folders.set(folderPath, folder);
+                children.push(folder);
+            }
+            children = folder.childNodes;
+        }
+        children.push({ ...entry.row, name: parts[parts.length - 1], isFolder: false, childNodes: [] });
+    }
+    return roots;
+};
+
 
 const FileBrowser = (props) => {
     const {context, config={}, isActive} = props;
@@ -30,6 +88,10 @@ const FileBrowser = (props) => {
     const [error, setError] = useState(null);
 
     const events = fileBrowserHandlers(context, config);
+    const providedRowsSignature = JSON.stringify(Array.isArray(config.rows) ? config.rows : []);
+    const resolvedCollection = () => Array.isArray(config.rows)
+        ? config.rows
+        : handlers.dataSource.getCollection();
 
 
     // Helpers to preserve expansion across refreshes
@@ -58,16 +120,17 @@ const FileBrowser = (props) => {
 
     // Whenever the collection signal changes, rebuild tree data
     useSignalEffect(() => {
+        if (Array.isArray(config.rows)) return;
         const {loading, error} = control.value || {};
         setLoading(loading);
         setError(error);
-        const data = handlers.dataSource.getCollection();
+        const data = resolvedCollection();
 
         if (data) {
             // Build tree data from the collection and prepend ".." when we
             // are inside a sub-folder so the user can navigate up.
             const expanded = collectExpanded(fileTreeData);
-            let input = data;
+            let input = dedupeFileBrowserRows(data, config.dedupeBy);
             try {
                 if (events.onPrepareTreeData && events.onPrepareTreeData.isDefined()) {
                     const transformed = events.onPrepareTreeData.execute({ collection: data, context });
@@ -120,10 +183,10 @@ const FileBrowser = (props) => {
     useEffect(() => {
         // Fetch top-level items when component mounts
         setLoading(true);
-        const data = handlers.dataSource.getCollection();
+        const data = resolvedCollection();
         if (data?.length > 0) {
             const expanded = collectExpanded(fileTreeData);
-            let input = data;
+            let input = dedupeFileBrowserRows(data, config.dedupeBy);
             try {
                 if (events.onPrepareTreeData && events.onPrepareTreeData.isDefined()) {
                     const transformed = events.onPrepareTreeData.execute({ collection: data, context });
@@ -171,7 +234,7 @@ const FileBrowser = (props) => {
         } else if (data?.length === 0) {
             events.onInit.execute({});
         }
-    }, [isActive]);
+    }, [isActive, providedRowsSignature, config.dedupeBy]);
 
 
 
@@ -179,7 +242,7 @@ const FileBrowser = (props) => {
     /**
      * Build the tree recursively from dataSource collection
      */
-    const buildTree = (nodes, path = []) => {
+    function buildTree(nodes, path = []) {
         return nodes.map((node, index) => {
             const currentNodePath = [...path, index];
             const isSelected = handlers.dataSource.isSelected({node, nodePath: currentNodePath});
@@ -202,7 +265,7 @@ const FileBrowser = (props) => {
                 isSelected: isSelected,
             };
         });
-    };
+    }
 
     // Helper function to get node at a specific path
     const getNodeAtPath = (nodes, path) => {
@@ -272,6 +335,11 @@ const FileBrowser = (props) => {
 
         const args = { item: nodeToUpdate, node:nodeToUpdate, nodePath, ...node.nodeData, handleNodeCollapse, handleNodeExpand }
 
+        if (!node.nodeData.isFolder && config.preview && typeof context?.handlers?.filePreview?.open === 'function') {
+            e?.stopPropagation?.();
+            return context.handlers.filePreview.open(resolveFilePreviewPayload(config.preview, node.nodeData));
+        }
+
         // Prefer specific handlers over the generic onNodeSelect.
         if (node.nodeData.isFolder) {
             if (events.onFolderSelect && events.onFolderSelect.isDefined()) {
@@ -303,7 +371,14 @@ const FileBrowser = (props) => {
         }
     };
 
-    if (loading && fileTreeData.length === 0) {
+    const providedTreeData = Array.isArray(config.rows)
+        ? buildTree(config.display === 'tree'
+            ? buildFileBrowserTreeRows(dedupeFileBrowserRows(config.rows, config.dedupeBy), config.pathField || 'url')
+            : dedupeFileBrowserRows(config.rows, config.dedupeBy))
+        : null;
+    const effectiveTreeData = providedTreeData || fileTreeData;
+
+    if (loading && effectiveTreeData.length === 0) {
         // Soft loading block while fetching tree
         return <SoftBlock height={160} />;
     }
@@ -327,7 +402,7 @@ const FileBrowser = (props) => {
         >
             <div className="app-file-browser-scroll" style={{ flex: 1, minHeight: 0, overflow: overflow || 'auto' }}>
                 <Tree
-                    contents={fileTreeData}
+                    contents={effectiveTreeData}
                     onNodeClick={handleNodeClick}
                     onNodeExpand={handleNodeExpand}
                     onNodeCollapse={handleNodeCollapse}

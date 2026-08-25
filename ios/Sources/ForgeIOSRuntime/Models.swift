@@ -3532,6 +3532,10 @@ public struct FileBrowserDef: Codable, Sendable {
     public let title: String?
     public let dataSourceRef: String?
     public let folderOnly: Bool?
+    public let dedupeBy: String?
+    public let display: String?
+    public let pathField: String?
+    public let preview: FilePreviewDef?
     public let on: [ExecutionDef]
     public let target: JSONValue?
     public let targetOverrides: [String: JSONValue]
@@ -3540,6 +3544,10 @@ public struct FileBrowserDef: Codable, Sendable {
         case title
         case dataSourceRef
         case folderOnly
+        case dedupeBy
+        case display
+        case pathField
+        case preview
         case on
         case target
         case targetOverrides
@@ -3549,6 +3557,10 @@ public struct FileBrowserDef: Codable, Sendable {
         title: String? = nil,
         dataSourceRef: String? = nil,
         folderOnly: Bool? = nil,
+        dedupeBy: String? = nil,
+        display: String? = nil,
+        pathField: String? = nil,
+        preview: FilePreviewDef? = nil,
         on: [ExecutionDef] = [],
         target: JSONValue? = nil,
         targetOverrides: [String: JSONValue] = [:]
@@ -3556,6 +3568,10 @@ public struct FileBrowserDef: Codable, Sendable {
         self.title = title
         self.dataSourceRef = dataSourceRef
         self.folderOnly = folderOnly
+        self.dedupeBy = dedupeBy
+        self.display = display
+        self.pathField = pathField
+        self.preview = preview
         self.on = on
         self.target = target
         self.targetOverrides = targetOverrides
@@ -3566,9 +3582,56 @@ public struct FileBrowserDef: Codable, Sendable {
         title = try container.decodeIfPresent(String.self, forKey: .title)
         dataSourceRef = try container.decodeIfPresent(String.self, forKey: .dataSourceRef)
         folderOnly = try container.decodeIfPresent(Bool.self, forKey: .folderOnly)
+        dedupeBy = try container.decodeIfPresent(String.self, forKey: .dedupeBy)
+        display = try container.decodeIfPresent(String.self, forKey: .display)
+        pathField = try container.decodeIfPresent(String.self, forKey: .pathField)
+        preview = try container.decodeIfPresent(FilePreviewDef.self, forKey: .preview)
         on = try container.decodeIfPresent([ExecutionDef].self, forKey: .on) ?? []
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
         targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
+    }
+}
+
+public struct FilePreviewDef: Codable, Sendable {
+    public let kind: String?
+    public let tool: String?
+    public let defaultMode: String?
+    public let currentField: String?
+    public let previousField: String?
+    public let diffField: String?
+    public let modes: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case kind, tool, defaultMode, currentField, previousField, diffField, modes
+    }
+
+    public init(
+        kind: String? = nil,
+        tool: String? = nil,
+        defaultMode: String? = nil,
+        currentField: String? = nil,
+        previousField: String? = nil,
+        diffField: String? = nil,
+        modes: [String] = []
+    ) {
+        self.kind = kind
+        self.tool = tool
+        self.defaultMode = defaultMode
+        self.currentField = currentField
+        self.previousField = previousField
+        self.diffField = diffField
+        self.modes = modes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try container.decodeIfPresent(String.self, forKey: .kind)
+        tool = try container.decodeIfPresent(String.self, forKey: .tool)
+        defaultMode = try container.decodeIfPresent(String.self, forKey: .defaultMode)
+        currentField = try container.decodeIfPresent(String.self, forKey: .currentField)
+        previousField = try container.decodeIfPresent(String.self, forKey: .previousField)
+        diffField = try container.decodeIfPresent(String.self, forKey: .diffField)
+        modes = try container.decodeIfPresent([String].self, forKey: .modes) ?? []
     }
 }
 
@@ -3803,6 +3866,8 @@ public struct ToolbarItemDef: Codable, Sendable, Identifiable {
     public let label: String?
     public let icon: String?
     public let align: String?
+    public let intent: String?
+    public let appearance: String?
     public let on: [ExecutionDef]
     public let target: JSONValue?
     public let targetOverrides: [String: JSONValue]
@@ -3812,6 +3877,8 @@ public struct ToolbarItemDef: Codable, Sendable, Identifiable {
         case label
         case icon
         case align
+        case intent
+        case appearance
         case on
         case target
         case targetOverrides
@@ -3822,6 +3889,8 @@ public struct ToolbarItemDef: Codable, Sendable, Identifiable {
         label: String? = nil,
         icon: String? = nil,
         align: String? = nil,
+        intent: String? = nil,
+        appearance: String? = nil,
         on: [ExecutionDef] = [],
         target: JSONValue? = nil,
         targetOverrides: [String: JSONValue] = [:]
@@ -3830,6 +3899,8 @@ public struct ToolbarItemDef: Codable, Sendable, Identifiable {
         self.label = label
         self.icon = icon
         self.align = align
+        self.intent = intent
+        self.appearance = appearance
         self.on = on
         self.target = target
         self.targetOverrides = targetOverrides
@@ -3841,6 +3912,8 @@ public struct ToolbarItemDef: Codable, Sendable, Identifiable {
         label = try container.decodeIfPresent(String.self, forKey: .label)
         icon = try container.decodeIfPresent(String.self, forKey: .icon)
         align = try container.decodeIfPresent(String.self, forKey: .align)
+        intent = try container.decodeIfPresent(String.self, forKey: .intent)
+        appearance = try container.decodeIfPresent(String.self, forKey: .appearance)
         on = try container.decodeIfPresent([ExecutionDef].self, forKey: .on) ?? []
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
         targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]

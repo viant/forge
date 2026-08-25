@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,15 +37,15 @@ fun TableToolbar(runtime: ForgeRuntime, context: DataSourceContext, toolbar: Too
                     .filter { it.event == "onReadonly" }
                     .any { exec -> runtime.isReadOnly(exec, context) }
             }
-            Button(onClick = {
+            val action = {
                 item.on.forEach { exec ->
                     if (exec.event == "onClick") {
                         runtime.execute(exec, context, emptyMap())
                     }
                 }
-            }, enabled = !readonly) {
-                Text(label)
             }
+            if (item.appearance == "minimal") TextButton(onClick = action, enabled = !readonly) { Text(label) }
+            else Button(onClick = action, enabled = !readonly) { Text(label) }
         }
     }
 }

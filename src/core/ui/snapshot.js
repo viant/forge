@@ -376,6 +376,8 @@ export function buildUISnapshot(options = {}) {
         region: w.region || null,
         workspaceSharePct: w.workspaceSharePct ?? null,
         workspaceMinHeight: w.workspaceMinHeight ?? null,
+        navigation: safeJSON(w.navigation || null, options),
+        mcpUI: safeJSON(w.mcpUI || null, options),
         workspaceCollapsed: w.workspaceCollapsed === true,
         parentKey: w.parentKey,
         parameters: safeJSON(w.parameters, options),
