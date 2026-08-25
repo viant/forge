@@ -165,7 +165,8 @@ internal fun ReportBuilderAuthoredResult(
     document: JsonObject,
     primaryRows: List<Map<String, Any?>>,
     primaryControl: ControlState,
-    primaryRequest: Map<String, Any?>
+    primaryRequest: Map<String, Any?>,
+    runRequestId: String?
 ) {
     val referencedDatasetRefs = remember(document) { reportBuilderAuthoredDatasetRefs(document) }
     val declarations = remember(config, document) { reportBuilderPublishedSources(config, document) }
@@ -191,14 +192,38 @@ internal fun ReportBuilderAuthoredResult(
     // one expensive cube. Hydrate them in priority order so Android does not
     // stampede the gateway with identical concurrent cube jobs. The first
     // cheap aggregate normally unlocks the KPI overview immediately.
-    LaunchedEffect(primaryRequest, declarations) {
+    LaunchedEffect(primaryRequest, declarations, primaryRows, runRequestId) {
+        val requestId = runRequestId?.trim()?.takeIf(String::isNotEmpty)
+            ?: "native-${java.util.UUID.randomUUID()}"
+        runtime.publishNativeReportMaterialization(
+            windowId = window.windowId,
+            requestId = requestId,
+            status = "running",
+            rowsById = emptyMap(),
+            errors = emptyList()
+        )
+        val loadedRows = linkedMapOf<String, List<Map<String, Any?>>>()
+        val loadErrors = mutableListOf<String>()
+        if ("primary" in referencedDatasetRefs) {
+            loadedRows["primary"] = primaryRows
+            primaryControl.error?.takeIf(String::isNotBlank)?.let(loadErrors::add)
+        }
         contexts.forEach { (declaration, context) ->
             val request = reportBuilderPublishedRequest(primaryRequest, declaration)
             if (request.isEmpty()) return@forEach
             context.setInputParameters(request, fetch = true)
             context.control.flow.first { it.loading || it.resolved }
             context.control.flow.first { !it.loading && it.resolved }
+            loadedRows[declaration.id] = context.collection.peek()
+            context.control.peek().error?.takeIf(String::isNotBlank)?.let(loadErrors::add)
         }
+        runtime.publishNativeReportMaterialization(
+            windowId = window.windowId,
+            requestId = requestId,
+            status = if (loadErrors.isEmpty()) "completed" else "failed",
+            rowsById = loadedRows,
+            errors = loadErrors
+        )
     }
 
     val preparedDocument = remember(document) { materializeReportBuilderAuthoredDocument(document) }
@@ -254,6 +279,35 @@ internal fun ReportBuilderAuthoredResult(
             DashboardReportRuntimeSurface(runtime, window, runtimeContainer, dashboardRoot)
         }
     }
+}
+
+private fun ForgeRuntime.publishNativeReportMaterialization(
+    windowId: String,
+    requestId: String,
+    status: String,
+    rowsById: Map<String, List<Map<String, Any?>>>,
+    errors: List<String>
+) {
+    val materialization = linkedMapOf<String, Any?>(
+        "id" to requestId,
+        "requestId" to requestId,
+        "status" to status,
+        "materialized" to (status == "completed"),
+        "datasetRefs" to rowsById.keys.sorted(),
+        "rowCounts" to rowsById.mapValues { it.value.size }
+    )
+    if (errors.isNotEmpty()) materialization["errors"] = errors
+    val values = linkedMapOf<String, Any?>("reportMaterialization" to materialization)
+    if (status != "running") {
+        values["reportStaticDatasets"] = rowsById.keys.sorted().map { id ->
+            mapOf(
+                "id" to id,
+                "dataSourceRef" to id,
+                "rows" to rowsById[id].orEmpty()
+            )
+        }
+    }
+    setWindowFormValues(windowId, values, replace = false, bumpPrefillRevision = false)
 }
 
 internal fun authoredReportLoadErrorMessage(error: String): String {

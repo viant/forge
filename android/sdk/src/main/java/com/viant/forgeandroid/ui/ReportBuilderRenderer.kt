@@ -747,7 +747,8 @@ fun ReportBuilderRenderer(
                     document = authoredDocument,
                     primaryRows = rows,
                     primaryControl = control,
-                    primaryRequest = requestPayload
+                    primaryRequest = requestPayload,
+                    runRequestId = JsonUtil.asStringMap(windowForm["reportRunRequest"])["id"]?.toString()
                 )
             } else {
                 ReportBuilderResultView(

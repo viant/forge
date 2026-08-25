@@ -530,7 +530,8 @@ public struct ReportBuilderRenderer: View {
                 document: authoredDocument,
                 primaryRows: rows,
                 primaryControl: dataSourceControlState,
-                primaryRequest: requestPayload
+                primaryRequest: requestPayload,
+                runRequestID: windowFormValues["reportRunRequest"]?.objectValue?["id"]?.stringValue
             )
         } else if viewMode == "chart", let spec = chartSpec {
             chartView(spec: spec)
