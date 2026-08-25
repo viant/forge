@@ -145,7 +145,7 @@ private fun TerminalEntry(
                 )
                 Text(
                     text = entry.input,
-                    color = Color(0xFFE5E7EB),
+                    color = Color(0xFF7DD3FC),
                     fontFamily = FontFamily.Monospace,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -159,7 +159,7 @@ private fun TerminalEntry(
         }
         renderTerminalBlock(
             text = entry.output,
-            color = Color(0xFFD0D5DD),
+            color = if (entry.isError) Color(0xFFFDA29B) else Color(0xFF6EE7B7),
             truncateLongOutput = truncateLongOutput,
             truncateLength = truncateLength
         )

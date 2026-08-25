@@ -24,6 +24,37 @@ const closeViewDialog = (dialogSignal) => {
     dialogSignal.value = {...dialogSignal.peek(), open: false};
 }
 
+const dialogResult = (status, reason) => ({ status, canceled: status !== 'committed', reason });
+
+function restoreDialogFocus(entry) {
+    const target = entry?.returnFocusElement;
+    if (!target || typeof target.focus !== 'function') return;
+    const restore = () => {
+        try {
+            if (target.isConnected !== false) target.focus();
+        } catch (_) {}
+    };
+    setTimeout(restore, 0);
+}
+
+function settlePendingDialog(dialogKey, result) {
+    const entry = pendingDialogResolvers.get(dialogKey);
+    if (!entry) return false;
+    pendingDialogResolvers.delete(dialogKey);
+    if (entry.resolve) entry.resolve(result);
+    restoreDialogFocus(entry);
+    return true;
+}
+
+function cancelDialogsOwnedByWindow(windowId, reason = 'owner_destroyed') {
+    const prefix = `${windowId}Dialog`;
+    for (const dialogKey of Array.from(pendingDialogResolvers.keys())) {
+        if (dialogKey.startsWith(prefix)) {
+            settlePendingDialog(dialogKey, dialogResult('canceled', reason));
+        }
+    }
+}
+
 
 export function useDialogHandlers(windowId, dialogId) {
     const getDialogId = () => {
@@ -31,7 +62,9 @@ export function useDialogHandlers(windowId, dialogId) {
     }
 
     const close = () => {
-        const dialogSignal = getDialogSignal(getDialogId(dialogId))
+        const dialogKey = getDialogId(dialogId);
+        const dialogSignal = getDialogSignal(dialogKey)
+        settlePendingDialog(dialogKey, dialogResult('canceled', 'closed'));
         closeViewDialog(dialogSignal)
     }
 
@@ -151,6 +184,7 @@ export function useDialogHandlers(windowId, dialogId) {
             try { console.debug('[dialog.commit] resolve(payload)', payload); } catch (_) {}
             if (resolve) resolve(payload);
             pendingDialogResolvers.delete(dialogKey);
+            restoreDialogFocus(entry);
         }
         // close dialog after commit
         close();
@@ -285,6 +319,7 @@ export function useWindowHandlers(windowId) {
                 parentKey: options.parentKey,
                 workspaceSharePct: options.workspaceSharePct,
                 workspaceMinHeight: options.workspaceMinHeight,
+                navigation: options.navigation,
                 workspaceCollapsed: options.workspaceCollapsed,
             }
         );
@@ -314,6 +349,7 @@ export function useWindowHandlers(windowId) {
 
 
     const closeWindow = (props = {}) => {
+        cancelDialogsOwnedByWindow(windowId);
         removeSignalsForKey(windowId);
     }
 
@@ -643,6 +679,16 @@ export function useWindowHandlers(windowId) {
         }
         const dialogSignal = getDialogSignal(dialogKey);
 
+        const existingSignal = dialogSignal.peek() || {};
+        if (existingSignal.open) {
+            dialogSignal.value = {
+                ...existingSignal,
+                focusRequest: Number(existingSignal.focusRequest || 0) + 1,
+            };
+            const busy = dialogResult('busy', 'dialog_already_open');
+            return options.awaitResult ? Promise.resolve(busy) : busy;
+        }
+
         const parameterDefinitions = Array.isArray(execution.parameters) ? execution.parameters : [];
         const paramDefs = Array.isArray(options.parameters)
             ? options.parameters
@@ -711,6 +757,15 @@ export function useWindowHandlers(windowId) {
                 windowId,
                 dataSourceRef: props.context?.identity?.dataSourceRef || undefined,
             },
+            owner: {
+                windowId,
+                conversationId: options.conversationId || props.context?.identity?.conversationId || undefined,
+                dataSourceRef: props.context?.identity?.dataSourceRef || undefined,
+                controlId: options.ownerControlId || props.context?.identity?.controlId || undefined,
+                contextKind: options.contextKind || props.context?.identity?.contextKind || undefined,
+                contextId: options.contextId || props.context?.identity?.contextId || undefined,
+            },
+            returnFocusElement: typeof document !== 'undefined' ? document.activeElement : null,
         };
 
         if (options.awaitResult) {
@@ -726,7 +781,9 @@ export function useWindowHandlers(windowId) {
     const closeDialog = (props = {}) => {
         const { dialogId } = props || {};
         if (!dialogId) return;
-        const sig = getDialogSignal(getDialogId(dialogId));
+        const dialogKey = getDialogId(dialogId);
+        const sig = getDialogSignal(dialogKey);
+        settlePendingDialog(dialogKey, dialogResult('canceled', 'closed'));
         closeViewDialog(sig);
     }
 

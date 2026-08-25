@@ -30,6 +30,7 @@ activeWindows.value = [
     region: 'chat.top',
     workspaceSharePct: 72,
     workspaceMinHeight: 500,
+    navigation: { label: 'Reports', icon: 'chart' },
     workspaceCollapsed: true,
     parentKey: 'root',
     inTab: true,
@@ -127,6 +128,7 @@ assert.equal(snap.windows[0].presentation, 'hosted');
 assert.equal(snap.windows[0].region, 'chat.top');
 assert.equal(snap.windows[0].workspaceSharePct, 72);
 assert.equal(snap.windows[0].workspaceMinHeight, 500);
+assert.deepEqual(snap.windows[0].navigation, { label: 'Reports', icon: 'chart' });
 assert.equal(snap.windows[0].workspaceCollapsed, true);
 assert.equal(snap.windows[0].parentKey, 'root');
 assert.equal(snap.windows[0].inlineMetadata.namespace, 'Demo');

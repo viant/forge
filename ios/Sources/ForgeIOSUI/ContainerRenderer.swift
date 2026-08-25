@@ -95,6 +95,11 @@ public struct ContainerRenderer: View {
             }
         } else if effectiveContainer.kind == "chat" || effectiveContainer.chat != nil {
             ChatRenderer(runtime: runtime, window: window, container: effectiveContainer)
+        } else if let terminal = effectiveContainer.terminal {
+            VStack(alignment: .leading, spacing: 12) {
+                titleBlock
+                TerminalRenderer(runtime: runtime, window: window, container: effectiveContainer, terminal: terminal)
+            }
         } else if !effectiveContainer.items.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock

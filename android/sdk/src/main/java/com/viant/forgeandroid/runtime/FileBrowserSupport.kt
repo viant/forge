@@ -8,6 +8,45 @@ data class FileBrowserRowModel(
     val isFolder: Boolean
 )
 
+fun deduplicateFileBrowserRows(rows: List<Map<String, Any?>>, field: String?): List<Map<String, Any?>> {
+    val key = field?.trim().orEmpty()
+    if (key.isBlank()) return rows
+    val values = linkedMapOf<String, Map<String, Any?>>()
+    rows.forEach { row -> row[key]?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let { values[it] = row } }
+    return values.values.toList()
+}
+
+fun previousTextFromUnifiedDiff(current: String, diff: String): String {
+    val currentHasNewline = current.endsWith("\n")
+    val currentLines = current.removeSuffix("\n").lines()
+    val previous = mutableListOf<String>()
+    var currentIndex = 0
+    var found = false
+    val lines = diff.lines()
+    var index = 0
+    val header = Regex("^@@\\s+-\\d+(?:,\\d+)?\\s+\\+(\\d+)(?:,\\d+)?\\s+@@")
+    while (index < lines.size) {
+        val match = header.find(lines[index])
+        if (match == null) { index += 1; continue }
+        found = true
+        val newStart = ((match.groupValues[1].toIntOrNull() ?: 1) - 1).coerceAtLeast(0)
+        while (currentIndex < newStart && currentIndex < currentLines.size) previous += currentLines[currentIndex++]
+        index += 1
+        while (index < lines.size && !lines[index].startsWith("@@ ")) {
+            val line = lines[index]
+            when {
+                line.startsWith("+") && !line.startsWith("+++") -> currentIndex += 1
+                line.startsWith("-") && !line.startsWith("---") -> previous += line.drop(1)
+                line.startsWith(" ") -> { previous += currentLines.getOrElse(currentIndex) { line.drop(1) }; currentIndex += 1 }
+            }
+            index += 1
+        }
+    }
+    if (!found) return ""
+    while (currentIndex < currentLines.size) previous += currentLines[currentIndex++]
+    return previous.joinToString("\n").let { if (currentHasNewline && it.isNotEmpty()) "$it\n" else it }
+}
+
 fun fileBrowserRowModel(row: Map<String, Any?>, fallbackIndex: Int): FileBrowserRowModel {
     val uri = fileBrowserRowLocation(row).orEmpty()
     val explicitName = listOf("name", "label", "filename", "fileName")
@@ -36,6 +75,8 @@ fun fileBrowserRowAccessibilityLabel(model: FileBrowserRowModel, disabled: Boole
         "$kind ${model.name}, ${model.subtitle}$status"
     }
 }
+
+fun compactFileBrowserParent(uri: String): String = uri.split('/').filter(String::isNotBlank).dropLast(1).takeLast(3).joinToString("/")
 
 fun fileBrowserRowLocation(row: Map<String, Any?>?): String? {
     if (row == null) {

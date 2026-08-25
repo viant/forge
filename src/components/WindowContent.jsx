@@ -762,6 +762,7 @@ function WindowContentInner({window, metadata, services}) {
                                     selectionMode ? { selectionMode } : {},
                                 )}
                                 dialog={dialog}
+                                focusRequest={Number(dialogSignal?.focusRequest || 0)}
                             />
                         );
                     })}

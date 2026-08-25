@@ -1,7 +1,7 @@
 // Composer.jsx – TextArea prompt with send/upload/tools controls
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Menu, MenuDivider, MenuItem, Popover, Tag, TextArea } from "@blueprintjs/core";
-import { PaperPlaneRight, StopCircle, Microphone, MicrophoneSlash, ListBullets, UserCircle, Lightbulb } from '@phosphor-icons/react';
+import { PaperPlaneRight, StopCircle, Microphone, MicrophoneSlash, ListBullets, UserCircle, Lightbulb, Brain } from '@phosphor-icons/react';
 import BundlesDialog from "./BundlesDialog.jsx";
 
 function composerMaxHeightPx(maxRows, paddingTopPx) {
@@ -1332,6 +1332,8 @@ export default function Composer({
 	            small
 	            disabled={disabled}
 	            data-testid="chat-composer-reasoning"
+	            icon={<Brain size={18} weight="duotone" />}
+	            className="composer-icon-btn composer-icon-btn--reasoning composer-icon-btn--labelText"
 	            aria-label="Reasoning"
 	            title="Reasoning"
 	            onClick={(e) => { e.preventDefault(); setReasoningOpen((v) => !v); }}
@@ -1479,6 +1481,7 @@ export default function Composer({
                                 icon={submitIconEl}
                                 minimal
                                 intent="primary"
+                                className="composer-send-action"
                                 data-testid="chat-composer-send"
                                 aria-label={sendTooltip || submitText}
                                 title={sendTooltip || submitText}

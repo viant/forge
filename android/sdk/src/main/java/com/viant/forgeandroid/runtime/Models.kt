@@ -912,9 +912,24 @@ data class FileBrowserDef(
     val title: String? = null,
     val dataSourceRef: String? = null,
     val folderOnly: Boolean? = null,
+    val dedupeBy: String? = null,
+    val display: String? = null,
+    val pathField: String? = null,
+    val preview: FilePreviewDef? = null,
     val on: List<ExecutionDef> = emptyList(),
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
+data class FilePreviewDef(
+    val kind: String? = null,
+    val tool: String? = null,
+    val defaultMode: String? = null,
+    val currentField: String? = null,
+    val previousField: String? = null,
+    val diffField: String? = null,
+    val modes: List<String> = emptyList()
 )
 
 @Serializable
@@ -961,6 +976,8 @@ data class ToolbarItemDef(
     val label: String? = null,
     val icon: String? = null,
     val align: String? = null,
+    val intent: String? = null,
+    val appearance: String? = null,
     val on: List<ExecutionDef> = emptyList(),
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()

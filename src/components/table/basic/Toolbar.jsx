@@ -88,6 +88,9 @@ const Toolbar = ({
                     icon={item.icon}
                     {...events}
                     disabled={effectiveDisabled}
+                    intent={item.intent || 'none'}
+                    minimal={item.appearance === 'minimal'}
+                    outlined={item.appearance === 'outlined'}
                     data-testid={testID}
                 >
                     {item.label || ""}

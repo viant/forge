@@ -100,6 +100,32 @@ assert.deepEqual(dialogHandlers.callerProps().parameters, {
 assert.equal(dialogHandlers.callerProps().multiple, true);
 console.log('openDialog ✓ preserves explicit caller parameters in dialog props');
 
+const busyResult = await handlers.openDialog({
+  execution: { args: ['adOrderPicker', { awaitResult: true }] },
+  context: { identity: { dataSourceRef: 'perf', controlId: 'second-control' } },
+});
+assert.deepEqual(busyResult, {
+  status: 'busy',
+  canceled: true,
+  reason: 'dialog_already_open',
+});
+assert.equal(getDialogSignal(`${windowId}DialogadOrderPicker`).peek().focusRequest, 1);
+
+dialogHandlers.commit({ payload: { id: 'order-1' } });
+assert.deepEqual(await dialogPromise, { id: 'order-1' });
+
+const canceledPromise = handlers.openDialog({
+  execution: { args: ['adOrderPicker', { awaitResult: true }] },
+  context: { identity: { dataSourceRef: 'perf', controlId: 'cancel-control' } },
+});
+dialogHandlers.close();
+assert.deepEqual(await canceledPromise, {
+  status: 'canceled',
+  canceled: true,
+  reason: 'closed',
+});
+console.log('openDialog ✓ preserves the first owner and settles busy/canceled invocations');
+
 handlers.openWindow({
   execution: {
     args: ['metrics/report', 'Performance Metrics', '', true],
@@ -217,5 +243,25 @@ assert.equal(activeWindows.peek()[0].parentKey, 'chat/new');
 assert.equal(activeWindows.peek()[0].workspaceSharePct, 72);
 assert.equal(activeWindows.peek()[0].workspaceMinHeight, undefined);
 console.log('openTarget ✓ replaces the current hosted workspace region for drillback navigation');
+
+const ownerA = useWindowHandlers('W_owner_a');
+const ownerB = useWindowHandlers('W_owner_b');
+const ownerAPromise = ownerA.openDialog({ execution: { args: ['sharedPicker', { awaitResult: true }] } });
+const ownerBPromise = ownerB.openDialog({ execution: { args: ['sharedPicker', { awaitResult: true }] } });
+assert.equal(getDialogSignal('W_owner_aDialogsharedPicker').peek().open, true);
+assert.equal(getDialogSignal('W_owner_bDialogsharedPicker').peek().open, true);
+useDialogHandlers('W_owner_a', 'sharedPicker').commit({ payload: { owner: 'a' } });
+useDialogHandlers('W_owner_b', 'sharedPicker').commit({ payload: { owner: 'b' } });
+assert.deepEqual(await ownerAPromise, { owner: 'a' });
+assert.deepEqual(await ownerBPromise, { owner: 'b' });
+
+const teardownPromise = ownerA.openDialog({ execution: { args: ['sharedPicker', { awaitResult: true }] } });
+ownerA.closeWindow();
+assert.deepEqual(await teardownPromise, {
+  status: 'canceled',
+  canceled: true,
+  reason: 'owner_destroyed',
+});
+console.log('openDialog ✓ isolates owners and cancels pending work on owner teardown');
 
 clearWindowContext(windowId);
