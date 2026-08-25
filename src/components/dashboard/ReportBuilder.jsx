@@ -9974,6 +9974,53 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             && runtimePreviewDatasetPayloadState.loading !== true
             && runtimePreviewRowsSource.loading !== true
         : hasCompletedCurrentRun;
+    const currentReportDatasetMaterialization = useMemo(() => {
+        const freshPublishedIds = new Set(
+            (Array.isArray(runtimePreviewDatasetPayloadState?.freshDatasetIds)
+                ? runtimePreviewDatasetPayloadState.freshDatasetIds
+                : [])
+                .map((id) => normalizeString(id))
+                .filter(Boolean),
+        );
+        const datasets = [];
+        const primaryId = normalizeString(runtimePreviewPrimaryDataset?.id || "primary") || "primary";
+        datasets.push({
+            id: primaryId,
+            dataSourceRef: normalizeString(runtimePreviewPrimaryDataset?.dataSourceRef),
+            rowCount: Array.isArray(runtimePreviewPrimaryDatasetPayload?.rows)
+                ? runtimePreviewPrimaryDatasetPayload.rows.length
+                : (Array.isArray(runtimePreviewRowsSource?.rows) ? runtimePreviewRowsSource.rows.length : 0),
+            fresh: !!currentPrimaryRuntimeResultFresh,
+            hasMore: runtimePreviewPrimaryDatasetPayload?.hasMore === true || runtimePreviewRowsSource?.hasMore === true,
+        });
+        runtimePreviewPublishedDatasets.forEach((dataset) => {
+            const id = normalizeString(dataset?.id);
+            if (!id || id === primaryId) return;
+            const payload = runtimePreviewDatasetPayloadState?.payloads?.[id] || null;
+            datasets.push({
+                id,
+                dataSourceRef: normalizeString(dataset?.dataSourceRef),
+                rowCount: Array.isArray(payload?.rows) ? payload.rows.length : 0,
+                fresh: freshPublishedIds.has(id),
+                hasMore: payload?.hasMore === true,
+                diagnosticCount: Array.isArray(payload?.diagnostics) ? payload.diagnostics.length : 0,
+            });
+        });
+        const failed = runtimePreviewRowsSource?.error || runtimePreviewDatasetPayloadState?.error;
+        return {
+            status: failed
+                ? "failed"
+                : (currentTerminalMaterializationFresh ? "completed" : (
+                    runtimePreviewRowsState.loading === true
+                    || runtimePreviewDatasetPayloadState.loading === true
+                    || runtimePreviewRowsSource.loading === true
+                        ? "running"
+                        : "pending"
+                )),
+            fresh: !!currentTerminalMaterializationFresh,
+            datasets,
+        };
+    }, [currentPrimaryRuntimeResultFresh, currentTerminalMaterializationFresh, runtimePreviewDatasetPayloadState?.error, runtimePreviewDatasetPayloadState?.freshDatasetIds, runtimePreviewDatasetPayloadState?.loading, runtimePreviewDatasetPayloadState?.payloads, runtimePreviewPrimaryDataset?.dataSourceRef, runtimePreviewPrimaryDataset?.id, runtimePreviewPrimaryDatasetPayload?.hasMore, runtimePreviewPrimaryDatasetPayload?.rows, runtimePreviewPublishedDatasets, runtimePreviewRowsSource?.error, runtimePreviewRowsSource?.hasMore, runtimePreviewRowsSource?.loading, runtimePreviewRowsSource?.rows, runtimePreviewRowsState.loading]);
     currentReportEventRequestRef.current = draftExportRequest;
     currentReportEventIdentityRef.current = {
         reportId: activeReportEventId,
@@ -13675,7 +13722,8 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                 request: cloneReportBuilderValue(currentRequest),
                 canRun: !!canRunReport,
                 canSave: !!canSaveCurrentReportFile && typeof reportStoreHandler?.saveReport === "function",
-                hasCompletedRun: !!hasCompletedCurrentRun,
+                hasCompletedRun: !!hasCompletedCurrentRun || currentReportDatasetMaterialization?.status === "completed",
+                materialization: cloneReportBuilderValue(currentReportDatasetMaterialization),
             }),
             run: async () => {
                 if (!canRunReport) {
@@ -13706,6 +13754,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         canRunReport,
         canSaveCurrentReportFile,
         currentRequest,
+        currentReportDatasetMaterialization,
         hasCompletedCurrentRun,
         reportEventContext.windowId,
         reportEventContext.windowKey,
