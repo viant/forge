@@ -224,6 +224,7 @@ struct ReportBuilderAuthoredResult: View {
     let primaryRows: [[String: JSONValue]]
     let primaryControl: ControlState
     let primaryRequest: [String: JSONValue]
+    let runRequestID: String?
 
     @State private var rowsByID: [String: [[String: JSONValue]]] = [:]
     @State private var controlsByID: [String: ControlState] = [:]
@@ -247,7 +248,7 @@ struct ReportBuilderAuthoredResult: View {
                 DashboardRenderer(runtime: runtime, window: window, container: container)
             }
         }
-        .task(id: requestSignature) {
+        .task(id: materializationTaskID) {
             await loadPublishedDatasets()
         }
     }
@@ -301,10 +302,29 @@ struct ReportBuilderAuthoredResult: View {
         return primaryRequest.jsonSignature + "::" + declarationSignature
     }
 
+    private var materializationTaskID: String {
+        requestSignature + "::" + (nonBlankAuthored(runRequestID) ?? "auto")
+    }
+
     @MainActor
     private func loadPublishedDatasets() async {
+        let requestID = nonBlankAuthored(runRequestID) ?? "native-\(UUID().uuidString)"
+        await publishMaterialization(
+            requestID: requestID,
+            status: "running",
+            rowsByID: [:],
+            errors: []
+        )
         rowsByID = [:]
         controlsByID = [:]
+        var loadedRows: [String: [[String: JSONValue]]] = [:]
+        var loadErrors: [String] = []
+        if reportBuilderAuthoredDatasetRefs(document).contains("primary") {
+            loadedRows["primary"] = primaryRows
+            if let error = primaryControl.error, !error.isEmpty {
+                loadErrors.append(error)
+            }
+        }
         for declaration in declarations {
             guard !Task.isCancelled else { return }
             controlsByID[declaration.id] = ControlState(loading: true)
@@ -321,12 +341,65 @@ struct ReportBuilderAuthoredResult: View {
                 windowID: window.windowID,
                 dataSourceRef: instanceRef
             )
-            rowsByID[declaration.id] = reportBuilderMaterializeComputedRows(rows, fields: declaration.fields)
-            controlsByID[declaration.id] = await runtime.dataSourceControl(
+            let materializedRows = reportBuilderMaterializeComputedRows(rows, fields: declaration.fields)
+            rowsByID[declaration.id] = materializedRows
+            loadedRows[declaration.id] = materializedRows
+            let control = await runtime.dataSourceControl(
                 windowID: window.windowID,
                 dataSourceRef: instanceRef
             )
+            controlsByID[declaration.id] = control
+            if let error = control.error, !error.isEmpty {
+                loadErrors.append(error)
+            }
         }
+        await publishMaterialization(
+            requestID: requestID,
+            status: loadErrors.isEmpty ? "completed" : "failed",
+            rowsByID: loadedRows,
+            errors: loadErrors
+        )
+    }
+
+    @MainActor
+    private func publishMaterialization(
+        requestID: String,
+        status: String,
+        rowsByID: [String: [[String: JSONValue]]],
+        errors: [String]
+    ) async {
+        let datasets = rowsByID.keys.sorted().map { id in
+            JSONValue.object([
+                "id": .string(id),
+                "dataSourceRef": .string(id),
+                "rows": .array((rowsByID[id] ?? []).map(JSONValue.object))
+            ])
+        }
+        let rowCounts = Dictionary(uniqueKeysWithValues: rowsByID.map { id, rows in
+            (id, JSONValue.number(Double(rows.count)))
+        })
+        var materialization: [String: JSONValue] = [
+            "id": .string(requestID),
+            "requestId": .string(requestID),
+            "status": .string(status),
+            "materialized": .bool(status == "completed"),
+            "datasetRefs": .array(rowsByID.keys.sorted().map(JSONValue.string)),
+            "rowCounts": .object(rowCounts)
+        ]
+        if !errors.isEmpty {
+            materialization["errors"] = .array(errors.map(JSONValue.string))
+        }
+        var values: [String: JSONValue] = [
+            "reportMaterialization": .object(materialization)
+        ]
+        if status != "running" {
+            values["reportStaticDatasets"] = .array(datasets)
+        }
+        await runtime.setWindowFormValue(
+            windowID: window.windowID,
+            values: values,
+            replace: false
+        )
     }
 }
 
