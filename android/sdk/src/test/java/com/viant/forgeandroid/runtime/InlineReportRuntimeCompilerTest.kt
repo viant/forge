@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class InlineReportRuntimeCompilerTest {
     @Test
@@ -171,6 +172,28 @@ class InlineReportRuntimeCompilerTest {
     }
 
     @Test
+    fun rejectsWorkspaceDatasetWithoutExplicitDatasourceReference() {
+        val report = TranscriptCanonicalReport(
+            scope = "message",
+            id = "delivery",
+            grammar = "report-document-v1",
+            status = "committed",
+            source = JsonObject(mapOf(
+                "datasets" to JsonArray(listOf(JsonObject(mapOf(
+                    "id" to JsonPrimitive("delivery"),
+                    "kind" to JsonPrimitive("workspaceRef")
+                )))),
+                "blocks" to JsonArray(emptyList())
+            ))
+        )
+
+        val error = assertFailsWith<IllegalStateException> {
+            InlineReportRuntimeCompiler.workspaceDatasetRequests(report)
+        }
+        assertEquals("Workspace dataset 'delivery' must declare dataSourceRef.", error.message)
+    }
+
+    @Test
     fun materializesCanonicalCsvData() {
         val report = TranscriptCanonicalReport(
             scope = "message",
@@ -248,6 +271,38 @@ class InlineReportRuntimeCompilerTest {
         assertEquals(true, markdown.contains("Scale: 1.2M"))
         assertEquals(true, markdown.contains("Spend: $9,876"))
         assertEquals(true, markdown.contains("Missing: —"))
+    }
+
+    @Test
+    fun unresolvedTemplateDoesNotBorrowAFieldFromAnotherDataset() {
+        val report = TranscriptCanonicalReport(
+            scope = "message",
+            id = "dataset-isolation",
+            grammar = "report-document-v1",
+            status = "committed",
+            source = JsonObject(mapOf(
+                "blocks" to JsonArray(listOf(JsonObject(mapOf(
+                    "id" to JsonPrimitive("summary"),
+                    "kind" to JsonPrimitive("markdownBlock"),
+                    "datasetRef" to JsonPrimitive("expected"),
+                    "markdown" to JsonPrimitive("Value: {{value}}")
+                ))))
+            )),
+            dataSources = mapOf(
+                "expected" to TranscriptCanonicalData(
+                    id = "expected",
+                    payload = JsonArray(listOf(JsonObject(mapOf("other" to JsonPrimitive("present")))))
+                ),
+                "unrelated" to TranscriptCanonicalData(
+                    id = "unrelated",
+                    payload = JsonArray(listOf(JsonObject(mapOf("value" to JsonPrimitive("wrong")))))
+                )
+            )
+        )
+
+        val artifact = InlineReportRuntimeCompiler.compile(report)
+        val block = (artifact.reportFill["blocks"] as JsonArray).single() as JsonObject
+        assertEquals(JsonPrimitive("Value: —"), (block["content"] as JsonObject)["markdown"])
     }
 
     @Test
