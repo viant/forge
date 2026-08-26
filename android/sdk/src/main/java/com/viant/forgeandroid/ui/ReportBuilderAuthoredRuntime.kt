@@ -73,6 +73,15 @@ internal fun reportBuilderAuthoredDatasetRefs(document: JsonObject): Set<String>
         }
         .toSet()
 
+internal fun reportBuilderMaterializeComputedRows(
+    rows: List<Map<String, Any?>>,
+    config: DashboardReportBuilderDef
+): List<Map<String, Any?>> {
+    val computedKeys = config.computedMeasures.map(::reportBuilderMeasureKey)
+    if (computedKeys.isEmpty()) return rows
+    return rows.map { row -> applyReportBuilderComputedMeasures(row, computedKeys, config) }
+}
+
 internal fun reportBuilderPublishedSources(
     config: DashboardReportBuilderDef,
     document: JsonObject
@@ -185,7 +194,7 @@ internal fun ReportBuilderAuthoredResult(
     contexts.forEach { (declaration, context) ->
         val rows by context.collection.flow.collectAsState(initial = context.collection.peek())
         val control by context.control.flow.collectAsState(initial = context.control.peek())
-        rowsById[declaration.id] = rows
+        rowsById[declaration.id] = reportBuilderMaterializeComputedRows(rows, config)
         controls += control
     }
     // A large authored report can reference many logical datasets backed by
@@ -214,7 +223,10 @@ internal fun ReportBuilderAuthoredResult(
             context.setInputParameters(request, fetch = true)
             context.control.flow.first { it.loading || it.resolved }
             context.control.flow.first { !it.loading && it.resolved }
-            loadedRows[declaration.id] = context.collection.peek()
+            loadedRows[declaration.id] = reportBuilderMaterializeComputedRows(
+                context.collection.peek(),
+                config
+            )
             context.control.peek().error?.takeIf(String::isNotBlank)?.let(loadErrors::add)
         }
         runtime.publishNativeReportMaterialization(
