@@ -142,17 +142,19 @@ private func reportBuilderPublishedFieldRequest(
 func reportBuilderMaterializeComputedRows(
     _ rows: [[String: JSONValue]],
     fields: [[String: JSONValue]],
-    config: DashboardReportBuilderDef
+    config: DashboardReportBuilderDef,
+    requiredFields: Set<String> = []
 ) -> [[String: JSONValue]] {
     let computed = Set(fields.compactMap { field -> String? in
         guard field["kind"]?.stringValue == "computedMeasure" else { return nil }
         return nonBlankAuthored(field["key"]?.stringValue)
-    })
+    }).union(requiredFields)
     guard !computed.isEmpty else { return rows }
     return rows.map { row in
         var result = row
         for measure in config.computedMeasures where computed.contains(measure.identityKey) {
-            guard result[measure.identityKey] == nil,
+            let existing = result[measure.identityKey]
+            guard existing == nil || existing == .null,
                   let compute = measure.compute,
                   (compute.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "ratio",
                   let numerator = compute.numerator,
@@ -168,6 +170,30 @@ func reportBuilderMaterializeComputedRows(
         }
         return result
     }
+}
+
+private func reportBuilderAuthoredComputedFields(
+    document: [String: JSONValue],
+    datasetID: String,
+    config: DashboardReportBuilderDef
+) -> Set<String> {
+    let computed = Set(config.computedMeasures.map(\.identityKey))
+    var referenced = Set<String>()
+    func collect(_ value: JSONValue) {
+        switch value {
+        case .string(let string):
+            if computed.contains(string) { referenced.insert(string) }
+        case .array(let values): values.forEach(collect)
+        case .object(let object): object.values.forEach(collect)
+        default: break
+        }
+    }
+    for block in document["blocks"]?.arrayValue ?? [] {
+        guard let object = block.objectValue,
+              object["datasetRef"]?.stringValue == datasetID else { continue }
+        collect(.object(object))
+    }
+    return referenced
 }
 
 private func authoredNumber(_ value: JSONValue?) -> Double? {
@@ -315,6 +341,34 @@ struct ReportBuilderAuthoredResult: View {
 
     @MainActor
     private func loadPublishedDatasets() async {
+        if nonBlankAuthored(runRequestID) == nil {
+            let form = await runtime.windowFormJSONValue(windowID: window.windowID)
+            let cached = reportBuilderPersistedDatasets(form)
+            if !cached.isEmpty {
+                let materialized = Dictionary(uniqueKeysWithValues: cached.map { id, rows in
+                    let fields = declarations.first(where: { $0.id == id })?.fields ?? []
+                    return (id, reportBuilderMaterializeComputedRows(
+                        rows,
+                        fields: fields,
+                        config: config,
+                        requiredFields: reportBuilderAuthoredComputedFields(document: document, datasetID: id, config: config)
+                    ))
+                })
+                rowsByID = materialized
+                controlsByID = Dictionary(uniqueKeysWithValues: materialized.keys.map {
+                    ($0, ControlState(loading: false))
+                })
+                let requestID = form["reportMaterialization"]?.objectValue?["requestId"]?.stringValue
+                    ?? "restored-\(UUID().uuidString)"
+                await publishMaterialization(
+                    requestID: requestID,
+                    status: "completed",
+                    rowsByID: materialized,
+                    errors: []
+                )
+                return
+            }
+        }
         let requestID = nonBlankAuthored(runRequestID) ?? "native-\(UUID().uuidString)"
         await publishMaterialization(
             requestID: requestID,
@@ -351,7 +405,12 @@ struct ReportBuilderAuthoredResult: View {
             let materializedRows = reportBuilderMaterializeComputedRows(
                 rows,
                 fields: declaration.fields,
-                config: config
+                config: config,
+                requiredFields: reportBuilderAuthoredComputedFields(
+                    document: document,
+                    datasetID: declaration.id,
+                    config: config
+                )
             )
             rowsByID[declaration.id] = materializedRows
             loadedRows[declaration.id] = materializedRows
@@ -412,6 +471,20 @@ struct ReportBuilderAuthoredResult: View {
             replace: false
         )
     }
+}
+
+private func reportBuilderPersistedDatasets(
+    _ form: [String: JSONValue]
+) -> [String: [[String: JSONValue]]] {
+    var result: [String: [[String: JSONValue]]] = [:]
+    for value in form["reportStaticDatasets"]?.arrayValue ?? [] {
+        guard let dataset = value.objectValue,
+              let id = nonBlankAuthored(dataset["id"]?.stringValue ?? dataset["dataSourceRef"]?.stringValue) else {
+            continue
+        }
+        result[id] = (dataset["rows"]?.arrayValue ?? []).compactMap(\.objectValue)
+    }
+    return result
 }
 
 private func reportBuilderRelativeDateRange(
