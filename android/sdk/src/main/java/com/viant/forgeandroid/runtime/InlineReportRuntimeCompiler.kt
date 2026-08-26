@@ -379,8 +379,11 @@ object InlineReportRuntimeCompiler {
         return result.toString()
     }
 
-    private val DOLLAR_TEMPLATE = Regex("""\$\{\s*([^}]+?)\s*}""")
-    private val HANDLEBARS_TEMPLATE = Regex("""\{\{\s*(.+?)\s*}}""")
+    // Android's ICU regex engine requires closing braces to be escaped even
+    // when they cannot form a valid quantifier. Keep these patterns portable
+    // between the JVM test runtime and Android devices.
+    private val DOLLAR_TEMPLATE = Regex("""\$\{\s*([^}]+?)\s*\}""")
+    private val HANDLEBARS_TEMPLATE = Regex("""\{\{\s*(.+?)\s*\}\}""")
     private val FORMAT_FUNCTION = Regex(
         """(?i)^fmt\.(compact|compactNumber|currency|currency2|percent|percentFraction|number|number2|number5)\((.+)\)$"""
     )
