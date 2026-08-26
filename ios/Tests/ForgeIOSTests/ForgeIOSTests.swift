@@ -3799,6 +3799,15 @@ final class ForgeIOSTests: XCTestCase {
                     id: "kpi",
                     kind: "kpiBlock",
                     title: "Revenue",
+                    content: [
+                        "title": .string("Revenue"),
+                        "description": .string("Current period"),
+                        "value": .string("42"),
+                        "valueLabel": .string("Booked"),
+                        "secondaryField": .string("change"),
+                        "secondaryValue": .string("12%"),
+                        "rowCount": .number(1)
+                    ],
                     kpi: DashboardReportRuntimeKPIValue(
                         description: "Current period",
                         valueLabel: "Booked",

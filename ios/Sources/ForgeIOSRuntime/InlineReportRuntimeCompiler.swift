@@ -24,6 +24,16 @@ public struct InlineReportRuntimeArtifact: Sendable {
     }
 }
 
+private func badgeDisplayMapKey(_ value: JSONValue) -> String {
+    switch value {
+    case .string(let text): return text
+    case .number(let number): return String(number)
+    case .bool(let flag): return flag ? "true" : "false"
+    case .null: return "null"
+    case .array, .object: return String(describing: value)
+    }
+}
+
 public enum InlineReportRuntimeCompilerError: LocalizedError, Sendable {
     case invalidSource
     case unsupportedGrammar(String)
@@ -320,6 +330,42 @@ public enum InlineReportRuntimeCompiler {
             let secondaryField = object["secondaryField"]?.stringValue
             content["value"] = valueField.flatMap { row?[$0] } ?? .null
             content["secondaryValue"] = secondaryField.flatMap { row?[$0] } ?? .null
+            content["rowCount"] = .number(Double(datasets[datasetRef]?.count ?? 0))
+        }
+        if kind == "badgesBlock" {
+            let datasetRef = object["datasetRef"]?.stringValue ?? ""
+            let row = datasets[datasetRef]?.first?.objectValue
+            let items = object["items"]?.arrayValue ?? content["items"]?.arrayValue ?? []
+            content["items"] = .array(items.compactMap { value -> JSONValue? in
+                guard var item = value.objectValue else { return nil }
+                let valueField = nonEmpty(item["valueField"]?.stringValue)
+                let rawValue = valueField.flatMap { row?[$0] } ?? item["value"]
+                guard item["label"] != nil || rawValue != nil || valueField != nil else { return nil }
+                if let rawValue { item["value"] = rawValue }
+                let displayKey = nonEmpty(item["displayKey"]?.stringValue)
+                let matchedRule = item["rules"]?.arrayValue?.compactMap(\.objectValue).first { rule in
+                    rule["value"] == rawValue
+                }
+                var mappedValue: JSONValue?
+                if let map = item["displayValueMap"]?.objectValue,
+                   let rawValue {
+                    mappedValue = map[badgeDisplayMapKey(rawValue)]
+                }
+                var displayValue = item["displayValue"]
+                if displayValue == nil { displayValue = matchedRule?["label"] }
+                if displayValue == nil, let displayKey { displayValue = row?[displayKey] }
+                if displayValue == nil { displayValue = mappedValue }
+                if displayValue == nil, let rawValue {
+                    if let format = nonEmpty(item["format"]?.stringValue) {
+                        displayValue = .string(DashboardRuntime.formatDashboardValue(reportTemplateAnyValue(rawValue) as Any, format: format))
+                    } else {
+                        displayValue = rawValue
+                    }
+                }
+                if let displayValue { item["displayValue"] = displayValue }
+                if let ruleTone = matchedRule?["tone"] ?? item["tone"] { item["tone"] = ruleTone }
+                return .object(item)
+            })
             content["rowCount"] = .number(Double(datasets[datasetRef]?.count ?? 0))
         }
         if kind == "timelineBlock" {
