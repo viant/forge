@@ -82,6 +82,22 @@ internal fun reportBuilderMaterializeComputedRows(
     return rows.map { row -> applyReportBuilderComputedMeasures(row, computedKeys, config) }
 }
 
+internal fun reportBuilderPersistedDatasets(
+    windowForm: Map<String, Any?>,
+    config: DashboardReportBuilderDef
+): Map<String, List<Map<String, Any?>>> {
+    val datasets = windowForm["reportStaticDatasets"] as? List<*> ?: return emptyMap()
+    return datasets.mapNotNull { value ->
+        val dataset = value as? Map<*, *> ?: return@mapNotNull null
+        val id = (dataset["id"] ?: dataset["dataSourceRef"])?.toString()?.trim().orEmpty()
+        if (id.isEmpty()) return@mapNotNull null
+        val rows = (dataset["rows"] as? List<*>).orEmpty().mapNotNull { row ->
+            (row as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value }
+        }
+        id to reportBuilderMaterializeComputedRows(rows, config)
+    }.toMap()
+}
+
 internal fun reportBuilderPublishedSources(
     config: DashboardReportBuilderDef,
     document: JsonObject
@@ -178,6 +194,7 @@ internal fun ReportBuilderAuthoredResult(
     runRequestId: String?
 ) {
     val referencedDatasetRefs = remember(document) { reportBuilderAuthoredDatasetRefs(document) }
+    val persistedRows = reportBuilderPersistedDatasets(window.peekWindowForm(), config)
     val declarations = remember(config, document) { reportBuilderPublishedSources(config, document) }
     val contexts = declarations.mapNotNull { declaration ->
         window.contextForInstanceOrNull(
@@ -186,12 +203,14 @@ internal fun ReportBuilderAuthoredResult(
         )?.let { declaration to it }
     }
     val rowsById = linkedMapOf<String, List<Map<String, Any?>>>()
+    rowsById.putAll(persistedRows)
     val controls = mutableListOf<ControlState>()
-    if ("primary" in referencedDatasetRefs) {
+    if ("primary" in referencedDatasetRefs && "primary" !in persistedRows) {
         rowsById["primary"] = primaryRows
         controls += primaryControl
     }
     contexts.forEach { (declaration, context) ->
+        if (declaration.id in persistedRows) return@forEach
         val rows by context.collection.flow.collectAsState(initial = context.collection.peek())
         val control by context.control.flow.collectAsState(initial = context.control.peek())
         rowsById[declaration.id] = reportBuilderMaterializeComputedRows(rows, config)
@@ -204,6 +223,16 @@ internal fun ReportBuilderAuthoredResult(
     LaunchedEffect(primaryRequest, declarations, primaryRows, runRequestId) {
         val requestId = runRequestId?.trim()?.takeIf(String::isNotEmpty)
             ?: "native-${java.util.UUID.randomUUID()}"
+        if (runRequestId.isNullOrBlank() && persistedRows.isNotEmpty()) {
+            runtime.publishNativeReportMaterialization(
+                windowId = window.windowId,
+                requestId = requestId,
+                status = "completed",
+                rowsById = persistedRows,
+                errors = emptyList()
+            )
+            return@LaunchedEffect
+        }
         runtime.publishNativeReportMaterialization(
             windowId = window.windowId,
             requestId = requestId,

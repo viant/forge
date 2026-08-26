@@ -191,4 +191,22 @@ class ReportBuilderAuthoredRuntimeTest {
         assertEquals(0.02, rows.first()["ctr"])
         assertEquals(15.0, rows.first()["ecpm"])
     }
+
+    @Test
+    fun persistedDatasetsRestoreRowsAndComputedMeasures() {
+        val config = DashboardReportBuilderDef(computedMeasures = listOf(
+            ReportBuilderMeasureDef(
+                key = "ctr",
+                compute = ReportBuilderComputeDef(type = "ratio", numerator = "clicks", denominator = "impressions")
+            )
+        ))
+        val restored = reportBuilderPersistedDatasets(
+            mapOf("reportStaticDatasets" to listOf(mapOf(
+                "id" to "summary",
+                "rows" to listOf(mapOf("clicks" to 20, "impressions" to 1_000, "ctr" to null))
+            ))),
+            config
+        )
+        assertEquals(0.02, restored["summary"]?.first()?.get("ctr"))
+    }
 }

@@ -300,12 +300,11 @@ final class ReportBuilderAuthoredRuntimeTests: XCTestCase {
             [[
                 "clicks": .number(20),
                 "impressions": .number(1_000),
-                "totalSpend": .number(15)
+                "totalSpend": .number(15),
+                "ctr": .null,
+                "ecpm": .null
             ]],
-            fields: [
-                ["key": .string("ctr"), "kind": .string("computedMeasure")],
-                ["key": .string("ecpm"), "kind": .string("computedMeasure")]
-            ],
+            fields: [],
             config: DashboardReportBuilderDef(computedMeasures: [
                 ReportBuilderMeasureDef(
                     key: "ctr",
@@ -315,7 +314,8 @@ final class ReportBuilderAuthoredRuntimeTests: XCTestCase {
                     key: "ecpm",
                     compute: ReportBuilderComputeDef(type: "ratio", numerator: "totalSpend", denominator: "impressions", scale: 1_000)
                 )
-            ])
+            ]),
+            requiredFields: ["ctr", "ecpm"]
         )
 
         XCTAssertEqual(rows.first?["ctr"], .number(0.02))
