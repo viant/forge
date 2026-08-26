@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -2339,37 +2340,47 @@ private fun DashboardReportRuntimeCollectionItems(content: Map<String, JsonEleme
         val tone = severityTone(reportRuntimeContentText(item["tone"]))
         val background = reportRuntimeAuthoredColor(item["background"], tone.background)
         val foreground = reportRuntimeAuthoredColor(item["color"], tone.text)
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(background, RoundedCornerShape(12.dp))
                 .border(1.dp, tone.border, RoundedCornerShape(12.dp))
-                .padding(horizontal = 12.dp, vertical = 11.dp),
-            verticalArrangement = Arrangement.spacedBy(7.dp)
+                .height(IntrinsicSize.Min)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.Top
+            Spacer(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(foreground)
+            )
+            Column(
+                modifier = Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 11.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp)
             ) {
-                Text(
-                    text = reportRuntimeContentText(item["title"]) ?: "Item",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = foreground,
-                    modifier = Modifier.weight(1f)
-                )
-                reportRuntimeContentText(item["toneLabel"])?.takeIf { it.isNotBlank() }?.let { label ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
                     Text(
-                        text = label.uppercase(Locale.US),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = foreground
+                        text = reportRuntimeContentText(item["title"]) ?: "Item",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = foreground,
+                        modifier = Modifier.weight(1f)
                     )
+                    reportRuntimeContentText(item["toneLabel"])?.takeIf { it.isNotBlank() }?.let { label ->
+                        Text(
+                            text = label.uppercase(Locale.US),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = foreground
+                        )
+                    }
                 }
-            }
-            reportRuntimeContentText(item["bodyMarkdown"])?.takeIf { it.isNotBlank() }?.let { body ->
-                MarkdownRenderer(markdown = body, modifier = Modifier.fillMaxWidth())
+                reportRuntimeContentText(item["bodyMarkdown"])?.takeIf { it.isNotBlank() }?.let { body ->
+                    MarkdownRenderer(markdown = body, modifier = Modifier.fillMaxWidth())
+                }
             }
         }
     }
@@ -2428,16 +2439,17 @@ private fun DashboardReportRuntimePanel(
                 shape = RoundedCornerShape(12.dp),
                 shadowElevation = 0.dp,
             ) {
-                Box {
-                    panelContent()
+                Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                     accent?.let { accentColor ->
-                        Box(
+                        Spacer(
                             modifier = Modifier
-                                .align(Alignment.CenterStart)
-                                .fillMaxHeight()
                                 .width(4.dp)
+                                .fillMaxHeight()
                                 .background(accentColor)
                         )
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        panelContent()
                     }
                 }
             }
