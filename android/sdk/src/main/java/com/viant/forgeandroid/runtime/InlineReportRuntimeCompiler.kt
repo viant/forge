@@ -38,8 +38,7 @@ object InlineReportRuntimeCompiler {
             InlineReportWorkspaceDatasetRequest(
                 id = id,
                 dataSourceRef = string(declaration["dataSourceRef"])
-                    ?: string(declaration["sourceRef"])
-                    ?: id,
+                    ?: error("Workspace dataset '$id' must declare dataSourceRef."),
                 inputs = (declaration["request"] as? JsonObject)
                     ?: (declaration["inputs"] as? JsonObject)
                     ?: emptyMap()
@@ -309,12 +308,7 @@ object InlineReportRuntimeCompiler {
             return resolveReportTemplatePath(datasets[absolute[0]]?.firstOrNull(), nestedPath)
         }
         val preferredRows = datasets[datasetRef].orEmpty()
-        resolveReportTemplatePath(preferredRows.firstOrNull(), path)?.let { return it }
-        for ((id, rows) in datasets) {
-            if (id == datasetRef) continue
-            resolveReportTemplatePath(rows.firstOrNull(), path)?.let { return it }
-        }
-        return null
+        return resolveReportTemplatePath(preferredRows.firstOrNull(), path)
     }
 
     private fun resolveReportTemplatePath(root: JsonElement?, path: String): JsonElement? {
