@@ -879,7 +879,7 @@ public enum DashboardRuntime {
                 kind: kind,
                 title: title,
                 diagnostics: blockDiagnostics,
-                content: presentationKinds.contains(kind) ? content : [:],
+                content: presentationKinds.contains(kind) || kind == "kpiBlock" ? content : [:],
                 runtime: block["runtime"]?.objectValue ?? [:],
                 markdown: markdown,
                 kpi: kpi,
@@ -1667,7 +1667,8 @@ public enum DashboardRuntime {
                     label: nonBlank(object["label"]?.stringValue) ?? id,
                     type: nonBlank(object["type"]?.stringValue),
                     format: nonBlank(object["format"]?.stringValue),
-                    emptyText: nonBlank(object["emptyText"]?.stringValue)
+                    emptyText: nonBlank(object["emptyText"]?.stringValue),
+                    cellVisual: object["cellVisual"]
                 )
             default:
                 return nil
@@ -1678,7 +1679,8 @@ public enum DashboardRuntime {
     public static func dashboardReportRuntimeKPI(content: [String: JSONValue]) -> DashboardReportRuntimeKPIValue {
         let valueText = dashboardReportRuntimeFormattedValueText(
             content["value"],
-            format: nonBlank(content["valueFormat"]?.stringValue)
+            format: nonBlank(content["valueFormat"]?.stringValue),
+            suffix: nonBlank(content["suffix"]?.stringValue)
         )
         let secondaryField = nonBlank(content["secondaryField"]?.stringValue)
         let secondaryValue = dashboardReportRuntimeFormattedValueText(
@@ -1790,19 +1792,20 @@ public enum DashboardRuntime {
 
     private static func dashboardReportRuntimeFormattedValueText(
         _ value: JSONValue?,
-        format: String?
+        format: String?,
+        suffix: String? = nil
     ) -> String? {
         guard let value else { return nil }
         guard let format else {
-            return dashboardReportRuntimeValueText(value)
+            return dashboardReportRuntimeValueText(value).map { $0 + (suffix ?? "") }
         }
         switch value {
         case .null:
             return nil
         case .string(let string):
-            return formatDashboardValue(string, format: format)
+            return formatDashboardValue(string, format: format) + (suffix ?? "")
         case .number(let number):
-            return formatDashboardValue(number, format: format)
+            return formatDashboardValue(number, format: format) + (suffix ?? "")
         case .bool, .array, .object:
             return dashboardReportRuntimeValueText(value)
         }

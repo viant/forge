@@ -2,6 +2,72 @@ import XCTest
 @testable import ForgeIOSRuntime
 
 final class InlineReportRuntimeCompilerTests: XCTestCase {
+    func testMaterializesBadgeValuesPreservesKPIFormatAndTableCellVisual() throws {
+        let source: JSONValue = .object([
+            "title": .string("Parity"),
+            "blocks": .array([
+                .object([
+                    "id": .string("badges"), "kind": .string("badgesBlock"),
+                    "datasetRef": .string("summary"),
+                    "items": .array([.object([
+                        "id": .string("setup"), "label": .string("Setup"),
+                        "valueField": .string("setup"), "tone": .string("success")
+                    ])])
+                ]),
+                .object([
+                    "id": .string("potential"), "kind": .string("kpiBlock"),
+                    "datasetRef": .string("summary"), "valueField": .string("bidPotential"),
+                    "valueFormat": .string("number5"), "suffix": .string("x"),
+                    "tone": .string("danger")
+                ]),
+                .object([
+                    "id": .string("evidence"), "kind": .string("tableBlock"),
+                    "datasetRef": .string("evidence"),
+                    "columns": .array([.object([
+                        "key": .string("current"), "label": .string("Current count"),
+                        "cellVisual": .object([
+                            "kind": .string("dataBar"), "valueField": .string("current"),
+                            "palette": .array([.string("#fee2e2"), .string("#dc2626")])
+                        ])
+                    ])])
+                ])
+            ]),
+            "datasets": .array([])
+        ])
+        let report = TranscriptCanonicalReport(
+            scope: "message", id: "parity", grammar: "report-document-v1", status: "committed",
+            source: source,
+            dataSources: [
+                "summary": TranscriptCanonicalData(id: "summary", format: "json", payload: .array([
+                    .object(["setup": .string("Ready"), "bidPotential": .number(0.003)])
+                ])),
+                "evidence": TranscriptCanonicalData(id: "evidence", format: "json", payload: .array([
+                    .object(["current": .number(18250)])
+                ]))
+            ]
+        )
+
+        let artifact = try InlineReportRuntimeCompiler.compile(report)
+        let fillBlocks = try XCTUnwrap(artifact.reportFill.objectValue?["blocks"]?.arrayValue)
+        let badges = try XCTUnwrap(fillBlocks.first { $0.objectValue?["id"] == .string("badges") }?.objectValue)
+        XCTAssertEqual(badges["content"]?.objectValue?["items"]?.arrayValue?.first?.objectValue?["value"], .string("Ready"))
+        XCTAssertEqual(badges["content"]?.objectValue?["items"]?.arrayValue?.first?.objectValue?["displayValue"], .string("Ready"))
+
+        let kpi = try XCTUnwrap(fillBlocks.first { $0.objectValue?["id"] == .string("potential") }?.objectValue)
+        let kpiContent = try XCTUnwrap(kpi["content"]?.objectValue)
+        XCTAssertEqual(DashboardRuntime.dashboardReportRuntimeKPI(content: kpiContent).valueText, "0.00300x")
+        XCTAssertEqual(DashboardRuntime.dashboardReportRuntimeSummary(
+            ContainerDef(id: "report", kind: "dashboard.reportRuntime", reportRuntime: .object([
+                "reportFill": artifact.reportFill, "reportSpec": artifact.reportSpec
+            ]))
+        ).blocks.first(where: { $0.id == "potential" })?.content["tone"], .string("danger"))
+
+        let columns = DashboardRuntime.dashboardReportRuntimeColumns(
+            fillBlocks.first { $0.objectValue?["id"] == .string("evidence") }?.objectValue?["columns"]?.arrayValue ?? []
+        )
+        XCTAssertEqual(columns.first?.cellVisual?.objectValue?["kind"], .string("dataBar"))
+    }
+
     func testCompilesCanonicalPrimitivesIntoNativeReportRuntime() throws {
         let source: JSONValue = .object([
             "title": .string("Delivery review"),
