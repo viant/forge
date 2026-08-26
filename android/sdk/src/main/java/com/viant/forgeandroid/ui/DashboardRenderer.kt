@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
@@ -2222,7 +2223,7 @@ private fun DashboardReportRuntimeAuthoredBlockBody(runtime: ForgeRuntime, windo
                     )
                 } else {
                     Text(
-                        text = block.kpi.valueLabel,
+                        text = reportRuntimeKpiLabel(block.kpi.valueLabel),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -2283,6 +2284,8 @@ private fun DashboardReportRuntimeAuthoredBlockBody(runtime: ForgeRuntime, windo
     }
 }
 
+internal fun reportRuntimeKpiLabel(value: String): String = value.uppercase(Locale.US)
+
 @Composable
 private fun DashboardReportRuntimePresentationBlock(block: DashboardReportRuntimeBlockSummary) {
     val content = block.content
@@ -2292,7 +2295,8 @@ private fun DashboardReportRuntimePresentationBlock(block: DashboardReportRuntim
     DashboardReportRuntimePanel(
         title = block.title,
         background = if (useAuthoredTone) authoredTone.background else Color(0xFFFCFEFF),
-        border = if (useAuthoredTone) authoredTone.border else Color(0xFFDBE5EC)
+        border = if (useAuthoredTone) authoredTone.border else Color(0xFFDBE5EC),
+        accent = if (useAuthoredTone) authoredTone.text else null
     ) {
         reportRuntimeContentText(content["eyebrow"])?.let {
             Text(it.uppercase(Locale.US), style = MaterialTheme.typography.labelSmall, color = Color(0xFF526A82))
@@ -2387,6 +2391,7 @@ private fun DashboardReportRuntimePanel(
     subtitle: String? = null,
     background: Color = Color(0xFFFCFEFF),
     border: Color = Color(0xFFDBE5EC),
+    accent: Color? = null,
     content: @Composable () -> Unit
 ) {
     val panelContent: @Composable () -> Unit = {
@@ -2422,8 +2427,20 @@ private fun DashboardReportRuntimePanel(
                 border = BorderStroke(1.dp, border),
                 shape = RoundedCornerShape(12.dp),
                 shadowElevation = 0.dp,
-                content = panelContent
-            )
+            ) {
+                Box {
+                    panelContent()
+                    accent?.let { accentColor ->
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .fillMaxHeight()
+                                .width(4.dp)
+                                .background(accentColor)
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -2678,10 +2695,8 @@ private fun DashboardReportRuntimeTablePreview(
         val visibleRows = table.rows.take(visibleRowCount)
         val dataBarMaximums = table.columns.associateWith { column ->
             if (!reportRuntimeColumnHasDataBar(column)) return@associateWith 0.0
-            val key = listOf(column.id, column.key, column.name)
-                .firstOrNull { !it.isNullOrBlank() }
-                .orEmpty()
-            table.rows.maxOfOrNull { reportRuntimeNumericValue(it[key]) ?: 0.0 } ?: 0.0
+            val key = reportRuntimeDataBarValueKey(column)
+            table.rows.maxOfOrNull { kotlin.math.abs(reportRuntimeNumericValue(it[key]) ?: 0.0) } ?: 0.0
         }
         Column(
             modifier = Modifier
@@ -2700,7 +2715,7 @@ private fun DashboardReportRuntimeTablePreview(
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF30404D),
-                        modifier = Modifier.widthIn(min = 104.dp, max = 176.dp)
+                        modifier = Modifier.width(reportRuntimeColumnWidthDp(column).dp)
                     )
                 }
             }
@@ -2713,11 +2728,13 @@ private fun DashboardReportRuntimeTablePreview(
                 ) {
                     table.columns.forEach { column ->
                         val key = reportRuntimeColumnKey(column)
-                        Box(modifier = Modifier.widthIn(min = 104.dp, max = 176.dp)) {
+                        val dataBarKey = reportRuntimeDataBarValueKey(column)
+                        Box(modifier = Modifier.width(reportRuntimeColumnWidthDp(column).dp)) {
                             ReportRuntimeTableCell(
                                 label = null,
                                 value = reportRuntimeDisplayValue(row[key], column),
-                                fraction = reportRuntimeDataBarFraction(row[key], dataBarMaximums[column] ?: 0.0),
+                                fraction = reportRuntimeDataBarFraction(row[dataBarKey], dataBarMaximums[column] ?: 0.0),
+                                dataBarColors = reportRuntimeDataBarColors(column),
                                 primary = false
                             )
                         }
@@ -2744,8 +2761,20 @@ private fun DashboardReportRuntimeTablePreview(
     }
 }
 
-private fun reportRuntimeColumnKey(column: ColumnDef): String =
-    listOf(column.id, column.key, column.name).firstOrNull { !it.isNullOrBlank() }.orEmpty()
+internal fun reportRuntimeColumnKey(column: ColumnDef): String =
+    listOf(column.key, column.id, column.name).firstOrNull { !it.isNullOrBlank() }.orEmpty()
+
+internal fun reportRuntimeColumnWidthDp(column: ColumnDef): Int {
+    column.width?.takeIf { it > 0 }?.let { return it.coerceIn(104, 320) }
+    val label = column.label ?: column.name ?: column.id.orEmpty()
+    return (label.length * 11).coerceIn(104, 260)
+}
+
+internal fun reportRuntimeDataBarValueKey(column: ColumnDef): String =
+    (column.cellVisual?.get("valueField") as? JsonPrimitive)?.contentOrNull
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?: reportRuntimeColumnKey(column)
 
 private fun reportRuntimeDisplayValue(value: Any?, column: ColumnDef): String {
     if (value == null) return column.emptyText ?: "—"
@@ -2760,6 +2789,7 @@ private fun ReportRuntimeTableCell(
     label: String?,
     value: String,
     fraction: Float?,
+    dataBarColors: List<Color> = listOf(Color(0xFFCFE0FB), Color(0xFF3F73EA)),
     primary: Boolean
 ) {
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -2780,7 +2810,7 @@ private fun ReportRuntimeTableCell(
                 Box(
                     modifier = Modifier.fillMaxWidth(fraction).height(32.dp)
                         .background(
-                            Brush.horizontalGradient(listOf(Color(0xFFCFE0FB), Color(0xFF3F73EA))),
+                            Brush.horizontalGradient(dataBarColors),
                             RoundedCornerShape(8.dp)
                         )
                 )
@@ -2806,10 +2836,24 @@ internal fun reportRuntimeColumnHasDataBar(column: ColumnDef): Boolean =
         ?.trim()
         ?.lowercase() in setOf("databar", "progressbar", "sparkbar")
 
+internal fun reportRuntimeDataBarColors(column: ColumnDef): List<Color> {
+    val fallback = listOf(Color(0xFFCFE0FB), Color(0xFF3F73EA))
+    val palette = (column.cellVisual?.get("palette") as? JsonArray).orEmpty()
+        .mapNotNull { value ->
+            val parsed = reportRuntimeAuthoredColor(value, Color.Unspecified)
+            parsed.takeUnless { it == Color.Unspecified }
+        }
+    return when (palette.size) {
+        0 -> fallback
+        1 -> listOf(palette[0], palette[0])
+        else -> palette
+    }
+}
+
 internal fun reportRuntimeDataBarFraction(value: Any?, maximum: Double): Float? {
     if (maximum <= 0.0) return null
     val numeric = reportRuntimeNumericValue(value) ?: return null
-    return (numeric / maximum).coerceIn(0.0, 1.0).toFloat()
+    return (kotlin.math.abs(numeric) / maximum).coerceIn(0.0, 1.0).toFloat()
 }
 
 private fun reportRuntimeNumericValue(value: Any?): Double? = when (value) {

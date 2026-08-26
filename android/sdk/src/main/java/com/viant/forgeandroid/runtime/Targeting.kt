@@ -45,6 +45,13 @@ object MetadataResolver {
             if (shouldStripTargetingKey(key, value)) {
                 return@forEach
             }
+            // Materialized dataset rows are application data, not metadata.
+            // Fields such as `target` and `targetOverrides` inside a row must
+            // survive verbatim instead of being interpreted as host targeting.
+            if (key == "rows" && isMaterializedDatasetNode(working)) {
+                result[key] = value
+                return@forEach
+            }
             val resolved = resolveValue(value, targetContext)
             if (resolved != null) {
                 result[key] = resolved
@@ -52,6 +59,10 @@ object MetadataResolver {
         }
         return JsonObject(result)
     }
+
+    private fun isMaterializedDatasetNode(node: JsonObject): Boolean =
+        node["rows"] is JsonArray &&
+            (node["provenance"] is JsonObject || node["dataSourceRef"] != null)
 
     private fun applicableOverrides(raw: JsonElement?, targetContext: ForgeTargetContext): List<JsonObject> {
         val obj = raw as? JsonObject ?: return emptyList()
