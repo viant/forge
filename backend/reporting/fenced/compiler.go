@@ -357,6 +357,7 @@ func buildFillBlocks(blocks []map[string]any, datasets []any) []any {
 			block["content"] = map[string]any{
 				"title": block["title"], "description": block["description"],
 				"valueField": field, "valueLabel": block["valueLabel"], "valueFormat": block["valueFormat"],
+				"suffix": block["suffix"], "tone": block["tone"],
 				"value": value, "rowCount": len(rows), "secondaryValue": nil,
 			}
 		case "markdownBlock":
@@ -427,7 +428,22 @@ func buildFillBlocks(blocks []map[string]any, datasets []any) []any {
 		case "stepperBlock":
 			block["content"] = map[string]any{"title": block["title"], "description": block["description"], "steps": block["steps"]}
 		case "timelineBlock":
-			block["content"] = map[string]any{"title": block["title"], "description": block["description"], "events": block["events"]}
+			events, _ := block["events"].([]any)
+			if len(events) == 0 {
+				timeField := textValue(block["timeField"])
+				titleField := textValue(block["titleField"])
+				descriptionField := textValue(block["descriptionField"])
+				for index, row := range rows {
+					events = append(events, map[string]any{
+						"id":    fmt.Sprintf("%s_event_%d", textValue(block["id"]), index+1),
+						"date":  textValue(row[timeField]),
+						"title": textValue(row[titleField]),
+						"body":  textValue(row[descriptionField]),
+					})
+				}
+			}
+			block["events"] = events
+			block["content"] = map[string]any{"title": block["title"], "description": block["description"], "events": events}
 		case "kanbanBlock":
 			block["content"] = map[string]any{"title": block["title"], "description": block["description"], "columns": block["columns"]}
 		}
@@ -611,9 +627,15 @@ func buildPrint(title string, source map[string]any, specRaw, fillRaw json.RawMe
 			cardWidth := (width - 2*margin - gap*float64(columns-1)) / columns
 			x := margin + float64(pendingKPIs)*(cardWidth+gap)
 			titleID := id + "__title"
-			elements = append(elements, rectElement(id+"__card", x, y, cardWidth, 64, "#f7faff"))
+			background, border, foreground := kpiToneColors(textValue(block["tone"]))
+			card := rectElement(id+"__card", x, y, cardWidth, 64, background)
+			card["strokeColor"] = border
+			elements = append(elements, card)
 			elements = append(elements, textElement(titleID, x+12, y+8, cardWidth-24, 16, fitTableText(blockTitle, cardWidth-24, 10), 10, "600"))
-			elements = append(elements, textElement(id+"__value", x+12, y+28, cardWidth-24, 28, fitTableText(formatValue(value, textValue(block["valueFormat"])), cardWidth-24, 18), 18, "700"))
+			displayValue := formatValue(value, textValue(block["valueFormat"])) + textValue(block["suffix"])
+			valueElement := textElement(id+"__value", x+12, y+28, cardWidth-24, 28, fitTableText(displayValue, cardWidth-24, 18), 18, "700")
+			valueElement["color"] = foreground
+			elements = append(elements, valueElement)
 			bookmarks = append(bookmarks, bookmark(id, blockTitle, pageNumber, titleID, y))
 			pendingKPIs++
 			if pendingKPIs == columns {
@@ -755,15 +777,12 @@ func normalizeColumns(value any) []map[string]any {
 func normalizeBadgeItems(value any, rows []map[string]any) []any {
 	raw, _ := value.([]any)
 	result := make([]any, 0, len(raw))
-	for index, item := range raw {
+	for _, item := range raw {
 		source, ok := item.(map[string]any)
 		if !ok {
 			continue
 		}
 		next := cloneMap(source)
-		if textValue(next["id"]) == "" {
-			next["id"] = fmt.Sprintf("badge_%d", index+1)
-		}
 		value := next["value"]
 		if field := textValue(next["valueField"]); field != "" && len(rows) > 0 {
 			value = rows[0][field]
@@ -794,6 +813,10 @@ func matchingBadgeRule(value any, actual any) map[string]any {
 		}
 	}
 	return nil
+}
+
+func kpiToneColors(tone string) (background, border, foreground string) {
+	return badgeToneColors(tone)
 }
 
 func badgeToneColors(tone string) (background, border, foreground string) {

@@ -73,6 +73,7 @@ type Block struct {
 	ValueField               string                `json:"valueField,omitempty"`
 	ValueLabel               string                `json:"valueLabel,omitempty"`
 	ValueFormat              string                `json:"valueFormat,omitempty"`
+	Suffix                   string                `json:"suffix,omitempty"`
 	SecondaryField           string                `json:"secondaryField,omitempty"`
 	SecondaryLabel           string                `json:"secondaryLabel,omitempty"`
 	SecondaryFormat          string                `json:"secondaryFormat,omitempty"`
@@ -104,6 +105,9 @@ type Block struct {
 	ToneField                string                `json:"toneField,omitempty"`
 	ToneRules                []map[string]any      `json:"toneRules,omitempty"`
 	Layout                   string                `json:"layout,omitempty"`
+	TimeField                string                `json:"timeField,omitempty"`
+	TitleField               string                `json:"titleField,omitempty"`
+	DescriptionField         string                `json:"descriptionField,omitempty"`
 	ChartContent             *ChartContent         `json:"-"`
 	GeoContent               *GeoContent           `json:"-"`
 	KPIContent               *KPIContent           `json:"-"`
@@ -248,6 +252,8 @@ type KPIContent struct {
 	ValueField               string         `json:"valueField"`
 	ValueLabel               string         `json:"valueLabel"`
 	ValueFormat              string         `json:"valueFormat,omitempty"`
+	Suffix                   string         `json:"suffix,omitempty"`
+	Tone                     string         `json:"tone,omitempty"`
 	Value                    any            `json:"value"`
 	RowCount                 *int           `json:"rowCount"`
 	SecondaryField           string         `json:"secondaryField,omitempty"`
@@ -480,12 +486,14 @@ type rawKPIBlock struct {
 	ValueField               string         `json:"valueField"`
 	ValueLabel               string         `json:"valueLabel"`
 	ValueFormat              string         `json:"valueFormat,omitempty"`
+	Suffix                   string         `json:"suffix,omitempty"`
 	SecondaryField           string         `json:"secondaryField,omitempty"`
 	SecondaryLabel           string         `json:"secondaryLabel,omitempty"`
 	SecondaryFormat          string         `json:"secondaryFormat,omitempty"`
 	SecondaryDisplayKey      string         `json:"secondaryDisplayKey,omitempty"`
 	SecondaryDisplayValueMap map[string]any `json:"secondaryDisplayValueMap,omitempty"`
 	Description              string         `json:"description,omitempty"`
+	Tone                     string         `json:"tone,omitempty"`
 	EmptyLabel               string         `json:"emptyLabel,omitempty"`
 	RowSelector              string         `json:"rowSelector,omitempty"`
 	PresentationMode         string         `json:"presentationMode,omitempty"`
@@ -640,12 +648,16 @@ type rawKanbanBlock struct {
 }
 
 type rawTimelineBlock struct {
-	ID          string                     `json:"id"`
-	Kind        string                     `json:"kind"`
-	Title       string                     `json:"title"`
-	Description string                     `json:"description,omitempty"`
-	Events      []reportspec.TimelineEvent `json:"events,omitempty"`
-	Content     TimelineContent            `json:"content"`
+	ID               string                     `json:"id"`
+	Kind             string                     `json:"kind"`
+	Title            string                     `json:"title"`
+	Description      string                     `json:"description,omitempty"`
+	DatasetRef       string                     `json:"datasetRef,omitempty"`
+	TimeField        string                     `json:"timeField,omitempty"`
+	TitleField       string                     `json:"titleField,omitempty"`
+	DescriptionField string                     `json:"descriptionField,omitempty"`
+	Events           []reportspec.TimelineEvent `json:"events,omitempty"`
+	Content          TimelineContent            `json:"content"`
 }
 
 func DecodeJSON(data []byte) (*ReportFill, error) {
@@ -743,12 +755,14 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				ValueField:               kpiBlock.ValueField,
 				ValueLabel:               kpiBlock.ValueLabel,
 				ValueFormat:              kpiBlock.ValueFormat,
+				Suffix:                   kpiBlock.Suffix,
 				SecondaryField:           kpiBlock.SecondaryField,
 				SecondaryLabel:           kpiBlock.SecondaryLabel,
 				SecondaryFormat:          kpiBlock.SecondaryFormat,
 				SecondaryDisplayKey:      kpiBlock.SecondaryDisplayKey,
 				SecondaryDisplayValueMap: kpiBlock.SecondaryDisplayValueMap,
 				Description:              kpiBlock.Description,
+				Tone:                     kpiBlock.Tone,
 				EmptyLabel:               kpiBlock.EmptyLabel,
 				RowSelector:              kpiBlock.RowSelector,
 				PresentationMode:         kpiBlock.PresentationMode,
@@ -911,11 +925,15 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				return nil, fmt.Errorf("decode reportFill.blocks[%d] timelineBlock: %w", index, err)
 			}
 			fill.Blocks = append(fill.Blocks, Block{
-				ID:              timelineBlock.ID,
-				Kind:            timelineBlock.Kind,
-				Title:           timelineBlock.Title,
-				Description:     timelineBlock.Description,
-				TimelineContent: &timelineBlock.Content,
+				ID:               timelineBlock.ID,
+				Kind:             timelineBlock.Kind,
+				Title:            timelineBlock.Title,
+				Description:      timelineBlock.Description,
+				DatasetRef:       timelineBlock.DatasetRef,
+				TimeField:        timelineBlock.TimeField,
+				TitleField:       timelineBlock.TitleField,
+				DescriptionField: timelineBlock.DescriptionField,
+				TimelineContent:  &timelineBlock.Content,
 			})
 		case "filterBarBlock":
 			filterBarBlock := rawFilterBarBlock{}
@@ -1382,11 +1400,6 @@ func (r *ReportFill) Validate() error {
 			}
 			if block.BadgesContent.Items == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.items is required for badgesBlock", index)
-			}
-			for itemIndex, item := range block.BadgesContent.Items {
-				if strings.TrimSpace(item.ID) == "" {
-					return fmt.Errorf("reportFill.blocks[%d].content.items[%d].id is required for badgesBlock", index, itemIndex)
-				}
 			}
 		}
 		if strings.TrimSpace(block.Kind) == "sectionBlock" {

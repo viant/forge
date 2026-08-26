@@ -225,6 +225,7 @@ type Block struct {
 	ValueField               string           `json:"valueField,omitempty"`
 	ValueLabel               string           `json:"valueLabel,omitempty"`
 	ValueFormat              string           `json:"valueFormat,omitempty"`
+	Suffix                   string           `json:"suffix,omitempty"`
 	SecondaryField           string           `json:"secondaryField,omitempty"`
 	SecondaryLabel           string           `json:"secondaryLabel,omitempty"`
 	SecondaryFormat          string           `json:"secondaryFormat,omitempty"`
@@ -257,6 +258,9 @@ type Block struct {
 	Body                     string           `json:"body,omitempty"`
 	ColumnsLayout            []KanbanColumn   `json:"columns,omitempty"`
 	Events                   []TimelineEvent  `json:"events,omitempty"`
+	TimeField                string           `json:"timeField,omitempty"`
+	TitleField               string           `json:"titleField,omitempty"`
+	DescriptionField         string           `json:"descriptionField,omitempty"`
 	Items                    []BadgeItem      `json:"items,omitempty"`
 	CollectionCols           int              `json:"columnsCount,omitempty"`
 	ItemTitleField           string           `json:"itemTitleField,omitempty"`
@@ -319,12 +323,14 @@ type rawKPIBlock struct {
 	ValueField               string         `json:"valueField"`
 	ValueLabel               string         `json:"valueLabel"`
 	ValueFormat              string         `json:"valueFormat,omitempty"`
+	Suffix                   string         `json:"suffix,omitempty"`
 	SecondaryField           string         `json:"secondaryField,omitempty"`
 	SecondaryLabel           string         `json:"secondaryLabel,omitempty"`
 	SecondaryFormat          string         `json:"secondaryFormat,omitempty"`
 	SecondaryDisplayKey      string         `json:"secondaryDisplayKey,omitempty"`
 	SecondaryDisplayValueMap map[string]any `json:"secondaryDisplayValueMap,omitempty"`
 	Description              string         `json:"description,omitempty"`
+	Tone                     string         `json:"tone,omitempty"`
 	EmptyLabel               string         `json:"emptyLabel,omitempty"`
 	RowSelector              string         `json:"rowSelector,omitempty"`
 	PresentationMode         string         `json:"presentationMode,omitempty"`
@@ -441,11 +447,15 @@ type rawKanbanBlock struct {
 }
 
 type rawTimelineBlock struct {
-	ID          string          `json:"id"`
-	Kind        string          `json:"kind"`
-	Title       string          `json:"title"`
-	Description string          `json:"description,omitempty"`
-	Events      []TimelineEvent `json:"events"`
+	ID               string          `json:"id"`
+	Kind             string          `json:"kind"`
+	Title            string          `json:"title"`
+	Description      string          `json:"description,omitempty"`
+	DatasetRef       string          `json:"datasetRef,omitempty"`
+	TimeField        string          `json:"timeField,omitempty"`
+	TitleField       string          `json:"titleField,omitempty"`
+	DescriptionField string          `json:"descriptionField,omitempty"`
+	Events           []TimelineEvent `json:"events,omitempty"`
 }
 
 type rawCollectionBlock struct {
@@ -695,9 +705,6 @@ func (r *ReportSpec) Validate() error {
 				return fmt.Errorf("reportSpec.blocks[%d].items is required for badgesBlock", index)
 			}
 			for itemIndex, item := range block.Items {
-				if strings.TrimSpace(item.ID) == "" {
-					return fmt.Errorf("reportSpec.blocks[%d].items[%d].id is required for badgesBlock", index, itemIndex)
-				}
 				labelMode := strings.TrimSpace(item.LabelMode)
 				if labelMode != "" && labelMode != "field" && labelMode != "manual" {
 					return fmt.Errorf("reportSpec.blocks[%d].items[%d].labelMode %q is not supported for badgesBlock", index, itemIndex, item.LabelMode)
@@ -787,8 +794,11 @@ func (r *ReportSpec) Validate() error {
 			if strings.TrimSpace(block.Title) == "" {
 				return fmt.Errorf("reportSpec.blocks[%d].title is required for timelineBlock", index)
 			}
-			if len(block.Events) == 0 {
-				return fmt.Errorf("reportSpec.blocks[%d].events must not be empty for timelineBlock", index)
+			if len(block.Events) == 0 && strings.TrimSpace(block.DatasetRef) == "" {
+				return fmt.Errorf("reportSpec.blocks[%d] requires events or datasetRef for timelineBlock", index)
+			}
+			if strings.TrimSpace(block.DatasetRef) != "" && (strings.TrimSpace(block.TimeField) == "" || strings.TrimSpace(block.TitleField) == "") {
+				return fmt.Errorf("reportSpec.blocks[%d].timeField and titleField are required for dataset-bound timelineBlock", index)
 			}
 		case "filterBarBlock":
 			if strings.TrimSpace(block.Title) == "" {
@@ -910,12 +920,14 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			ValueField:               block.ValueField,
 			ValueLabel:               block.ValueLabel,
 			ValueFormat:              block.ValueFormat,
+			Suffix:                   block.Suffix,
 			SecondaryField:           block.SecondaryField,
 			SecondaryLabel:           block.SecondaryLabel,
 			SecondaryFormat:          block.SecondaryFormat,
 			SecondaryDisplayKey:      block.SecondaryDisplayKey,
 			SecondaryDisplayValueMap: block.SecondaryDisplayValueMap,
 			Description:              block.Description,
+			Tone:                     block.Tone,
 			EmptyLabel:               block.EmptyLabel,
 			RowSelector:              block.RowSelector,
 			PresentationMode:         block.PresentationMode,
@@ -1060,11 +1072,15 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			return Block{}, err
 		}
 		return Block{
-			ID:          block.ID,
-			Kind:        block.Kind,
-			Title:       block.Title,
-			Description: block.Description,
-			Events:      block.Events,
+			ID:               block.ID,
+			Kind:             block.Kind,
+			Title:            block.Title,
+			Description:      block.Description,
+			DatasetRef:       block.DatasetRef,
+			TimeField:        block.TimeField,
+			TitleField:       block.TitleField,
+			DescriptionField: block.DescriptionField,
+			Events:           block.Events,
 		}, nil
 	case "filterBarBlock":
 		block := rawFilterBarBlock{}
