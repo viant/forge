@@ -194,6 +194,40 @@ class InlineReportRuntimeCompilerTest {
     }
 
     @Test
+    fun rejectsMissingReportStatusAndWorkspaceDatasetIdentity() {
+        val noStatus = TranscriptCanonicalReport(
+            scope = "message",
+            id = "delivery",
+            grammar = "report-document-v1",
+            status = "",
+            source = JsonObject(mapOf("blocks" to JsonArray(emptyList())))
+        )
+        assertEquals(
+            "Inline report status '' cannot be rendered.",
+            assertFailsWith<IllegalArgumentException> {
+                InlineReportRuntimeCompiler.compile(noStatus)
+            }.message
+        )
+
+        val noDatasetID = noStatus.copy(
+            status = "committed",
+            source = JsonObject(mapOf(
+                "datasets" to JsonArray(listOf(JsonObject(mapOf(
+                    "kind" to JsonPrimitive("workspaceRef"),
+                    "dataSourceRef" to JsonPrimitive("metrics")
+                )))),
+                "blocks" to JsonArray(emptyList())
+            ))
+        )
+        assertEquals(
+            "Workspace dataset must declare id.",
+            assertFailsWith<IllegalStateException> {
+                InlineReportRuntimeCompiler.workspaceDatasetRequests(noDatasetID)
+            }.message
+        )
+    }
+
+    @Test
     fun materializesCanonicalCsvData() {
         val report = TranscriptCanonicalReport(
             scope = "message",

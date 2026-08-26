@@ -48,8 +48,8 @@ object InlineReportRuntimeCompiler {
 
     fun compile(report: TranscriptCanonicalReport): InlineReportRuntimeArtifact {
         val status = report.status.trim().lowercase()
-        require(status.isEmpty() || status == "committed" || status == "ready") {
-            "Inline report is $status and cannot be rendered."
+        require(status == "committed" || status == "ready") {
+            "Inline report status '$status' cannot be rendered."
         }
         val source = report.source as? JsonObject
             ?: error("Inline report source must be a JSON object.")
@@ -433,7 +433,17 @@ object InlineReportRuntimeCompiler {
             }
         }
         val seen = mutableSetOf<String>()
-        return result.filter { declaration -> string(declaration["id"])?.let(seen::add) == true }
+        return result.filter { declaration ->
+            val id = string(declaration["id"])
+            if (id == null) {
+                if (string(declaration["kind"])?.lowercase() == "workspaceref") {
+                    error("Workspace dataset must declare id.")
+                }
+                false
+            } else {
+                seen.add(id)
+            }
+        }
     }
 
     private fun layoutBlockOrder(source: JsonObject, blocks: List<JsonElement>): List<String> {
