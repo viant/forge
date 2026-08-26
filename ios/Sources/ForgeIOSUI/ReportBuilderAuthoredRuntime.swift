@@ -141,7 +141,8 @@ private func reportBuilderPublishedFieldRequest(
 
 func reportBuilderMaterializeComputedRows(
     _ rows: [[String: JSONValue]],
-    fields: [[String: JSONValue]]
+    fields: [[String: JSONValue]],
+    config: DashboardReportBuilderDef
 ) -> [[String: JSONValue]] {
     let computed = Set(fields.compactMap { field -> String? in
         guard field["kind"]?.stringValue == "computedMeasure" else { return nil }
@@ -150,14 +151,20 @@ func reportBuilderMaterializeComputedRows(
     guard !computed.isEmpty else { return rows }
     return rows.map { row in
         var result = row
-        let impressions = authoredNumber(row["impressions"])
-        if computed.contains("ctr"), result["ctr"] == nil,
-           let clicks = authoredNumber(row["clicks"]), let impressions, impressions != 0 {
-            result["ctr"] = .number(clicks / impressions)
-        }
-        if computed.contains("ecpm"), result["ecpm"] == nil,
-           let spend = authoredNumber(row["totalSpend"]), let impressions, impressions != 0 {
-            result["ecpm"] = .number((spend / impressions) * 1_000)
+        for measure in config.computedMeasures where computed.contains(measure.identityKey) {
+            guard result[measure.identityKey] == nil,
+                  let compute = measure.compute,
+                  (compute.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "ratio",
+                  let numerator = compute.numerator,
+                  let denominator = compute.denominator,
+                  let denominatorValue = authoredNumber(result[denominator]),
+                  denominatorValue != 0 else { continue }
+            var value = (authoredNumber(result[numerator]) ?? 0) / denominatorValue * (compute.scale ?? 1)
+            if let decimals = compute.decimals {
+                let factor = pow(10.0, Double(max(0, decimals)))
+                value = (value * factor).rounded() / factor
+            }
+            result[measure.identityKey] = .number(value)
         }
         return result
     }
@@ -341,7 +348,11 @@ struct ReportBuilderAuthoredResult: View {
                 windowID: window.windowID,
                 dataSourceRef: instanceRef
             )
-            let materializedRows = reportBuilderMaterializeComputedRows(rows, fields: declaration.fields)
+            let materializedRows = reportBuilderMaterializeComputedRows(
+                rows,
+                fields: declaration.fields,
+                config: config
+            )
             rowsByID[declaration.id] = materializedRows
             loadedRows[declaration.id] = materializedRows
             let control = await runtime.dataSourceControl(

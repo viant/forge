@@ -2,6 +2,8 @@ package com.viant.forgeandroid.ui
 
 import com.viant.forgeandroid.runtime.DashboardReportBuilderDef
 import com.viant.forgeandroid.runtime.ReportBuilderPublishedDataSourceDef
+import com.viant.forgeandroid.runtime.ReportBuilderMeasureDef
+import com.viant.forgeandroid.runtime.ReportBuilderComputeDef
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -169,5 +171,24 @@ class ReportBuilderAuthoredRuntimeTest {
         ))
         val block = (materializeReportBuilderAuthoredDocument(document)["blocks"] as JsonArray).first() as JsonObject
         assertTrue(block["chartModel"] is JsonObject)
+    }
+
+    @Test
+    fun computedRowsUsePublishedMeasureFormula() {
+        val rows = reportBuilderMaterializeComputedRows(
+            rows = listOf(mapOf("clicks" to 20, "impressions" to 1_000, "totalSpend" to 15)),
+            config = DashboardReportBuilderDef(computedMeasures = listOf(
+                ReportBuilderMeasureDef(
+                    key = "ctr",
+                    compute = ReportBuilderComputeDef(type = "ratio", numerator = "clicks", denominator = "impressions")
+                ),
+                ReportBuilderMeasureDef(
+                    key = "ecpm",
+                    compute = ReportBuilderComputeDef(type = "ratio", numerator = "totalSpend", denominator = "impressions", scale = 1_000.0)
+                )
+            ))
+        )
+        assertEquals(0.02, rows.first()["ctr"])
+        assertEquals(15.0, rows.first()["ecpm"])
     }
 }

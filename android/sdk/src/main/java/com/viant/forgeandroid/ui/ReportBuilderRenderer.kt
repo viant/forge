@@ -2037,7 +2037,7 @@ private fun defaultDynamicFilterKeys(): List<String> {
     return emptyList()
 }
 
-private fun reportBuilderMeasureKey(measure: ReportBuilderMeasureDef): String = measure.key ?: measure.id ?: ""
+internal fun reportBuilderMeasureKey(measure: ReportBuilderMeasureDef): String = measure.key ?: measure.id ?: ""
 private fun reportBuilderMeasureLabel(measure: ReportBuilderMeasureDef): String = measure.label ?: reportBuilderMeasureKey(measure)
 private fun reportBuilderDimensionKey(dimension: ReportBuilderDimensionDef): String = dimension.key ?: dimension.id ?: ""
 private fun reportBuilderDimensionLabel(dimension: ReportBuilderDimensionDef): String = dimension.label ?: reportBuilderDimensionKey(dimension)
@@ -2068,7 +2068,7 @@ private fun aggregateRows(
             existing[key] = ((existing[key] as? Double) ?: (existing[key] as? Number)?.toDouble() ?: 0.0) + numeric
         }
     }
-    return grouped.values.map { AggregatedRow(applyComputedMeasures(it, measures, config)) }
+    return grouped.values.map { AggregatedRow(applyReportBuilderComputedMeasures(it, measures, config)) }
 }
 
 private fun displayDimensionValue(row: Map<String, Any?>, dimension: ReportBuilderDimensionDef?, key: String): Any? {
@@ -2079,7 +2079,7 @@ private fun displayDimensionValue(row: Map<String, Any?>, dimension: ReportBuild
     return SelectorUtil.resolve(row, key)
 }
 
-private fun applyComputedMeasures(
+internal fun applyReportBuilderComputedMeasures(
     row: Map<String, Any?>,
     measures: List<String>,
     config: DashboardReportBuilderDef
