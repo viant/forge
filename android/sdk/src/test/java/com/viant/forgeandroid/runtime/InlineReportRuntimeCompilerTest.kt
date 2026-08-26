@@ -250,6 +250,42 @@ class InlineReportRuntimeCompilerTest {
         assertEquals(true, markdown.contains("Missing: —"))
     }
 
+    @Test
+    fun canonicalDatasetMapKeyRemainsTheReportDatasetIdentity() {
+        val report = TranscriptCanonicalReport(
+            scope = "message",
+            id = "configured-goal",
+            grammar = "report-document-v1",
+            status = "committed",
+            source = JsonObject(mapOf(
+                "blocks" to JsonArray(listOf(JsonObject(mapOf(
+                    "id" to JsonPrimitive("goal-table"),
+                    "kind" to JsonPrimitive("tableBlock"),
+                    "datasetRef" to JsonPrimitive("configured_goal"),
+                    "columns" to JsonArray(listOf(JsonObject(mapOf(
+                        "key" to JsonPrimitive("status"),
+                        "label" to JsonPrimitive("Status")
+                    ))))
+                ))))
+            )),
+            dataSources = mapOf(
+                "configured_goal" to TranscriptCanonicalData(
+                    id = "workspace_result",
+                    payload = JsonArray(listOf(JsonObject(mapOf(
+                        "status" to JsonPrimitive("Behind")
+                    ))))
+                )
+            )
+        )
+
+        val artifact = InlineReportRuntimeCompiler.compile(report)
+        val dataset = (artifact.reportFill["datasets"] as JsonArray).single() as JsonObject
+        assertEquals(JsonPrimitive("configured_goal"), dataset["id"])
+        val runtimeContainer = artifact.metadata.view?.content?.containers?.single()!!
+        val table = dashboardReportRuntimeSummary(runtimeContainer).blocks.single().table!!
+        assertEquals("Behind", table.rows.single()["status"])
+    }
+
     private fun block(id: String, kind: String) = JsonObject(mapOf(
         "id" to JsonPrimitive(id), "kind" to JsonPrimitive(kind)
     ))

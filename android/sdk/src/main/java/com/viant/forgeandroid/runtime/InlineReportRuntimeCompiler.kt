@@ -122,7 +122,9 @@ object InlineReportRuntimeCompiler {
     private fun normalizedDatasetRows(
         dataSources: Map<String, TranscriptCanonicalData>
     ): Map<String, List<JsonElement>> = dataSources.map { (key, source) ->
-        val id = source.id.trim().ifEmpty { key }
+        // The canonical map key is the report's dataset identity. source.id is
+        // transport metadata and may name the backing datasource instead.
+        val id = key.trim().ifEmpty { source.id.trim() }
         val rows = when (val payload = TranscriptEnvelope.materializeCanonicalPayload(source.format, source.payload)) {
             is JsonArray -> payload.toList()
             is JsonObject -> listOf(payload)

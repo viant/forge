@@ -1207,10 +1207,17 @@ fun dashboardReportRuntimeColumns(values: List<JsonElement>): List<ColumnDef> {
                 ColumnDef(
                     id = id,
                     name = jsonString(value["name"]) ?: id,
+                    key = firstNonBlank(
+                        jsonString(value["key"]),
+                        jsonString(value["sourceKey"]),
+                        jsonString(value["displayKey"]),
+                        id
+                    ),
                     label = jsonString(value["label"]) ?: id,
                     type = jsonString(value["type"]),
                     format = jsonString(value["format"]),
                     emptyText = jsonString(value["emptyText"]),
+                    width = dashboardReportRuntimeInt(value["width"]),
                     cellVisual = value["cellVisual"] as? JsonObject
                 )
             }
@@ -1220,10 +1227,13 @@ fun dashboardReportRuntimeColumns(values: List<JsonElement>): List<ColumnDef> {
 }
 
 fun dashboardReportRuntimeKpi(content: Map<String, JsonElement>): DashboardReportRuntimeKpiValue {
-    val valueText = dashboardReportRuntimeFormattedValueText(
+    val formattedValue = dashboardReportRuntimeFormattedValueText(
         content["value"],
         jsonString(content["valueFormat"])
     )
+    val valueText = formattedValue?.let {
+        jsonString(content["prefix"]).orEmpty() + it + jsonString(content["suffix"]).orEmpty()
+    }
     val secondaryField = jsonString(content["secondaryField"])
     val secondaryValueText = dashboardReportRuntimeFormattedValueText(
         content["secondaryValue"],

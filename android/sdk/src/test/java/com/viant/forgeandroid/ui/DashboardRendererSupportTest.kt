@@ -1,5 +1,6 @@
 package com.viant.forgeandroid.ui
 
+import androidx.compose.ui.graphics.Color
 import com.viant.forgeandroid.runtime.ChartDef
 import com.viant.forgeandroid.runtime.ColumnDef
 import com.viant.forgeandroid.runtime.ContainerDef
@@ -145,6 +146,36 @@ class DashboardRendererSupportTest {
         assertEquals(true, reportRuntimeColumnHasDataBar(column))
         assertEquals(1.0f, reportRuntimeDataBarFraction(249300, 249300.0))
         assertEquals(0.0072f, reportRuntimeDataBarFraction(1800, 249300.0)!!, 0.0001f)
+    }
+
+    @Test
+    fun reportRuntimeTableColumnsUseStableAuthoredOrLabelWidths() {
+        assertEquals("rowKey", reportRuntimeColumnKey(ColumnDef(id = "display-id", key = "rowKey")))
+        assertEquals(220, reportRuntimeColumnWidthDp(ColumnDef(id = "status", label = "Status", width = 220)))
+        assertEquals(242, reportRuntimeColumnWidthDp(ColumnDef(id = "reason", label = "Customer-facing reason")))
+        assertEquals(104, reportRuntimeColumnWidthDp(ColumnDef(id = "id", label = "ID")))
+    }
+
+    @Test
+    fun reportRuntimeDataBarsPreserveAuthoredPaletteAndValueField() {
+        val column = ColumnDef(
+            id = "displayCount",
+            key = "displayCount",
+            cellVisual = JsonObject(mapOf(
+                "kind" to JsonPrimitive("dataBar"),
+                "valueField" to JsonPrimitive("rawCount"),
+                "palette" to JsonArray(listOf(JsonPrimitive("#fee2e2"), JsonPrimitive("#dc2626")))
+            ))
+        )
+
+        assertEquals("rawCount", reportRuntimeDataBarValueKey(column))
+        assertEquals(listOf(Color(0xFFFEE2E2), Color(0xFFDC2626)), reportRuntimeDataBarColors(column))
+        assertEquals(0.5f, reportRuntimeDataBarFraction(-5, 10.0))
+    }
+
+    @Test
+    fun reportRuntimeKpiLabelsMatchWebUppercasePresentation() {
+        assertEquals("TOTALSPEND", reportRuntimeKpiLabel("totalSpend"))
     }
 
     @Test

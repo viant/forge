@@ -14,6 +14,18 @@ import org.junit.Test
 class DashboardRuntimeTest {
 
     @Test
+    fun reportRuntimeKpiPreservesAuthoredPrefixAndSuffix() {
+        val kpi = dashboardReportRuntimeKpi(mapOf(
+            "value" to JsonPrimitive(0.003),
+            "prefix" to JsonPrimitive("~"),
+            "suffix" to JsonPrimitive("x"),
+            "rowCount" to JsonPrimitive(1)
+        ))
+
+        assertEquals("~0.003x", kpi.valueText)
+    }
+
+    @Test
     fun dashboardReportRuntimeBlocksPreserveResolvedPresentationContent() {
         val presentationKinds = listOf(
             "badgesBlock", "collectionBlock", "sectionBlock", "tabGroupBlock", "compositeBlock",
@@ -881,8 +893,8 @@ class DashboardRuntimeTest {
                         table = DashboardReportRuntimeTableValue(
                             dataSourceRef = "rows",
                             columns = listOf(
-                                ColumnDef(id = "name", name = "name", label = "Name"),
-                                ColumnDef(id = "value", name = "value", label = "Value", format = "integer")
+                                ColumnDef(id = "name", name = "name", key = "name", label = "Name"),
+                                ColumnDef(id = "value", name = "value", key = "value", label = "Value", format = "integer")
                             ),
                             rows = listOf(
                                 mapOf("name" to "North", "value" to 12L),

@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
@@ -292,5 +293,38 @@ class TargetingTest {
         val containers = resolved["view"]!!.jsonObject["content"]!!.jsonObject["containers"] as JsonArray
 
         assertEquals(listOf("normalized"), containers.map { it.jsonObject["id"]!!.jsonPrimitive.content })
+    }
+
+    @Test
+    fun preservesBusinessTargetFieldsInsideMaterializedDatasetRows() {
+        val payload = Json.parseToJsonElement(
+            """
+            {
+              "reportFill": {
+                "kind": "reportFill",
+                "datasets": [{
+                  "id": "configured_goal",
+                  "rows": [{
+                    "goalType": "Scale / impressions",
+                    "target": "Not configured",
+                    "status": "Behind",
+                    "targetOverrides": { "source": "business data" }
+                  }],
+                  "provenance": { "rowCount": 1 }
+                }]
+              }
+            }
+            """.trimIndent()
+        )
+
+        val resolved = MetadataResolver.resolve(
+            payload,
+            ForgeTargetContext(platform = "android", formFactor = "phone", surface = "app")
+        )!!.jsonObject
+        val row = resolved["reportFill"]!!.jsonObject["datasets"]!!.jsonArray
+            .single().jsonObject["rows"]!!.jsonArray.single().jsonObject
+
+        assertEquals("Not configured", row["target"]!!.jsonPrimitive.content)
+        assertEquals("business data", row["targetOverrides"]!!.jsonObject["source"]!!.jsonPrimitive.content)
     }
 }
