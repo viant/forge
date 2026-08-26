@@ -1526,10 +1526,6 @@ function renderReportPrintCalloutBlock(state = {}, block = {}, {
   const badges = (Array.isArray(content?.badges) ? content.badges : Array.isArray(block?.badges) ? block.badges : [])
     .map((badge) => normalizeString(badge))
     .filter(Boolean);
-  const bodyLines = normalizeMarkdownToPlainText(content?.body || block?.body || "")
-    .split("\n")
-    .map((line) => normalizeString(line))
-    .filter(Boolean);
   const lines = [
     ...(icon ? [`Icon: ${icon}`] : []),
     ...(description ? [description] : []),
