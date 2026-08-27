@@ -16,6 +16,7 @@ type ReportPrint struct {
 	FillHash     string       `json:"fillHash"`
 	Source       Source       `json:"source"`
 	Title        string       `json:"title"`
+	Subtitle     string       `json:"subtitle,omitempty"`
 	PageGeometry PageGeometry `json:"pageGeometry"`
 	Pages        []Page       `json:"pages"`
 	Bookmarks    []Bookmark   `json:"bookmarks"`

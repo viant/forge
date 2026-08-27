@@ -13,6 +13,7 @@ type ReportSpec struct {
 	Kind             string           `json:"kind"`
 	Source           Source           `json:"source"`
 	Title            string           `json:"title"`
+	Subtitle         string           `json:"subtitle,omitempty"`
 	Theme            map[string]any   `json:"theme,omitempty"`
 	Binding          *Binding         `json:"binding,omitempty"`
 	SemanticSummary  *SemanticSummary `json:"semanticSummary,omitempty"`
@@ -278,6 +279,7 @@ type rawReportSpec struct {
 	Kind             string            `json:"kind"`
 	Source           Source            `json:"source"`
 	Title            string            `json:"title"`
+	Subtitle         string            `json:"subtitle,omitempty"`
 	Theme            map[string]any    `json:"theme,omitempty"`
 	Binding          *Binding          `json:"binding,omitempty"`
 	SemanticSummary  *SemanticSummary  `json:"semanticSummary,omitempty"`
@@ -497,6 +499,7 @@ func DecodeJSON(data []byte) (*ReportSpec, error) {
 		Kind:             raw.Kind,
 		Source:           raw.Source,
 		Title:            raw.Title,
+		Subtitle:         raw.Subtitle,
 		Theme:            raw.Theme,
 		Binding:          raw.Binding,
 		SemanticSummary:  raw.SemanticSummary,
