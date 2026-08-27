@@ -21,9 +21,9 @@ export function resolveQuickFilterSet(context) {
         set = {
             ...set,
             filters: set.template.map((tpl) => ({
+                ...tpl,
                 field: tpl.id,
-                placeholder: tpl.label || tpl.id,
-                // default icon/width can be overridden later if needed.
+                placeholder: tpl.placeholder || tpl.label || tpl.id,
             })),
         };
     }

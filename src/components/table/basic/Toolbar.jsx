@@ -29,6 +29,10 @@ function toolbarItemTestID(item) {
 const Toolbar = ({
                      context,
                      toolbarItems = [],
+                     density = '',
+                     layout = '',
+                     className = '',
+                     style,
                  }) => {
 
     const toolbarEvents = useToolbarControlEvents(context, toolbarItems);
@@ -74,6 +78,8 @@ const Toolbar = ({
         }
 
         const { events = {}, stateEvents } = toolbarEvents[item.id] || {};
+        const isVisible = stateEvents?.onVisible ? stateEvents.onVisible() : true;
+        if (isVisible === false) return null;
         const isReadonly = stateEvents?.onReadonly ? stateEvents.onReadonly() : false;
         const effectiveDisabled = (item.enabled !== true && disabled) || isReadonly;
         const testID = toolbarItemTestID(item);
@@ -92,6 +98,10 @@ const Toolbar = ({
                     minimal={item.appearance === 'minimal'}
                     outlined={item.appearance === 'outlined'}
                     data-testid={testID}
+                    aria-label={item.ariaLabel || item.tooltip || item.label || item.id}
+                    title={item.tooltip || item.label || item.id}
+                    className={item.className}
+                    style={item.style}
                 >
                     {item.label || ""}
                 </Button>
@@ -108,7 +118,10 @@ const Toolbar = ({
     };
 
     return (
-        <div className="toolbar-container">
+        <div
+            className={`toolbar-container${density === 'compact' ? ' is-compact' : ''}${layout === 'balanced' ? ' is-balanced' : ''}${className ? ` ${className}` : ''}`}
+            style={style}
+        >
             {/* Items aligned to the left */}
             <div className="toolbar-left">
                 {renderAlignedItems('left')}

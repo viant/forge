@@ -701,14 +701,12 @@ func (c *Container) ensureDashboard() *Dashboard {
 }
 
 func (c *Container) applyDashboardCompactAliases(compact dashboardCompactAliases) {
-	if compact.VisibleWhen != nil {
+	if compact.VisibleWhen != nil && isDashboardContainerKind(c.Kind) {
 		dashboard := c.ensureDashboard()
 		if dashboard.VisibleWhen == nil {
 			dashboard.VisibleWhen = compact.VisibleWhen
 		}
-		if isDashboardContainerKind(c.Kind) {
-			c.VisibleWhen = nil
-		}
+		c.VisibleWhen = nil
 	}
 	if compact.Report != nil {
 		c.ensureDashboard().ReportOptions = compact.Report
@@ -1174,14 +1172,15 @@ type Card struct {
 }
 
 type Table struct {
-	Columns           []Column              `json:"columns" yaml:"columns"`
-	Toolbar           *Toolbar              `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
-	EnforceColumnSize *bool                 `json:"enforceColumnSize,omitempty" yaml:"enforceColumnSize,omitempty"`
-	Width             string                `json:"width,omitempty" yaml:"width,omitempty"`
-	FullWidth         *bool                 `json:"fullWidth,omitempty" yaml:"fullWidth,omitempty"`
-	Pagination        interface{}           `json:"pagination,omitempty" yaml:"pagination,omitempty"`
-	FormattingRules   []TableFormattingRule `json:"formattingRules,omitempty" yaml:"formattingRules,omitempty"`
-	On                []*Execute            `json:"on,omitempty" yaml:"on,omitempty"`
+	Columns           []Column               `json:"columns" yaml:"columns"`
+	Toolbar           *Toolbar               `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
+	EnforceColumnSize *bool                  `json:"enforceColumnSize,omitempty" yaml:"enforceColumnSize,omitempty"`
+	Width             string                 `json:"width,omitempty" yaml:"width,omitempty"`
+	FullWidth         *bool                  `json:"fullWidth,omitempty" yaml:"fullWidth,omitempty"`
+	Pagination        interface{}            `json:"pagination,omitempty" yaml:"pagination,omitempty"`
+	FormattingRules   []TableFormattingRule  `json:"formattingRules,omitempty" yaml:"formattingRules,omitempty"`
+	On                []*Execute             `json:"on,omitempty" yaml:"on,omitempty"`
+	EmptyState        map[string]interface{} `json:"emptyState,omitempty" yaml:"emptyState,omitempty"`
 }
 
 type TableFormattingRule struct {
@@ -1226,6 +1225,8 @@ type Toolbar struct {
 	DataSourceRef   string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 	Style           *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
 	ClassName       string                            `json:"className,omitempty" yaml:"className,omitempty"`
+	Density         string                            `json:"density,omitempty" yaml:"density,omitempty"`
+	Layout          string                            `json:"layout,omitempty" yaml:"layout,omitempty"`
 	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
 	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
 }
@@ -1252,17 +1253,22 @@ type Column struct {
 
 // TemplateItem represents a single template item with an ID and an operator.
 type TemplateItem struct {
-	ID       string `json:"id"`
-	Label    string `json:"label"`
-	Operator string `json:"operator"`
-	Type     string `json:"type,omitempty" yaml:"type,omitempty"`
+	ID          string `json:"id" yaml:"id"`
+	Label       string `json:"label,omitempty" yaml:"label,omitempty"`
+	OptionLabel string `json:"optionLabel,omitempty" yaml:"optionLabel,omitempty"`
+	Placeholder string `json:"placeholder,omitempty" yaml:"placeholder,omitempty"`
+	Operator    string `json:"operator" yaml:"operator"`
+	Type        string `json:"type,omitempty" yaml:"type,omitempty"`
+	Width       int    `json:"width,omitempty" yaml:"width,omitempty"`
 }
 
 // Filter represents a filter with a name, a default indicator, and a template.
 type Filter struct {
-	Name     string         `json:"name"`
-	Default  bool           `json:"default"`
-	Template []TemplateItem `json:"template"`
+	Name         string         `json:"name" yaml:"name"`
+	Default      bool           `json:"default" yaml:"default"`
+	Mode         string         `json:"mode,omitempty" yaml:"mode,omitempty"`
+	DefaultField string         `json:"defaultField,omitempty" yaml:"defaultField,omitempty"`
+	Template     []TemplateItem `json:"template" yaml:"template"`
 }
 
 type SettingsConfig struct {
@@ -1302,6 +1308,10 @@ type Item struct {
 	NumericFormat        string                            `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
 	Format               string                            `json:"format,omitempty" yaml:"format,omitempty"`
 	Icon                 string                            `json:"icon,omitempty" yaml:"icon,omitempty"`
+	ClassName            string                            `json:"className,omitempty" yaml:"className,omitempty"`
+	Intent               string                            `json:"intent,omitempty" yaml:"intent,omitempty"`
+	Tooltip              string                            `json:"tooltip,omitempty" yaml:"tooltip,omitempty"`
+	AriaLabel            string                            `json:"ariaLabel,omitempty" yaml:"ariaLabel,omitempty"`
 	Type                 string                            `json:"type,omitempty" yaml:"type,omitempty"`
 	Widget               string                            `json:"widget,omitempty" yaml:"widget,omitempty"`
 	Appearance           string                            `json:"appearance,omitempty" yaml:"appearance,omitempty"`
@@ -1370,6 +1380,7 @@ type Execute struct {
 	Async           bool                              `json:"async,omitempty" yaml:"async,omitempty"`
 	Arguments       []string                          `json:"args,omitempty" yaml:"args,omitempty"`
 	Parameters      []*Parameter                      `json:"parameters,omitempty" yaml:"parameters,omitempty"`
+	State           map[string]interface{}            `json:"state,omitempty" yaml:"state,omitempty"`
 	Init            string                            `json:"init,omitempty" yaml:"init,omitempty"`
 	Handler         string                            `json:"handler,omitempty" yaml:"handler,omitempty"`
 	OnError         string                            `json:"onError,omitempty" yaml:"onError,omitempty"`

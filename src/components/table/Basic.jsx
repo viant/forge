@@ -10,10 +10,12 @@ import FilterDialog from "./FilterDialog.jsx";
 import SettingsDialog from "./SettingsDialog.jsx";
 import "./Basic.css";
 import Toolbar from "./basic/Toolbar.jsx";
+import TableEmptyState from "./basic/TableEmptyState.jsx";
 import FullContentDialog from "./FullContentDialog.jsx";
 import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from "./formattingRules.js";
 import {resolveTableCellText, resolveTableLink} from "../../utils/tableLink.js";
 import {resolveKey} from "../../utils/selector.js";
+import {filterEmptyStateToolbarItems, shouldRenderTableEmptyState} from "./tableEmptyState.js";
 
 const defaultCellWidth = 30; // Adjust as needed
 
@@ -385,14 +387,26 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     handlers["dataSource"]["openFilter"] = handleOpenFilter;
 
     const tableDisplayWidth = container?.table?.width || (container?.table?.fullWidth === true ? "100%" : "90%");
+    const toolbarConfig = container?.table?.toolbar || {};
+    const emptyState = container?.table?.emptyState;
+    const showEmptyState = shouldRenderTableEmptyState({
+        emptyState,
+        collection: sortedCollection,
+        loading,
+        error,
+    });
     const toolbarItems = container?.table?.toolbar?.items || [];
     const footerToolbarItems = toolbarItems.filter(isFooterToolbarItem);
-    const primaryToolbarItems = toolbarItems.filter((item) => !isFooterToolbarItem(item));
+    const primaryToolbarItems = filterEmptyStateToolbarItems(
+        toolbarItems.filter((item) => !isFooterToolbarItem(item)),
+        emptyState,
+        showEmptyState,
+    );
     const hasFooterToolbar = footerToolbarItems.length > 0;
 
     return (
         <div
-            className={`basic-table-wrapper${loading && sortedCollection.length > 0 ? " is-loading" : ""}`}
+            className={`basic-table-wrapper${loading && sortedCollection.length > 0 ? " is-loading" : ""}${showEmptyState ? " has-metadata-empty-state" : ""}`}
             style={{
                 height: "100%",
                 width: tableDisplayWidth,
@@ -401,16 +415,24 @@ const Basic = ({ context, container, columns, pagination, children }) => {
             ref={tableRef}
         >
             {primaryToolbarItems.length > 0 ? (
-                <div className="basic-table-filterbar">
+                <div
+                    className={`basic-table-filterbar${toolbarConfig.density === 'compact' ? ' is-compact' : ''}${toolbarConfig.className ? ` ${toolbarConfig.className}` : ''}`}
+                    style={toolbarConfig.style || undefined}
+                >
                     <Toolbar
                         context={context}
                         toolbarItems={primaryToolbarItems}
+                        density={toolbarConfig.density}
+                        layout={toolbarConfig.layout}
                     />
                 </div>
             ) : null}
 
-            <div className="basic-table-scroll">
-                <HTMLTable style={{ width: "100%", tableLayout: "fixed" }}>
+            {showEmptyState ? (
+                <TableEmptyState context={context} config={emptyState}/>
+            ) : (
+                <div className="basic-table-scroll">
+                    <HTMLTable style={{ width: "100%", tableLayout: "fixed" }}>
                     {/* Table Header */}
                     <TableHeader
                         context={context}
@@ -442,14 +464,17 @@ const Basic = ({ context, container, columns, pagination, children }) => {
                             pagingEnabled={pagingEnabled}
                         />
                     ) : null}
-                </HTMLTable>
-            </div>
+                    </HTMLTable>
+                </div>
+            )}
 
-            {hasFooterToolbar ? (
+            {hasFooterToolbar && !showEmptyState ? (
                 <div className="basic-table-paginationbar">
                     <Toolbar
                         context={context}
                         toolbarItems={footerToolbarItems}
+                        density={toolbarConfig.density}
+                        layout={toolbarConfig.layout}
                     />
                 </div>
             ) : null}

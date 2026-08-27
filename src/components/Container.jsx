@@ -386,7 +386,14 @@ const Container = ({context, container, isActive, suppressTitle = false}) => {
             const wrapperClass = tb.className || '';
             return (
                 <div className={`mb-2 ${wrapperClass}`} style={wrapperStyle}>
-                    <TableToolbar context={tbContext} toolbarItems={tb.items} />
+                    <TableToolbar
+                        context={tbContext}
+                        toolbarItems={tb.items}
+                        density={tb.density}
+                        layout={tb.layout}
+                        className={tb.className}
+                        style={tb.style}
+                    />
                 </div>
             );
         }

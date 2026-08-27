@@ -65,6 +65,98 @@ items:
 	}
 }
 
+func TestGenericWindowMetadataPreservesPresentationAndCallbacks(t *testing.T) {
+	input := []byte(`
+id: genericWorkspace
+visibleWhen:
+  all:
+    - source: collection
+      notEmpty: true
+    - source: form
+      field: editing
+      equals: true
+table:
+  emptyState:
+    title: Create the first record
+    action:
+      id: addNew
+      on:
+        - event: onClick
+          handler: domain.add
+  toolbar:
+    className: compact-toolbar
+    density: compact
+    layout: balanced
+    items:
+      - id: run
+        icon: play
+        className: run-action
+        intent: success
+        tooltip: Run selected record
+        ariaLabel: Run selected record
+        on:
+          - event: onReadonly
+            handler: domain.noSelection
+          - event: onClick
+            handler: domain.edit
+            state:
+              mode: editor
+`)
+
+	var c Container
+	if err := yaml.Unmarshal(input, &c); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+	if c.Dashboard != nil {
+		t.Fatalf("generic window visibility must not create dashboard metadata: %#v", c.Dashboard)
+	}
+	if _, ok := c.VisibleWhen["all"]; !ok {
+		t.Fatalf("compound generic visibleWhen was not preserved: %#v", c.VisibleWhen)
+	}
+	if c.Table == nil || c.Table.EmptyState["title"] != "Create the first record" {
+		t.Fatalf("generic table empty state was not preserved: %#v", c.Table)
+	}
+	if c.Table.Toolbar == nil || c.Table.Toolbar.Density != "compact" || c.Table.Toolbar.Layout != "balanced" || c.Table.Toolbar.ClassName != "compact-toolbar" {
+		t.Fatalf("generic toolbar presentation was not preserved: %#v", c.Table.Toolbar)
+	}
+	item := c.Table.Toolbar.Items[0]
+	if item.ClassName != "run-action" || item.Intent != "success" || item.Tooltip != "Run selected record" || item.AriaLabel != "Run selected record" {
+		t.Fatalf("generic toolbar item presentation was not preserved: %#v", item)
+	}
+	if len(item.On) != 2 || item.On[0].Handler != "domain.noSelection" || item.On[1].Handler != "domain.edit" || item.On[1].State["mode"] != "editor" {
+		t.Fatalf("named callbacks and state patch were not preserved: %#v", item.On)
+	}
+}
+
+func TestGenericQuickFilterFieldSelectorMetadata(t *testing.T) {
+	input := []byte(`
+filterSet:
+  - name: quick
+    mode: fieldSelector
+    defaultField: status
+    template:
+      - id: status
+        optionLabel: Status
+        placeholder: Filter by status...
+        width: 200
+        operator: contains
+quickFilterSet: quick
+`)
+
+	var dataSource DataSource
+	if err := yaml.Unmarshal(input, &dataSource); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+	filter := dataSource.FilterSet[0]
+	if filter.Mode != "fieldSelector" || filter.DefaultField != "status" {
+		t.Fatalf("field-selector filter metadata was not preserved: %#v", filter)
+	}
+	item := filter.Template[0]
+	if item.OptionLabel != "Status" || item.Placeholder != "Filter by status..." || item.Width != 200 {
+		t.Fatalf("quick-filter presentation was not preserved: %#v", item)
+	}
+}
+
 func TestContainerUnmarshal_PreservesExtendedChartFields(t *testing.T) {
 	input := []byte(`
 id: performanceTab

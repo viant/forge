@@ -1,5 +1,5 @@
 import React from 'react';
-import { InputGroup, ControlGroup, Icon } from '@blueprintjs/core';
+import { InputGroup, ControlGroup, HTMLSelect, Icon } from '@blueprintjs/core';
 import {
     resolveQuickFilterSet,
     isQuickFiltersActive,
@@ -17,6 +17,11 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
     if (!set) return null;
 
     const filters = set.filters || [];
+    const fieldSelectorMode = set.mode === 'fieldSelector' && filters.length > 1;
+    const initialField = filters.some((filter) => filter.field === set.defaultField)
+        ? set.defaultField
+        : filters[0]?.field;
+    const [selectedField, setSelectedField] = React.useState(initialField);
     const currentFilter = handlers?.dataSource?.peekFilter?.() || {};
     const currentFilterKey = JSON.stringify(currentFilter);
 
@@ -129,47 +134,82 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
         [active, values, commitValues, filters]
     );
 
+    const handleSelectedFieldChange = React.useCallback((event) => {
+        const nextField = event?.target?.value || filters[0]?.field;
+        const clearedValues = {};
+        filters.forEach((filter) => {
+            clearedValues[filter.field] = '';
+        });
+        valuesRef.current = clearedValues;
+        setValues(clearedValues);
+        setSelectedField(nextField);
+        commitValues(clearedValues);
+    }, [commitValues, filters]);
+
+    const renderFilterInput = (filter, index = 0) => {
+        const value = values[filter.field] ?? '';
+        const showToggle = index === 0;
+        const iconName = active ? 'filter-remove' : filter.icon || 'filter';
+        return (
+            <InputGroup
+                key={filter.field}
+                leftElement={
+                    showToggle ? (
+                        <span
+                            onClick={toggleFilters}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: 22,
+                                cursor: 'pointer',
+                                margin: '7px 3px',
+                            }}
+                        >
+                            <Icon icon={iconName} size={12} />
+                        </span>
+                    ) : undefined
+                }
+                placeholder={filter.placeholder || filter.field}
+                value={value}
+                onChange={handleChange(filter.field)}
+                onBlur={() => flushCommit()}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        flushCommit();
+                    }
+                }}
+                style={{ width: filter.width || 140 }}
+            />
+        );
+    };
+
+    if (fieldSelectorMode) {
+        const activeFilter = filters.find((filter) => filter.field === selectedField) || filters[0];
+        return (
+            <ControlGroup
+                fill
+                className="bp4-small forge-quick-filter forge-quick-filter--field-selector"
+                style={{ marginRight: align === 'left' ? 8 : 0, marginLeft: align !== 'left' ? 8 : 0 }}
+            >
+                <HTMLSelect
+                    aria-label="Filter field"
+                    value={activeFilter.field}
+                    onChange={handleSelectedFieldChange}
+                    options={filters.map((filter) => ({
+                        label: filter.optionLabel || filter.label || filter.field,
+                        value: filter.field,
+                    }))}
+                />
+                {renderFilterInput(activeFilter)}
+            </ControlGroup>
+        );
+    }
+
     return (
         <ControlGroup fill className="bp4-small" style={{ marginRight: align === 'left' ? 8 : 0, marginLeft: align !== 'left' ? 8 : 0 }}>
-            {filters.map((f, idx) => {
-                const value = values[f.field] ?? '';
-                const showToggle = idx === 0; // only first field gets toggle icon
-                const iconName = active ? 'filter-remove' : f.icon || 'filter';
-
-                return (
-                    <InputGroup
-                        key={f.field}
-                        leftElement={
-                            showToggle ? (
-                                <span
-                                    onClick={toggleFilters}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        width: 22,
-                                        cursor: 'pointer',
-                                        margin: '7px 3px',
-                                    }}
-                                >
-                                    <Icon icon={iconName} size={12} />
-                                </span>
-                            ) : undefined
-                        }
-                        placeholder={f.placeholder || f.field}
-                        value={value}
-                        onChange={handleChange(f.field)}
-                        onBlur={() => flushCommit()}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                e.preventDefault();
-                                flushCommit();
-                            }
-                        }}
-                        style={{ width: f.width || 140 }}
-                    />
-                );
-            })}
+            {filters.map((filter, index) => renderFilterInput(filter, index))}
         </ControlGroup>
     );
 }

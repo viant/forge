@@ -68,4 +68,59 @@ assert.equal(
     false,
 );
 
+const automationContext = metricsContext({}, {
+    signals: {
+        collection: {
+            peek: () => [],
+            value: [],
+        },
+        windowForm: {
+            peek: () => ({automationView: 'list'}),
+            value: {automationView: 'list'},
+        },
+    },
+});
+
+assert.equal(
+    isContainerVisible({
+        id: 'automationGuidance',
+        visibleWhen: {
+            all: [
+                {source: 'collection', empty: true},
+                {source: 'windowForm', field: 'automationView', notEquals: 'editor'},
+            ],
+        },
+    }, automationContext),
+    true,
+);
+
+assert.equal(
+    isContainerVisible({
+        id: 'automationWorkspace',
+        visibleWhen: {source: 'collection', notEmpty: true},
+    }, automationContext),
+    false,
+);
+
+const populatedAutomationContext = metricsContext({}, {
+    signals: {
+        collection: {
+            peek: () => [{id: 'schedule-1'}],
+            value: [{id: 'schedule-1'}],
+        },
+        windowForm: {
+            peek: () => ({automationView: 'list'}),
+            value: {automationView: 'list'},
+        },
+    },
+});
+
+assert.equal(
+    isContainerVisible({
+        id: 'automationWorkspace',
+        visibleWhen: {source: 'collection', notEmpty: true},
+    }, populatedAutomationContext),
+    true,
+);
+
 console.log('visibleWhen ✓');
