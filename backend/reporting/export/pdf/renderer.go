@@ -16,8 +16,6 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 )
 
-var deterministicCreationDate = time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
-
 const pdfUnicodeFontFamily = "ForgeSans"
 
 type Options struct {
@@ -133,7 +131,7 @@ func resolveDocumentOrientationAndSize(geometry reportprint.PageGeometry) (strin
 
 func resolveCreationDate(options Options) time.Time {
 	if options.CreationDate.IsZero() {
-		return deterministicCreationDate
+		return time.Now().UTC()
 	}
 	return options.CreationDate.UTC()
 }

@@ -37,7 +37,7 @@ func TestParseAndAssembleCommittedReport(t *testing.T) {
 
 func TestCompileProducesExportablePDFContract(t *testing.T) {
 	content := "```forge-report\n" +
-		`{"version":1,"scope":"message","id":"demo","sequence":1,"mode":"start","grammar":"report-document-v1","title":"Backend compiled report","blocks":[]}` +
+		`{"version":1,"scope":"message","id":"demo","sequence":1,"mode":"start","grammar":"report-document-v1","title":"Backend compiled report","subtitle":"Diagnostic window: August 19-25, 2026","blocks":[]}` +
 		"\n```\n```forge-data\n" +
 		`{"version":2,"scope":"message","id":"metrics","reportRef":"demo","sequence":2,"format":"json","mode":"replace","data":[{"name":"Display","spend":12.5},{"name":"CTV","spend":8.25}]}` +
 		"\n```\n```forge-report\n" +
@@ -51,6 +51,12 @@ func TestCompileProducesExportablePDFContract(t *testing.T) {
 	require.NotEmpty(t, compiled.ReportSpec)
 	require.NotEmpty(t, compiled.ReportFill)
 	require.NotEmpty(t, compiled.ReportPrint)
+	var printArtifact map[string]any
+	require.NoError(t, json.Unmarshal(compiled.ReportPrint, &printArtifact))
+	require.Equal(t, "Diagnostic window: August 19-25, 2026", printArtifact["subtitle"])
+	headerElements := printArtifact["pages"].([]any)[0].(map[string]any)["headerElements"].([]any)
+	require.Equal(t, "Diagnostic window: August 19-25, 2026", headerElements[1].(map[string]any)["text"])
+	require.Equal(t, "#667085", headerElements[1].(map[string]any)["color"])
 
 	envelope, err := forgeexport.DecodeJSON(mustJSON(t, map[string]any{
 		"version": 1,
@@ -132,7 +138,7 @@ func TestCompileProducesExportableStaticReportWithoutDataFences(t *testing.T) {
 
 func TestCompileProducesExportableMultiTabDashboard(t *testing.T) {
 	content := "```forge-report\n" +
-		`{"version":1,"scope":"message","id":"delivery","sequence":1,"mode":"start","grammar":"report-document-v1","title":"Order 2672373 delivery","blocks":[{"id":"tabs","kind":"tabGroupBlock","title":"Report sections","sectionIds":["posture","funnel"],"defaultSectionId":"posture"},{"id":"posture","kind":"sectionBlock","title":"Delivery posture","navigationLabel":"Delivery posture"},{"id":"spend","kind":"kpiBlock","datasetRef":"daily","valueField":"spend","valueFormat":"currency","title":"Spend"},{"id":"status","kind":"badgesBlock","datasetRef":"daily","title":"Current posture","items":[{"id":"pacing","label":"Pacing","value":"Behind","tone":"warning"}]},{"id":"trend","kind":"chartBlock","datasetRef":"daily","title":"Daily delivery","chartSpec":{"type":"line","xField":"date","yFields":["spend","impressions"]}},{"id":"funnel","kind":"sectionBlock","title":"Bid funnel","navigationLabel":"Bid funnel"},{"id":"funnel_table","kind":"tableBlock","datasetRef":"funnel","title":"Delivery funnel","columns":[{"key":"stage","label":"Stage"},{"key":"count","label":"Count","format":"integer","cellVisual":{"kind":"dataBar"}}]},{"id":"finding","kind":"markdownBlock","title":"Finding","markdown":"Spend is **behind plan**; allocated capacity was not exhausted."}]}` +
+		`{"version":1,"scope":"message","id":"delivery","sequence":1,"mode":"start","grammar":"report-document-v1","title":"Order 2672373 delivery","blocks":[{"id":"tabs","kind":"tabGroupBlock","title":"Report sections","sectionIds":["posture","funnel"],"defaultSectionId":"posture"},{"id":"posture","kind":"sectionBlock","title":"Delivery posture","navigationLabel":"Delivery posture"},{"id":"spend","kind":"kpiBlock","datasetRef":"daily","valueField":"spend","valueFormat":"currency","title":"Spend"},{"id":"status","kind":"badgesBlock","datasetRef":"daily","title":"Current posture","items":[{"id":"pacing","label":"Pacing","value":"Behind","tone":"warning"}]},{"id":"trend","kind":"chartBlock","datasetRef":"daily","title":"Daily delivery","chartSpec":{"type":"line","xField":"date","yFields":["spend","impressions"]}},{"id":"funnel","kind":"sectionBlock","title":"Bid funnel","navigationLabel":"Bid funnel"},{"id":"funnel_table","kind":"tableBlock","datasetRef":"funnel","title":"Delivery funnel","columns":[{"key":"stage","label":"Stage"},{"key":"count","label":"Count","format":"integer","cellVisual":{"kind":"dataBar","palette":["#fee2e2","#dc2626"]}}]},{"id":"finding","kind":"markdownBlock","title":"Finding","markdown":"Spend is **behind plan**; allocated capacity was not exhausted."}]}` +
 		"\n```\n```forge-data\n" +
 		`{"version":2,"scope":"message","id":"daily","reportRef":"delivery","sequence":2,"format":"json","mode":"replace","data":[{"date":"2026-07-25","spend":1100.64,"impressions":27678},{"date":"2026-07-26","spend":980.25,"impressions":24120}]}` +
 		"\n```\n```forge-data\n" +
@@ -148,6 +154,8 @@ func TestCompileProducesExportableMultiTabDashboard(t *testing.T) {
 	require.Contains(t, printJSON, "#fff7e1")
 	require.Contains(t, printJSON, "#f5d28c")
 	require.Contains(t, printJSON, "Pacing: Behind")
+	require.Contains(t, printJSON, "#fee2e2")
+	require.Contains(t, printJSON, "#dc2626")
 
 	envelope, err := forgeexport.DecodeJSON(mustJSON(t, map[string]any{
 		"version": 1,
