@@ -807,6 +807,12 @@ const setFormData = ({values = {}, parameters = {}}) => {
     formStatus.value = { dirty: false, version: formStatus.peek().version + 1 };
 }
 
+const setEditedFormData = ({values = {}, parameters = {}}) => {
+    const nextValues = Object.keys(values || {}).length > 0 ? values : parameters;
+    form.value = nextValues;
+    updateDirtyFlag();
+}
+
 const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpPrefillRevision = true} = {}) => {
     const nextValues = Object.keys(values || {}).length > 0 ? values : parameters;
     if (signals.windowForm) {
@@ -1036,6 +1042,7 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
         getFormData,
         getWindowFormData,
         setFormData,
+        setEditedFormData,
         setWindowFormData,
         setSilentFormData,
         peekFormData,

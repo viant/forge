@@ -2,6 +2,7 @@ package com.viant.forgeandroid.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -13,7 +14,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
@@ -22,6 +25,8 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +35,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +53,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.ColumnDef
 import com.viant.forgeandroid.runtime.DataSourceContext
@@ -53,6 +61,7 @@ import com.viant.forgeandroid.runtime.ForgeRuntime
 import com.viant.forgeandroid.runtime.SelectionState
 import com.viant.forgeandroid.runtime.SelectorUtil
 import com.viant.forgeandroid.runtime.TableDef
+import com.viant.forgeandroid.runtime.TableEmptyStateDef
 import com.viant.forgeandroid.runtime.formatDashboardValue
 import kotlinx.coroutines.launch
 
@@ -77,6 +86,8 @@ fun TableRenderer(
     var sortAscending by remember(table.columns) { mutableStateOf(true) }
     val sortedRows = sortedTableRows(rows, sortColumnId, sortAscending)
     val refreshFeedback = tableRefreshFeedback(control.loading, control.error)
+    val showMetadataEmptyState = table.emptyState != null && sortedRows.isEmpty() &&
+        !control.loading && control.error.isNullOrBlank()
 
     LaunchedEffect(rowsOverride) {
         if (rowsOverride == null) {
@@ -86,9 +97,16 @@ fun TableRenderer(
 
     Column(modifier = Modifier.fillMaxWidth()) {
         table.toolbar?.let { tb ->
-            TableToolbar(runtime, context, tb)
+            TableToolbar(
+                runtime,
+                context,
+                tb,
+                hiddenItemIds = if (showMetadataEmptyState) table.emptyState?.hideToolbarItems.orEmpty().toSet() else emptySet()
+            )
         }
-        if (tableRefreshControlVisible(context.dataSourceRef, rowsOverride != null)) {
+        if (tableRefreshControlVisible(context.dataSourceRef, rowsOverride != null) &&
+            table.toolbar?.items.orEmpty().none { it.id == "refresh" }
+        ) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 IconButton(
                     onClick = {
@@ -108,7 +126,20 @@ fun TableRenderer(
         ) {
             val compact = maxWidth < 720.dp
             if (sortedRows.isEmpty() && !control.loading && control.error.isNullOrBlank()) {
-                EmptyTableState(context.dataSourceRef)
+                if (table.emptyState != null) {
+                    MetadataTableEmptyState(runtime, context, table.emptyState)
+                } else {
+                    EmptyTableState(context.dataSourceRef)
+                }
+            } else if (compact && table.presentation.equals("tabular", ignoreCase = true)) {
+                CompactTabularTable(
+                    table = table,
+                    rows = sortedRows,
+                    selection = selection,
+                    onSelect = { row, rowIndex ->
+                        coroutineScope.launch { context.toggleSelection(row, rowIndex, selectionModeOverride) }
+                    }
+                )
             } else if (compact) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     CompactSortControls(table, sortColumnId, sortAscending) { columnId ->
@@ -188,6 +219,171 @@ fun TableRenderer(
                 metrics = metrics,
                 currentPage = input.page ?: 1
             )
+        }
+    }
+}
+
+@Composable
+private fun CompactTabularTable(
+    table: TableDef,
+    rows: List<IndexedTableRow>,
+    selection: SelectionState,
+    onSelect: (Map<String, Any?>, Int) -> Unit
+) {
+    val columns = displayColumns(table)
+    val scroll = rememberScrollState()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(scroll)
+            .background(Color.White, RoundedCornerShape(14.dp))
+            .border(BorderStroke(1.dp, Color(0xFFE2E8F0)), RoundedCornerShape(14.dp))
+    ) {
+        Row(
+            modifier = Modifier
+                .background(Color(0xFFF7F9FC))
+                .padding(horizontal = 10.dp, vertical = 9.dp)
+        ) {
+            columns.forEachIndexed { index, column ->
+                Text(
+                    text = column.label ?: column.name ?: column.id.orEmpty(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF667085),
+                    maxLines = 1,
+                    modifier = Modifier
+                        .width(compactTableColumnWidth(column, index))
+                        .padding(end = 10.dp)
+                )
+            }
+        }
+        rows.forEach { indexed ->
+            val selected = tableRowIsSelected(selection, indexed.row, indexed.originalIndex)
+            Row(
+                modifier = Modifier
+                    .background(if (selected) Color(0xFFF0F5FF) else Color.White)
+                    .clickable { onSelect(indexed.row, indexed.originalIndex) }
+                    .semantics { contentDescription = tableRowAccessibilityLabel(table, indexed.row) }
+                    .padding(horizontal = 10.dp, vertical = 12.dp)
+            ) {
+                columns.forEachIndexed { index, column ->
+                    val key = tableColumnKey(column).orEmpty()
+                    CompactTabularCell(
+                        value = SelectorUtil.resolve(indexed.row, key),
+                        column = column,
+                        emphasized = index == 0,
+                        width = compactTableColumnWidth(column, index)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactTabularCell(
+    value: Any?,
+    column: ColumnDef,
+    emphasized: Boolean,
+    width: androidx.compose.ui.unit.Dp
+) {
+    if (column.type.equals("checkbox", ignoreCase = true)) {
+        Checkbox(
+            checked = when (value) {
+                is Boolean -> value
+                is Number -> value.toInt() != 0
+                else -> value?.toString()?.equals("true", ignoreCase = true) == true
+            },
+            onCheckedChange = null,
+            modifier = Modifier.width(width)
+        )
+        return
+    }
+    Text(
+        text = formatTableValue(value, column).ifBlank { "-" },
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier
+            .width(width)
+            .padding(end = 10.dp)
+    )
+}
+
+private fun compactTableColumnWidth(column: ColumnDef, index: Int) =
+    (column.width?.coerceIn(72, 220) ?: if (index == 0) 180 else 120).dp
+
+@Composable
+private fun MetadataTableEmptyState(
+    runtime: ForgeRuntime,
+    context: DataSourceContext,
+    emptyState: TableEmptyStateDef
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 28.dp),
+        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(
+            imageVector = if (emptyState.icon == "plus") Icons.Default.Add else Icons.Default.History,
+            contentDescription = null,
+            tint = Color(0xFF5E72A0),
+            modifier = Modifier.size(34.dp)
+        )
+        emptyState.kicker?.takeIf { it.isNotBlank() }?.let {
+            Text(it.uppercase(), style = MaterialTheme.typography.labelSmall, color = Color(0xFF667085))
+        }
+        Text(
+            text = emptyState.title ?: "Nothing here yet",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = Color(0xFF27364F)
+        )
+        emptyState.body?.takeIf { it.isNotBlank() }?.let {
+            Text(it, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF667085))
+        }
+        if (emptyState.steps.isNotEmpty()) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                emptyState.steps.forEachIndexed { index, step ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFFF7F9FC), RoundedCornerShape(12.dp))
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = (step.number ?: index + 1).toString(),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = Color(0xFF2764C7)
+                        )
+                        Column {
+                            Text(step.title.orEmpty(), fontWeight = FontWeight.SemiBold)
+                            step.body?.takeIf { it.isNotBlank() }?.let {
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF667085))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        emptyState.action?.let { action ->
+            Button(
+                onClick = {
+                    action.on.filter { it.event == "onClick" }.forEach { execution ->
+                        runtime.execute(execution, context, mapOf("item" to action))
+                    }
+                }
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Text(action.label ?: "Create new", modifier = Modifier.padding(start = 6.dp))
+            }
         }
     }
 }
@@ -711,7 +907,12 @@ private fun TablePagination(
             }
             IconButton(
                 onClick = { context.setPage(currentPage + 1) },
-                enabled = totalPages <= 0 || currentPage < totalPages || (metrics["hasMore"] as? Boolean == true)
+                enabled = when {
+                    metrics["hasMore"] as? Boolean == true -> true
+                    totalPages > 0 -> currentPage < totalPages
+                    totalCount != null -> false
+                    else -> true
+                }
             ) {
                 Icon(Icons.Default.ChevronRight, contentDescription = "Next page")
             }

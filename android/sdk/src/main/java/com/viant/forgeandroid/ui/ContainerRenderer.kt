@@ -29,6 +29,7 @@ import com.viant.forgeandroid.runtime.ForgeRuntime
 import com.viant.forgeandroid.runtime.ItemDef
 import com.viant.forgeandroid.runtime.LayoutDef
 import com.viant.forgeandroid.runtime.SelectorUtil
+import com.viant.forgeandroid.runtime.SelectionState
 import com.viant.forgeandroid.runtime.WindowContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
@@ -54,6 +55,26 @@ fun ContainerRenderer(
     } else {
         androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
     }
+    val visibilityCollection by if (visibilityContext != null) {
+        visibilityContext.collection.flow.collectAsState(initial = visibilityContext.collection.peek())
+    } else {
+        androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyList<Map<String, Any?>>()) }
+    }
+    val visibilityForm by if (visibilityContext != null) {
+        visibilityContext.form.flow.collectAsState(initial = visibilityContext.form.peek())
+    } else {
+        androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
+    }
+    val visibilityInput by if (visibilityContext != null) {
+        visibilityContext.input.flow.collectAsState(initial = visibilityContext.input.peek())
+    } else {
+        androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.viant.forgeandroid.runtime.InputState()) }
+    }
+    val visibilitySelection by if (visibilityContext != null) {
+        visibilityContext.selection.flow.collectAsState(initial = visibilityContext.selection.peek())
+    } else {
+        androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(SelectionState()) }
+    }
     val kind = container.kind?.trim().orEmpty()
     val customRenderer = LocalForgeContainerRendererRegistry.current.renderer(kind)
     val presentationDensity = LocalForgePresentationDensity.current
@@ -65,7 +86,26 @@ fun ContainerRenderer(
     }
 
     if (kind != "dashboard" && !kind.startsWith("dashboard.") &&
-        !evaluateDashboardCondition(container.visibleWhen, metrics = visibilityMetrics)
+        !evaluateDashboardCondition(
+            condition = container.visibleWhen,
+            metrics = visibilityMetrics,
+            filters = visibilityInput.filter,
+            form = visibilityForm,
+            windowForm = windowForm,
+            collection = visibilityCollection,
+            input = mapOf(
+                "filter" to visibilityInput.filter,
+                "parameters" to visibilityInput.parameters,
+                "page" to visibilityInput.page,
+                "fetch" to visibilityInput.fetch,
+                "refresh" to visibilityInput.refresh
+            ),
+            selectionValues = mapOf(
+                "selected" to visibilitySelection.selected,
+                "selection" to visibilitySelection.selection,
+                "rowIndex" to visibilitySelection.rowIndex
+            )
+        )
     ) {
         return
     }
@@ -135,7 +175,10 @@ fun ContainerRenderer(
             }
         }
 
-        if (container.toolbar != null && effectiveDataSourceRef.isNotBlank()) {
+        if (container.toolbar != null &&
+            container.toolbar.placement?.lowercase() !in setOf("afternavigation", "windowheader") &&
+            effectiveDataSourceRef.isNotBlank()
+        ) {
             WithContainerDataSource(
                 window = window,
                 dataSourceRef = effectiveDataSourceRef
@@ -318,8 +361,18 @@ fun ContainerRenderer(
     }
 }
 
-private fun shouldUseMenuList(items: List<ItemDef>): Boolean {
+internal fun shouldUseMenuList(items: List<ItemDef>): Boolean {
     if (items.isEmpty()) return false
+    val formControlTypes = setOf(
+        "text", "textarea", "number", "numeric", "currency", "date", "datetime",
+        "checkbox", "toggle", "radio", "select", "dropdown", "multiselect", "lookup",
+        "object", "schema", "keyvaluepairs", "treemultiselect"
+    )
+    if (items.any { item ->
+            item.lookup != null || item.type?.trim()?.lowercase() in formControlTypes
+        }) {
+        return false
+    }
     return items.all { item ->
         val type = item.type?.trim()?.lowercase().orEmpty()
         item.on.isNotEmpty() ||

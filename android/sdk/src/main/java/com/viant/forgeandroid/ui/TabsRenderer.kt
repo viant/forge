@@ -2,6 +2,7 @@ package com.viant.forgeandroid.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -13,12 +14,17 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,6 +36,8 @@ import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
 import com.viant.forgeandroid.runtime.ContainerDef
 import com.viant.forgeandroid.runtime.ForgeRuntime
 import com.viant.forgeandroid.runtime.WindowContext
@@ -42,10 +50,51 @@ fun TabsRenderer(runtime: ForgeRuntime, window: WindowContext, container: Contai
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val compactPages = remember(container) { mobileTabPages(container) }
         val tabStyle = container.tabs?.style?.trim()?.lowercase().orEmpty()
-        if (maxWidth < 600.dp && tabStyle !in setOf("menu", "dropdown", "picker") && compactPages.isNotEmpty()) {
+        val presentation = container.tabs?.presentation?.trim()?.lowercase().orEmpty()
+        if (presentation in setOf("views", "pages", "stack") && compactPages.isNotEmpty()) {
+            MobileTabViewStackRenderer(runtime, window, container, compactPages)
+        } else if (maxWidth < 600.dp && tabStyle !in setOf("menu", "dropdown", "picker") && compactPages.isNotEmpty()) {
             MobileTabPagesRenderer(runtime, window, container, compactPages)
         } else {
             StandardTabsRenderer(runtime, window, container)
+        }
+    }
+}
+
+@Composable
+private fun MobileTabViewStackRenderer(
+    runtime: ForgeRuntime,
+    window: WindowContext,
+    container: ContainerDef,
+    pages: List<MobileTabPage>
+) {
+    val initialIndex = initialMobileTabPageIndex(container, pages)
+    var selectedPageId by remember(container.id, pages.map { it.id }) {
+        mutableStateOf(pages[initialIndex.coerceIn(0, pages.lastIndex)].id)
+    }
+    val selectedPage = pages.firstOrNull { it.id == selectedPageId } ?: pages.first()
+
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        CompactSectionNavigator(
+            entries = pages.map { it.id to it.title },
+            selectedId = selectedPage.id,
+            onSelect = { selectedPageId = it },
+            fallbackLabel = "Section",
+            chooserContentDescription = "Choose section"
+        )
+        if (container.toolbar?.placement.equals("afterNavigation", ignoreCase = true)) {
+            container.dataSourceRef?.let(window::contextOrNull)?.let { context ->
+                TableToolbar(runtime, context, container.toolbar!!)
+            }
+        }
+        key(selectedPage.id) {
+            ContainerRenderer(
+                runtime = runtime,
+                window = window,
+                container = selectedPage.container,
+                suppressTitle = true,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }

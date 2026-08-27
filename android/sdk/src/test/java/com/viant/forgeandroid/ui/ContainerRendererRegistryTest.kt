@@ -6,6 +6,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import com.viant.forgeandroid.runtime.ExecutionDef
+import com.viant.forgeandroid.runtime.ItemDef
 
 private object TestContainerRendererExtension : ForgeContainerRendererExtension {
     @Composable
@@ -13,6 +17,32 @@ private object TestContainerRendererExtension : ForgeContainerRendererExtension 
 }
 
 class ContainerRendererRegistryTest {
+    @Test
+    fun `editable controls with callbacks remain forms`() {
+        assertFalse(
+            shouldUseMenuList(
+                listOf(
+                    ItemDef(
+                        id = "name",
+                        type = "text",
+                        on = listOf(ExecutionDef(event = "onChange", handler = "records.sync"))
+                    )
+                )
+            )
+        )
+        assertTrue(
+            shouldUseMenuList(
+                listOf(
+                    ItemDef(
+                        id = "open",
+                        type = "button",
+                        on = listOf(ExecutionDef(event = "onClick", handler = "records.open"))
+                    )
+                )
+            )
+        )
+    }
+
     @Test
     fun `registry uses exact kind`() {
         val registry = ForgeContainerRendererRegistry.Builder()

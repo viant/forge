@@ -124,7 +124,13 @@ fun DialogRenderer(runtime: ForgeRuntime, window: WindowContext, dialogs: List<D
                                     container.items.isNotEmpty() ||
                                     container.containers.isNotEmpty()
                                 ) {
-                                    ContainerRenderer(runtime, window, container, effectiveSelectionMode)
+                                    ContainerRenderer(
+                                        runtime = runtime,
+                                        window = window,
+                                        container = container,
+                                        selectionModeOverride = effectiveSelectionMode,
+                                        inheritedDataSourceRef = dialogDataSourceRef
+                                    )
                                 } else {
                                     Text("Dialog content")
                                 }

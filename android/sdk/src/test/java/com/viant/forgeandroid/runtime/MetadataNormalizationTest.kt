@@ -13,6 +13,52 @@ class MetadataNormalizationTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun `automation metadata primitives decode for native targets`() {
+        val decoded = json.decodeFromString(
+            WindowMetadata.serializer(),
+            """
+            {
+              "view": {"content": {"containers": [{
+                "id": "automations",
+                "visibleWhen": {"all": [
+                  {"source": "collection", "notEmpty": true},
+                  {"source": "windowForm", "field": "mode", "equals": "list"}
+                ]},
+                "table": {
+                  "emptyState": {
+                    "title": "Create your first automation",
+                    "hideToolbarItems": ["run"],
+                    "action": {"id": "add", "icon": "plus", "on": [{
+                      "event": "onClick", "handler": "automation.add", "state": {"mode": "editor"}
+                    }]}
+                  },
+                  "toolbar": {"density": "compact", "layout": "balanced", "items": [{
+                    "id": "run", "icon": "play", "tooltip": "Run now", "ariaLabel": "Run selected",
+                    "style": {"backgroundColor": "#edf9f2"}
+                  }]}
+                }
+              }]}},
+              "dataSource": {"automations": {
+                "autoSelect": false,
+                "quickFilterSet": "default",
+                "filterSet": [{"name": "default", "template": [{"id": "name", "operator": "contains"}]}]
+              }}
+            }
+            """.trimIndent()
+        )
+
+        val container = decoded.view?.content?.containers?.single()
+        val table = container?.table
+        assertEquals(2, container?.visibleWhen?.all?.size)
+        assertEquals("Create your first automation", table?.emptyState?.title)
+        assertEquals("editor", table?.emptyState?.action?.on?.single()?.state?.get("mode")?.jsonPrimitive?.content)
+        assertEquals("compact", table?.toolbar?.density)
+        assertEquals("Run selected", table?.toolbar?.items?.single()?.ariaLabel)
+        assertEquals(false, decoded.dataSources["automations"]?.autoSelect)
+        assertEquals("name", decoded.dataSources["automations"]?.filterSet?.single()?.template?.single()?.id)
+    }
+
+    @Test
     fun `normalizeWindowMetadataJson wraps top level content container`() {
         val raw = json.parseToJsonElement(
             """

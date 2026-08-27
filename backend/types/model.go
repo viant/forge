@@ -320,6 +320,7 @@ type StyleProperties struct {
 type SizingProperties struct {
 	Width     string `json:"width,omitempty" yaml:"width,omitempty"`
 	Height    string `json:"height,omitempty" yaml:"height,omitempty"`
+	ItemSize  string `json:"itemSize,omitempty" yaml:"itemSize,omitempty"`
 	MaxWidth  string `json:"maxWidth,omitempty" yaml:"maxWidth,omitempty"`
 	MaxHeight string `json:"maxHeight,omitempty" yaml:"maxHeight,omitempty"`
 	MinWidth  string `json:"minWidth,omitempty" yaml:"minWidth,omitempty"`
@@ -1163,6 +1164,9 @@ type Tabs struct {
 	SelectedTabId            string `json:"selectedTabId" yaml:"selectedTabId"`
 	Style                    string `json:"style" yaml:"style"`
 	Vertical                 bool   `json:"vertical" yaml:"vertical"`
+	Presentation             string `json:"presentation,omitempty" yaml:"presentation,omitempty"`
+	ShowBack                 *bool  `json:"showBack,omitempty" yaml:"showBack,omitempty"`
+	ListTitle                string `json:"listTitle,omitempty" yaml:"listTitle,omitempty"`
 }
 
 type Card struct {
@@ -1173,6 +1177,7 @@ type Card struct {
 
 type Table struct {
 	Columns           []Column               `json:"columns" yaml:"columns"`
+	Presentation      string                 `json:"presentation,omitempty" yaml:"presentation,omitempty"`
 	Toolbar           *Toolbar               `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
 	EnforceColumnSize *bool                  `json:"enforceColumnSize,omitempty" yaml:"enforceColumnSize,omitempty"`
 	Width             string                 `json:"width,omitempty" yaml:"width,omitempty"`
@@ -1227,6 +1232,7 @@ type Toolbar struct {
 	ClassName       string                            `json:"className,omitempty" yaml:"className,omitempty"`
 	Density         string                            `json:"density,omitempty" yaml:"density,omitempty"`
 	Layout          string                            `json:"layout,omitempty" yaml:"layout,omitempty"`
+	Placement       string                            `json:"placement,omitempty" yaml:"placement,omitempty"`
 	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
 	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
 }

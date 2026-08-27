@@ -37,8 +37,9 @@ const Toolbar = ({
 
     const toolbarEvents = useToolbarControlEvents(context, toolbarItems);
     const { signals } = context;
-    const { control } = signals;
+    const { control, formStatus } = signals;
     const disabled = control.value?.inactive || false;
+    const formDirty = formStatus?.value?.dirty === true;
 
     const renderToolbarItem = (item, align) => {
         if (item.id === 'quickFilter' || item.id === 'quickFilterInputs') {
@@ -121,6 +122,7 @@ const Toolbar = ({
         <div
             className={`toolbar-container${density === 'compact' ? ' is-compact' : ''}${layout === 'balanced' ? ' is-balanced' : ''}${className ? ` ${className}` : ''}`}
             style={style}
+            data-form-dirty={formDirty ? 'true' : 'false'}
         >
             {/* Items aligned to the left */}
             <div className="toolbar-left">

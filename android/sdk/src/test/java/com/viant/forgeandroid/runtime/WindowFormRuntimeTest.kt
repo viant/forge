@@ -4,8 +4,33 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.json.JsonPrimitive
 
 class WindowFormRuntimeTest {
+    @Test
+    fun successfulExecutionAppliesMetadataStateToWindowForm() {
+        val runtime = ForgeRuntime(
+            endpoints = emptyMap(),
+            scope = CoroutineScope(Dispatchers.Unconfined)
+        )
+        runtime.registerHandler("records.openEditor") { true }
+        val state = runtime.openWindowInline(
+            windowKey = "records",
+            metadata = WindowMetadata(dataSources = mapOf("records" to DataSourceDef()))
+        )
+        val context = runtime.windowContext(state.windowId).context("records")
+
+        runtime.execute(
+            ExecutionDef(
+                handler = "records.openEditor",
+                state = mapOf("mode" to JsonPrimitive("editor"))
+            ),
+            context
+        )
+
+        assertEquals("editor", runtime.windowFormValue(state.windowId)["mode"])
+    }
+
     @Test
     fun openWindowInlineSeedsWindowFormFromMetadataOnInitConstants() {
         val runtime = ForgeRuntime(
