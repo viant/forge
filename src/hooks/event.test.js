@@ -6,6 +6,12 @@ const createContext = (calls) => ({
             value: [],
             peek: () => [],
         },
+        windowForm: {
+            value: {},
+            peek() {
+                return this.value;
+            },
+        },
     },
     lookupHandler: (id) => {
         if (id === 'schedule.saveSchedule') {
@@ -47,6 +53,20 @@ const createContext = (calls) => ({
     }
     if (readonlyCalls !== 1) {
         console.error(`expected one toolbar readonly evaluation, got ${readonlyCalls}`);
+        process.exitCode = 1;
+    }
+
+    const stateful = useToolbarControlEvents(context, [{
+        id: 'edit',
+        on: [{
+            event: 'onClick',
+            handler: 'schedule.saveSchedule',
+            state: {mode: 'editor'},
+        }],
+    }]);
+    stateful.edit.events.onClick({type: 'click'});
+    if (context.signals.windowForm.value.mode !== 'editor') {
+        console.error('expected event metadata state to update shared window state');
         process.exitCode = 1;
     }
 }

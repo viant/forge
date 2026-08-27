@@ -12,6 +12,7 @@
 .toolbar-left {
     display: flex;
     align-items: center;
+    gap: 8px;
 }
 
 .toolbar-center {
@@ -26,6 +27,32 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
+    gap: 8px;
+}
+
+.toolbar-left > span,
+.toolbar-center > span,
+.toolbar-right > span {
+    display: inline-flex;
+    align-items: center;
+}
+
+.toolbar-container .bp4-button,
+.toolbar-container .bp6-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    line-height: 1;
+}
+
+.toolbar-container .bp4-button .bp4-icon,
+.toolbar-container .bp6-button .bp6-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
 }
 
 td .pagination-bar {
@@ -44,4 +71,31 @@ td .pagination-bar {
     align-items: center;
     gap: 6px;
     white-space: nowrap;
+}
+
+.toolbar-container.is-balanced {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.toolbar-container.is-balanced .toolbar-left {
+    justify-self: start;
+}
+
+.toolbar-container.is-balanced .toolbar-center {
+    justify-self: center;
+}
+
+.toolbar-container.is-balanced .toolbar-right {
+    justify-self: end;
+}
+
+.toolbar-container.is-compact .bp4-button,
+.toolbar-container.is-compact .bp6-button {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+    border-radius: 10px;
 }

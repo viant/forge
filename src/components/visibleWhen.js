@@ -12,8 +12,24 @@ export const resolveChildContext = (baseContext, dataSourceRef) => {
     return typeof baseContext?.Context === 'function' ? baseContext.Context(targetRef) : baseContext;
 };
 
+const isEmptyValue = (value) => {
+    if (value == null) return true;
+    if (Array.isArray(value) || typeof value === 'string') return value.length === 0;
+    if (typeof value === 'object') return Object.keys(value).length === 0;
+    return false;
+};
+
 export const evaluatePlainVisibleWhen = (visibleWhen, context) => {
     if (!visibleWhen || !context) return true;
+    if (Array.isArray(visibleWhen.all)) {
+        return visibleWhen.all.every((condition) => evaluatePlainVisibleWhen(condition, context));
+    }
+    if (Array.isArray(visibleWhen.any)) {
+        return visibleWhen.any.some((condition) => evaluatePlainVisibleWhen(condition, context));
+    }
+    if (visibleWhen.not) {
+        return !evaluatePlainVisibleWhen(visibleWhen.not, context);
+    }
     const source = String(visibleWhen.source || 'form').toLowerCase();
     const field = visibleWhen.field || visibleWhen.selector || visibleWhen.key;
 
@@ -35,6 +51,9 @@ export const evaluatePlainVisibleWhen = (visibleWhen, context) => {
         case 'metrics':
             scope = context.signals?.metrics?.peek?.() || {};
             break;
+        case 'collection':
+            scope = context.signals?.collection?.peek?.() || [];
+            break;
         case 'form':
         default:
             scope = context.handlers?.dataSource?.peekFormData?.() || {};
@@ -51,11 +70,26 @@ export const evaluatePlainVisibleWhen = (visibleWhen, context) => {
     if (visibleWhen.notEquals !== undefined) {
         return actual !== visibleWhen.notEquals;
     }
+    if (visibleWhen.empty !== undefined) {
+        return isEmptyValue(actual) === visibleWhen.empty;
+    }
+    if (visibleWhen.notEmpty !== undefined) {
+        return (!isEmptyValue(actual)) === visibleWhen.notEmpty;
+    }
     return !!actual;
 };
 
 export const trackVisibleWhen = (visibleWhen, context) => {
     if (!visibleWhen || !context) {
+        return;
+    }
+    const nested = [
+        ...(Array.isArray(visibleWhen.all) ? visibleWhen.all : []),
+        ...(Array.isArray(visibleWhen.any) ? visibleWhen.any : []),
+        ...(visibleWhen.not ? [visibleWhen.not] : []),
+    ];
+    if (nested.length > 0) {
+        nested.forEach((condition) => trackVisibleWhen(condition, context));
         return;
     }
     const source = String(visibleWhen.source || 'form').toLowerCase();
@@ -75,6 +109,9 @@ export const trackVisibleWhen = (visibleWhen, context) => {
             break;
         case 'metrics':
             context?.signals?.metrics?.value;
+            break;
+        case 'collection':
+            context?.signals?.collection?.value;
             break;
         case 'form':
         default:

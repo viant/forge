@@ -41,9 +41,13 @@ export const createDashboardContext = (context, container) => {
     return withDashboardContext(context, dashboardKey);
 };
 
-export const getDashboardVisibleWhen = (container = {}) => (
-    container?.dashboard?.visibleWhen || container?.visibleWhen || null
-);
+export const getDashboardVisibleWhen = (container = {}) => {
+    const dashboardCondition = container?.dashboard?.visibleWhen;
+    if (dashboardCondition && Object.keys(dashboardCondition).length > 0) {
+        return dashboardCondition;
+    }
+    return container?.visibleWhen || null;
+};
 
 const collectDashboardContainers = (containers = []) => {
     const result = [];

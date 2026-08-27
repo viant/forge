@@ -38,6 +38,14 @@ const Execution = (context, messageBus) => {
             }
             result = handler({execution, ...args, parameters, context});
 
+            if (result !== false && execution.state && typeof execution.state === 'object' && !Array.isArray(execution.state)) {
+                const signal = context?.signals?.windowForm;
+                if (signal) {
+                    const current = signal.peek?.() || signal.value || {};
+                    signal.value = { ...current, ...execution.state };
+                }
+            }
+
             if (execution.onSuccessHandler) {
                 return execution.onSuccessHandler({execution, ...args, result, parameters});
             }
@@ -143,14 +151,14 @@ const Execution = (context, messageBus) => {
 };
 
 function indexExecution(context, on, handlers, messageBus) {
-    on.forEach(({event, init, handler, onError, onDone, onSuccess, async, args, parameters}) => {
+    on.forEach(({event, init, handler, onError, onDone, onSuccess, async, args, parameters, state}) => {
         // Alias handling for common event names
         let evtKey = event;
         if (event === 'onSelection') evtKey = 'onItemSelect';
         if (!handlers[evtKey]) {
             handlers[evtKey] = Execution(context, messageBus);
         }
-        handlers[evtKey].push({id: handler, init, onError, onSuccess, onDone, async, args, parameters, handler: null});
+        handlers[evtKey].push({id: handler, init, onError, onSuccess, onDone, async, args, parameters, state, handler: null});
     });
 }
 
