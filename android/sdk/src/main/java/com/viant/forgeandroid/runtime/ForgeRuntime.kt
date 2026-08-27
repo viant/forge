@@ -170,6 +170,12 @@ class ForgeRuntime(
         return execEngine.execute(execution, context, args)
     }
 
+    suspend fun evaluate(
+        execution: ExecutionDef,
+        context: DataSourceContext?,
+        args: Map<String, Any?> = emptyMap()
+    ): Any? = execEngine.evaluate(execution, context, args)
+
     private fun loadWindowMetadata(window: WindowState, forceReload: Boolean = false) {
         scope.launch(Dispatchers.IO) {
             if (window.inlineMetadata != null) {
@@ -330,17 +336,46 @@ class ExecutionEngine(
     private val scope: CoroutineScope
 ) {
     fun execute(execution: ExecutionDef, context: DataSourceContext?, args: Map<String, Any?> = emptyMap()): Job? {
-        val params = if (context != null) parameterResolver.resolve(execution.parameters, context) else ParameterResolution(emptyMap(), emptyList())
-        val resolved = ExecutionArgs(execution, context, params.inbound, args)
-
         val handlerName = execution.handler ?: return null
         val handler = handlers.resolve(handlerName) ?: builtIn(handlerName)
         if (handler != null) {
             return scope.launch {
-                handler.invoke(resolved)
+                invokeHandler(execution, context, args, handler, applyState = true)
             }
         }
         return null
+    }
+
+    suspend fun evaluate(
+        execution: ExecutionDef,
+        context: DataSourceContext?,
+        args: Map<String, Any?> = emptyMap()
+    ): Any? {
+        val handlerName = execution.handler ?: return null
+        val handler = handlers.resolve(handlerName) ?: builtIn(handlerName) ?: return null
+        return invokeHandler(execution, context, args, handler, applyState = false)
+    }
+
+    private suspend fun invokeHandler(
+        execution: ExecutionDef,
+        context: DataSourceContext?,
+        args: Map<String, Any?>,
+        handler: Handler,
+        applyState: Boolean
+    ): Any? {
+        val params = if (context != null) {
+            parameterResolver.resolve(execution.parameters, context)
+        } else {
+            ParameterResolution(emptyMap(), emptyList())
+        }
+        val result = handler.invoke(ExecutionArgs(execution, context, params.inbound, args))
+        if (applyState && result != false && execution.state.isNotEmpty() && context != null) {
+            runtime.setWindowFormValues(
+                context.window.windowId,
+                execution.state.mapValues { JsonUtil.elementToAny(it.value) }
+            )
+        }
+        return result
     }
 
     fun evaluateReadOnly(execution: ExecutionDef, context: DataSourceContext?): Boolean {
@@ -486,6 +521,10 @@ class ExecutionEngine(
         "dataSource.isFormNotDirty" -> handler@{ args ->
             val context = args.context ?: return@handler true
             !context.isFormDirty()
+        }
+        "dataSource.isFormDirty" -> handler@{ args ->
+            val context = args.context ?: return@handler false
+            context.isFormDirty()
         }
         "dataSource.setFilter" -> handler@{ args ->
             val context = args.context ?: return@handler null

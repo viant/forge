@@ -2,12 +2,14 @@ package com.viant.forgeandroid.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -89,6 +91,11 @@ private fun WindowContentBody(
         dataSourceRef?.takeIf { it.isNotBlank() }?.let(context::contextOrNull)
     }
     val inheritedDataSourceRef = defaultDataSourceContext?.dataSourceRef
+    val headerToolbarContainer = remember(metadata) { findWindowHeaderToolbar(containers) }
+    val headerToolbarContext = remember(windowId, metadata, headerToolbarContainer?.dataSourceRef) {
+        val ref = headerToolbarContainer?.dataSourceRef ?: inheritedDataSourceRef
+        ref?.let(context::contextOrNull)
+    }
 
     LaunchedEffect(windowId, metadata) {
         metadata.on.filter { it.event == "onInit" }.forEach {
@@ -129,8 +136,16 @@ private fun WindowContentBody(
                     text = metadata.namespace ?: windowKey,
                     fontWeight = FontWeight.SemiBold,
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(start = 4.dp, top = 10.dp)
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = 4.dp, top = 10.dp)
                 )
+                val headerToolbar = headerToolbarContainer?.toolbar
+                if (headerToolbar != null && headerToolbarContext != null) {
+                    Box(modifier = Modifier.width(56.dp)) {
+                        TableToolbar(runtime, headerToolbarContext, headerToolbar)
+                    }
+                }
             }
             HorizontalDivider()
         }
@@ -248,6 +263,16 @@ private fun WindowContentBody(
     }
 
     DialogRenderer(runtime, context, metadata.dialogs)
+}
+
+private fun findWindowHeaderToolbar(containers: List<com.viant.forgeandroid.runtime.ContainerDef>): com.viant.forgeandroid.runtime.ContainerDef? {
+    containers.forEach { container ->
+        if (container.toolbar?.placement.equals("windowHeader", ignoreCase = true)) {
+            return container
+        }
+        findWindowHeaderToolbar(container.containers)?.let { return it }
+    }
+    return null
 }
 
 private fun splitFractions(count: Int): List<Float> {

@@ -24,6 +24,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
@@ -34,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -249,9 +251,44 @@ private fun FormItemRenderer(
     val metrics by dataSourceContext.metrics.flow.collectAsState(initial = emptyMap())
     val windowFormSignal = context.window.windowFormSignal()
     val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
+    val collection by dataSourceContext.collection.flow.collectAsState(initial = dataSourceContext.collection.peek())
+    val input by dataSourceContext.input.flow.collectAsState(initial = dataSourceContext.input.peek())
+    val selection by dataSourceContext.selection.flow.collectAsState(initial = dataSourceContext.selection.peek())
+    val visibleExecutions = item.on.filter { it.event == "onVisible" }
+    val callbackVisible by produceState(
+        initialValue = true,
+        item,
+        form,
+        metrics,
+        windowForm,
+        collection,
+        input,
+        selection
+    ) {
+        value = visibleExecutions.all { execution ->
+            runtime.evaluate(execution, dataSourceContext, mapOf("item" to item)) as? Boolean ?: true
+        }
+    }
+    val metadataVisible = com.viant.forgeandroid.runtime.evaluateDashboardCondition(
+        condition = item.visibleWhen,
+        metrics = metrics,
+        filters = input.filter,
+        form = form,
+        windowForm = windowForm,
+        collection = collection,
+        input = mapOf("filter" to input.filter, "parameters" to input.parameters, "page" to input.page),
+        selectionValues = mapOf(
+            "selected" to selection.selected,
+            "selection" to selection.selection,
+            "rowIndex" to selection.rowIndex
+        )
+    )
+    if (!callbackVisible || !metadataVisible) return
 
     LaunchedEffect(dataSourceContext.dataSourceRef) {
-        if (dataSourceContext.dataSource.autoFetch != false) {
+        if (dataSourceContext.dataSourceRef != context.dataSourceRef &&
+            dataSourceContext.dataSource.autoFetch != false
+        ) {
             dataSourceContext.fetchCollection()
         }
     }
@@ -259,7 +296,7 @@ private fun FormItemRenderer(
     val key = itemValueKey(item) ?: return
     val value = resolveItemValue(item, key, form, metrics, windowForm)
     val validationError = validationErrors[key]
-    when (item.type) {
+    when (if (item.lookup != null) "lookup" else item.type) {
                 "label" -> LabelItemCard(
                     label = item.label ?: key,
                     value = resolveItemDisplayValue(item, key, form, metrics, windowForm)
@@ -372,7 +409,7 @@ private fun FormItemRenderer(
                     )
                 }
                 "lookup" -> {
-                    val lookup = item.properties["lookup"]
+                    val lookup = item.lookup ?: item.properties["lookup"]
                     val display = lookupDisplayValue(lookup, form, value)
                     Row(modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(
@@ -397,6 +434,25 @@ private fun FormItemRenderer(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                        )
+                    }
+                }
+                "checkbox", "toggle" -> {
+                    val checked = when (val raw = resolveItemRawValue(item, key, form, metrics, windowForm)) {
+                        is Boolean -> raw
+                        is Number -> raw.toInt() != 0
+                        else -> raw?.toString()?.equals("true", ignoreCase = true) == true
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(item.label ?: key)
+                        Switch(
+                            checked = checked,
+                            onCheckedChange = { setScopedItemValue(runtime, dataSourceContext, item, key, it) }
                         )
                     }
                 }
@@ -668,6 +724,19 @@ internal fun setScopedItemValue(
     when (item.scope?.trim()?.lowercase()) {
         "windowform" -> runtime.setWindowFormValues(context.window.windowId, mapOf(key to value))
         else -> context.setFormField(key, value)
+    }
+    val eventOrder = when (item.type?.trim()?.lowercase()) {
+        "number", "numeric", "currency" -> listOf("onValueChange", "onChange", "onInput")
+        "multiselect" -> listOf("onChange", "onSelection", "onItemSelect")
+        else -> listOf("onChange", "onInput", "onValueChange", "onSelection", "onItemSelect")
+    }
+    val execution = eventOrder.firstNotNullOfOrNull { event -> item.on.firstOrNull { it.event == event } }
+    if (execution != null) {
+        runtime.execute(
+            execution,
+            context,
+            mapOf("item" to item, "value" to value, "selected" to value)
+        )
     }
 }
 

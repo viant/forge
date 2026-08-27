@@ -17,7 +17,7 @@ import WindowControls from './WindowControls';
 import './WindowManager.css';
 import { resolveTabWindows, resolveVisibleTabId } from './windowManagerState.js';
 
-const WindowManager = () => {
+const WindowManager = ({renderWindowContent, isTabVisible}) => {
     useSignals();
     const windows = activeWindows.value || [];
     const tabId = selectedTabId.value || null;
@@ -68,7 +68,9 @@ const WindowManager = () => {
     }, [windows]);
 
     // Separate windows into tabbed and floating
-    const tabWindows = resolveTabWindows(windows);
+    const tabWindows = resolveTabWindows(windows).filter((win) => (
+        typeof isTabVisible !== 'function' || isTabVisible(win) !== false
+    ));
     const floatingWindows = windows.filter(
         (win) => win.inTab === false && !win.isMinimized
     );
@@ -121,6 +123,14 @@ const WindowManager = () => {
         return String(win?.windowKey || '').trim();
     };
 
+    const renderContent = (win, isInTab) => {
+        const defaultContent = <WindowContent window={win} isInTab={isInTab} />;
+        if (typeof renderWindowContent !== 'function') {
+            return defaultContent;
+        }
+        return renderWindowContent({window: win, isInTab, defaultContent}) ?? defaultContent;
+    };
+
     return (
         <div
             ref={containerRef}
@@ -160,9 +170,7 @@ const WindowManager = () => {
                         }
                         panel={
                             win.windowId === visibleTabId ? (
-                                <WindowContent window={win}
-                                    isInTab={true}
-                                />
+                                renderContent(win, true)
                             ) : null
                         }
                     />
@@ -357,10 +365,7 @@ const WindowManager = () => {
                             }}
                             tabIndex={win.isModal ? 0 : undefined}
                         >
-                            <WindowContent
-                                window={win}
-                                isInTab={false}
-                            />
+                            {renderContent(win, false)}
                         </div>
                     </div>
                 </Rnd>

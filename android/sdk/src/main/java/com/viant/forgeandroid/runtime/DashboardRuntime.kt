@@ -1366,13 +1366,44 @@ fun evaluateDashboardCondition(
     condition: DashboardConditionDef?,
     metrics: Map<String, Any?> = emptyMap(),
     filters: Map<String, Any?> = emptyMap(),
-    selection: DashboardSelectionState = DashboardSelectionState()
+    selection: DashboardSelectionState = DashboardSelectionState(),
+    form: Map<String, Any?> = emptyMap(),
+    windowForm: Map<String, Any?> = emptyMap(),
+    collection: List<Map<String, Any?>> = emptyList(),
+    input: Map<String, Any?> = emptyMap(),
+    selectionValues: Map<String, Any?> = emptyMap()
 ): Boolean {
     if (condition == null) {
         return true
     }
+    if (condition.all.isNotEmpty() && condition.all.any {
+            !evaluateDashboardCondition(it, metrics, filters, selection, form, windowForm, collection, input, selectionValues)
+        }) {
+        return false
+    }
+    if (condition.any.isNotEmpty() && condition.any.none {
+            evaluateDashboardCondition(it, metrics, filters, selection, form, windowForm, collection, input, selectionValues)
+        }) {
+        return false
+    }
+    if (condition.not != null &&
+        evaluateDashboardCondition(condition.not, metrics, filters, selection, form, windowForm, collection, input, selectionValues)
+    ) {
+        return false
+    }
     val selector = condition.selector ?: condition.field ?: condition.key
-    val actual = resolveDashboardValue(condition.source, selector, metrics, filters, selection)
+    val actual = resolveDashboardValue(
+        condition.source,
+        selector,
+        metrics,
+        filters,
+        selection,
+        form,
+        windowForm,
+        collection,
+        input,
+        selectionValues
+    )
 
     condition.whenValue?.let { expected ->
         if (!dashboardValuesEqual(actual, expected)) {
@@ -1763,45 +1794,46 @@ private fun resolveDashboardValue(
     selector: String?,
     metrics: Map<String, Any?>,
     filters: Map<String, Any?>,
-    selection: DashboardSelectionState
+    selection: DashboardSelectionState,
+    form: Map<String, Any?> = emptyMap(),
+    windowForm: Map<String, Any?> = emptyMap(),
+    collection: List<Map<String, Any?>> = emptyList(),
+    input: Map<String, Any?> = emptyMap(),
+    selectionValues: Map<String, Any?> = emptyMap()
 ): Any? {
+    val dashboardSelection = mapOf(
+        "dimension" to selection.dimension,
+        "entityKey" to selection.entityKey,
+        "pointKey" to selection.pointKey,
+        "selected" to selection.selected,
+        "sourceBlockId" to selection.sourceBlockId
+    )
+    val effectiveSelection = selectionValues.ifEmpty { dashboardSelection }
+    val normalizedSource = source?.lowercase() ?: "metrics"
     if (selector.isNullOrBlank()) {
-        return when (source?.lowercase()) {
-            "selection" -> mapOf(
-                "dimension" to selection.dimension,
-                "entityKey" to selection.entityKey,
-                "pointKey" to selection.pointKey,
-                "selected" to selection.selected,
-                "sourceBlockId" to selection.sourceBlockId
-            )
+        return when (normalizedSource) {
+            "selection" -> effectiveSelection
             "filters", "filter" -> filters
+            "form" -> form
+            "windowform" -> windowForm
+            "collection" -> collection
+            "input" -> input
             else -> metrics
         }
     }
-    return when (source?.lowercase()) {
-        "selection" -> SelectorUtil.resolve(
-            mapOf(
-                "dimension" to selection.dimension,
-                "entityKey" to selection.entityKey,
-                "pointKey" to selection.pointKey,
-                "selected" to selection.selected,
-                "sourceBlockId" to selection.sourceBlockId
-            ),
-            selector
-        )
+    return when (normalizedSource) {
+        "selection" -> SelectorUtil.resolve(effectiveSelection, selector)
         "filters", "filter" -> SelectorUtil.resolve(filters, selector)
+        "form" -> SelectorUtil.resolve(form, selector)
+        "windowform" -> SelectorUtil.resolve(windowForm, selector)
+        "collection" -> SelectorUtil.resolve(collection, selector)
+        "input" -> SelectorUtil.resolve(input, selector)
         else -> when {
             selector.startsWith("filters.") -> SelectorUtil.resolve(filters, selector.removePrefix("filters."))
-            selector.startsWith("selection.") -> SelectorUtil.resolve(
-                mapOf(
-                    "dimension" to selection.dimension,
-                    "entityKey" to selection.entityKey,
-                    "pointKey" to selection.pointKey,
-                    "selected" to selection.selected,
-                    "sourceBlockId" to selection.sourceBlockId
-                ),
-                selector.removePrefix("selection.")
-            )
+            selector.startsWith("selection.") -> SelectorUtil.resolve(effectiveSelection, selector.removePrefix("selection."))
+            selector.startsWith("form.") -> SelectorUtil.resolve(form, selector.removePrefix("form."))
+            selector.startsWith("windowForm.") -> SelectorUtil.resolve(windowForm, selector.removePrefix("windowForm."))
+            selector.startsWith("input.") -> SelectorUtil.resolve(input, selector.removePrefix("input."))
             else -> SelectorUtil.resolve(metrics, selector)
         }
     }

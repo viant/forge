@@ -14,6 +14,33 @@ import org.junit.Test
 class DashboardRuntimeTest {
 
     @Test
+    fun evaluateDashboardConditionSupportsCompoundWindowAndCollectionSources() {
+        val condition = DashboardConditionDef(
+            all = listOf(
+                DashboardConditionDef(source = "collection", notEmpty = true),
+                DashboardConditionDef(source = "windowForm", field = "mode", equals = JsonPrimitive("list"))
+            ),
+            not = DashboardConditionDef(source = "form", field = "disabled", equals = JsonPrimitive(true))
+        )
+
+        assertTrue(
+            evaluateDashboardCondition(
+                condition = condition,
+                collection = listOf(mapOf("id" to "one")),
+                windowForm = mapOf("mode" to "list"),
+                form = mapOf("disabled" to false)
+            )
+        )
+        assertFalse(
+            evaluateDashboardCondition(
+                condition = condition,
+                collection = emptyList(),
+                windowForm = mapOf("mode" to "list")
+            )
+        )
+    }
+
+    @Test
     fun reportRuntimeKpiPreservesAuthoredPrefixAndSuffix() {
         val kpi = dashboardReportRuntimeKpi(mapOf(
             "value" to JsonPrimitive(0.003),

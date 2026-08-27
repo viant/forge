@@ -236,6 +236,18 @@ export function shouldPrimeDataSourceFetch(dataSource = {}, prevInput = {}, coll
     return !!prevInput.fetch || (autoFetchEnabled && (paramsChanged || !hasCollection));
 }
 
+export function resolveWindowDataSourceFetchFlag({
+    fetchOwnedByContainer = false,
+    previousFetch = false,
+    shouldFetch = false,
+    paramsChanged = false,
+} = {}) {
+    if (!fetchOwnedByContainer || paramsChanged) {
+        return shouldFetch;
+    }
+    return !!previousFetch;
+}
+
 function hasOwnDataSourceParameters(dataSource = {}, windowParameters = {}) {
     const metadataParameters = Array.isArray(dataSource?.parameters) ? dataSource.parameters : [];
     if (metadataParameters.length > 0) {
@@ -711,7 +723,12 @@ function WindowContentInner({window, metadata, services}) {
             inputSignal.value = {
                 ...prevInput,
                 parameters: nextParams,
-                fetch: fetchOwnedByContainer ? !!prevInput.fetch : shouldFetch,
+                fetch: resolveWindowDataSourceFetchFlag({
+                    fetchOwnedByContainer,
+                    previousFetch: prevInput.fetch,
+                    shouldFetch,
+                    paramsChanged,
+                }),
             };
         }
     }, [windowFormSignal, metadata, defaultDataSourceRef, initialWindowFormSeed, context, parameters, windowId, log, fetcherOwnedDataSourceRefs]);

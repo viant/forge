@@ -177,7 +177,10 @@ data class TabsDef(
     val defaultSelectedTabId: String? = null,
     val selectedTabId: String? = null,
     val style: String? = null,
-    val vertical: Boolean? = null
+    val vertical: Boolean? = null,
+    val presentation: String? = null,
+    val showBack: Boolean? = null,
+    val listTitle: String? = null
 )
 
 @Serializable
@@ -193,6 +196,9 @@ data class LayoutDef(
 
 @Serializable
 data class DashboardConditionDef(
+    val all: List<DashboardConditionDef> = emptyList(),
+    val any: List<DashboardConditionDef> = emptyList(),
+    val not: DashboardConditionDef? = null,
     val source: String? = null,
     val dataSourceRef: String? = null,
     val selector: String? = null,
@@ -748,14 +754,35 @@ data class DashboardDetailDef(
 @Serializable
 data class TableDef(
     val title: String? = null,
+    val presentation: String? = null,
     val columns: List<ColumnDef> = emptyList(),
     val toolbar: ToolbarDef? = null,
     val on: List<ExecutionDef> = emptyList(),
     val selectionField: String? = null,
     val disabledField: String? = null,
     val callback: JsonElement? = null,
+    val emptyState: TableEmptyStateDef? = null,
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
+data class TableEmptyStateDef(
+    val icon: String? = null,
+    val kicker: String? = null,
+    val title: String? = null,
+    val body: String? = null,
+    val hideToolbarItems: List<String> = emptyList(),
+    val steps: List<TableEmptyStateStepDef> = emptyList(),
+    val action: ToolbarItemDef? = null
+)
+
+@Serializable
+data class TableEmptyStateStepDef(
+    val id: String? = null,
+    val number: Int? = null,
+    val title: String? = null,
+    val body: String? = null
 )
 
 @Serializable
@@ -966,6 +993,11 @@ data class EditorSelectorDef(
 @Serializable
 data class ToolbarDef(
     val items: List<ToolbarItemDef> = emptyList(),
+    val density: String? = null,
+    val layout: String? = null,
+    val placement: String? = null,
+    val style: Map<String, JsonElement> = emptyMap(),
+    val className: String? = null,
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
@@ -978,6 +1010,13 @@ data class ToolbarItemDef(
     val align: String? = null,
     val intent: String? = null,
     val appearance: String? = null,
+    val tooltip: String? = null,
+    val ariaLabel: String? = null,
+    val style: Map<String, JsonElement> = emptyMap(),
+    val className: String? = null,
+    val type: String? = null,
+    val placeholder: String? = null,
+    val visibleWhen: DashboardConditionDef? = null,
     val on: List<ExecutionDef> = emptyList(),
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
@@ -1052,6 +1091,10 @@ data class ItemDef(
     val scope: String? = null,
     val value: JsonElement? = null,
     val link: LinkDef? = null,
+    val lookup: JsonElement? = null,
+    val style: Map<String, JsonElement> = emptyMap(),
+    val columnSpan: Int? = null,
+    val rowSpan: Int? = null,
     val visibleWhen: DashboardConditionDef? = null,
     val options: List<OptionDef> = emptyList(),
     val properties: Map<String, JsonElement> = emptyMap(),
@@ -1114,8 +1157,29 @@ data class DataSourceDef(
     val uri: String? = null,
     val method: String? = null,
     val on: List<ExecutionDef> = emptyList(),
+    val filterSet: List<FilterSetDef> = emptyList(),
+    val quickFilterSet: String? = null,
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
+)
+
+@Serializable
+data class FilterSetDef(
+    val name: String? = null,
+    val default: Boolean? = null,
+    val mode: String? = null,
+    val defaultField: String? = null,
+    val template: List<FilterFieldDef> = emptyList()
+)
+
+@Serializable
+data class FilterFieldDef(
+    val id: String? = null,
+    val label: String? = null,
+    val optionLabel: String? = null,
+    val placeholder: String? = null,
+    val width: Int? = null,
+    val operator: String? = null
 )
 
 @Serializable
@@ -1157,6 +1221,7 @@ data class ExecutionDef(
     val onDone: String? = null,
     val onSuccess: String? = null,
     val async: Boolean? = null,
+    val state: Map<String, JsonElement> = emptyMap(),
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
 )

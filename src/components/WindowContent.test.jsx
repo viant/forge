@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowMetadataForTarget, resolveWindowRootContainer, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
+import { resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataForTarget, resolveWindowRootContainer, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
 
 describe('resolveInitialWindowFormValues', () => {
   it('collects explicit windowForm item values alongside onInit constants', () => {
@@ -214,6 +214,26 @@ describe('shouldPrimeDataSourceFetch', () => {
     expect(
       shouldPrimeDataSourceFetch({ autoFetch: false, parameters: [] }, { parameters: { measures: { totalSpend: true } } }, [], false),
     ).toBe(false);
+  });
+});
+
+describe('resolveWindowDataSourceFetchFlag', () => {
+  it('refetches fetchData-owned datasources when resolved parameters change', () => {
+    expect(resolveWindowDataSourceFetchFlag({
+      fetchOwnedByContainer: true,
+      previousFetch: false,
+      shouldFetch: true,
+      paramsChanged: true,
+    })).toBe(true);
+  });
+
+  it('leaves unchanged fetchData-owned datasources to their container', () => {
+    expect(resolveWindowDataSourceFetchFlag({
+      fetchOwnedByContainer: true,
+      previousFetch: false,
+      shouldFetch: true,
+      paramsChanged: false,
+    })).toBe(false);
   });
 });
 

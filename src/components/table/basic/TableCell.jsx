@@ -1,5 +1,5 @@
 import React, {useEffect, useRef, useState} from "react";
-import {Button, Icon, Checkbox} from "@blueprintjs/core";
+import {Button, Icon} from "@blueprintjs/core";
 import ProgressBar from "../../control/ProgressBar.jsx";
 import {useCellEvents} from "../../../hooks/event.js";
 import {resolveTableLink} from "../../../utils/tableLink.js";
@@ -139,7 +139,15 @@ const TableCell = ({
                     />
                 );
             } else {
-                cellContent = <Checkbox checked={!!value} {...cellProps} />;
+                cellContent = (
+                    <input
+                        type="checkbox"
+                        checked={value === true || value === 1 || String(value).toLowerCase() === 'true'}
+                        disabled
+                        readOnly
+                        aria-label={col.label || col.name || col.id || 'Boolean value'}
+                    />
+                );
             }
             break;
         case "link": {

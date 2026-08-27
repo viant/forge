@@ -2068,69 +2068,13 @@ private fun CompactReportSectionPicker(
         ReportSectionStrip(entries, selectedId, onSelect)
         return
     }
-    var expanded by remember(entries, selectedId) { mutableStateOf(false) }
-    val selectedIndex = entries.indexOfFirst { it.first == selectedId }.coerceAtLeast(0)
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFFF5F8FB),
-        border = BorderStroke(1.dp, ReportTabStripBorderColor),
-        shape = RoundedCornerShape(14.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                enabled = selectedIndex > 0,
-                onClick = { onSelect(entries[selectedIndex - 1].first) }
-            ) {
-                Text("‹", style = MaterialTheme.typography.headlineSmall)
-            }
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { expanded = true }
-                    .padding(horizontal = 6.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    text = entries.getOrNull(selectedIndex)?.second ?: "Report section",
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "${selectedIndex + 1} of ${entries.size} · tap to choose",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            IconButton(onClick = { expanded = true }) {
-                Icon(Icons.Filled.ArrowDropDown, contentDescription = "Choose report section")
-            }
-            IconButton(
-                enabled = selectedIndex < entries.lastIndex,
-                onClick = { onSelect(entries[selectedIndex + 1].first) }
-            ) {
-                Text("›", style = MaterialTheme.typography.headlineSmall)
-            }
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            entries.forEachIndexed { index, entry ->
-                DropdownMenuItem(
-                    text = {
-                        Text(
-                            text = "${index + 1}. ${entry.second}",
-                            fontWeight = if (entry.first == selectedId) FontWeight.SemiBold else FontWeight.Normal
-                        )
-                    },
-                    onClick = {
-                        onSelect(entry.first)
-                        expanded = false
-                    }
-                )
-            }
-        }
-    }
+    CompactSectionNavigator(
+        entries = entries,
+        selectedId = selectedId,
+        onSelect = onSelect,
+        fallbackLabel = "Report section",
+        chooserContentDescription = "Choose report section"
+    )
 }
 
 @Composable
