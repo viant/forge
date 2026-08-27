@@ -57,6 +57,7 @@ func lowerAssembly(assembly *Assembly) (json.RawMessage, json.RawMessage, json.R
 	if title == "" {
 		title = assembly.ID
 	}
+	subtitle := textValue(assembly.Source["subtitle"])
 	source := map[string]any{
 		"kind": "dashboard.reportBuilder", "containerId": assembly.ID,
 		"stateKey": assembly.ID, "dataSourceRef": primaryDataSourceRef(assembly),
@@ -92,6 +93,9 @@ func lowerAssembly(assembly *Assembly) (json.RawMessage, json.RawMessage, json.R
 	if theme, ok := assembly.Source["theme"].(map[string]any); ok {
 		specObject["theme"] = theme
 	}
+	if subtitle != "" {
+		specObject["subtitle"] = subtitle
+	}
 	specRaw, _ := json.Marshal(specObject)
 	if _, err = reportspec.DecodeJSON(specRaw); err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("compile fenced reportSpec: %w", err)
@@ -106,7 +110,7 @@ func lowerAssembly(assembly *Assembly) (json.RawMessage, json.RawMessage, json.R
 	if _, err = reportfill.DecodeJSON(fillRaw); err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("compile fenced reportFill: %w", err)
 	}
-	printObject := buildPrint(title, source, specRaw, fillRaw, fillBlocks, fillDatasets)
+	printObject := buildPrint(title, subtitle, source, specRaw, fillRaw, fillBlocks, fillDatasets)
 	printRaw, _ := json.Marshal(printObject)
 	if _, err = reportprint.DecodeJSON(printRaw); err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("compile fenced reportPrint: %w", err)
@@ -115,6 +119,9 @@ func lowerAssembly(assembly *Assembly) (json.RawMessage, json.RawMessage, json.R
 		"version": 1, "kind": "reportDocument", "id": assembly.ID, "title": title,
 		"source": source, "blocks": blocks,
 		"layout": map[string]any{"type": "grid", "columns": 12, "items": items},
+	}
+	if subtitle != "" {
+		documentObject["subtitle"] = subtitle
 	}
 	documentRaw, _ := json.Marshal(documentObject)
 	return documentRaw, specRaw, fillRaw, printRaw, nil, nil
@@ -452,19 +459,29 @@ func buildFillBlocks(blocks []map[string]any, datasets []any) []any {
 	return result
 }
 
-func buildPrint(title string, source map[string]any, specRaw, fillRaw json.RawMessage, blocks, datasets []any) map[string]any {
+func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw json.RawMessage, blocks, datasets []any) map[string]any {
 	const width, height, margin = 612.0, 792.0, 36.0
 	pages := []any{}
 	bookmarks := []any{}
 	pageNumber, y := 1, 84.0
 	elements := []any{}
 	flush := func() {
+		headerElements := []any{
+			textElement(fmt.Sprintf("page_%d__header_title", pageNumber), margin, 36, width-2*margin, 28, title, 18, "700"),
+			lineElement(fmt.Sprintf("page_%d__header_rule", pageNumber), margin, 70, width-2*margin),
+		}
+		if subtitle != "" {
+			subtitleElement := textElement(fmt.Sprintf("page_%d__header_subtitle", pageNumber), margin, 56, width-2*margin, 12, subtitle, 9, "")
+			subtitleElement["color"] = "#667085"
+			headerElements = []any{
+				textElement(fmt.Sprintf("page_%d__header_title", pageNumber), margin, 34, width-2*margin, 20, title, 18, "700"),
+				subtitleElement,
+				lineElement(fmt.Sprintf("page_%d__header_rule", pageNumber), margin, 70, width-2*margin),
+			}
+		}
 		pages = append(pages, map[string]any{
 			"number": pageNumber, "elements": elements,
-			"headerElements": []any{
-				textElement(fmt.Sprintf("page_%d__header_title", pageNumber), margin, 36, width-2*margin, 28, title, 18, "700"),
-				lineElement(fmt.Sprintf("page_%d__header_rule", pageNumber), margin, 70, width-2*margin),
-			},
+			"headerElements": headerElements,
 			"footerElements": []any{
 				lineElement(fmt.Sprintf("page_%d__footer_rule", pageNumber), margin, 754, width-2*margin),
 				alignTextElement(fmt.Sprintf("page_%d__footer_page_number", pageNumber), margin, 758, width-2*margin, 16, fmt.Sprintf("Page %d", pageNumber), 11, "", "right"),
@@ -550,12 +567,13 @@ func buildPrint(title string, source map[string]any, specRaw, fillRaw json.RawMe
 						if maximum <= 0 {
 							maximum = 1
 						}
+						backgroundColor, fillColor := dataBarColors(cellVisual)
 						elements = append(elements, map[string]any{
 							"id": fmt.Sprintf("%s__r%d_%s_bar", id, rowIndex, key), "kind": "tableCellDataBar",
 							"box":    map[string]any{"x": margin + float64(columnIndex)*colWidth + 4, "y": y + 7, "width": colWidth - 8, "height": 10},
 							"rowKey": fmt.Sprintf("row_%d", rowIndex), "columnKey": key,
 							"value": value, "min": 0, "max": maximum,
-							"fillColor": "#93c5fd", "backgroundColor": "#eff6ff",
+							"fillColor": fillColor, "backgroundColor": backgroundColor,
 						})
 					}
 					displayValue := fitTableText(formatValue(row[key], textValue(column["format"])), colWidth-12, 8.5)
@@ -706,10 +724,26 @@ func buildPrint(title string, source map[string]any, specRaw, fillRaw json.RawMe
 	}
 	return map[string]any{
 		"version": 1, "kind": "reportPrint", "specVersion": 1, "specHash": hashJSON(specRaw),
-		"fillVersion": 1, "fillHash": hashJSON(fillRaw), "source": source, "title": title,
+		"fillVersion": 1, "fillHash": hashJSON(fillRaw), "source": source, "title": title, "subtitle": subtitle,
 		"pageGeometry": map[string]any{"width": width, "height": height, "marginTop": margin, "marginRight": margin, "marginBottom": margin, "marginLeft": margin, "headerHeight": 36, "footerHeight": 24},
 		"pages":        pages, "bookmarks": bookmarks, "diagnostics": []any{},
 	}
+}
+
+func dataBarColors(cellVisual map[string]any) (string, string) {
+	backgroundColor, fillColor := "#eff6ff", "#93c5fd"
+	rawPalette, _ := cellVisual["palette"].([]any)
+	palette := make([]string, 0, len(rawPalette))
+	for _, value := range rawPalette {
+		if color := strings.TrimSpace(textValue(value)); color != "" {
+			palette = append(palette, color)
+		}
+	}
+	if len(palette) > 0 {
+		backgroundColor = palette[0]
+		fillColor = palette[len(palette)-1]
+	}
+	return backgroundColor, fillColor
 }
 
 func primaryDataSourceRef(a *Assembly) string {
