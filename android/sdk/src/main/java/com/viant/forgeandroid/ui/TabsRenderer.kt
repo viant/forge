@@ -146,25 +146,24 @@ private fun MobileTabPagesRenderer(
     val currentIndex = index.coerceIn(0, pages.lastIndex)
     val currentPage = pages[currentIndex]
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            pages.forEachIndexed { pageIndex, page ->
-                val selected = pageIndex == currentIndex
-                FilterChip(
-                    selected = selected,
-                    onClick = { index = pageIndex },
-                    label = { Text(page.title) },
-                    border = BorderStroke(
-                        1.dp,
-                        if (selected) ReportTabSelectedBorderColor else Color.Transparent
-                    ),
-                    colors = reportTabChipColors()
-                )
-            }
+        if (pages.size > 3) {
+            CompactSectionNavigator(
+                entries = pages.map { it.id to it.title },
+                selectedId = currentPage.id,
+                onSelect = { selectedId ->
+                    pages.indexOfFirst { it.id == selectedId }.takeIf { it >= 0 }?.let { index = it }
+                },
+                fallbackLabel = "Section",
+                chooserContentDescription = "Choose feed section"
+            )
+        } else {
+            SectionTabRail(
+                items = pages.map { SectionTabItem(it.id, it.title) },
+                selectedId = currentPage.id,
+                onSelect = { selectedId ->
+                    pages.indexOfFirst { it.id == selectedId }.takeIf { it >= 0 }?.let { index = it }
+                }
+            )
         }
         key(currentPage.id) {
             ContainerRenderer(
@@ -230,34 +229,17 @@ private fun StandardTabsRenderer(runtime: ForgeRuntime, window: WindowContext, c
     }
 
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Surface(
-            color = ReportTabStripColor,
-            border = BorderStroke(1.dp, ReportTabStripBorderColor),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier
-                    .horizontalScroll(rememberScrollState())
-                    .padding(4.dp)
-            ) {
-                containers.forEachIndexed { idx, c ->
-                    val title = c.title ?: c.id ?: "Tab${idx + 1}"
-                    val selected = idx == currentIndex
-                    FilterChip(
-                        selected = selected,
-                        onClick = { index = idx },
-                        label = { Text(title) },
-                        modifier = Modifier.padding(end = 6.dp),
-                        border = BorderStroke(
-                            1.dp,
-                            if (selected) ReportTabSelectedBorderColor else Color.Transparent
-                        ),
-                        colors = reportTabChipColors()
-                    )
-                }
+        SectionTabRail(
+            items = containers.mapIndexed { idx, c ->
+                SectionTabItem(c.id ?: "tab-$idx", c.title ?: c.id ?: "Tab${idx + 1}")
+            },
+            selectedId = currentContainer.id ?: "tab-$currentIndex",
+            onSelect = { selectedId ->
+                containers.indexOfFirst { (it.id ?: "tab-${containers.indexOf(it)}") == selectedId }
+                    .takeIf { it >= 0 }
+                    ?.let { index = it }
             }
-        }
+        )
 
         key(currentContainer.id ?: currentIndex) {
             ContainerRenderer(

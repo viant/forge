@@ -1,5 +1,5 @@
 import React from "react";
-import { Checkbox, Icon, Tooltip, Position } from "@blueprintjs/core";
+import { Icon, Tooltip, Position } from "@blueprintjs/core";
 
 const TableHeader = ({ context, columns, tableTitle, sortConfig }) => {
     const { onSort, sortColumnId, sortDirection } = sortConfig;
@@ -54,8 +54,9 @@ const TableHeader = ({ context, columns, tableTitle, sortConfig }) => {
         const content = (
             <>
                 {multiSelect && selectionMode === "multi" ? (
-                    <Checkbox
-                        inline={true}
+                    <input
+                        type="checkbox"
+                        aria-label="Select all rows"
                         checked={selectedAll}
                         onChange={handleHeaderCheckboxClick}
                     />

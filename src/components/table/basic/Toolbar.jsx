@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Button, HTMLSelect } from '@blueprintjs/core';
+import { useSignals } from '@preact/signals-react/runtime';
 import QuickFilterInputs from './QuickFilterInputs.jsx';
 import QuickFilterToggle from './QuickFilterToggle.jsx';
 import PaginationBar from './PaginationBar.jsx';
@@ -34,6 +35,8 @@ const Toolbar = ({
                      className = '',
                      style,
                  }) => {
+
+    useSignals();
 
     const toolbarEvents = useToolbarControlEvents(context, toolbarItems);
     const { signals } = context;
@@ -82,7 +85,23 @@ const Toolbar = ({
         const isVisible = stateEvents?.onVisible ? stateEvents.onVisible() : true;
         if (isVisible === false) return null;
         const isReadonly = stateEvents?.onReadonly ? stateEvents.onReadonly() : false;
-        const effectiveDisabled = (item.enabled !== true && disabled) || isReadonly;
+        const dirtyRefs = Array.isArray(item.enableWhenDirtyDataSourceRefs) ? item.enableWhenDirtyDataSourceRefs : [];
+        const hasDirtyRef = dirtyRefs.length === 0 || dirtyRefs.some((ref) => {
+            try {
+                return context?.Context?.(ref)?.signals?.formStatus?.value?.dirty === true;
+            } catch (_) {
+                return false;
+            }
+        });
+        const disableDirtyRefs = Array.isArray(item.disableWhenDirtyDataSourceRefs) ? item.disableWhenDirtyDataSourceRefs : [];
+        const hasBlockingDirtyRef = disableDirtyRefs.some((ref) => {
+            try {
+                return context?.Context?.(ref)?.signals?.formStatus?.value?.dirty === true;
+            } catch (_) {
+                return false;
+            }
+        });
+        const effectiveDisabled = item.disabled === true || item.enabled === false || !hasDirtyRef || hasBlockingDirtyRef || (item.enabled !== true && disabled) || isReadonly;
         const testID = toolbarItemTestID(item);
         const spanStyle = align === 'center'
             ? { margin: "0 10px" }

@@ -533,6 +533,37 @@ export async function runUICommand(cmd = {}) {
       if (w.inTab === false) bringFloatingWindowToFront(windowId);
       return { ok: true };
     }
+    case 'ui.feed.get': {
+      const feedId = requireString('feedId', params.feedId);
+      const conversationId = requireString('conversationId', params.conversationId);
+      const refs = Array.isArray(params.dataSourceRefs) ? params.dataSourceRefs.map((value) => String(value || '').trim()).filter(Boolean) : [];
+      if (refs.length === 0) throw new Error('dataSourceRefs are required');
+      const windowId = `feed-${feedId}-${conversationId}`;
+      const dataSources = {};
+      for (const ref of refs) {
+        const { dataSourceId } = getDataSourceId(windowId, ref);
+        dataSources[ref] = {
+          form: getFormSignal(dataSourceId).peek() || {},
+          collection: getCollectionSignal(dataSourceId).peek() || [],
+          selection: getSelectionSignal(dataSourceId).peek() || {},
+        };
+      }
+      return { feedId, conversationId, dataSources };
+    }
+    case 'ui.feed.update': {
+      const feedId = requireString('feedId', params.feedId);
+      const operations = Array.isArray(params.operations) ? params.operations : [];
+      if (operations.length === 0) throw new Error('operations are required');
+      if (typeof window === 'undefined') throw new Error('feed updates require a browser client');
+      window.dispatchEvent(new CustomEvent('forge:feed-update', {
+        detail: {
+          ...params,
+          feedId,
+          operations,
+        },
+      }));
+      return { ok: true };
+    }
     case 'ui.window.selectTab': {
       const windowId = requireString('windowId', params.windowId);
       const tabId = requireString('tabId', params.tabId);

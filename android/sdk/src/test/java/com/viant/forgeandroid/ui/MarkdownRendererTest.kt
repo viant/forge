@@ -16,6 +16,15 @@ class MarkdownRendererTest {
     }
 
     @Test
+    fun `entity tokens retain identity while showing only business label`() {
+        val text = inlineMarkdownAnnotatedString("@{media_plan:plan_123 \"Coca-Cola\"} version 4")
+
+        assertEquals("Coca-Cola version 4", text.text)
+        assertEquals("media_plan:plan_123", text.getStringAnnotations("entity", 0, text.length).single().item)
+        assertTrue(text.text.none { it == '@' || it == '{' || it == '}' })
+    }
+
+    @Test
     fun `markdownCodeHighlightRuns classifies json tokens`() {
         val runs = markdownCodeHighlightRuns("json", """{"ok": true, "count": 42}""")
 

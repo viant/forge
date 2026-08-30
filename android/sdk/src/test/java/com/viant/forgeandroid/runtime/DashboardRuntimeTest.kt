@@ -14,6 +14,15 @@ import org.junit.Test
 class DashboardRuntimeTest {
 
     @Test
+    fun bareFieldConditionUsesFieldPresence() {
+        val condition = DashboardConditionDef(source = "form", field = "message")
+
+        assertFalse(evaluateDashboardCondition(condition, form = emptyMap()))
+        assertFalse(evaluateDashboardCondition(condition, form = mapOf("message" to "")))
+        assertTrue(evaluateDashboardCondition(condition, form = mapOf("message" to "Draft changed")))
+    }
+
+    @Test
     fun evaluateDashboardConditionSupportsCompoundWindowAndCollectionSources() {
         val condition = DashboardConditionDef(
             all = listOf(

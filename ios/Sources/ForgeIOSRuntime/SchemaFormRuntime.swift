@@ -186,6 +186,10 @@ public enum SchemaFormRuntime {
             return .multiSelect
         case "textarea":
             return .textarea
+        case "daterange", "date-range":
+            return .dateRange
+        case "boolean", "bool", "toggle", "switch":
+            return .boolean
         case "array":
             return enumValues.isEmpty ? .json : .multiSelect
         case "object", "schema":
@@ -394,4 +398,6 @@ public enum SchemaFieldType: String, Sendable, Equatable {
     case multiSelect
     case json
     case lookup
+    case dateRange
+    case boolean
 }

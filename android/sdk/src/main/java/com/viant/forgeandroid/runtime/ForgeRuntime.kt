@@ -49,6 +49,7 @@ class ForgeRuntime(
     private var windowMetadataLoader: (suspend (String) -> WindowMetadata?)? = null
     private var fileTextLoader: (suspend (String) -> String)? = null
     private var filePreviewLoader: (suspend (String, String) -> FilePreviewContent)? = null
+    private var feedPatchHandler: ((String, FeedPatchOperation) -> Boolean)? = null
 
     val windows = windowRuntime.windows()
 
@@ -102,6 +103,13 @@ class ForgeRuntime(
     fun registerFilePreviewLoader(loader: suspend (String, String) -> FilePreviewContent) { filePreviewLoader = loader }
     suspend fun loadFilePreview(tool: String, uri: String): FilePreviewContent? = filePreviewLoader?.invoke(tool, uri)
 
+    fun registerFeedPatchHandler(handler: (windowId: String, operation: FeedPatchOperation) -> Boolean) {
+        feedPatchHandler = handler
+    }
+
+    fun dispatchFeedPatch(windowId: String, operation: FeedPatchOperation): Boolean =
+        feedPatchHandler?.invoke(windowId, operation) == true
+
     fun openWindow(
         windowKey: String,
         title: String = windowKey,
@@ -134,8 +142,23 @@ class ForgeRuntime(
         return state
     }
 
-    fun openWindowInline(windowKey: String, title: String = windowKey, inTab: Boolean = true, metadata: WindowMetadata): WindowState {
-        val state = windowRuntime.openWindow(windowKey, title, inTab, emptyMap(), inline = metadata)
+    fun openWindowInline(
+        windowKey: String,
+        title: String = windowKey,
+        inTab: Boolean = true,
+        metadata: WindowMetadata,
+        conversationId: String? = null,
+        presentation: String? = null
+    ): WindowState {
+        val state = windowRuntime.openWindow(
+            windowKey,
+            title,
+            inTab,
+            emptyMap(),
+            conversationId = conversationId,
+            presentation = presentation,
+            inline = metadata
+        )
         val resolved = resolveMetadata(metadata)
         signals.metadata(state.windowId).set(resolved)
         reconcileWindowForm(state.windowId, resolved, state.parameters)

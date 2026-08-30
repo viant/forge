@@ -1,16 +1,17 @@
 import React from 'react';
 import { Colors } from "@blueprintjs/core";
 
-const ProgressBar = ({ value = 0, text, maxValue = 100 , progress, row}) => {
-    let widthValue = 0;
-     if(progress.maxValueField) {
-        const maxValueField = row[progress.maxValueField];
-        if(maxValueField) {
-            widthValue =  value / maxValueField;
+const ProgressBar = ({ value = 0, text, maxValue = 100, progress = {}, row = {} }) => {
+    const numericValue = Number(value) || 0;
+    let numericMax = Number(maxValue) || 100;
+    if (progress.maxValueField) {
+        const rowMax = Number(row?.[progress.maxValueField]);
+        if (Number.isFinite(rowMax) && rowMax > 0) {
+            numericMax = rowMax;
         }
     }
-
-    const diff = maxValue - value;
+    const widthValue = Math.max(0, Math.min(1, numericMax > 0 ? numericValue / numericMax : 0));
+    const remainder = 100 - (100 * widthValue);
     return (
         <div>
             <div
@@ -27,7 +28,7 @@ const ProgressBar = ({ value = 0, text, maxValue = 100 , progress, row}) => {
                 <div
                     style={{
                         backgroundColor: Colors.GREEN5,
-                        minWidth: `${100 * widthValue}%`,
+                        width: `${100 * widthValue}%`,
                         transition: "width 0.3s ease",
                     }}
                 ></div>
@@ -35,7 +36,7 @@ const ProgressBar = ({ value = 0, text, maxValue = 100 , progress, row}) => {
                 <div
                     style={{
                         backgroundColor: Colors.RED5,
-                        width: `${diff}%`,
+                        width: `${remainder}%`,
                         transition: "width 0.3s ease",
                     }}
                 ></div>

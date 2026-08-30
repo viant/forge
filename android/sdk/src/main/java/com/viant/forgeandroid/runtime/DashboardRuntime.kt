@@ -1451,6 +1451,19 @@ fun evaluateDashboardCondition(
             return false
         }
     }
+    val hasDirectPredicate = condition.whenValue != null || condition.equals != null || condition.notEquals != null ||
+        condition.inValues.isNotEmpty() || condition.gt != null || condition.gte != null || condition.lt != null ||
+        condition.lte != null || condition.empty != null || condition.notEmpty != null
+    if (!hasDirectPredicate && !selector.isNullOrBlank()) {
+        return when (actual) {
+            null -> false
+            is String -> actual.isNotBlank()
+            is Collection<*> -> actual.isNotEmpty()
+            is Map<*, *> -> actual.isNotEmpty()
+            is Boolean -> actual
+            else -> true
+        }
+    }
     return true
 }
 

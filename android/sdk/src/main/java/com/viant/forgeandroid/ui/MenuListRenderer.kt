@@ -1,11 +1,14 @@
 package com.viant.forgeandroid.ui
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
@@ -240,6 +243,11 @@ private fun SummaryList(
     items: List<ItemDef>,
     onExpand: (String, String) -> Unit
 ) {
+    val compactPresentation = LocalForgePresentationDensity.current == ForgePresentationDensity.Compact
+    if (compactPresentation) {
+        CompactSummaryList(window, baseContext, container, items, onExpand)
+        return
+    }
     StaticGrid(
         items = items,
         minCellWidth = 82.dp,
@@ -270,6 +278,53 @@ private fun SummaryList(
         if (isItemVisible(item, form, metrics, windowForm, rows)) {
             val value = resolveItemDisplayValue(item, key, form, metrics, windowForm, rows)
             SummaryCard(item.label ?: key, value) { onExpand(item.label ?: key, normalizeValue(value)) }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CompactSummaryList(
+    window: WindowContext,
+    baseContext: DataSourceContext?,
+    container: ContainerDef,
+    items: List<ItemDef>,
+    onExpand: (String, String) -> Unit
+) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        items.forEach { item ->
+            val dataContext = resolveMenuListContext(window, baseContext, container, item)
+            val windowFormSignal = window.windowFormSignal()
+            val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
+            val form by if (dataContext != null) dataContext.form.flow.collectAsState(initial = dataContext.form.peek())
+                else remember { mutableStateOf(emptyMap()) }
+            val metrics by if (dataContext != null) dataContext.metrics.flow.collectAsState(initial = dataContext.metrics.peek())
+                else remember { mutableStateOf(emptyMap()) }
+            val rows by if (dataContext != null) dataContext.collection.flow.collectAsState(initial = dataContext.collection.peek())
+                else remember { mutableStateOf(emptyList()) }
+            val key = itemValueKey(item) ?: return@forEach
+            if (isItemVisible(item, form, metrics, windowForm, rows)) {
+                val label = item.label ?: key
+                val value = normalizeValue(resolveItemDisplayValue(item, key, form, metrics, windowForm, rows))
+                Text(
+                    text = "$label: $value",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF21538F),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .widthIn(max = 290.dp)
+                        .background(Color(0xFFEEF4FB), RoundedCornerShape(999.dp))
+                        .border(1.dp, Color(0xFFCFDCED), RoundedCornerShape(999.dp))
+                        .clickable { onExpand(label, value) }
+                        .padding(horizontal = 9.dp, vertical = 6.dp)
+                )
+            }
         }
     }
 }
@@ -587,6 +642,19 @@ private fun isItemVisible(
             else -> true
         }
         if (present != required) return false
+    }
+    val hasDirectPredicate = condition.whenValue != null || condition.equals != null || condition.notEquals != null ||
+        condition.inValues.isNotEmpty() || condition.gt != null || condition.gte != null || condition.lt != null ||
+        condition.lte != null || condition.empty != null || condition.notEmpty != null
+    if (!hasDirectPredicate && !selector.isNullOrBlank()) {
+        return when (actual) {
+            null -> false
+            is String -> actual.isNotBlank()
+            is Collection<*> -> actual.isNotEmpty()
+            is Map<*, *> -> actual.isNotEmpty()
+            is Boolean -> actual
+            else -> true
+        }
     }
     return true
 }

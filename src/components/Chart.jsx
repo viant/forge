@@ -429,6 +429,7 @@ export function resolveEmptyChartMessage(metrics = {}) {
 }
 
 const Chart = ({container, context, isActive = true, embedded = false, onDatumSelect = null, onLegendItemSelect = null, showControls = true}) => {
+    const controlsVisible = container?.chart?.showControls !== false && showControls !== false;
     useSignals();
     const log = getLogger('chart');
     const {chart} = container;
@@ -598,10 +599,10 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     }, [series?.valueKey, seriesDefinitionKeysSignature, seriesDefinitions, seriesValueKeysSignature, series]);
 
     useEffect(() => {
-        if ((embedded || !showControls) && viewMode !== "chart") {
+        if ((embedded || !controlsVisible) && viewMode !== "chart") {
             setViewMode("chart");
         }
-    }, [embedded, showControls, viewMode]);
+    }, [embedded, controlsVisible, viewMode]);
 
     const allTableColumns = useMemo(
         () => [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
@@ -1284,7 +1285,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             data-chart-loading={effectiveLoading ? "true" : "false"}
             data-chart-stale={staleWhileLoading ? "true" : "false"}
         >
-            {showControls && showEmbeddedSeriesSelector && showSeriesSelectionControls ? (
+            {controlsVisible && showEmbeddedSeriesSelector && showSeriesSelectionControls ? (
                 <div
                     aria-label="Chart series selector"
                     style={{
@@ -1333,7 +1334,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     })}
                 </div>
             ) : null}
-            {showControls && !embedded && showSeriesSelectionControls ? (
+            {controlsVisible && !embedded && showSeriesSelectionControls ? (
                 <>
                     {!directSeriesChart && !isPieChart ? (
                         <RadioGroup

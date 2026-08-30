@@ -5,7 +5,7 @@ import { resolveKey } from "../../utils/selector.js";
 import { resolveTableLink } from "../../utils/tableLink.js";
 import { formatDashboardValue } from "./dashboardUtils.js";
 import { resolveDashboardTableColumnValue } from "./dashboardTableValue.js";
-import { resolveReportTableCellVisualState } from "./reportTableCellVisuals.js";
+import { resolveTableCellVisualState } from "./tableCellVisuals.js";
 
 export const toneColors = {
     info: {background: '#ebf1f5', border: '#ced9e0', text: '#30404d'},
@@ -63,7 +63,7 @@ export function formatDashboardTableCellText(cell, row, column, locale) {
 }
 
 export function renderExplicitReportTableCellVisual(cell, row, column, locale) {
-  const visualState = resolveReportTableCellVisualState(row, column);
+  const visualState = resolveTableCellVisualState(row, column);
     if (!visualState) {
         return null;
     }

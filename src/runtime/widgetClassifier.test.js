@@ -27,6 +27,7 @@ const cases = [
     { item: { type: 'markdown' }, expected: 'markdown' },
     // Multi-select type
     { item: { type: 'multiSelect' }, expected: 'multiSelect' },
+    { item: { type: 'dateRange' }, expected: 'dateRange' },
 ];
 
 for (const { item, expected } of cases) {

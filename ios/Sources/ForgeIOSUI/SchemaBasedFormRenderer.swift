@@ -2,6 +2,7 @@ import SwiftUI
 import ForgeIOSRuntime
 
 public struct SchemaBasedFormRenderer: View {
+    @Environment(\.forgePresentationDensity) private var presentationDensity
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
     private let container: ContainerDef
@@ -17,6 +18,7 @@ public struct SchemaBasedFormRenderer: View {
     @State private var multiSelectValues: [String: Set<String>] = [:]
     @State private var dynamicFormState: [String: JSONValue] = [:]
     @State private var validationErrors: [String: String] = [:]
+    @State private var dateRangeValues: [String: FeedDateRangeValue] = [:]
 
     public init(runtime: ForgeRuntime? = nil,
                 window: WindowContext? = nil,
@@ -34,15 +36,7 @@ public struct SchemaBasedFormRenderer: View {
 
     public var body: some View {
         let fields = resolvedFields
-        VStack(alignment: .leading, spacing: 12) {
-            if let title = container.title, !title.isEmpty {
-                Text(title).font(.headline)
-            }
-            if let subtitle = container.subtitle, !subtitle.isEmpty {
-                Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+        VStack(alignment: .leading, spacing: presentationDensity == .compact ? 8 : 12) {
             if fields.isEmpty {
                 Text("No form fields.")
                     .font(.caption)
@@ -51,8 +45,16 @@ public struct SchemaBasedFormRenderer: View {
                     .padding(12)
                     .background(RoundedRectangle(cornerRadius: 12).strokeBorder(.quaternary))
             } else {
-                ForEach(fields) { field in
-                    fieldView(field)
+                if presentationDensity == .compact {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 150), spacing: 10, alignment: .top)],
+                        alignment: .leading,
+                        spacing: 10
+                    ) {
+                        ForEach(fields) { field in fieldView(field) }
+                    }
+                } else {
+                    ForEach(fields) { field in fieldView(field) }
                 }
             }
             if container.schemaBasedForm?.showSubmit != false,
@@ -62,7 +64,7 @@ public struct SchemaBasedFormRenderer: View {
                     .buttonStyle(.borderedProminent)
             }
         }
-        .padding()
+        .padding(presentationDensity == .compact ? 8 : 16)
         .task(id: fields.map(\.id).joined(separator: "|")) {
             applySeeds(fields)
         }
@@ -174,7 +176,11 @@ public struct SchemaBasedFormRenderer: View {
                 let display = lookupDisplay(for: field)
                 HStack(spacing: 8) {
                     TextField(field.placeholder ?? field.key, text: binding(for: field.key))
-                        .textFieldStyle(.roundedBorder)
+                        .textFieldStyle(.plain)
+                        .padding(.horizontal, 8)
+                        .frame(height: 34)
+                        .background(Color(red: 0.933, green: 0.973, blue: 0.945), in: RoundedRectangle(cornerRadius: 7))
+                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(Color(red: 0.75, green: 0.86, blue: 0.78), lineWidth: 1))
                     Button {
                         openLookup(field)
                     } label: {
@@ -189,6 +195,26 @@ public struct SchemaBasedFormRenderer: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            case .boolean:
+                Toggle(field.label, isOn: Binding(
+                    get: { formValues[field.key]?.lowercased() == "true" },
+                    set: { value in commitValue(.bool(value), for: field.key) }
+                ))
+                .labelsHidden()
+                .accessibilityLabel(field.label)
+            case .dateRange:
+                if presentationDensity == .compact {
+                    VStack(alignment: .leading, spacing: 6) {
+                        compactDatePickerRow("Start", selection: dateBinding(for: field.key, start: true))
+                        compactDatePickerRow("End", selection: dateBinding(for: field.key, start: false))
+                    }
+                } else {
+                    HStack(spacing: 8) {
+                        compactDatePicker("Start", selection: dateBinding(for: field.key, start: true))
+                        Image(systemName: "arrow.right").font(.caption).foregroundStyle(.secondary)
+                        compactDatePicker("End", selection: dateBinding(for: field.key, start: false))
+                    }
+                }
             }
             if let message = validationErrors[field.key] {
                 Text(message)
@@ -201,7 +227,7 @@ public struct SchemaBasedFormRenderer: View {
     // MARK: - Bindings and helpers
 
     private func binding(for key: String) -> Binding<String> {
-        Binding(get: { formValues[key] ?? "" }, set: { formValues[key] = $0 })
+        Binding(get: { formValues[key] ?? "" }, set: { commitValue(.string($0), for: key) })
     }
 
     private func applySeeds(_ fields: [ResolvedSchemaField]) {
@@ -224,6 +250,10 @@ public struct SchemaBasedFormRenderer: View {
                     multiSelectValues[field.key] = Set(defaults)
                     formValues[field.key] = defaults.joined(separator: ", ")
                 }
+            case .dateRange:
+                if let value = field.defaultValue { applyValue(value, for: field) }
+            case .boolean:
+                if let value = field.defaultValue { applyValue(value, for: field) }
             default:
                 let display = SchemaFormRuntime.displayValue(for: field.defaultValue)
                 if !display.isEmpty { formValues[field.key] = display }
@@ -250,6 +280,14 @@ public struct SchemaBasedFormRenderer: View {
             }
             multiSelectValues[field.key] = Set(items)
             formValues[field.key] = items.joined(separator: ", ")
+        case .dateRange:
+            let object = value.objectValue ?? [:]
+            let start = feedDate(object["start"]?.stringValue) ?? Date()
+            let end = feedDate(object["end"]?.stringValue) ?? start
+            dateRangeValues[field.key] = FeedDateRangeValue(start: start, end: max(start, end))
+            formValues[field.key] = "\(feedDateString(start)) – \(feedDateString(max(start, end)))"
+        case .boolean:
+            formValues[field.key] = value.boolValue == true ? "true" : "false"
         default:
             formValues[field.key] = value.stringValue ?? SchemaFormRuntime.displayValue(for: value)
         }
@@ -262,6 +300,12 @@ public struct SchemaBasedFormRenderer: View {
             case .multiSelect:
                 let selected = multiSelectValues[field.key, default: []]
                 result[field.key] = .array(selected.sorted().map { .string($0) })
+            case .dateRange:
+                if let range = dateRangeValues[field.key] {
+                    result[field.key] = .object(["start": .string(feedDateString(range.start)), "end": .string(feedDateString(range.end))])
+                }
+            case .boolean:
+                result[field.key] = .bool(formValues[field.key]?.lowercased() == "true")
             default:
                 if let v = formValues[field.key], !v.isEmpty {
                     result[field.key] = .string(v)
@@ -328,7 +372,89 @@ public struct SchemaBasedFormRenderer: View {
         if current.contains(option) { current.remove(option) } else { current.insert(option) }
         multiSelectValues[key] = current
         formValues[key] = current.sorted().joined(separator: ", ")
+        commitValue(.array(current.sorted().map(JSONValue.string)), for: key)
     }
+
+    private func commitValue(_ value: JSONValue, for key: String) {
+        switch value {
+        case .string(let text): formValues[key] = text
+        case .bool(let flag): formValues[key] = flag ? "true" : "false"
+        default: break
+        }
+        notifyChange()
+        guard let runtime, let window, let ref = schemaFormDataSourceRef, !ref.isEmpty else { return }
+        Task {
+            let operation = FeedPatchOperation(
+                dataSourceRef: ref,
+                op: "replace",
+                path: "/collection/0/\(escapeSchemaFeedPointer(key))",
+                value: value
+            )
+            do {
+                if try await runtime.dispatchFeedPatch(windowID: window.windowID, operation: operation) { return }
+                _ = try await runtime.applyFeedPatchOperations(windowID: window.windowID, operations: [operation])
+            } catch { return }
+        }
+    }
+
+    private func dateBinding(for key: String, start: Bool) -> Binding<Date> {
+        Binding(
+            get: {
+                let range = dateRangeValues[key] ?? FeedDateRangeValue(start: Date(), end: Date())
+                return start ? range.start : range.end
+            },
+            set: { value in
+                var range = dateRangeValues[key] ?? FeedDateRangeValue(start: value, end: value)
+                if start { range.start = value; range.end = max(value, range.end) }
+                else { range.end = max(range.start, value) }
+                dateRangeValues[key] = range
+                formValues[key] = "\(feedDateString(range.start)) – \(feedDateString(range.end))"
+                commitValue(.object(["start": .string(feedDateString(range.start)), "end": .string(feedDateString(range.end))]), for: key)
+            }
+        )
+    }
+
+    private func compactDatePicker(_ label: String, selection: Binding<Date>) -> some View {
+        DatePicker(label, selection: selection, displayedComponents: .date)
+            .labelsHidden()
+            .datePickerStyle(.compact)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityLabel(label)
+    }
+
+    private func compactDatePickerRow(_ label: String, selection: Binding<Date>) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+            compactDatePicker(label, selection: selection)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct FeedDateRangeValue: Equatable {
+    var start: Date
+    var end: Date
+}
+
+private func feedDate(_ value: String?) -> Date? {
+    guard let value else { return nil }
+    return ISO8601DateFormatter().date(from: value + (value.count == 10 ? "T00:00:00Z" : ""))
+}
+
+private func feedDateString(_ value: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.string(from: value)
+}
+
+private func escapeSchemaFeedPointer(_ value: String) -> String {
+    value.replacingOccurrences(of: "~", with: "~0").replacingOccurrences(of: "/", with: "~1")
 }
 
 private func lookupDialogID(_ lookup: JSONValue?) -> String? {

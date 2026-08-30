@@ -1,6 +1,8 @@
 package com.viant.forgeandroid.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -10,7 +12,10 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
@@ -39,6 +44,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -58,6 +65,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FormRenderer(
     runtime: ForgeRuntime,
@@ -68,6 +76,7 @@ fun FormRenderer(
     val visibleItems = items.filter(::shouldRenderItem)
     if (visibleItems.isEmpty()) return
     var expandedSummary by remember { mutableStateOf<Pair<String, String>?>(null) }
+    val compactPresentation = LocalForgePresentationDensity.current == ForgePresentationDensity.Compact
 
     val compactSelectGrid = visibleItems.size >= 2 && visibleItems.all { item ->
         item.type?.trim()?.lowercase() in setOf("select", "dropdown")
@@ -89,16 +98,30 @@ fun FormRenderer(
             )
         }
     } else if (visibleItems.size >= 2 && visibleItems.all(::isSummaryLabelItem)) {
-        StaticGrid(
-            items = visibleItems,
-            minCellWidth = 82.dp,
-            minimumColumns = 2,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp)
-        ) { item ->
-            SummaryItemCard(context = context, item = item) { label, value ->
-                expandedSummary = label to value
+        if (compactPresentation) {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth().padding(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                visibleItems.forEach { item ->
+                    SummaryItemPill(context = context, item = item) { label, value ->
+                        expandedSummary = label to value
+                    }
+                }
+            }
+        } else {
+            StaticGrid(
+                items = visibleItems,
+                minCellWidth = 132.dp,
+                minimumColumns = 2,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
+            ) { item ->
+                SummaryItemCard(context = context, item = item) { label, value ->
+                    expandedSummary = label to value
+                }
             }
         }
     } else {
@@ -123,6 +146,34 @@ fun FormRenderer(
             }
         )
     }
+}
+
+@Composable
+private fun SummaryItemPill(
+    context: DataSourceContext,
+    item: ItemDef,
+    onExpand: (String, String) -> Unit
+) {
+    val dataSourceContext = resolveItemDataSourceContext(context, item)
+    val form by dataSourceContext.form.flow.collectAsState(initial = emptyMap())
+    val metrics by dataSourceContext.metrics.flow.collectAsState(initial = emptyMap())
+    val windowFormSignal = dataSourceContext.window.windowFormSignal()
+    val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
+    val key = itemValueKey(item) ?: return
+    val label = item.label ?: key
+    val value = resolveItemDisplayValue(item, key, form, metrics, windowForm).ifBlank { "—" }
+    Text(
+        text = "$label: $value",
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = androidx.compose.ui.graphics.Color(0xFF21538F),
+        maxLines = 1,
+        modifier = Modifier
+            .background(androidx.compose.ui.graphics.Color(0xFFEEF4FB), androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
+            .border(1.dp, androidx.compose.ui.graphics.Color(0xFFCFDCED), androidx.compose.foundation.shape.RoundedCornerShape(999.dp))
+            .clickable { onExpand(label, value) }
+            .padding(horizontal = 12.dp, vertical = 7.dp)
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -214,7 +265,9 @@ internal fun <T> StaticGrid(
         } else {
             (((maxWidthValue + horizontalSpacing) / (minCellWidth + horizontalSpacing)).toInt()).coerceAtLeast(1)
         }
-        val columns = autoColumns.coerceAtLeast(minimumColumns.coerceAtLeast(1))
+        val requestedMinimum = minimumColumns.coerceAtLeast(1)
+        val minimumWidth = minCellWidth * requestedMinimum + horizontalSpacing * (requestedMinimum - 1)
+        val columns = if (maxWidthValue >= minimumWidth) autoColumns.coerceAtLeast(requestedMinimum) else autoColumns
 
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -313,7 +366,17 @@ private fun FormItemRenderer(
                     )
                 }
                 "radio" -> {
-                    if (item.appearance?.trim()?.equals("segmented", ignoreCase = true) == true &&
+                    val compactPresentation = LocalForgePresentationDensity.current == ForgePresentationDensity.Compact
+                    if (compactPresentation && item.options.size > 5) {
+                        SelectMenuItem(
+                            label = item.label ?: key,
+                            options = item.options.map { option ->
+                                option.value.orEmpty() to (option.label ?: option.value.orEmpty())
+                            },
+                            selectedValue = value,
+                            onSelect = { optVal -> setScopedItemValue(runtime, dataSourceContext, item, key, optVal) }
+                        )
+                    } else if ((compactPresentation || item.appearance?.trim()?.equals("segmented", ignoreCase = true) == true) &&
                         item.options.isNotEmpty()
                     ) {
                         SegmentedOptionRow(
@@ -398,6 +461,7 @@ private fun FormItemRenderer(
                     )
                 }
                 "textarea" -> {
+                    val compactPresentation = LocalForgePresentationDensity.current == ForgePresentationDensity.Compact
                     OutlinedTextField(
                         value = value,
                         onValueChange = { setScopedItemValue(runtime, dataSourceContext, item, key, it) },
@@ -405,27 +469,86 @@ private fun FormItemRenderer(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp),
-                        minLines = 5
+                        minLines = if (compactPresentation) 3 else 5,
+                        textStyle = if (compactPresentation) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge
                     )
+                }
+                "dateRange" -> {
+                    val raw = resolveItemRawValue(item, key, form, metrics, windowForm) as? Map<*, *> ?: emptyMap<String, Any?>()
+                    val start = raw["start"]?.toString().orEmpty()
+                    val end = raw["end"]?.toString().orEmpty()
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 2.dp)) {
+                        Text(item.label ?: key, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            DateRangeInput(
+                                value = start,
+                                onValueChange = { next -> setScopedItemValue(runtime, dataSourceContext, item, key, mapOf("start" to next, "end" to end)) },
+                                placeholder = "Start",
+                                pickerEnabled = true
+                            )
+                            DateRangeInput(
+                                value = end,
+                                onValueChange = { next -> setScopedItemValue(runtime, dataSourceContext, item, key, mapOf("start" to start, "end" to next)) },
+                                placeholder = "End",
+                                pickerEnabled = true
+                            )
+                        }
+                    }
                 }
                 "lookup" -> {
                     val lookup = item.lookup ?: item.properties["lookup"]
                     val display = lookupDisplayValue(lookup, form, value)
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = value,
-                            onValueChange = { setScopedItemValue(runtime, dataSourceContext, item, key, it) },
-                            label = { Text(item.label ?: key) },
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(vertical = 4.dp)
-                        )
-                        IconButton(
-                            onClick = { openLookup(runtime, dataSourceContext, item, lookup) },
-                            enabled = lookupDialogId(lookup) != null,
-                            modifier = Modifier.padding(top = 8.dp)
+                    val compactPresentation = LocalForgePresentationDensity.current == ForgePresentationDensity.Compact
+                    if (compactPresentation) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            Icon(Icons.Filled.Search, contentDescription = "Open lookup")
+                            Text(
+                                item.label ?: key,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                CompactTextInputSurface(
+                                    value = value,
+                                    onValueChange = { setScopedItemValue(runtime, dataSourceContext, item, key, it) },
+                                    modifier = Modifier.weight(1f),
+                                    backgroundColor = Color(0xFFEEF8F1)
+                                )
+                                IconButton(
+                                    onClick = { openLookup(runtime, dataSourceContext, item, lookup) },
+                                    enabled = lookupDialogId(lookup) != null,
+                                    modifier = Modifier.size(40.dp)
+                                ) {
+                                    Icon(Icons.Filled.Search, contentDescription = "Open lookup")
+                                }
+                            }
+                        }
+                    } else {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = value,
+                                onValueChange = { setScopedItemValue(runtime, dataSourceContext, item, key, it) },
+                                label = { Text(item.label ?: key) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(vertical = 4.dp)
+                            )
+                            IconButton(
+                                onClick = { openLookup(runtime, dataSourceContext, item, lookup) },
+                                enabled = lookupDialogId(lookup) != null,
+                                modifier = Modifier.padding(top = 8.dp)
+                            ) {
+                                Icon(Icons.Filled.Search, contentDescription = "Open lookup")
+                            }
                         }
                     }
                     if (!display.isNullOrBlank() && display != value) {
@@ -457,14 +580,21 @@ private fun FormItemRenderer(
                     }
                 }
                 else -> {
-                    OutlinedTextField(
-                        value = value,
-                        onValueChange = { setScopedItemValue(runtime, dataSourceContext, item, key, it) },
-                        label = { Text(item.label ?: key) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                    )
+                    val compactPresentation = LocalForgePresentationDensity.current == ForgePresentationDensity.Compact
+                    if (compactPresentation) {
+                        CompactLabeledTextInput(
+                            label = item.label ?: key,
+                            value = value,
+                            onValueChange = { setScopedItemValue(runtime, dataSourceContext, item, key, it) }
+                        )
+                    } else {
+                        OutlinedTextField(
+                            value = value,
+                            onValueChange = { setScopedItemValue(runtime, dataSourceContext, item, key, it) },
+                            label = { Text(item.label ?: key) },
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                        )
+                    }
                 }
             }
     if (!validationError.isNullOrBlank()) {
@@ -475,6 +605,39 @@ private fun FormItemRenderer(
             modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
         )
     }
+}
+
+@Composable
+private fun CompactLabeledTextInput(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        CompactTextInputSurface(value, onValueChange, Modifier.fillMaxWidth(), shape)
+    }
+}
+
+@Composable
+private fun CompactTextInputSurface(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+    backgroundColor: Color = Color.White,
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+        modifier = modifier
+            .background(backgroundColor, shape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .padding(horizontal = 11.dp, vertical = 9.dp)
+    )
 }
 
 @Composable
@@ -711,6 +874,11 @@ internal fun resolveItemDisplayValue(
     collection: List<Map<String, Any?>> = emptyList()
 ): String {
     val raw = resolveItemRawValue(item, key, form, metrics, windowForm, collection)
+    if (raw is Map<*, *> && raw.containsKey("start") && raw.containsKey("end")) {
+        return listOf(raw["start"], raw["end"])
+            .mapNotNull { it?.toString()?.takeIf(String::isNotBlank) }
+            .joinToString(" – ")
+    }
     return if (raw == null) "" else formatDashboardValue(raw, item.format)
 }
 

@@ -285,28 +285,46 @@ private fun inlineMarkdown(text: String): String {
 
 internal fun inlineMarkdownAnnotatedString(text: String): AnnotatedString = buildAnnotatedString {
     var cursor = 0
-    val token = Regex("\\*\\*(.+?)\\*\\*|`(.+?)`|\\[(.+?)]\\((.+?)\\)")
+    val token = Regex("@\\{([a-zA-Z][a-zA-Z0-9_-]*):([^\\s\"]+)\\s+\"((?:[^\"\\\\]|\\\\.)*)\"\\}|\\*\\*(.+?)\\*\\*|`(.+?)`|\\[(.+?)]\\((.+?)\\)")
     token.findAll(text).forEach { match ->
         if (match.range.first > cursor) append(text.substring(cursor, match.range.first))
         when {
             match.groups[1] != null -> {
-                pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
-                append(match.groups[1]?.value.orEmpty())
+                val entityType = match.groups[1]?.value.orEmpty()
+                val entityId = match.groups[2]?.value.orEmpty()
+                val label = match.groups[3]?.value.orEmpty()
+                    .replace("\\\"", "\"")
+                    .replace("\\\\", "\\")
+                pushStringAnnotation(tag = "entity", annotation = "$entityType:$entityId")
+                pushStyle(
+                    SpanStyle(
+                        color = Color(0xFF1849A9),
+                        background = Color(0xFFEAF1FF),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
+                append(label)
+                pop()
                 pop()
             }
-            match.groups[2] != null -> {
+            match.groups[4] != null -> {
+                pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
+                append(match.groups[4]?.value.orEmpty())
+                pop()
+            }
+            match.groups[5] != null -> {
                 pushStyle(
                     SpanStyle(
                         fontFamily = FontFamily.Monospace,
                         background = Color(0xFFF1F5F9)
                     )
                 )
-                append(match.groups[2]?.value.orEmpty())
+                append(match.groups[5]?.value.orEmpty())
                 pop()
             }
             else -> {
                 pushStyle(SpanStyle(color = Color(0xFF1D4ED8)))
-                append(match.groups[3]?.value.orEmpty())
+                append(match.groups[6]?.value.orEmpty())
                 pop()
             }
         }

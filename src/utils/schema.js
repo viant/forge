@@ -81,6 +81,7 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
 
         // -------- widget (default mapping) ------------------------
         let widget = p['x-ui-widget'];
+        if (p.lookup && typeof p.lookup === 'object') widget = 'lookup';
 
         // Normalize deprecated/alias widget keys
         if (widget === 'text-area') widget = 'textarea';
@@ -150,14 +151,18 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
         }
 
         let field = {
+            id: k,
             name: k,
+            dataField: k,
             label,
             type: p.type,
             enum: p.enum,
             format: p.format,
             required: Array.isArray(schema.required) && schema.required.includes(k),
+            readOnly: p.readOnly === true,
             default: p.default,
             widget,
+            lookup: p.lookup,
             group: p['x-ui-group'] || '',
             order: p['x-ui-order'] || 0,
             columnSpan:
@@ -167,7 +172,11 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
                 undefined,
             // Convert enum -> options array for select-like widgets
             options: Array.isArray(p.enum)
-                ? p.enum.map((v) => ({ value: v, label: String(v) }))
+                ? p.enum.map((v, index) => {
+                    const labels = p['x-ui-enum-labels'];
+                    const optionLabel = Array.isArray(labels) ? labels[index] : (labels && typeof labels === 'object' ? labels[v] : undefined);
+                    return { value: v, label: optionLabel == null ? String(v) : String(optionLabel) };
+                })
                 : undefined,
             tooltip,
         };
