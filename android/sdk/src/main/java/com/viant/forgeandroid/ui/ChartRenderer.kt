@@ -127,9 +127,10 @@ fun ChartRenderer(
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         val regularWidth = maxWidth >= 720.dp
+        val compactPresentation = LocalForgePresentationDensity.current == ForgePresentationDensity.Compact
         val panelPadding = if (regularWidth) 10.dp else 0.dp
         val chartHeight = when {
-            type == "pie" || type == "donut" -> if (regularWidth) 196.dp else 236.dp
+            type == "pie" || type == "donut" -> if (regularWidth) 196.dp else if (compactPresentation) 176.dp else 236.dp
             regularWidth -> 184.dp
             else -> 236.dp
         }
@@ -916,7 +917,8 @@ internal data class PreparedChartData(
     val points: List<ChartPoint>,
     val series: List<ChartSeriesDisplay>,
     val maxValue: Double,
-    val maxValuesByAxis: Map<String, Double> = emptyMap()
+    val maxValuesByAxis: Map<String, Double> = emptyMap(),
+    val slicePalette: List<Color> = emptyList()
 ) {
     fun maximumForSeries(seriesKey: String): Double {
         val axis = series.firstOrNull { it.key == seriesKey }?.axis ?: "default"
@@ -977,7 +979,8 @@ internal fun prepareChartData(rows: List<Map<String, Any?>>, chart: ChartDef): P
         points = points,
         series = seriesDefs,
         maxValue = maxValue.coerceAtLeast(1.0),
-        maxValuesByAxis = chartAxisMaximums(points, seriesDefs)
+        maxValuesByAxis = chartAxisMaximums(points, seriesDefs),
+        slicePalette = (chart.series?.palette.takeUnless { it.isNullOrEmpty() } ?: DefaultChartPalette).map(::parseChartColor)
     )
 }
 
@@ -1001,7 +1004,7 @@ internal fun sampledChartAxisLabels(labels: List<String>, maximum: Int): List<St
 }
 
 internal fun buildPieSlices(prepared: PreparedChartData): List<PieSlice> {
-    return prepared.points.flatMap { point ->
+    return prepared.points.flatMapIndexed { pointIndex, point ->
         point.values.map { value ->
             PieSlice(
                 rowIndex = point.rowIndex,
@@ -1010,7 +1013,9 @@ internal fun buildPieSlices(prepared: PreparedChartData): List<PieSlice> {
                 seriesLabel = value.label,
                 value = value.value,
                 valueLabel = formatChartValue(value.value),
-                color = value.color
+                color = if (prepared.series.size == 1 && prepared.slicePalette.isNotEmpty()) {
+                    prepared.slicePalette[pointIndex % prepared.slicePalette.size]
+                } else value.color
             )
         }
     }.filter { it.value > 0 }
@@ -1123,7 +1128,8 @@ internal fun filterPreparedChartData(
         points = filteredPoints,
         series = filteredSeries,
         maxValue = maxValue,
-        maxValuesByAxis = chartAxisMaximums(filteredPoints, filteredSeries)
+        maxValuesByAxis = chartAxisMaximums(filteredPoints, filteredSeries),
+        slicePalette = prepared.slicePalette
     )
 }
 

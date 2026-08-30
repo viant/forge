@@ -592,6 +592,13 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
     public let chart: ChartDef?
     public let table: TableDef?
     public let columns: [ColumnDef]
+    public let density: String?
+    public let editableRows: Bool?
+    public let quickFilter: Bool?
+    public let allowAdd: Bool?
+    public let addRow: JSONValue?
+    public let removeRowLabel: String?
+    public let lookup: JSONValue?
     public let geo: JSONValue?
     public let treeBrowser: TreeBrowserDef?
     public let fileBrowser: FileBrowserDef?
@@ -666,6 +673,13 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         case chart
         case table
         case columns
+        case density
+        case editableRows
+        case quickFilter
+        case allowAdd
+        case addRow
+        case removeRowLabel
+        case lookup
         case geo
         case treeBrowser
         case fileBrowser
@@ -732,6 +746,13 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         chart: ChartDef? = nil,
         table: TableDef? = nil,
         columns: [ColumnDef] = [],
+        density: String? = nil,
+        editableRows: Bool? = nil,
+        quickFilter: Bool? = nil,
+        allowAdd: Bool? = nil,
+        addRow: JSONValue? = nil,
+        removeRowLabel: String? = nil,
+        lookup: JSONValue? = nil,
         geo: JSONValue? = nil,
         treeBrowser: TreeBrowserDef? = nil,
         fileBrowser: FileBrowserDef? = nil,
@@ -792,6 +813,13 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         self.chart = chart
         self.table = table
         self.columns = columns
+        self.density = density
+        self.editableRows = editableRows
+        self.quickFilter = quickFilter
+        self.allowAdd = allowAdd
+        self.addRow = addRow
+        self.removeRowLabel = removeRowLabel
+        self.lookup = lookup
         self.geo = geo
         self.treeBrowser = treeBrowser
         self.fileBrowser = fileBrowser
@@ -867,6 +895,13 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         chart = try container.decodeIfPresent(ChartDef.self, forKey: .chart)
         table = try container.decodeIfPresent(TableDef.self, forKey: .table)
         columns = try container.decodeIfPresent([ColumnDef].self, forKey: .columns) ?? []
+        density = try container.decodeIfPresent(String.self, forKey: .density)
+        editableRows = try container.decodeIfPresent(Bool.self, forKey: .editableRows)
+        quickFilter = try container.decodeIfPresent(Bool.self, forKey: .quickFilter)
+        allowAdd = try container.decodeIfPresent(Bool.self, forKey: .allowAdd)
+        addRow = try container.decodeIfPresent(JSONValue.self, forKey: .addRow)
+        removeRowLabel = try container.decodeIfPresent(String.self, forKey: .removeRowLabel)
+        lookup = try container.decodeIfPresent(JSONValue.self, forKey: .lookup)
         geo = try container.decodeIfPresent(JSONValue.self, forKey: .geo)
         treeBrowser = try container.decodeIfPresent(TreeBrowserDef.self, forKey: .treeBrowser)
         fileBrowser = try container.decodeIfPresent(FileBrowserDef.self, forKey: .fileBrowser)
@@ -930,6 +965,13 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         try container.encodeIfPresent(chart, forKey: .chart)
         try container.encodeIfPresent(table, forKey: .table)
         try container.encode(columns, forKey: .columns)
+        try container.encodeIfPresent(density, forKey: .density)
+        try container.encodeIfPresent(editableRows, forKey: .editableRows)
+        try container.encodeIfPresent(quickFilter, forKey: .quickFilter)
+        try container.encodeIfPresent(allowAdd, forKey: .allowAdd)
+        try container.encodeIfPresent(addRow, forKey: .addRow)
+        try container.encodeIfPresent(removeRowLabel, forKey: .removeRowLabel)
+        try container.encodeIfPresent(lookup, forKey: .lookup)
         try container.encodeIfPresent(geo, forKey: .geo)
         try container.encodeIfPresent(treeBrowser, forKey: .treeBrowser)
         try container.encodeIfPresent(fileBrowser, forKey: .fileBrowser)
@@ -3995,8 +4037,10 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
     public let sortable: Bool?
     public let link: LinkDef?
     public let width: Int?
+    public let frozen: Bool?
     public let icon: String?
     public let cellVisual: JSONValue?
+    public let editor: JSONValue?
     public let on: [ExecutionDef]
     public let target: JSONValue?
     public let targetOverrides: [String: JSONValue]
@@ -4012,8 +4056,10 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         case sortable
         case link
         case width
+        case frozen
         case icon
         case cellVisual
+        case editor
         case on
         case target
         case targetOverrides
@@ -4030,8 +4076,10 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         sortable: Bool? = nil,
         link: LinkDef? = nil,
         width: Int? = nil,
+        frozen: Bool? = nil,
         icon: String? = nil,
         cellVisual: JSONValue? = nil,
+        editor: JSONValue? = nil,
         on: [ExecutionDef] = [],
         target: JSONValue? = nil,
         targetOverrides: [String: JSONValue] = [:]
@@ -4046,8 +4094,10 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         self.sortable = sortable
         self.link = link
         self.width = width
+        self.frozen = frozen
         self.icon = icon
         self.cellVisual = cellVisual
+        self.editor = editor
         self.on = on
         self.target = target
         self.targetOverrides = targetOverrides
@@ -4067,8 +4117,10 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
             self.sortable = nil
             self.link = nil
             self.width = nil
+            self.frozen = nil
             self.icon = nil
             self.cellVisual = nil
+            self.editor = nil
             self.on = []
             self.target = nil
             self.targetOverrides = [:]
@@ -4088,8 +4140,10 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         sortable = try container.decodeIfPresent(Bool.self, forKey: .sortable)
         link = try container.decodeIfPresent(LinkDef.self, forKey: .link)
         width = try container.decodeIfPresent(Int.self, forKey: .width)
+        frozen = try container.decodeIfPresent(Bool.self, forKey: .frozen)
         icon = try container.decodeIfPresent(String.self, forKey: .icon)
         cellVisual = try container.decodeIfPresent(JSONValue.self, forKey: .cellVisual)
+        editor = try container.decodeIfPresent(JSONValue.self, forKey: .editor)
         on = try container.decodeIfPresent([ExecutionDef].self, forKey: .on) ?? []
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
         targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
@@ -4107,8 +4161,10 @@ public struct ColumnDef: Codable, Sendable, Identifiable {
         try container.encodeIfPresent(sortable, forKey: .sortable)
         try container.encodeIfPresent(link, forKey: .link)
         try container.encodeIfPresent(width, forKey: .width)
+        try container.encodeIfPresent(frozen, forKey: .frozen)
         try container.encodeIfPresent(icon, forKey: .icon)
         try container.encodeIfPresent(cellVisual, forKey: .cellVisual)
+        try container.encodeIfPresent(editor, forKey: .editor)
         try container.encode(on, forKey: .on)
         try container.encodeIfPresent(target, forKey: .target)
         try container.encode(targetOverrides, forKey: .targetOverrides)

@@ -6,6 +6,7 @@ private let hostedWorkspaceDidOpenNotification = Notification.Name("forgeHostedW
 public struct MenuListRenderer: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.openURL) private var openURL
+    @Environment(\.forgePresentationDensity) private var presentationDensity
 
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
@@ -48,7 +49,7 @@ public struct MenuListRenderer: View {
                 if summaryItems.isEmpty {
                     emptyStateCard("No data available for this section yet.")
                 } else {
-                    LazyVGrid(columns: summaryColumns, spacing: 12) {
+                    LazyVGrid(columns: summaryColumns, spacing: presentationDensity == .compact ? 8 : 12) {
                         ForEach(summaryItems) { item in
                             summaryCard(item)
                         }
@@ -204,7 +205,24 @@ public struct MenuListRenderer: View {
         let title = item.label ?? item.title ?? item.id ?? "Item"
         let value = normalizedItemDisplayValue(item)
         let showsSingleLineValue = shouldUseCompactSummaryStyle(title: title, value: value)
-        VStack(alignment: .leading, spacing: 8) {
+        if presentationDensity == .compact {
+            Text("\(title): \(value)")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 11)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(Color.accentColor.opacity(0.065)))
+                .overlay(Capsule().stroke(Color.accentColor.opacity(0.16), lineWidth: 1))
+                .contentShape(Capsule())
+                .onTapGesture {
+                    expandedSummaryValue = ExpandedMenuSummaryValue(label: title, value: value)
+                }
+                .accessibilityHint("Double tap to show the complete value")
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
             if showsSingleLineValue && value != "No data" {
                 Text(value)
                     .font(.headline.weight(.semibold))
@@ -229,19 +247,20 @@ public struct MenuListRenderer: View {
                     .minimumScaleFactor(0.85)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: showsSingleLineValue ? 56 : 80, alignment: .topLeading)
-        .padding(.horizontal, 14)
-        .padding(.vertical, showsSingleLineValue ? 12 : 14)
-        .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.black.opacity(0.05), lineWidth: 1)
-        )
-        .contentShape(Rectangle())
-        .onTapGesture {
-            expandedSummaryValue = ExpandedMenuSummaryValue(label: title, value: value)
+            .frame(maxWidth: .infinity, minHeight: showsSingleLineValue ? 56 : 80, alignment: .topLeading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, showsSingleLineValue ? 12 : 14)
+            .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.black.opacity(0.05), lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+            .onTapGesture {
+                expandedSummaryValue = ExpandedMenuSummaryValue(label: title, value: value)
+            }
+            .accessibilityHint("Double tap to show the complete value")
         }
-        .accessibilityHint("Double tap to show the complete value")
     }
 
     @ViewBuilder
@@ -868,8 +887,10 @@ public struct MenuListRenderer: View {
     }
 
     private var summaryColumns: [GridItem] {
-        let minimumWidth = menuListSummaryMinimumWidth(isRegular: horizontalSizeClass == .regular)
-        return [GridItem(.adaptive(minimum: minimumWidth), spacing: 12, alignment: .top)]
+        let minimumWidth = presentationDensity == .compact
+            ? 142
+            : menuListSummaryMinimumWidth(isRegular: horizontalSizeClass == .regular)
+        return [GridItem(.adaptive(minimum: minimumWidth), spacing: presentationDensity == .compact ? 8 : 12, alignment: .top)]
     }
 
     private func optionColumns(for item: ItemDef) -> [GridItem] {

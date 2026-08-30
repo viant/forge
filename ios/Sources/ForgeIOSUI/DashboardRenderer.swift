@@ -188,6 +188,16 @@ public struct DashboardRenderer: View {
                 return AnyView(dashboardPanel(container) {
                     unsupportedBlock("dashboard table has no columns")
                 })
+            case "dashboard.editableTable":
+                let effectiveContainer = dashboardContainerInheritingDataSource(container, dashboardRoot: dashboardRoot)
+                return AnyView(dashboardPanel(container) {
+                    FeedEditableTableView(runtime: runtime, window: window, container: effectiveContainer)
+                })
+            case "dashboard.lookupChips":
+                let effectiveContainer = dashboardContainerInheritingDataSource(container, dashboardRoot: dashboardRoot)
+                return AnyView(dashboardPanel(container) {
+                    FeedLookupChipsView(runtime: runtime, window: window, container: effectiveContainer)
+                })
             case "dashboard.reportBuilder":
                 let effectiveContainer = dashboardContainerInheritingDataSource(container, dashboardRoot: dashboardRoot)
                 return AnyView(
@@ -294,9 +304,29 @@ public struct DashboardRenderer: View {
             VStack(alignment: .leading, spacing: 10) {
                 if cards.isEmpty {
                     emptyDashboardState("No summary data available for this view.")
+                } else if isCompactPresentation {
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 142), spacing: 8, alignment: .top)],
+                        alignment: .leading,
+                        spacing: 8
+                    ) {
+                        ForEach(Array(cards.enumerated()), id: \.offset) { _, card in
+                            let tone = toneStyle(card.tone)
+                            Text("\(card.label): \(card.displayValue)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(tone.text)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 11)
+                                .padding(.vertical, 7)
+                                .background(Capsule().fill(tone.background))
+                                .overlay(Capsule().stroke(tone.border, lineWidth: 1))
+                        }
+                    }
                 } else {
                     LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: isCompactPresentation ? 136 : (horizontalSizeClass == .regular ? 156 : 160)), spacing: 10, alignment: .top)],
+                        columns: [GridItem(.adaptive(minimum: horizontalSizeClass == .regular ? 156 : 160), spacing: 10, alignment: .top)],
                         alignment: .leading,
                         spacing: 10
                     ) {
@@ -304,7 +334,7 @@ public struct DashboardRenderer: View {
                             let tone = toneStyle(card.tone)
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(card.label)
-                                    .font((isCompactPresentation ? Font.caption2 : .caption).weight(.medium))
+                                    .font(Font.caption.weight(.medium))
                                     .foregroundStyle(tone.text.opacity(0.8))
                                 Text(card.displayValue)
                                     .font(summaryValueFont(for: card.displayValue).weight(.semibold))
@@ -314,9 +344,9 @@ public struct DashboardRenderer: View {
                                     .allowsTightening(true)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
-                            .frame(maxWidth: .infinity, minHeight: isCompactPresentation ? 52 : (horizontalSizeClass == .regular ? 60 : 72), alignment: .leading)
-                            .padding(.horizontal, isCompactPresentation ? 10 : 12)
-                            .padding(.vertical, isCompactPresentation ? 9 : (horizontalSizeClass == .regular ? 10 : 11))
+                            .frame(maxWidth: .infinity, minHeight: horizontalSizeClass == .regular ? 60 : 72, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, horizontalSizeClass == .regular ? 10 : 11)
                             .background(
                                 RoundedRectangle(cornerRadius: 14)
                                     .fill(tone.background)
@@ -2491,6 +2521,13 @@ internal func dashboardContainerInheritingDataSource(
         chart: container.chart,
         table: container.table,
         columns: container.columns,
+        density: container.density,
+        editableRows: container.editableRows,
+        quickFilter: container.quickFilter,
+        allowAdd: container.allowAdd,
+        addRow: container.addRow,
+        removeRowLabel: container.removeRowLabel,
+        lookup: container.lookup,
         geo: container.geo,
         treeBrowser: container.treeBrowser,
         fileBrowser: container.fileBrowser,

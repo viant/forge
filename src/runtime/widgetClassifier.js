@@ -129,6 +129,9 @@ registerClassifier((item) => {
             return 'currency';
         case 'date':
             return 'date';
+        case 'dateRange':
+        case 'daterange':
+            return 'dateRange';
         case 'datetime':
             return 'datetime';
         case 'radio':

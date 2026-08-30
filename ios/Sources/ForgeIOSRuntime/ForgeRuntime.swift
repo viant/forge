@@ -104,6 +104,7 @@ public actor ForgeRuntime {
     private let session: URLSession
     private var dataSourceLoader: (@Sendable (DataSourceFetchRequest) async throws -> DataSourceFetchResult?)?
     private var windowMetadataLoader: (@Sendable (String) async throws -> WindowMetadata?)?
+    private var feedPatchHandler: (@Sendable (String, FeedPatchOperation) async throws -> Bool)?
 
     var handlers: [String: ForgeHandler] = [:]
     private var pendingDialogs: [String: PendingDialog] = [:]
@@ -130,9 +131,21 @@ public actor ForgeRuntime {
     // MARK: - Window lifecycle
 
     @discardableResult
-    public func openWindowInline(key: String, title: String, metadata: WindowMetadata) async -> WindowState {
+    public func openWindowInline(
+        key: String,
+        title: String,
+        metadata: WindowMetadata,
+        conversationID: String? = nil,
+        presentation: String? = nil
+    ) async -> WindowState {
         let resolved = MetadataResolver.resolve(metadata, for: targetContext)
-        let state = WindowState(key: key, title: title, metadata: resolved)
+        let state = WindowState(
+            key: key,
+            title: title,
+            metadata: resolved,
+            conversationID: conversationID,
+            presentation: presentation
+        )
         windows.append(state)
         let signal = await signals.metadata(windowID: state.id)
         await signal.set(resolved)
@@ -297,6 +310,16 @@ public actor ForgeRuntime {
         _ loader: @escaping @Sendable (String) async throws -> WindowMetadata?
     ) {
         windowMetadataLoader = loader
+    }
+
+    public func registerFeedPatchHandler(
+        _ handler: @escaping @Sendable (String, FeedPatchOperation) async throws -> Bool
+    ) {
+        feedPatchHandler = handler
+    }
+
+    public func dispatchFeedPatch(windowID: String, operation: FeedPatchOperation) async throws -> Bool {
+        try await feedPatchHandler?(windowID, operation) == true
     }
 
     // MARK: - Form values

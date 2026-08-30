@@ -626,7 +626,13 @@ const Container = ({context, container, isActive, suppressTitle = false}) => {
                     )
                 ) : null}
                 {shouldAllocateChartRemainder ? (
-                    <div style={{ flex: '1 1 0', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                    <div style={{
+                        flex: container?.style?.minHeight ? '0 0 auto' : '1 1 0',
+                        minHeight: container?.style?.minHeight || 0,
+                        minWidth: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                    }}>
                         {chartPanel}
                     </div>
                 ) : chartPanel}

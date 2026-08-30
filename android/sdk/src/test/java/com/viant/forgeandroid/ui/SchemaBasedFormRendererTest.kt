@@ -94,6 +94,18 @@ class SchemaBasedFormRendererTest {
     }
 
     @Test
+    fun dateRangeWidgetMapsToStructuredDateRangeItem() {
+        val schema = Json.parseToJsonElement(
+            """{"type":"object","properties":{"flight":{"type":"object","title":"Flight dates","x-ui-widget":"dateRange"}}}"""
+        )
+
+        val items = schemaBasedFormItems(schema, emptyList())
+
+        assertEquals("dateRange", items.single().type)
+        assertEquals("flight", items.single().dataField)
+    }
+
+    @Test
     fun schemaLookupMetadataMapsToLookupItem() {
         val schema = Json.parseToJsonElement(
             """

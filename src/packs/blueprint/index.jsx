@@ -55,6 +55,18 @@ function TextInput({ value = '', onChange, readOnly, ...rest }) {
     );
 }
 
+function BooleanPill({value = false, onChange, readOnly, disabled, item, ariaLabel, ...rest}) {
+    const checked = !!value;
+    return (
+        <button id={rest.id} title={rest.title} type="button" role="switch" aria-checked={checked} aria-label={ariaLabel || item?.label || item?.name || 'Boolean value'}
+            className={`forge-boolean-pill${checked ? ' is-on' : ''}`}
+            disabled={readOnly || disabled} onClick={() => onChange?.(!checked)}>
+            <span className="forge-boolean-pill__track"><span className="forge-boolean-pill__thumb"/></span>
+            <span>{checked ? 'Yes' : 'No'}</span>
+        </button>
+    );
+}
+
 const normalizeMultiValues = (value) => {
     if (Array.isArray(value)) return value.map((v) => `${v}`);
     if (typeof value === 'string') {
@@ -133,12 +145,14 @@ export function registerPack() {
     /* -------------------- TextArea ---------------------------------- */
     registerWidget(
         'textarea',
-        ({ value = '', onChange, readOnly, ...rest }) => (
+        ({ value = '', onChange, readOnly, style, ...rest }) => (
             <TextArea
                 {...rest}
+                fill
                 value={value}
                 onChange={(e) => onChange?.(e.target.value)}
                 readOnly={readOnly}
+                style={{ minHeight: 96, resize: 'vertical', ...(style || {}) }}
             />
         ),
         { framework: 'blueprint' }
@@ -196,6 +210,7 @@ export function registerPack() {
             disabled={readOnly}
         />
     ), { framework: 'blueprint' });
+    registerWidget('booleanPill', (props) => <BooleanPill {...props}/>, { framework: 'blueprint' });
 
     const checkboxChangeHandler = ({ adapter }) => (arg) => {
         if (arg && arg.target) {
@@ -213,6 +228,9 @@ export function registerPack() {
     });
     registerEventAdapter('switch', {
         onChange: checkboxChangeHandler,
+    });
+    registerEventAdapter('booleanPill', {
+        onChange: ({ adapter }) => (value) => adapter.set(!!value),
     });
 
     /* -------------------- Select / Dropdown ------------------------- */
@@ -498,6 +516,71 @@ export function registerPack() {
 
     registerDateKind('date');
     registerDateKind('datetime');
+
+    /* -------------------- Date range ------------------------------- */
+    registerWidget(
+        'dateRange',
+        ({ value, onChange, readOnly, disabled, item }) => {
+            const range = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+            const start = String(range.start || '');
+            const end = String(range.end || '');
+            const invalid = !!start && !!end && start > end;
+            const inputStyle = {
+                minWidth: 0,
+                width: '100%',
+                borderRadius: 8,
+            };
+            return (
+                <div
+                    role="group"
+                    aria-label={item?.label || item?.name || 'Date range'}
+                    aria-invalid={invalid || undefined}
+                    className={`forge-date-range-input${invalid ? ' is-invalid' : ''}`}
+                    style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
+                        alignItems: 'center',
+                        gap: 10,
+                        width: '100%',
+                        padding: 10,
+                        border: `1px solid ${invalid ? '#c23030' : '#cbd5e1'}`,
+                        borderRadius: 10,
+                        background: readOnly || disabled ? '#f4f6f8' : '#ffffff',
+                    }}
+                    title={invalid ? 'Start date must be on or before end date.' : undefined}
+                >
+                    <input
+                        className="bp6-input"
+                        type="date"
+                        aria-label="Start date"
+                        value={start}
+                        max={end || undefined}
+                        readOnly={readOnly}
+                        disabled={disabled}
+                        style={inputStyle}
+                        onChange={(event) => onChange?.({ ...range, start: event.target.value })}
+                    />
+                    <span aria-hidden="true" style={{ color: '#64748b', fontWeight: 600 }}>to</span>
+                    <input
+                        className="bp6-input"
+                        type="date"
+                        aria-label="End date"
+                        value={end}
+                        min={start || undefined}
+                        readOnly={readOnly}
+                        disabled={disabled}
+                        style={inputStyle}
+                        onChange={(event) => onChange?.({ ...range, end: event.target.value })}
+                    />
+                </div>
+            );
+        },
+        { framework: 'blueprint' }
+    );
+
+    registerEventAdapter('dateRange', {
+        onChange: ({ adapter }) => (range) => adapter.set(range),
+    });
 
     /* -------------------- Radio group ------------------------------- */
     registerWidget('radio', ({ value, onChange, readOnly, options = [], appearance, ...rest }) => {

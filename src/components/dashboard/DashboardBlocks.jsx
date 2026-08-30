@@ -1,5 +1,7 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {useSignalEffect} from '@preact/signals-react';
+import {useSignals} from '@preact/signals-react/runtime';
+import {Icon} from '@blueprintjs/core';
 import {useDataSourceState} from "../../hooks/useDataSourceState.js";
 import Chart from "../Chart.jsx";
 import {resolveKey} from "../../utils/selector.js";
@@ -11,6 +13,9 @@ import {aggregateGeoRows, buildGeoConfig, DEFAULT_GEO_PALETTE, findGeoColorRule,
 import ReportRuntime from "./ReportRuntime.jsx";
 import { resolveDashboardReportRuntimeHandlers } from "./dashboardReportRuntimeHandlers.js";
 import DashboardTableContent from "./DashboardTableContent.jsx";
+import { buildTableRuntimeColumns, resolveTableCellVisualState } from "./tableCellVisuals.js";
+import { withFrozenIdentifierColumn } from "./tableFrozenIdentifier.js";
+import LookupSelectionInput from "../lookup/LookupSelectionInput.jsx";
 import { dashboardStatusTone, isDashboardStatusValue, titleizeDashboardKey, toneColors } from "./dashboardVisualUtils.jsx";
 import { DashboardErrorBoundary } from "./dashboardErrorBoundary.js";
 import "./Dashboard.css";
@@ -138,6 +143,7 @@ export function DashboardSummary({container, context}) {
                 label: metric.label,
                 value,
                 format: metric.format,
+                icon: metric.icon,
                 secondaryValue,
                 secondaryFormat: metric.secondaryFormat || metric.format,
             };
@@ -164,7 +170,10 @@ export function DashboardSummary({container, context}) {
                             className="forge-dashboard-metric-card"
                             style={{"--forge-dashboard-accent": accent}}
                         >
-                            <div className="forge-dashboard-metric-label">{metric.label}</div>
+                            <div className="forge-dashboard-metric-label" style={{display: 'flex', alignItems: 'center', gap: 7}}>
+                                {metric.icon ? <Icon icon={metric.icon} size={14}/> : null}
+                                <span>{metric.label}</span>
+                            </div>
                             {isStatus ? (
                                 <div>
                                     <span style={{display: 'inline-flex', alignItems: 'center', fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: tone.text, background: tone.background, border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '5px 10px'}}>
@@ -1355,6 +1364,419 @@ export function DashboardTable({container, context}) {
     );
 }
 
+export function DashboardEditableTable({container, context, embedded = false}) {
+    useSignals();
+    const dataSourceRef = String(container?.dataSourceRef || '').trim();
+    const dataSource = dataSourceRef ? context?.Context?.(dataSourceRef)?.handlers?.dataSource : null;
+    const [revision, setRevision] = useState(0);
+    const [filterText, setFilterText] = useState('');
+    const [page, setPage] = useState(1);
+    const currentRows = () => dataSource?.peekFullCollection?.() || dataSource?.peekCollection?.() || [];
+    const rows = currentRows();
+    const columns = Array.isArray(container?.columns) ? container.columns : [];
+    const runtimeColumns = useMemo(() => buildTableRuntimeColumns(columns, rows), [columns, rows]);
+    const tableColumns = useMemo(() => withFrozenIdentifierColumn(runtimeColumns), [runtimeColumns]);
+    const pageSize = Math.max(1, Number(container?.pageSize || 20));
+    const normalizedFilter = filterText.trim().toLowerCase();
+    const filteredEntries = rows.map((row, index) => ({row, index})).filter(({row}) => !normalizedFilter || columns.some((column) => (
+        displayLookupValue(row?.[column.key]).toLowerCase().includes(normalizedFilter)
+    )));
+    const pageCount = Math.max(1, Math.ceil(filteredEntries.length / pageSize));
+    const currentPage = Math.min(page, pageCount);
+    const visibleEntries = filteredEntries.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    const commit = (nextRows) => {
+        dataSource?.replaceCollection?.({rows: nextRows, selectAll: true});
+        setRevision((value) => value + 1);
+    };
+    const updateCell = (rowIndex, key, value) => commit(currentRows().map((row, index) => (
+        index === rowIndex ? {...row, [key]: value} : row
+    )));
+    const addRow = () => {
+        const latest = currentRows();
+        commit([...latest, {...(container?.addRow?.defaults || {})}]);
+        setPage(Math.ceil((latest.length + 1) / pageSize));
+    };
+    const removeRow = (rowIndex) => commit(currentRows().filter((_, index) => index !== rowIndex));
+    const frequencyParts = (value) => {
+        const match = String(value || '').trim().match(/^(\d+(?:\.\d+)?)\s+per\s+(\d+(?:\.\d+)?)\s+(hour|day|week)s?$/i);
+        return match ? {count: match[1], interval: match[2], unit: match[3].toLowerCase()} : {count: '', interval: '1', unit: 'day'};
+    };
+    const setFrequencyPart = (rowIndex, column, part, nextValue) => {
+        const next = {...frequencyParts(currentRows()[rowIndex]?.[column.key]), [part]: nextValue};
+        updateCell(rowIndex, column.key, next.count ? `${next.count} per ${next.interval || 1} ${next.unit || 'day'}` : '');
+    };
+    const editableCellStyle = (row, column) => {
+        const visual = resolveTableCellVisualState(row, column);
+        if (!visual || !['dataBar', 'progressBar', 'sparkBar'].includes(visual.kind)) return undefined;
+        const pct = Math.round(Math.max(0, Math.min(1, Number(visual.percent || 0))) * 100);
+        const color = visual.palette?.[0] || 'rgba(56, 87, 214, .16)';
+        return {backgroundImage: `linear-gradient(90deg, ${color} 0%, ${color} ${pct}%, #fff ${pct}%, #fff 100%)`};
+    };
+
+    const content = (
+            <div className="forge-editable-collection" data-revision={revision}>
+                <div className="forge-editable-collection__toolbar">
+                    {container?.quickFilter !== false ? <input className="forge-editable-collection__filter" type="search" value={filterText} placeholder={embedded ? `Filter selected ${String(container?.selectedFilterLabel || container?.title || 'rows').toLowerCase()}…` : `Filter ${String(container?.title || 'collection').toLowerCase()} rows…`} aria-label={embedded ? `Filter selected ${container?.selectedFilterLabel || container?.title || 'rows'}` : `Filter ${container?.title || 'collection'} rows`} onChange={(event) => { setFilterText(event.target.value); setPage(1); }}/> : null}
+                    <span>{filteredEntries.length} of {rows.length} {rows.length === 1 ? 'row' : 'rows'}</span>
+                    {container?.allowAdd !== false ? (
+                        <button type="button" className="forge-editable-collection__icon-action" aria-label={container?.addRow?.label || 'Add row'} title={container?.addRow?.label || 'Add row'} onClick={addRow}><Icon icon="plus" size={14}/></button>
+                    ) : null}
+                </div>
+                <div className="forge-editable-collection__table-wrap">
+                    <table className="forge-editable-collection__table forge-editable-collection__table--frozen-identifier">
+                        <thead><tr>{tableColumns.map((column) => <th key={column.key} className={column.frozen ? 'forge-table-frozen-identifier' : undefined} style={column.frozen ? {'--forge-frozen-column-width': `${column.resolvedCompactWidth}px`} : undefined}>{column.label || column.key}</th>)}<th aria-label="Row actions"/></tr></thead>
+                        <tbody>
+                            {visibleEntries.map(({row, index: rowIndex}) => (
+                                <tr key={rowIndex}>
+                                    {tableColumns.map((column) => {
+                                        const editor = column.editor === false ? null : (column.editor || {type: 'text'});
+                                        const value = row?.[column.key] ?? '';
+                                        return (
+                                            <td key={column.key} className={column.frozen ? 'forge-table-frozen-identifier' : undefined} style={column.frozen ? {'--forge-frozen-column-width': `${column.resolvedCompactWidth}px`} : undefined}>
+                                                {!editor ? <span>{formatDashboardValue(value, column.format, getDashboardLocale(context))}</span>
+                                                    : editor.type === 'frequency' ? (() => {
+                                                        const parts = frequencyParts(value);
+                                                        return <div className="forge-frequency-editor">
+                                                            <input aria-label={`${column.label || column.key} count row ${rowIndex + 1}`} type="number" min="1" value={parts.count} placeholder="—" onChange={(event) => setFrequencyPart(rowIndex, column, 'count', event.target.value)}/>
+                                                            <span>per</span>
+                                                            <input aria-label={`${column.label || column.key} interval row ${rowIndex + 1}`} type="number" min="1" value={parts.interval} onChange={(event) => setFrequencyPart(rowIndex, column, 'interval', event.target.value)}/>
+                                                            <select aria-label={`${column.label || column.key} unit row ${rowIndex + 1}`} value={parts.unit} onChange={(event) => setFrequencyPart(rowIndex, column, 'unit', event.target.value)}>
+                                                                {(editor.units || ['hour', 'day', 'week']).map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                                                            </select>
+                                                        </div>;
+                                                    })()
+                                                    : editor.type === 'select' ? (
+                                                        <select aria-label={`${column.label || column.key} row ${rowIndex + 1}`} value={value}
+                                                            onChange={(event) => updateCell(rowIndex, column.key, event.target.value)}>
+                                                            {(editor.options || []).map((option) => {
+                                                                const normalized = option && typeof option === 'object' ? option : {label: option, value: option};
+                                                                return <option key={normalized.value} value={normalized.value}>{normalized.label}</option>;
+                                                            })}
+                                                        </select>
+                                                    ) : /rationale|reason|description/i.test(`${column.key} ${column.label || ''}`) ? (
+                                                        <textarea aria-label={`${column.label || column.key} row ${rowIndex + 1}`}
+                                                            rows={1}
+                                                            ref={(node) => {
+                                                                if (!node) return;
+                                                                node.style.height = 'auto';
+                                                                node.style.height = `${node.scrollHeight}px`;
+                                                            }}
+                                                            style={editableCellStyle(row, column)}
+                                                            value={value} placeholder={editor.placeholder || ''}
+                                                            onChange={(event) => {
+                                                                event.currentTarget.style.height = 'auto';
+                                                                event.currentTarget.style.height = `${event.currentTarget.scrollHeight}px`;
+                                                                updateCell(rowIndex, column.key, event.target.value);
+                                                            }}/>
+                                                    ) : (
+                                                        <input aria-label={`${column.label || column.key} row ${rowIndex + 1}`}
+                                                            type={editor.type === 'number' ? 'number' : editor.type === 'time' ? 'time' : 'text'}
+                                                            style={editableCellStyle(row, column)}
+                                                            value={editor.type === 'tags' && Array.isArray(value) ? value.join(', ') : value} placeholder={editor.placeholder || ''}
+                                                            onChange={(event) => updateCell(rowIndex, column.key,
+                                                                editor.type === 'number' ? Number(event.target.value)
+                                                                    : editor.type === 'tags' ? event.target.value.split(',').map((entry) => entry.trim()).filter(Boolean)
+                                                                        : event.target.value)}/>
+                                                    )}
+                                            </td>
+                                        );
+                                    })}
+                                    <td className="forge-editable-collection__actions">
+                                        <button type="button" aria-label={`${container?.removeRowLabel || 'Remove row'} ${rowIndex + 1}`} title={container?.removeRowLabel || 'Remove row'} onClick={() => removeRow(rowIndex)}><Icon icon="trash" size={14}/></button>
+                                    </td>
+                                </tr>
+                            ))}
+                            {visibleEntries.length === 0 ? <tr><td colSpan={columns.length + 1} className="forge-editable-collection__empty">{rows.length === 0 ? (container?.emptyText || 'No rows yet. Add one to begin.') : 'No matching rows.'}</td></tr> : null}
+                        </tbody>
+                    </table>
+                </div>
+                {pageCount > 1 ? <div className="forge-editable-collection__pager">
+                    <button type="button" disabled={currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
+                    <span>Page {currentPage} of {pageCount}</span>
+                    <button type="button" disabled={currentPage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</button>
+                </div> : null}
+            </div>
+    );
+    return embedded ? content : <Panel container={container}>{content}</Panel>;
+}
+
+function valueAtPath(value, path = '') {
+    return String(path || '').split('.').filter(Boolean).reduce((current, key) => (
+        current && typeof current === 'object' ? current[key] : undefined
+    ), value);
+}
+
+function displayLookupValue(value) {
+    if (Array.isArray(value)) return value.map(displayLookupValue).filter(Boolean).join(' > ');
+    if (value && typeof value === 'object') return displayLookupValue(value.label ?? value.name ?? value.value ?? '');
+    return value == null ? '' : String(value);
+}
+
+function lookupRowLabel(row, preferredField = 'label') {
+    for (const field of [preferredField, 'label', 'displayPath', 'path', 'name', 'value']) {
+        const candidate = displayLookupValue(valueAtPath(row, field));
+        if (candidate) return candidate;
+    }
+    return '';
+}
+
+function setLookupInput(target = {}, path = '', value) {
+    const result = JSON.parse(JSON.stringify(target || {}));
+    const parts = String(path || '').split('.').filter(Boolean);
+    let current = result;
+    parts.forEach((part, index) => {
+        if (index === parts.length - 1) current[part] = value;
+        else {
+            current[part] = current[part] && typeof current[part] === 'object' ? current[part] : {};
+            current = current[part];
+        }
+    });
+    return result;
+}
+
+function mapLookupRow(row, mapping = {}) {
+    return Object.fromEntries(Object.entries(mapping || {}).map(([target, source]) => {
+        if (source && typeof source === 'object' && Object.prototype.hasOwnProperty.call(source, 'value')) {
+            return [target, source.value];
+        }
+        if (source && typeof source === 'object' && Array.isArray(source.firstOf)) {
+            const value = source.firstOf.map((path) => valueAtPath(row, path)).find((candidate) => displayLookupValue(candidate));
+            return [target, displayLookupValue(value)];
+        }
+        return [target, valueAtPath(row, source)];
+    }));
+}
+
+/**
+ * Generic lookup-backed chip editor. The host owns lookup transport and the
+ * workspace owns datasource IDs, inputs, providers, and result mappings.
+ */
+export function DashboardLookupChips({container, context}) {
+    useSignals();
+    const dataSourceRef = String(container?.dataSourceRef || '').trim();
+    const dataSourceContext = dataSourceRef ? context?.Context?.(dataSourceRef) : null;
+    const dataSource = dataSourceContext?.handlers?.dataSource;
+    const lookupService = context?.handlers?.lookup;
+    const config = container?.lookup || {};
+    const providers = Array.isArray(config.providers) ? config.providers : [];
+    const [providerId, setProviderId] = useState(String(config.defaultProvider || providers[0]?.id || ''));
+    const [query, setQuery] = useState('');
+    const [results, setResults] = useState([]);
+    const [drillStack, setDrillStack] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [revision, setRevision] = useState(0);
+    const currentRows = () => dataSource?.peekFullCollection?.() || dataSource?.peekCollection?.() || [];
+    const rows = currentRows();
+    const reactiveSelection = dataSourceContext?.signals?.selection?.value?.selection;
+    const selectedCount = Array.isArray(reactiveSelection) ? reactiveSelection.length : rows.length;
+    const valueField = String(config.valueField || 'value');
+    const labelField = String(config.labelField || 'label');
+    const showSelectionChips = String(config.selectionPresentation || 'chips').toLowerCase() !== 'table';
+    const selections = showSelectionChips ? (Array.isArray(rows) ? rows : []).map((row) => ({
+        value: valueAtPath(row, config.selectionValueField || 'id'),
+        label: valueAtPath(row, config.selectionLabelField || 'name') || valueAtPath(row, config.selectionValueField || 'id'),
+    })) : [];
+    const activeProvider = providers.find((provider) => String(provider?.id || '') === providerId) || providers[0] || {};
+    const mapResult = (row) => {
+        const mapped = mapLookupRow(row, config.resultMapping || {id: valueField, name: labelField});
+        if (activeProvider?.id && config.providerField) mapped[config.providerField] = activeProvider.id;
+        if (activeProvider?.label && config.providerLabelField) mapped[config.providerLabelField] = activeProvider.label;
+        return mapped;
+    };
+    const omitSelectedResults = (found = []) => {
+        const keyField = config.selectionValueField || 'id';
+        const existingKeys = new Set(currentRows().map((row) => String(valueAtPath(row, keyField) ?? '')).filter(Boolean));
+        return (Array.isArray(found) ? found : []).filter((row) => {
+            const key = String(valueAtPath(mapResult(row), keyField) ?? '');
+            return !key || !existingKeys.has(key);
+        });
+    };
+
+    const search = async () => {
+        const minimumQueryLength = Number(config.minQueryLength || 0);
+        if (minimumQueryLength > 0 && String(query || '').trim().length < minimumQueryLength) {
+            setResults([]);
+            setError(`Enter at least ${minimumQueryLength} characters to search.`);
+            return;
+        }
+        if (Array.isArray(config.options)) {
+            const normalizedQuery = String(query || '').trim().toLowerCase();
+            const existingKeys = new Set(rows.map((row) => String(valueAtPath(row, config.selectionValueField || 'id') ?? '')));
+            const found = config.options.map((option) => option && typeof option === 'object' ? option : {label: option, value: option})
+                .filter((option) => !existingKeys.has(String(option.value ?? '')))
+                .filter((option) => !normalizedQuery || String(option.label || option.value || '').toLowerCase().includes(normalizedQuery));
+            setError('');
+            setResults(found);
+            return;
+        }
+        if (typeof lookupService?.search !== 'function') {
+            setError('Lookup service is unavailable.');
+            return;
+        }
+        setLoading(true);
+        setError('');
+        try {
+            const found = await lookupService.search({
+                dataSourceRef: config.dataSourceRef,
+                query,
+                queryInput: config.queryInput,
+                inputs: {...(config.inputs || {}), ...(activeProvider.inputs || {})},
+                inputBindings: config.inputBindings || {},
+                timeoutMs: config.timeoutMs,
+            });
+            setResults(omitSelectedResults(found));
+        } catch (searchError) {
+            setResults([]);
+            setError(String(searchError?.message || searchError || 'Lookup failed.'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!query.trim() || config.searchAsYouType === false) return undefined;
+        const timeout = setTimeout(search, Number(config.debounceMs || 250));
+        return () => clearTimeout(timeout);
+    // The provider is intentionally part of the lookup query identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [query, providerId]);
+
+    const addResult = (row) => {
+        const latestRows = currentRows();
+        const mapped = mapResult(row);
+        const key = String(valueAtPath(mapped, config.selectionValueField || 'id') ?? '');
+        const next = key && latestRows.some((item) => String(valueAtPath(item, config.selectionValueField || 'id') ?? '') === key)
+            ? latestRows
+            : [...latestRows, mapped];
+        dataSource?.replaceCollection?.({rows: next, selectAll: true});
+        setQuery('');
+        setResults([]);
+        setRevision((value) => value + 1);
+    };
+
+    const drillInto = async (row) => {
+        const drill = config.drill && typeof config.drill === 'object' ? config.drill : null;
+        if (!drill?.dataSourceRef) return;
+        const rawNodeValue = valueAtPath(row, drill.valueField || valueField);
+        const typedNodeValue = drill.valueType === 'number' ? Number(rawNodeValue) : rawNodeValue;
+        const nodeValue = drill.wrapArray ? [typedNodeValue] : typedNodeValue;
+        const nodeID = drill.namespace ? {namespace: drill.namespace, id: nodeValue} : nodeValue;
+        setLoading(true);
+        setError('');
+        try {
+            const inputs = setLookupInput(
+                {...(config.inputs || {}), ...(activeProvider.inputs || {}), ...(drill.inputs || {})},
+                drill.idInput || 'Body.treeLookupParam.id',
+                nodeID,
+            );
+            const children = await lookupService.search({
+                dataSourceRef: drill.dataSourceRef,
+                inputs,
+                inputBindings: config.inputBindings || {},
+            });
+            setDrillStack((stack) => [...stack, {row, results}]);
+            setResults(Array.isArray(children) ? children : []);
+            setQuery('');
+        } catch (drillError) {
+            setError(String(drillError?.message || drillError || 'Could not load children.'));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const drillBack = () => {
+        setDrillStack((stack) => {
+            const previous = stack[stack.length - 1];
+            if (previous) setResults(previous.results || []);
+            return stack.slice(0, -1);
+        });
+    };
+
+    const removeSelection = (index) => {
+        dataSource?.replaceCollection?.({rows: currentRows().filter((_, rowIndex) => rowIndex !== index), selectAll: true});
+        setRevision((value) => value + 1);
+    };
+
+    return (
+        <Panel container={container}>
+            <div className="forge-dashboard-lookup-chips" data-revision={revision}>
+                {providers.length > 1 ? (
+                    <label className="forge-dashboard-lookup-chips__provider">
+                        <span>{config.providerLabel || 'Provider'}</span>
+                        <select value={providerId} onChange={(event) => { setProviderId(event.target.value); setResults([]); }}>
+                            {providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.label || provider.id}</option>)}
+                        </select>
+                    </label>
+                ) : null}
+                <LookupSelectionInput
+                    selections={selections}
+                    inputValue={query}
+                    placeholder={config.placeholder || 'Search and add'}
+                    browseLabel={loading ? 'Searching' : (config.browseLabel || 'Search')}
+                    allowManualEntry
+                    disabled={loading}
+                    onInputChange={setQuery}
+                    onInputCommit={search}
+                    onBrowse={search}
+                    onRemoveSelection={removeSelection}
+                />
+                {!showSelectionChips ? <div className="forge-dashboard-lookup-chips__count">{selectedCount} selected {selectedCount === 1 ? 'item' : 'items'}</div> : null}
+                {error ? <div className="forge-dashboard-lookup-chips__error" role="alert">{error}</div> : null}
+                {drillStack.length > 0 ? (
+                    <div className="forge-dashboard-lookup-chips__breadcrumb">
+                        <button type="button" onClick={drillBack}><Icon icon="chevron-left" size={14}/>Back</button>
+                        <span>{drillStack.map((entry) => lookupRowLabel(entry.row, labelField)).join(' / ')}</span>
+                    </div>
+                ) : null}
+                {results.length > 0 ? (
+                    <div className="forge-dashboard-lookup-chips__results" role="listbox" aria-label={config.resultsLabel || 'Lookup results'}>
+                        {results.slice(0, Number(config.resultLimit || 12)).map((row, index) => {
+                            const activeLabelField = drillStack.length > 0 ? (config.drill?.resultLabelField || labelField) : labelField;
+                            const activeValueField = drillStack.length > 0 ? (config.drill?.resultValueField || valueField) : valueField;
+                            const resultLabel = lookupRowLabel(row, activeLabelField) || displayLookupValue(valueAtPath(row, activeValueField));
+                            const canDrill = !!config.drill?.dataSourceRef && drillStack.length < Number(config.drill?.maxDepth || 1);
+                            return (
+                            <div className="forge-dashboard-lookup-chips__result" key={`${valueAtPath(row, activeValueField) ?? index}`} role="option">
+                                {!(config.drill?.rootOnlyAdd && drillStack.length > 0) ? (
+                                    <button className="forge-dashboard-lookup-chips__result-add" type="button" onClick={() => addResult(row)}>
+                                        <Icon icon="plus" size={14}/>
+                                        <span><strong>{resultLabel}</strong>{activeProvider?.label ? <small>{activeProvider.label}</small> : null}</span>
+                                    </button>
+                                ) : <span className="forge-dashboard-lookup-chips__result-label"><strong>{resultLabel}</strong></span>}
+                                {canDrill ? (
+                                    <button className="forge-dashboard-lookup-chips__result-drill" type="button" aria-label={`View children of ${resultLabel}`} onClick={() => drillInto(row)}>
+                                        <Icon icon="chevron-right" size={14}/>
+                                    </button>
+                                ) : null}
+                            </div>
+                        );})}
+                    </div>
+                ) : null}
+                {!loading && !error && query.trim() && results.length === 0 ? <div className="forge-dashboard-lookup-chips__empty">No matching options.</div> : null}
+                {Array.isArray(container.columns) && container.columns.length > 0 ? (
+                    <div className="forge-dashboard-lookup-chips__selection">
+                        {container?.editableRows === true ? (
+                            <DashboardEditableTable
+                                embedded
+                                container={{...container, selectedFilterLabel: container.title, title: '', subtitle: '', allowAdd: false, quickFilter: container.quickFilter !== false}}
+                                context={context}
+                            />
+                        ) : (
+                            <DashboardTableContent
+                                container={{...container, title: '', subtitle: '', quickFilter: container.quickFilter !== false, selectionLabelField: config.selectionLabelField}}
+                                context={context}
+                                locale={getDashboardLocale(context)}
+                                subtitleStyle={subtitleStyle}
+                            />
+                        )}
+                    </div>
+                ) : null}
+            </div>
+        </Panel>
+    );
+}
+
 export function DashboardBlock({container, context, isActive, children}) {
     let content = null;
     switch (container.kind) {
@@ -1411,6 +1833,12 @@ export function DashboardBlock({container, context, isActive, children}) {
             break;
         case 'dashboard.table':
             content = <DashboardTable container={container} context={context}/>;
+            break;
+        case 'dashboard.editableTable':
+            content = <DashboardEditableTable container={container} context={context}/>;
+            break;
+        case 'dashboard.lookupChips':
+            content = <DashboardLookupChips container={container} context={context}/>;
             break;
         case 'dashboard.detail':
             content = <DashboardDetail container={container} context={context}>{children}</DashboardDetail>;

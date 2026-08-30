@@ -33,6 +33,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -42,6 +45,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -91,6 +95,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 import java.time.LocalDate
+import java.time.Instant
+import java.time.ZoneOffset
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -1704,39 +1710,68 @@ private fun BreakdownSection(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DateRangeInput(
+internal fun DateRangeInput(
     value: String,
     onValueChange: (String) -> Unit,
-    placeholder: String
+    placeholder: String,
+    pickerEnabled: Boolean = false
 ) {
+    var showPicker by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(10.dp)
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        singleLine = true,
-        textStyle = MaterialTheme.typography.bodyMedium.copy(
-            color = Color(0xFF1F3B2B),
-            fontWeight = FontWeight.Medium
-        ),
-        modifier = Modifier
-            .width(124.dp)
-            .background(Color(0xFFEEF8F1), shape)
-            .border(1.dp, Color(0xFFC7E0D0), shape)
-            .padding(horizontal = 12.dp, vertical = 9.dp),
-        decorationBox = { innerTextField ->
-            Box(contentAlignment = Alignment.CenterStart) {
-                if (value.isBlank()) {
-                    Text(
-                        text = placeholder,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF6A8273)
-                    )
+    Box {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            readOnly = pickerEnabled,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                color = Color(0xFF1F3B2B),
+                fontWeight = FontWeight.Medium
+            ),
+            modifier = Modifier
+                .width(124.dp)
+                .background(Color(0xFFEEF8F1), shape)
+                .border(1.dp, Color(0xFFC7E0D0), shape)
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+            decorationBox = { innerTextField ->
+                Box(contentAlignment = Alignment.CenterStart) {
+                    if (value.isBlank()) {
+                        Text(
+                            text = placeholder,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF6A8273)
+                        )
+                    }
+                    innerTextField()
                 }
-                innerTextField()
             }
+        )
+        if (pickerEnabled) {
+            Box(modifier = Modifier.matchParentSize().clickable { showPicker = true })
         }
-    )
+    }
+    if (pickerEnabled && showPicker) {
+        val initialMillis = runCatching {
+            LocalDate.parse(value).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+        }.getOrNull()
+        val pickerState = androidx.compose.material3.rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { millis ->
+                        onValueChange(Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toString())
+                    }
+                    showPicker = false
+                }) { Text("Done") }
+            },
+            dismissButton = { TextButton(onClick = { showPicker = false }) { Text("Cancel") } }
+        ) {
+            DatePicker(state = pickerState)
+        }
+    }
 }
 
 @Composable

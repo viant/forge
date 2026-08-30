@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 import Chart from "../Chart.jsx";
+import SectionTabRail from "../SectionTabRail.jsx";
 import {
   REPORT_LAYOUT_GRID_COLUMNS,
   resolveReportLayoutSpan,
@@ -3166,40 +3167,12 @@ export default function ReportRuntime({
               {runtimeTabGroup.title}
             </div>
           ) : null}
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              flexWrap: "wrap",
-              padding: 4,
-              borderRadius: 12,
-              background: "#f5f8fb",
-              border: "1px solid #dbe5ec",
-            }}
-          >
-            {runtimeSections.map((section) => {
-              const selected = normalizeString(section?.id) === resolvedActiveSectionId;
-              return (
-                <button
-                  key={section.id}
-                  type="button"
-                  onClick={() => setActiveSectionId(section.id)}
-                  style={{
-                    border: selected ? "1px solid #93c5fd" : "1px solid transparent",
-                    background: selected ? "#ffffff" : "transparent",
-                    color: selected ? "#1d4ed8" : "#486579",
-                    borderRadius: 10,
-                    padding: "8px 12px",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  {section.navigationLabel}
-                </button>
-              );
-            })}
-          </div>
+          <SectionTabRail
+            items={runtimeSections.map((section) => ({id: section.id, label: section.navigationLabel}))}
+            selectedId={resolvedActiveSectionId}
+            onChange={setActiveSectionId}
+            ariaLabel={runtimeTabGroup?.title || "Report sections"}
+          />
           {runtimeSections.map((section) => {
             if (normalizeString(section?.id) !== resolvedActiveSectionId) {
               return null;

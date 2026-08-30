@@ -1,0 +1,47 @@
+.forge-section-tab-rail {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    padding: 4px;
+    border: 1px solid #dbe5ec;
+    border-radius: 12px;
+    background: #f5f8fb;
+    scrollbar-width: thin;
+}
+
+.forge-section-tab {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 38px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: #486579;
+    padding: 8px 14px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.forge-section-tab:hover { background: rgba(255, 255, 255, 0.72); color: #28445a; }
+
+.forge-section-tab.is-selected {
+    border-color: #6f9fe9;
+    background: #ffffff;
+    color: #1d4ed8;
+    box-shadow: 0 0 0 2px rgba(47, 109, 225, 0.32), 0 2px 5px rgba(47, 109, 225, 0.12);
+}
+
+.forge-section-tab:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+
+@media (min-width: 1000px) {
+    .forge-section-tab-rail .forge-section-tab { flex: 1 0 auto; }
+}

@@ -6,6 +6,7 @@ import { useSignalEffect } from '@preact/signals-react';
 import { resolveSelector } from '../utils/selector.js';
 import WidgetRenderer from '../runtime/WidgetRenderer.jsx';
 import { jsonSchemaToFields } from '../utils/schema.js';
+import LookupSelectionInput from '../components/lookup/LookupSelectionInput.jsx';
 
 /*
 Props:
@@ -41,7 +42,10 @@ const SchemaBasedForm = (props) => {
 
     if (context && dataSourceRef) {
         try {
-            renderContext = context.Context(dataSourceRef);
+            const currentRef = String(context?.identity?.dataSourceRef || '').trim();
+            renderContext = currentRef === String(dataSourceRef).trim()
+                ? context
+                : context.Context(dataSourceRef);
             scope = 'form';
         } catch (e) {
             console.error('SchemaBasedForm: unable to resolve dataSourceRef', dataSourceRef, e);
@@ -103,6 +107,35 @@ const SchemaBasedForm = (props) => {
 
     const handleChangeDirect = (name, val) => {
         setValues((prev) => ({ ...prev, [name]: val }));
+    };
+
+    const openLookupField = async (field) => {
+        const lookup = field?.lookup || {};
+        const dialogId = String(lookup?.dialogId || '').trim();
+        if (!dialogId) return;
+        const payload = await renderContext?.handlers?.window?.openDialog?.({
+            execution: { args: [dialogId, {awaitResult: true, multiple: false}] },
+            context: renderContext,
+        });
+        const record = Array.isArray(payload) ? payload[0] : payload;
+        if (!record || typeof record !== 'object') return;
+        const patch = {};
+        const outputs = Array.isArray(lookup.outputs) ? lookup.outputs : [];
+        if (outputs.length > 0) {
+            outputs.forEach((output) => {
+                const source = String(output?.location || output?.name || '').trim();
+                const target = String(output?.name || output?.location || '').trim();
+                if (source && target && record[source] !== undefined) patch[target] = record[source];
+            });
+        } else if (record[field.name] !== undefined) {
+            patch[field.name] = record[field.name];
+        }
+        if (scope === 'form') {
+            const current = renderContext?.handlers?.dataSource?.getFormData?.() || {};
+            renderContext?.handlers?.dataSource?.setFormData?.({...current, ...patch});
+        } else {
+            setValues((previous) => ({...previous, ...patch}));
+        }
     };
 
     const basicValidate = () => {
@@ -190,6 +223,27 @@ const SchemaBasedForm = (props) => {
         >
             {derivedFields.map((field) => {
                 const colSpan = field.columnSpan || (field.type === 'textarea' ? 2 : 1);
+                if (field.widget === 'lookup' && field.lookup) {
+                    const formValues = scope === 'form'
+                        ? (renderContext?.handlers?.dataSource?.getFormData?.() || {})
+                        : values;
+                    const rawValue = formValues?.[field.name];
+                    const displayTemplate = String(field.lookup.display || '').trim();
+                    const display = displayTemplate.replace(/\$\{([^}]+)\}/g, (_, selector) => String(formValues?.[String(selector).trim()] ?? '')).trim();
+                    return (
+                        <label key={field.name} style={{gridColumn: `span ${colSpan}`, display: 'grid', gap: 6}}>
+                            <span>{field.label}</span>
+                            <LookupSelectionInput
+                                selections={rawValue == null || rawValue === '' ? [] : [{value: rawValue, label: display || String(rawValue)}]}
+                                inputValue=""
+                                placeholder={`Select ${String(field.label || field.name).toLowerCase()}`}
+                                browseLabel={`Choose ${field.label || field.name}`}
+                                allowManualEntry={false}
+                                onBrowse={() => openLookupField(field)}
+                            />
+                        </label>
+                    );
+                }
                 return (
                     <WidgetRenderer
                         key={field.name}

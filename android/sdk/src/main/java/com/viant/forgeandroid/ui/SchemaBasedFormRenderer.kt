@@ -117,6 +117,7 @@ internal fun schemaBasedFormItems(
             val type = (property["type"] as? JsonPrimitive)?.content
             val lookup = property["lookup"]
             val enumValues = (property["enum"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content }
+            val enumLabels = property["x-ui-enum-labels"] as? JsonObject
             val defaultValue = property["default"]
             ItemDef(
                 id = name,
@@ -127,7 +128,7 @@ internal fun schemaBasedFormItems(
                 options = enumValues.map { option ->
                     com.viant.forgeandroid.runtime.OptionDef(
                         value = option,
-                        label = option,
+                        label = (enumLabels?.get(option) as? JsonPrimitive)?.content ?: option.ifBlank { "Any" },
                         default = when (defaultValue) {
                             is JsonPrimitive -> defaultValue.content == option
                             is JsonArray -> defaultValue.any { (it as? JsonPrimitive)?.content == option }
@@ -215,6 +216,8 @@ private fun schemaWidgetToItemType(widget: String?, type: String?, hasEnum: Bool
     val normalizedType = type?.trim().orEmpty()
     return when ((normalizedWidget.ifBlank { normalizedType })) {
         "lookup", "treeLookup" -> "lookup"
+        "booleanPill", "boolean", "toggle" -> "toggle"
+        "dateRange" -> "dateRange"
         "radio" -> "radio"
         "multiSelect" -> "multiSelect"
         "multiselect" -> "multiSelect"

@@ -19,64 +19,39 @@ public struct TabsRenderer: View {
                 Text(title)
                     .font(.headline)
             }
-            if usesMenuStyle {
+            if container.containers.count > 3 {
+                CompactSectionNavigator(
+                    entries: container.containers.enumerated().map { index, child in
+                        (id: child.id ?? "tab-\(index)", title: child.title ?? child.id ?? "Tab")
+                    },
+                    selectedID: selectedContainer?.id ?? "tab-\(clampedSelectedIndex)",
+                    onSelect: { selectedID in
+                        container.containers.enumerated().first(where: { ($0.element.id ?? "tab-\($0.offset)") == selectedID })
+                            .map { selectedIndex = $0.offset }
+                    }
+                )
+            } else if usesMenuStyle {
                 Menu {
                     ForEach(Array(container.containers.enumerated()), id: \.element.id) { index, child in
-                        Button(child.title ?? child.id ?? "Tab") {
-                            selectedIndex = index
-                        }
+                        Button(child.title ?? child.id ?? "Tab") { selectedIndex = index }
                     }
                 } label: {
-                    HStack(spacing: 8) {
-                        Text(selectedContainer?.title ?? selectedContainer?.id ?? "Tab")
-                            .font(.subheadline.weight(.semibold))
-                        Image(systemName: "chevron.down")
-                            .font(.caption.weight(.semibold))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color.forgeSystemBackground)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.black.opacity(0.06), lineWidth: 1)
-                    )
+                    Label(selectedContainer?.title ?? selectedContainer?.id ?? "Tab", systemImage: "chevron.down")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 12))
                 }
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(Array(container.containers.enumerated()), id: \.element.id) { index, child in
-                            let isSelected = index == clampedSelectedIndex
-                            Button {
-                                selectedIndex = index
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Text(child.title ?? child.id ?? "Tab")
-                                        .font(.subheadline.weight(isSelected ? .semibold : .medium))
-                                    if isSelected {
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption2.weight(.bold))
-                                    }
-                                }
-                                .foregroundStyle(isSelected ? Color.accentColor : Color.primary.opacity(0.78))
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .background(
-                                    Capsule()
-                                        .fill(isSelected ? Color.accentColor.opacity(0.14) : Color.forgeSystemBackground)
-                                )
-                                .overlay(
-                                    Capsule()
-                                        .stroke(isSelected ? Color.accentColor.opacity(0.18) : Color.black.opacity(0.06), lineWidth: 1)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
+                SectionTabRail(
+                    items: container.containers.enumerated().map { index, child in
+                        SectionTabItem(id: child.id ?? "tab-\(index)", label: child.title ?? child.id ?? "Tab")
+                    },
+                    selectedID: selectedContainer?.id ?? "tab-\(clampedSelectedIndex)",
+                    onSelect: { selectedID in
+                        container.containers.enumerated().first(where: { ($0.element.id ?? "tab-\($0.offset)") == selectedID })
+                            .map { selectedIndex = $0.offset }
                     }
-                }
+                )
             }
 
             if let child = selectedContainer {

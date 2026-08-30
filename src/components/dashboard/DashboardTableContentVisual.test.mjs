@@ -105,4 +105,18 @@ assert.ok(fullHtml.includes('forge-dashboard-row-action__label">Show channel det
 assert.ok(fullHtml.includes('forge-dashboard-row-action__label">Drill to Publisher<'));
 assert.ok(!fullHtml.includes("forge-dashboard-row-actions--compact"));
 
+const selectableContext = createContext(rows);
+selectableContext.dataSource = { selectionMode: "multi", uniqueKey: [{ field: "channelId" }] };
+selectableContext.signals.selection.value = { selection: rows };
+selectableContext.handlers = { dataSource: { setAllSelection() {}, resetSelection() {}, toggleSelection() {} } };
+const selectableHtml = renderToStaticMarkup(
+  React.createElement(DashboardTableContent, {
+    container: { id: "selectableTable", columns },
+    context: selectableContext,
+  }),
+);
+assert.ok(selectableHtml.includes('aria-label="Select all rows"'));
+assert.ok(selectableHtml.includes('aria-label="Select Display"'));
+assert.ok(selectableHtml.includes('checked=""'));
+
 console.log("DashboardTableContentVisual ✓ renders compact runtime action chips with short visible labels and full hidden labels");

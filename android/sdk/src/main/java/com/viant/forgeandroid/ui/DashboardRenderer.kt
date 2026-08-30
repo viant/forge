@@ -20,13 +20,17 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.FilterAlt
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material3.AssistChip
@@ -43,6 +47,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -86,6 +91,8 @@ import com.viant.forgeandroid.runtime.SelectionState
 import com.viant.forgeandroid.runtime.TableDef
 import com.viant.forgeandroid.runtime.WindowContext
 import com.viant.forgeandroid.runtime.applyDashboardSelectionToCollection
+import com.viant.forgeandroid.runtime.applyFeedPatchOperations
+import com.viant.forgeandroid.runtime.FeedPatchOperation
 import com.viant.forgeandroid.runtime.dashboardFilterSignal
 import com.viant.forgeandroid.runtime.dashboardCompositionChart
 import com.viant.forgeandroid.runtime.dashboardDefaultGeoPalette
@@ -124,6 +131,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import java.util.Locale
 
@@ -223,6 +231,18 @@ private fun DashboardRenderer(runtime: ForgeRuntime, window: WindowContext, cont
                 Text("Dashboard table requires columns and data source.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        "dashboard.editableTable" -> DashboardPanel(runtime, window, container) {
+            val dataSourceRef = dashboardDataSourceRef(container, dashboardRoot)
+            val context = dataSourceRef?.let { window.contextOrNull(it) }
+            if (context != null) DashboardEditableFeedTable(runtime, context, container)
+            else Text("Editable table requires a data source.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        "dashboard.lookupChips" -> DashboardPanel(runtime, window, container) {
+            val dataSourceRef = dashboardDataSourceRef(container, dashboardRoot)
+            val context = dataSourceRef?.let { window.contextOrNull(it) }
+            if (context != null) DashboardLookupChips(runtime, window, context, container)
+            else Text("Lookup editor requires a data source.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         "dashboard.reportBuilder" -> ReportBuilderRenderer(runtime, window, container)
         "dashboard.reportCatalog" -> DashboardPanel(runtime, window, container) {
             DashboardReportCatalogBlock(runtime, window, container)
@@ -244,6 +264,583 @@ private fun DashboardRenderer(runtime: ForgeRuntime, window: WindowContext, cont
         else -> DashboardPlaceholderBlock(container)
     }
 }
+
+@Composable
+private fun DashboardEditableFeedTable(
+    runtime: ForgeRuntime,
+    context: DataSourceContext,
+    container: ContainerDef
+) {
+    val rows by context.collection.flow.collectAsState(initial = context.collection.peek())
+    var query by remember(context.dataSourceRef) { mutableStateOf("") }
+    val indexedRows = rows.withIndex().filter { (_, row) ->
+        query.isBlank() || row.values.any { it?.toString()?.contains(query, ignoreCase = true) == true }
+    }
+    if (container.quickFilter == true) {
+        val filterLabel = "Filter selected ${container.title?.lowercase().orEmpty().ifBlank { "rows" }}"
+        if (LocalForgePresentationDensity.current == ForgePresentationDensity.Compact) {
+            CompactDashboardTextInputSurface(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = filterLabel,
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text(filterLabel) },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        val addRow = container.addRow
+        if (container.allowAdd != false && addRow != null) {
+            val defaults = (addRow["defaults"] as? JsonObject)
+                ?.entries?.associate { (key, value) -> key to JsonUtil.elementToAny(value) }
+                .orEmpty()
+            val addLabel = (addRow["label"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) ?: "Add row"
+            val addAction = {
+                dispatchEditableFeedPatch(
+                    runtime,
+                    context,
+                    FeedPatchOperation(context.dataSourceRef, "add", "/collection/-", defaults)
+                )
+            }
+            if (LocalForgePresentationDensity.current == ForgePresentationDensity.Compact) {
+                IconButton(onClick = addAction) { Icon(Icons.Filled.Add, contentDescription = addLabel) }
+            } else {
+                OutlinedButton(onClick = addAction) { Text(addLabel) }
+            }
+        }
+        if (indexedRows.isEmpty()) {
+            Text("No rows available.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (LocalForgePresentationDensity.current == ForgePresentationDensity.Compact) {
+            CompactEditableFeedTable(runtime, context, container, indexedRows)
+        } else indexedRows.forEach { indexed ->
+            val rowIndex = indexed.index
+            val row = indexed.value
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, Color(0xFFE0E6EF), RoundedCornerShape(14.dp))
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                container.columns.forEach columnLoop@{ column ->
+                    val field = dashboardTableColumnKey(column) ?: return@columnLoop
+                    EditableFeedCell(
+                        column = column,
+                        value = row[field],
+                        onChange = { value ->
+                            dispatchEditableFeedPatch(
+                                runtime,
+                                context,
+                                FeedPatchOperation(
+                                    dataSourceRef = context.dataSourceRef,
+                                    op = "replace",
+                                    path = "/collection/$rowIndex/${escapeFeedPointer(field)}",
+                                    value = value
+                                )
+                            )
+                        }
+                    )
+                }
+                OutlinedButton(onClick = {
+                    dispatchEditableFeedPatch(
+                        runtime,
+                        context,
+                        FeedPatchOperation(context.dataSourceRef, "remove", "/collection/$rowIndex")
+                    )
+                }) {
+                    Text(container.removeRowLabel?.takeIf(String::isNotBlank) ?: "Remove")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactEditableFeedTable(
+    runtime: ForgeRuntime,
+    context: DataSourceContext,
+    container: ContainerDef,
+    indexedRows: List<IndexedValue<Map<String, Any?>>>
+) {
+    if (indexedRows.isEmpty()) return
+    val horizontalState = rememberScrollState()
+    val actionWidth = 64.dp
+    val frozenColumn = remember(container.columns) { compactFrozenIdentifierColumn(container.columns) }
+    val scrollingColumns = remember(container.columns, frozenColumn) { container.columns.filterNot { it === frozenColumn } }
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+    val frozenWidth = frozenColumn?.let { minOf(compactEditableColumnWidth(it), 160.dp, maxWidth * 0.4f) } ?: 0.dp
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, Color(0xFFDCE3ED)),
+        color = Color.White
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFF3F6FA))
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                frozenColumn?.let { column ->
+                    val field = dashboardTableColumnKey(column).orEmpty()
+                    Text(
+                        text = column.label ?: field,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF344054),
+                        modifier = Modifier.width(frozenWidth).padding(horizontal = 10.dp)
+                    )
+                }
+                Row(modifier = Modifier.weight(1f).horizontalScroll(horizontalState)) {
+                    scrollingColumns.forEach { column ->
+                        val field = dashboardTableColumnKey(column).orEmpty()
+                        Text(text = column.label ?: field, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = Color(0xFF475467), modifier = Modifier.width(compactEditableColumnWidth(column)).padding(horizontal = 10.dp))
+                    }
+                    Text("Actions", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = Color(0xFF475467), modifier = Modifier.width(actionWidth).padding(horizontal = 10.dp))
+                }
+            }
+            indexedRows.forEach { indexed ->
+                HorizontalDivider(color = Color(0xFFE7ECF3))
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    frozenColumn?.let { column ->
+                        val field = dashboardTableColumnKey(column).orEmpty()
+                        Box(modifier = Modifier.width(frozenWidth).fillMaxHeight().background(Color(0xFFFAFBFC)).padding(horizontal = 6.dp, vertical = 6.dp)) {
+                            EditableFeedCell(column = column, value = indexed.value[field], showLabel = false, onChange = { value ->
+                                dispatchEditableFeedPatch(runtime, context, FeedPatchOperation(context.dataSourceRef, "replace", "/collection/${indexed.index}/${escapeFeedPointer(field)}", value))
+                            })
+                        }
+                    }
+                    Row(modifier = Modifier.weight(1f).horizontalScroll(horizontalState).padding(vertical = 6.dp), verticalAlignment = Alignment.Top) {
+                    scrollingColumns.forEach columnLoop@{ column ->
+                        val field = dashboardTableColumnKey(column) ?: return@columnLoop
+                        Box(modifier = Modifier.width(compactEditableColumnWidth(column)).padding(horizontal = 6.dp)) {
+                            EditableFeedCell(
+                                column = column,
+                                value = indexed.value[field],
+                                showLabel = false,
+                                onChange = { value ->
+                                    dispatchEditableFeedPatch(runtime, context, FeedPatchOperation(context.dataSourceRef, "replace", "/collection/${indexed.index}/${escapeFeedPointer(field)}", value))
+                                }
+                            )
+                        }
+                    }
+                    Box(modifier = Modifier.width(actionWidth).padding(horizontal = 6.dp)) {
+                        IconButton(onClick = {
+                            dispatchEditableFeedPatch(runtime, context, FeedPatchOperation(context.dataSourceRef, "remove", "/collection/${indexed.index}"))
+                        }) {
+                            Icon(Icons.Filled.Delete, contentDescription = container.removeRowLabel?.takeIf(String::isNotBlank) ?: "Remove row")
+                        }
+                    }
+                    }
+                }
+            }
+        }
+    }
+    }
+}
+
+private fun compactFrozenIdentifierColumn(columns: List<ColumnDef>): ColumnDef? {
+    columns.firstOrNull { it.frozen == true }?.let { return it }
+    fun semantic(column: ColumnDef) = "${dashboardTableColumnKey(column).orEmpty()} ${column.label.orEmpty()}".lowercase()
+    return columns.firstOrNull { column ->
+        val key = dashboardTableColumnKey(column).orEmpty().lowercase()
+        val value = semantic(column)
+        !key.endsWith("id") && (key == "name" || value.contains(" name") || value.contains("audience") ||
+            value.contains("publisher") || value.contains("metropolitan") || value.contains("deal"))
+    } ?: columns.firstOrNull { column ->
+        val key = dashboardTableColumnKey(column).orEmpty().lowercase()
+        val value = semantic(column)
+        key == "id" || key.endsWith("_id") || key.endsWith("id") || value.contains(" id") || value.contains("code")
+    } ?: columns.firstOrNull()
+}
+
+private fun compactEditableColumnWidth(column: ColumnDef): androidx.compose.ui.unit.Dp {
+    column.width?.takeIf { it > 0 }?.let { return it.coerceIn(76, 280).dp }
+    val key = dashboardTableColumnKey(column).orEmpty().lowercase()
+    val label = column.label.orEmpty().lowercase()
+    val semantic = "$key $label"
+    return when {
+        key == "id" || key.endsWith("_id") || key.endsWith("id") || semantic.contains(" id") || semantic.contains("code") -> 96.dp
+        semantic.contains("rationale") || semantic.contains("reason") || semantic.contains("description") -> 260.dp
+        semantic.contains("publisher") || semantic.contains("audience") || semantic.contains("metropolitan") ||
+            semantic.contains("deal") || semantic.contains("site") || key == "name" -> 220.dp
+        semantic.contains("impression") || semantic.contains("budget") || semantic.contains("cost") || semantic.contains("reach") -> 124.dp
+        semantic.contains("percent") || semantic.contains("mix") || semantic.contains("ecpm") || semantic.contains("cpm") ||
+            semantic.contains("count") || semantic.contains("interval") -> 104.dp
+        semantic.contains("media") || semantic.contains("channel") || semantic.contains("provider") || semantic.contains("type") ||
+            semantic.contains("days") || semantic.contains("hours") || semantic.contains("frequency") -> 128.dp
+        else -> 148.dp
+    }
+}
+
+@Composable
+private fun EditableFeedCell(
+    column: ColumnDef,
+    value: Any?,
+    showLabel: Boolean = true,
+    onChange: (Any?) -> Unit
+) {
+    val field = dashboardTableColumnKey(column).orEmpty()
+    val label = column.label ?: field
+    val compactLongText = !showLabel && "$field $label".lowercase().let {
+        it.contains("rationale") || it.contains("reason") || it.contains("description")
+    }
+    val editor = column.editor
+    if (editor is JsonPrimitive && editor.booleanOrNull == false) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            if (showLabel) Text(label, style = MaterialTheme.typography.labelMedium, color = Color(0xFF667085))
+            Text(formatDashboardValue(value, column.format).ifBlank { column.emptyText ?: "-" })
+        }
+        return
+    }
+    val config = editor as? JsonObject
+    when ((config?.get("type") as? JsonPrimitive)?.contentOrNull?.lowercase()) {
+        "boolean" -> Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = value == true, onCheckedChange = onChange)
+            if (showLabel) Text(label)
+        }
+        "select" -> {
+            var expanded by remember(field, value) { mutableStateOf(false) }
+            Box {
+                OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth().then(if (!showLabel) Modifier.height(42.dp) else Modifier)) {
+                    Text(if (showLabel) "$label: ${value?.toString().orEmpty().ifBlank { "Select" }}" else value?.toString().orEmpty().ifBlank { "Select" })
+                }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    (config["options"] as? JsonArray).orEmpty().forEach { option ->
+                        val optionValue = JsonUtil.elementToAny(option)
+                        DropdownMenuItem(
+                            text = { Text(optionValue?.toString().orEmpty()) },
+                            onClick = { expanded = false; onChange(optionValue) }
+                        )
+                    }
+                }
+            }
+        }
+        else -> {
+            val textValue = value?.toString().orEmpty()
+            val updateValue: (String) -> Unit = { text ->
+                val next: Any? = if ((config?.get("type") as? JsonPrimitive)?.contentOrNull == "number") {
+                    text.toLongOrNull() ?: text.toDoubleOrNull() ?: text
+                } else text
+                onChange(next)
+            }
+            if (compactLongText) {
+                CompactDashboardTextAreaSurface(
+                    value = textValue,
+                    onValueChange = updateValue,
+                    placeholder = (config?.get("placeholder") as? JsonPrimitive)?.contentOrNull,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else if (!showLabel) {
+                CompactDashboardTextInputSurface(
+                    value = textValue,
+                    onValueChange = updateValue,
+                    placeholder = (config?.get("placeholder") as? JsonPrimitive)?.contentOrNull,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                OutlinedTextField(
+                    value = textValue,
+                    onValueChange = updateValue,
+                    label = if (showLabel) ({ Text(label) }) else null,
+                    placeholder = {
+                        (config?.get("placeholder") as? JsonPrimitive)?.contentOrNull?.let { Text(it) }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = if (!showLabel) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+                    singleLine = false,
+                    minLines = 1,
+                    maxLines = Int.MAX_VALUE
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactDashboardTextInputSurface(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String? = null,
+    modifier: Modifier = Modifier,
+    backgroundColor: Color = Color.White,
+) {
+    val shape = RoundedCornerShape(10.dp)
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+        modifier = modifier
+            .background(backgroundColor, shape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .padding(horizontal = 11.dp, vertical = 9.dp),
+        decorationBox = { inner ->
+            Box {
+                if (value.isEmpty() && !placeholder.isNullOrBlank()) {
+                    Text(
+                        placeholder,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                inner()
+            }
+        }
+    )
+}
+
+@Composable
+private fun CompactDashboardTextAreaSurface(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String? = null,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(10.dp)
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = false,
+        minLines = 1,
+        maxLines = 2,
+        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+        modifier = modifier
+            .heightIn(min = 40.dp, max = 48.dp)
+            .background(Color.White, shape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .padding(horizontal = 11.dp, vertical = 5.dp),
+        decorationBox = { inner ->
+            Box {
+                if (value.isEmpty() && !placeholder.isNullOrBlank()) {
+                    Text(
+                        placeholder,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                inner()
+            }
+        }
+    )
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun DashboardLookupChips(
+    runtime: ForgeRuntime,
+    window: WindowContext,
+    context: DataSourceContext,
+    container: ContainerDef
+) {
+    val lookup = container.lookup ?: return
+    val selectedRows by context.collection.flow.collectAsState(initial = context.collection.peek())
+    var lookupExpanded by remember(context.dataSourceRef, "lookup-expanded") { mutableStateOf(false) }
+    var query by remember(context.dataSourceRef, "lookup") { mutableStateOf("") }
+    var provider by remember(context.dataSourceRef) {
+        mutableStateOf((lookup["defaultProvider"] as? JsonPrimitive)?.contentOrNull.orEmpty())
+    }
+    val lookupRef = (lookup["dataSourceRef"] as? JsonPrimitive)?.contentOrNull
+    val lookupContext = lookupRef?.let(window::contextOrNull)
+    val lookupRows = if (lookupContext != null) {
+        val liveRows by lookupContext.collection.flow.collectAsState(initial = lookupContext.collection.peek())
+        liveRows
+    } else {
+        (lookup["options"] as? JsonArray).orEmpty().mapNotNull { option ->
+            (JsonUtil.elementToAny(option) as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value }
+        }
+    }
+    val lookupParameters = remember(lookup, provider, query, window.windowId) {
+        buildLookupInputParameters(lookup, provider, query, window)
+    }
+    LaunchedEffect(lookupContext, lookupParameters, lookupExpanded) {
+        if (lookupExpanded && lookupContext != null) {
+            lookupContext.setInputParameters(lookupParameters)
+            lookupContext.fetchCollection()
+        }
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        IconButton(onClick = { lookupExpanded = !lookupExpanded }) {
+            Icon(Icons.Filled.Add, contentDescription = "Add ${container.title?.lowercase().orEmpty().ifBlank { "item" }}")
+        }
+        if (lookupExpanded) {
+        val lookupPlaceholder = (lookup["placeholder"] as? JsonPrimitive)?.contentOrNull ?: "Search"
+        if (LocalForgePresentationDensity.current == ForgePresentationDensity.Compact) {
+            CompactDashboardTextInputSurface(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = lookupPlaceholder,
+                modifier = Modifier.fillMaxWidth(),
+                backgroundColor = Color(0xFFEEF8F1)
+            )
+        } else {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text(lookupPlaceholder) },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        val providers = lookup["providers"] as? JsonArray
+        if (!providers.isNullOrEmpty()) {
+            Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                providers.forEach { raw ->
+                    val item = raw as? JsonObject ?: return@forEach
+                    val id = (item["id"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+                    FilterChip(
+                        selected = provider == id,
+                        onClick = { provider = id },
+                        label = { Text((item["label"] as? JsonPrimitive)?.contentOrNull ?: id) }
+                    )
+                }
+            }
+        }
+        val valueField = (lookup["valueField"] as? JsonPrimitive)?.contentOrNull ?: "value"
+        val selectionValueField = (lookup["selectionValueField"] as? JsonPrimitive)?.contentOrNull ?: valueField
+        val selectedValues = selectedRows.map { it[selectionValueField]?.toString() }.toSet()
+        val filtered = lookupRows.filter { row ->
+            query.isNotBlank() && row.values.any { it?.toString()?.contains(query, ignoreCase = true) == true } &&
+                row[valueField]?.toString() !in selectedValues
+        }.take(20)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            filtered.forEach { candidate ->
+                val labelField = (lookup["labelField"] as? JsonPrimitive)?.contentOrNull ?: "label"
+                val label = lookupCandidateLabel(candidate, labelField)
+                AssistChip(
+                    onClick = {
+                        val result = mapLookupFeedResult(candidate, lookup, provider)
+                        dispatchEditableFeedPatch(
+                            runtime,
+                            context,
+                            FeedPatchOperation(context.dataSourceRef, "add", "/collection/-", result)
+                        )
+                        query = ""
+                        lookupExpanded = false
+                    },
+                    label = { Text(label) }
+                )
+            }
+        }
+        if (query.isNotBlank() && filtered.isEmpty()) {
+            Text("No available matches.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        }
+    }
+    DashboardEditableFeedTable(runtime, context, container)
+}
+
+private fun buildLookupInputParameters(
+    lookup: JsonObject,
+    provider: String,
+    query: String,
+    window: WindowContext
+): Map<String, Any?> {
+    var result: Any? = linkedMapOf<String, Any?>()
+    fun mergeInputs(inputs: JsonObject?) {
+        inputs.orEmpty().forEach { (path, raw) ->
+            result = setLookupInputPath(result, path.split('.').filter(String::isNotBlank), JsonUtil.elementToAny(raw))
+        }
+    }
+    mergeInputs(lookup["inputs"] as? JsonObject)
+    val providerDef = (lookup["providers"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+        .firstOrNull { (it["id"] as? JsonPrimitive)?.contentOrNull == provider }
+    mergeInputs(providerDef?.get("inputs") as? JsonObject)
+    (lookup["inputBindings"] as? JsonObject).orEmpty().forEach { (targetPath, rawBinding) ->
+        val binding = rawBinding as? JsonObject ?: return@forEach
+        val ref = (binding["dataSourceRef"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+        val path = (binding["path"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+        val source = window.contextOrNull(ref)
+        val value = source?.let { SelectorUtil.resolve(it.peekForm(), path) ?: SelectorUtil.resolve(it.collection.peek().firstOrNull().orEmpty(), path) }
+        if (value != null) result = setLookupInputPath(result, targetPath.split('.').filter(String::isNotBlank), value)
+    }
+    val queryPath = (lookup["queryInput"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+    if (queryPath.isNotBlank()) result = setLookupInputPath(result, queryPath.split('.').filter(String::isNotBlank), query)
+    return JsonUtil.asStringMap(result)
+}
+
+private fun setLookupInputPath(root: Any?, tokens: List<String>, value: Any?): Any? {
+    if (tokens.isEmpty()) return value
+    val map = (root as? Map<*, *>)?.entries?.associateTo(linkedMapOf()) { it.key.toString() to it.value } ?: linkedMapOf()
+    val key = tokens.first()
+    map[key] = setLookupInputPath(map[key], tokens.drop(1), value)
+    return map
+}
+
+private fun mapLookupFeedResult(
+    candidate: Map<String, Any?>,
+    lookup: JsonObject,
+    provider: String
+): Map<String, Any?> {
+    val mapping = lookup["resultMapping"] as? JsonObject
+    val result = linkedMapOf<String, Any?>()
+    mapping?.forEach { (field, raw) ->
+        result[field] = when (raw) {
+            is JsonPrimitive -> candidate[raw.content]
+            is JsonObject -> when {
+                raw["value"] != null -> JsonUtil.elementToAny(raw["value"]!!)
+                raw["firstOf"] is JsonArray -> (raw["firstOf"] as JsonArray)
+                    .mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.let(candidate::get) }
+                    .firstOrNull { lookupDisplayValue(it).isNotBlank() }
+                    ?.let(::lookupDisplayValue)
+                else -> null
+            }
+            else -> null
+        }
+    }
+    if (result.isEmpty()) {
+        val selectionField = (lookup["selectionValueField"] as? JsonPrimitive)?.contentOrNull
+            ?: (lookup["valueField"] as? JsonPrimitive)?.contentOrNull
+            ?: "value"
+        result[selectionField] = candidate[(lookup["valueField"] as? JsonPrimitive)?.contentOrNull ?: "value"]
+    }
+    val providerField = (lookup["providerField"] as? JsonPrimitive)?.contentOrNull
+    if (!providerField.isNullOrBlank() && provider.isNotBlank()) result[providerField] = provider
+    return result
+}
+
+private fun lookupCandidateLabel(candidate: Map<String, Any?>, preferredField: String): String {
+    for (field in listOf(preferredField, "label", "displayPath", "path", "name", "value").distinct()) {
+        val display = lookupDisplayValue(candidate[field])
+        if (display.isNotBlank() && !display.equals("null", ignoreCase = true)) return display
+    }
+    return "Option"
+}
+
+private fun lookupDisplayValue(value: Any?): String = when (value) {
+    null -> ""
+    is Collection<*> -> value.map(::lookupDisplayValue).filter(String::isNotBlank).joinToString(" > ")
+    is Map<*, *> -> lookupDisplayValue(value["label"] ?: value["name"] ?: value["value"])
+    else -> value.toString()
+}
+
+private fun dispatchEditableFeedPatch(
+    runtime: ForgeRuntime,
+    context: DataSourceContext,
+    operation: FeedPatchOperation
+) {
+    val handled = try {
+        runtime.dispatchFeedPatch(context.window.windowId, operation)
+    } catch (_: Throwable) {
+        return
+    }
+    if (!handled) {
+        runCatching { applyFeedPatchOperations(context.window, listOf(operation)) }
+    }
+}
+
+private fun escapeFeedPointer(value: String): String = value.replace("~", "~0").replace("/", "~1")
 
 @Composable
 private fun DashboardReportCatalogBlock(
@@ -401,11 +998,12 @@ private fun DashboardRoot(runtime: ForgeRuntime, window: WindowContext, containe
 
 @Composable
 private fun DashboardPanel(runtime: ForgeRuntime, window: WindowContext, container: ContainerDef, content: @Composable () -> Unit) {
+    val compactPresentation = LocalForgePresentationDensity.current == ForgePresentationDensity.Compact
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(18.dp),
+            .padding(horizontal = if (compactPresentation) 3.dp else 8.dp, vertical = if (compactPresentation) 3.dp else 6.dp),
+        shape = RoundedCornerShape(if (compactPresentation) 14.dp else 18.dp),
         border = BorderStroke(1.dp, Color(0xFFE7ECF3)),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp)
@@ -413,8 +1011,8 @@ private fun DashboardPanel(runtime: ForgeRuntime, window: WindowContext, contain
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = if (compactPresentation) 8.dp else 14.dp, vertical = if (compactPresentation) 7.dp else 12.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compactPresentation) 7.dp else 10.dp)
         ) {
             if (!container.title.isNullOrBlank() || !container.subtitle.isNullOrBlank()) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -808,6 +1406,7 @@ private fun DashboardActions(runtime: ForgeRuntime, window: WindowContext, conta
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DashboardSummaryBlock(
     window: WindowContext,
@@ -815,6 +1414,7 @@ private fun DashboardSummaryBlock(
     dashboardRoot: ContainerDef,
     metrics: Map<String, Any?>
 ) {
+    val compactPresentation = LocalForgePresentationDensity.current == ForgePresentationDensity.Compact
     val summaryMetrics = dashboardSummaryMetrics(container)
     val dataSourceRef = dashboardDataSourceRef(container, dashboardRoot)
     val context = dataSourceRef?.let { window.contextOrNull(it) }
@@ -839,34 +1439,46 @@ private fun DashboardSummaryBlock(
         if (cards.isEmpty()) {
             DashboardEmptyState("No summary data available for this view.")
         } else {
-            StaticGrid(
-                items = cards,
-                minCellWidth = 180.dp,
-                modifier = Modifier.fillMaxWidth(),
-                horizontalSpacing = 10.dp,
-                verticalSpacing = 10.dp
-            ) { card ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(card.tone.background, RoundedCornerShape(14.dp))
-                        .border(1.dp, card.tone.border, RoundedCornerShape(14.dp))
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
+            if (compactPresentation) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = card.label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = card.tone.text.copy(alpha = 0.82f)
-                    )
-                    Text(
-                        text = card.displayValue,
-                        style = summaryMetricValueStyle(card.displayValue),
-                        fontWeight = FontWeight.SemiBold,
-                        color = card.tone.text,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    cards.forEach { card ->
+                        Text(
+                            text = "${card.label}: ${card.displayValue}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = card.tone.text,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .background(card.tone.background, RoundedCornerShape(999.dp))
+                                .border(1.dp, card.tone.border, RoundedCornerShape(999.dp))
+                                .padding(horizontal = 9.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            } else {
+                StaticGrid(
+                    items = cards,
+                    minCellWidth = 180.dp,
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalSpacing = 10.dp,
+                    verticalSpacing = 10.dp
+                ) { card ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(card.tone.background, RoundedCornerShape(14.dp))
+                            .border(1.dp, card.tone.border, RoundedCornerShape(14.dp))
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(card.label, style = MaterialTheme.typography.labelMedium, color = card.tone.text.copy(alpha = 0.82f))
+                        Text(card.displayValue, style = summaryMetricValueStyle(card.displayValue), fontWeight = FontWeight.SemiBold, color = card.tone.text, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
         }

@@ -6,10 +6,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,6 +26,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -70,6 +76,7 @@ fun TableToolbar(
     val compactPadding = if (toolbar.density.equals("compact", ignoreCase = true)) 2.dp else 4.dp
     val itemSpacing = toolbarStyleDp(toolbar, "gap") ?: 6.dp
     val itemSize = toolbarStyleDp(toolbar, "itemSize")
+    val compactPresentation = LocalForgePresentationDensity.current == ForgePresentationDensity.Compact
 
     BoxWithConstraints(
         modifier = Modifier
@@ -77,7 +84,9 @@ fun TableToolbar(
             .padding(vertical = compactPadding)
     ) {
         val compact = maxWidth < 600.dp
-        if (compact && center.isNotEmpty()) {
+        if (compactPresentation) {
+            ToolbarGroup(runtime, context, items, spacing = itemSpacing, actionSize = itemSize)
+        } else if (compact && center.isNotEmpty()) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -108,6 +117,7 @@ fun TableToolbar(
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 private fun ToolbarGroup(
     runtime: ForgeRuntime,
     context: DataSourceContext,
@@ -116,15 +126,31 @@ private fun ToolbarGroup(
     spacing: Dp = 6.dp,
     actionSize: Dp? = null
 ) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(spacing),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        items.forEach { item ->
-            when {
-                item.id == "quickFilter" || item.id == "quickFilterInputs" -> QuickFilter(context, item)
-                item.on.any { it.event == "onClick" } -> ToolbarAction(runtime, context, item, actionSize)
+    val compactPresentation = LocalForgePresentationDensity.current == ForgePresentationDensity.Compact
+    if (compactPresentation) {
+        FlowRow(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(spacing),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            items.forEach { item ->
+                when {
+                    item.id == "quickFilter" || item.id == "quickFilterInputs" -> QuickFilter(context, item)
+                    item.on.any { it.event == "onClick" } -> ToolbarAction(runtime, context, item, actionSize)
+                }
+            }
+        }
+    } else {
+        Row(
+            modifier = modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(spacing),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items.forEach { item ->
+                when {
+                    item.id == "quickFilter" || item.id == "quickFilterInputs" -> QuickFilter(context, item)
+                    item.on.any { it.event == "onClick" } -> ToolbarAction(runtime, context, item, actionSize)
+                }
             }
         }
     }
@@ -201,10 +227,18 @@ private fun ToolbarAction(runtime: ForgeRuntime, context: DataSourceContext, ite
         }
     } else {
         val label = item.label ?: item.icon ?: item.id ?: "Action"
-        if (item.appearance == "minimal") {
+        val compactPresentation = LocalForgePresentationDensity.current == ForgePresentationDensity.Compact
+        if (compactPresentation) {
+            AssistChip(
+                onClick = onClick,
+                enabled = !readonly,
+                label = { Text(label, maxLines = 1) },
+                leadingIcon = icon?.let { image -> { Icon(image, contentDescription = null, modifier = Modifier.size(18.dp)) } }
+            )
+        } else if (item.appearance == "minimal") {
             TextButton(onClick = onClick, enabled = !readonly) { Text(label) }
         } else {
-            Button(onClick = onClick, enabled = !readonly) { Text(label) }
+            OutlinedButton(onClick = onClick, enabled = !readonly) { Text(label, maxLines = 1) }
         }
     }
 }

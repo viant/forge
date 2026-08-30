@@ -145,16 +145,20 @@ fun ContainerRenderer(
 
     Column(
         modifier = if (usesContainerChrome) {
+            val compact = presentationDensity == ForgePresentationDensity.Compact
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp)
-                .background(Color.White, RoundedCornerShape(18.dp))
-                .border(1.dp, Color(0xFFE7ECF3), RoundedCornerShape(18.dp))
-                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .padding(horizontal = if (compact) 3.dp else 8.dp, vertical = if (compact) 3.dp else 6.dp)
+                .background(Color.White, RoundedCornerShape(if (compact) 14.dp else 18.dp))
+                .border(1.dp, Color(0xFFE7ECF3), RoundedCornerShape(if (compact) 14.dp else 18.dp))
+                .padding(horizontal = if (compact) 7.dp else 12.dp, vertical = if (compact) 6.dp else 10.dp)
         } else {
             modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .padding(
+                    horizontal = if (presentationDensity == ForgePresentationDensity.Compact) 3.dp else 12.dp,
+                    vertical = if (presentationDensity == ForgePresentationDensity.Compact) 3.dp else 8.dp
+                )
         }
     ) {
         if (!suppressTitle) {
@@ -523,14 +527,16 @@ private fun NestedContainersRenderer(
                     }
                 }
             } else {
-                container.containers.forEach { nested ->
-                    ContainerRenderer(
-                        runtime,
-                        window,
-                        nested,
-                        selectionModeOverride,
-                        inheritedDataSourceRef = nested.dataSourceRef?.takeIf { it.isNotBlank() } ?: inheritedDataSourceRef
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(resolveSpacing(layout.gap, 12.dp))) {
+                    container.containers.forEach { nested ->
+                        ContainerRenderer(
+                            runtime,
+                            window,
+                            nested,
+                            selectionModeOverride,
+                            inheritedDataSourceRef = nested.dataSourceRef?.takeIf { it.isNotBlank() } ?: inheritedDataSourceRef
+                        )
+                    }
                 }
             }
         }
@@ -571,14 +577,16 @@ private fun NestedContainersRenderer(
                     inheritedDataSourceRef = inheritedDataSourceRef
                 )
             } else {
-                container.containers.forEach { nested ->
-                    ContainerRenderer(
-                        runtime,
-                        window,
-                        nested,
-                        selectionModeOverride,
-                        inheritedDataSourceRef = nested.dataSourceRef?.takeIf { it.isNotBlank() } ?: inheritedDataSourceRef
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(resolveSpacing(layout.rowGap ?: layout.gap, 12.dp))) {
+                    container.containers.forEach { nested ->
+                        ContainerRenderer(
+                            runtime,
+                            window,
+                            nested,
+                            selectionModeOverride,
+                            inheritedDataSourceRef = nested.dataSourceRef?.takeIf { it.isNotBlank() } ?: inheritedDataSourceRef
+                        )
+                    }
                 }
             }
         }
