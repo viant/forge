@@ -6,12 +6,13 @@ private struct ForgeEmbeddedNonScrollingKey: EnvironmentKey {
 }
 
 public enum ForgePresentationDensity {
+    case automatic
     case standard
     case compact
 }
 
 private struct ForgePresentationDensityKey: EnvironmentKey {
-    static let defaultValue = ForgePresentationDensity.standard
+    static let defaultValue = ForgePresentationDensity.automatic
 }
 
 private struct ForgeDedicatedReportScreenKey: EnvironmentKey {
@@ -38,6 +39,7 @@ extension EnvironmentValues {
 
 public struct WindowContentView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.forgePresentationDensity) private var requestedPresentationDensity
     @State private var availableWidth: CGFloat = 0
 
     private let runtime: ForgeRuntime?
@@ -81,6 +83,7 @@ public struct WindowContentView: View {
                 )
             }
         }
+        .environment(\.forgePresentationDensity, resolvedPresentationDensity)
         .task(id: onInitTaskKey) {
             await runWindowLifecycle(event: "onInit")
         }
@@ -100,6 +103,16 @@ public struct WindowContentView: View {
             Task {
                 await runWindowLifecycle(event: "onDestroy")
             }
+        }
+    }
+
+    private var resolvedPresentationDensity: ForgePresentationDensity {
+        guard requestedPresentationDensity == .automatic else {
+            return requestedPresentationDensity
+        }
+        switch runtime?.targetContext.formFactor.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "phone", "tablet", "mobile": return .compact
+        default: return .standard
         }
     }
 

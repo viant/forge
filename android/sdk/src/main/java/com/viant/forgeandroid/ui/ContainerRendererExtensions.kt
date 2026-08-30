@@ -9,6 +9,7 @@ import com.viant.forgeandroid.runtime.ForgeTargetContext
 import com.viant.forgeandroid.runtime.WindowContext
 
 enum class ForgePresentationDensity {
+    Automatic,
     Standard,
     Compact
 }
@@ -67,5 +68,5 @@ val LocalForgeContainerRendererRegistry = staticCompositionLocalOf {
 }
 
 val LocalForgePresentationDensity = staticCompositionLocalOf {
-    ForgePresentationDensity.Standard
+    ForgePresentationDensity.Automatic
 }
