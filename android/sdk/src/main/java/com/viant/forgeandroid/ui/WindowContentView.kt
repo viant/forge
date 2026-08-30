@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -47,25 +48,36 @@ fun WindowContentView(
     canGoBack: Boolean = false,
     onBack: (() -> Unit)? = null
 ) {
+    val requestedDensity = LocalForgePresentationDensity.current
+    val resolvedDensity = if (requestedDensity == ForgePresentationDensity.Automatic) {
+        when (runtime.targetContext.formFactor.orEmpty().trim().lowercase()) {
+            "phone", "tablet", "mobile" -> ForgePresentationDensity.Compact
+            else -> ForgePresentationDensity.Standard
+        }
+    } else {
+        requestedDensity
+    }
     val metadataSignal = runtime.metadataSignal(windowId)
     val metadata by metadataSignal.flow.collectAsState(initial = metadataSignal.peek())
 
-    key(windowId, metadata != null) {
-        val resolvedMetadata = metadata
-        if (resolvedMetadata == null) {
-            Text("Loading $windowKey...", modifier = Modifier.padding(16.dp))
-        } else {
-            WindowContentBody(
-                runtime = runtime,
-                windowId = windowId,
-                windowKey = windowKey,
-                metadata = resolvedMetadata,
-                modifier = modifier,
-                scrollEnabled = scrollEnabled,
-                showWindowHeader = showWindowHeader,
-                canGoBack = canGoBack,
-                onBack = onBack
-            )
+    CompositionLocalProvider(LocalForgePresentationDensity provides resolvedDensity) {
+        key(windowId, metadata != null) {
+            val resolvedMetadata = metadata
+            if (resolvedMetadata == null) {
+                Text("Loading $windowKey...", modifier = Modifier.padding(16.dp))
+            } else {
+                WindowContentBody(
+                    runtime = runtime,
+                    windowId = windowId,
+                    windowKey = windowKey,
+                    metadata = resolvedMetadata,
+                    modifier = modifier,
+                    scrollEnabled = scrollEnabled,
+                    showWindowHeader = showWindowHeader,
+                    canGoBack = canGoBack,
+                    onBack = onBack
+                )
+            }
         }
     }
 }

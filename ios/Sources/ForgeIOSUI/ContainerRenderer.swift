@@ -5,6 +5,12 @@ public struct ContainerRenderer: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.forgePresentationDensity) private var presentationDensity
     @Environment(\.forgeContainerRendererRegistry) private var rendererRegistry
+    @State private var visibilityWindowForm: [String: JSONValue] = [:]
+    @State private var visibilityForm: [String: JSONValue] = [:]
+    @State private var visibilityMetrics: [String: JSONValue] = [:]
+    @State private var visibilityCollection: [[String: JSONValue]] = []
+    @State private var visibilityInput = InputState()
+    @State private var visibilitySelection = SelectionState()
 
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
@@ -27,7 +33,103 @@ public struct ContainerRenderer: View {
     }
 
     public var body: some View {
-        renderedBody
+        Group {
+            if containerIsVisible {
+                renderedBody
+            }
+        }
+        .task(id: visibilityWindowTaskKey) {
+            await observeVisibilityWindowForm()
+        }
+        .task(id: visibilityDataTaskKey) {
+            await observeVisibilityDataSource()
+        }
+    }
+
+    private var visibilityWindowTaskKey: String {
+        guard container.visibleWhen != nil else { return "" }
+        return window?.windowID ?? ""
+    }
+
+    private var visibilityDataSourceRef: String {
+        normalizedContainerVisibilityRef(container.visibleWhen?.dataSourceRef)
+            ?? normalizedContainerVisibilityRef(container.dataSourceRef)
+            ?? normalizedContainerVisibilityRef(inheritedDataSourceRef)
+            ?? ""
+    }
+
+    private var visibilityDataTaskKey: String {
+        guard container.visibleWhen != nil else { return "" }
+        return "\(window?.windowID ?? "")#\(visibilityDataSourceRef)"
+    }
+
+    private var containerIsVisible: Bool {
+        let kind = container.kind?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        if kind == "dashboard" || kind.hasPrefix("dashboard.") { return true }
+        return DashboardRuntime.evaluateDashboardCondition(
+            container.visibleWhen,
+            metrics: visibilityMetrics.mapValues(containerVisibilityAnyValue),
+            filters: visibilityInput.filter.mapValues(containerVisibilityAnyValue),
+            form: visibilityForm.mapValues(containerVisibilityAnyValue),
+            windowForm: visibilityWindowForm.mapValues(containerVisibilityAnyValue),
+            collection: visibilityCollection.map { $0.mapValues(containerVisibilityAnyValue) },
+            input: [
+                "filter": visibilityInput.filter.mapValues(containerVisibilityAnyValue),
+                "parameters": visibilityInput.parameters.mapValues(containerVisibilityAnyValue),
+                "page": visibilityInput.page as Any,
+                "fetch": visibilityInput.fetch,
+                "refresh": visibilityInput.refresh
+            ],
+            selectionValues: [
+                "selected": visibilitySelection.selected?.mapValues(containerVisibilityAnyValue) as Any,
+                "selection": visibilitySelection.selection.map { $0.mapValues(containerVisibilityAnyValue) },
+                "rowIndex": visibilitySelection.rowIndex
+            ]
+        )
+    }
+
+    @MainActor
+    private func observeVisibilityWindowForm() async {
+        guard container.visibleWhen != nil, let runtime, let window else { return }
+        visibilityWindowForm = await runtime.windowFormJSONValue(windowID: window.windowID)
+        let stream = await runtime.windowFormUpdates(windowID: window.windowID)
+        for await next in stream { visibilityWindowForm = next }
+    }
+
+    @MainActor
+    private func observeVisibilityDataSource() async {
+        guard container.visibleWhen != nil,
+              let runtime,
+              let window,
+              !visibilityDataSourceRef.isEmpty else { return }
+        let ref = visibilityDataSourceRef
+        visibilityCollection = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
+        visibilityForm = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: ref)
+        visibilityMetrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: ref)
+        visibilityInput = await runtime.dataSourceInputState(windowID: window.windowID, dataSourceRef: ref)
+        visibilitySelection = await runtime.dataSourceSelectionState(windowID: window.windowID, dataSourceRef: ref)
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask {
+                let stream = await runtime.dataSourceCollectionUpdates(windowID: window.windowID, dataSourceRef: ref)
+                for await next in stream { await MainActor.run { visibilityCollection = next } }
+            }
+            group.addTask {
+                let stream = await runtime.dataSourceFormUpdates(windowID: window.windowID, dataSourceRef: ref)
+                for await next in stream { await MainActor.run { visibilityForm = next } }
+            }
+            group.addTask {
+                let stream = await runtime.dataSourceMetricsUpdates(windowID: window.windowID, dataSourceRef: ref)
+                for await next in stream { await MainActor.run { visibilityMetrics = next } }
+            }
+            group.addTask {
+                let stream = await runtime.dataSourceInputUpdates(windowID: window.windowID, dataSourceRef: ref)
+                for await next in stream { await MainActor.run { visibilityInput = next } }
+            }
+            group.addTask {
+                let stream = await runtime.dataSourceSelectionUpdates(windowID: window.windowID, dataSourceRef: ref)
+                for await next in stream { await MainActor.run { visibilitySelection = next } }
+            }
+        }
     }
 
     @ViewBuilder
@@ -305,5 +407,21 @@ private struct PlaceholderContainerView: View {
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(.quaternary)
         )
+    }
+}
+
+private func normalizedContainerVisibilityRef(_ value: String?) -> String? {
+    let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return normalized.isEmpty ? nil : normalized
+}
+
+private func containerVisibilityAnyValue(_ value: JSONValue) -> Any {
+    switch value {
+    case .string(let value): return value
+    case .number(let value): return value
+    case .bool(let value): return value
+    case .array(let values): return values.map(containerVisibilityAnyValue)
+    case .object(let values): return values.mapValues(containerVisibilityAnyValue)
+    case .null: return NSNull()
     }
 }

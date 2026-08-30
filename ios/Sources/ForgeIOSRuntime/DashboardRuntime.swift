@@ -2115,16 +2115,64 @@ public enum DashboardRuntime {
         _ condition: DashboardConditionDef?,
         metrics: [String: Any] = [:],
         filters: [String: Any] = [:],
-        selection: DashboardSelectionState = DashboardSelectionState()
+        selection: DashboardSelectionState = DashboardSelectionState(),
+        form: [String: Any] = [:],
+        windowForm: [String: Any] = [:],
+        collection: [[String: Any]] = [],
+        input: [String: Any] = [:],
+        selectionValues: [String: Any] = [:]
     ) -> Bool {
         guard let condition else { return true }
+        if !condition.all.isEmpty && condition.all.contains(where: {
+            !evaluateDashboardCondition(
+                $0,
+                metrics: metrics,
+                filters: filters,
+                selection: selection,
+                form: form,
+                windowForm: windowForm,
+                collection: collection,
+                input: input,
+                selectionValues: selectionValues
+            )
+        }) { return false }
+        if !condition.any.isEmpty && !condition.any.contains(where: {
+            evaluateDashboardCondition(
+                $0,
+                metrics: metrics,
+                filters: filters,
+                selection: selection,
+                form: form,
+                windowForm: windowForm,
+                collection: collection,
+                input: input,
+                selectionValues: selectionValues
+            )
+        }) { return false }
+        if let negated = condition.not,
+           evaluateDashboardCondition(
+               negated,
+               metrics: metrics,
+               filters: filters,
+               selection: selection,
+               form: form,
+               windowForm: windowForm,
+               collection: collection,
+               input: input,
+               selectionValues: selectionValues
+           ) { return false }
         let selector = condition.selector ?? condition.field ?? condition.key
         let actual = resolveDashboardValue(
             source: condition.source,
             selector: selector,
             metrics: metrics,
             filters: filters,
-            selection: selection
+            selection: selection,
+            form: form,
+            windowForm: windowForm,
+            collection: collection,
+            input: input,
+            selectionValues: selectionValues
         )
 
         if let expected = condition.whenValue, !dashboardValuesEqual(actual: actual, expected: expected) {
@@ -2166,7 +2214,12 @@ public enum DashboardRuntime {
         selector: String?,
         metrics: [String: Any] = [:],
         filters: [String: Any] = [:],
-        selection: DashboardSelectionState = DashboardSelectionState()
+        selection: DashboardSelectionState = DashboardSelectionState(),
+        form: [String: Any] = [:],
+        windowForm: [String: Any] = [:],
+        collection: [[String: Any]] = [],
+        input: [String: Any] = [:],
+        selectionValues: [String: Any] = [:]
     ) -> Any? {
         let selectionPayload = selectionDictionary(selection)
 
@@ -2176,6 +2229,16 @@ public enum DashboardRuntime {
                 return selectionPayload
             case "filters", "filter":
                 return filters
+            case "form":
+                return form
+            case "windowform":
+                return windowForm
+            case "collection":
+                return collection
+            case "input":
+                return input
+            case "selectionvalues":
+                return selectionValues
             default:
                 return metrics
             }
@@ -2186,6 +2249,16 @@ public enum DashboardRuntime {
             return SelectorUtil.resolve(selectionPayload, selector: selector)
         case "filters", "filter":
             return SelectorUtil.resolve(filters, selector: selector)
+        case "form":
+            return SelectorUtil.resolve(form, selector: selector)
+        case "windowform":
+            return SelectorUtil.resolve(windowForm, selector: selector)
+        case "collection":
+            return SelectorUtil.resolve(collection, selector: selector)
+        case "input":
+            return SelectorUtil.resolve(input, selector: selector)
+        case "selectionvalues":
+            return SelectorUtil.resolve(selectionValues, selector: selector)
         default:
             if selector.hasPrefix("filters.") {
                 return SelectorUtil.resolve(filters, selector: String(selector.dropFirst("filters.".count)))

@@ -1205,6 +1205,21 @@ public struct DataSourcePagingDef: Codable, Sendable {
         self.parameters = parameters
         self.dataInfoSelectors = dataInfoSelectors
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case size
+        case enabled
+        case parameters
+        case dataInfoSelectors
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        size = try container.decodeIfPresent(Int.self, forKey: .size)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled)
+        parameters = try container.decodeIfPresent([String: String].self, forKey: .parameters) ?? [:]
+        dataInfoSelectors = try container.decodeIfPresent([String: String].self, forKey: .dataInfoSelectors) ?? [:]
+    }
 }
 
 public struct SchemaBasedFormDef: Codable, Sendable {
@@ -2873,7 +2888,10 @@ public struct DashboardDetailDef: Codable, Sendable {
     public let reserved: String?
 }
 
-public struct DashboardConditionDef: Codable, Sendable {
+public final class DashboardConditionDef: Codable, @unchecked Sendable {
+    public let all: [DashboardConditionDef]
+    public let any: [DashboardConditionDef]
+    public let not: DashboardConditionDef?
     public let source: String?
     public let dataSourceRef: String?
     public let selector: String?
@@ -2891,6 +2909,9 @@ public struct DashboardConditionDef: Codable, Sendable {
     public let notEmpty: Bool?
 
     enum CodingKeys: String, CodingKey {
+        case all
+        case any
+        case not
         case source
         case dataSourceRef
         case selector
@@ -2923,8 +2944,14 @@ public struct DashboardConditionDef: Codable, Sendable {
         lt: Double? = nil,
         lte: Double? = nil,
         empty: Bool? = nil,
-        notEmpty: Bool? = nil
+        notEmpty: Bool? = nil,
+        all: [DashboardConditionDef] = [],
+        any: [DashboardConditionDef] = [],
+        not: DashboardConditionDef? = nil
     ) {
+        self.all = all
+        self.any = any
+        self.not = not
         self.source = source
         self.dataSourceRef = dataSourceRef
         self.selector = selector
@@ -2944,6 +2971,9 @@ public struct DashboardConditionDef: Codable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        all = try container.decodeIfPresent([DashboardConditionDef].self, forKey: .all) ?? []
+        any = try container.decodeIfPresent([DashboardConditionDef].self, forKey: .any) ?? []
+        not = try container.decodeIfPresent(DashboardConditionDef.self, forKey: .not)
         source = try container.decodeIfPresent(String.self, forKey: .source)
         dataSourceRef = try container.decodeIfPresent(String.self, forKey: .dataSourceRef)
         selector = try container.decodeIfPresent(String.self, forKey: .selector)
