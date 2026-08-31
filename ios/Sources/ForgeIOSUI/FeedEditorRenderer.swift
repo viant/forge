@@ -104,8 +104,7 @@ struct FeedEditableTableView: View {
                     }
                 }
                 .background(Color.forgeSystemBackground)
-                .overlay(alignment: .trailing) { Divider() }
-                .shadow(color: Color.black.opacity(0.045), radius: 2, x: 1)
+                .shadow(color: Color.black.opacity(0.055), radius: 3, x: 2)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -138,8 +137,6 @@ struct FeedEditableTableView: View {
         )
         .padding(6)
         .background(feedTablePastelColor(key: container.id, rowIndex: row.offset, header: false))
-        .overlay(alignment: .bottom) { Divider() }
-        .overlay(alignment: .trailing) { Divider().opacity(0.55) }
     }
 
     private var dataSourceRef: String { container.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "" }
@@ -160,33 +157,37 @@ struct FeedEditableTableView: View {
     private func dispatch(_ operation: FeedPatchOperation) {
         guard let runtime, let window else { return }
         Task {
-            do {
-                let handled = try await runtime.dispatchFeedPatch(windowID: window.windowID, operation: operation)
-                if !handled {
-                    _ = try await runtime.applyFeedPatchOperations(windowID: window.windowID, operations: [operation])
-                }
-                let rawField = operation.path.split(separator: "/").last.map(String.init) ?? ""
-                let field = rawField
-                    .replacingOccurrences(of: "~1", with: "/")
-                    .replacingOccurrences(of: "~0", with: "~")
-                await runtime.emitInteraction(
-                    kind: "feed.form_changed",
-                    windowID: window.windowID,
-                    dataSourceRef: operation.dataSourceRef,
-                    detail: [
-                        "field": .string(field),
-                        "scope": .string(operation.path.hasPrefix("/collection/") ? "collection" : "form"),
-                        "controlType": .string("editableTable"),
-                        "operation": .string(operation.op),
-                        "path": .string(operation.path),
-                        "value": operation.value ?? .null,
-                    ]
-                )
-            } catch {
-                return
-            }
+            try? await dispatchEditableFeedPatchAndEmit(runtime: runtime, windowID: window.windowID, operation: operation)
         }
     }
+}
+
+func dispatchEditableFeedPatchAndEmit(
+    runtime: ForgeRuntime,
+    windowID: String,
+    operation: FeedPatchOperation
+) async throws {
+    let handled = try await runtime.dispatchFeedPatch(windowID: windowID, operation: operation)
+    if !handled {
+        _ = try await runtime.applyFeedPatchOperations(windowID: windowID, operations: [operation])
+    }
+    let rawField = operation.path.split(separator: "/").last.map(String.init) ?? ""
+    let field = rawField
+        .replacingOccurrences(of: "~1", with: "/")
+        .replacingOccurrences(of: "~0", with: "~")
+    await runtime.emitInteraction(
+        kind: "feed.form_changed",
+        windowID: windowID,
+        dataSourceRef: operation.dataSourceRef,
+        detail: [
+            "field": .string(field),
+            "scope": .string(operation.path.hasPrefix("/collection/") ? "collection" : "form"),
+            "controlType": .string("editableTable"),
+            "operation": .string(operation.op),
+            "path": .string(operation.path),
+            "value": operation.value ?? .null,
+        ]
+    )
 }
 
 private struct FeedEditableCell: View {

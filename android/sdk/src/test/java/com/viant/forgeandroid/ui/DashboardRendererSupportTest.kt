@@ -5,6 +5,12 @@ import com.viant.forgeandroid.runtime.ChartDef
 import com.viant.forgeandroid.runtime.ColumnDef
 import com.viant.forgeandroid.runtime.ContainerDef
 import com.viant.forgeandroid.runtime.DashboardReportRuntimeBlockSummary
+import com.viant.forgeandroid.runtime.FeedPatchOperation
+import com.viant.forgeandroid.runtime.ForgeInteraction
+import com.viant.forgeandroid.runtime.ForgeRuntime
+import com.viant.forgeandroid.runtime.WindowMetadata
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -33,6 +39,36 @@ class DashboardRendererSupportTest {
     fun frequencyEditorWritesSharedFeedValueAndKeepsBlankEmpty() {
         assertEquals("4 per 1 day", formatDashboardFrequency(DashboardFrequencyParts("4", "1", "day")))
         assertEquals("", formatDashboardFrequency(DashboardFrequencyParts("", "1", "day")))
+    }
+
+    @Test
+    fun editableTablePatchEmitsInspectableFeedChange() {
+        val runtime = ForgeRuntime(emptyMap(), CoroutineScope(Dispatchers.Unconfined))
+        val window = runtime.openWindowInline(
+            windowKey = "feed-catalog-conversation",
+            title = "Catalog",
+            metadata = WindowMetadata()
+        )
+        var observed: ForgeInteraction? = null
+        runtime.registerInteractionObserver { observed = it }
+
+        emitEditableFeedPatchInteraction(
+            runtime = runtime,
+            windowId = window.windowId,
+            operation = FeedPatchOperation(
+                dataSourceRef = "frequency",
+                op = "replace",
+                path = "/collection/0/Freq~1Cap",
+                value = "7 per 1 day"
+            )
+        )
+
+        assertEquals("feed.form_changed", observed?.kind)
+        assertEquals("feed-catalog-conversation", observed?.windowKey)
+        assertEquals("frequency", observed?.dataSourceRef)
+        assertEquals("Freq/Cap", observed?.detail?.get("field"))
+        assertEquals("/collection/0/Freq~1Cap", observed?.detail?.get("path"))
+        assertEquals("7 per 1 day", observed?.detail?.get("value"))
     }
 
     @Test

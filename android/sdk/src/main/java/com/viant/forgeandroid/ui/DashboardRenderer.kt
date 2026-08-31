@@ -922,9 +922,17 @@ private fun dispatchEditableFeedPatch(
     if (!handled) {
         runCatching { applyFeedPatchOperations(context.window, listOf(operation)) }
     }
+    emitEditableFeedPatchInteraction(runtime, context.window.windowId, operation)
+}
+
+internal fun emitEditableFeedPatchInteraction(
+    runtime: ForgeRuntime,
+    windowId: String,
+    operation: FeedPatchOperation,
+) {
     runtime.emitInteraction(
         kind = "feed.form_changed",
-        windowId = context.window.windowId,
+        windowId = windowId,
         dataSourceRef = operation.dataSourceRef,
         detail = mapOf(
             "field" to operation.path.substringAfterLast('/').replace("~1", "/").replace("~0", "~"),
