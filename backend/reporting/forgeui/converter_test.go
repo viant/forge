@@ -21,6 +21,9 @@ func TestBuildFencesCompilesSharedForgeUI(t *testing.T) {
 	})
 	require.NoError(t, err)
 	compiled, err := fenced.Compile(&fenced.CompileRequest{Fences: fences, ReportID: "feed_catalog"})
+	if err != nil {
+		t.Logf("diagnostics: %#v", compiled.Diagnostics)
+	}
 	require.NoError(t, err)
 	require.NotEmpty(t, compiled.ReportSpec)
 	require.NotEmpty(t, compiled.ReportFill)

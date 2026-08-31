@@ -161,8 +161,27 @@ struct FeedEditableTableView: View {
         guard let runtime, let window else { return }
         Task {
             do {
-                if try await runtime.dispatchFeedPatch(windowID: window.windowID, operation: operation) { return }
-                _ = try await runtime.applyFeedPatchOperations(windowID: window.windowID, operations: [operation])
+                let handled = try await runtime.dispatchFeedPatch(windowID: window.windowID, operation: operation)
+                if !handled {
+                    _ = try await runtime.applyFeedPatchOperations(windowID: window.windowID, operations: [operation])
+                }
+                let rawField = operation.path.split(separator: "/").last.map(String.init) ?? ""
+                let field = rawField
+                    .replacingOccurrences(of: "~1", with: "/")
+                    .replacingOccurrences(of: "~0", with: "~")
+                await runtime.emitInteraction(
+                    kind: "feed.form_changed",
+                    windowID: window.windowID,
+                    dataSourceRef: operation.dataSourceRef,
+                    detail: [
+                        "field": .string(field),
+                        "scope": .string(operation.path.hasPrefix("/collection/") ? "collection" : "form"),
+                        "controlType": .string("editableTable"),
+                        "operation": .string(operation.op),
+                        "path": .string(operation.path),
+                        "value": operation.value ?? .null,
+                    ]
+                )
             } catch {
                 return
             }
@@ -209,6 +228,13 @@ private struct FeedEditableCell: View {
             .padding(.vertical, 5)
             .background(Color.secondary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.16), lineWidth: 1))
+        } else if case .object(let editor) = column.editor,
+                  editor["type"]?.stringValue?.lowercased() == "frequency" {
+            FeedFrequencyEditor(
+                value: value?.feedDisplayText ?? "",
+                units: editor["units"]?.arrayValue?.compactMap(\.stringValue) ?? ["hour", "day", "week"],
+                onChange: { onChange(.string($0)) }
+            )
         } else if isFeedNarrativeColumn(column) {
             TextEditor(text: Binding(
                 get: { value?.feedDisplayText ?? "" },
@@ -241,6 +267,88 @@ private struct FeedEditableCell: View {
             .background(Color.secondary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.16), lineWidth: 1))
         }
+    }
+}
+
+struct FeedFrequencyParts: Equatable {
+    var count: String
+    var interval: String
+    var unit: String
+}
+
+func feedFrequencyParts(_ value: String, units: [String]) -> FeedFrequencyParts {
+    let allowedUnits = units.isEmpty ? ["hour", "day", "week"] : units
+    let defaultUnit = allowedUnits.first(where: { $0.caseInsensitiveCompare("day") == .orderedSame }) ?? allowedUnits[0]
+    let pattern = #"^(\d+(?:\.\d+)?)\s+per\s+(\d+(?:\.\d+)?)\s+([A-Za-z]+?)s?$"#
+    guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+          let match = expression.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)),
+          match.numberOfRanges == 4,
+          let countRange = Range(match.range(at: 1), in: value),
+          let intervalRange = Range(match.range(at: 2), in: value),
+          let unitRange = Range(match.range(at: 3), in: value) else {
+        return FeedFrequencyParts(count: "", interval: "1", unit: defaultUnit)
+    }
+    let parsedUnit = String(value[unitRange])
+    let unit = allowedUnits.first(where: { $0.caseInsensitiveCompare(parsedUnit) == .orderedSame }) ?? defaultUnit
+    return FeedFrequencyParts(count: String(value[countRange]), interval: String(value[intervalRange]), unit: unit)
+}
+
+func formatFeedFrequency(_ parts: FeedFrequencyParts) -> String {
+    guard !parts.count.isEmpty else { return "" }
+    return "\(parts.count) per \(parts.interval.isEmpty ? "1" : parts.interval) \(parts.unit.isEmpty ? "day" : parts.unit)"
+}
+
+private struct FeedFrequencyEditor: View {
+    let value: String
+    let units: [String]
+    let onChange: (String) -> Void
+
+    private var parts: FeedFrequencyParts { feedFrequencyParts(value, units: units) }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            compactField(parts.count, placeholder: "—", width: 54) { next in
+                onChange(formatFeedFrequency(FeedFrequencyParts(count: next, interval: parts.interval, unit: parts.unit)))
+            }
+            Text("per")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            compactField(parts.interval, placeholder: "1", width: 46) { next in
+                onChange(formatFeedFrequency(FeedFrequencyParts(count: parts.count, interval: next, unit: parts.unit)))
+            }
+            Picker("Unit", selection: Binding(
+                get: { parts.unit },
+                set: { next in
+                    onChange(formatFeedFrequency(FeedFrequencyParts(count: parts.count, interval: parts.interval, unit: next)))
+                }
+            )) {
+                ForEach(units.isEmpty ? ["hour", "day", "week"] : units, id: \.self) { unit in
+                    Text(unit).tag(unit)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 5)
+            .frame(height: 38)
+            .background(Color.secondary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.16), lineWidth: 1))
+        }
+    }
+
+    private func compactField(
+        _ text: String,
+        placeholder: String,
+        width: CGFloat,
+        onEdit: @escaping (String) -> Void
+    ) -> some View {
+        TextField(placeholder, text: Binding(get: { text }, set: onEdit))
+            .font(.subheadline)
+            .multilineTextAlignment(.leading)
+            .padding(.horizontal, 7)
+            .frame(width: width, height: 38)
+            .background(Color.secondary.opacity(0.035), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.secondary.opacity(0.16), lineWidth: 1))
     }
 }
 
@@ -458,6 +566,7 @@ private func isFeedNarrativeColumn(_ column: ColumnDef) -> Bool {
 private func feedColumnWidth(_ column: ColumnDef?, availableWidth: CGFloat) -> CGFloat {
     guard let column else { return min(140, availableWidth * 0.4) }
     if let width = column.width, width > 0 { return CGFloat(width) }
+    if column.editor?.objectValue?["type"]?.stringValue?.lowercased() == "frequency" { return 268 }
     let key = ((feedColumnKey(column) ?? "") + " " + (column.label ?? "")).lowercased()
     if isFeedNarrativeColumn(column) { return 320 }
     if key.contains("name") || key.contains("publisher") || key.contains("audience") || key.contains("deal") { return 220 }

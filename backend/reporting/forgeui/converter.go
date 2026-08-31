@@ -38,6 +38,11 @@ func BuildFences(request Request) ([]fenced.Fence, error) {
 		converter.refMap[ref] = safeSegment(ref, "data")
 	}
 	containers := objectSlice(ui["containers"])
+	if view, ok := ui["view"].(map[string]any); ok {
+		if content, ok := view["content"].(map[string]any); ok {
+			containers = objectSlice(content["containers"])
+		}
+	}
 	if content, ok := ui["content"].(map[string]any); ok {
 		containers = objectSlice(content["containers"])
 	}
@@ -244,7 +249,11 @@ func (c *converter) referencedDataSourceRefs(blocks []any) []string {
 	set := map[string]bool{}
 	for _, block := range blocks {
 		if object, ok := block.(map[string]any); ok {
-			if ref := strings.TrimSpace(fmt.Sprint(object["datasetRef"])); ref != "" {
+			if value, exists := object["datasetRef"]; exists {
+				ref := text(value, "")
+				if ref == "" {
+					continue
+				}
 				set[ref] = true
 			}
 		}

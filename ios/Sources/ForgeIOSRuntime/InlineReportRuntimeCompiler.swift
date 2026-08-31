@@ -575,14 +575,14 @@ public enum InlineReportRuntimeCompiler {
                 return []
             case "dashboard.summary":
                 let metrics = object["metrics"]?.arrayValue ?? []
-                return metrics.enumerated().compactMap { index, metric in
+                return metrics.enumerated().compactMap { index, metric -> JSONValue? in
                     guard let value = metric.objectValue else { return nil }
                     let selector = value["selector"]?.stringValue?.replacingOccurrences(of: "0.", with: "")
                     let summaryID = object["id"]?.stringValue ?? "summary"
                     let metricID = value["id"] ?? .string("\(summaryID)-\(index + 1)")
                     let metricTitle = value["label"] ?? object["title"] ?? .string("KPI")
-                    let datasetRef = .string(object["dataSourceRef"]?.stringValue ?? "data")
-                    let valueField = .string(selector ?? "value")
+                    let datasetRef = JSONValue.string(object["dataSourceRef"]?.stringValue ?? "data")
+                    let valueField = JSONValue.string(selector ?? "value")
                     let valueLabel = value["label"] ?? .string("Value")
                     var result: [String: JSONValue] = [
                         "id": metricID,

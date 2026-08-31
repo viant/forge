@@ -468,6 +468,8 @@ private fun compactFrozenIdentifierColumn(columns: List<ColumnDef>): ColumnDef? 
 
 private fun compactEditableColumnWidth(column: ColumnDef): androidx.compose.ui.unit.Dp {
     column.width?.takeIf { it > 0 }?.let { return it.coerceIn(76, 280).dp }
+    val editorType = ((column.editor as? JsonObject)?.get("type") as? JsonPrimitive)?.contentOrNull?.lowercase()
+    if (editorType == "frequency") return 268.dp
     val key = dashboardTableColumnKey(column).orEmpty().lowercase()
     val label = column.label.orEmpty().lowercase()
     val semantic = "$key $label"
@@ -528,6 +530,15 @@ private fun EditableFeedCell(
                 }
             }
         }
+        "frequency" -> CompactDashboardFrequencyEditor(
+            value = value?.toString().orEmpty(),
+            units = (config["units"] as? JsonArray)
+                .orEmpty()
+                .mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                .ifEmpty { listOf("hour", "day", "week") },
+            onValueChange = onChange,
+            modifier = Modifier.fillMaxWidth()
+        )
         else -> {
             val textValue = value?.toString().orEmpty()
             val updateValue: (String) -> Unit = { text ->
@@ -564,6 +575,79 @@ private fun EditableFeedCell(
                     minLines = 1,
                     maxLines = Int.MAX_VALUE
                 )
+            }
+        }
+    }
+}
+
+internal data class DashboardFrequencyParts(
+    val count: String,
+    val interval: String,
+    val unit: String,
+)
+
+internal fun dashboardFrequencyParts(value: String, units: List<String>): DashboardFrequencyParts {
+    val allowedUnits = units.ifEmpty { listOf("hour", "day", "week") }
+    val match = Regex("""^(\d+(?:\.\d+)?)\s+per\s+(\d+(?:\.\d+)?)\s+([A-Za-z]+?)s?$""", RegexOption.IGNORE_CASE)
+        .matchEntire(value.trim())
+    val parsedUnit = match?.groupValues?.get(3)?.lowercase()
+    val defaultUnit = allowedUnits.firstOrNull { it.equals("day", ignoreCase = true) } ?: allowedUnits.first()
+    return DashboardFrequencyParts(
+        count = match?.groupValues?.get(1).orEmpty(),
+        interval = match?.groupValues?.get(2) ?: "1",
+        unit = allowedUnits.firstOrNull { it.equals(parsedUnit, ignoreCase = true) } ?: defaultUnit,
+    )
+}
+
+internal fun formatDashboardFrequency(parts: DashboardFrequencyParts): String =
+    if (parts.count.isBlank()) "" else "${parts.count} per ${parts.interval.ifBlank { "1" }} ${parts.unit.ifBlank { "day" }}"
+
+@Composable
+private fun CompactDashboardFrequencyEditor(
+    value: String,
+    units: List<String>,
+    onValueChange: (Any?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val parts = dashboardFrequencyParts(value, units)
+    var unitMenuExpanded by remember(value, units) { mutableStateOf(false) }
+    val commit: (DashboardFrequencyParts) -> Unit = { onValueChange(formatDashboardFrequency(it)) }
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CompactDashboardTextInputSurface(
+            value = parts.count,
+            onValueChange = { commit(parts.copy(count = it)) },
+            placeholder = "—",
+            modifier = Modifier.width(62.dp).height(42.dp),
+        )
+        Text("per", style = MaterialTheme.typography.bodySmall, color = Color(0xFF667085))
+        CompactDashboardTextInputSurface(
+            value = parts.interval,
+            onValueChange = { commit(parts.copy(interval = it)) },
+            modifier = Modifier.width(52.dp).height(42.dp),
+        )
+        Box(modifier = Modifier.weight(1f)) {
+            OutlinedButton(
+                onClick = { unitMenuExpanded = true },
+                modifier = Modifier.fillMaxWidth().height(42.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp),
+            ) {
+                Text(parts.unit, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
+            DropdownMenu(expanded = unitMenuExpanded, onDismissRequest = { unitMenuExpanded = false }) {
+                units.forEach { unit ->
+                    DropdownMenuItem(
+                        text = { Text(unit) },
+                        onClick = {
+                            unitMenuExpanded = false
+                            commit(parts.copy(unit = unit))
+                        },
+                    )
+                }
             }
         }
     }
@@ -838,6 +922,19 @@ private fun dispatchEditableFeedPatch(
     if (!handled) {
         runCatching { applyFeedPatchOperations(context.window, listOf(operation)) }
     }
+    runtime.emitInteraction(
+        kind = "feed.form_changed",
+        windowId = context.window.windowId,
+        dataSourceRef = operation.dataSourceRef,
+        detail = mapOf(
+            "field" to operation.path.substringAfterLast('/').replace("~1", "/").replace("~0", "~"),
+            "scope" to if (operation.path.startsWith("/collection/")) "collection" else "form",
+            "controlType" to "editableTable",
+            "operation" to operation.op,
+            "path" to operation.path,
+            "value" to operation.value,
+        ),
+    )
 }
 
 private fun escapeFeedPointer(value: String): String = value.replace("~", "~0").replace("/", "~1")

@@ -14,6 +14,28 @@ import org.junit.Test
 class DashboardRendererSupportTest {
 
     @Test
+    fun frequencyEditorParsesSharedFeedValue() {
+        assertEquals(
+            DashboardFrequencyParts(count = "4", interval = "1", unit = "day"),
+            dashboardFrequencyParts("4 per 1 day", listOf("hour", "day", "week"))
+        )
+        assertEquals(
+            DashboardFrequencyParts(count = "3.5", interval = "2", unit = "week"),
+            dashboardFrequencyParts("3.5 per 2 weeks", listOf("hour", "day", "week"))
+        )
+        assertEquals(
+            DashboardFrequencyParts(count = "", interval = "1", unit = "day"),
+            dashboardFrequencyParts("", listOf("hour", "day", "week"))
+        )
+    }
+
+    @Test
+    fun frequencyEditorWritesSharedFeedValueAndKeepsBlankEmpty() {
+        assertEquals("4 per 1 day", formatDashboardFrequency(DashboardFrequencyParts("4", "1", "day")))
+        assertEquals("", formatDashboardFrequency(DashboardFrequencyParts("", "1", "day")))
+    }
+
+    @Test
     fun plannerTableNarrativeColumnsReceiveReadableWidthTreatment() {
         assertEquals(true, plannerTableColumnIsNarrative(ColumnDef(key = "rationale", label = "Rationale")))
         assertEquals(true, plannerTableColumnIsNarrative(ColumnDef(key = "changeReason", label = "Change reason")))
