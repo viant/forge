@@ -42,4 +42,20 @@ final class DataSourcePagingDecodingTests: XCTestCase {
             )
         )
     }
+
+    func testMobileTableAndLookupMetadataDecodeWithoutLosingAuthoredUI() throws {
+        let table = try JSONDecoder().decode(
+            TableDef.self,
+            from: Data(#"{"presentation":"tabular","columns":[{"id":"name","name":"Name"}],"emptyState":{"title":"Create your first automation","hideToolbarItems":["pagination"],"action":{"id":"addNew","icon":"plus","label":"New automation","on":[{"event":"onClick","handler":"schedule.addNewSchedule"}]}}}"#.utf8)
+        )
+        let item = try JSONDecoder().decode(
+            ItemDef.self,
+            from: Data(#"{"id":"agentRef","type":"text","lookup":{"dialogId":"agentLov","outputs":[{"name":"agentRef","location":"id"}]}}"#.utf8)
+        )
+
+        XCTAssertEqual(table.presentation, "tabular")
+        XCTAssertEqual(table.emptyState?.title, "Create your first automation")
+        XCTAssertEqual(table.emptyState?.action?.on.first?.action, "schedule.addNewSchedule")
+        XCTAssertEqual(item.lookup?.objectValue?["dialogId"]?.stringValue, "agentLov")
+    }
 }

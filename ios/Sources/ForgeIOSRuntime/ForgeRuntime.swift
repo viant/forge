@@ -105,6 +105,7 @@ public actor ForgeRuntime {
     private var dataSourceLoader: (@Sendable (DataSourceFetchRequest) async throws -> DataSourceFetchResult?)?
     private var windowMetadataLoader: (@Sendable (String) async throws -> WindowMetadata?)?
     private var feedPatchHandler: (@Sendable (String, FeedPatchOperation) async throws -> Bool)?
+    private var interactionObserver: (@Sendable (ForgeInteraction) async -> Void)?
 
     var handlers: [String: ForgeHandler] = [:]
     private var pendingDialogs: [String: PendingDialog] = [:]
@@ -125,6 +126,30 @@ public actor ForgeRuntime {
         self.windowMetadataEndpoint = Self.makeWindowMetadataEndpoint(
             baseURL: windowMetadataBaseURL,
             path: windowMetadataBasePath
+        )
+    }
+
+    public func registerInteractionObserver(
+        _ observer: (@Sendable (ForgeInteraction) async -> Void)?
+    ) {
+        interactionObserver = observer
+    }
+
+    public func emitInteraction(
+        kind: String,
+        windowID: String,
+        dataSourceRef: String? = nil,
+        detail: [String: JSONValue] = [:]
+    ) async {
+        guard let interactionObserver else { return }
+        await interactionObserver(
+            ForgeInteraction(
+                kind: kind,
+                windowID: windowID,
+                windowKey: windows.first { $0.id == windowID }?.key,
+                dataSourceRef: dataSourceRef,
+                detail: detail
+            )
         )
     }
 

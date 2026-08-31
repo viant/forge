@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
@@ -291,6 +292,7 @@ private fun toolbarIcon(name: String?): ImageVector? = when (name?.trim()?.lower
     "arrow-left", "back" -> Icons.AutoMirrored.Filled.ArrowBack
     "floppy-disk", "save" -> Icons.Default.Save
     "history", "time" -> Icons.Default.History
+    "pdf", "document-pdf", "print" -> Icons.Default.PictureAsPdf
     else -> null
 }
 

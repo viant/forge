@@ -78,7 +78,12 @@ private fun MobileTabViewStackRenderer(
         CompactSectionNavigator(
             entries = pages.map { it.id to it.title },
             selectedId = selectedPage.id,
-            onSelect = { selectedPageId = it },
+            onSelect = { selectedId ->
+                selectedPageId = selectedId
+                pages.indexOfFirst { it.id == selectedId }.takeIf { it >= 0 }?.let { selectedIndex ->
+                    emitTabInteraction(runtime, window, container, pages[selectedIndex].id, pages[selectedIndex].title, selectedIndex)
+                }
+            },
             fallbackLabel = "Section",
             chooserContentDescription = "Choose section"
         )
@@ -151,7 +156,10 @@ private fun MobileTabPagesRenderer(
                 entries = pages.map { it.id to it.title },
                 selectedId = currentPage.id,
                 onSelect = { selectedId ->
-                    pages.indexOfFirst { it.id == selectedId }.takeIf { it >= 0 }?.let { index = it }
+                    pages.indexOfFirst { it.id == selectedId }.takeIf { it >= 0 }?.let {
+                        index = it
+                        emitTabInteraction(runtime, window, container, pages[it].id, pages[it].title, it)
+                    }
                 },
                 fallbackLabel = "Section",
                 chooserContentDescription = "Choose feed section"
@@ -161,7 +169,10 @@ private fun MobileTabPagesRenderer(
                 items = pages.map { SectionTabItem(it.id, it.title) },
                 selectedId = currentPage.id,
                 onSelect = { selectedId ->
-                    pages.indexOfFirst { it.id == selectedId }.takeIf { it >= 0 }?.let { index = it }
+                    pages.indexOfFirst { it.id == selectedId }.takeIf { it >= 0 }?.let {
+                        index = it
+                        emitTabInteraction(runtime, window, container, pages[it].id, pages[it].title, it)
+                    }
                 }
             )
         }
@@ -213,6 +224,14 @@ private fun StandardTabsRenderer(runtime: ForgeRuntime, window: WindowContext, c
                             onClick = {
                                 index = idx
                                 expanded = false
+                                emitTabInteraction(
+                                    runtime,
+                                    window,
+                                    container,
+                                    child.id ?: "tab-$idx",
+                                    child.title ?: child.id ?: "Tab${idx + 1}",
+                                    idx
+                                )
                             }
                         )
                     }
@@ -237,7 +256,17 @@ private fun StandardTabsRenderer(runtime: ForgeRuntime, window: WindowContext, c
             onSelect = { selectedId ->
                 containers.indexOfFirst { (it.id ?: "tab-${containers.indexOf(it)}") == selectedId }
                     .takeIf { it >= 0 }
-                    ?.let { index = it }
+                    ?.let {
+                        index = it
+                        emitTabInteraction(
+                            runtime,
+                            window,
+                            container,
+                            containers[it].id ?: "tab-$it",
+                            containers[it].title ?: containers[it].id ?: "Tab${it + 1}",
+                            it
+                        )
+                    }
             }
         )
 
@@ -250,6 +279,27 @@ private fun StandardTabsRenderer(runtime: ForgeRuntime, window: WindowContext, c
             )
         }
     }
+}
+
+private fun emitTabInteraction(
+    runtime: ForgeRuntime,
+    window: WindowContext,
+    container: ContainerDef,
+    tabId: String,
+    tabTitle: String,
+    tabIndex: Int
+) {
+    runtime.emitInteraction(
+        kind = "feed.tab_changed",
+        windowId = window.windowId,
+        dataSourceRef = container.dataSourceRef,
+        detail = mapOf(
+            "containerId" to container.id,
+            "tabId" to tabId,
+            "tabTitle" to tabTitle,
+            "tabIndex" to tabIndex
+        )
+    )
 }
 
 @Composable

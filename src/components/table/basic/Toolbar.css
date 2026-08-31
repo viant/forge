@@ -55,6 +55,20 @@
     margin: 0;
 }
 
+.forge-toolbar-pdf-icon {
+    display: inline-flex;
+    width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid currentColor;
+    border-radius: 2px;
+    font-size: 7px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.25px;
+}
+
 td .pagination-bar {
     display: flex;
     justify-content: center;

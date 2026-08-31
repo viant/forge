@@ -17,6 +17,7 @@ public struct MenuListRenderer: View {
     @State private var formValuesByDataSource: [String: [String: JSONValue]] = [:]
     @State private var metricsValuesByDataSource: [String: [String: JSONValue]] = [:]
     @State private var collectionValuesByDataSource: [String: [[String: JSONValue]]] = [:]
+    @State private var eventVisibilityByItemID: [String: Bool] = [:]
     @State private var expandedSummaryValue: ExpandedMenuSummaryValue?
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef, items: [ItemDef]) {
@@ -75,6 +76,9 @@ public struct MenuListRenderer: View {
         .task(id: window?.windowID ?? "") {
             await observeWindowForm()
         }
+        .task(id: itemVisibilityTaskKey) {
+            await evaluateEventVisibility()
+        }
         .alert(item: $expandedSummaryValue) { expanded in
             Alert(
                 title: Text(expanded.label),
@@ -104,7 +108,18 @@ public struct MenuListRenderer: View {
     }
 
     private var visibleItems: [ItemDef] {
-        items.filter(isVisible(_:))
+        items.filter { item in
+            isVisible(item) && eventVisibilityByItemID[item.id ?? item.label ?? ""] != false
+        }
+    }
+
+    private var itemVisibilityTaskKey: String {
+        [
+            window?.windowID ?? "",
+            windowFormValues.signature,
+            String(describing: formValuesByDataSource).hashValue.description,
+            items.map { $0.id ?? $0.label ?? "" }.joined(separator: "|")
+        ].joined(separator: ":")
     }
 
     private var summaryItems: [ItemDef] {
@@ -130,7 +145,9 @@ public struct MenuListRenderer: View {
 
     @ViewBuilder
     private func renderedItem(_ item: ItemDef) -> some View {
-        if shouldRenderOptionGroup(item) {
+        if item.lookup != nil {
+            lookupInputItem(item)
+        } else if shouldRenderOptionGroup(item) {
             optionGroupItem(item)
         } else {
             switch (item.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
@@ -142,6 +159,14 @@ public struct MenuListRenderer: View {
                 buttonItem(item)
             case "select", "dropdown":
                 selectMenuItem(item)
+            case "text", "number":
+                editableTextItem(item)
+            case "textarea":
+                editableTextAreaItem(item)
+            case "checkbox", "toggle", "boolean":
+                editableToggleItem(item)
+            case "multiselect":
+                multiSelectOptionItem(item)
             default:
                 labelItem(item)
             }
@@ -184,9 +209,11 @@ public struct MenuListRenderer: View {
 
     @ViewBuilder
     private func markdownItem(_ item: ItemDef) -> some View {
-        let markdown = resolvedItemDisplayValue(item)
+        let authored = item.properties["value"]?.displayString
             ?? item.value?.displayString
-            ?? item.properties["value"]?.displayString
+        let resolved = resolvedItemDisplayValue(item)
+        let markdown = authored?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            ?? (resolved == "—" ? nil : resolved)
             ?? ""
         if markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             RoundedRectangle(cornerRadius: 10)
@@ -298,21 +325,21 @@ public struct MenuListRenderer: View {
                     let optionLabel = option.label ?? optionValue
                     let isSelected = optionValue == selectedValue
                     Button {
-                        applyOptionSelection(optionValue, for: item)
+                        applyItemValue(.string(optionValue), for: item)
                     } label: {
                         Text(optionLabel)
                             .font(.footnote.weight(isSelected ? .semibold : .medium))
-                            .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+                            .foregroundStyle(isSelected ? Color(red: 0.12, green: 0.25, blue: 0.54) : Color(red: 0.38, green: 0.44, blue: 0.54))
                             .frame(maxWidth: .infinity)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
                             .background(
                                 Capsule()
-                                    .fill(isSelected ? Color.accentColor.opacity(0.14) : Color.forgeSystemBackground)
+                                    .fill(isSelected ? Color(red: 0.89, green: 0.91, blue: 0.94) : Color.clear)
                             )
                             .overlay(
                                 Capsule()
-                                    .stroke(isSelected ? Color.accentColor.opacity(0.22) : Color.black.opacity(0.05), lineWidth: 1)
+                                    .stroke(isSelected ? Color(red: 0.80, green: 0.84, blue: 0.88) : Color.clear, lineWidth: 1)
                             )
                     }
                     .buttonStyle(.plain)
@@ -343,7 +370,7 @@ public struct MenuListRenderer: View {
                 .foregroundStyle(.secondary)
             Picker(title, selection: Binding(
                 get: { selectedValue },
-                set: { applyOptionSelection($0, for: item) }
+                set: { applyItemValue(.string($0), for: item) }
             )) {
                 ForEach(item.options, id: \.value) { option in
                     Text(option.label ?? option.value ?? "").tag(option.value ?? "")
@@ -360,6 +387,108 @@ public struct MenuListRenderer: View {
             RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.black.opacity(0.05), lineWidth: 1)
         )
+    }
+
+    @ViewBuilder
+    private func editableTextItem(_ item: ItemDef) -> some View {
+        let title = item.label ?? item.id ?? "Field"
+        let value = editableItemText(item)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            TextField(item.properties["placeholder"]?.displayString ?? title, text: Binding(
+                get: { value },
+                set: { applyItemValue(.string($0), for: item) }
+            ))
+            .forgeEditableKeyboardType(isNumber: (item.type ?? "").lowercased() == "number")
+            .padding(.horizontal, 11)
+            .frame(height: 38)
+            .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.black.opacity(0.10), lineWidth: 1))
+        }
+    }
+
+    @ViewBuilder
+    private func editableTextAreaItem(_ item: ItemDef) -> some View {
+        let title = item.label ?? item.id ?? "Details"
+        let value = editableItemText(item)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            TextEditor(text: Binding(
+                get: { value },
+                set: { applyItemValue(.string($0), for: item) }
+            ))
+            .frame(minHeight: 76, maxHeight: 120)
+            .padding(8)
+            .scrollContentBackground(.hidden)
+            .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.black.opacity(0.10), lineWidth: 1))
+        }
+    }
+
+    @ViewBuilder
+    private func editableToggleItem(_ item: ItemDef) -> some View {
+        let title = item.label ?? item.id ?? "Enabled"
+        let selected = resolvedItemValue(item)?.boolValue ?? false
+        Toggle(title, isOn: Binding(
+            get: { selected },
+            set: { applyItemValue(.bool($0), for: item) }
+        ))
+        .font(.subheadline.weight(.semibold))
+        .padding(.vertical, 5)
+    }
+
+    @ViewBuilder
+    private func multiSelectOptionItem(_ item: ItemDef) -> some View {
+        let title = item.label ?? item.id ?? "Options"
+        let selected = Set((resolvedItemValue(item)?.arrayValue ?? []).compactMap(\.stringValue))
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 38), spacing: 6)], alignment: .leading, spacing: 6) {
+                ForEach(item.options, id: \.value) { option in
+                    let value = option.value ?? ""
+                    let isSelected = selected.contains(value)
+                    Button {
+                        var next = selected
+                        if isSelected { next.remove(value) } else { next.insert(value) }
+                        applyItemValue(.array(next.sorted().map(JSONValue.string)), for: item)
+                    } label: {
+                        Text(option.label ?? value)
+                            .font(.footnote.weight(isSelected ? .bold : .medium))
+                            .foregroundStyle(isSelected ? Color(red: 0.12, green: 0.25, blue: 0.54) : Color(red: 0.38, green: 0.44, blue: 0.54))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(isSelected ? Color(red: 0.89, green: 0.91, blue: 0.94) : Color.clear, in: Capsule())
+                            .overlay(Capsule().stroke(isSelected ? Color(red: 0.80, green: 0.84, blue: 0.88) : Color.clear, lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func lookupInputItem(_ item: ItemDef) -> some View {
+        let title = item.label ?? item.id ?? "Lookup"
+        let value = editableItemText(item)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                TextField(item.properties["placeholder"]?.displayString ?? "Select \(title.lowercased())", text: Binding(
+                    get: { value },
+                    set: { applyItemValue(.string($0), for: item) }
+                ))
+                .padding(.horizontal, 11)
+                .frame(height: 38)
+                .background(Color(red: 0.93, green: 0.97, blue: 0.94), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(red: 0.72, green: 0.85, blue: 0.75), lineWidth: 1))
+                Button { openItemLookup(item) } label: {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 34, height: 34)
+                }
+                .buttonStyle(.bordered)
+            }
+        }
     }
 
     @ViewBuilder
@@ -448,6 +577,31 @@ public struct MenuListRenderer: View {
                 await refreshWindowFormDrivenDataSources(windowFormValues: next)
             }
         }
+    }
+
+    @MainActor
+    private func evaluateEventVisibility() async {
+        guard let runtime, let window else { return }
+        var next: [String: Bool] = [:]
+        for item in items {
+            let key = item.id ?? item.label ?? ""
+            let executions = item.on.filter { $0.event == "onVisible" }
+            guard !executions.isEmpty else {
+                next[key] = true
+                continue
+            }
+            let dataSourceRef = resolveItemDataSourceRef(item) ?? container.dataSourceRef ?? ""
+            var visible = true
+            for execution in executions {
+                let result = await runtime.execute(
+                    execution,
+                    context: ExecutionContext(windowID: window.windowID, dataSourceRef: dataSourceRef)
+                )
+                if result?.boolValue == false { visible = false }
+            }
+            next[key] = visible
+        }
+        eventVisibilityByItemID = next
     }
 
     private func openLinkedWindow(_ item: ItemDef) async {
@@ -910,6 +1064,10 @@ public struct MenuListRenderer: View {
     }
 
     private func applyOptionSelection(_ value: String, for item: ItemDef) {
+        applyItemValue(.string(value), for: item)
+    }
+
+    private func applyItemValue(_ value: JSONValue, for item: ItemDef) {
         guard let runtime, let window else {
             return
         }
@@ -918,13 +1076,65 @@ public struct MenuListRenderer: View {
             return
         }
         let scope = (item.scope ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard scope == "windowform" else {
-            return
-        }
         Task {
-            await runtime.setWindowFormValue(
+            let dataSourceRef = resolveItemDataSourceRef(item) ?? container.dataSourceRef ?? ""
+            if scope == "windowform" {
+                await runtime.setWindowFormValue(windowID: window.windowID, values: [key: value])
+            } else if !dataSourceRef.isEmpty {
+                var current = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: dataSourceRef)
+                current[key] = value
+                await runtime.setDataSourceForm(windowID: window.windowID, dataSourceRef: dataSourceRef, values: current)
+            }
+            await runtime.emitInteraction(
+                kind: "feed.form_changed",
                 windowID: window.windowID,
-                values: [key: .string(value)]
+                dataSourceRef: dataSourceRef.isEmpty ? nil : dataSourceRef,
+                detail: [
+                    "field": .string(key),
+                    "scope": .string(scope.isEmpty ? "form" : scope),
+                    "controlType": .string(item.type ?? "text"),
+                    "value": value
+                ]
+            )
+            let changeEvents = Set(["onChange", "onInput", "onValueChange", "onSelection", "onItemSelect"])
+            for execution in item.on where changeEvents.contains(execution.event ?? "") {
+                _ = await runtime.execute(
+                    execution,
+                    context: ExecutionContext(windowID: window.windowID, dataSourceRef: dataSourceRef),
+                    args: ["value": value]
+                )
+            }
+        }
+    }
+
+    private func editableItemText(_ item: ItemDef) -> String {
+        guard let value = resolvedItemValue(item), value != .null else { return "" }
+        let display = value.displayString.trimmingCharacters(in: .whitespacesAndNewlines)
+        return display == "—" ? "" : display
+    }
+
+    private func openItemLookup(_ item: ItemDef) {
+        guard let runtime,
+              let window,
+              let lookup = item.lookup,
+              let dialogID = lookup.objectValue?["dialogId"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !dialogID.isEmpty else { return }
+        let multiple = lookup.objectValue?["multiple"]?.boolValue ?? false
+        let execution = ExecutionDef(
+            action: "window.openDialog",
+            args: [dialogID],
+            parameters: menuLookupParameters(lookup)
+        )
+        let dataSourceRef = resolveItemDataSourceRef(item) ?? container.dataSourceRef ?? ""
+        Task {
+            _ = await runtime.execute(
+                execution,
+                context: ExecutionContext(windowID: window.windowID, dataSourceRef: dataSourceRef),
+                args: [
+                    "windowId": .string(window.windowID),
+                    "selectionMode": .string(multiple ? "multi" : "single"),
+                    "multiple": .bool(multiple)
+                ]
             )
         }
     }
@@ -940,6 +1150,17 @@ public struct MenuListRenderer: View {
 
     private func normalizedSummaryTitle(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func forgeEditableKeyboardType(isNumber: Bool) -> some View {
+        #if canImport(UIKit)
+        self.keyboardType(isNumber ? .decimalPad : .default)
+        #else
+        self
+        #endif
     }
 }
 
@@ -1157,4 +1378,31 @@ private extension String {
     var nilIfEmpty: String? {
         isEmpty ? nil : self
     }
+}
+
+private func menuLookupParameters(_ lookup: JSONValue) -> [ParameterDef] {
+    guard let object = lookup.objectValue else { return [] }
+    let inputs = object["inputs"]?.arrayValue ?? []
+    let outputs = object["outputs"]?.arrayValue ?? []
+    var parameters = inputs.compactMap { value -> ParameterDef? in
+        guard let entry = value.objectValue else { return nil }
+        let name = entry["name"]?.stringValue ?? entry["location"]?.stringValue ?? ""
+        guard !name.isEmpty else { return nil }
+        return ParameterDef(
+            name: name,
+            input: "form",
+            location: .string(entry["location"]?.stringValue ?? name)
+        )
+    }
+    parameters += outputs.compactMap { value -> ParameterDef? in
+        guard let entry = value.objectValue else { return nil }
+        let name = entry["name"]?.stringValue ?? entry["location"]?.stringValue ?? ""
+        guard !name.isEmpty else { return nil }
+        return ParameterDef(
+            name: name,
+            direction: "out",
+            location: .string(entry["location"]?.stringValue ?? name)
+        )
+    }
+    return parameters
 }

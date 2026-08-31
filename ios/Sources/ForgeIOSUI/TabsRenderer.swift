@@ -27,13 +27,13 @@ public struct TabsRenderer: View {
                     selectedID: selectedContainer?.id ?? "tab-\(clampedSelectedIndex)",
                     onSelect: { selectedID in
                         container.containers.enumerated().first(where: { ($0.element.id ?? "tab-\($0.offset)") == selectedID })
-                            .map { selectedIndex = $0.offset }
+                            .map { selectTab(at: $0.offset) }
                     }
                 )
             } else if usesMenuStyle {
                 Menu {
                     ForEach(Array(container.containers.enumerated()), id: \.element.id) { index, child in
-                        Button(child.title ?? child.id ?? "Tab") { selectedIndex = index }
+                        Button(child.title ?? child.id ?? "Tab") { selectTab(at: index) }
                     }
                 } label: {
                     Label(selectedContainer?.title ?? selectedContainer?.id ?? "Tab", systemImage: "chevron.down")
@@ -49,7 +49,7 @@ public struct TabsRenderer: View {
                     selectedID: selectedContainer?.id ?? "tab-\(clampedSelectedIndex)",
                     onSelect: { selectedID in
                         container.containers.enumerated().first(where: { ($0.element.id ?? "tab-\($0.offset)") == selectedID })
-                            .map { selectedIndex = $0.offset }
+                            .map { selectTab(at: $0.offset) }
                     }
                 )
             }
@@ -94,5 +94,25 @@ public struct TabsRenderer: View {
             return 0
         }
         return container.containers.firstIndex(where: { $0.id == requestedId }) ?? 0
+    }
+
+    private func selectTab(at index: Int) {
+        guard container.containers.indices.contains(index) else { return }
+        selectedIndex = index
+        guard let runtime, let window else { return }
+        let child = container.containers[index]
+        Task {
+            await runtime.emitInteraction(
+                kind: "feed.tab_changed",
+                windowID: window.windowID,
+                dataSourceRef: container.dataSourceRef,
+                detail: [
+                    "containerId": .string(container.id ?? ""),
+                    "tabId": .string(child.id ?? "tab-\(index)"),
+                    "tabTitle": .string(child.title ?? child.id ?? "Tab \(index + 1)"),
+                    "tabIndex": .number(Double(index))
+                ]
+            )
+        }
     }
 }

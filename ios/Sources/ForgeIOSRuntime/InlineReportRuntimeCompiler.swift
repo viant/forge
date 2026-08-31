@@ -95,6 +95,7 @@ public enum InlineReportRuntimeCompiler {
         let blockOrder = layoutBlockOrder(source: source, blocks: blocks)
 
         var reportSpecObject = source
+        reportSpecObject["version"] = .number(1)
         reportSpecObject["kind"] = .string("reportSpec")
         reportSpecObject["id"] = .string(report.id)
         reportSpecObject["title"] = .string(title)
@@ -113,7 +114,9 @@ public enum InlineReportRuntimeCompiler {
         }
         let fillBlocks = blocks.map { materializeBlock($0, datasets: datasetRows) }
         let reportFill: JSONValue = .object([
+            "version": .number(1),
             "kind": .string("reportFill"),
+            "specVersion": .number(1),
             "reportId": .string(report.id),
             "datasets": .array(fillDatasets),
             "blocks": .array(fillBlocks),
@@ -125,7 +128,10 @@ public enum InlineReportRuntimeCompiler {
             "reportSpec": reportSpec,
             "reportFill": reportFill,
             "reportPrint": .object([
+                "version": .number(1),
                 "kind": .string("reportPrint"),
+                "specVersion": .number(1),
+                "reportId": .string(report.id),
                 "title": .string(title)
             ]),
             "reportId": .string(report.id),
@@ -151,15 +157,22 @@ public enum InlineReportRuntimeCompiler {
         guard let source = report.source.objectValue else {
             throw InlineReportRuntimeCompilerError.invalidSource
         }
-        let exportScope = nonEmpty(source["scope"]?.stringValue) ?? report.scope
+        var exportSource = source
+        var exportGrammar = report.grammar
+        if report.grammar.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "dashboard-v1" {
+            let compiled = try compile(report)
+            exportSource["blocks"] = compiled.reportSpec.objectValue?["blocks"] ?? .array([])
+            exportGrammar = "report-document-v1"
+        }
+        let exportScope = safeFenceSegment(nonEmpty(source["scope"]?.stringValue) ?? report.scope, fallback: "message")
         var sequence = 1
-        var start = pdfSource(source)
+        var start = pdfSource(exportSource)
         start["version"] = .number(1)
         start["scope"] = .string(exportScope)
         start["id"] = .string(report.id)
         start["sequence"] = .number(Double(sequence))
         start["mode"] = .string("start")
-        start["grammar"] = .string(report.grammar)
+        start["grammar"] = .string(exportGrammar)
         sequence += 1
         var fences: [JSONValue] = [exportFence(kind: "forge-report", index: 0, payload: start)]
         var emittedDatasetIDs = Set<String>()
@@ -233,6 +246,13 @@ public enum InlineReportRuntimeCompiler {
             "index": .number(Double(index)),
             "payload": .object(payload)
         ])
+    }
+
+    private static func safeFenceSegment(_ value: String, fallback: String) -> String {
+        let sanitized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "[^A-Za-z0-9._-]+", with: "_", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+        return sanitized.isEmpty ? fallback : sanitized
     }
 
     private static func pdfSource(_ source: [String: JSONValue]) -> [String: JSONValue] {
@@ -544,17 +564,15 @@ public enum InlineReportRuntimeCompiler {
 
     private static func adaptDashboardBlocks(_ blocks: [JSONValue]) -> [JSONValue] {
         blocks.flatMap { block -> [JSONValue] in
-            guard var object = block.objectValue else { return [] }
+            guard let object = block.objectValue else { return [] }
             let kind = object["kind"]?.stringValue ?? ""
             switch kind {
-            case "dashboard.table", "dashboard.kpiTable":
-                object["kind"] = .string("tableBlock")
-            case "dashboard.timeline", "dashboard.dimensions", "dashboard.composition":
-                object["kind"] = .string("chartBlock")
-                object["xField"] = object["xField"] ?? object["dateField"] ?? object["categoryKey"] ?? object["timeKey"]
-                object["measures"] = object["measures"] ?? object["series"] ?? object["valueKey"].map { .array([$0]) }
+            case "dashboard.table", "dashboard.kpiTable", "dashboard.timeline", "dashboard.dimensions",
+                 "dashboard.composition", "dashboard.messages", "dashboard.status", "dashboard.badges",
+                 "dashboard.compare", "dashboard.feed":
+                return [.object(canonicalTableBlock(object))]
             case "dashboard.filters":
-                object["kind"] = .string("filterBarBlock")
+                return []
             case "dashboard.summary":
                 let metrics = object["metrics"]?.arrayValue ?? []
                 return metrics.enumerated().compactMap { index, metric in
@@ -563,29 +581,82 @@ public enum InlineReportRuntimeCompiler {
                     let summaryID = object["id"]?.stringValue ?? "summary"
                     let metricID = value["id"] ?? .string("\(summaryID)-\(index + 1)")
                     let metricTitle = value["label"] ?? object["title"] ?? .string("KPI")
-                    let datasetRef = object["dataSourceRef"] ?? .null
-                    let valueField = selector.map(JSONValue.string) ?? .null
+                    let datasetRef = .string(object["dataSourceRef"]?.stringValue ?? "data")
+                    let valueField = .string(selector ?? "value")
                     let valueLabel = value["label"] ?? .string("Value")
-                    let valueFormat = value["format"] ?? .null
-                    return .object([
+                    var result: [String: JSONValue] = [
                         "id": metricID,
                         "kind": .string("kpiBlock"),
                         "title": metricTitle,
                         "datasetRef": datasetRef,
                         "valueField": valueField,
-                        "valueLabel": valueLabel,
-                        "valueFormat": valueFormat
-                    ])
+                        "valueLabel": valueLabel
+                    ]
+                    if let format = value["format"]?.stringValue { result["valueFormat"] = .string(format) }
+                    return .object(result)
                 }
-            case "dashboard.report":
-                object["kind"] = .string("sectionBlock")
-            case "dashboard.messages":
-                object["kind"] = .string("collectionBlock")
+            case "dashboard.detail", "dashboard.report":
+                let children = adaptDashboardBlocks(object["containers"]?.arrayValue ?? [])
+                guard !children.isEmpty else { return [.object(canonicalMarkdownBlock(object))] }
+                let id = object["id"]?.stringValue ?? "section"
+                return [.object([
+                    "id": .string(id),
+                    "kind": .string("compositeBlock"),
+                    "title": .string(object["title"]?.stringValue ?? humanize(id)),
+                    "childBlockIds": .array(children.compactMap { $0.objectValue?["id"] })
+                ])] + children
             default:
-                break
+                if kind.hasPrefix("dashboard.") {
+                    return object["dataSourceRef"]?.stringValue == nil
+                        ? [.object(canonicalMarkdownBlock(object))]
+                        : [.object(canonicalTableBlock(object))]
+                }
+                return [.object(object)]
             }
-            return [.object(object)]
         }
+    }
+
+    private static func canonicalTableBlock(_ source: [String: JSONValue]) -> [String: JSONValue] {
+        let id = source["id"]?.stringValue ?? "table"
+        return [
+            "id": .string(id),
+            "kind": .string("tableBlock"),
+            "title": .string(source["title"]?.stringValue ?? humanize(id)),
+            "datasetRef": .string(source["dataSourceRef"]?.stringValue ?? source["datasetRef"]?.stringValue ?? "data"),
+            "columns": .array(canonicalTableColumns(source))
+        ]
+    }
+
+    private static func canonicalTableColumns(_ source: [String: JSONValue]) -> [JSONValue] {
+        let authored = (source["columns"]?.arrayValue ?? []).compactMap { value -> JSONValue? in
+            guard let column = value.objectValue,
+                  let key = nonEmpty(column["key"]?.stringValue)
+                    ?? nonEmpty(column["id"]?.stringValue)
+                    ?? nonEmpty(column["name"]?.stringValue) else { return nil }
+            var result: [String: JSONValue] = [
+                "key": .string(key),
+                "label": .string(column["label"]?.stringValue ?? column["name"]?.stringValue ?? humanize(key))
+            ]
+            if let format = nonEmpty(column["format"]?.stringValue) { result["format"] = .string(format) }
+            if let visual = column["cellVisual"] { result["cellVisual"] = visual }
+            return .object(result)
+        }
+        if !authored.isEmpty { return authored }
+        let keys = ["categoryKey", "nameKey", "dateField", "timeKey", "valueKey"]
+            .compactMap { nonEmpty(source[$0]?.stringValue) }
+            .reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        return (keys.isEmpty ? ["value"] : keys).map { .object(["key": .string($0), "label": .string(humanize($0))]) }
+    }
+
+    private static func canonicalMarkdownBlock(_ source: [String: JSONValue]) -> [String: JSONValue] {
+        let id = source["id"]?.stringValue ?? "section"
+        let title = source["title"]?.stringValue ?? humanize(id)
+        return [
+            "id": .string(id),
+            "kind": .string("markdownBlock"),
+            "title": .string(title),
+            "markdown": .string(source["subtitle"]?.stringValue ?? title)
+        ]
     }
 
     private static func sourceDeclarations(_ source: [String: JSONValue]) -> [[String: JSONValue]] {

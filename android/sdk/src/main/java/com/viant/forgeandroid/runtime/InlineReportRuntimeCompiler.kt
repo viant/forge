@@ -28,6 +28,84 @@ data class InlineReportRuntimeArtifact(
  * The host application owns placement and datasource transport; report semantics stay here.
  */
 object InlineReportRuntimeCompiler {
+    fun exportFences(report: TranscriptCanonicalReport): List<JsonElement> {
+        val source = report.source as? JsonObject ?: error("Inline report source must be a JSON object.")
+        val exportSource = if (report.grammar.trim().lowercase() == "dashboard-v1") {
+            source.toMutableMap().apply { put("blocks", compile(report).reportSpec["blocks"] ?: JsonArray(emptyList())) }
+        } else source.toMutableMap()
+        val exportGrammar = if (report.grammar.trim().lowercase() == "dashboard-v1") "report-document-v1" else report.grammar
+        val exportScope = safeFenceSegment(string(source["scope"]) ?: report.scope, "message")
+        var sequence = 1
+        val start = exportSource.apply {
+            put("version", JsonPrimitive(1))
+            put("scope", JsonPrimitive(exportScope))
+            put("id", JsonPrimitive(report.id))
+            put("sequence", JsonPrimitive(sequence++))
+            put("mode", JsonPrimitive("start"))
+            put("grammar", JsonPrimitive(exportGrammar))
+        }
+        val fences = mutableListOf<JsonElement>(exportFence("forge-report", 0, JsonObject(start)))
+        val emitted = mutableSetOf<String>()
+        report.dataSources.toSortedMap().forEach { (key, dataSource) ->
+            val payload = dataSource.payload ?: return@forEach
+            val datasetId = key.trim().ifEmpty { dataSource.id.trim() }
+            val materialized = TranscriptEnvelope.materializeCanonicalPayload(dataSource.format, payload)
+            fences += exportFence(
+                "forge-data",
+                fences.size,
+                JsonObject(
+                    mapOf(
+                        "version" to JsonPrimitive(dataSource.version ?: 2),
+                        "scope" to JsonPrimitive(dataSource.scope?.trim()?.takeIf(String::isNotEmpty) ?: exportScope),
+                        "reportRef" to JsonPrimitive(dataSource.reportRef?.trim()?.takeIf(String::isNotEmpty) ?: report.id),
+                        "sequence" to JsonPrimitive(sequence++),
+                        "id" to JsonPrimitive(datasetId),
+                        "format" to JsonPrimitive(if (materialized == null) dataSource.format?.trim()?.ifEmpty { "json" } ?: "json" else "json"),
+                        "mode" to JsonPrimitive("replace"),
+                        "data" to pdfDatasetPayload(materialized ?: payload)
+                    )
+                )
+            )
+            emitted += datasetId
+        }
+        val referenced = (start["blocks"] as? JsonArray).orEmpty().mapNotNull { block ->
+            string((block as? JsonObject)?.get("dataSourceRef"))
+                ?: string((block as? JsonObject)?.get("datasetRef"))
+        }.toSet()
+        referenced.subtract(emitted).sorted().forEach { datasetId ->
+            fences += exportFence(
+                "forge-data",
+                fences.size,
+                JsonObject(
+                    mapOf(
+                        "version" to JsonPrimitive(2),
+                        "scope" to JsonPrimitive(exportScope),
+                        "reportRef" to JsonPrimitive(report.id),
+                        "sequence" to JsonPrimitive(sequence++),
+                        "id" to JsonPrimitive(datasetId),
+                        "format" to JsonPrimitive("json"),
+                        "mode" to JsonPrimitive("replace"),
+                        "data" to JsonArray(emptyList())
+                    )
+                )
+            )
+        }
+        fences += exportFence(
+            "forge-report",
+            fences.size,
+            JsonObject(
+                mapOf(
+                    "version" to JsonPrimitive(1),
+                    "scope" to JsonPrimitive(exportScope),
+                    "id" to JsonPrimitive(report.id),
+                    "sequence" to JsonPrimitive(sequence),
+                    "mode" to JsonPrimitive("commit")
+                )
+            )
+        )
+        return fences
+    }
+
     fun workspaceDatasetRequests(report: TranscriptCanonicalReport): List<InlineReportWorkspaceDatasetRequest> {
         val source = report.source as? JsonObject ?: return emptyList()
         val materialized = report.dataSources.keys
@@ -65,6 +143,7 @@ object InlineReportRuntimeCompiler {
         val declarations = sourceDeclarations(source)
         val blockOrder = layoutBlockOrder(source, blocks)
         val reportSpec = JsonObject(source.toMutableMap().apply {
+            put("version", JsonPrimitive(1))
             put("kind", JsonPrimitive("reportSpec"))
             put("id", JsonPrimitive(report.id))
             put("title", JsonPrimitive(title))
@@ -86,7 +165,9 @@ object InlineReportRuntimeCompiler {
         val fillBlocks = blocks.map { materializeBlock(it, datasetRows) }
         val reportFill = JsonObject(
             mapOf(
+                "version" to JsonPrimitive(1),
                 "kind" to JsonPrimitive("reportFill"),
+                "specVersion" to JsonPrimitive(1),
                 "reportId" to JsonPrimitive(report.id),
                 "datasets" to JsonArray(fillDatasets),
                 "blocks" to JsonArray(fillBlocks),
@@ -131,6 +212,26 @@ object InlineReportRuntimeCompiler {
         }
         id to rows
     }.toMap()
+
+    private fun exportFence(kind: String, index: Int, payload: JsonObject): JsonObject = JsonObject(
+        mapOf(
+            "kind" to JsonPrimitive(kind),
+            "index" to JsonPrimitive(index),
+            "payload" to payload
+        )
+    )
+
+    private fun safeFenceSegment(value: String, fallback: String): String = value.trim()
+        .replace(Regex("[^A-Za-z0-9._-]+"), "_")
+        .trim('_')
+        .ifEmpty { fallback }
+
+    private fun pdfDatasetPayload(value: JsonElement): JsonElement = when (value) {
+        is JsonArray -> JsonArray(value.map(::pdfDatasetPayload))
+        is JsonObject -> JsonObject(value.mapValues { pdfDatasetPayload(it.value) })
+        is JsonPrimitive -> if (value.isString && value.content.isBlank()) JsonPrimitive("—") else value
+        else -> value
+    }
 
     private fun materializeBlock(
         block: JsonElement,
@@ -389,36 +490,79 @@ object InlineReportRuntimeCompiler {
 
     private fun adaptDashboardBlocks(blocks: List<JsonElement>): List<JsonElement> = blocks.flatMap { block ->
         val source = block as? JsonObject ?: return@flatMap emptyList()
-        val value = source.toMutableMap()
         when (string(source["kind"])) {
-            "dashboard.table", "dashboard.kpiTable" -> value["kind"] = JsonPrimitive("tableBlock")
-            "dashboard.timeline", "dashboard.dimensions", "dashboard.composition" -> {
-                value["kind"] = JsonPrimitive("chartBlock")
-                value.putIfAbsent("xField", source["dateField"] ?: source["categoryKey"] ?: source["timeKey"] ?: JsonNull)
-                value.putIfAbsent("measures", source["series"] ?: source["valueKey"]?.let { JsonArray(listOf(it)) } ?: JsonArray(emptyList()))
+            "dashboard.table", "dashboard.kpiTable", "dashboard.timeline", "dashboard.dimensions",
+            "dashboard.composition", "dashboard.messages", "dashboard.status", "dashboard.badges",
+            "dashboard.compare", "dashboard.feed" -> listOf(canonicalTableBlock(source))
+            "dashboard.filters" -> emptyList()
+            "dashboard.summary" -> (source["metrics"] as? JsonArray).orEmpty().mapIndexedNotNull { index, metric ->
+                val item = metric as? JsonObject ?: return@mapIndexedNotNull null
+                val selector = string(item["selector"])?.removePrefix("0.") ?: "value"
+                JsonObject(mapOf(
+                    "id" to (item["id"] ?: JsonPrimitive("${string(source["id"]) ?: "summary"}-${index + 1}")),
+                    "kind" to JsonPrimitive("kpiBlock"),
+                    "title" to (item["label"] ?: source["title"] ?: JsonPrimitive("KPI")),
+                    "datasetRef" to JsonPrimitive(string(source["dataSourceRef"]) ?: "data"),
+                    "valueField" to JsonPrimitive(selector),
+                    "valueLabel" to (item["label"] ?: JsonPrimitive("Value"))
+                ) + string(item["format"])?.let { mapOf("valueFormat" to JsonPrimitive(it)) }.orEmpty())
             }
-            "dashboard.filters" -> value["kind"] = JsonPrimitive("filterBarBlock")
-            "dashboard.summary" -> {
-                return@flatMap (source["metrics"] as? JsonArray).orEmpty().mapIndexedNotNull { index, metric ->
-                    val item = metric as? JsonObject ?: return@mapIndexedNotNull null
-                    val selector = string(item["selector"])?.removePrefix("0.")
-                    JsonObject(
-                        mapOf(
-                            "id" to (item["id"] ?: JsonPrimitive("${string(source["id"]) ?: "summary"}-${index + 1}")),
-                            "kind" to JsonPrimitive("kpiBlock"),
-                            "title" to (item["label"] ?: source["title"] ?: JsonPrimitive("KPI")),
-                            "datasetRef" to (source["dataSourceRef"] ?: JsonNull),
-                            "valueField" to (selector?.let(::JsonPrimitive) ?: JsonNull),
-                            "valueLabel" to (item["label"] ?: JsonPrimitive("Value")),
-                            "valueFormat" to (item["format"] ?: JsonNull)
-                        )
-                    )
+            "dashboard.detail", "dashboard.report" -> {
+                val children = adaptDashboardBlocks((source["containers"] as? JsonArray).orEmpty())
+                if (children.isEmpty()) listOf(canonicalMarkdownBlock(source)) else {
+                    val id = string(source["id"]) ?: "section"
+                    listOf(JsonObject(mapOf(
+                        "id" to JsonPrimitive(id),
+                        "kind" to JsonPrimitive("compositeBlock"),
+                        "title" to JsonPrimitive(string(source["title"]) ?: humanize(id)),
+                        "childBlockIds" to JsonArray(children.mapNotNull { (it as? JsonObject)?.get("id") })
+                    ))) + children
                 }
             }
-            "dashboard.report" -> value["kind"] = JsonPrimitive("sectionBlock")
-            "dashboard.messages" -> value["kind"] = JsonPrimitive("collectionBlock")
+            else -> if (string(source["kind"])?.startsWith("dashboard.") == true) {
+                if (string(source["dataSourceRef"]) != null) listOf(canonicalTableBlock(source))
+                else listOf(canonicalMarkdownBlock(source))
+            } else listOf(source)
         }
-        listOf(JsonObject(value))
+    }
+
+    private fun canonicalTableBlock(source: JsonObject): JsonObject {
+        val id = string(source["id"]) ?: "table"
+        return JsonObject(mapOf(
+            "id" to JsonPrimitive(id),
+            "kind" to JsonPrimitive("tableBlock"),
+            "title" to JsonPrimitive(string(source["title"]) ?: humanize(id)),
+            "datasetRef" to JsonPrimitive(string(source["dataSourceRef"]) ?: string(source["datasetRef"]) ?: "data"),
+            "columns" to JsonArray(canonicalTableColumns(source))
+        ))
+    }
+
+    private fun canonicalTableColumns(source: JsonObject): List<JsonElement> {
+        val authored = (source["columns"] as? JsonArray).orEmpty().mapNotNull { value ->
+            val column = value as? JsonObject ?: return@mapNotNull null
+            val key = string(column["key"]) ?: string(column["id"]) ?: string(column["name"]) ?: return@mapNotNull null
+            JsonObject(buildMap {
+                put("key", JsonPrimitive(key))
+                put("label", JsonPrimitive(string(column["label"]) ?: string(column["name"]) ?: humanize(key)))
+                string(column["format"])?.let { put("format", JsonPrimitive(it)) }
+                column["cellVisual"]?.let { put("cellVisual", it) }
+            })
+        }
+        if (authored.isNotEmpty()) return authored
+        val keys = listOf("categoryKey", "nameKey", "dateField", "timeKey", "valueKey")
+            .mapNotNull { string(source[it]) }.distinct().ifEmpty { listOf("value") }
+        return keys.map { key -> JsonObject(mapOf("key" to JsonPrimitive(key), "label" to JsonPrimitive(humanize(key)))) }
+    }
+
+    private fun canonicalMarkdownBlock(source: JsonObject): JsonObject {
+        val id = string(source["id"]) ?: "section"
+        val title = string(source["title"]) ?: humanize(id)
+        return JsonObject(mapOf(
+            "id" to JsonPrimitive(id),
+            "kind" to JsonPrimitive("markdownBlock"),
+            "title" to JsonPrimitive(title),
+            "markdown" to JsonPrimitive(string(source["subtitle"]) ?: title)
+        ))
     }
 
     private fun sourceDeclarations(source: JsonObject): List<JsonObject> {

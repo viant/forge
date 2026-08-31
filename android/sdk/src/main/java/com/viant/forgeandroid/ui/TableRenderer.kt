@@ -96,7 +96,7 @@ fun TableRenderer(
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        table.toolbar?.let { tb ->
+        if (!showMetadataEmptyState) table.toolbar?.let { tb ->
             TableToolbar(
                 runtime,
                 context,
@@ -104,7 +104,7 @@ fun TableRenderer(
                 hiddenItemIds = if (showMetadataEmptyState) table.emptyState?.hideToolbarItems.orEmpty().toSet() else emptySet()
             )
         }
-        if (tableRefreshControlVisible(context.dataSourceRef, rowsOverride != null) &&
+        if (!showMetadataEmptyState && tableRefreshControlVisible(context.dataSourceRef, rowsOverride != null) &&
             table.toolbar?.items.orEmpty().none { it.id == "refresh" }
         ) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -213,7 +213,7 @@ fun TableRenderer(
                 }
             }
         }
-        if (context.dataSource.paging?.enabled == true || metrics["pageCount"] != null || metrics["hasMore"] != null) {
+        if (!showMetadataEmptyState && (context.dataSource.paging?.enabled == true || metrics["pageCount"] != null || metrics["hasMore"] != null)) {
             TablePagination(
                 context = context,
                 metrics = metrics,

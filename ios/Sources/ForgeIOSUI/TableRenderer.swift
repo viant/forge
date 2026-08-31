@@ -54,10 +54,18 @@ public struct TableRenderer: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.primary.opacity(0.9))
             }
-            if let toolbar = table.toolbar, !toolbar.items.isEmpty {
-                tableToolbar(toolbar)
+            if !(rows.isEmpty && table.emptyState != nil), let toolbar = table.toolbar, !toolbar.items.isEmpty {
+                tableToolbar(
+                    ToolbarDef(
+                        items: toolbar.items.filter { item in
+                            !(rows.isEmpty && (table.emptyState?.hideToolbarItems.contains(item.id ?? "") == true))
+                        }
+                    )
+                )
             }
-            if tableRefreshControlVisible(dataSourceRef: resolvedDataSourceRef, usesProvidedRows: providedRows != nil) {
+            if !(rows.isEmpty && table.emptyState != nil),
+               !tableToolbarHasRefreshAction,
+               tableRefreshControlVisible(dataSourceRef: resolvedDataSourceRef, usesProvidedRows: providedRows != nil) {
                 tableRefreshControl
             }
             if let refreshMessage = currentTableRefreshFeedback.message {
@@ -72,12 +80,18 @@ public struct TableRenderer: View {
                 if currentTableRefreshFeedback.busy {
                     tableLoadingState
                 } else if currentTableRefreshFeedback.message == nil {
-                    emptyTableState
+                    if let emptyState = table.emptyState {
+                        metadataEmptyTableState(emptyState)
+                    } else {
+                        emptyTableState
+                    }
                 }
             } else {
                 contentTable
             }
-            paginationFooter
+            if !(rows.isEmpty && table.emptyState != nil) {
+                paginationFooter
+            }
         }
         .padding(10)
         .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 18))
@@ -413,12 +427,68 @@ public struct TableRenderer: View {
     }
 
     private var presentationMode: TablePresentationMode {
-        Self.resolvePresentationMode(
+        if table.presentation?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "tabular" {
+            return .regularGrid
+        }
+        return Self.resolvePresentationMode(
             targetContext: nil,
             horizontalSizeClass: horizontalSizeClass,
             containerKind: container.kind,
             hasProvidedRows: providedRows != nil
         )
+    }
+
+    private func metadataEmptyTableState(_ emptyState: TableEmptyStateDef) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Image(systemName: emptyState.icon == "plus" ? "plus.circle.fill" : "clock.badge.checkmark")
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(Color(red: 0.37, green: 0.45, blue: 0.63))
+            if let kicker = emptyState.kicker, !kicker.isEmpty {
+                Text(kicker.uppercased())
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.secondary)
+            }
+            Text(emptyState.title ?? "Nothing here yet")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(Color(red: 0.15, green: 0.21, blue: 0.31))
+            if let body = emptyState.body, !body.isEmpty {
+                Text(body).font(.subheadline).foregroundStyle(.secondary)
+            }
+            ForEach(Array(emptyState.steps.enumerated()), id: \.offset) { index, step in
+                HStack(alignment: .top, spacing: 10) {
+                    Text(String(step.number ?? index + 1))
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Color(red: 0.15, green: 0.39, blue: 0.78))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(step.title ?? "Step").font(.subheadline.weight(.semibold))
+                        if let body = step.body, !body.isEmpty {
+                            Text(body).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(Color(red: 0.97, green: 0.98, blue: 0.99), in: RoundedRectangle(cornerRadius: 12))
+            }
+            if let action = emptyState.action {
+                Button {
+                    guard let runtime, let window else { return }
+                    Task {
+                        for execution in action.on where execution.event == "onClick" {
+                            _ = await runtime.execute(
+                                execution,
+                                context: ExecutionContext(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+                            )
+                        }
+                    }
+                } label: {
+                    Label(action.label ?? "Create new", systemImage: action.icon == "plus" ? "plus" : "arrow.right")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
     }
 
     private var contentTable: some View {
@@ -774,21 +844,30 @@ public struct TableRenderer: View {
     private func tableToolbar(_ toolbar: ToolbarDef) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(toolbar.items) { item in
-                    Button(item.label ?? item.id ?? "Action") {
-                        guard let runtime, let window else { return }
-                        guard let execution = item.on.first else { return }
-                        Task {
-                            _ = await runtime.execute(
-                                execution,
-                                context: ExecutionContext(windowID: window.windowID, dataSourceRef: container.dataSourceRef ?? "")
-                            )
-                        }
-                    }
-                    .buttonStyle(.bordered)
+                ForEach(toolbar.items.filter(tableToolbarActionItem)) { item in
+                    TableToolbarActionButton(
+                        item: item,
+                        runtime: runtime,
+                        context: window.map {
+                            ExecutionContext(windowID: $0.windowID, dataSourceRef: container.dataSourceRef ?? "")
+                        },
+                        stateKey: selectedRowIndex.map(String.init) ?? "none"
+                    )
                 }
             }
         }
+    }
+
+    private var tableToolbarHasRefreshAction: Bool {
+        table.toolbar?.items.contains { item in
+            item.id?.lowercased() == "refresh" && item.on.contains { $0.event == "onClick" }
+        } == true
+    }
+
+    private func tableToolbarActionItem(_ item: ToolbarItemDef) -> Bool {
+        let id = item.id?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        guard !["pagination", "quickfilter", "quickfilterinputs"].contains(id) else { return false }
+        return item.on.contains { $0.event == "onClick" }
     }
 
     @ViewBuilder
@@ -952,8 +1031,9 @@ public struct TableRenderer: View {
             togglePlannerRow(rowIndex: rowIndex)
             return
         }
-        selectedRowIndex = selectedRowIndex == rowIndex ? nil : rowIndex
+        let nextSelectedRowIndex = selectedRowIndex == rowIndex ? nil : rowIndex
         guard let runtime, let window, let dataSourceRef = container.dataSourceRef, !dataSourceRef.isEmpty else {
+            selectedRowIndex = nextSelectedRowIndex
             return
         }
         Task {
@@ -965,6 +1045,9 @@ public struct TableRenderer: View {
                     "rowIndex": .number(Double(rowIndex))
                 ]
             )
+            await MainActor.run {
+                selectedRowIndex = nextSelectedRowIndex
+            }
         }
     }
 
@@ -1113,6 +1196,97 @@ public struct TableRenderer: View {
         }
     }
 
+}
+
+private struct TableToolbarActionButton: View {
+    let item: ToolbarItemDef
+    let runtime: ForgeRuntime?
+    let context: ExecutionContext?
+    let stateKey: String
+
+    @State private var isVisible: Bool
+
+    init(item: ToolbarItemDef, runtime: ForgeRuntime?, context: ExecutionContext?, stateKey: String) {
+        self.item = item
+        self.runtime = runtime
+        self.context = context
+        self.stateKey = stateKey
+        _isVisible = State(initialValue: !item.on.contains { $0.event == "onVisible" })
+    }
+
+    var body: some View {
+        ZStack {
+            if isVisible {
+                Button {
+                    guard let runtime else { return }
+                    Task {
+                        for execution in item.on where execution.event == "onClick" {
+                            _ = await runtime.execute(execution, context: context)
+                        }
+                    }
+                } label: {
+                    if let label = item.label?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty {
+                        Label(label, systemImage: tableToolbarSymbol(item.icon))
+                    } else {
+                        Image(systemName: tableToolbarSymbol(item.icon))
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 38, height: 38)
+                            .background(tableToolbarBackground(item), in: Circle())
+                            .foregroundStyle(tableToolbarForeground(item))
+                            .overlay(
+                                Circle().stroke(tableToolbarBorder(item), lineWidth: 1)
+                            )
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(item.enabled == false)
+                .accessibilityLabel(item.ariaLabel ?? item.tooltip ?? item.label ?? item.id ?? "Action")
+            } else {
+                Color.clear.frame(width: 0, height: 0)
+            }
+        }
+        .task(id: stateKey) {
+            let conditions = item.on.filter { $0.event == "onVisible" }
+            guard !conditions.isEmpty, let runtime else {
+                isVisible = true
+                return
+            }
+            var visible = true
+            for execution in conditions {
+                if case .bool(let value)? = await runtime.execute(execution, context: context) {
+                    visible = visible && value
+                }
+            }
+            isVisible = visible
+        }
+    }
+}
+
+private func tableToolbarSymbol(_ icon: String?) -> String {
+    switch icon?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+    case "floppy-disk", "save": return "tray.and.arrow.down.fill"
+    case "arrow-left", "back": return "chevron.left"
+    case "plus", "add", "new-object": return "plus"
+    case "refresh": return "arrow.clockwise"
+    case "history", "time": return "clock.arrow.circlepath"
+    case "edit": return "pencil"
+    case "play", "run": return "play.fill"
+    case "trash", "delete": return "trash"
+    case "pdf", "document-pdf": return "doc.richtext"
+    default: return "circle"
+    }
+}
+
+private func tableToolbarForeground(_ item: ToolbarItemDef) -> Color {
+    item.style["color"]?.stringValue.flatMap(tableColor) ?? .accentColor
+}
+
+private func tableToolbarBackground(_ item: ToolbarItemDef) -> Color {
+    item.style["backgroundColor"]?.stringValue.flatMap(tableColor) ?? tableToolbarForeground(item).opacity(0.12)
+}
+
+private func tableToolbarBorder(_ item: ToolbarItemDef) -> Color {
+    item.style["borderColor"]?.stringValue.flatMap(tableColor) ?? tableToolbarForeground(item).opacity(0.18)
 }
 
 extension TableRenderer {
