@@ -35,7 +35,17 @@ public struct ContainerRenderer: View {
     public var body: some View {
         Group {
             if containerIsVisible {
-                renderedBody
+                VStack(alignment: .leading, spacing: 8) {
+                    if let toolbar = container.toolbar, !toolbar.items.isEmpty {
+                        containerActionToolbar(toolbar)
+                    }
+                    renderedBody
+                }
+            } else {
+                // Keep the observation tasks mounted while the container is
+                // hidden. A true EmptyView is removed from the SwiftUI tree and
+                // can never observe the state transition that makes it visible.
+                Color.clear.frame(width: 0, height: 0)
             }
         }
         .task(id: visibilityWindowTaskKey) {
@@ -44,6 +54,42 @@ public struct ContainerRenderer: View {
         .task(id: visibilityDataTaskKey) {
             await observeVisibilityDataSource()
         }
+    }
+
+    private func containerActionToolbar(_ toolbar: ToolbarDef) -> some View {
+        HStack(spacing: 8) {
+            ForEach(toolbar.items) { item in
+                if item.align == "right" { Spacer(minLength: 0) }
+                Button {
+                    guard let runtime, let window else { return }
+                    Task {
+                        for execution in item.on where execution.event == "onClick" {
+                            _ = await runtime.execute(
+                                execution,
+                                context: ExecutionContext(
+                                    windowID: window.windowID,
+                                    dataSourceRef: container.dataSourceRef ?? inheritedDataSourceRef ?? ""
+                                )
+                            )
+                        }
+                    }
+                } label: {
+                    if let label = item.label, !label.isEmpty {
+                        Label(label, systemImage: containerToolbarSymbol(item.icon))
+                    } else {
+                        Image(systemName: containerToolbarSymbol(item.icon))
+                            .font(.system(size: 16, weight: .semibold))
+                            .frame(width: 34, height: 34)
+                            .background(containerToolbarColor(item).opacity(0.12), in: Circle())
+                            .foregroundStyle(containerToolbarColor(item))
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(item.enabled == false)
+                .accessibilityLabel(item.ariaLabel ?? item.tooltip ?? item.label ?? item.id ?? "Action")
+            }
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private var visibilityWindowTaskKey: String {
@@ -423,5 +469,41 @@ private func containerVisibilityAnyValue(_ value: JSONValue) -> Any {
     case .array(let values): return values.map(containerVisibilityAnyValue)
     case .object(let values): return values.mapValues(containerVisibilityAnyValue)
     case .null: return NSNull()
+    }
+}
+
+private func containerToolbarSymbol(_ icon: String?) -> String {
+    switch icon?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+    case "floppy-disk", "save": return "tray.and.arrow.down.fill"
+    case "arrow-left", "back": return "chevron.left"
+    case "plus", "add", "new-object": return "plus"
+    case "refresh": return "arrow.clockwise"
+    case "history", "time": return "clock.arrow.circlepath"
+    case "edit": return "pencil"
+    case "play", "run": return "play.fill"
+    case "trash", "delete": return "trash"
+    case "pdf", "document-pdf": return "doc.richtext"
+    default: return "circle"
+    }
+}
+
+private func containerToolbarColor(_ item: ToolbarItemDef) -> Color {
+    guard let raw = item.style["color"]?.stringValue,
+          let color = Color(containerHex: raw) else {
+        return .accentColor
+    }
+    return color
+}
+
+private extension Color {
+    init?(containerHex rawValue: String) {
+        var value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.hasPrefix("#") { value.removeFirst() }
+        guard value.count == 6, let rgb = UInt64(value, radix: 16) else { return nil }
+        self.init(
+            red: Double((rgb >> 16) & 0xff) / 255,
+            green: Double((rgb >> 8) & 0xff) / 255,
+            blue: Double(rgb & 0xff) / 255
+        )
     }
 }

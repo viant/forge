@@ -27,6 +27,14 @@ function toolbarItemTestID(item) {
     return itemID ? `toolbar-btn-${itemID}` : undefined;
 }
 
+export function toolbarItemIcon(icon) {
+    const normalized = String(icon || '').trim().toLowerCase();
+    if (normalized === 'pdf' || normalized === 'document-pdf') {
+        return <span className="forge-toolbar-pdf-icon" aria-hidden="true">PDF</span>;
+    }
+    return icon;
+}
+
 const Toolbar = ({
                      context,
                      toolbarItems = [],
@@ -111,7 +119,7 @@ const Toolbar = ({
             <span key={item.id} style={spanStyle}>
                 <Button
                     key={item.id}
-                    icon={item.icon}
+                    icon={toolbarItemIcon(item.icon)}
                     {...events}
                     disabled={effectiveDisabled}
                     intent={item.intent || 'none'}

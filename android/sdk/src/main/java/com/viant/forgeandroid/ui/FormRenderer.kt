@@ -1,6 +1,7 @@
 package com.viant.forgeandroid.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -18,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -193,11 +193,21 @@ private fun SegmentedOptionRow(
     ) {
         options.forEach { (value, label) ->
             val selected = if (onToggle != null) selectedValues.contains(value) else selectedValue == value
-            FilterChip(
-                selected = selected,
+            val shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp)
+            Surface(
                 onClick = { onToggle?.invoke(value) ?: onSelect?.invoke(value) },
-                label = { Text(label, style = MaterialTheme.typography.bodySmall) }
-            )
+                shape = shape,
+                color = if (selected) Color(0xFFE2E8F0) else Color.Transparent,
+                border = if (selected) BorderStroke(1.dp, Color(0xFFCBD5E1)) else null
+            ) {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (selected) Color(0xFF1E3F8A) else Color(0xFF607089),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+                )
+            }
         }
     }
 }
@@ -893,6 +903,17 @@ internal fun setScopedItemValue(
         "windowform" -> runtime.setWindowFormValues(context.window.windowId, mapOf(key to value))
         else -> context.setFormField(key, value)
     }
+    runtime.emitInteraction(
+        kind = "feed.form_changed",
+        windowId = context.window.windowId,
+        dataSourceRef = context.dataSourceRef,
+        detail = mapOf(
+            "field" to key,
+            "scope" to (item.scope ?: "form"),
+            "controlType" to item.type,
+            "value" to value
+        )
+    )
     val eventOrder = when (item.type?.trim()?.lowercase()) {
         "number", "numeric", "currency" -> listOf("onValueChange", "onChange", "onInput")
         "multiselect" -> listOf("onChange", "onSelection", "onItemSelect")

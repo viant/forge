@@ -50,6 +50,7 @@ class ForgeRuntime(
     private var fileTextLoader: (suspend (String) -> String)? = null
     private var filePreviewLoader: (suspend (String, String) -> FilePreviewContent)? = null
     private var feedPatchHandler: ((String, FeedPatchOperation) -> Boolean)? = null
+    @Volatile private var interactionObserver: ((ForgeInteraction) -> Unit)? = null
 
     val windows = windowRuntime.windows()
 
@@ -109,6 +110,27 @@ class ForgeRuntime(
 
     fun dispatchFeedPatch(windowId: String, operation: FeedPatchOperation): Boolean =
         feedPatchHandler?.invoke(windowId, operation) == true
+
+    fun registerInteractionObserver(observer: ((ForgeInteraction) -> Unit)?) {
+        interactionObserver = observer
+    }
+
+    fun emitInteraction(
+        kind: String,
+        windowId: String,
+        dataSourceRef: String? = null,
+        detail: Map<String, Any?> = emptyMap()
+    ) {
+        interactionObserver?.invoke(
+            ForgeInteraction(
+                kind = kind,
+                windowId = windowId,
+                windowKey = windows.value.firstOrNull { it.windowId == windowId }?.windowKey,
+                dataSourceRef = dataSourceRef,
+                detail = detail
+            )
+        )
+    }
 
     fun openWindow(
         windowKey: String,

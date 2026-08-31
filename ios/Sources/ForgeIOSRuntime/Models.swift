@@ -3071,6 +3071,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
     public let visibleWhen: DashboardConditionDef?
     public let options: [OptionDef]
     public let properties: [String: JSONValue]
+    public let lookup: JSONValue?
     public let on: [ExecutionDef]
     public let target: JSONValue?
     public let targetOverrides: [String: JSONValue]
@@ -3107,6 +3108,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         case visibleWhen
         case options
         case properties
+        case lookup
         case on
         case target
         case targetOverrides
@@ -3144,6 +3146,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         visibleWhen: DashboardConditionDef? = nil,
         options: [OptionDef] = [],
         properties: [String: JSONValue] = [:],
+        lookup: JSONValue? = nil,
         on: [ExecutionDef] = [],
         target: JSONValue? = nil,
         targetOverrides: [String: JSONValue] = [:]
@@ -3179,6 +3182,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         self.visibleWhen = visibleWhen
         self.options = options
         self.properties = properties
+        self.lookup = lookup
         self.on = on
         self.target = target
         self.targetOverrides = targetOverrides
@@ -3217,6 +3221,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         visibleWhen = try container.decodeIfPresent(DashboardConditionDef.self, forKey: .visibleWhen)
         options = try container.decodeIfPresent([OptionDef].self, forKey: .options) ?? []
         properties = try container.decodeIfPresent([String: JSONValue].self, forKey: .properties) ?? [:]
+        lookup = try container.decodeIfPresent(JSONValue.self, forKey: .lookup)
         on = try container.decodeIfPresent([ExecutionDef].self, forKey: .on) ?? []
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
         targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
@@ -3741,67 +3746,79 @@ public struct ChartValueOption: Codable, Sendable, Equatable {
 
 public struct TableDef: Codable, Sendable {
     public let title: String?
+    public let presentation: String?
     public let columns: [ColumnDef]
     public let toolbar: ToolbarDef?
     public let on: [ExecutionDef]
     public let selectionField: String?
     public let disabledField: String?
     public let callback: JSONValue?
+    public let emptyState: TableEmptyStateDef?
     public let target: JSONValue?
     public let targetOverrides: [String: JSONValue]
 
     enum CodingKeys: String, CodingKey {
         case title
+        case presentation
         case columns
         case toolbar
         case on
         case selectionField
         case disabledField
         case callback
+        case emptyState
         case target
         case targetOverrides
     }
 
     public init(
         title: String? = nil,
+        presentation: String? = nil,
         columns: [String] = [],
         toolbar: ToolbarDef? = nil,
         on: [ExecutionDef] = [],
         selectionField: String? = nil,
         disabledField: String? = nil,
         callback: JSONValue? = nil,
+        emptyState: TableEmptyStateDef? = nil,
         target: JSONValue? = nil,
         targetOverrides: [String: JSONValue] = [:]
     ) {
         self.title = title
+        self.presentation = presentation
         self.columns = columns.map { ColumnDef(id: $0, name: $0, label: $0) }
         self.toolbar = toolbar
         self.on = on
         self.selectionField = selectionField
         self.disabledField = disabledField
         self.callback = callback
+        self.emptyState = emptyState
         self.target = target
         self.targetOverrides = targetOverrides
     }
 
     public init(
         title: String? = nil,
+        presentation: String? = nil,
         columns: [ColumnDef] = [],
         toolbar: ToolbarDef? = nil,
         on: [ExecutionDef] = [],
         selectionField: String? = nil,
         disabledField: String? = nil,
         callback: JSONValue? = nil,
+        emptyState: TableEmptyStateDef? = nil,
         target: JSONValue? = nil,
         targetOverrides: [String: JSONValue] = [:]
     ) {
         self.title = title
+        self.presentation = presentation
         self.columns = columns
         self.toolbar = toolbar
         self.on = on
         self.selectionField = selectionField
         self.disabledField = disabledField
         self.callback = callback
+        self.emptyState = emptyState
         self.target = target
         self.targetOverrides = targetOverrides
     }
@@ -3809,15 +3826,67 @@ public struct TableDef: Codable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         title = try container.decodeIfPresent(String.self, forKey: .title)
+        presentation = try container.decodeIfPresent(String.self, forKey: .presentation)
         columns = try container.decodeIfPresent([ColumnDef].self, forKey: .columns) ?? []
         toolbar = try container.decodeIfPresent(ToolbarDef.self, forKey: .toolbar)
         on = try container.decodeIfPresent([ExecutionDef].self, forKey: .on) ?? []
         selectionField = try container.decodeIfPresent(String.self, forKey: .selectionField)
         disabledField = try container.decodeIfPresent(String.self, forKey: .disabledField)
         callback = try container.decodeIfPresent(JSONValue.self, forKey: .callback)
+        emptyState = try container.decodeIfPresent(TableEmptyStateDef.self, forKey: .emptyState)
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
         targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
     }
+}
+
+public struct TableEmptyStateDef: Codable, Sendable {
+    public let icon: String?
+    public let kicker: String?
+    public let title: String?
+    public let body: String?
+    public let hideToolbarItems: [String]
+    public let steps: [TableEmptyStateStepDef]
+    public let action: ToolbarItemDef?
+
+    public init(
+        icon: String? = nil,
+        kicker: String? = nil,
+        title: String? = nil,
+        body: String? = nil,
+        hideToolbarItems: [String] = [],
+        steps: [TableEmptyStateStepDef] = [],
+        action: ToolbarItemDef? = nil
+    ) {
+        self.icon = icon
+        self.kicker = kicker
+        self.title = title
+        self.body = body
+        self.hideToolbarItems = hideToolbarItems
+        self.steps = steps
+        self.action = action
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case icon, kicker, title, body, hideToolbarItems, steps, action
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        icon = try container.decodeIfPresent(String.self, forKey: .icon)
+        kicker = try container.decodeIfPresent(String.self, forKey: .kicker)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        body = try container.decodeIfPresent(String.self, forKey: .body)
+        hideToolbarItems = try container.decodeIfPresent([String].self, forKey: .hideToolbarItems) ?? []
+        steps = try container.decodeIfPresent([TableEmptyStateStepDef].self, forKey: .steps) ?? []
+        action = try container.decodeIfPresent(ToolbarItemDef.self, forKey: .action)
+    }
+}
+
+public struct TableEmptyStateStepDef: Codable, Sendable, Identifiable {
+    public let id: String?
+    public let number: Int?
+    public let title: String?
+    public let body: String?
 }
 
 public struct TreeBrowserDef: Codable, Sendable {
@@ -3940,6 +4009,10 @@ public struct ToolbarItemDef: Codable, Sendable, Identifiable {
     public let align: String?
     public let intent: String?
     public let appearance: String?
+    public let ariaLabel: String?
+    public let tooltip: String?
+    public let enabled: Bool?
+    public let style: [String: JSONValue]
     public let on: [ExecutionDef]
     public let target: JSONValue?
     public let targetOverrides: [String: JSONValue]
@@ -3951,6 +4024,10 @@ public struct ToolbarItemDef: Codable, Sendable, Identifiable {
         case align
         case intent
         case appearance
+        case ariaLabel
+        case tooltip
+        case enabled
+        case style
         case on
         case target
         case targetOverrides
@@ -3963,6 +4040,10 @@ public struct ToolbarItemDef: Codable, Sendable, Identifiable {
         align: String? = nil,
         intent: String? = nil,
         appearance: String? = nil,
+        ariaLabel: String? = nil,
+        tooltip: String? = nil,
+        enabled: Bool? = nil,
+        style: [String: JSONValue] = [:],
         on: [ExecutionDef] = [],
         target: JSONValue? = nil,
         targetOverrides: [String: JSONValue] = [:]
@@ -3973,6 +4054,10 @@ public struct ToolbarItemDef: Codable, Sendable, Identifiable {
         self.align = align
         self.intent = intent
         self.appearance = appearance
+        self.ariaLabel = ariaLabel
+        self.tooltip = tooltip
+        self.enabled = enabled
+        self.style = style
         self.on = on
         self.target = target
         self.targetOverrides = targetOverrides
@@ -3986,6 +4071,10 @@ public struct ToolbarItemDef: Codable, Sendable, Identifiable {
         align = try container.decodeIfPresent(String.self, forKey: .align)
         intent = try container.decodeIfPresent(String.self, forKey: .intent)
         appearance = try container.decodeIfPresent(String.self, forKey: .appearance)
+        ariaLabel = try container.decodeIfPresent(String.self, forKey: .ariaLabel)
+        tooltip = try container.decodeIfPresent(String.self, forKey: .tooltip)
+        enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled)
+        style = try container.decodeIfPresent([String: JSONValue].self, forKey: .style) ?? [:]
         on = try container.decodeIfPresent([ExecutionDef].self, forKey: .on) ?? []
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
         targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
