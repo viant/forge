@@ -20,6 +20,13 @@ const TablePanel = ({
             displayName: col.displayName || col.name,
         }))
     );
+    useEffect(() => {
+        setConfiguredColumns(columns.map((col) => ({
+            ...col,
+            visible: col.visible !== false,
+            displayName: col.displayName || col.name,
+        })));
+    }, [columns]);
     const visibleColumns = configuredColumns.filter((col) => col.visible);
 
 
