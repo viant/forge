@@ -15,11 +15,27 @@ import { chatHandlers } from "../hooks/index.js";
 import { useEffect, useRef } from "react";
 import {
     BugBeetle,
+    CalendarDots,
+    ChartLineUp,
+    ChartPieSlice,
+    ClipboardText,
+    CirclesThree,
+    EnvelopeSimple,
+    FileText,
     Flask,
     GameController,
+    GlobeHemisphereWest,
+    Path,
     PencilSimple,
+    ImageSquare,
+    Pulse,
+    Palette,
     RocketLaunch,
     ShieldWarning,
+    TrendUp,
+    Stack,
+    Target,
+    Wrench,
     TreeStructure
 } from '@phosphor-icons/react';
 
@@ -97,11 +113,27 @@ export const defaultRenderers = {
 
 const STARTER_TASK_ICON_MAP = {
     'bug': BugBeetle,
+    'calendar-report': CalendarDots,
+    'chart-line': ChartLineUp,
+    'chart-arcs': ChartPieSlice,
+    'clipboard': ClipboardText,
+    'venn': CirclesThree,
+    'document': FileText,
+    'email': EnvelopeSimple,
     'flask': Flask,
     'gamepad': GameController,
+    'globe-search': GlobeHemisphereWest,
     'pencil': PencilSimple,
+    'image': ImageSquare,
+    'pulse': Pulse,
+    'palette': Palette,
+    'route': Path,
     'rocket': RocketLaunch,
     'shield-warning': ShieldWarning,
+    'trend-up': TrendUp,
+    'layers': Stack,
+    'target': Target,
+    'wrench': Wrench,
     'tree-structure': TreeStructure,
 };
 
@@ -110,9 +142,100 @@ function StarterTaskIcon({ icon }) {
     return <Icon size={20} weight="duotone" />;
 }
 
-function StarterTaskGrid({ tasks = [], onSelect }) {
+function taskMatchesCategory(task = {}, category = {}) {
+    const taskCategory = String(task?.categoryId || '').trim();
+    const categoryID = String(category?.id || '').trim();
+    if (!taskCategory || taskCategory !== categoryID) return false;
+    const taskAgent = String(task?.agentId || '').trim();
+    const categoryAgent = String(category?.agentId || '').trim();
+    return !taskAgent || !categoryAgent || taskAgent === categoryAgent;
+}
+
+function starterCategoryKey(category = {}) {
+    return `${String(category?.agentId || '').trim()}|${String(category?.id || '').trim()}`;
+}
+
+function StarterTaskGrid({ tasks = [], categories = [], onSelect }) {
     const list = Array.isArray(tasks) ? tasks.filter(Boolean) : [];
+    const declaredCategories = (Array.isArray(categories) ? categories : []).filter((category) => (
+        String(category?.id || '').trim()
+        && String(category?.title || '').trim()
+        && list.some((task) => taskMatchesCategory(task, category))
+    ));
+    const categorized = new Set();
+    declaredCategories.forEach((category) => list.forEach((task, index) => {
+        if (taskMatchesCategory(task, category)) categorized.add(index);
+    }));
+    const moreTasks = list.filter((_, index) => !categorized.has(index));
+    const visibleCategories = declaredCategories.length > 0
+        ? [...declaredCategories, ...(moreTasks.length > 0 ? [{ id: '__more__', title: 'More', icon: 'pencil', tasks: moreTasks }] : [])]
+        : [];
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const activeCategory = visibleCategories.find((category) => starterCategoryKey(category) === selectedCategory) || null;
+    const activeTasks = Array.isArray(activeCategory?.tasks)
+        ? activeCategory.tasks
+        : activeCategory ? list.filter((task) => taskMatchesCategory(task, activeCategory)) : [];
+    const activeCategoryTone = activeCategory ? (visibleCategories.indexOf(activeCategory) % 5) + 1 : undefined;
     if (list.length === 0) return null;
+    if (visibleCategories.length > 0) {
+        return (
+            <section className="chat-starter-tasks chat-starter-tasks--categorized" data-category-tone={activeCategoryTone} data-testid="chat-starter-tasks">
+                <div className="chat-starter-tasks-head">
+                    {activeCategory ? (
+                        <button type="button" className="chat-starter-category-back" onClick={() => setSelectedCategory('')}>
+                            <span aria-hidden="true">←</span> Back to categories
+                        </button>
+                    ) : (
+                        <h2 className="chat-starter-tasks-title">Starter tasks</h2>
+                    )}
+                </div>
+                {!activeCategory ? (
+                    <div className="chat-starter-category-list" role="list" aria-label="Starter task categories">
+                        {visibleCategories.map((category) => (
+                            <button
+                                key={starterCategoryKey(category)}
+                                type="button"
+                                className="chat-starter-category"
+                                onClick={() => setSelectedCategory(starterCategoryKey(category))}
+                            >
+                                <span className="chat-starter-category-icon" aria-hidden="true"><StarterTaskIcon icon={category?.icon} /></span>
+                                <span className="chat-starter-category-copy">
+                                    <span className="chat-starter-category-title">{category.title}</span>
+                                    {String(category.description || '').trim() ? <span className="chat-starter-category-description">{category.description}</span> : null}
+                                </span>
+                                <span className="chat-starter-category-arrow" aria-hidden="true">›</span>
+                            </button>
+                        ))}
+                    </div>
+                ) : (
+                    <>
+                        <div className="chat-starter-category-heading">
+                            <div>
+                                <h3>{activeCategory.title}</h3>
+                                {String(activeCategory.description || '').trim() ? <p>{activeCategory.description}</p> : null}
+                            </div>
+                            <span>{activeTasks.length} {activeTasks.length === 1 ? 'task' : 'tasks'}</span>
+                        </div>
+                        <div className="chat-starter-tasks-grid chat-starter-tasks-grid--categorized">
+                            {activeTasks.map((task, index) => (
+                                <button
+                                    key={String(task?.id || `starter-task-${index}`)}
+                                    type="button"
+                                    className="chat-starter-task-card"
+                                    data-testid={`chat-starter-task-${index}`}
+                                    onClick={() => onSelect?.(task)}
+                                >
+                                    <span className="chat-starter-task-icon"><StarterTaskIcon icon={task?.icon} /></span>
+                                    <span className="chat-starter-task-title">{task?.title}</span>
+                                    {String(task?.description || '').trim() ? <span className="chat-starter-task-description">{task.description}</span> : null}
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                )}
+            </section>
+        );
+    }
     return (
         <section className="chat-starter-tasks" data-testid="chat-starter-tasks">
             <div className="chat-starter-tasks-head">
@@ -524,6 +647,9 @@ export default function Chat({
     const starterTasks = usesExternalComposerProps
         ? (Array.isArray(externalComposerProps?.starterTasks) ? externalComposerProps.starterTasks : [])
         : (Array.isArray(metaSnapshot?.starterTasks) ? metaSnapshot.starterTasks : []);
+    const starterTaskCategories = usesExternalComposerProps
+        ? (Array.isArray(externalComposerProps?.starterTaskCategories) ? externalComposerProps.starterTaskCategories : [])
+        : (Array.isArray(metaSnapshot?.starterTaskCategories) ? metaSnapshot.starterTaskCategories : []);
     const composerAgentOptions = usesExternalComposerProps
         ? (externalComposerProps?.agentOptions || [])
         : metaSnapshot?.agentOptions;
@@ -945,6 +1071,7 @@ export default function Chat({
                     <div className="chat-starter-stage" data-testid="chat-starter-stage">
                         <StarterTaskGrid
                             tasks={starterTasks}
+                            categories={starterTaskCategories}
                             onSelect={(task) => {
                                 const prompt = String(task?.prompt || '').trim();
                                 if (!prompt) return;
