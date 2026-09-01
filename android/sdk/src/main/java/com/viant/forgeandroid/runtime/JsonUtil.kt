@@ -38,6 +38,7 @@ object JsonUtil {
     }
 
     fun elementToAny(el: JsonElement): Any? = when (el) {
+        JsonNull -> null
         is JsonObject -> el.entries.associate { it.key to elementToAny(it.value) }
         is JsonArray -> el.map { elementToAny(it) }
         is JsonPrimitive -> when {
