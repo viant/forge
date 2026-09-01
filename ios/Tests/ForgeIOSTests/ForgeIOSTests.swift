@@ -2889,6 +2889,23 @@ final class ForgeIOSTests: XCTestCase {
         )
     }
 
+    func testInlineMarkdownRendersEntityReferenceAsDisplayLabel() {
+        let rendered = inlineMarkdownAttributedString(
+            #"@{media_plan:plan_05890cc562904ff1 "Starbucks"} draft created"#
+        )
+
+        XCTAssertEqual(String(rendered.characters), "Starbucks draft created")
+        XCTAssertFalse(String(rendered.characters).contains("plan_05890cc562904ff1"))
+    }
+
+    func testInlineMarkdownEntityReferenceUnescapesDisplayLabel() {
+        let rendered = inlineMarkdownAttributedString(
+            #"@{document:doc_1 "The \"Launch\" Plan"}"#
+        )
+
+        XCTAssertEqual(String(rendered.characters), #"The "Launch" Plan"#)
+    }
+
     func testMarkdownCodeAccessibilityLabelsIncludeLanguageAndLineCount() {
         XCTAssertEqual(
             markdownCodeAccessibilityLabel(language: " Swift ", body: "let a = 1\nlet b = 2"),
