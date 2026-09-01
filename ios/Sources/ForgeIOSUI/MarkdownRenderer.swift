@@ -19,11 +19,11 @@ public struct MarkdownRenderer: View {
                 switch block {
                 case .markdown(let text):
                     if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text(.init(text))
+                        Text(inlineMarkdownAttributedString(text))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 case .heading(let level, let text):
-                    Text(.init(text))
+                    Text(inlineMarkdownAttributedString(text))
                         .font(markdownHeadingFont(level: level))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .accessibilityAddTraits(.isHeader)
@@ -38,6 +38,52 @@ public struct MarkdownRenderer: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
+
+internal func inlineMarkdownAttributedString(_ text: String) -> AttributedString {
+    let pattern = #"@\{([a-zA-Z][a-zA-Z0-9_-]*):([^\s"]+)\s+"((?:[^"\\]|\\.)*)"\}"#
+    guard let expression = try? NSRegularExpression(pattern: pattern) else {
+        return markdownAttributedString(text)
+    }
+    let matches = expression.matches(
+        in: text,
+        range: NSRange(text.startIndex..., in: text)
+    )
+    guard !matches.isEmpty else {
+        return markdownAttributedString(text)
+    }
+
+    var result = AttributedString()
+    var cursor = text.startIndex
+    for match in matches {
+        guard let rawRange = Range(match.range, in: text),
+              let labelRange = Range(match.range(at: 3), in: text) else {
+            continue
+        }
+        if cursor < rawRange.lowerBound {
+            result.append(markdownAttributedString(String(text[cursor..<rawRange.lowerBound])))
+        }
+        let label = String(text[labelRange])
+            .replacingOccurrences(of: #"\""#, with: "\"")
+            .replacingOccurrences(of: #"\\"#, with: #"\"#)
+        var chip = AttributedString(label)
+        chip.foregroundColor = Color(red: 0.09, green: 0.29, blue: 0.66)
+        chip.backgroundColor = Color(red: 0.92, green: 0.95, blue: 1.0)
+        chip.inlinePresentationIntent = .stronglyEmphasized
+        result.append(chip)
+        cursor = rawRange.upperBound
+    }
+    if cursor < text.endIndex {
+        result.append(markdownAttributedString(String(text[cursor...])))
+    }
+    return result
+}
+
+private func markdownAttributedString(_ text: String) -> AttributedString {
+    (try? AttributedString(
+        markdown: text,
+        options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+    )) ?? AttributedString(text)
 }
 
 enum MarkdownBlock: Equatable {
