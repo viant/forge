@@ -15,6 +15,7 @@ import {getWidgetEntry} from './widgetRegistry.jsx';
 import {getEventAdapter, resolveStateAdapter, runDynamicEvaluators,} from './binding.js';
 import {resolveSelector} from '../utils/selector.js';
 import { resolveLinkTarget } from '../utils/linkTarget.js';
+import {evaluatePlainVisibleWhen} from '../components/visibleWhen.js';
 
 import ControlWrapper from './ControlWrapper.jsx';
 
@@ -233,44 +234,13 @@ export default function WidgetRenderer({
         } catch (e) { /* ignore */ }
     }
     if (visible === undefined) {
-        const vw = item?.visibleWhen;
-        if (vw) {
-            try {
-                const source = String(vw.source || 'form').toLowerCase();
-                let data = {};
-                switch (source) {
-                    case 'windowform':
-                        data = resolvedContext?.signals?.windowForm?.peek?.() || {};
-                        break;
-                    case 'filter':
-                    case 'filters':
-                        data = resolvedContext?.handlers?.dataSource?.peekFilter?.() || {};
-                        break;
-                    case 'selection':
-                        data = resolvedContext?.signals?.selection?.peek?.() || {};
-                        break;
-                    case 'metrics':
-                        data = resolvedContext?.signals?.metrics?.peek?.() || {};
-                        break;
-                    case 'input':
-                        data = resolvedContext?.signals?.input?.peek?.() || {};
-                        break;
-                    case 'form':
-                    default:
-                        data = resolvedContext?.handlers?.dataSource?.getFormData?.() || {};
-                        break;
-                }
-                const field = vw.field || vw.selector || vw.key;
-                const actual = field ? resolveSelector(data, field) : undefined;
-                if (vw.equals !== undefined) {
-                    visible = (actual === vw.equals);
-                } else if (Array.isArray(vw.in)) {
-                    visible = vw.in.includes(actual);
-                }
-            } catch (e) { /* ignore */ }
-        }
+        visible = item?.visibleWhen ? evaluatePlainVisibleWhen(item.visibleWhen, resolvedContext) : undefined;
     }
+    if (item?.hiddenWhen && evaluatePlainVisibleWhen(item.hiddenWhen, resolvedContext)) visible = false;
     if (visible === false) return null;
+
+    if (item?.disabledWhen && evaluatePlainVisibleWhen(item.disabledWhen, resolvedContext)) widgetProps.disabled = true;
+    if (item?.readOnlyWhen && evaluatePlainVisibleWhen(item.readOnlyWhen, resolvedContext)) widgetProps.readOnly = true;
 
     const itemWithError = validationMsg ? { ...item, validationError: validationMsg } : item;
 

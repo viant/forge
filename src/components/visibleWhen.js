@@ -19,6 +19,13 @@ const isEmptyValue = (value) => {
     return false;
 };
 
+const containsValue = (actual, expected) => {
+    if (Array.isArray(actual)) return actual.includes(expected);
+    if (typeof actual === 'string') return actual.includes(String(expected));
+    if (actual && typeof actual === 'object') return Object.hasOwn(actual, expected);
+    return false;
+};
+
 export const evaluatePlainVisibleWhen = (visibleWhen, context) => {
     if (!visibleWhen || !context) return true;
     if (Array.isArray(visibleWhen.all)) {
@@ -35,6 +42,9 @@ export const evaluatePlainVisibleWhen = (visibleWhen, context) => {
 
     let scope = {};
     switch (source) {
+        case 'authorization':
+            scope = context.signals?.authorization?.peek?.() || context.authorization || {};
+            break;
         case 'windowform':
             scope = context.signals?.windowForm?.peek?.() || {};
             break;
@@ -70,11 +80,20 @@ export const evaluatePlainVisibleWhen = (visibleWhen, context) => {
     if (visibleWhen.notEquals !== undefined) {
         return actual !== visibleWhen.notEquals;
     }
+    if (visibleWhen.contains !== undefined) {
+        return containsValue(actual, visibleWhen.contains);
+    }
     if (visibleWhen.empty !== undefined) {
         return isEmptyValue(actual) === visibleWhen.empty;
     }
     if (visibleWhen.notEmpty !== undefined) {
         return (!isEmptyValue(actual)) === visibleWhen.notEmpty;
+    }
+    if (visibleWhen.exists !== undefined) {
+        return (actual !== undefined && actual !== null) === visibleWhen.exists;
+    }
+    if (source === 'authorization') {
+        return false;
     }
     return !!actual;
 };
@@ -94,6 +113,9 @@ export const trackVisibleWhen = (visibleWhen, context) => {
     }
     const source = String(visibleWhen.source || 'form').toLowerCase();
     switch (source) {
+        case 'authorization':
+            if (context?.signals?.authorization) context.signals.authorization.value;
+            break;
         case 'windowform':
             context?.signals?.windowForm?.value;
             break;
@@ -122,23 +144,23 @@ export const trackVisibleWhen = (visibleWhen, context) => {
 
 export const isContainerVisible = (container, baseContext) => {
     const visibleWhen = getDashboardVisibleWhen(container);
-    if (!visibleWhen) {
-        return true;
-    }
     const scopedContext = resolveChildContext(baseContext, container?.dataSourceRef || baseContext?.identity?.dataSourceRef);
-    return scopedContext?.dashboardKey
+    const visible = !visibleWhen ? true : scopedContext?.dashboardKey
         ? evaluateDashboardCondition(visibleWhen, {
             context: scopedContext,
             dashboardKey: scopedContext.dashboardKey,
         })
         : evaluatePlainVisibleWhen(visibleWhen, scopedContext);
+    if (!visible) return false;
+    return !container?.hiddenWhen || !evaluatePlainVisibleWhen(container.hiddenWhen, scopedContext);
 };
 
 export const trackContainerVisibility = (container, baseContext) => {
     const visibleWhen = getDashboardVisibleWhen(container);
-    if (!visibleWhen) {
+    if (!visibleWhen && !container?.hiddenWhen) {
         return;
     }
     const scopedContext = resolveChildContext(baseContext, container?.dataSourceRef || baseContext?.identity?.dataSourceRef);
     trackVisibleWhen(visibleWhen, scopedContext);
+    trackVisibleWhen(container?.hiddenWhen, scopedContext);
 };

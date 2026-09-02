@@ -104,6 +104,7 @@ public actor ForgeRuntime {
     private let session: URLSession
     private var dataSourceLoader: (@Sendable (DataSourceFetchRequest) async throws -> DataSourceFetchResult?)?
     private var windowMetadataLoader: (@Sendable (String) async throws -> WindowMetadata?)?
+    private var windowMetadataRequestLoader: (@Sendable (WindowMetadataRequest) async throws -> WindowMetadata?)?
     private var feedPatchHandler: (@Sendable (String, FeedPatchOperation) async throws -> Bool)?
     private var interactionObserver: (@Sendable (ForgeInteraction) async -> Void)?
 
@@ -335,6 +336,12 @@ public actor ForgeRuntime {
         _ loader: @escaping @Sendable (String) async throws -> WindowMetadata?
     ) {
         windowMetadataLoader = loader
+    }
+
+    public func registerWindowMetadataRequestLoader(
+        _ loader: @escaping @Sendable (WindowMetadataRequest) async throws -> WindowMetadata?
+    ) {
+        windowMetadataRequestLoader = loader
     }
 
     public func registerFeedPatchHandler(
@@ -843,9 +850,24 @@ public actor ForgeRuntime {
         if forceReload {
             await signal.set(nil)
         }
-        if let windowMetadataLoader {
+        if windowMetadataRequestLoader != nil || windowMetadataLoader != nil {
             do {
-                if let resolved = try await windowMetadataLoader(state.key) {
+                let resolved: WindowMetadata?
+                if let windowMetadataRequestLoader {
+                    resolved = try await windowMetadataRequestLoader(
+                        WindowMetadataRequest(
+                            windowID: state.id,
+                            windowKey: state.key,
+                            parameters: state.parameters,
+                            conversationID: state.conversationID
+                        )
+                    )
+                } else if let windowMetadataLoader {
+                    resolved = try await windowMetadataLoader(state.key)
+                } else {
+                    resolved = nil
+                }
+                if let resolved {
                     if let index = windows.firstIndex(where: { $0.id == state.id }) {
                         let existing = windows[index]
                         windows[index] = WindowState(
@@ -902,6 +924,25 @@ public actor ForgeRuntime {
         } catch {
             print("ForgeRuntime metadata load failed for \(state.key): \(error)")
             await signal.set(nil)
+        }
+    }
+
+    public struct WindowMetadataRequest: Sendable {
+        public let windowID: String
+        public let windowKey: String
+        public let parameters: [String: JSONValue]
+        public let conversationID: String?
+
+        public init(
+            windowID: String,
+            windowKey: String,
+            parameters: [String: JSONValue] = [:],
+            conversationID: String? = nil
+        ) {
+            self.windowID = windowID
+            self.windowKey = windowKey
+            self.parameters = parameters
+            self.conversationID = conversationID
         }
     }
 

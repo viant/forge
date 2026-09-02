@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataForTarget, resolveWindowRootContainer, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
+import { applyWindowPermissionMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataForTarget, resolveWindowRootContainer, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
+
+describe('applyWindowPermissionMetadata', () => {
+  it('passes the complete tree and one concrete resource to the dedicated service', async () => {
+    const completeMetadata = {authorization: {scope: 'resource'}, view: {content: {id: 'root'}}};
+    const calls = [];
+    const permitted = {authorizationSnapshot: {resources: {'42': {id: 42}}}, view: {content: {id: 'root'}}};
+    const result = await applyWindowPermissionMetadata(completeMetadata, {
+      services: {applyPermission: async (input) => { calls.push(input); return permitted; }},
+      windowKey: 'document',
+      resource: {DocumentId: [42]},
+      windowParams: {DocumentId: [42]},
+    });
+    expect(result).toBe(permitted);
+    expect(calls).toEqual([expect.objectContaining({
+      windowKey: 'document', completeMetadata, resource: {DocumentId: [42]},
+    })]);
+  });
+});
 
 describe('resolveInitialWindowFormValues', () => {
   it('collects explicit windowForm item values alongside onInit constants', () => {

@@ -186,6 +186,33 @@ class ActionHookRuntimeTest {
     }
 
     @Test
+    fun openWindowRequestLoaderReceivesResourceAndConversationContext() = runBlocking {
+        val runtime = ForgeRuntime(
+            endpoints = emptyMap(),
+            scope = CoroutineScope(Dispatchers.Unconfined)
+        )
+        var captured: ForgeRuntime.WindowMetadataRequest? = null
+        runtime.registerWindowMetadataRequestLoader { request ->
+            captured = request
+            WindowMetadata(view = ViewDef(content = ContentDef(id = "permitted")))
+        }
+
+        val state = runtime.openWindow(
+            windowKey = "advertiser",
+            title = "Advertiser",
+            parameters = mapOf("AdvertiserId" to listOf(85141)),
+            conversationId = "conv-1"
+        )
+        withTimeout(1_000) {
+            runtime.metadataSignal(state.windowId).flow.filterNotNull().first()
+        }
+
+        assertEquals("advertiser", captured?.windowKey)
+        assertEquals("conv-1", captured?.conversationId)
+        assertEquals(listOf(85141), captured?.parameters?.get("AdvertiserId"))
+    }
+
+    @Test
     fun metadataResolverPreservesDatasourceNamedTarget() {
         val metadata = WindowMetadata(
             dataSources = mapOf(

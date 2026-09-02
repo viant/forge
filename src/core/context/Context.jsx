@@ -139,6 +139,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
 
         identity: {windowId, getDataSourceId, dataSourceRef, getDialogId, ...(actorRef ? { actorRef } : {})},
         windowState: services?.windowState || null,
+        authorization: services?.authorization || null,
         resources: {},
         metadata: metadata,
         dataSourceRef: dataSourceRef,

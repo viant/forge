@@ -123,4 +123,28 @@ assert.equal(
     true,
 );
 
+const authorizationContext = metricsContext({}, {
+    authorization: {
+        principal: {features: ['ENABLE_EXPORTS']},
+        resource: {capabilities: {read: true, write: false}},
+    },
+});
+
+assert.equal(isContainerVisible({
+    id: 'exports',
+    visibleWhen: {source: 'authorization', field: 'principal.features', contains: 'ENABLE_EXPORTS'},
+}, authorizationContext), true);
+assert.equal(isContainerVisible({
+    id: 'edit',
+    visibleWhen: {source: 'authorization', field: 'resource.capabilities.write', equals: true},
+}, authorizationContext), false);
+assert.equal(isContainerVisible({
+    id: 'hiddenHistory',
+    hiddenWhen: {source: 'authorization', field: 'resource.capabilities.read', equals: true},
+}, authorizationContext), false);
+assert.equal(isContainerVisible({
+    id: 'failClosed',
+    visibleWhen: {source: 'authorization', field: 'resource.capabilities.read'},
+}, metricsContext({})), false);
+
 console.log('visibleWhen ✓');

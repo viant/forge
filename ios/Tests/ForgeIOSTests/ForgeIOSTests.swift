@@ -4931,6 +4931,29 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(metadata?.view?.content?.containers.first?.title, "Report Review")
     }
 
+    func testOpenWindowRequestLoaderReceivesResourceAndConversationContext() async throws {
+        let runtime = ForgeRuntime()
+        var captured: ForgeRuntime.WindowMetadataRequest?
+        await runtime.registerWindowMetadataRequestLoader { request in
+            captured = request
+            return WindowMetadata(view: ViewDef(content: ContentDef(id: "permitted")))
+        }
+
+        let state = await runtime.openWindow(
+            key: "advertiser",
+            title: "Advertiser",
+            parameters: ["AdvertiserId": .array([.number(85141)])],
+            conversationID: "conv-1"
+        )
+        try await Task.sleep(nanoseconds: 100_000_000)
+
+        let signal = await runtime.signals.metadata(windowID: state.id)
+        _ = await signal.peek()
+        XCTAssertEqual(captured?.windowKey, "advertiser")
+        XCTAssertEqual(captured?.conversationID, "conv-1")
+        XCTAssertEqual(captured?.parameters["AdvertiserId"], .array([.number(85141)]))
+    }
+
     func testBuiltInHandlerToggleSelectionSelectsThenDeselects() async throws {
         let runtime = ForgeRuntime()
         let meta = WindowMetadata(view: ViewDef(content: ContentDef()))

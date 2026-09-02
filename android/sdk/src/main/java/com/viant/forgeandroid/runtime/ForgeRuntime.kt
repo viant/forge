@@ -47,6 +47,7 @@ class ForgeRuntime(
     private val pendingDialogResults = mutableMapOf<String, CompletableDeferred<Map<String, Any?>?>>()
     private val pendingWindows = mutableMapOf<String, PendingWindow>()
     private var windowMetadataLoader: (suspend (String) -> WindowMetadata?)? = null
+    private var windowMetadataRequestLoader: (suspend (WindowMetadataRequest) -> WindowMetadata?)? = null
     private var fileTextLoader: (suspend (String) -> String)? = null
     private var filePreviewLoader: (suspend (String, String) -> FilePreviewContent)? = null
     private var feedPatchHandler: ((String, FeedPatchOperation) -> Boolean)? = null
@@ -89,6 +90,12 @@ class ForgeRuntime(
         loader: suspend (String) -> WindowMetadata?
     ) {
         windowMetadataLoader = loader
+    }
+
+    fun registerWindowMetadataRequestLoader(
+        loader: suspend (WindowMetadataRequest) -> WindowMetadata?
+    ) {
+        windowMetadataRequestLoader = loader
     }
 
     fun registerHandler(name: String, handler: Handler) {
@@ -235,7 +242,14 @@ class ForgeRuntime(
                 if (forceReload) {
                     signals.metadata(window.windowId).set(null)
                 }
-                val loaded = windowMetadataLoader?.invoke(window.windowKey)
+                val loaded = windowMetadataRequestLoader?.invoke(
+                    WindowMetadataRequest(
+                        windowId = window.windowId,
+                        windowKey = window.windowKey,
+                        parameters = window.parameters,
+                        conversationId = window.conversationId
+                    )
+                ) ?: windowMetadataLoader?.invoke(window.windowKey)
                 if (loaded != null) {
                     signals.metadata(window.windowId).set(loaded)
                     reconcileWindowForm(window.windowId, loaded, window.parameters)
@@ -255,6 +269,13 @@ class ForgeRuntime(
             }
         }
     }
+
+    data class WindowMetadataRequest(
+        val windowId: String,
+        val windowKey: String,
+        val parameters: Map<String, Any?> = emptyMap(),
+        val conversationId: String? = null
+    )
 
     private fun resolveMetadata(metadata: WindowMetadata): WindowMetadata {
         val parsed = json.parseToJsonElement(json.encodeToString(metadata))

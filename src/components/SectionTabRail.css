@@ -45,3 +45,13 @@
 @media (min-width: 1000px) {
     .forge-section-tab-rail .forge-section-tab { flex: 1 0 auto; }
 }
+
+@media (max-width: 480px) {
+    .forge-section-tab-rail { gap: 2px; padding: 3px; }
+    .forge-section-tab-rail .forge-section-tab {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 7px 5px;
+        font-size: 12px;
+    }
+}
