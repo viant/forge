@@ -3,6 +3,7 @@ package fenced
 import (
 	"bytes"
 	"encoding/json"
+	"math"
 	"strings"
 	"testing"
 
@@ -334,6 +335,55 @@ func TestAssembleRejectsTabSectionMissingFromExplicitLayout(t *testing.T) {
 		messages = append(messages, diagnostic.Message)
 	}
 	require.Contains(t, strings.Join(messages, "\n"), `section "overview" must appear in layout.items`)
+}
+
+func TestResolveColumnLayoutUsesFormattedDataSize(t *testing.T) {
+	columns := []map[string]any{
+		{"key": "a", "label": "A"},
+		{"key": "b", "label": "B"},
+	}
+	rows := []map[string]any{{"a": "x", "b": "a substantially longer displayed value"}}
+	positions, widths := resolveColumnLayout(columns, rows, 36, 540)
+	if len(positions) != 2 || len(widths) != 2 {
+		t.Fatalf("layout lengths = %d/%d, want 2/2", len(positions), len(widths))
+	}
+	if widths[1] <= widths[0] {
+		t.Fatalf("data-sized widths = %v, longer displayed data must receive more width", widths)
+	}
+	if got := widths[0] + widths[1]; math.Abs(got-540) > 0.001 {
+		t.Fatalf("total width = %v, want 540", got)
+	}
+}
+
+func TestBuildPrintWrapsFullTableCellAndExpandsRow(t *testing.T) {
+	fullText := "This complete rationale must wrap across multiple lines without an ellipsis or dropped content."
+	printDoc := buildPrint("Report", "", map[string]any{}, json.RawMessage(`{}`), json.RawMessage(`{}`), []any{
+		map[string]any{
+			"id": "table", "kind": "tableBlock", "title": "Rows", "datasetRef": "rows",
+			"columns": []any{map[string]any{"key": "short", "label": "Short"}, map[string]any{"key": "detail", "label": "Detail"}},
+		},
+	}, []any{
+		map[string]any{"id": "rows", "rows": []map[string]any{{"short": "A", "detail": fullText}}},
+	})
+	pages := printDoc["pages"].([]any)
+	var matched map[string]any
+	for _, rawElement := range pages[0].(map[string]any)["elements"].([]any) {
+		element := rawElement.(map[string]any)
+		if element["id"] == "table__r0_detail" {
+			matched = element
+			break
+		}
+	}
+	if matched == nil {
+		t.Fatal("wrapped detail cell was not rendered")
+	}
+	if matched["text"] != fullText || matched["wrap"] != true {
+		t.Fatalf("cell = %#v, want full wrapped text", matched)
+	}
+	box := matched["box"].(map[string]any)
+	if box["height"].(float64) <= 16 {
+		t.Fatalf("cell height = %v, want expanded height", box["height"])
+	}
 }
 
 func TestAssembleAcceptsDataBeforeStartAndPatchesBlocks(t *testing.T) {

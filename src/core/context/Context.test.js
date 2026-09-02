@@ -20,6 +20,11 @@ const metadata = {
       selectors: {},
       uniqueKey: [{field: 'id', parameter: 'id'}],
     },
+    timeline: {
+      selectionMode: 'none',
+      selectors: {},
+      uniqueKey: [{field: 'date', parameter: 'date'}],
+    },
   },
   view: {},
 };
@@ -45,6 +50,14 @@ assert.deepEqual(selection.selection[1], rows[1]);
 const singleCtx = context.Context('lookup');
 assert.equal(singleCtx.dataSource.selectionMode, 'single');
 assert.equal(multiCtx.dataSource.selectionMode, 'multi');
+
+const noSelectionCtx = context.Context('timeline');
+assert.equal(noSelectionCtx.dataSource.selectionMode, 'none');
+assert.equal(typeof noSelectionCtx.signals.collection?.peek, 'function');
+assert.equal(typeof noSelectionCtx.signals.collectionInfo?.peek, 'function');
+assert.equal(typeof noSelectionCtx.signals.metrics?.peek, 'function');
+assert.equal(typeof noSelectionCtx.signals.selection?.peek, 'function');
+assert.deepEqual(noSelectionCtx.signals.selection.peek(), {selected: null, rowIndex: -1});
 
 const actorContext = Context('W_ctx_actor', metadata, 'lookup', {
   __connectorRuntime: {
