@@ -688,7 +688,7 @@ export function registerPack() {
     ), { framework: 'blueprint' });
 
     /* -------------------- Button ------------------------------------ */
-    registerWidget('button', ({ onClick, readOnly, intent, children, className, style, title, ...rest }) => {
+    registerWidget('button', ({ onClick, readOnly, intent, children, className, style, title, item, ...rest }) => {
         const intentColors = {
             primary: { background: '#2f6de1', border: '#2f6de1', color: '#fff' },
             success: { background: '#0f9960', border: '#0f9960', color: '#fff' },
@@ -722,10 +722,14 @@ export function registerPack() {
                 }}
                 {...rest}
             >
-                {children}
+                {children || item?.label || title}
             </button>
         );
     }, { framework: 'blueprint' });
+
+    registerEventAdapter('button', {
+        onClick: () => () => {},
+    });
 
     /* -------------------- Label ------------------------------------- */
     registerWidget('label', ({ value, format, locale, timeZone, item, ...rest }) => {

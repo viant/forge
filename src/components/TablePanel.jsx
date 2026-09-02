@@ -27,11 +27,6 @@ const TablePanel = ({
             displayName: col.displayName || col.name,
         })));
     }, [columns]);
-    const visibleColumns = configuredColumns.filter((col) => col.visible);
-
-
-
-
     // Function to get row style based on formatting rules
     const getRowStyle = (item) => {
         for (const rule of formattingRules) {
@@ -73,13 +68,15 @@ const TablePanel = ({
     }
 
 
+    // Basic owns visibility and persistence; hidden columns must remain
+    // available to its Table Settings dialog.
     return (
         <div className="table-panel" style={stlye}>
             <div style={{flexGrow: 1, overflow: "hidden", minHeight: 0}}>
                 <Basic
                     context={context}
                     container={container}
-                    columns={visibleColumns}
+                    columns={configuredColumns}
                     pagination={pagination}
                 >
                 {children}

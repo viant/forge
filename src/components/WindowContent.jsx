@@ -33,6 +33,7 @@ import useDataConnector from '../hooks/dataconnector.js';
 import { mergeWindowFormValues } from '../hooks/dataSource.js';
 import {injectActions} from '../actions';
 import { resolveMetadataForTarget } from '../runtime/metadataResolver.js';
+import {compilePermittedView, normalizeAuthorizationSnapshot} from '../runtime/permittedView.js';
 import { resolveParameters } from '../hooks/parameters.js';
 import { resolveSelector } from '../utils/selector.js';
 import { getLogger } from '../utils/logger.js';
@@ -57,6 +58,43 @@ function collectInitialWindowFormItemValues(node, initial) {
             collectInitialWindowFormItemValues(child, initial);
         }
     }
+}
+
+export function compileWindowAuthorizationMetadata(metadata, parameters = {}) {
+    if (!metadata?.authorization) return metadata;
+    const snapshot = metadata?.authorizationSnapshot;
+    if (!snapshot || typeof snapshot !== 'object') return null;
+    const spec = metadata.authorization || {};
+    const resourceType = String(spec?.resource?.type || spec?.resourceType || '').trim();
+    const selector = String(spec?.resource?.id?.selector || '').trim();
+    const selected = selector ? resolveSelector(parameters || {}, selector) : null;
+    const resourceId = selected == null || selected === '' ? null : Number(selected);
+    const authorization = normalizeAuthorizationSnapshot(snapshot, resourceType, Number.isFinite(resourceId) ? resourceId : null);
+    const result = compilePermittedView(metadata, authorization, {requireRead: String(spec.scope || '').toLowerCase() === 'resource'});
+    if (result.denied || !result.metadata) return null;
+    return {...result.metadata, authorizationSnapshot: authorization};
+}
+
+export async function applyWindowPermissionMetadata(completeMetadata, {
+    services,
+    windowKey,
+    resource = {},
+    windowParams = {},
+    conversationId = '',
+    targetContext = null,
+} = {}) {
+    if (!completeMetadata?.authorization) return completeMetadata;
+    if (typeof services?.applyPermission !== 'function') {
+        throw Object.assign(new Error('Permission service is unavailable'), {status: 503});
+    }
+    return services.applyPermission({
+        windowKey,
+        completeMetadata,
+        resource,
+        windowParams,
+        conversationId,
+        targetContext,
+    });
 }
 
 export function resolveInitialWindowFormValues(metadata) {
@@ -383,6 +421,10 @@ function syncWindowRuntimeHints(windowId, metadata, windowState = null) {
     const metadataWorkspaceMinHeight = resolveNumericWindowRuntimeHint(metadata, 'workspaceMinHeight');
     if (metadataWorkspaceMinHeight !== undefined && next.workspaceMinHeight !== metadataWorkspaceMinHeight) {
         next.workspaceMinHeight = metadataWorkspaceMinHeight;
+        changed = true;
+    }
+    if (metadata?.authorizationSnapshot && next.authorizationSnapshot !== metadata.authorizationSnapshot) {
+        next.authorizationSnapshot = metadata.authorizationSnapshot;
         changed = true;
     }
     if (windowState?.workspaceCollapsed !== undefined && next.workspaceCollapsed !== windowState.workspaceCollapsed) {
@@ -963,7 +1005,7 @@ export default function WindowContent({window, isInTab = false}) {
         setFetchError(null);
 
         let hasInlineFallback = false;
-        if (window && window.inlineMetadata) {
+        if (window && window.inlineMetadata && (!window.inlineMetadata.authorization || window.inlineMetadata.authorizationSnapshot)) {
             try {
                 const resolvedMetadata = resolveWindowMetadataForTarget(window.inlineMetadata, targetContext);
                 injectActions(resolvedMetadata);
@@ -980,10 +1022,23 @@ export default function WindowContent({window, isInTab = false}) {
         }
 
         connector.get({})
-            .then((resp) => {
+            .then(async (resp) => {
                 if (cancelled) return;
                 setFetchError(null);
-                const resolvedMetadata = resolveWindowMetadataForTarget(resp.data, targetContext);
+                const completeMetadata = resolveWindowMetadataForTarget(resp.data, targetContext);
+                const permissionAppliedMetadata = await applyWindowPermissionMetadata(completeMetadata, {
+                    services,
+                    windowKey: baseKey,
+                    resource: window?.resource || window?.parameters || {},
+                    windowParams: window?.parameters || {},
+                    conversationId: window?.conversationId || '',
+                    targetContext,
+                });
+                if (cancelled) return;
+                const resolvedMetadata = compileWindowAuthorizationMetadata(permissionAppliedMetadata, window?.parameters || {});
+                if (!resolvedMetadata) {
+                    throw Object.assign(new Error('Resource not found or access denied'), {status: 403});
+                }
                 injectActions(resolvedMetadata);
                 metadataSignalHandle.value = {
                     ...resolvedMetadata,
@@ -1043,11 +1098,24 @@ export default function WindowContent({window, isInTab = false}) {
         );
     }
 
+    const runtimeWindow = {...window, isInTab};
+    const runtimePrepareRequest = typeof services?.prepareDataConnectorRequest === 'function'
+        ? (request) => services.prepareDataConnectorRequest({...request, windowState: runtimeWindow}) || request
+        : resolvedServices?.__connectorRuntime?.prepareRequest;
+    const runtimeServices = {
+        ...resolvedServices,
+        windowState: runtimeWindow,
+        authorization: metadata?.authorizationSnapshot || resolvedServices.authorization,
+        __connectorRuntime: {
+            ...(resolvedServices.__connectorRuntime || {}),
+            prepareRequest: runtimePrepareRequest,
+        },
+    };
     return (
         <WindowContentInner
-            window={{...window, isInTab}}
+            window={runtimeWindow}
             metadata={metadata}
-            services={resolvedServices}
+            services={runtimeServices}
         />
     );
 }

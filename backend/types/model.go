@@ -220,18 +220,49 @@ type QuickFilterSpec struct {
 }
 
 type Window struct {
-	Ns              []string                          `json:"ns,omitempty" yaml:"ns,omitempty"`
-	Namespace       string                            `json:"namespace,omitempty" yaml:"namespace,omitempty"`
-	Presentation    string                            `json:"presentation,omitempty" yaml:"presentation,omitempty"`
-	Region          string                            `json:"region,omitempty" yaml:"region,omitempty"`
-	Window          *WindowSettings                   `json:"window,omitempty" yaml:"window,omitempty"`
-	DataSource      map[string]DataSource             `json:"dataSource" yaml:"dataSource"`
-	View            View                              `json:"view" yaml:"view"`
-	Dialogs         []Dialog                          `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
-	Actions         *Actions                          `json:"actions,omitempty" yaml:"actions,omitempty"`
-	On              []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
-	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
-	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
+	Ns                    []string                          `json:"ns,omitempty" yaml:"ns,omitempty"`
+	Namespace             string                            `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Presentation          string                            `json:"presentation,omitempty" yaml:"presentation,omitempty"`
+	Region                string                            `json:"region,omitempty" yaml:"region,omitempty"`
+	Window                *WindowSettings                   `json:"window,omitempty" yaml:"window,omitempty"`
+	DataSource            map[string]DataSource             `json:"dataSource" yaml:"dataSource"`
+	View                  View                              `json:"view" yaml:"view"`
+	Dialogs               []Dialog                          `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
+	Actions               *Actions                          `json:"actions,omitempty" yaml:"actions,omitempty"`
+	On                    []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
+	Target                *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides       map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
+	Authorization         *AuthorizationSpec                `json:"authorization,omitempty" yaml:"authorization,omitempty"`
+	AuthorizationSnapshot map[string]interface{}            `json:"authorizationSnapshot,omitempty" yaml:"-"`
+}
+
+// AuthorizationSpec declares the generic authorization preflight required before a
+// window's datasource contexts may be created. Policy is resolved server-side; Forge
+// only carries and evaluates the resulting authorization snapshot.
+type AuthorizationSpec struct {
+	DataSourceRef               string                     `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	Scope                       string                     `json:"scope,omitempty" yaml:"scope,omitempty"`
+	ResourceType                string                     `json:"resourceType,omitempty" yaml:"resourceType,omitempty"`
+	Resource                    *AuthorizationResourceSpec `json:"resource,omitempty" yaml:"resource,omitempty"`
+	RequestedCapabilities       []string                   `json:"requestedCapabilities,omitempty" yaml:"requestedCapabilities,omitempty"`
+	RequestedGlobalCapabilities []string                   `json:"requestedGlobalCapabilities,omitempty" yaml:"requestedGlobalCapabilities,omitempty"`
+	Behavior                    AuthorizationBehavior      `json:"behavior,omitempty" yaml:"behavior,omitempty"`
+}
+
+type AuthorizationResourceSpec struct {
+	Type string                     `json:"type,omitempty" yaml:"type,omitempty"`
+	ID   AuthorizationValueSelector `json:"id,omitempty" yaml:"id,omitempty"`
+}
+
+type AuthorizationValueSelector struct {
+	Source   string `json:"source,omitempty" yaml:"source,omitempty"`
+	Selector string `json:"selector,omitempty" yaml:"selector,omitempty"`
+}
+
+type AuthorizationBehavior struct {
+	FailClosed                    bool `json:"failClosed,omitempty" yaml:"failClosed,omitempty"`
+	AuthorizeBeforeDatasourceInit bool `json:"authorizeBeforeDatasourceInit,omitempty" yaml:"authorizeBeforeDatasourceInit,omitempty"`
+	ClearProtectedStateOnChange   bool `json:"clearProtectedStateOnChange,omitempty" yaml:"clearProtectedStateOnChange,omitempty"`
 }
 
 type WindowSettings struct {
@@ -459,6 +490,9 @@ type Container struct {
 	Layout            *Layout                           `json:"layout,omitempty" yaml:"layout,omitempty"`
 	Style             *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
 	VisibleWhen       map[string]interface{}            `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+	HiddenWhen        map[string]interface{}            `json:"hiddenWhen,omitempty" yaml:"hiddenWhen,omitempty"`
+	DisabledWhen      map[string]interface{}            `json:"disabledWhen,omitempty" yaml:"disabledWhen,omitempty"`
+	ReadOnlyWhen      map[string]interface{}            `json:"readOnlyWhen,omitempty" yaml:"readOnlyWhen,omitempty"`
 	Toolbar           *Toolbar                          `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
 	Table             *Table                            `json:"table,omitempty" yaml:"table,omitempty"`
 	FileBrowser       *FileBrowser                      `json:"fileBrowser,omitempty" yaml:"fileBrowser,omitempty"`
@@ -1255,6 +1289,10 @@ type Column struct {
 	Progress          *Progress              `json:"progress,omitempty" yaml:"progress,omitempty"`
 	On                []*Execute             `json:"on,omitempty" yaml:"on,omitempty"`
 	ToolTip           string                 `json:"tooltip" yaml:"tooltip"`
+	VisibleWhen       map[string]interface{} `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+	HiddenWhen        map[string]interface{} `json:"hiddenWhen,omitempty" yaml:"hiddenWhen,omitempty"`
+	DisabledWhen      map[string]interface{} `json:"disabledWhen,omitempty" yaml:"disabledWhen,omitempty"`
+	ReadOnlyWhen      map[string]interface{} `json:"readOnlyWhen,omitempty" yaml:"readOnlyWhen,omitempty"`
 }
 
 // TemplateItem represents a single template item with an ID and an operator.
@@ -1323,6 +1361,9 @@ type Item struct {
 	Appearance           string                            `json:"appearance,omitempty" yaml:"appearance,omitempty"`
 	HideLabel            bool                              `json:"hideLabel,omitempty" yaml:"hideLabel,omitempty"`
 	VisibleWhen          map[string]interface{}            `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+	HiddenWhen           map[string]interface{}            `json:"hiddenWhen,omitempty" yaml:"hiddenWhen,omitempty"`
+	DisabledWhen         map[string]interface{}            `json:"disabledWhen,omitempty" yaml:"disabledWhen,omitempty"`
+	ReadOnlyWhen         map[string]interface{}            `json:"readOnlyWhen,omitempty" yaml:"readOnlyWhen,omitempty"`
 	// ColumnSpan defines how many columns this item occupies in a grid layout.
 	// Alternative casings ColSpan/colspan are accepted for backward compatibility.
 	ColumnSpan int                    `json:"columnSpan,omitempty" yaml:"columnSpan,omitempty"`
@@ -1394,12 +1435,17 @@ type Execute struct {
 	OnSuccess       string                            `json:"onSuccess,omitempty" yaml:"onSuccess,omitempty"`
 	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
 	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
+	VisibleWhen     map[string]interface{}            `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+	DisabledWhen    map[string]interface{}            `json:"disabledWhen,omitempty" yaml:"disabledWhen,omitempty"`
 }
 
 type Option struct {
-	Value   string `json:"value" yaml:"value"`
-	Label   string `json:"label" yaml:"label"`
-	Tooltip string `json:"tooltip,omitempty" yaml:"tooltip,omitempty"`
+	Value        string                 `json:"value" yaml:"value"`
+	Label        string                 `json:"label" yaml:"label"`
+	Tooltip      string                 `json:"tooltip,omitempty" yaml:"tooltip,omitempty"`
+	VisibleWhen  map[string]interface{} `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+	HiddenWhen   map[string]interface{} `json:"hiddenWhen,omitempty" yaml:"hiddenWhen,omitempty"`
+	DisabledWhen map[string]interface{} `json:"disabledWhen,omitempty" yaml:"disabledWhen,omitempty"`
 }
 
 type DataSource struct {
