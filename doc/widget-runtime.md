@@ -1,8 +1,6 @@
 # Forge Widget Runtime v2
 
-This document outlines the **framework-agnostic widget system** that will power **all** interactive controls inside Forge – from Schema-based forms and chat prompts to data-grid toolbars and dialogs.
-
-The design replaces the hard-coded switch–case in `ControlRenderer.jsx` with a modular pipeline that can host Blueprint widgets (the current default) **or** any other UI framework without touching Forge core.
+Forge renders controls through a widget registry, classifiers, binding helpers, and framework packs. The default Blueprint pack can be extended through the widget registry.
 
 ---
 
@@ -117,23 +115,3 @@ To ensure **zero regressions** the Blueprint pack and default helpers must repli
 7. Fallback: unresolved widget keys render legacy InputGroup and log a warning.
 
 ---
-
-## 5  Migration Path for Core Codebase
-
-1. Implement runtime registries (`widgetRegistry`, `widgetClassifier`, `binding`).
-2. Create `WidgetRenderer` + `ControlWrapper`.
-3. Port switch-case bodies from `ControlRenderer.jsx` into Blueprint components and register via `packs/blueprint`.
-4. Replace `ControlRenderer` implementation with a re-export of `WidgetRenderer`.
-5. Delete legacy code after external imports have migrated.
-
----
-
-## 6  Future Directions
-
-• **SSR friendly** – registry can flag widgets that require browser APIs and provide fallbacks.
-• **Theming** – packs may expose `registerTheme()` to offer light/dark or brand schemes.
-• **Low-code studio** – visual editor simply lists `listWidgets()` and offers drag-&-drop.
-
----
-
-*Last updated: 2025-06-26*

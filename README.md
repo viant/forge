@@ -21,9 +21,9 @@ Forge has been **built with LLMs**, leveraging AI-powered capabilities to enhanc
 - [License](#license)
 - [Acknowledgments](#acknowledgments)
 # Documentation
-- [Parameter passing between windows](docs/window-parameter-passing.md)
-- [Schema-driven forms](docs/jsonschema-forms.md)
-- [Widgets reference](docs/widgets.md)
+- [Parameter passing between windows](doc/window-parameter-passing.md)
+- [Schema-driven forms](doc/jsonschema-forms.md)
+- [Widgets reference](doc/widgets.md)
 
 ## Introduction
 
