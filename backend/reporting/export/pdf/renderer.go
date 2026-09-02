@@ -10,6 +10,7 @@ import (
 
 	"codeberg.org/go-pdf/fpdf"
 	reportprint "github.com/viant/forge/backend/reporting/print"
+	"github.com/viant/forge/backend/reporting/textwrap"
 	"golang.org/x/image/font/gofont/gobold"
 	"golang.org/x/image/font/gofont/gobolditalic"
 	"golang.org/x/image/font/gofont/goitalic"
@@ -253,16 +254,8 @@ func (r *renderer) resolveWrappedTextLines(text string, width float64) []string 
 	if width <= 0 {
 		return []string{text}
 	}
-	paragraphs := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
-	lines := make([]string, 0, len(paragraphs))
-	for _, paragraph := range paragraphs {
-		if paragraph == "" {
-			lines = append(lines, "")
-			continue
-		}
-		lines = append(lines, r.pdf.SplitText(paragraph, width)...)
-	}
-	return lines
+	fontSize, _ := r.pdf.GetFontSize()
+	return textwrap.Lines(text, width, fontSize)
 }
 
 func (r *renderer) renderLineOperation(operation linePaintOperation) {

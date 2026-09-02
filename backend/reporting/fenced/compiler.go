@@ -14,6 +14,7 @@ import (
 	reportfill "github.com/viant/forge/backend/reporting/fill"
 	reportprint "github.com/viant/forge/backend/reporting/print"
 	reportspec "github.com/viant/forge/backend/reporting/spec"
+	"github.com/viant/forge/backend/reporting/textwrap"
 )
 
 // Compile assembles fences and lowers the committed report-document-v1
@@ -460,7 +461,16 @@ func buildFillBlocks(blocks []map[string]any, datasets []any) []any {
 }
 
 func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw json.RawMessage, blocks, datasets []any) map[string]any {
-	const width, height, margin = 612.0, 792.0, 36.0
+	width, height := 612.0, 792.0
+	for _, item := range blocks {
+		block := item.(map[string]any)
+		if textValue(block["kind"]) == "tableBlock" && len(normalizeColumns(block["columns"])) >= 6 {
+			width, height = 792, 612
+			break
+		}
+	}
+	const margin = 36.0
+	contentBottom := height - 48
 	pages := []any{}
 	bookmarks := []any{}
 	pageNumber, y := 1, 84.0
@@ -483,8 +493,8 @@ func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw 
 			"number": pageNumber, "elements": elements,
 			"headerElements": headerElements,
 			"footerElements": []any{
-				lineElement(fmt.Sprintf("page_%d__footer_rule", pageNumber), margin, 754, width-2*margin),
-				alignTextElement(fmt.Sprintf("page_%d__footer_page_number", pageNumber), margin, 758, width-2*margin, 16, fmt.Sprintf("Page %d", pageNumber), 11, "", "right"),
+				lineElement(fmt.Sprintf("page_%d__footer_rule", pageNumber), margin, height-38, width-2*margin),
+				alignTextElement(fmt.Sprintf("page_%d__footer_page_number", pageNumber), margin, height-34, width-2*margin, 16, fmt.Sprintf("Page %d", pageNumber), 11, "", "right"),
 			},
 		})
 		pageNumber++
@@ -492,7 +502,7 @@ func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw 
 		elements = []any{}
 	}
 	ensure := func(required float64) {
-		if y+required > 744 {
+		if y+required > contentBottom {
 			flush()
 		}
 	}
@@ -502,6 +512,21 @@ func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw 
 		rowsByID[textValue(ds["id"])], _ = ds["rows"].([]map[string]any)
 	}
 	pendingKPIs := 0
+	kpiColumns := 3
+	if width >= 700 {
+		kpiColumns = 4
+	}
+	kpiCardHeight, kpiAdvance := 44.0, 52.0
+	tabSections := map[string]bool{}
+	for _, item := range blocks {
+		block := item.(map[string]any)
+		if textValue(block["kind"]) != "tabGroupBlock" {
+			continue
+		}
+		for _, sectionID := range stringSlice(block["sectionIds"]) {
+			tabSections[sectionID] = true
+		}
+	}
 	for _, item := range blocks {
 		block := item.(map[string]any)
 		kind, id, blockTitle := textValue(block["kind"]), textValue(block["id"]), textValue(block["title"])
@@ -509,7 +534,7 @@ func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw 
 			continue
 		}
 		if kind != "kpiBlock" && pendingKPIs > 0 {
-			y += 76
+			y += kpiAdvance
 			pendingKPIs = 0
 		}
 		if blockTitle == "" {
@@ -517,6 +542,9 @@ func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw 
 		}
 		switch kind {
 		case "sectionBlock":
+			if tabSections[id] && len(elements) > 0 {
+				flush()
+			}
 			ensure(44)
 			titleID := id + "__title"
 			elements = append(elements, rectElement(id+"__rule", margin, y, 4, 28, "#2563eb"))
@@ -526,23 +554,35 @@ func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw 
 		case "tableBlock":
 			columns := normalizeColumns(block["columns"])
 			rows := rowsByID[textValue(block["datasetRef"])]
-			rowLimit := len(rows)
-			if rowLimit > 20 {
-				rowLimit = 20
-			}
-			required := 48.0 + float64(rowLimit)*24
-			ensure(required)
-			titleID := id + "__title"
-			elements = append(elements, textElement(titleID, margin, y, width-2*margin, 20, blockTitle, 14, "600"))
-			bookmarks = append(bookmarks, bookmark(id, blockTitle, pageNumber, titleID, y))
-			y += 24
-			colWidth := (width - 2*margin) / float64(max(1, len(columns)))
-			elements = append(elements, rectElement(id+"__header_bg", margin, y, width-2*margin, 24, "#f8fafc"))
+			columnX, columnWidths := resolveColumnLayout(columns, rows, margin, width-2*margin)
+			headerHeight := 24.0
 			for index, column := range columns {
-				label := fitTableText(textValue(column["label"]), colWidth-12, 9)
-				elements = append(elements, textElement(id+"__header_"+textValue(column["key"]), margin+float64(index)*colWidth+6, y+4, colWidth-12, 16, label, 9, "600"))
+				lines := estimatedWrappedLineCount(textValue(column["label"]), columnWidths[index]-12, 9)
+				headerHeight = math.Max(headerHeight, 8+float64(lines)*11)
 			}
-			y += 24
+			ensure(24 + headerHeight + 24)
+			renderTableHeading := func(continued bool) {
+				titleID := id + "__title"
+				title := blockTitle
+				if continued {
+					title += " (continued)"
+					titleID += fmt.Sprintf("__page_%d", pageNumber)
+				}
+				elements = append(elements, textElement(titleID, margin, y, width-2*margin, 20, title, 14, "600"))
+				if !continued {
+					bookmarks = append(bookmarks, bookmark(id, blockTitle, pageNumber, titleID, y))
+				}
+				y += 24
+				elements = append(elements, rectElement(fmt.Sprintf("%s__header_bg_%d", id, pageNumber), margin, y, width-2*margin, headerHeight, "#f8fafc"))
+				for index, column := range columns {
+					header := textElement(fmt.Sprintf("%s__header_%s_%d", id, textValue(column["key"]), pageNumber), columnX[index]+6, y+4, columnWidths[index]-12, headerHeight-8, textValue(column["label"]), 9, "600")
+					header["wrap"] = true
+					header["verticalAlign"] = "top"
+					elements = append(elements, header)
+				}
+				y += headerHeight
+			}
+			renderTableHeading(false)
 			columnMax := map[string]float64{}
 			for _, column := range columns {
 				key := textValue(column["key"])
@@ -556,10 +596,24 @@ func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw 
 					}
 				}
 			}
-			for rowIndex := 0; rowIndex < rowLimit; rowIndex++ {
+			for rowIndex := 0; rowIndex < len(rows); rowIndex++ {
 				row := rows[rowIndex]
+				displayValues := make([]string, len(columns))
+				rowHeight := 24.0
 				for columnIndex, column := range columns {
 					key := textValue(column["key"])
+					displayValues[columnIndex] = formatValue(row[key], textValue(column["format"]))
+					lines := estimatedWrappedLineCount(displayValues[columnIndex], columnWidths[columnIndex]-12, 8.5)
+					rowHeight = math.Max(rowHeight, 8+float64(lines)*11)
+				}
+				if y+rowHeight > contentBottom {
+					flush()
+					renderTableHeading(true)
+				}
+				for columnIndex, column := range columns {
+					key := textValue(column["key"])
+					colWidth := columnWidths[columnIndex]
+					colX := columnX[columnIndex]
 					cellVisual, _ := column["cellVisual"].(map[string]any)
 					if textValue(cellVisual["kind"]) == "dataBar" {
 						value, _ := numberValue(row[key])
@@ -570,16 +624,18 @@ func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw 
 						backgroundColor, fillColor := dataBarColors(cellVisual)
 						elements = append(elements, map[string]any{
 							"id": fmt.Sprintf("%s__r%d_%s_bar", id, rowIndex, key), "kind": "tableCellDataBar",
-							"box":    map[string]any{"x": margin + float64(columnIndex)*colWidth + 4, "y": y + 7, "width": colWidth - 8, "height": 10},
+							"box":    map[string]any{"x": colX + 4, "y": y + 7, "width": colWidth - 8, "height": 10},
 							"rowKey": fmt.Sprintf("row_%d", rowIndex), "columnKey": key,
 							"value": value, "min": 0, "max": maximum,
 							"fillColor": fillColor, "backgroundColor": backgroundColor,
 						})
 					}
-					displayValue := fitTableText(formatValue(row[key], textValue(column["format"])), colWidth-12, 8.5)
-					elements = append(elements, textElement(fmt.Sprintf("%s__r%d_%s", id, rowIndex, key), margin+float64(columnIndex)*colWidth+6, y+4, colWidth-12, 16, displayValue, 8.5, ""))
+					cell := textElement(fmt.Sprintf("%s__r%d_%s", id, rowIndex, key), colX+6, y+4, colWidth-12, rowHeight-8, displayValues[columnIndex], 8.5, "")
+					cell["wrap"] = true
+					cell["verticalAlign"] = "top"
+					elements = append(elements, cell)
 				}
-				y += 24
+				y += rowHeight
 				elements = append(elements, lineElement(fmt.Sprintf("%s__rule_%d", id, rowIndex), margin, y, width-2*margin))
 			}
 			y += 12
@@ -602,37 +658,79 @@ func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw 
 			if len(items) == 0 {
 				continue
 			}
-			columns := min(2, len(items))
-			rows := (len(items) + columns - 1) / columns
-			required := 26.0 + float64(rows)*42
-			ensure(required)
-			titleID := id + "__title"
-			elements = append(elements, textElement(titleID, margin, y, width-2*margin, 20, blockTitle, 14, "600"))
-			bookmarks = append(bookmarks, bookmark(id, blockTitle, pageNumber, titleID, y))
-			y += 26
-			badgeWidth := (width - 2*margin - float64(columns-1)*8) / float64(columns)
+			ensure(68)
+			renderBadgeTitle := func(continued bool) {
+				title := blockTitle
+				titleID := id + "__title"
+				if continued {
+					title += " (continued)"
+					titleID += fmt.Sprintf("__page_%d", pageNumber)
+				}
+				elements = append(elements, textElement(titleID, margin, y, width-2*margin, 20, title, 14, "600"))
+				if !continued {
+					bookmarks = append(bookmarks, bookmark(id, blockTitle, pageNumber, titleID, y))
+				}
+				y += 26
+			}
+			renderBadgeTitle(false)
+			fullWidth := width - 2*margin
+			halfWidth := (fullWidth - 8) / 2
+			columnIndex := 0
+			rowHeight := 0.0
 			for index, rawItem := range items {
 				badge := rawItem.(map[string]any)
-				x := margin + float64(index%columns)*(badgeWidth+8)
-				badgeY := y + float64(index/columns)*42
-				background, border, foreground := badgeToneColors(textValue(badge["tone"]))
-				badgeHeight, textInset, textTop := 32.0, 12.0, 8.0
-				rect := rectElement(fmt.Sprintf("%s__badge_%d", id, index), x, badgeY, badgeWidth, badgeHeight, background)
-				rect["strokeColor"] = border
-				rect["radius"] = 16
-				elements = append(elements, rect)
 				label := textValue(badge["label"])
 				value := textValue(badge["displayValue"])
 				badgeText := strings.TrimSpace(label + ": " + value)
-				badgeText = fitTableText(badgeText, badgeWidth-2*textInset, 10)
-				text := textElement(fmt.Sprintf("%s__badge_text_%d", id, index), x+textInset, badgeY+textTop, badgeWidth-2*textInset, 16, badgeText, 10, "600")
+				spanFull := estimatedWrappedLineCount(badgeText, halfWidth-24, 10) > 2
+				if spanFull && columnIndex != 0 {
+					y += rowHeight + 8
+					columnIndex = 0
+					rowHeight = 0
+				}
+				badgeWidth := halfWidth
+				if spanFull {
+					badgeWidth = fullWidth
+				}
+				lineCount := estimatedWrappedLineCount(badgeText, badgeWidth-24, 10)
+				badgeHeight := math.Max(32, 14+float64(lineCount)*12)
+				if y+badgeHeight > contentBottom {
+					flush()
+					renderBadgeTitle(true)
+					columnIndex = 0
+					rowHeight = 0
+				}
+				x := margin + float64(columnIndex)*(halfWidth+8)
+				background, border, foreground := badgeToneColors(textValue(badge["tone"]))
+				rect := rectElement(fmt.Sprintf("%s__badge_%d", id, index), x, y, badgeWidth, badgeHeight, background)
+				rect["strokeColor"] = border
+				rect["radius"] = 10
+				elements = append(elements, rect)
+				text := textElement(fmt.Sprintf("%s__badge_text_%d", id, index), x+12, y+7, badgeWidth-24, badgeHeight-14, badgeText, 10, "600")
 				text["color"] = foreground
+				text["wrap"] = true
+				text["verticalAlign"] = "top"
 				elements = append(elements, text)
+				if spanFull {
+					y += badgeHeight + 8
+					columnIndex = 0
+					rowHeight = 0
+					continue
+				}
+				rowHeight = math.Max(rowHeight, badgeHeight)
+				columnIndex++
+				if columnIndex == 2 {
+					y += rowHeight + 8
+					columnIndex = 0
+					rowHeight = 0
+				}
 			}
-			y += float64(rows)*42 + 8
+			if columnIndex != 0 {
+				y += rowHeight + 8
+			}
 		case "kpiBlock":
 			if pendingKPIs == 0 {
-				ensure(76)
+				ensure(kpiAdvance)
 			}
 			rows := rowsByID[textValue(block["datasetRef"])]
 			field := textValue(block["valueField"])
@@ -640,24 +738,23 @@ func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw 
 			if len(rows) > 0 {
 				value = rows[0][field]
 			}
-			const columns = 3
 			const gap = 8.0
-			cardWidth := (width - 2*margin - gap*float64(columns-1)) / columns
+			cardWidth := (width - 2*margin - gap*float64(kpiColumns-1)) / float64(kpiColumns)
 			x := margin + float64(pendingKPIs)*(cardWidth+gap)
 			titleID := id + "__title"
 			background, border, foreground := kpiToneColors(textValue(block["tone"]))
-			card := rectElement(id+"__card", x, y, cardWidth, 64, background)
+			card := rectElement(id+"__card", x, y, cardWidth, kpiCardHeight, background)
 			card["strokeColor"] = border
 			elements = append(elements, card)
-			elements = append(elements, textElement(titleID, x+12, y+8, cardWidth-24, 16, fitTableText(blockTitle, cardWidth-24, 10), 10, "600"))
+			elements = append(elements, textElement(titleID, x+10, y+5, cardWidth-20, 14, fitTableText(blockTitle, cardWidth-20, 9), 9, "600"))
 			displayValue := formatValue(value, textValue(block["valueFormat"])) + textValue(block["suffix"])
-			valueElement := textElement(id+"__value", x+12, y+28, cardWidth-24, 28, fitTableText(displayValue, cardWidth-24, 18), 18, "700")
+			valueElement := textElement(id+"__value", x+10, y+20, cardWidth-20, 20, fitTableText(displayValue, cardWidth-20, 16), 16, "700")
 			valueElement["color"] = foreground
 			elements = append(elements, valueElement)
 			bookmarks = append(bookmarks, bookmark(id, blockTitle, pageNumber, titleID, y))
 			pendingKPIs++
-			if pendingKPIs == columns {
-				y += 76
+			if pendingKPIs == kpiColumns {
+				y += kpiAdvance
 				pendingKPIs = 0
 			}
 		case "calloutBlock":
@@ -1063,11 +1160,77 @@ func fitTableText(value string, width, fontSize float64) string {
 	return string(runes[:maxRunes-1]) + "…"
 }
 
+func estimatedWrappedLineCount(value string, width, fontSize float64) int {
+	return max(1, len(textwrap.Lines(value, width, fontSize)))
+}
+
+func resolveColumnLayout(columns []map[string]any, rows []map[string]any, left, totalWidth float64) ([]float64, []float64) {
+	if len(columns) == 0 {
+		return []float64{left}, []float64{totalWidth}
+	}
+	weights := make([]float64, len(columns))
+	totalWeight := 0.0
+	for index, column := range columns {
+		key := textValue(column["key"])
+		numeric := isNumericFormat(textValue(column["format"]))
+		for _, row := range rows[:min(50, len(rows))] {
+			if _, ok := numberValue(row[key]); ok {
+				numeric = true
+				break
+			}
+		}
+		longest := len([]rune(textValue(column["label"])))
+		if numeric {
+			longest = min(12, longest)
+		}
+		for _, row := range rows[:min(50, len(rows))] {
+			displayValue := formatValue(row[key], textValue(column["format"]))
+			length := len([]rune(displayValue))
+			if length > longest {
+				longest = length
+			}
+		}
+		limit := 30
+		if numeric {
+			limit = 18
+			// Preserve at least a signed, grouped 7.2 numeric display atomically.
+			longest = max(longest, 13)
+		}
+		weight := float64(max(7, min(limit, longest)))
+		weights[index] = weight
+		totalWeight += weight
+	}
+	positions := make([]float64, len(columns))
+	widths := make([]float64, len(columns))
+	baseWidth := math.Min(64, (totalWidth/float64(max(1, len(columns))))*0.7)
+	flexibleWidth := math.Max(0, totalWidth-(baseWidth*float64(len(columns))))
+	x := left
+	for index, weight := range weights {
+		positions[index] = x
+		widths[index] = baseWidth + (flexibleWidth * weight / math.Max(1, totalWeight))
+		x += widths[index]
+	}
+	return positions, widths
+}
+
+func isNumericFormat(format string) bool {
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case "number", "integer", "currency", "percent", "percentage", "compact", "compactnumber":
+		return true
+	default:
+		return false
+	}
+}
+
 func buildChartSVG(rows []map[string]any, chartSpec map[string]any, width, height float64) string {
 	xField := textValue(chartSpec["xField"])
 	yFields := stringSlice(chartSpec["yFields"])
 	if len(yFields) == 0 {
 		return fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="%.0f" height="%.0f"><text x="12" y="24" font-size="12" fill="#667085">No chart measures configured</text></svg>`, width, height)
+	}
+	chartType := strings.ToLower(textValue(chartSpec["type"]))
+	if chartType == "donut" || chartType == "pie" {
+		return buildDonutChartSVG(rows, chartSpec, width, height)
 	}
 	const left, top, right, bottom = 48.0, 12.0, 12.0, 30.0
 	plotWidth, plotHeight := width-left-right, height-top-bottom
@@ -1087,7 +1250,6 @@ func buildChartSVG(rows []map[string]any, chartSpec map[string]any, width, heigh
 	fmt.Fprintf(&svg, `<rect width="%.0f" height="%.0f" rx="6" fill="#ffffff" stroke="#d0d5dd"/>`, width, height)
 	fmt.Fprintf(&svg, `<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#98a2b3"/>`, left, top+plotHeight, left+plotWidth, top+plotHeight)
 	palette := []string{"#2563eb", "#16a34a", "#f59e0b", "#7c3aed"}
-	chartType := strings.ToLower(textValue(chartSpec["type"]))
 	if chartType == "bar" || chartType == "column" {
 		count := max(1, len(rows)*len(yFields))
 		barWidth := plotWidth / float64(count) * 0.72
@@ -1132,6 +1294,67 @@ func buildChartSVG(rows []map[string]any, chartSpec map[string]any, width, heigh
 		}
 		label := html.EscapeString(textValue(rows[rowIndex][xField]))
 		fmt.Fprintf(&svg, `<text x="%.1f" y="%.1f" text-anchor="middle" font-size="9" fill="#667085">%s</text>`, x, height-10, label)
+	}
+	svg.WriteString(`</svg>`)
+	return svg.String()
+}
+
+func buildDonutChartSVG(rows []map[string]any, chartSpec map[string]any, width, height float64) string {
+	xField := textValue(chartSpec["xField"])
+	yFields := stringSlice(chartSpec["yFields"])
+	if len(yFields) == 0 {
+		return fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="%.0f" height="%.0f"><text x="12" y="24" font-size="12" fill="#667085">No chart measure configured</text></svg>`, width, height)
+	}
+	valueField := yFields[0]
+	total := 0.0
+	values := make([]float64, len(rows))
+	for index, row := range rows {
+		value, _ := numberValue(row[valueField])
+		if value < 0 {
+			value = 0
+		}
+		values[index] = value
+		total += value
+	}
+	if total <= 0 {
+		total = 1
+	}
+	palette := stringSlice(chartSpec["palette"])
+	if len(palette) == 0 {
+		palette = []string{"#3857d6", "#2aa198", "#f0a43c", "#d65b7b", "#7b61c9"}
+	}
+	cx, cy := width*0.32, height*0.48
+	radius := math.Min(width*0.18, height*0.31)
+	strokeWidth := math.Max(14, radius*0.36)
+	startAngle := -math.Pi / 2
+	var svg strings.Builder
+	fmt.Fprintf(&svg, `<svg xmlns="http://www.w3.org/2000/svg" width="%.0f" height="%.0f">`, width, height)
+	fmt.Fprintf(&svg, `<rect width="%.0f" height="%.0f" rx="8" fill="#ffffff" stroke="#dfe6ef"/>`, width, height)
+	for index, value := range values {
+		if value <= 0 {
+			continue
+		}
+		endAngle := startAngle + (value/total)*2*math.Pi
+		steps := max(3, int(math.Ceil((endAngle-startAngle)/(math.Pi/32))))
+		points := make([]string, 0, steps+1)
+		for step := 0; step <= steps; step++ {
+			angle := startAngle + (endAngle-startAngle)*float64(step)/float64(steps)
+			points = append(points, fmt.Sprintf("%.2f %.2f", cx+radius*math.Cos(angle), cy+radius*math.Sin(angle)))
+		}
+		fmt.Fprintf(&svg, `<path d="M %s" fill="none" stroke="%s" stroke-width="%.1f"/>`, strings.Join(points, " L "), palette[index%len(palette)], strokeWidth)
+		startAngle = endAngle
+	}
+	fmt.Fprintf(&svg, `<circle cx="%.2f" cy="%.2f" r="%.2f" fill="#ffffff"/>`, cx, cy, math.Max(1, radius-strokeWidth*0.62))
+	legendX, legendY := width*0.61, 28.0
+	for index, row := range rows {
+		if index >= 8 {
+			break
+		}
+		label := html.EscapeString(textValue(row[xField]))
+		pct := values[index] / total * 100
+		y := legendY + float64(index)*19
+		fmt.Fprintf(&svg, `<rect x="%.1f" y="%.1f" width="10" height="10" rx="2" fill="%s"/>`, legendX, y-8, palette[index%len(palette)])
+		fmt.Fprintf(&svg, `<text x="%.1f" y="%.1f" font-size="10" fill="#344054">%s %.0f%%</text>`, legendX+16, y, label, pct)
 	}
 	svg.WriteString(`</svg>`)
 	return svg.String()

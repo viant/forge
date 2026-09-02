@@ -239,14 +239,15 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
 
             const initialSelectionValue =
                 dataSource.selectionMode === 'multi' ? {selection: []} : {selected: null, rowIndex: -1};
-            const hasSelection = dataSource.selectionMode !== 'none'
-            const selectionSignals = hasSelection ? {
+            // DataSource always consumes collection/metrics/selection signals,
+            // even when row selection is disabled. `selectionMode: none`
+            // controls interaction semantics; it must not remove runtime state.
+            const dataSignals = {
                 collection: getCollectionSignal(identity.dataSourceId),
                 collectionInfo: getCollectionInfoSignal(identity.dataSourceId),
                 selection: getSelectionSignal(identity.dataSourceId, initialSelectionValue),
                 metrics: getMetricsSignal(identity.dataSourceId),
-
-            } : {}
+            }
 
             const standardSignals = {
                 input: getInputSignal(identity.dataSourceId),
@@ -261,7 +262,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
 
             const signals = {
                 ...standardSignals,
-                ...selectionSignals
+                ...dataSignals
             }
 
 
@@ -337,13 +338,12 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
 
             const initialSelectionValue =
                 dataSource.selectionMode === 'multi' ? {selection: []} : {selected: null, rowIndex: -1};
-            const hasSelection = dataSource.selectionMode !== 'none';
-            const selectionSignals = hasSelection ? {
+            const dataSignals = {
                 collection: getCollectionSignal(identity.dataSourceId),
                 collectionInfo: getCollectionInfoSignal(identity.dataSourceId),
                 selection: getSelectionSignal(identity.dataSourceId, initialSelectionValue),
                 metrics: getMetricsSignal(identity.dataSourceId),
-            } : {};
+            };
 
             const standardSignals = {
                 input: getInputSignal(identity.dataSourceId),
@@ -355,7 +355,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 windowControl: windowControlSignal,
             };
 
-            const signals = {...standardSignals, ...selectionSignals};
+            const signals = {...standardSignals, ...dataSignals};
 
             const result = {
                 ...this,
