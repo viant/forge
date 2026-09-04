@@ -21,4 +21,13 @@ assert.equal(resolveDynamicDataSourceRef(item, context), 'performance_today');
 context.signals.windowForm.value.periodView = 'unknown';
 assert.equal(resolveDynamicDataSourceRef(item, context), 'fallback');
 
+const tableContainer = {
+  dataSourceRef: 'advertiser_list',
+  dataSourceRefSelector: 'mode',
+  dataSourceRefSource: 'windowForm',
+  dataSourceRefs: {all: 'advertiser_list', starred: 'advertiser_starred_list'},
+};
+context.signals.windowForm.value = {mode: 'starred'};
+assert.equal(resolveDynamicDataSourceRef(tableContainer, context, tableContainer.dataSourceRef), 'advertiser_starred_list');
+
 console.log('dataSourceRef ✓ resolves one dynamic datasource contract for rendering and empty states');

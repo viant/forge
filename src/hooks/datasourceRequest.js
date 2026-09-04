@@ -6,3 +6,10 @@ export function buildDatasourceFetchInputs({ inputParameters = {}, filter = {}, 
         ...(filter || {}),
     };
 }
+
+export function buildDatasourceFetchPayload({inputParameters = {}, filter = {}, pagingValues = null, cache = null} = {}) {
+    return {
+        inputs: buildDatasourceFetchInputs({inputParameters, filter, pagingValues}),
+        ...(cache && typeof cache === 'object' && !Array.isArray(cache) ? {cache: {...cache}} : {}),
+    };
+}

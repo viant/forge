@@ -432,7 +432,7 @@ export function registerPack() {
         { framework: 'blueprint' }
     );
 
-    registerWidget('toggle', ({ value = false, onChange, readOnly, ...rest }) => (
+    registerWidget('toggle', ({ value = false, onChange, readOnly, type: _type, widget: _widget, ...rest }) => (
         <Switch
             {...rest}
             checked={!!value}
@@ -441,15 +441,47 @@ export function registerPack() {
         />
     ), { framework: 'blueprint' });
 
-    // Alias: provide explicit 'switch' control using the same implementation
-    registerWidget('switch', ({ value = false, onChange, readOnly, ...rest }) => (
-        <Switch
-            {...rest}
-            checked={!!value}
-            onChange={(e) => onChange?.(e.target.checked)}
-            disabled={readOnly}
-        />
-    ), { framework: 'blueprint' });
+    // Explicit switch uses a small native button shell so it remains visually
+    // stable even when host and embedded Blueprint CSS versions differ.
+    registerWidget('switch', ({ value = false, onChange, readOnly, disabled, 'aria-label': ariaLabel, item, title }) => {
+        const checked = !!value;
+        const unavailable = readOnly || disabled;
+        return (
+            <button
+                type="button"
+                role="switch"
+                aria-checked={checked}
+                aria-label={ariaLabel || item?.ariaLabel || item?.label || 'Toggle'}
+                title={title || item?.label}
+                disabled={unavailable}
+                onClick={() => onChange?.(!checked)}
+                style={{
+                    position: 'relative',
+                    display: 'inline-flex',
+                    width: 36,
+                    height: 20,
+                    padding: 2,
+                    border: '1px solid',
+                    borderColor: checked ? '#2f6fdd' : '#8a9aaa',
+                    borderRadius: 999,
+                    background: checked ? '#2f6fdd' : '#d8e0e8',
+                    cursor: unavailable ? 'not-allowed' : 'pointer',
+                    opacity: unavailable ? 0.55 : 1,
+                }}
+            >
+                <span aria-hidden="true" style={{
+                    display: 'block',
+                    width: 14,
+                    height: 14,
+                    borderRadius: '50%',
+                    background: '#fff',
+                    boxShadow: '0 1px 2px rgba(0,0,0,.28)',
+                    transform: checked ? 'translateX(16px)' : 'translateX(0)',
+                    transition: 'transform 120ms ease',
+                }}/>
+            </button>
+        );
+    }, { framework: 'blueprint' });
     registerWidget('booleanPill', (props) => <BooleanPill {...props}/>, { framework: 'blueprint' });
     registerWidget('chipList', (props) => <ChipList {...props}/>, { framework: 'blueprint' });
 

@@ -515,7 +515,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
 
     return (
         <div
-            className={`basic-table-wrapper${loading && sortedCollection.length > 0 ? " is-loading" : ""}${showEmptyState ? " has-metadata-empty-state" : ""}${horizontalOverflow.left ? " has-table-overflow-left" : ""}${horizontalOverflow.right ? " has-table-overflow-right" : ""}`}
+            className={`basic-table-wrapper${String(container?.table?.density || '').toLowerCase() === 'compact' ? " is-compact-density" : ""}${loading && sortedCollection.length > 0 ? " is-loading" : ""}${showEmptyState ? " has-metadata-empty-state" : ""}${horizontalOverflow.left ? " has-table-overflow-left" : ""}${horizontalOverflow.right ? " has-table-overflow-right" : ""}`}
             style={{
                 height: "100%",
                 width: tableDisplayWidth,

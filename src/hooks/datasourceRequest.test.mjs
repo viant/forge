@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { resolvePagingValues } from './paging.js';
-import { buildDatasourceFetchInputs } from './datasourceRequest.js';
+import { buildDatasourceFetchInputs, buildDatasourceFetchPayload } from './datasourceRequest.js';
 
 const pagingValues = resolvePagingValues(4, {
   enabled: true,
@@ -58,5 +58,18 @@ assert.deepEqual(
   }
 );
 console.log('buildDatasourceFetchInputs ✓ preserves Page/Limit query-selector paging contracts');
+
+assert.deepEqual(
+  buildDatasourceFetchPayload({
+    inputParameters: {AdvertiserId: [85141]},
+    filter: {},
+    cache: {bypassCache: true},
+  }),
+  {
+    inputs: {AdvertiserId: [85141]},
+    cache: {bypassCache: true},
+  },
+);
+console.log('buildDatasourceFetchPayload ✓ carries one-shot cache bypass hints');
 
 console.log('\nDATASOURCE REQUEST TESTS PASSED');

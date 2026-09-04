@@ -2,7 +2,7 @@ import {useSetting} from "../core/index.js";
 import { getLogger } from "../utils/logger.js";
 import { appendTargetContextQuery } from "../runtime/targetContext.js";
 import { resolvePagingValues, withPagingInputs } from "./paging.js";
-import { buildDatasourceFetchInputs } from "./datasourceRequest.js";
+import { buildDatasourceFetchPayload } from "./datasourceRequest.js";
 
 const inFlightGetRequests = new Map();
 
@@ -269,7 +269,7 @@ export function createDataConnector(dataSource, runtime = {}) {
     /**
      * GET method
      */
-    async function get({filter = {}, page, inputParameters = {}}) {
+    async function get({filter = {}, page, inputParameters = {}, cache = null}) {
         try {
             let {method, url, headers} = getUrlAndHeaders();
             let queryParams = new URLSearchParams();
@@ -301,13 +301,12 @@ export function createDataConnector(dataSource, runtime = {}) {
             url = applyParameters({url, headers, queryParams, body}, effectiveInputParameters);
             appendServiceTargetContext(queryParams);
             let payload = requestMethod !== 'GET' && isDatasourceFetchRoute
-                ? {
-                    inputs: buildDatasourceFetchInputs({
-                        inputParameters: effectiveInputParameters,
-                        filter,
-                        pagingValues,
-                    }),
-                }
+                ? buildDatasourceFetchPayload({
+                    inputParameters: effectiveInputParameters,
+                    filter,
+                    pagingValues,
+                    cache,
+                })
                 : body;
             ({url, method, headers, queryParams, body: payload} = applyRequestPreparation({
                 url,

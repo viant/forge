@@ -78,8 +78,12 @@ export function extractData(selectors = {}, paging, data) {
   if (dataSelector) {
     respData = resolveKey(data, dataSelector);
     if (typeof respData === "undefined") {
-      const envelopeRecords = extractEnvelopeRecords(data);
-      respData = typeof envelopeRecords !== "undefined" ? envelopeRecords : undefined;
+      if (Array.isArray(data)) {
+        respData = data;
+      } else {
+        const envelopeRecords = extractEnvelopeRecords(data);
+        respData = typeof envelopeRecords !== "undefined" ? envelopeRecords : undefined;
+      }
     }
   } else {
     const envelopeRecords = extractEnvelopeRecords(data);

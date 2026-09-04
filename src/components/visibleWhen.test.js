@@ -146,5 +146,25 @@ assert.equal(isContainerVisible({
     id: 'failClosed',
     visibleWhen: {source: 'authorization', field: 'resource.capabilities.read'},
 }, metricsContext({})), false);
+assert.equal(isContainerVisible({
+    id: 'validHttps',
+    visibleWhen: {source: 'metrics', field: 'landingPageUrl', matches: '^https://.+'},
+}, metricsContext({landingPageUrl: 'https://example.com'})), true);
+assert.equal(isContainerVisible({
+    id: 'invalidHttp',
+    visibleWhen: {source: 'metrics', field: 'landingPageUrl', matches: '^https://.+'},
+}, metricsContext({landingPageUrl: 'http://example.com'})), false);
+assert.equal(isContainerVisible({
+    id: 'insideNumericBounds',
+    visibleWhen: {source: 'metrics', field: 'windowHours', gt: 0, lte: 720},
+}, metricsContext({windowHours: '720'})), true);
+assert.equal(isContainerVisible({
+    id: 'outsideNumericBounds',
+    visibleWhen: {source: 'metrics', field: 'windowHours', gt: 0, lte: 720},
+}, metricsContext({windowHours: 721})), false);
+assert.equal(isContainerVisible({
+    id: 'invalidNumericValue',
+    visibleWhen: {source: 'metrics', field: 'windowHours', gt: 0},
+}, metricsContext({windowHours: ''})), false);
 
 console.log('visibleWhen ✓');

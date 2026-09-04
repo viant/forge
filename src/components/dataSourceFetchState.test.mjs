@@ -2,9 +2,14 @@ import assert from "node:assert/strict";
 
 import {
     resolveFetchPage,
+    shouldReplayPendingFetchOnMount,
     snapshotFilter,
     withFetchedPageInfo,
 } from "./dataSourceFetchState.js";
+
+assert.equal(shouldReplayPendingFetchOnMount({}, true), true);
+assert.equal(shouldReplayPendingFetchOnMount({replayPendingFetchOnRestore: false}, true), false);
+assert.equal(shouldReplayPendingFetchOnMount({replayPendingFetchOnRestore: false}, false), true);
 
 assert.deepEqual(snapshotFilter({
     b: 2,

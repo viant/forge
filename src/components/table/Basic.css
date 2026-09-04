@@ -240,6 +240,35 @@
     flex: 0 0 auto;
 }
 
+.basic-table-wrapper.is-compact-density .basic-table-filterbar {
+    min-height: 36px !important;
+    padding: 3px 8px !important;
+}
+
+.basic-table-wrapper.is-compact-density .basic-table-filterbar .bp4-button,
+.basic-table-wrapper.is-compact-density .basic-table-filterbar .bp6-button,
+.basic-table-wrapper.is-compact-density .basic-table-filterbar .bp4-input,
+.basic-table-wrapper.is-compact-density .basic-table-filterbar .bp6-input {
+    min-height: 28px !important;
+    height: 28px !important;
+}
+
+.basic-table-wrapper.is-compact-density .basic-table-paginationbar {
+    min-height: 36px !important;
+    padding: 2px 8px !important;
+}
+
+.basic-table-wrapper.is-compact-density table th,
+.basic-table-wrapper.is-compact-density table td {
+    height: 22px !important;
+    max-height: 22px;
+    padding: 1px 6px !important;
+    overflow: hidden;
+    line-height: 18px !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .basic-table-wrapper.has-metadata-empty-state {
     min-height: 0;
 }

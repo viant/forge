@@ -77,11 +77,32 @@ export const evaluatePlainVisibleWhen = (visibleWhen, context) => {
     if (Array.isArray(visibleWhen.in)) {
         return visibleWhen.in.includes(actual);
     }
+    const numericBounds = [
+        ['gt', (value, bound) => value > bound],
+        ['gte', (value, bound) => value >= bound],
+        ['lt', (value, bound) => value < bound],
+        ['lte', (value, bound) => value <= bound],
+    ].filter(([key]) => visibleWhen[key] !== undefined);
+    if (numericBounds.length > 0) {
+        const value = Number(actual);
+        if (!Number.isFinite(value)) return false;
+        return numericBounds.every(([key, compare]) => {
+            const bound = Number(visibleWhen[key]);
+            return Number.isFinite(bound) && compare(value, bound);
+        });
+    }
     if (visibleWhen.notEquals !== undefined) {
         return actual !== visibleWhen.notEquals;
     }
     if (visibleWhen.contains !== undefined) {
         return containsValue(actual, visibleWhen.contains);
+    }
+    if (visibleWhen.matches !== undefined) {
+        try {
+            return new RegExp(String(visibleWhen.matches)).test(String(actual ?? ''));
+        } catch (_) {
+            return false;
+        }
     }
     if (visibleWhen.empty !== undefined) {
         return isEmptyValue(actual) === visibleWhen.empty;

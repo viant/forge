@@ -954,12 +954,13 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
     }
 
     const fetchCollection = (props) => {
-        const {filter = {}} = props || {}
+        const {filter = {}, cache = null} = props || {}
         const inputFilter = input.value.filter || {};
         const newValue =  {
             ...input.peek(),
             filter: {...inputFilter, ...filter},
             fetch: true,
+            cache,
         };
         try {
             const log = getLogger('ds');

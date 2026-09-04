@@ -8,6 +8,7 @@ import {dialogHandlers} from "../hooks/index.js";
 import {resolveTemplate} from "../utils/index.js";
 import { getLogger } from '../utils/logger.js';
 import { buildQuickFilterSeed, mergeQuickFilterValue } from './viewDialogQuickFilters.js';
+import {evaluatePlainVisibleWhen, trackVisibleWhen} from './visibleWhen.js';
 
 function normalizeQuickFilterSpecs(dialog) {
     const specs = Array.isArray(dialog?.properties?.quickFilters) && dialog.properties.quickFilters.length > 0
@@ -446,6 +447,19 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
         );
     };
 
+    const visibleDialogActions = Array.isArray(dialog.actions)
+        ? dialog.actions.filter((action) => {
+            trackVisibleWhen(action?.visibleWhen, dsCtx);
+            return !action?.visibleWhen || evaluatePlainVisibleWhen(action.visibleWhen, dsCtx);
+        })
+        : [];
+
+    const dialogActionDisabled = (action) => {
+        trackVisibleWhen(action?.disabledWhen, dsCtx);
+        return action?.disabled === true
+            || (!!action?.disabledWhen && evaluatePlainVisibleWhen(action.disabledWhen, dsCtx));
+    };
+
     return (
 
         <div             onMouseDown={(e) => e.stopPropagation()} >
@@ -477,11 +491,11 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
             </DialogBody>
             <DialogFooter actions={
                 (dialog.actions && dialog.actions.length > 0)
-                    ? dialog.actions.map((action) => (
+                    ? visibleDialogActions.map((action) => (
                         <Button
                             key={action.id}
                             intent={action.intent}
-                            disabled={action.disabled === true}
+                            disabled={dialogActionDisabled(action)}
                             title={action.tooltip || action.label || action.id}
                             onClick={(e) => {
                                 if (action.close === true) {

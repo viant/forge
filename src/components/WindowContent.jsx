@@ -589,7 +589,10 @@ function WindowContentInner({window, metadata, services}) {
                 }
             } catch (_) {}
         }
-    }, [desiredWindowTitle, windowId]);
+    // A repeated window-open command may restore the static metadata title after
+    // the bound datasource value has already settled. Observe the active window
+    // title as well so the dynamic identity is reapplied in that case.
+    }, [desiredWindowTitle, windowId, window?.windowTitle]);
 
     useEffect(() => {
         if (typeof document === 'undefined' || !windowId) {
@@ -628,7 +631,7 @@ function WindowContentInner({window, metadata, services}) {
                 workspaceRoot.setAttribute('aria-label', `${title} workspace`);
             }
         } catch (_) {}
-    }, [windowId, metadata, desiredWindowTitle]);
+    }, [windowId, metadata, desiredWindowTitle, window?.windowTitle]);
 
     useEffect(() => {
         if (typeof window === 'undefined' || !windowId) {
@@ -658,7 +661,7 @@ function WindowContentInner({window, metadata, services}) {
                 },
             }));
         } catch (_) {}
-    }, [windowId, metadata, desiredWindowTitle]);
+    }, [windowId, metadata, desiredWindowTitle, window?.windowTitle]);
 
     /* ------------------------------------------------------------
      * Execute window-level onInit events (declared in metadata.window.on)

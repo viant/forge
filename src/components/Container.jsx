@@ -30,6 +30,7 @@ import {isContainerVisible, resolveChildContext, trackContainerVisibility} from 
 import {mergeSectionOpenState, resolveSectionOpenState, resolveSectionProperties} from './containerChrome.js';
 import AccessibleSection from './AccessibleSection.jsx';
 import {resolveDynamicDataSourceRef} from '../runtime/dataSourceRef.js';
+import {isPureBoundLabelSection} from './containerEmptyState.js';
 
 const wrapContainerChrome = (container, content, suppressTitle = false, sectionPropertiesOverride = null) => {
     if (!container?.section && !container?.card) {
@@ -131,7 +132,8 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
     const orientation = layout?.orientation || 'vertical';
 
     const {identity} = effectiveContext
-    const dataSourceRef = container.dataSourceRef || identity.dataSourceRef
+    const fallbackDataSourceRef = container.dataSourceRef || identity.dataSourceRef;
+    const dataSourceRef = resolveDynamicDataSourceRef(container, effectiveContext, fallbackDataSourceRef);
     const dashboardKey = effectiveContext?.dashboardKey;
     const windowId = effectiveContext?.identity?.windowId;
     const sectionViewSignal = windowId && container?.section?.persistState === true ? getViewSignal(windowId) : null;
@@ -620,6 +622,7 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
         !schemaFormPanel &&
         !formPanel &&
         (!containers || containers.length === 0) &&
+        isPureBoundLabelSection(visualItems) &&
         boundLabelItems.length > 0 &&
         boundLabelItems.every((item) => {
             const itemDataSourceRef = resolveDynamicDataSourceRef(item, effectiveContext, dataSourceRef);
@@ -706,8 +709,8 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
             {/* Container-level fetcher */}
             {containerWantsFetcher && (
                 <DataSourceFetcher
-                    key={`auto-fetcher-${container.id}`}
-                    context={resolveChildContext(effectiveContext, container.dataSourceRef || dataSourceRef)}
+                    key={`auto-fetcher-${container.id}-${dataSourceRef}`}
+                    context={resolveChildContext(effectiveContext, dataSourceRef)}
                     selectFirst={container.selectFirst === true}
                     fetchData={container.fetchData === true}
                     fetchOnce={dataSourceFetchMode === 'once'}

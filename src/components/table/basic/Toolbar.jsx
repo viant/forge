@@ -40,6 +40,13 @@ export function toolbarItemIcon(icon) {
     return icon;
 }
 
+export function toolbarStatusValue(item = {}, form = {}, dirty = false) {
+    if (dirty && item.dirtyValue !== undefined) return String(item.dirtyValue ?? '');
+    const field = item.dataField || item.field || item.bind || item.id;
+    const value = field && form?.[field] !== undefined ? form[field] : item.value;
+    return value == null ? '' : String(value);
+}
+
 const Toolbar = ({
                      context,
                      toolbarItems = [],
@@ -147,6 +154,27 @@ const Toolbar = ({
             return (
                 <span key={`pagination-${align}`} style={align === 'center' ? { margin: "0 10px" } : (align === 'right' ? { marginLeft: "10px" } : { marginRight: "10px" })}>
                     <PaginationBar context={context} pagination={item.pagination || {}} />
+                </span>
+            );
+        }
+        if (item.type === 'status' || item.type === 'label') {
+            const ctx = item.dataSourceRef ? context?.Context?.(item.dataSourceRef) || context : context;
+            const form = item.scope === 'windowForm'
+                ? (ctx?.handlers?.dataSource?.peekWindowFormData?.() || {})
+                : (ctx?.handlers?.dataSource?.peekFormData?.() || {});
+            const isDirty = ctx?.signals?.formStatus?.value?.dirty === true;
+            const value = toolbarStatusValue(item, form, isDirty);
+            const spanStyle = align === 'right' ? {marginLeft: 10} : {marginRight: 10};
+            return (
+                <span
+                    key={`status-${item.id}-${align}`}
+                    className={`forge-toolbar-status${item.className ? ` ${item.className}` : ''}`}
+                    style={{...spanStyle, ...(item.style || {})}}
+                    role="status"
+                    aria-live={item?.properties?.['aria-live'] || item?.ariaLive || 'polite'}
+                >
+                    {item.label ? <strong>{item.label}:</strong> : null}
+                    {value}
                 </span>
             );
         }
