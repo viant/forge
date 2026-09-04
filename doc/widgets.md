@@ -17,7 +17,7 @@ This page lists the widgets that ship with Forge’s default **Blueprint** pack.
 | `label`           | `<Label>`                            | Static label (non-interactive). |
 | `button`          | `<Button>`                           | Action button inside forms/toolbars. |
 | `progressBar`     | `<ProgressBar>`                      | Read-only progress indicator (0–1). |
-| `math`            | `<EditableMathField>`                | MathQuill equation editor. |
+| `math`            | `<InputGroup>`                       | Lightweight formula/LaTeX text input. |
 | `markdown`        | `MarkdownView`                       | Renders Markdown text; use `type: markdown` or `format: markdown`. |
 
 > **Tip**   You can override any widget or add new ones at runtime – see [widget-runtime.md](widget-runtime.md).
