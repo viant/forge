@@ -146,8 +146,11 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
         _globalServices: services || {},
         services,
         handlers: {
-            window: windowHandlers,
             ...(services || {}),
+            window: {
+                ...windowHandlers,
+                ...(services?.window || {}),
+            },
         },
         actions: {},
         dialogs: {},
@@ -156,6 +159,19 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
 
         init: function () {
             ensureActionsInitialized(this);
+        },
+
+        dispose: function () {
+            Object.values(dataSourceContextCache).forEach((dataSourceContext) => {
+                try {
+                    dataSourceContext?.connector?.dispose?.();
+                } catch (_) {}
+            });
+            Object.keys(dataSourceContextCache).forEach((key) => delete dataSourceContextCache[key]);
+            Object.keys(dialogContextCache).forEach((key) => delete dialogContextCache[key]);
+            this.dataSources = {};
+            this.dialogs = {};
+            this.actions = {};
         },
 
         dialogContext: function (dialog, dataSourceRef, options = {}) {
@@ -293,9 +309,12 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             result.handlers = {
                 // inherit parent handlers (including dialog for dialog contexts)
                 ...result.handlers,
-                dataSource: useDataSourceHandlers(identity, signals, metadata.dataSource, connector, dataSource),
-                window: windowHandlers,
                 ...this._globalServices,
+                dataSource: useDataSourceHandlers(identity, signals, metadata.dataSource, connector, dataSource),
+                window: {
+                    ...windowHandlers,
+                    ...(this._globalServices?.window || {}),
+                },
             }
             result.actions = metadata.actions.import(result) || {}
 
@@ -375,9 +394,12 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
 
             result.handlers = {
                 ...result.handlers,
-                dataSource: useDataSourceHandlers(identity, signals, metadata.dataSource, connector, dataSource),
-                window: windowHandlers,
                 ...this._globalServices,
+                dataSource: useDataSourceHandlers(identity, signals, metadata.dataSource, connector, dataSource),
+                window: {
+                    ...windowHandlers,
+                    ...(this._globalServices?.window || {}),
+                },
             };
             result.actions = metadata.actions.import(result) || {};
             result.lookupHandler = (name) => resolveActionHandler(result.actions, result.handlers, name);

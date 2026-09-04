@@ -13,6 +13,13 @@ export function resolveWindowLayoutContext(context) {
     return context.Context(defaultRef);
 }
 
+export function resolveWindowLayoutOverflow(content, fillParent = true) {
+    if (!fillParent) return 'visible';
+    if (String(content?.scrollMode || '').trim().toLowerCase() === 'self') return 'auto';
+    if (!content?.dashboard && Array.isArray(content?.containers) && content.containers.length > 1) return 'auto';
+    return 'hidden';
+}
+
 const WindowLayout = ({
                           title,
                           context,
@@ -40,7 +47,8 @@ const WindowLayout = ({
         width: '100%',
         minHeight: fillParent ? 0 : 'max-content',
         minWidth: 0,
-        overflow: fillParent ? 'hidden' : 'visible',
+        overflow: resolveWindowLayoutOverflow(content, fillParent),
+        overscrollBehavior: resolveWindowLayoutOverflow(content, fillParent) === 'auto' ? 'contain' : undefined,
     };
     return (
         <div

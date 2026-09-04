@@ -6,7 +6,6 @@ import {
     Radio,
     Tooltip as BpTooltip,
 } from "@blueprintjs/core";
-import { Table as BpTable, Column as BpColumn, Cell as BpCell, ColumnHeaderCell as BpColumnHeaderCell } from "@blueprintjs/table";
 import {
     LineChart,
     Line,
@@ -67,6 +66,7 @@ import { resolveSelector } from "../utils/selector.js";
 import { getLogger } from "../utils/logger.js";
 import { normalizeServiceErrorText } from "../utils/errorText.js";
 import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "../reporting/reportChartAnnotations.js";
+import "./Chart.css";
 
 function ChartActionButton({
     children,
@@ -79,6 +79,7 @@ function ChartActionButton({
     return (
         <button
             type="button"
+            className="forge-chart-action"
             disabled={disabled}
             title={title || undefined}
             onClick={onClick}
@@ -175,8 +176,9 @@ function formatValueByFormat(value, formatType) {
     }
     switch (formatType) {
         case "currency":
+            return new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}).format(numeric);
         case "currency2":
-            return `$${numeric.toFixed(2)}`;
+            return new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2}).format(numeric);
         case "compactNumber":
             return formatLargeNumber(numeric);
         case "percent":
@@ -186,6 +188,19 @@ function formatValueByFormat(value, formatType) {
         default:
             return formatLargeNumber(numeric);
     }
+}
+
+export function chartTableColumnMeta(columnKey, xAxis = {}, seriesDefinitions = []) {
+    if (columnKey === xAxis?.dataKey) {
+        return {key: columnKey, label: xAxis?.label || 'Date', format: 'xAxis'};
+    }
+    const series = seriesDefinitions.find((entry) => entry?.value === columnKey) || {};
+    return {key: columnKey, label: series.label || series.name || columnKey, format: series.format || ''};
+}
+
+export function formatChartTableCell(value, meta = {}, resolvedTickFormat = '') {
+    if (meta.format === 'xAxis') return formatChartXAxisValue(value, resolvedTickFormat);
+    return formatValueByFormat(value, meta.format);
 }
 
 function shouldRenderSeriesDataLabels(series = {}, chartType = "", rowCount = 0, embedded = false) {
@@ -648,7 +663,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         : {fontSize: 12, fill: "#667085", fontWeight: 500};
     const gridStroke = embedded ? "rgba(95,107,124,0.18)" : "rgba(152,162,179,0.22)";
     const showEmbeddedSeriesSelector = embedded && !isPieChart && availableDataKeys.length > 1;
-    const showChartLegend = !showEmbeddedSeriesSelector;
+    const showChartLegend = !showEmbeddedSeriesSelector && (embedded || !controlsVisible);
 
     const seriesToggleOptions = useMemo(() => availableDataKeys.map((dataKey, index) => {
         const seriesDef = seriesDefinitions.find((entry) => entry.value === dataKey);
@@ -814,6 +829,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             strokeDasharray: entry.strokeDasharray || defaultLineDash,
             fillOpacity: entry.fillOpacity ?? (entry.type === "area" ? 0.22 : 1),
             opacity: entry.opacity,
+            isAnimationActive: chart?.animate === true || chart?.animation === true,
         };
         const showSeriesDataLabels = shouldRenderSeriesDataLabels(entry, type, normalizedChartData.length, embedded);
         const dataLabelFormatter = buildDataLabelFormatter(entry.format || leftAxis.format);
@@ -886,7 +902,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 tickLine={false}
                 minTickGap={embedded ? 24 : 5}
                 label={{
-                    value: embedded ? "" : (xAxis.label || xAxis.sourceDataKey || xAxis.dataKey),
+                    value: embedded ? "" : (xAxis.label || ""),
                     position: "insideBottomRight",
                     offset: 0,
                     ...axisLabelStyle,
@@ -1135,31 +1151,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         URL.revokeObjectURL(url);
     };
 
-    const tableColumns = visibleColumns.map((columnKey) => (
-        <BpColumn
-            key={columnKey}
-            columnHeaderCellRenderer={() => <BpColumnHeaderCell name={columnKey}/>}
-            cellRenderer={(rowIndex) => {
-                const raw = readChartDataValue(chartData[rowIndex], columnKey) ?? "";
-                const text = String(raw);
-                const isLong = text.length > 120;
-                const display = isLong ? `${text.slice(0, 120)}…` : text;
-                const content = <span>{display}</span>;
-                return (
-                    <BpCell
-                        style={{whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", cursor: isLong ? "pointer" : "default"}}
-                        onClick={() => isLong && setExpandedCell({title: columnKey, content: text})}
-                    >
-                        {isLong ? (
-                            <BpTooltip content={<div style={{maxWidth: 640, whiteSpace: "pre-wrap", wordBreak: "break-word"}}>{text}</div>}>
-                                {content}
-                            </BpTooltip>
-                        ) : content}
-                    </BpCell>
-                );
-            }}
-        />
-    ));
+    const tableColumnMeta = visibleColumns.map((columnKey) => chartTableColumnMeta(columnKey, xAxis, seriesDefinitions));
 
     const chartExportId = container?.id && String(container?.kind || '').startsWith('dashboard.')
         ? container.id
@@ -1179,7 +1171,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         && !hasChartRows
         && hasResolvedMetricsPayload;
     const emptyChartMessage = resolveEmptyChartMessage(chartMetrics);
-    const showSeriesSelectionControls = !showResolvedEmptyStateWhileLoading;
+    const showSeriesSelectionControls = !showResolvedEmptyStateWhileLoading
+        && !(chart?.hideControlsWhenEmpty === true && !hasUnderlyingChartRows);
     const { showSelectionMessage, showEmptyDataMessage } = resolveChartBodyState({
         loading: effectiveLoading,
         error,
@@ -1258,11 +1251,14 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const resolvedHeight = isHorizontalBar
         ? normalizeChartExtent(height, embedded ? 320 : 260)
         : normalizeChartExtent(height, embedded ? 380 : 240);
+    const effectiveViewportHeight = showEmptyDataMessage
+        ? normalizeChartExtent(chart?.emptyHeight, resolvedHeight)
+        : resolvedHeight;
     const resolvedMinHeight = (() => {
-        if (typeof resolvedHeight === 'number') {
-            return resolvedHeight;
+        if (typeof effectiveViewportHeight === 'number') {
+            return effectiveViewportHeight;
         }
-        const normalized = typeof resolvedHeight === 'string' ? resolvedHeight.trim().toLowerCase() : '';
+        const normalized = typeof effectiveViewportHeight === 'string' ? effectiveViewportHeight.trim().toLowerCase() : '';
         if (normalized === '100%') {
             return embedded ? 220 : 420;
         }
@@ -1270,7 +1266,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     })();
     const chartViewportStyle = {
         width: "100%",
-        height: resolvedHeight,
+        height: effectiveViewportHeight,
         minHeight: resolvedMinHeight || undefined,
         minWidth: 0,
         flex: "0 0 auto",
@@ -1455,29 +1451,33 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     ) : null}
                 </div>
             ) : (
-                <div style={{width: "100%", marginTop: 8, overflowX: "auto"}}>
-                    <BpTable
-                        numRows={chartData.length}
-                        columnWidths={tableColumnWidths}
-                        onColumnWidthChanged={(indexOrSize, sizeOrIndex) => {
-                            let idx = indexOrSize;
-                            let size = sizeOrIndex;
-                            if (idx > 2000 && size < 200) {
-                                const t = idx;
-                                idx = size;
-                                size = t;
-                            }
-                            const key = visibleColumns[idx];
-                            if (key && Number.isFinite(size) && size > 60) {
-                                setColumnWidths((prev) => ({...prev, [key]: size}));
-                            }
-                        }}
-                        enableGhostCells={false}
-                        enableRowHeader={false}
-                        defaultRowHeight={28}
-                    >
-                        {tableColumns}
-                    </BpTable>
+                <div className="forge-chart-table-scroll">
+                    <table className="forge-chart-table" style={{minWidth: Math.max(640, tableColumnWidths.reduce((sum, widthValue) => sum + widthValue, 0))}}>
+                        <colgroup>
+                            {tableColumnWidths.map((widthValue, index) => <col key={`${visibleColumns[index]}-width`} style={{width: widthValue}}/>)}
+                        </colgroup>
+                        <thead>
+                            <tr>{tableColumnMeta.map((meta) => <th key={meta.key} scope="col">{meta.label}</th>)}</tr>
+                        </thead>
+                        <tbody>
+                            {chartData.map((row, rowIndex) => (
+                                <tr key={row?.[xAxis?.dataKey] || rowIndex}>
+                                    {tableColumnMeta.map((meta) => {
+                                        const raw = readChartDataValue(row, meta.key) ?? '';
+                                        const formatted = formatChartTableCell(raw, meta, resolvedTickFormat);
+                                        const text = String(formatted ?? '');
+                                        const isLong = text.length > 120;
+                                        return (
+                                            <td key={meta.key} title={isLong ? text : undefined}
+                                                onClick={() => isLong && setExpandedCell({title: meta.label, content: text})}>
+                                                {isLong ? `${text.slice(0, 120)}…` : text}
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             )}
 

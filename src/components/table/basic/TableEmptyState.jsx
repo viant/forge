@@ -11,7 +11,7 @@ const TableEmptyState = ({context, config = {}}) => {
 
     return (
         <section
-            className={`forge-table-empty-state${steps.length ? ' forge-table-empty-state--guided' : ''}`}
+            className={`forge-table-empty-state${config.compact ? ' is-compact' : ''}${steps.length ? ' forge-table-empty-state--guided' : ''}`}
             aria-label={config.title || 'No records'}
             style={config.style}
         >

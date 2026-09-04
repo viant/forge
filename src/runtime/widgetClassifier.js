@@ -125,6 +125,8 @@ registerClassifier((item) => {
             return 'textarea';
         case 'password':
             return 'password';
+        case 'file':
+            return 'file';
         case 'currency':
             return 'currency';
         case 'date':
@@ -142,6 +144,9 @@ registerClassifier((item) => {
         case 'multiSelect':
         case 'multiselect':
             return 'multiSelect';
+        case 'chipList':
+        case 'chiplist':
+            return 'chipList';
         case 'label':
             return 'label';
         case 'progressBar':

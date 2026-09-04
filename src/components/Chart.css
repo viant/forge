@@ -1,0 +1,58 @@
+.forge-chart-table-scroll {
+    width: 100%;
+    max-height: 300px;
+    margin-top: 8px;
+    overflow: auto;
+    border: 1px solid #d9e2ec;
+    border-radius: 10px;
+    background: #ffffff;
+}
+
+.forge-chart-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+    color: #253247;
+    font-size: 13px;
+}
+
+.forge-chart-table th,
+.forge-chart-table td {
+    height: 34px;
+    padding: 7px 12px;
+    overflow: hidden;
+    border-right: 1px solid #edf1f6;
+    border-bottom: 1px solid #e5eaf1;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.forge-chart-table th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    color: #244f9e;
+    background: #edf3ff;
+    font-size: 12px;
+    font-weight: 750;
+}
+
+.forge-chart-table tbody tr:nth-child(even) td {
+    background: #f9fbfe;
+}
+
+.forge-chart-table th:last-child,
+.forge-chart-table td:last-child {
+    border-right: 0;
+}
+
+.forge-chart-action:focus {
+    outline: none;
+}
+
+.forge-chart-action:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}

@@ -23,6 +23,15 @@ assert.equal(info.pageCount, 61389);
 assert.equal(info.totalCount, 1227774);
 assert.doesNotThrow(() => JSON.stringify(info));
 assert.equal(Object.prototype.hasOwnProperty.call(info, 'value'), false);
+
+const openEnded = extractData(
+  {data: 'data'},
+  {enabled: true, size: 100, dataInfoSelectors: {}},
+  {data: [{id: 1}]},
+);
+assert.deepEqual(openEnded.info, {});
+assert.equal(Object.prototype.hasOwnProperty.call(openEnded.info, 'totalCount'), false);
+assert.equal(Object.prototype.hasOwnProperty.call(openEnded.info, 'pageCount'), false);
 console.log('extractData ✓ falls back to recordCount for totalCount');
 
 const projectedPayload = {

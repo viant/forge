@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import {filterEmptyStateToolbarItems, shouldRenderTableEmptyState} from './tableEmptyState.js';
+import {filterEmptyStateToolbarItems, resolveTableEmptyState, shouldRenderTableEmptyState} from './tableEmptyState.js';
 
 const emptyState = {
     title: 'Create your first automation',
@@ -25,3 +25,6 @@ assert.deepEqual(
 );
 
 console.log('table empty state ✓ metadata controls zero-state visibility and toolbar actions');
+
+assert.equal(resolveTableEmptyState({title: 'Create', filtered: {title: 'No matches'}}, {}).title, 'Create');
+assert.equal(resolveTableEmptyState({title: 'Create', filtered: {title: 'No matches'}}, {Name: 'x'}).title, 'No matches');

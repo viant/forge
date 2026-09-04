@@ -184,6 +184,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
     const log = getLogger('dialog');
     const {handlers} = context
     const resolvedDataSourceRef = dialog?.dataSourceRef || context?.identity?.dataSourceRef || '';
+    const fetchOnOpen = dialog?.content?.fetchData !== false;
     const callerProps = handlers.dialog.callerProps?.() || {};
     const selectionModeOverride = resolveDialogSelectionMode(dialog, callerProps);
 
@@ -248,7 +249,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                 const nextFilterStr = JSON.stringify(nextFilter || {});
                 const prevFilterStr = JSON.stringify((current.filter || {}));
                 const inputChanged = nextArgsStr !== prevArgsStr || nextParamsStr !== prevParamsStr || nextFilterStr !== prevFilterStr;
-                if (inputChanged) {
+                if (inputChanged && fetchOnOpen) {
                     try {
                         dialogDataSourceHandlers?.resetSelection?.();
                         dialogDataSourceHandlers?.setCollection?.([]);
@@ -280,6 +281,13 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
             }
             // Trigger initial fetch using DS helper (deferred to avoid reactive cycle)
             try {
+                if (!fetchOnOpen) {
+                    previousOpenRef.current = isDialogOpen;
+                    if (events.onOpen.isDefined()) {
+                        events.onOpen.execute({ context, dialog });
+                    }
+                    return;
+                }
                 setTimeout(() => {
                     try {
                         const dsC = resolvedDataSourceRef
@@ -321,7 +329,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
             }
         }
         previousOpenRef.current = isDialogOpen;
-    }, [dialogOpen, handlers, resolvedDataSourceRef, selectionModeOverride, context, dialog, events, quickFilterSpecs, log]);
+    }, [dialogOpen, handlers, resolvedDataSourceRef, selectionModeOverride, context, dialog, events, quickFilterSpecs, fetchOnOpen, log]);
 
     const handleClose = () => {
         handlers.dialog.close();
@@ -473,9 +481,14 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                         <Button
                             key={action.id}
                             intent={action.intent}
+                            disabled={action.disabled === true}
+                            title={action.tooltip || action.label || action.id}
                             onClick={(e) => {
+                                if (action.close === true) {
+                                    return handleClose();
+                                }
                                 const handler = events.actions[action.id]
-                                if (handler.onClick) {
+                                if (handler?.onClick) {
                                     // Execute action handlers in the dialog's DS context so
                                     // service functions do not need to call hooks (Context.Context)
                                     return handler.onClick.execute({event: e, action: action.id, context: dsCtx})

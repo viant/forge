@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mergeSelectedTab, nextBusMessage} from './FormPanelState.js';
+import {mergeSelectedTab, nextBusMessage, resolveDataSourceFetchMode} from './FormPanelState.js';
 
 {
     const previous = {tabs: {root: 'general'}, other: true};
@@ -7,6 +7,11 @@ import {mergeSelectedTab, nextBusMessage} from './FormPanelState.js';
     assert.equal(result.changed, false);
     assert.equal(result.value, previous);
 }
+
+assert.equal(resolveDataSourceFetchMode('once', 'always'), 'once');
+assert.equal(resolveDataSourceFetchMode('always', 'once'), 'always');
+assert.equal(resolveDataSourceFetchMode('', 'once'), 'once');
+assert.equal(resolveDataSourceFetchMode('unsupported', 'always'), 'always');
 
 {
     const previous = {tabs: {root: 'general'}, other: true};

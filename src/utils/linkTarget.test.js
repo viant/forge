@@ -2,6 +2,19 @@ import assert from 'node:assert/strict';
 
 import { resolveLinkTarget } from './linkTarget.js';
 
+assert.deepEqual(resolveLinkTarget({
+  row: {recordId: 42},
+  value: 'Record 42',
+  linkConfig: {hrefTemplate: 'https://example.test/records/{{recordId}}', text: 'Open record'},
+}), {
+  kind: 'external',
+  href: 'https://example.test/records/42',
+  text: 'Open record',
+  target: '_blank',
+  rel: 'noopener noreferrer',
+  title: '',
+});
+
 const row = {
   id: 123,
   campaignId: 456,

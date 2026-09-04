@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import ControlRenderer from './ControlRenderer.jsx';
+import {evaluatePlainVisibleWhen, trackVisibleWhen} from './visibleWhen.js';
 
 // GridLayoutRenderer – coordinate-free auto-placement grid with colspan/rowspan
 // Supports label-cells in two symmetric modes: left (default) and top.
@@ -11,7 +12,7 @@ function clamp(n, min, max) {
     return Math.min(Math.max(n, min), max);
 }
 
-function placeItems(items, columns) {
+function placeItems(items, columns, dense = true) {
     // Occupancy grid: rows of columns booleans; grows as needed.
     const occ = [];
     const placements = [];
@@ -38,6 +39,8 @@ function placeItems(items, columns) {
         }
     }
 
+    let flowRow = 1;
+    let flowColumn = 1;
     items.forEach((item) => {
         let w = item?.columnSpan || 1;
         let h = item?.rowSpan || 1;
@@ -51,14 +54,25 @@ function placeItems(items, columns) {
 
         // Scan rows and columns to find first fit
         let placed = false;
-        let r = 1;
+        let r = dense ? 1 : flowRow;
         while (!placed) {
             ensureRows(r);
-            for (let c = 1; c <= columns; c++) {
+            const columnStart = !dense && r === flowRow ? flowColumn : 1;
+            for (let c = columnStart; c <= columns; c++) {
                 if (c + w - 1 > columns) break; // cannot fit on this row from column c
                 if (rectFree(r, c, w, h)) {
                     markRect(r, c, w, h);
                     placements.push({ item, r, c, w, h });
+                    if (!dense) {
+                        const nextColumn = c + w;
+                        if (nextColumn > columns) {
+                            flowRow = r + h;
+                            flowColumn = 1;
+                        } else {
+                            flowRow = r;
+                            flowColumn = nextColumn;
+                        }
+                    }
                     placed = true;
                     break;
                 }
@@ -151,8 +165,22 @@ export default function GridLayoutRenderer({
     const controlGap = labels?.controlGap !== undefined ? Number(labels.controlGap) : 8;
     const labelStyle = { fontWeight: 700, color: '#1f2937', ...(labels.style || labels.labelStyle || {}) };
     const sourceEntries = entries || items || [];
+    sourceEntries.forEach((item) => {
+        const dsRef = item?.dataSourceRef || baseDataSourceRef;
+        const scoped = typeof context?.Context === 'function' ? context.Context(dsRef) : context;
+        trackVisibleWhen(item?.visibleWhen, scoped);
+        trackVisibleWhen(item?.hiddenWhen, scoped);
+    });
+    const visibleEntries = sourceEntries.filter((item) => {
+        const dsRef = item?.dataSourceRef || baseDataSourceRef;
+        const scoped = typeof context?.Context === 'function' ? context.Context(dsRef) : context;
+        if (item?.visibleWhen && !evaluatePlainVisibleWhen(item.visibleWhen, scoped)) return false;
+        if (item?.hiddenWhen && evaluatePlainVisibleWhen(item.hiddenWhen, scoped)) return false;
+        return true;
+    });
 
-    const { placements, rowCount } = useMemo(() => placeItems(sourceEntries, columns), [sourceEntries, columns]);
+    const dense = layout?.dense !== false;
+    const { placements, rowCount } = useMemo(() => placeItems(visibleEntries, columns, dense), [visibleEntries, columns, dense]);
 
     const containerStyle = useMemo(() => ({ ...styleOverride, ...buildContainerStyle(layout, rowCount) }), [layout, rowCount, styleOverride]);
 
@@ -184,17 +212,15 @@ export default function GridLayoutRenderer({
 
                 // Label cell (if applicable)
                 const labelNode = hasLabel ? (
-                    <div
+                    <label
                         key={`${item.id || item.name}-label`}
+                        htmlFor={item.id || undefined}
+                        title={item.tooltip || undefined}
                         style={{ display: 'flex', alignItems: (labels.align || (labelMode === 'left' ? 'baseline' : 'center')), ...labelStyle, ...css.label }}
                     >
-                        <ControlRenderer
-                            key={`${item.id || item.name}-label-w`}
-                            item={{ id: `${item.id || item.name}-label`, widget: 'label', wrapper: 'none', scope: 'noop', properties: { value: item.label, style: { margin: 0, ...labelStyle } } }}
-                            context={subCtx}
-                            container={container}
-                        />
-                    </div>
+                        <span>{item.label}</span>
+                        {(item.required || item?.properties?.required) ? <span aria-hidden="true">&nbsp;*</span> : null}
+                    </label>
                 ) : null;
 
                 // Control cell

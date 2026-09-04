@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import {useDialogHandlers, useWindowHandlers} from './window.js';
 import {setWindowContext, clearWindowContext} from '../core/context/registry.js';
-import {activeWindows, getDashboardFilterSignal, getDashboardSelectionSignal, getDialogSignal} from '../core/store/signals.js';
+import {activeWindows, getDashboardFilterSignal, getDashboardSelectionSignal, getDialogSignal, removeWindow} from '../core/store/signals.js';
 
 const windowId = 'W_test_dashboard';
 const dashboardId = 'demoDashboard';
@@ -263,5 +263,13 @@ assert.deepEqual(await teardownPromise, {
   reason: 'owner_destroyed',
 });
 console.log('openDialog ✓ isolates owners and cancels pending work on owner teardown');
+
+let disposeCount = 0;
+setWindowContext('W_dispose', {dispose() { disposeCount += 1; }});
+activeWindows.value = [{windowId: 'W_dispose', windowKey: 'advertiser', inTab: true}];
+removeWindow('W_dispose');
+assert.equal(disposeCount, 1);
+assert.equal(activeWindows.peek().some((entry) => entry.windowId === 'W_dispose'), false);
+console.log('removeWindow ✓ synchronously disposes the cached window context');
 
 clearWindowContext(windowId);

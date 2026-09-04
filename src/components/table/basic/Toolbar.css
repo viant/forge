@@ -106,10 +106,30 @@ td .pagination-bar {
 
 .toolbar-container.is-compact .bp4-button,
 .toolbar-container.is-compact .bp6-button {
-    width: 36px;
+    width: auto;
     min-width: 36px;
     height: 36px;
     min-height: 36px;
-    padding: 0;
+    padding: 0 11px;
     border-radius: 10px;
+}
+
+.forge-toolbar-select-trigger {
+    max-width: min(280px, 32vw);
+}
+
+.forge-toolbar-select-trigger .bp6-button-text,
+.forge-toolbar-select-trigger .bp5-button-text,
+.forge-toolbar-select-trigger .bp4-button-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.forge-toolbar-select-menu {
+    min-width: 220px;
+    max-width: min(340px, calc(100vw - 32px));
+    max-height: min(320px, calc(100vh - 96px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }

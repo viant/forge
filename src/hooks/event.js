@@ -434,6 +434,9 @@ export const dialogHandlers = (context, container) => {
     };
     actions.forEach((action) => {
         if (!action.on) {
+            if (action.close === true || action.disabled === true) {
+                return;
+            }
             throw new Error(`Action '${action.id}' 'on' attribute is required`);
         }
         const actionHandler = {
@@ -455,6 +458,8 @@ export const dataSourceEvents = (context, dataSource) => {
     const {on = []} = dataSource;
     const handlers = {
         onFetch: Execution(context, message),
+        onSuccess: Execution(context, message),
+        onError: Execution(context, message),
     };
     indexExecution(context, on, handlers, message);
     return handlers;

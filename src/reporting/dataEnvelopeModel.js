@@ -108,15 +108,15 @@ export function extractData(selectors = {}, paging, data) {
       : dataInfoSelector
         ? (resolveKey(data, dataInfoSelector) || envelopeInfo)
         : envelopeInfo;
+    const pageCount = resolveKey(summary, dataInfoSelectors.pageCount || "pageCount")
+      ?? resolveKey(data, dataInfoSelectors.pageCount || "pageCount");
+    const totalCount = resolveKey(summary, dataInfoSelectors.totalCount || "totalCount")
+      ?? resolveKey(data, dataInfoSelectors.totalCount || "totalCount")
+      ?? resolveKey(summary, "recordCount")
+      ?? resolveKey(data, "recordCount");
     info = {
-      pageCount: resolveKey(summary, dataInfoSelectors.pageCount || "pageCount")
-        ?? resolveKey(data, dataInfoSelectors.pageCount || "pageCount")
-        ?? 0,
-      totalCount: resolveKey(summary, dataInfoSelectors.totalCount || "totalCount")
-        ?? resolveKey(data, dataInfoSelectors.totalCount || "totalCount")
-        ?? resolveKey(summary, "recordCount")
-        ?? resolveKey(data, "recordCount")
-        ?? 0,
+      ...(pageCount != null ? {pageCount} : {}),
+      ...(totalCount != null ? {totalCount} : {}),
     };
   }
 

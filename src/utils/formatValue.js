@@ -25,7 +25,13 @@ export const formatDisplayValue = (value, format, locale = 'en-US', options = {}
         return String(value);
     }
 
-    if (format === 'date' || format === 'dateTime' || format === 'wallClockHour' || format === 'wallClockDate') {
+    if (format === 'dimensions' && typeof value === 'object' && !Array.isArray(value)) {
+        const width = Number(value?.width);
+        const height = Number(value?.height);
+        return Number.isFinite(width) && Number.isFinite(height) ? `${width}x${height}` : '-';
+    }
+
+    if (format === 'date' || format === 'dateTime' || format === 'dateTime24' || format === 'wallClockHour' || format === 'wallClockDate') {
         const date = new Date(value);
         if (!Number.isNaN(date.getTime())) {
             if (format === 'wallClockHour' || format === 'wallClockDate') {
@@ -49,6 +55,7 @@ export const formatDisplayValue = (value, format, locale = 'en-US', options = {}
                 day: 'numeric',
                 hour: 'numeric',
                 minute: '2-digit',
+                ...(format === 'dateTime24' ? {hour12: false} : {}),
                 ...(timeZone ? {timeZone} : {}),
             }).format(date);
         }
@@ -82,6 +89,8 @@ export const formatDisplayValue = (value, format, locale = 'en-US', options = {}
             return `${numeric.toFixed(1)}%`;
         case 'percentFraction':
             return `${(numeric * 100).toFixed(1)}%`;
+        case 'percentFraction2':
+            return `${(numeric * 100).toFixed(2)}%`;
         case 'number':
             return new Intl.NumberFormat(locale, {
                 minimumFractionDigits: 0,
@@ -100,7 +109,23 @@ export const formatDisplayValue = (value, format, locale = 'en-US', options = {}
                 maximumFractionDigits: 5,
                 useGrouping: true,
             }).format(numeric);
+        case 'durationHours':
+            return numeric % 24 === 0 ? `${numeric / 24}d` : `${numeric}h`;
         default:
             return new Intl.NumberFormat(locale, {maximumFractionDigits: 2}).format(numeric);
     }
+};
+
+export const mapDisplayValue = (value, valueMap) => {
+    if (valueMap && typeof valueMap === 'object' && Object.prototype.hasOwnProperty.call(valueMap, String(value))) {
+        return valueMap[String(value)];
+    }
+    return value;
+};
+
+export const resolveEmptyDisplayText = (item = {}, fallback = 'No data') => {
+    const configured = item?.emptyText ?? item?.properties?.emptyText;
+    return configured === undefined || configured === null || String(configured).trim() === ''
+        ? fallback
+        : String(configured);
 };

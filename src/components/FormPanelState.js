@@ -35,3 +35,12 @@ export function nextBusMessage(messages, previous = {}) {
         message,
     };
 }
+
+export function resolveDataSourceFetchMode(configuredMode, inheritedMode = 'always') {
+    const normalized = String(configuredMode || '').trim().toLowerCase();
+    if (normalized === 'once' || normalized === 'always') {
+        return normalized;
+    }
+    const inherited = String(inheritedMode || '').trim().toLowerCase();
+    return inherited === 'once' ? 'once' : 'always';
+}

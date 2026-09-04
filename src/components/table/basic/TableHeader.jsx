@@ -101,9 +101,10 @@ const TableHeader = ({ context, columns, tableTitle, sortConfig }) => {
                     cursor: sortable ? "pointer" : "default",
                     textAlign: align || "left",
                     ...(minWidth && { width: minWidth }),
+                    ...(String(col?.sticky || '').toLowerCase() === 'left' ? {left: col.stickyOffset || 0} : {}),
                 };
                 return (
-                    <th key={id} style={style} onClick={() => handleSort(col)}>
+                    <th key={id} className={`${String(col?.sticky || '').toLowerCase() === 'left' ? 'is-sticky-left' : ''}${col?.stickyEdge ? ' is-sticky-edge' : ''}`} style={style} onClick={() => handleSort(col)}>
                         {renderHeaderContent(col)}
                     </th>
                 );

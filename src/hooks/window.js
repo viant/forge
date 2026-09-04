@@ -4,7 +4,7 @@ import {
     addWindow,
     getDialogSignal, removeSignalsForKey,
 } from "../core/store/signals.js";
-import { getWindowContext } from "../core/context/registry.js";
+import { clearWindowContext, getWindowContext } from "../core/context/registry.js";
 import { resolveSelector } from "../utils/selector.js";
 import { resolveParameters } from './parameters.js';
 import {buildStandaloneDashboardDocument, downloadDashboardHtml} from "../core/ui/dashboardExport.js";
@@ -350,6 +350,7 @@ export function useWindowHandlers(windowId) {
 
     const closeWindow = (props = {}) => {
         cancelDialogsOwnedByWindow(windowId);
+        clearWindowContext(windowId);
         removeSignalsForKey(windowId);
     }
 

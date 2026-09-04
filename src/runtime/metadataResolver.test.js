@@ -361,3 +361,18 @@ assert.equal(resolvedWebLayeredOverride.view.content.reportBuilder.filterPresent
 assert.equal(resolvedWebLayeredOverride.view.content.reportBuilder.density, 'desktop');
 assert.equal(resolvedWebLayeredOverride.view.content.reportBuilder.controls.placement, 'web-toolbar');
 assert.equal(resolvedWebLayeredOverride.view.content.reportBuilder.controls.summary, 'full');
+
+const linkMetadata = {
+    view: {
+        content: {
+            items: [{
+                id: 'recordLink',
+                type: 'link',
+                link: {hrefTemplate: 'https://example.test/records/{{id}}', target: '_blank'},
+            }],
+        },
+    },
+};
+const resolvedLinkMetadata = resolveMetadataForTarget(linkMetadata, {platform: 'web', formFactor: 'desktop'});
+assert.equal(resolvedLinkMetadata.view.content.items[0].link.target, '_blank');
+assert.equal(resolvedLinkMetadata.view.content.items[0].link.hrefTemplate, 'https://example.test/records/{{id}}');

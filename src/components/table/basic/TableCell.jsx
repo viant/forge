@@ -4,6 +4,9 @@ import ProgressBar from "../../control/ProgressBar.jsx";
 import {useCellEvents} from "../../../hooks/event.js";
 import {resolveTableLink} from "../../../utils/tableLink.js";
 import { resolveLinkTarget } from "../../../utils/linkTarget.js";
+import { evaluatePlainVisibleWhen } from "../../visibleWhen.js";
+import {resolveTableCellBadge} from './tableCellBadge.js';
+import {resolveTableStackedValue} from './tableStackedValue.js';
 
 const defaultCellProperties = (item) => {
     const properties = {};
@@ -151,6 +154,16 @@ const TableCell = ({
             }
             break;
         case "link": {
+            const isZeroRelation = col?.format === 'relationCount'
+                && /^0(?:\s|$)/.test(String(displayedText ?? '').trim());
+            if (isZeroRelation) {
+                cellContent = displayedText;
+                break;
+            }
+            if (col?.link?.visibleWhen && !evaluatePlainVisibleWhen(col.link.visibleWhen, context)) {
+                cellContent = displayedText;
+                break;
+            }
             const link = resolveTableLink({row, column: col, value})
                 || resolveLinkTarget({ linkConfig: col?.link, row, value, context });
             if (!link) {
@@ -161,7 +174,7 @@ const TableCell = ({
                 cellContent = (
                     <button
                         type="button"
-                        title={link.title || link.text}
+                        title={link.title || displayedText || link.text}
                         className="forge-table-link"
                         style={{background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer'}}
                         onClick={(event) => {
@@ -170,7 +183,29 @@ const TableCell = ({
                             context?.handlers?.window?.openTarget?.({ target: link, context });
                         }}
                     >
-                        {link.text}
+                        {col?.format === 'relationCount' ? displayedText : link.text}
+                    </button>
+                );
+                break;
+            }
+            if (link.kind === 'dialog') {
+                cellContent = (
+                    <button
+                        type="button"
+                        title={link.title || displayedText || link.text}
+                        className="forge-table-link"
+                        style={{background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer'}}
+                        onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            context?.handlers?.window?.openDialog?.({
+                                context,
+                                execution: {args: [link.dialogId, {awaitResult: link.awaitResult}]},
+                                parameters: link.parameters,
+                            });
+                        }}
+                    >
+                        {col?.format === 'relationCount' ? displayedText : link.text}
                     </button>
                 );
                 break;
@@ -186,6 +221,30 @@ const TableCell = ({
                 >
                     {link.text}
                 </a>
+            );
+            break;
+        }
+        case "stacked": {
+            const stacked = resolveTableStackedValue(value);
+            cellContent = (
+                <div className="forge-table-stacked-summary">
+                    {stacked.meta ? <div className="forge-table-stacked-summary__meta">{stacked.meta}</div> : null}
+                    {stacked.title ? <div className="forge-table-stacked-summary__title">{stacked.title}</div> : null}
+                    <div className="forge-table-stacked-summary__body">{stacked.body}</div>
+                    {stacked.body && onShowFullContent ? (
+                        <button
+                            type="button"
+                            className="forge-table-stacked-summary__expand"
+                            onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                onShowFullContent(stacked.body);
+                            }}
+                        >
+                            {stacked.expandLabel}
+                        </button>
+                    ) : null}
+                </div>
             );
             break;
         }
@@ -206,13 +265,29 @@ const TableCell = ({
                             {displayedText}
                         </span>
                         {showMoreButton && (
-                            <Icon
-                                icon="maximize"
-                                size={10}
-                                small={true}
+                            <button
+                                type="button"
+                                className="forge-table-cell-expand"
+                                aria-label={`Show full ${col.name || col.label || col.id || 'cell'} content`}
+                                title="Show full content"
                                 onClick={handleMoreClick}
-                                style={{marginLeft: 4}}
-                            />
+                                style={{
+                                    display: 'inline-flex',
+                                    flex: '0 0 auto',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginLeft: 4,
+                                    minWidth: 24,
+                                    minHeight: 24,
+                                    padding: 4,
+                                    border: 0,
+                                    background: 'transparent',
+                                    color: 'inherit',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                <Icon icon="maximize" size={10} small={true}/>
+                            </button>
                         )}
                     </div>
                 );
@@ -222,12 +297,36 @@ const TableCell = ({
             break;
     }
 
+    const resolvedBadge = resolveTableCellBadge(row, col.badge, context);
+    if (resolvedBadge) {
+        const badgeContent = (
+            <span
+                className={`forge-table-cell-badge is-${resolvedBadge.tone}${resolvedBadge.className ? ` ${resolvedBadge.className}` : ''}`}
+                title={resolvedBadge.tooltip}
+            >
+                {resolvedBadge.icon === 'sparkles'
+                    ? <span className="forge-sparkles-icon" aria-hidden="true">✦</span>
+                    : (resolvedBadge.icon ? <Icon icon={resolvedBadge.icon} size={12}/> : null)}
+                <span>{resolvedBadge.label}</span>
+            </span>
+        );
+        cellContent = resolvedBadge.replaceValue ? badgeContent : (
+            <div className="forge-table-cell-stack">
+                <div className="forge-table-cell-stack__primary">{cellContent}</div>
+                {badgeContent}
+            </div>
+        );
+    }
+
     const tdStyle = {
         textAlign: align,
         ...(rowStyle || {}),
         ...(cell.style || {}),
         ...(cell.maxWidth && {maxWidth: cell.maxWidth, minWidth: cell.minWidth}),
+        ...(String(col?.sticky || '').toLowerCase() === 'left' ? {left: col.stickyOffset || 0} : {}),
     };
+    if (String(col?.sticky || '').toLowerCase() === 'left') tdClass += ' is-sticky-left';
+    if (col?.stickyEdge) tdClass += ' is-sticky-edge';
 
     // Expose the raw value as a data attribute so CSS can style cells by content
     const dataAttrs = {};
@@ -236,6 +335,8 @@ const TableCell = ({
         if (raw) dataAttrs['data-value'] = raw;
     }
     if (col.id) dataAttrs['data-col'] = col.id;
+    if (type) dataAttrs['data-type'] = type;
+    if (col.link) dataAttrs['data-link-kind'] = col.link.kind || (col.link.href || col.link.hrefTemplate ? 'external' : 'configured');
 
     return (
         <td style={tdStyle} className={tdClass} {...dataAttrs}>
