@@ -1,6 +1,7 @@
 // useGenericDataSourceHandlers.js
 import {resolveParameters} from "./parameters.js";
 import {setSelector} from "../utils/selector.js";
+import {shouldSelectRowForCellAction} from "../components/table/basic/cellActionSelection.js";
 
 const Execution = (context, messageBus) => {
     const executions = [];
@@ -483,7 +484,7 @@ export const useCellEvents = ({context, cellSelection, columnHandlers = {}, onRo
             events[key] = (event) => {
                 if (event && event.stopPropagation) {
                     event.stopPropagation();
-                    if (!isSelected({...cellSelection})) {
+                    if (shouldSelectRowForCellAction(cellSelection, isSelected({...cellSelection}))) {
                         onRowClick({event, ...cellSelection, context});
                     }
                 }

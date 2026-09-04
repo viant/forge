@@ -4,6 +4,7 @@ import {getLogger} from "../utils/logger.js";
 import {useSignals} from '@preact/signals-react/runtime';
 import { extractData, isDeferredCacheHitEnvelope } from "./dataSourceExtract.js";
 import { resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, withFetchedPageInfo } from "./dataSourceFetchState.js";
+import {reconcileMultiSelection} from "./dataSourceSelection.js";
 import {
     findSelectionSignal,
 
@@ -564,6 +565,12 @@ export default function DataSource({context}) {
             });
             metrics.value = stats;
             control.value = { ...control.peek(), loaded: true, error: null, stale: false };
+            if (selectionMode === 'multi') {
+                const reconciledSelection = reconcileMultiSelection(currentSelection, records, getUniqueKeyValue);
+                if (stableSnapshotSignature(currentSelection?.selection) !== stableSnapshotSignature(reconciledSelection.selection)) {
+                    setSelected(reconciledSelection);
+                }
+            }
             if (pagingEnabled) {
                 const currentInput = input.peek() || {};
                 if (Number(currentInput.page || 1) !== Number(page || 1)) {

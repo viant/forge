@@ -1258,6 +1258,7 @@ type TableLink struct {
 	Title               string                 `json:"title,omitempty" yaml:"title,omitempty"`
 	Target              string                 `json:"target,omitempty" yaml:"target,omitempty"`
 	Rel                 string                 `json:"rel,omitempty" yaml:"rel,omitempty"`
+	DialogId            string                 `json:"dialogId,omitempty" yaml:"dialogId,omitempty"`
 	WindowKey           string                 `json:"windowKey,omitempty" yaml:"windowKey,omitempty"`
 	WindowTitle         string                 `json:"windowTitle,omitempty" yaml:"windowTitle,omitempty"`
 	WindowTitleSelector string                 `json:"windowTitleSelector,omitempty" yaml:"windowTitleSelector,omitempty"`
