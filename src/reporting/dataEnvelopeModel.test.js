@@ -24,3 +24,10 @@ test("extractData converts a selected diagnostic CSV dataset to typed rows", () 
     status: "behind",
   }]);
 });
+
+test("extractData preserves root-array records with a redundant legacy data selector", () => {
+  const rows = [{ id: "draft-1", name: "" }];
+  const result = extractData({ data: "data" }, null, rows);
+
+  assert.deepEqual(result.records, rows);
+});

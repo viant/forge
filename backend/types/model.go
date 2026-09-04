@@ -1220,6 +1220,7 @@ type Card struct {
 type Table struct {
 	Columns           []Column               `json:"columns" yaml:"columns"`
 	Presentation      string                 `json:"presentation,omitempty" yaml:"presentation,omitempty"`
+	Density           string                 `json:"density,omitempty" yaml:"density,omitempty"`
 	Toolbar           *Toolbar               `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
 	EnforceColumnSize *bool                  `json:"enforceColumnSize,omitempty" yaml:"enforceColumnSize,omitempty"`
 	Width             string                 `json:"width,omitempty" yaml:"width,omitempty"`
@@ -1304,6 +1305,7 @@ type Column struct {
 	Visible           *bool                  `json:"visible,omitempty" yaml:"visible,omitempty"`
 	Sortable          bool                   `json:"sortable,omitempty" yaml:"sortable,omitempty"`
 	Icon              string                 `json:"icon,omitempty" yaml:"icon,omitempty"`
+	IconFromValue     bool                   `json:"iconFromValue,omitempty" yaml:"iconFromValue,omitempty"`
 	Type              string                 `json:"type,omitempty" yaml:"type,omitempty"`
 	MultiSelect       bool                   `json:"multiSelect,omitempty" yaml:"multiSelect,omitempty"`
 	EnforceColumnSize bool                   `json:"enforceColumnSize,omitempty" yaml:"enforceColumnSize,omitempty"`
@@ -1386,6 +1388,7 @@ type Item struct {
 	TargetOverrides      map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
 	OptionDataSourceRets []string                          `json:"optionDataSourceRets,omitempty" yaml:"optionDataSourceRets,omitempty"`
 	Value                interface{}                       `json:"value,omitempty" yaml:"value,omitempty"`
+	DirtyValue           interface{}                       `json:"dirtyValue,omitempty" yaml:"dirtyValue,omitempty"`
 	Style                *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
 	Label                string                            `json:"label" yaml:"label"`
 	LabelPosition        string                            `json:"labelPosition,omitempty" yaml:"labelPosition,omitempty"`
@@ -1518,6 +1521,7 @@ type DataSource struct {
 	FilterSet                               []Filter                          `json:"filterSet,omitempty" yaml:"filterSet,omitempty"`
 	AutoSelect                              *bool                             `json:"autoSelect,omitempty" yaml:"autoSelect,omitempty"`
 	AutoFetch                               *bool                             `json:"autoFetch,omitempty" yaml:"autoFetch,omitempty"`
+	ReplayPendingFetchOnRestore             *bool                             `json:"replayPendingFetchOnRestore,omitempty" yaml:"replayPendingFetchOnRestore,omitempty"`
 	PreserveParametersOnMissingDependencies *bool                             `json:"preserveParametersOnMissingDependencies,omitempty" yaml:"preserveParametersOnMissingDependencies,omitempty"`
 	SelfReference                           string                            `json:"selfReference,omitempty" yaml:"selfReference,omitempty"`
 	SortMode                                string                            `json:"sortMode,omitempty" yaml:"sortMode,omitempty"`
@@ -1594,6 +1598,7 @@ type Parameter struct {
 	Direction string `json:"direction,omitempty" yaml:"direction,omitempty"`
 	Codec     *Codec `json:"codec,omitempty" yaml:"codec,omitempty"`
 	Default   string `json:"default,omitempty" yaml:"default,omitempty"`
+	Required  *bool  `json:"required,omitempty" yaml:"required,omitempty"`
 
 	//Deprecated
 	In string `json:"in,omitempty" yaml:"in,omitempty"`

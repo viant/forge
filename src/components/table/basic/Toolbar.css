@@ -133,3 +133,15 @@ td .pagination-bar {
     overflow-y: auto;
     overscroll-behavior: contain;
 }
+.forge-toolbar-status {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    color: var(--forge-text-muted, #5f6b7c);
+    font-size: 12px;
+    white-space: normal;
+}
+
+.forge-toolbar-status strong {
+    margin-right: 4px;
+}

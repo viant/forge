@@ -44,6 +44,10 @@ export function snapshotFilter(filter = {}) {
     return buildStableSnapshot(filter);
 }
 
+export function shouldReplayPendingFetchOnMount(dataSource = {}, fetch = false) {
+    return !fetch || dataSource?.replayPendingFetchOnRestore !== false;
+}
+
 export function resolveFetchPage({
     page = 1,
     filter = {},

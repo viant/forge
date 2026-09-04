@@ -7,6 +7,7 @@ import { resolveLinkTarget } from "../../../utils/linkTarget.js";
 import { evaluatePlainVisibleWhen } from "../../visibleWhen.js";
 import {resolveTableCellBadge} from './tableCellBadge.js';
 import {resolveTableStackedValue} from './tableStackedValue.js';
+import {resolveButtonIcon} from './buttonIcon.js';
 
 const defaultCellProperties = (item) => {
     const properties = {};
@@ -121,7 +122,7 @@ const TableCell = ({
             />
             break;
         case "button":
-            cellContent = <Button {...cellProps} />;
+            cellContent = <Button {...cellProps} icon={resolveButtonIcon(col, value, cellProps.icon)} />;
             break;
         case "progress":
             cellContent = (

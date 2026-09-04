@@ -3,7 +3,7 @@ import React, {useEffect, useState} from "react";
 import {getLogger} from "../utils/logger.js";
 import {useSignals} from '@preact/signals-react/runtime';
 import { extractData, isDeferredCacheHitEnvelope } from "./dataSourceExtract.js";
-import { resolveFetchPage, snapshotFilter, withFetchedPageInfo } from "./dataSourceFetchState.js";
+import { resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, withFetchedPageInfo } from "./dataSourceFetchState.js";
 import {
     findSelectionSignal,
 
@@ -22,7 +22,7 @@ import {useRef} from "react";
  *  - If at least one parameter is missing, returns false.
  *  - If a parameter is missing but has a default value, the default is assigned.
  */
-function hasResolvedDependencies(parameters = [], values = {}, filter = {}) {
+export function hasResolvedDependencies(parameters = [], values = {}, filter = {}) {
     if (!parameters || parameters.length === 0) return true; // no parameters => no dependencies
 
     for (const paramDef of parameters) {
@@ -34,6 +34,8 @@ function hasResolvedDependencies(parameters = [], values = {}, filter = {}) {
         if (!isDefined) {
             if ('default' in paramDef) {
                 values[paramDef.name] = paramDef.default;
+            } else if (paramDef.required === false) {
+                continue;
             } else {
                 return false;
             }
@@ -87,6 +89,7 @@ export default function DataSource({context}) {
     const prevQuerySig = useRef('');
     const lastResolvedParametersRef = useRef({});
     const mountedRef = useRef(true);
+    const initialFetchObservationRef = useRef(true);
 
     useEffect(() => () => {
         mountedRef.current = false;
@@ -188,9 +191,20 @@ export default function DataSource({context}) {
         const inputVal = inputValue || {};
         const {fetch, refresh = false} = inputVal;
         const loadingNow = !!(controlValue || {}).loading;
+        const initialFetchObservation = initialFetchObservationRef.current;
+        initialFetchObservationRef.current = false;
         try { log.debug('[watch] flags', { ds: context?.identity?.dataSourceRef, fetch, refresh, loading: loadingNow, input: inputVal }); } catch(_) {}
         if (!fetch && !refresh) {
             try { log.debug('[watch] skip (no flags)', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
+            return;
+        }
+        if (initialFetchObservation && fetch && !shouldReplayPendingFetchOnMount(dataSource, fetch)) {
+            input.value = {
+                ...input.peek(),
+                fetch: false,
+                refresh: false,
+            };
+            try { log.debug('[watch] suppress restored pending fetch', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
             return;
         }
         if (loadingNow) {
@@ -432,7 +446,7 @@ export default function DataSource({context}) {
         } catch (_) {
         }
         const inputVal = input.value || {};
-        let {page, filter = {}, parameters, sort = []} = inputVal || {};
+        let {page, filter = {}, parameters, sort = [], cache = null} = inputVal || {};
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, filter);
         if (!hasDeps) {
             const preservedParameters = lastResolvedParametersRef.current || {};
@@ -497,6 +511,7 @@ export default function DataSource({context}) {
                 filter: finalFilter,
                 page,
                 inputParameters: {...(parameters || {}), ...(sort?.length ? {sort} : {})},
+                cache,
             });
             if (!mountedRef.current) return;
             try {
@@ -611,6 +626,9 @@ export default function DataSource({context}) {
             }
         } finally {
             if (mountedRef.current) setLoading(false);
+            if (cache && mountedRef.current) {
+                input.value = {...input.peek(), cache: null};
+            }
         }
     }
 

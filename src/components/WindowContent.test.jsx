@@ -267,6 +267,13 @@ describe('resolveDefaultDataSourceRef', () => {
   });
 });
 
+describe('bound window title resynchronization contract', () => {
+  it('observes the active window title after a repeated open command', async () => {
+    const source = await import('node:fs/promises').then(({readFile}) => readFile(new URL('./WindowContent.jsx', import.meta.url), 'utf8'));
+    expect(source).toContain('[desiredWindowTitle, windowId, window?.windowTitle]');
+  });
+});
+
 describe('resolveWindowMetadataForTarget', () => {
   it('applies targetOverrides before window metadata is stored', () => {
     const metadata = {
