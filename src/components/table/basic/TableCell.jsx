@@ -8,6 +8,7 @@ import { evaluatePlainVisibleWhen } from "../../visibleWhen.js";
 import {resolveTableCellBadge} from './tableCellBadge.js';
 import {resolveTableStackedValue} from './tableStackedValue.js';
 import {resolveButtonIcon} from './buttonIcon.js';
+import {isolateButtonCellProps} from './buttonCellEvents.js';
 
 const defaultCellProperties = (item) => {
     const properties = {};
@@ -122,7 +123,7 @@ const TableCell = ({
             />
             break;
         case "button":
-            cellContent = <Button {...cellProps} icon={resolveButtonIcon(col, value, cellProps.icon)} />;
+            cellContent = <Button {...isolateButtonCellProps(cellProps)} icon={resolveButtonIcon(col, value, cellProps.icon)} />;
             break;
         case "progress":
             cellContent = (
