@@ -1,57 +1,139 @@
+.forge-section-tab-rail-frame {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+}
+
 .forge-section-tab-rail {
     display: flex;
-    align-items: center;
-    gap: 8px;
+    flex: 0 0 auto;
+    align-items: flex-end;
+    gap: 4px;
     width: 100%;
     max-width: 100%;
+    min-height: 39px;
     overflow-x: auto;
-    padding: 4px;
-    border: 1px solid #dbe5ec;
-    border-radius: 12px;
-    background: #f5f8fb;
+    padding: 0 2px;
+    border: 0;
+    border-bottom: 1px solid #dbe5ec;
+    border-radius: 0;
+    background: transparent;
     scrollbar-width: thin;
 }
 
+.forge-section-tab-rail-cue {
+    position: absolute;
+    top: 50%;
+    z-index: 10;
+    display: grid;
+    width: 28px;
+    height: 30px;
+    padding: 0;
+    place-items: center;
+    border: 1px solid #cbd8e5;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 3px 12px rgba(31, 54, 76, 0.16);
+    color: #36586f;
+    cursor: pointer;
+    transform: translateY(-50%);
+}
+
+.forge-section-tab-rail-cue.is-left { left: 2px; }
+.forge-section-tab-rail-cue.is-right { right: 2px; }
+
+.forge-section-tab-rail-frame.has-left-overflow::before,
+.forge-section-tab-rail-frame.has-right-overflow::after {
+    position: absolute;
+    top: 0;
+    bottom: 1px;
+    z-index: 9;
+    width: 44px;
+    content: '';
+    pointer-events: none;
+}
+
+.forge-section-tab-rail-frame.has-left-overflow::before {
+    left: 0;
+    background: linear-gradient(90deg, #fff 32%, rgba(255,255,255,0));
+}
+
+.forge-section-tab-rail-frame.has-right-overflow::after {
+    right: 0;
+    background: linear-gradient(270deg, #fff 32%, rgba(255,255,255,0));
+}
 .forge-section-tab {
+    position: relative;
     display: inline-flex;
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    gap: 7px;
+    gap: 6px;
     min-height: 38px;
-    border: 1px solid transparent;
-    border-radius: 10px;
+    margin: 0;
+    padding: 7px 12px 8px;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
     background: transparent;
     color: #486579;
-    padding: 8px 14px;
     font: inherit;
     font-size: 13px;
     font-weight: 700;
+    line-height: 20px;
     cursor: pointer;
     white-space: nowrap;
 }
 
-.forge-section-tab:hover { background: rgba(255, 255, 255, 0.72); color: #28445a; }
-
-.forge-section-tab.is-selected {
-    border-color: #6f9fe9;
-    background: #ffffff;
-    color: #1d4ed8;
-    box-shadow: 0 0 0 2px rgba(47, 109, 225, 0.32), 0 2px 5px rgba(47, 109, 225, 0.12);
+.forge-section-tab:hover {
+    color: #28445a;
+    background: rgba(47, 109, 225, 0.045);
 }
 
-.forge-section-tab:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.forge-section-tab.is-selected {
+    border-bottom-color: #2f6de1;
+    background: rgba(47, 109, 225, 0.055);
+    color: #1d4ed8;
+    box-shadow: none;
+}
 
-@media (min-width: 1000px) {
-    .forge-section-tab-rail .forge-section-tab { flex: 1 0 auto; }
+.forge-section-tab:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: -3px;
+}
+
+.forge-section-tab-rail.is-compact {
+    position: sticky;
+    top: 0;
+    z-index: 8;
+    gap: 2px;
+    min-height: 35px;
+    padding: 0 2px;
+    scroll-snap-type: x proximity;
+    background: rgba(255, 255, 255, 0.98);
+}
+
+.forge-section-tab-rail.is-compact .forge-section-tab {
+    min-height: 34px;
+    gap: 5px;
+    padding: 5px 10px 6px;
+    font-size: 12px;
+    scroll-snap-align: start;
 }
 
 @media (max-width: 480px) {
-    .forge-section-tab-rail { gap: 2px; padding: 3px; }
-    .forge-section-tab-rail .forge-section-tab {
-        flex: 1 1 0;
-        min-width: 0;
-        padding: 7px 5px;
+    .forge-section-tab-rail {
+        gap: 2px;
+        min-height: 41px;
+        padding: 0;
+    }
+
+    .forge-section-tab-rail .forge-section-tab,
+    .forge-section-tab-rail.is-compact .forge-section-tab {
+        flex: 0 0 auto;
+        min-width: max-content;
+        min-height: 40px;
+        padding: 8px 11px 9px;
         font-size: 12px;
     }
 }

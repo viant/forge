@@ -16,8 +16,85 @@ import {getEventAdapter, resolveStateAdapter, runDynamicEvaluators,} from './bin
 import {resolveSelector} from '../utils/selector.js';
 import { resolveLinkTarget } from '../utils/linkTarget.js';
 import {evaluatePlainVisibleWhen} from '../components/visibleWhen.js';
+import {resolveDynamicDataSourceRef} from './dataSourceRef.js';
 
 import ControlWrapper from './ControlWrapper.jsx';
+
+function resolveOptionFilterScope(context, source = 'form') {
+    switch (String(source || 'form').trim().toLowerCase()) {
+        case 'windowform':
+            return context?.signals?.windowForm?.value || {};
+        case 'input':
+        case 'filter':
+        case 'filters':
+            return context?.signals?.input?.value || {};
+        case 'selection': {
+            const selection = context?.handlers?.dataSource?.getSelection?.()
+                || context?.signals?.selection?.value
+                || {};
+            return selection?.selected ?? selection?.selection ?? selection;
+        }
+        case 'form':
+        default:
+            return context?.handlers?.dataSource?.getFormData?.()
+                || context?.signals?.form?.value
+                || {};
+    }
+}
+
+function filterDataSourceOptions(rows, optionFilter, context) {
+    const filters = Array.isArray(optionFilter) ? optionFilter : optionFilter ? [optionFilter] : [];
+    if (filters.length === 0) return rows;
+    return rows.filter((row) => filters.every((filter) => {
+        const expected = resolveSelector(
+            resolveOptionFilterScope(context, filter?.source),
+            filter?.selector || filter?.valueSelector || '',
+        );
+        if (expected === undefined || expected === null || expected === '') return true;
+        const actual = resolveSelector(row, filter?.field || filter?.rowSelector || '');
+        if (filter?.caseInsensitive === true) {
+            return String(actual ?? '').toLowerCase() === String(expected).toLowerCase();
+        }
+        return actual === expected;
+    }));
+}
+
+export function resolveDataSourceOptions(item = {}, context = {}, fallback = []) {
+    const dataSourceRef = String(item?.optionsDataSourceRef || '').trim();
+    if (!dataSourceRef || typeof context?.Context !== 'function') {
+        return Array.isArray(fallback) ? fallback : [];
+    }
+    try {
+        const optionContext = context.Context(dataSourceRef);
+        const rows = optionContext?.signals?.collection?.value
+            || optionContext?.signals?.collection?.peek?.()
+            || [];
+        if (!Array.isArray(rows)) return Array.isArray(fallback) ? fallback : [];
+        const labelSelector = String(item?.optionLabelField || item?.optionLabelSelector || 'label').trim();
+        const valueSelector = String(item?.optionValueField || item?.optionValueSelector || 'value').trim();
+        const secondarySelector = String(item?.optionSecondaryField || item?.optionSecondarySelector || '').trim();
+        const options = filterDataSourceOptions(rows, item?.optionFilter || item?.optionFilters, context)
+            .map((row) => {
+                const value = resolveSelector(row, valueSelector);
+                const label = resolveSelector(row, labelSelector);
+                if (value === undefined || value === null || label === undefined || label === null) return null;
+                const secondary = secondarySelector ? resolveSelector(row, secondarySelector) : undefined;
+                const displayLabel = secondary === undefined || secondary === null || secondary === ''
+                    ? String(label)
+                    : `${String(label)} (${String(secondary)})`;
+                return secondary === undefined || secondary === null || secondary === ''
+                    ? {value, label: displayLabel}
+                    : {value, label: displayLabel, secondary};
+            })
+            .filter(Boolean);
+        if (item?.includeEmptyOption === true) {
+            return [{value: '', label: String(item?.emptyOptionLabel || 'Select…')}, ...options];
+        }
+        return options;
+    } catch (_) {
+        return Array.isArray(fallback) ? fallback : [];
+    }
+}
 
 export default function WidgetRenderer({
     item,
@@ -51,36 +128,8 @@ export default function WidgetRenderer({
         }
     };
 
-    const resolveItemContext = () => {
-        const refs = item?.dataSourceRefs || {};
-        const selector = item?.dataSourceRefSelector || '';
-        const source = String(item?.dataSourceRefSource || 'windowForm').toLowerCase();
-        if (!selector || !refs || typeof refs !== 'object' || Array.isArray(refs)) {
-            return item?.dataSourceRef ? context.Context(item.dataSourceRef) : context;
-        }
-        let scope = {};
-        switch (source) {
-            case 'form':
-                scope = context?.signals?.form?.value || {};
-                break;
-            case 'filter':
-            case 'filters':
-                scope = context?.signals?.input?.value?.filter || {};
-                break;
-            case 'input':
-                scope = context?.signals?.input?.value || {};
-                break;
-            case 'windowform':
-            default:
-                scope = context?.signals?.windowForm?.value || {};
-                break;
-        }
-        const key = resolveSelector(scope, selector);
-        const mapped = key != null ? refs[key] : '';
-        if (mapped) return context.Context(mapped);
-        return item?.dataSourceRef ? context.Context(item.dataSourceRef) : context;
-    };
-    const resolvedContext = resolveItemContext();
+    const resolvedDataSourceRef = resolveDynamicDataSourceRef(item, context);
+    const resolvedContext = resolvedDataSourceRef ? context.Context(resolvedDataSourceRef) : context;
 
     // ------------------------------------------------------------------
     // 1. Resolve widget key / factory
@@ -173,12 +222,14 @@ export default function WidgetRenderer({
     }
 
 
-    const options = item.options || adapter.getOptions()
+    const options = item.options || resolveDataSourceOptions(item, resolvedContext, adapter.getOptions())
 
     const baseValue = (dynValue !== undefined ? dynValue : adapter.get());
     const safeValue = widgetKey === 'label' ? baseValue : ((baseValue === null || baseValue === undefined) ? '' : baseValue);
 
     const widgetProps = {
+        id: item.id || undefined,
+        'aria-label': item.ariaLabel || item.label || undefined,
         context: resolvedContext,
         adapter: adapter,
         item,
@@ -189,13 +240,22 @@ export default function WidgetRenderer({
                 : dynReadonlyGlobal !== undefined
                 ? dynReadonlyGlobal
                 : item.readOnly,
-        disabled: dynDisabledGlobal === undefined ? undefined : dynDisabledGlobal,
+        disabled: dynDisabledGlobal === undefined ? item.disabled : dynDisabledGlobal,
         onChange: events.onChange,
         options,
         ...item.properties,
         ...combinedProps,
         ...mergedEvents,
     };
+
+    if (item?.optionsDataSourceRef) {
+        const hasResolvedValue = safeValue !== '' && safeValue !== null && safeValue !== undefined;
+        widgetProps.className = [
+            item?.className,
+            'forge-dictionary-input',
+            hasResolvedValue ? 'is-resolved' : '',
+        ].filter(Boolean).join(' ');
+    }
 
 
     // No need to expose unsupported event keys to the widget DOM.

@@ -65,6 +65,24 @@ items:
 	}
 }
 
+func TestItemPreservesDatasourceBackedOptions(t *testing.T) {
+	var item Item
+	input := []byte(`
+id: category
+type: select
+optionsDataSourceRef: advertiser_categories
+optionLabelField: caption
+optionValueField: caption
+optionSecondaryField: id
+`)
+	if err := yaml.Unmarshal(input, &item); err != nil {
+		t.Fatal(err)
+	}
+	if item.OptionsDataSourceRef != "advertiser_categories" || item.OptionLabelField != "caption" || item.OptionValueField != "caption" || item.OptionSecondaryField != "id" {
+		t.Fatalf("datasource-backed options were not preserved: %#v", item)
+	}
+}
+
 func TestGenericWindowMetadataPreservesPresentationAndCallbacks(t *testing.T) {
 	input := []byte(`
 id: genericWorkspace

@@ -15,7 +15,12 @@ import FullContentDialog from "./FullContentDialog.jsx";
 import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from "./formattingRules.js";
 import {resolveTableCellText, resolveTableLink} from "../../utils/tableLink.js";
 import {resolveKey} from "../../utils/selector.js";
-import {filterEmptyStateToolbarItems, shouldRenderTableEmptyState} from "./tableEmptyState.js";
+import {filterEmptyStateToolbarItems, resolveTableEmptyState, shouldRenderTableEmptyState} from "./tableEmptyState.js";
+import {preserveDeclaredColumnWidths, scrollableTableWidth, tableBackfillCount, withStickyColumnOffsets} from './tableSizing.js';
+import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
+import {resolveClientPagination} from './clientPagination.js';
+import {useSignals} from '@preact/signals-react/runtime';
+import {applyClientFilters} from './clientFilters.js';
 
 const defaultCellWidth = 30; // Adjust as needed
 
@@ -28,8 +33,19 @@ function stableColumnsSignature(columns = []) {
             visible: col?.visible,
             displayName: col?.displayName,
             width: col?.width,
+            sticky: col?.sticky,
             widthPct: col?.widthPct,
             minWidth: col?.minWidth,
+            type: col?.type,
+            format: col?.format,
+	        timeZone: col?.timeZone,
+	        timeZoneSelector: col?.timeZoneSelector,
+            link: col?.link,
+            badge: col?.badge,
+            valueMap: col?.valueMap,
+            cellProperties: col?.cellProperties,
+            visibleWhen: col?.visibleWhen,
+            hiddenWhen: col?.hiddenWhen,
             multiSelect: col?.multiSelect,
             nonExcludable: col?.nonExcludable,
         }))
@@ -52,8 +68,11 @@ function convertWidthsToPct(columns, tableWidth) {
     return converted;
 }
 
-export function resolveTableColumnsForSelection(columns = [], context = null) {
+export function resolveTableColumnsForSelection(columns = [], context = null, selectionEnabled = true) {
     const baseColumns = Array.isArray(columns) ? columns : [];
+    if (selectionEnabled === false) {
+        return baseColumns.filter((col) => col?.multiSelect !== true);
+    }
     const selectionMode = String(context?.dataSource?.selectionMode || "").trim().toLowerCase();
     if (selectionMode !== "multi") {
         return baseColumns;
@@ -73,6 +92,7 @@ export function resolveTableColumnsForSelection(columns = [], context = null) {
             multiSelect: true,
             sortable: false,
             visible: true,
+            ...(baseColumns.some((col) => String(col?.sticky || '').toLowerCase() === 'left') ? {sticky: 'left'} : {}),
             nonExcludable: true,
             enforceColumnSize: false,
             cellProperties: {
@@ -101,18 +121,17 @@ export function reconcileConfiguredColumns(savedColumns = [], sourceColumns = []
         }
         return {
             ...column,
-            ...savedColumn,
-            id: column.id,
-            multiSelect: column.multiSelect,
-            nonExcludable: column.nonExcludable,
-            type: column.type,
+            visible: savedColumn.visible ?? column.visible,
+            displayName: savedColumn.displayName || column.displayName || column.name,
             width: savedColumn.width ?? column.width,
         };
     });
 }
 
 const Basic = ({ context, container, columns, pagination, children }) => {
+    useSignals();
     const tableRef = useRef(null);
+    const scrollRef = useRef(null);
 
     const [tableWidth, setTableWidth] = useState(0);
 
@@ -120,18 +139,25 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     const [popupContent, setPopupContent] = useState("");
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [horizontalOverflow, setHorizontalOverflow] = useState({left: false, right: false});
     const { collection: collectionData, loading, error } = useDataSourceState(context);
     const collection = collectionData; // keep old variable name for compatibility
 
-    const [sortColumnId, setSortColumnId] = useState(null);
-    const [sortDirection, setSortDirection] = useState("asc");
+    const initialSortColumnId = String(container?.table?.defaultSort?.columnId || '').trim() || null;
+    const initialSortDirection = String(container?.table?.defaultSort?.direction || '').trim().toLowerCase() === 'desc'
+        ? 'desc'
+        : 'asc';
+    const [sortColumnId, setSortColumnId] = useState(initialSortColumnId);
+    const [sortDirection, setSortDirection] = useState(initialSortDirection);
 
     // loading & error come from useDataSourceState hook
 
     const { dataSource, handlers } = context;
+    const selectionEnabled = container?.table?.selectionEnabled !== false
+        && evaluatePlainVisibleWhen(container?.table?.selectionVisibleWhen, context);
     const resolvedColumns = useMemo(
-        () => resolveTableColumnsForSelection(columns, context),
-        [columns, context],
+        () => resolveTableColumnsForSelection(columns, context, selectionEnabled),
+        [columns, context, selectionEnabled],
     );
     const columnsHandlers = useMemo(
         () => useColumnsHandlers(context, resolvedColumns),
@@ -144,7 +170,44 @@ const Basic = ({ context, container, columns, pagination, children }) => {
 
     const events = tableHandlers(context, container);
 
-    const filterSets = handlers?.dataSource?.getFilterSets?.() || [...(dataSource?.filterSet || [])];
+    const filterSets = handlers?.dataSource?.getFilterSets?.()
+        || handlers?.dataSource?.getFilterSet?.()
+        || [...(dataSource?.filterSet || [])];
+    const activeFilterSet = filterSets.find((entry) => entry?.default) || filterSets[0];
+    const currentFilter = context?.signals?.input?.value?.filter || {};
+    const displayedCollection = dataSource?.filterMode === 'client'
+        ? applyClientFilters(collection, activeFilterSet, currentFilter)
+        : collection;
+    const pagingEnabled = dataSource?.paging?.enabled || false;
+    const pagingSize = dataSource?.paging?.size || 0;
+    const clientPagination = pagingEnabled
+        && String(dataSource?.paginationMode || '').toLowerCase() === 'client'
+        && pagingSize > 0;
+    const requestedClientPage = Number(context?.signals?.input?.value?.page || 1);
+    const clientPageState = resolveClientPagination(displayedCollection, requestedClientPage, pagingSize, clientPagination);
+    const clientPage = clientPageState.page;
+    const toolbarContext = useMemo(() => {
+        if (dataSource?.filterMode !== 'client' && !clientPagination) return context;
+        return {
+            ...context,
+            handlers: {
+                ...context.handlers,
+                dataSource: {
+                    ...context.handlers.dataSource,
+                    getCollectionInfo: () => {
+                        const sourceRows = context?.signals?.collection?.value || [];
+                        const liveRows = dataSource?.filterMode === 'client'
+                            ? applyClientFilters(sourceRows, activeFilterSet, context?.signals?.input?.value?.filter || {})
+                            : sourceRows;
+                        return {
+                            pageCount: clientPagination ? Math.max(1, Math.ceil(liveRows.length / pagingSize)) : (liveRows.length ? 1 : 0),
+                            recordCount: liveRows.length,
+                        };
+                    },
+                },
+            },
+        };
+    }, [context, dataSource?.filterMode, clientPagination, pagingSize, activeFilterSet]);
 
     const enforceColumnSize = container?.table?.enforceColumnSize !== false; // default to true
 
@@ -207,13 +270,13 @@ const Basic = ({ context, container, columns, pagination, children }) => {
 
     // Apply sorting to collection when it changes or when sort parameters change
     const sortedCollection = useMemo(() => {
-        if (!sortColumnId || !collection?.length) {
-            return collection;
+        if (!sortColumnId || !displayedCollection?.length) {
+            return displayedCollection;
         }
 
         const sortColumn = columnsToUse.find((col) => col.id === sortColumnId) || resolvedColumns.find((col) => col.id === sortColumnId);
 
-        return [...collection].sort((a, b) => {
+        return [...displayedCollection].sort((a, b) => {
             const aRaw = resolveKey(a, sortColumnId);
             const bRaw = resolveKey(b, sortColumnId);
             const aLink = resolveTableLink({row: a, column: sortColumn, value: aRaw});
@@ -236,14 +299,24 @@ const Basic = ({ context, container, columns, pagination, children }) => {
             if (aVal > bVal) return sortDirection === "asc" ? 1 : -1;
             return 0;
         });
-    }, [collection, sortColumnId, sortDirection]);
+    }, [displayedCollection, sortColumnId, sortDirection]);
+
+    const renderedCollection = useMemo(() => {
+        return resolveClientPagination(sortedCollection, clientPage, pagingSize, clientPagination).rows;
+    }, [sortedCollection, clientPagination, clientPage, pagingSize]);
+
+    useEffect(() => {
+        if (!clientPagination || requestedClientPage === clientPage) return;
+        handlers?.dataSource?.setPage?.(clientPage);
+    }, [clientPagination, requestedClientPage, clientPage, handlers]);
 
 
 
     useEffect(() => {
-        const nextColumns = enforceColumnSize && tableWidth > 0
+        const sizedColumns = enforceColumnSize && tableWidth > 0
             ? convertWidthsToPct(visibleColumns, tableWidth)
-            : visibleColumns;
+            : preserveDeclaredColumnWidths(visibleColumns);
+        const nextColumns = withStickyColumnOffsets(sizedColumns);
         const nextSignature = stableColumnsSignature(nextColumns);
         if (enforceColumnSize && tableWidth > 0) {
             setColumnsToUse((previousColumns) => (
@@ -259,6 +332,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
                 : nextColumns
         ));
     }, [enforceColumnSize, tableWidth, visibleColumns]);
+    const resolvedTableWidth = enforceColumnSize ? '100%' : `${scrollableTableWidth(columnsToUse, tableWidth)}px`;
 
     // Added useEffect to update tableWidth when the table's width changes
     useEffect(() => {
@@ -291,11 +365,11 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         percent: "0.00%",
     };
 
-    // Use useMemo to compute preparedData from sortedCollection instead of collection
+    // Use useMemo to compute preparedData from the active server/client page.
     const preparedData = useMemo(() => {
         const newPreparedData = [];
-        for (let rowIndex = 0; rowIndex < sortedCollection.length; rowIndex++) {
-            const item = sortedCollection[rowIndex];
+        for (let rowIndex = 0; rowIndex < renderedCollection.length; rowIndex++) {
+            const item = renderedCollection[rowIndex];
             const rowArray = [];
             const rowRules = matchingRules(item, formattingRules, "row");
             const rowStyle = mergeStyles(rowRules);
@@ -340,7 +414,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
             });
         }
         return newPreparedData;
-    }, [sortedCollection, columnsToUse, loading, formattingRules]);
+    }, [renderedCollection, columnsToUse, loading, formattingRules]);
 
     const handleOpenFilter = () => setIsFilterOpen(true);
     const handleCloseFilter = () => setIsFilterOpen(false);
@@ -349,8 +423,6 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     const handleCloseSettings = () => setIsSettingsOpen(false);
 
     const handleApplyFilters = (args) => {
-        const { filter = {} } = args;
-        handlers.dataSource.setSilentFilterValues(filter);
         return events.onApplyFilter.execute(args);
     };
 
@@ -373,12 +445,12 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         }
         setSortColumnId(columnId);
         setSortDirection(newDirection);
+        if (String(dataSource?.sortMode || '').toLowerCase() === 'server') {
+            handlers?.dataSource?.setSort?.({columnId, direction: newDirection, fetch: !!dataSource?.service});
+        }
     };
 
-    const pagingEnabled = dataSource?.paging?.enabled || false;
-    const pagingSize = dataSource?.paging?.size || 0;
-    const backfillCount =
-        pagingSize > sortedCollection.length ? pagingSize - sortedCollection.length : 0;
+    const backfillCount = tableBackfillCount(pagingSize, renderedCollection.length, loading);
 
     const tableTitle = container?.table?.title || "";
     handlers["table"] = {
@@ -389,8 +461,9 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     const tableDisplayWidth = container?.table?.width || (container?.table?.fullWidth === true ? "100%" : "90%");
     const toolbarConfig = container?.table?.toolbar || {};
     const emptyState = container?.table?.emptyState;
+    const resolvedEmptyState = resolveTableEmptyState(emptyState, currentFilter);
     const showEmptyState = shouldRenderTableEmptyState({
-        emptyState,
+        emptyState: resolvedEmptyState,
         collection: sortedCollection,
         loading,
         error,
@@ -399,14 +472,50 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     const footerToolbarItems = toolbarItems.filter(isFooterToolbarItem);
     const primaryToolbarItems = filterEmptyStateToolbarItems(
         toolbarItems.filter((item) => !isFooterToolbarItem(item)),
-        emptyState,
+        resolvedEmptyState,
         showEmptyState,
     );
     const hasFooterToolbar = footerToolbarItems.length > 0;
 
+    useEffect(() => {
+        const scroller = scrollRef.current;
+        if (!scroller || showEmptyState) {
+            setHorizontalOverflow({left: false, right: false});
+            return undefined;
+        }
+        const update = () => {
+            const maxLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+            const next = {
+                left: scroller.scrollLeft > 2,
+                right: scroller.scrollLeft < maxLeft - 2,
+            };
+            setHorizontalOverflow((previous) => (
+                previous.left === next.left && previous.right === next.right ? previous : next
+            ));
+        };
+        update();
+        scroller.addEventListener('scroll', update, {passive: true});
+        const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(update) : null;
+        observer?.observe(scroller);
+        if (scroller.firstElementChild) observer?.observe(scroller.firstElementChild);
+        return () => {
+            scroller.removeEventListener('scroll', update);
+            observer?.disconnect();
+        };
+    }, [showEmptyState, resolvedTableWidth, columnsToUse.length, renderedCollection.length]);
+
+    const scrollTableHorizontally = (direction) => {
+        const scroller = scrollRef.current;
+        if (!scroller) return;
+        scroller.scrollTo({
+            left: scroller.scrollLeft + direction * Math.max(240, scroller.clientWidth * 0.72),
+            behavior: 'smooth',
+        });
+    };
+
     return (
         <div
-            className={`basic-table-wrapper${loading && sortedCollection.length > 0 ? " is-loading" : ""}${showEmptyState ? " has-metadata-empty-state" : ""}`}
+            className={`basic-table-wrapper${loading && sortedCollection.length > 0 ? " is-loading" : ""}${showEmptyState ? " has-metadata-empty-state" : ""}${horizontalOverflow.left ? " has-table-overflow-left" : ""}${horizontalOverflow.right ? " has-table-overflow-right" : ""}`}
             style={{
                 height: "100%",
                 width: tableDisplayWidth,
@@ -420,7 +529,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
                     style={toolbarConfig.style || undefined}
                 >
                     <Toolbar
-                        context={context}
+                        context={toolbarContext}
                         toolbarItems={primaryToolbarItems}
                         density={toolbarConfig.density}
                         layout={toolbarConfig.layout}
@@ -429,10 +538,10 @@ const Basic = ({ context, container, columns, pagination, children }) => {
             ) : null}
 
             {showEmptyState ? (
-                <TableEmptyState context={context} config={emptyState}/>
+                <TableEmptyState context={context} config={resolvedEmptyState}/>
             ) : (
-                <div className="basic-table-scroll">
-                    <HTMLTable style={{ width: "100%", tableLayout: "fixed" }}>
+                <div className="basic-table-scroll" ref={scrollRef}>
+                    <HTMLTable style={{width: resolvedTableWidth, minWidth: resolvedTableWidth, tableLayout: "fixed"}}>
                     {/* Table Header */}
                     <TableHeader
                         context={context}
@@ -444,7 +553,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
                     {/* Table Body */}
                     <TableBody
                         context={context}
-                        collection={sortedCollection}
+                        collection={renderedCollection}
                         preparedData={preparedData}
                         columns={columnsToUse}
                         events={events}
@@ -468,10 +577,21 @@ const Basic = ({ context, container, columns, pagination, children }) => {
                 </div>
             )}
 
+            {!showEmptyState && horizontalOverflow.left ? (
+                <button type="button" className="basic-table-overflow-cue is-left"
+                    aria-label="Scroll table left" title="More columns to the left"
+                    onClick={() => scrollTableHorizontally(-1)}><span aria-hidden="true">‹</span></button>
+            ) : null}
+            {!showEmptyState && horizontalOverflow.right ? (
+                <button type="button" className="basic-table-overflow-cue is-right"
+                    aria-label="Scroll table right" title="More columns to the right"
+                    onClick={() => scrollTableHorizontally(1)}><span aria-hidden="true">›</span></button>
+            ) : null}
+
             {hasFooterToolbar && !showEmptyState ? (
                 <div className="basic-table-paginationbar">
                     <Toolbar
-                        context={context}
+                        context={toolbarContext}
                         toolbarItems={footerToolbarItems}
                         density={toolbarConfig.density}
                         layout={toolbarConfig.layout}

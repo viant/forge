@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyWindowPermissionMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataForTarget, resolveWindowRootContainer, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
+import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, formatWindowMetadataError, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataForTarget, resolveWindowRootContainer, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
+import { resolveDataSourceOptions } from '../runtime/WidgetRenderer.jsx';
 
 describe('applyWindowPermissionMetadata', () => {
   it('passes the complete tree and one concrete resource to the dedicated service', async () => {
@@ -17,6 +18,20 @@ describe('applyWindowPermissionMetadata', () => {
     expect(calls).toEqual([expect.objectContaining({
       windowKey: 'document', completeMetadata, resource: {DocumentId: [42]},
     })]);
+  });
+});
+
+describe('window metadata authorization states', () => {
+  it('does not render protected inline metadata before a permission snapshot exists', () => {
+    expect(canUseInlineMetadataFallback({authorization: {scope: 'resource'}, view: {content: {id: 'protected'}}})).toBe(false);
+    expect(canUseInlineMetadataFallback({authorization: {scope: 'resource'}, authorizationSnapshot: {resources: {}}, view: {content: {id: 'permitted'}}})).toBe(true);
+    expect(canUseInlineMetadataFallback({view: {content: {id: 'public'}}})).toBe(true);
+  });
+
+  it('distinguishes forbidden resources from expired authentication', () => {
+    expect(formatWindowMetadataError({status: 403})).toBe('Access denied. You do not have permission to open this resource.');
+    expect(formatWindowMetadataError({status: 401})).toBe('Authentication required. Please sign in to continue.');
+    expect(formatWindowMetadataError({status: 500, message: 'boom'})).toBe('Failed to load window: boom');
   });
 });
 
@@ -63,11 +78,11 @@ describe('resolveRequiredDataSourceRefs', () => {
   it('includes only the selected mapped datasource ref for windowForm-driven charts', () => {
     const metadata = {
       dataSource: {
-        order_performance_profile: {},
-        order_performance_period_today: {},
-        order_performance_period_yesterday: {},
-        order_performance_period_7d: {},
-        order_performance_period_30d: {},
+        report_profile: {},
+        report_period_today: {},
+        report_period_yesterday: {},
+        report_period_7d: {},
+        report_period_30d: {},
       },
       view: {
         content: {
@@ -79,10 +94,10 @@ describe('resolveRequiredDataSourceRefs', () => {
                 dataSourceRefSelector: 'periodView',
                 dataSourceRefSource: 'windowForm',
                 dataSourceRefs: {
-                  today: 'order_performance_period_today',
-                  yesterday: 'order_performance_period_yesterday',
-                  '7d': 'order_performance_period_7d',
-                  '30d': 'order_performance_period_30d',
+                  today: 'report_period_today',
+                  yesterday: 'report_period_yesterday',
+                  '7d': 'report_period_7d',
+                  '30d': 'report_period_30d',
                 },
               },
             },
@@ -91,14 +106,148 @@ describe('resolveRequiredDataSourceRefs', () => {
       },
     };
 
-    expect(resolveRequiredDataSourceRefs(metadata, 'order_performance_profile', { periodView: '7d' })).toEqual([
-      'order_performance_profile',
-      'order_performance_period_7d',
+    expect(resolveRequiredDataSourceRefs(metadata, 'report_profile', { periodView: '7d' })).toEqual([
+      'report_profile',
+      'report_period_7d',
     ]);
+  });
+
+  it('includes an options datasource used by a form select', () => {
+    const metadata = {
+      dataSource: { product: {}, product_categories: {} },
+      view: {
+        content: {
+          dataSourceRef: 'product',
+          items: [{ id: 'category', type: 'select', optionsDataSourceRef: 'product_categories' }],
+        },
+      },
+    };
+
+    expect(resolveRequiredDataSourceRefs(metadata, 'product', {})).toEqual([
+      'product',
+      'product_categories',
+    ]);
+  });
+
+  it('mounts datasource refs only for the selected tab', () => {
+    const metadata = {
+      dataSource: { advertiser_properties: {}, advertiser_campaigns: {}, advertiser_orders: {} },
+      window: { titleBinding: { dataSourceRef: 'advertiser_properties' } },
+      view: {
+        content: {
+          id: 'advertiserRoot',
+          containers: [{
+            id: 'advertiserTabs',
+            tabs: { defaultSelectedTabId: 'properties', renderActiveTabPanelOnly: true },
+            containers: [
+              { id: 'properties', dataSourceRef: 'advertiser_properties' },
+              { id: 'campaigns', dataSourceRef: 'advertiser_campaigns' },
+              { id: 'orders', dataSourceRef: 'advertiser_orders' },
+            ],
+          }],
+        },
+      },
+    };
+
+    expect(resolveRequiredDataSourceRefs(metadata, '', {}, {})).toEqual(['advertiser_properties']);
+    expect(resolveRequiredDataSourceRefs(metadata, '', {}, {tabs: {advertiserTabs: 'orders'}})).toEqual([
+      'advertiser_properties',
+      'advertiser_orders',
+    ]);
+  });
+
+  it('preserves all-tab datasource mounting unless active mode is explicitly requested', () => {
+    const metadata = {
+      dataSource: { properties: {}, campaigns: {}, orders: {} },
+      view: {content: {
+        id: 'tabs',
+        tabs: {defaultSelectedTabId: 'properties'},
+        containers: [
+          {id: 'properties', dataSourceRef: 'properties'},
+          {id: 'campaigns', dataSourceRef: 'campaigns'},
+          {id: 'orders', dataSourceRef: 'orders'},
+        ],
+      }},
+    };
+    expect(resolveRequiredDataSourceRefs(metadata, '', {}, {})).toEqual(['properties', 'campaigns', 'orders']);
+  });
+
+  it('does not auto-refetch a completed empty datasource until parameters change', () => {
+    expect(shouldPrimeDataSourceFetch({}, {}, [], false, {loaded: true})).toBe(false);
+    expect(shouldPrimeDataSourceFetch({}, {}, [], true, {loaded: true})).toBe(true);
+    expect(shouldPrimeDataSourceFetch({}, {fetch: true}, [], false, {loaded: true})).toBe(true);
+  });
+});
+
+describe('resolveDataSourceOptions', () => {
+  it('maps live datasource rows into select options', () => {
+    const context = {
+      Context: () => ({
+        signals: {
+          collection: { value: [{ caption: 'Category A' }, { caption: 'Category B' }] },
+        },
+      }),
+    };
+
+    expect(resolveDataSourceOptions({
+      optionsDataSourceRef: 'product_categories',
+      optionLabelField: 'caption',
+      optionValueField: 'caption',
+    }, context)).toEqual([
+      { value: 'Category A', label: 'Category A' },
+      { value: 'Category B', label: 'Category B' },
+    ]);
+  });
+
+  it('adds a dictionary identifier to the display label without changing the stored value', () => {
+    const context = {
+      Context: () => ({
+        signals: {
+          collection: { value: [{ id: 2, caption: 'Category B' }] },
+        },
+      }),
+    };
+
+    expect(resolveDataSourceOptions({
+      optionsDataSourceRef: 'product_categories',
+      optionLabelField: 'caption',
+      optionValueField: 'caption',
+      optionSecondaryField: 'id',
+    }, context)).toEqual([
+      { value: 'Category B', label: 'Category B (2)', secondary: 2 },
+    ]);
+  });
+
+  it('filters datasource options from a reactive form selector', () => {
+    const context = {
+      signals: { form: { value: { group: 'Demographics' } } },
+      Context: () => ({
+        signals: {
+          collection: { value: [
+            { value: 'age:5', label: '18-24', group: 'Demographics' },
+            { value: 'browser:chrome', label: 'Chrome', group: 'Device' },
+          ] },
+        },
+      }),
+    };
+
+    expect(resolveDataSourceOptions({
+      optionsDataSourceRef: 'targeting_options',
+      optionLabelField: 'label',
+      optionValueField: 'value',
+      optionFilter: { field: 'group', source: 'form', selector: 'group' },
+    }, context)).toEqual([{ value: 'age:5', label: '18-24' }]);
   });
 });
 
 describe('resolveDefaultDataSourceRef', () => {
+  it('prefers the title binding over an arbitrary datasource map order', () => {
+    expect(resolveDefaultDataSourceRef({
+      dataSource: { advertiser_history: {}, advertiser_properties: {} },
+      window: { titleBinding: { dataSourceRef: 'advertiser_properties' } },
+      view: {},
+    })).toBe('advertiser_properties');
+  });
   it('prefers the root content datasource ref over object-key inference', () => {
     const metadata = {
       dataSource: {

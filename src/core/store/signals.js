@@ -2,6 +2,7 @@ import {signal} from '@preact/signals-react';
 
 import {generateIntHash} from "../../utils/hash.js";
 import { injectActions } from '../../actions/action.js';
+import {clearWindowContext} from '../context/registry.js';
 // Create per-key signals for metadata and data
 
 
@@ -470,6 +471,9 @@ function shouldRevalidateRestoredDatasourceSnapshot(snapshot = null, controlSnap
     if (shouldRetryRestoredDatasourceSnapshot(controlSnapshot)) {
         return true;
     }
+    if (controlSnapshot?.loaded === true) {
+        return true;
+    }
     if (Array.isArray(snapshot?.collection) && snapshot.collection.length > 0) {
         return true;
     }
@@ -524,6 +528,7 @@ function restoreWindowSignalsFromSnapshot(win) {
             nextControl = {
                 ...nextControl,
                 loading: false,
+                ...(Object.prototype.hasOwnProperty.call(nextControl || {}, 'loaded') ? {loaded: false} : {}),
                 error: null,
                 stale: false,
             };
@@ -874,6 +879,7 @@ export const removeWindow = (windowId) => {
     activeWindows.value = activeWindows.value.filter(
         (win) => win.windowId !== windowId
     );
+    clearWindowContext(windowId);
     removeSignalsForKey(windowId);
 
     if (selectedWindowId.value === windowId) {

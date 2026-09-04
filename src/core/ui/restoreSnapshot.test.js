@@ -65,6 +65,13 @@ restoreWindowsFromSnapshot({
         collection: [{ date: '2026-05-15', spend: 120 }],
         collectionInfo: { total: 1 },
         metrics: { spend: 120 },
+      },
+      campaigns: {
+        dataSourceRef: 'advertiser_campaigns',
+        input: { fetch: false, parameters: { AdvertiserId: [85141] } },
+        control: { loading: false, loaded: true, error: null },
+        collection: [],
+        metrics: {},
       }
     }
   }]
@@ -94,6 +101,17 @@ assert.deepEqual(getInputSignal('orderPerformance_1DSprofile').peek(), { fetch: 
 assert.deepEqual(getControlSignal('orderPerformance_1DSprofile').peek(), { loading: false, error: null, stale: false });
 assert.deepEqual(getCollectionSignal('orderPerformance_1DSprofile').peek(), [{ date: '2026-05-15', spend: 120 }]);
 assert.deepEqual(getMetricsSignal('orderPerformance_1DSprofile').peek(), { spend: 120 });
+assert.deepEqual(getInputSignal('orderPerformance_1DSadvertiser_campaigns').peek(), {
+  fetch: true,
+  refresh: false,
+  parameters: { AdvertiserId: [85141] },
+});
+assert.deepEqual(getControlSignal('orderPerformance_1DSadvertiser_campaigns').peek(), {
+  loading: false,
+  loaded: false,
+  error: null,
+  stale: false,
+});
 
 restoreWindowsFromSnapshot({
   selected: { windowId: 'line_1', tabId: 'line_1' },

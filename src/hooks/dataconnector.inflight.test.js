@@ -117,4 +117,42 @@ describe('createDataConnector', () => {
             expect(parsed.searchParams.getAll('capabilities')).toEqual(['markdown', 'chart']);
         }
     });
+
+    it('does not treat an upstream datasource 401 as an expired workspace session', async () => {
+        const handleUnauthorized = vi.fn();
+        const response = {
+            ok: false,
+            status: 401,
+            statusText: 'Unauthorized',
+            headers: { get: () => null },
+            clone() { return this; },
+            text: async () => 'upstream MCP authorization failed',
+        };
+        global.fetch = vi.fn().mockResolvedValue(response);
+        const connector = createDataConnector({
+            service: { URL: '/v1/api/datasources/advertiser/fetch', method: 'POST' },
+        }, { endpoints: {}, targetContext: {}, auth: { handleUnauthorized } });
+
+        await expect(connector.get({ filter: {}, inputParameters: {} })).rejects.toThrow('upstream MCP authorization failed');
+        expect(handleUnauthorized).not.toHaveBeenCalled();
+    });
+
+    it('requests login when Agently explicitly marks a workspace authentication failure', async () => {
+        const handleUnauthorized = vi.fn();
+        const response = {
+            ok: false,
+            status: 401,
+            statusText: 'Unauthorized',
+            headers: { get: (name) => name === 'X-Agently-Auth-Required' ? 'true' : null },
+            clone() { return this; },
+            text: async () => 'authorization required',
+        };
+        global.fetch = vi.fn().mockResolvedValue(response);
+        const connector = createDataConnector({
+            service: { URL: '/v1/api/datasources/advertiser/fetch', method: 'POST' },
+        }, { endpoints: {}, targetContext: {}, auth: { handleUnauthorized } });
+
+        await expect(connector.get({ filter: {}, inputParameters: {} })).rejects.toThrow('authorization required');
+        expect(handleUnauthorized).toHaveBeenCalledOnce();
+    });
 });

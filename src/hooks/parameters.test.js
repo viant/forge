@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 
-import { resolveParameters } from './parameters.js';
+import { applyParameterCodec, resolveParameters } from './parameters.js';
+
+assert.equal(applyParameterCodec('8', { name: 'int' }), 8);
+assert.equal(applyParameterCodec('8.5', { name: 'number' }), 8.5);
+assert.equal(applyParameterCodec('false', { name: 'boolean' }), false);
+assert.deepEqual(applyParameterCodec(['1', 2], { name: 'int[]' }), [1, 2]);
+assert.equal(applyParameterCodec('not-an-int', { name: 'int' }), 'not-an-int');
 
 const baseContext = {
   identity: { dataSourceRef: 'default' },
@@ -11,6 +17,7 @@ const baseContext = {
         AdOrderId: [2637048],
         granularity: 'hour',
         periodView: 'today',
+        publisherId: '8',
       }),
     },
   },
@@ -32,11 +39,13 @@ const baseContext = {
 const resolved = resolveParameters([
   { name: 'order_id', in: 'windowForm', location: 'AdOrderId.0' },
   { name: 'granularity', in: 'windowForm', location: 'granularity' },
+  { name: 'publisherId', in: 'windowForm', location: 'publisherId', codec: { name: 'int' } },
 ], baseContext);
 
 assert.deepEqual(resolved, {
   order_id: 2637048,
   granularity: 'hour',
+  publisherId: 8,
 });
 
 const crossDataSourceContext = {

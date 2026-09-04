@@ -1,4 +1,4 @@
-import { useToolbarControlEvents } from './event.js';
+import { dataSourceEvents, useToolbarControlEvents } from './event.js';
 
 const createContext = (calls) => ({
     signals: {
@@ -24,6 +24,12 @@ const createContext = (calls) => ({
             return () => {
                 calls.push(id);
                 return false;
+            };
+        }
+        if (id === 'datasource.success' || id === 'datasource.error') {
+            return () => {
+                calls.push(id);
+                return true;
             };
         }
         throw new Error(`unexpected handler lookup: ${id}`);
@@ -67,6 +73,21 @@ const createContext = (calls) => ({
     stateful.edit.events.onClick({type: 'click'});
     if (context.signals.windowForm.value.mode !== 'editor') {
         console.error('expected event metadata state to update shared window state');
+        process.exitCode = 1;
+    }
+}
+
+{
+    const calls = [];
+    const context = createContext(calls);
+    const events = dataSourceEvents(context, {on: [
+        {event: 'onSuccess', handler: 'datasource.success'},
+        {event: 'onError', handler: 'datasource.error'},
+    ]});
+    events.onSuccess.execute({collection: [{id: 1}]});
+    events.onError.execute({error: new Error('expected')});
+    if (calls.join(',') !== 'datasource.success,datasource.error') {
+        console.error(`expected datasource lifecycle events, got ${calls.join(',')}`);
         process.exitCode = 1;
     }
 }

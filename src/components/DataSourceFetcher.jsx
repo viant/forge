@@ -16,18 +16,20 @@ export default function DataSourceFetcher({
     context,
     selectFirst = false,
     fetchData = true,
+    fetchOnce = false,
 }) {
     const log = getLogger('ds');
     const dataSourceId = context?.identity?.dataSourceId || context?.identity?.dataSourceRef || '';
     // 1. trigger collection fetch when component mounts (optional)
     useEffect(() => {
-        if (fetchData) {
+        const alreadyLoaded = context?.signals?.control?.peek?.()?.loaded === true;
+        if (fetchData && !(fetchOnce && alreadyLoaded)) {
             try { log.debug('[fetcher] fetch on mount', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
             context?.handlers?.dataSource?.fetchCollection?.();
         } else {
             try { log.debug('[fetcher] fetch disabled', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
         }
-    }, [dataSourceId, fetchData]);
+    }, [dataSourceId, fetchData, fetchOnce]);
 
     // 2. once collection has items, optionally set selection to first row
     useSignalEffect(() => {

@@ -7,6 +7,7 @@
  * ---------------------------------------------------------------------- */
 
 import React from 'react';
+import {createPortal} from 'react-dom';
 import {
     InputGroup,
     Checkbox,
@@ -26,7 +27,6 @@ import TextLookup from './TextLookup.jsx';
 import { Select, MultiSelect } from '@blueprintjs/select';
 import { DateInput3 } from '@blueprintjs/datetime2';
 import { NumericInput } from '@blueprintjs/core';
-import { addStyles, EditableMathField } from 'react-mathquill';
 
 import PrettyJson from '../../components/PrettyJson.jsx';
 import SchemaExplorer from '../../widgets/SchemaExplorer.jsx';
@@ -39,8 +39,13 @@ import { registerWrapper } from '../../runtime/wrapperRegistry.js';
 import TreeMultiSelect from '../../components/TreeMultiSelect.jsx';
 import MarkdownView from '../../components/MarkdownView.jsx';
 import MarkdownEditor from '../../components/MarkdownEditor.jsx';
-import { formatDisplayValue } from '../../utils/formatValue.js';
+import { formatDisplayValue, mapDisplayValue, resolveEmptyDisplayText } from '../../utils/formatValue.js';
 import { resolveLinkTarget } from '../../utils/linkTarget.js';
+import { permittedOptions } from './permittedOptions.js';
+import ChipList from '../../components/ChipList.jsx';
+import {formatPercentFraction2Input, parsePercentFraction2Input} from './percentFractionInput.js';
+import {resolveSelector} from '../../utils/selector.js';
+import {normalizeLifetimeStart, resolveDateRangePreset} from './dateRangePreset.js';
 
 /* ------------------------ Widget implementation ----------------------- */
 
@@ -55,15 +60,218 @@ function TextInput({ value = '', onChange, readOnly, ...rest }) {
     );
 }
 
-function BooleanPill({value = false, onChange, readOnly, disabled, item, ariaLabel, ...rest}) {
+function BooleanPill({value = false, onChange, readOnly, disabled, item, ariaLabel, 'aria-label': ariaLabelProp, ...rest}) {
     const checked = !!value;
     return (
-        <button id={rest.id} title={rest.title} type="button" role="switch" aria-checked={checked} aria-label={ariaLabel || item?.label || item?.name || 'Boolean value'}
+        <button id={rest.id} title={rest.title} type="button" role="switch" aria-checked={checked} aria-label={ariaLabel || ariaLabelProp || item?.label || item?.name || 'Boolean value'}
             className={`forge-boolean-pill${checked ? ' is-on' : ''}`}
             disabled={readOnly || disabled} onClick={() => onChange?.(!checked)}>
             <span className="forge-boolean-pill__track"><span className="forge-boolean-pill__thumb"/></span>
             <span>{checked ? 'Yes' : 'No'}</span>
         </button>
+    );
+}
+
+const formatDateRangeDay = (value) => {
+    const parsed = new Date(`${value}T00:00:00Z`);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: 'UTC',
+    }).format(parsed);
+};
+
+export function DateRangePresetInput({
+    value = '',
+    onChange,
+    options = [],
+    readOnly,
+    disabled,
+    context,
+    item,
+    startField = 'customDateStart',
+    endField = 'customDateEnd',
+    granularityField = 'granularity',
+    includePartialDataField = 'includePartialData',
+    lifetimeStart = '2026-01-01',
+    lifetimeStartSelector = '',
+    timeZone = 'UTC',
+    timeZoneSelector = '',
+    customApplyEnabled = false,
+    customDisabledMessage = 'Custom dates are saved as a draft and do not refresh data yet.',
+}) {
+    const [open, setOpen] = React.useState(false);
+    const triggerRef = React.useRef(null);
+    const [popupPosition, setPopupPosition] = React.useState({top: 0, left: 0});
+    const windowForm = context?.signals?.windowForm?.value || {};
+    const metrics = context?.signals?.metrics?.value || context?.signals?.metrics?.peek?.() || {};
+    const resolvedTimeZone = timeZoneSelector
+        ? resolveSelector(metrics, timeZoneSelector) || timeZone
+        : timeZone;
+    const resolvedLifetimeStart = normalizeLifetimeStart(
+        lifetimeStartSelector ? resolveSelector(metrics, lifetimeStartSelector) : lifetimeStart,
+        lifetimeStart,
+    );
+    const start = String(windowForm[startField] || '');
+    const end = String(windowForm[endField] || '');
+    const invalid = !!start && !!end && start > end;
+    const includePartialData = windowForm[includePartialDataField] !== false;
+    const selected = options.find((option) => String(option.value) === String(value));
+    const selectedLabel = selected?.label || item?.label || 'Select period';
+    const triggerLabel = start && end
+        ? `${selectedLabel}: ${formatDateRangeDay(start)} – ${formatDateRangeDay(end)}`
+        : selectedLabel;
+    const setDraftFields = (patch) => {
+        if (!context?.signals?.windowForm) return;
+        const previous = context.signals.windowForm.peek?.() || context.signals.windowForm.value || {};
+        context.signals.windowForm.value = {...previous, ...patch};
+    };
+    const setDraftField = (field, nextValue) => setDraftFields({[field]: nextValue});
+    React.useLayoutEffect(() => {
+        if (String(value).toLowerCase() === 'custom') return;
+        const resolved = resolveDateRangePreset(value, new Date(), resolvedLifetimeStart, resolvedTimeZone);
+        if (!resolved) return;
+        const current = context?.signals?.windowForm?.peek?.() || context?.signals?.windowForm?.value || {};
+        if (current[startField] === resolved.start && current[endField] === resolved.end && current[granularityField] === resolved.granularity) return;
+        setDraftFields({
+            [startField]: resolved.start,
+            [endField]: resolved.end,
+            [granularityField]: resolved.granularity,
+        });
+    }, [value, context, startField, endField, granularityField, resolvedLifetimeStart, resolvedTimeZone]);
+    const choosePreset = (option) => {
+        if (String(option?.value).toLowerCase() === 'custom') return;
+        const resolved = resolveDateRangePreset(option?.value, new Date(), resolvedLifetimeStart, resolvedTimeZone);
+        if (resolved) {
+            setDraftFields({
+                [startField]: resolved.start,
+                [endField]: resolved.end,
+                [granularityField]: resolved.granularity,
+            });
+        }
+        onChange?.(option?.value);
+        setOpen(false);
+    };
+    const applyCustom = () => {
+        if (!customApplyEnabled || !start || !end || invalid) return;
+        const startDate = new Date(`${start}T00:00:00Z`);
+        const endDate = new Date(`${end}T00:00:00Z`);
+        const durationDays = Math.floor((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
+        setDraftField(granularityField, durationDays <= 2 ? 'hour' : 'day');
+        onChange?.('custom');
+        setOpen(false);
+    };
+    const updatePopupPosition = React.useCallback(() => {
+        const rect = triggerRef.current?.getBoundingClientRect?.();
+        if (!rect || typeof window === 'undefined') return;
+        const width = Math.min(360, Math.max(280, window.innerWidth - 32));
+        setPopupPosition({
+            top: Math.min(rect.bottom + 6, Math.max(16, window.innerHeight - 430)),
+            left: Math.max(16, Math.min(rect.right - width, window.innerWidth - width - 16)),
+        });
+    }, []);
+    React.useLayoutEffect(() => {
+        if (!open || typeof window === 'undefined') return undefined;
+        updatePopupPosition();
+        window.addEventListener('resize', updatePopupPosition);
+        window.addEventListener('scroll', updatePopupPosition, true);
+        return () => {
+            window.removeEventListener('resize', updatePopupPosition);
+            window.removeEventListener('scroll', updatePopupPosition, true);
+        };
+    }, [open, updatePopupPosition]);
+
+    return (
+        <div className="forge-date-range-preset" style={{position: 'relative', minWidth: 0, width: '100%'}}>
+            <Button
+                ref={triggerRef}
+                type="button"
+                rightIcon={open ? 'chevron-up' : 'chevron-down'}
+                aria-haspopup="dialog"
+                aria-expanded={open}
+                disabled={readOnly || disabled}
+                onClick={() => setOpen((current) => !current)}
+                style={{width: '100%', justifyContent: 'space-between'}}
+            >
+                {triggerLabel}
+            </Button>
+            {open && typeof document !== 'undefined' ? createPortal((
+                <div
+                    role="dialog"
+                    aria-label={`${item?.label || 'Date range'} options`}
+                    style={{
+                        position: 'fixed',
+                        top: popupPosition.top,
+                        left: popupPosition.left,
+                        zIndex: 3000,
+                        width: 360,
+                        maxWidth: 'min(360px, calc(100vw - 32px))',
+                        border: '1px solid #d7dbe5',
+                        borderRadius: 10,
+                        background: '#ffffff',
+                        boxShadow: '0 12px 30px rgba(31, 41, 55, 0.16)',
+                        padding: 12,
+                    }}
+                >
+                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6}}>
+                        {options.filter((option) => String(option.value).toLowerCase() !== 'custom').map((option) => (
+                            <Button
+                                key={option.value}
+                                type="button"
+                                minimal={String(option.value) !== String(value)}
+                                intent={String(option.value) === String(value) ? 'primary' : 'none'}
+                                alignText="left"
+                                onClick={() => choosePreset(option)}
+                            >
+                                {option.label}
+                            </Button>
+                        ))}
+                    </div>
+                    <div style={{margin: '12px -12px', borderTop: '1px solid #e4e7ee'}} />
+                    <div style={{fontSize: 12, fontWeight: 700, color: '#394257', marginBottom: 8}}>Custom dates</div>
+                    <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8}}>
+                        <label style={{display: 'grid', gap: 4, fontSize: 11, color: '#596579'}}>
+                            Start
+                            <input
+                                className="bp6-input"
+                                type="date"
+                                aria-label="Custom start date"
+                                value={start}
+                                max={end || undefined}
+                                onChange={(event) => setDraftField(startField, event.target.value)}
+                            />
+                        </label>
+                        <label style={{display: 'grid', gap: 4, fontSize: 11, color: '#596579'}}>
+                            End
+                            <input
+                                className="bp6-input"
+                                type="date"
+                                aria-label="Custom end date"
+                                value={end}
+                                min={start || undefined}
+                                onChange={(event) => setDraftField(endField, event.target.value)}
+                            />
+                        </label>
+                    </div>
+                    {invalid ? <div role="alert" style={{color: '#b42318', fontSize: 11, marginTop: 7}}>Start date must be on or before end date.</div> : null}
+                    <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10}}>
+                        <span style={{display: 'grid', gap: 4, color: '#6c7587', fontSize: 10, lineHeight: 1.3}}>
+                            <Checkbox
+                                checked={includePartialData}
+                                label="Include today's partial data"
+                                onChange={(event) => setDraftField(includePartialDataField, event.target.checked)}
+                            />
+                            {customApplyEnabled ? null : customDisabledMessage}
+                        </span>
+                        <Button type="button" intent="primary" disabled={!customApplyEnabled || !start || !end || invalid} onClick={applyCustom}>
+                            Apply dates
+                        </Button>
+                    </div>
+                </div>
+            ), document.body) : null}
+        </div>
     );
 }
 
@@ -101,6 +309,31 @@ export function registerPack() {
         },
     });
 
+    /* -------------------- Local file selector -------------------- */
+    registerWidget('file', ({onChange, readOnly, disabled, value, item, style, context, adapter, options, ...rest}) => {
+        const selectedName = value && typeof value === 'object' ? value.name : String(value || '');
+        return (
+            <div style={{display: 'grid', gap: 6, width: '100%', ...(style || {})}}>
+                <input
+                    {...rest}
+                    type="file"
+                    accept={rest.accept || item?.accept || item?.properties?.accept || '.csv'}
+                    disabled={disabled || readOnly}
+                    onChange={onChange}
+                    className={`bp6-input${rest.className ? ` ${rest.className}` : ''}`}
+                />
+                {selectedName ? <span style={{color: '#526579', fontSize: 12}}>Selected locally: {selectedName}</span> : null}
+            </div>
+        );
+    }, {framework: 'blueprint'});
+
+    registerEventAdapter('file', {
+        onChange: ({adapter}) => (event) => {
+            const file = event?.target?.files?.[0];
+            adapter.set(file ? {name: file.name, size: file.size, type: file.type} : null);
+        },
+    });
+
     /* -------------------- Object / JSON viewer -------------------- */
     registerWidget(
         'object',
@@ -127,14 +360,21 @@ export function registerPack() {
     /* -------------------- Number / Numeric input ------------------- */
     registerWidget(
         'number',
-        ({ value = '', onValueChange, readOnly, ...rest }) => (
-            <NumericInput
-                {...rest}
-                value={value ?? ''}
-                onValueChange={(v) => onValueChange?.(v)}
-                readOnly={readOnly}
-            />
-        ),
+        ({ value = '', onValueChange, readOnly, stepSize, minorStepSize, ...rest }) => {
+            const resolvedMinorStepSize = minorStepSize ?? (
+                Number.isFinite(stepSize) ? Math.min(0.1, stepSize) : undefined
+            );
+            return (
+                <NumericInput
+                    {...rest}
+                    value={value ?? ''}
+                    onValueChange={(v) => onValueChange?.(v)}
+                    readOnly={readOnly}
+                    stepSize={stepSize}
+                    minorStepSize={resolvedMinorStepSize}
+                />
+            );
+        },
         { framework: 'blueprint' }
     );
 
@@ -211,6 +451,7 @@ export function registerPack() {
         />
     ), { framework: 'blueprint' });
     registerWidget('booleanPill', (props) => <BooleanPill {...props}/>, { framework: 'blueprint' });
+    registerWidget('chipList', (props) => <ChipList {...props}/>, { framework: 'blueprint' });
 
     const checkboxChangeHandler = ({ adapter }) => (arg) => {
         if (arg && arg.target) {
@@ -232,15 +473,20 @@ export function registerPack() {
     registerEventAdapter('booleanPill', {
         onChange: ({ adapter }) => (value) => adapter.set(!!value),
     });
+    registerEventAdapter('chipList', {
+        onChange: ({ adapter }) => (values) => adapter.set(Array.isArray(values) ? values : []),
+    });
 
     /* -------------------- Select / Dropdown ------------------------- */
     registerWidget(
         'select',
-        function BPSelect({ value, onChange, readOnly, options = [], ...rest }) {
-            const selected = options.find((o) => o.value === value);
+        function BPSelect({ value, onChange, readOnly, options = [], context, fill = false, id, 'aria-label': ariaLabel, ...rest }) {
+            const visibleOptions = permittedOptions(options, context);
+            const selected = visibleOptions.find((o) => o.value === value);
             return (
                 <Select
-                    items={options}
+                    items={visibleOptions}
+                    fill={fill}
                     itemRenderer={(item, { handleClick, modifiers }) => (
                         <MenuItem key={item.value} text={item.label} active={modifiers.active} onClick={handleClick} />
                     )}
@@ -250,7 +496,7 @@ export function registerPack() {
                     {...rest}
                     onItemSelect={(item) => onChange?.(item.value)}
                 >
-                    <Button text={selected?.label || rest.placeholder || 'Select…'} rightIcon="caret-down" disabled={readOnly} />
+                    <Button id={id} aria-label={ariaLabel} fill={fill} text={selected?.label || rest.placeholder || 'Select…'} rightIcon="caret-down" disabled={readOnly} />
                 </Select>
             );
         },
@@ -274,11 +520,12 @@ export function registerPack() {
             appearance,
             placeholder,
             style,
+            context,
             ...rest
         }) {
             const selectedValues = normalizeMultiValues(value);
             const selectedSet = new Set(selectedValues);
-            const normalizedOptions = Array.isArray(options) ? options : [];
+            const normalizedOptions = permittedOptions(options, context);
             const selectedItems = normalizedOptions.filter((opt) => selectedSet.has(`${opt?.value ?? ''}`));
             const toggle = (option) => {
                 const optionValue = `${option?.value ?? ''}`;
@@ -495,6 +742,34 @@ export function registerPack() {
         onValueChange: ({ adapter }) => (v) => adapter.set(v),
     });
 
+    /* -------------------- Fractional percent input ----------------- */
+    registerWidget(
+        'percentFraction2Input',
+        ({ value = '', onValueChange, readOnly, ...rest }) => {
+            const numericValue = formatPercentFraction2Input(value);
+            return (
+                <NumericInput
+                    {...rest}
+                    value={numericValue}
+                    onValueChange={(valueAsNumber, valueAsString) => {
+                        onValueChange?.(parsePercentFraction2Input(valueAsNumber, valueAsString));
+                    }}
+                    readOnly={readOnly}
+                    min={0}
+                    max={100}
+                    stepSize={0.01}
+                    minorStepSize={0.01}
+                    rightElement={<span className="forge-percent-suffix" aria-hidden="true">%</span>}
+                />
+            );
+        },
+        { framework: 'blueprint' }
+    );
+
+    registerEventAdapter('percentFraction2Input', {
+        onValueChange: ({ adapter }) => (v) => adapter.set(v),
+    });
+
     /* -------------------- Date / DateTime --------------------------- */
     const registerDateKind = (kind) => {
         registerWidget(
@@ -580,6 +855,11 @@ export function registerPack() {
 
     registerEventAdapter('dateRange', {
         onChange: ({ adapter }) => (range) => adapter.set(range),
+    });
+
+    registerWidget('dateRangePreset', DateRangePresetInput, { framework: 'blueprint' });
+    registerEventAdapter('dateRangePreset', {
+        onChange: ({ adapter }) => (period) => adapter.set(period),
     });
 
     /* -------------------- Radio group ------------------------------- */
@@ -744,31 +1024,20 @@ export function registerPack() {
         if (shouldRenderEmptyState) {
             return (
                 <Label {...rest}>
-                    <span style={{ color: '#8a9ba8', fontStyle: 'italic' }}>No data</span>
+                    <span style={{ color: '#8a9ba8', fontStyle: 'italic' }}>{resolveEmptyDisplayText(item)}</span>
                 </Label>
             );
         }
+        const mappedValue = mapDisplayValue(value, item?.valueMap);
         return (
-            <Label {...rest}>{formatDisplayValue(value, inferredIdFormat, locale, {timeZone})}</Label>
+            <Label {...rest}>{formatDisplayValue(mappedValue, inferredIdFormat, locale, {timeZone})}</Label>
         );
     }, { framework: 'blueprint' });
 
-    /* -------------------- Math (MathQuill) -------------------------- */
-    // Ensure MathQuill CSS injected once
-    addStyles();
-
-    registerWidget(
-        'math',
-        ({ value = '', onChange, readOnly, ...rest }) => (
-            <EditableMathField
-                {...rest}
-                latex={value}
-                onChange={(mathField) => onChange?.(mathField.latex())}
-                readOnly={readOnly}
-            />
-        ),
-        { framework: 'blueprint' }
-    );
+    /* -------------------- Formula input ----------------------------- */
+    // Keep the legacy `math` metadata key without loading MathQuill or
+    // requiring browser globals during server-side rendering and tests.
+    registerWidget('math', TextInput, { framework: 'blueprint' });
 
     registerEventAdapter('math', {
         onChange: ({ adapter }) => (latex) => adapter.set(latex),
@@ -866,9 +1135,10 @@ registerWrapper('blueprint', (item, container, children) => {
         return (
             <FormGroup
                 label={labelContent}
+                labelInfo={(item?.required || item?.properties?.required) ? <span aria-hidden="true">*</span> : undefined}
                 inline={inline}
                 labelFor={item.id}
-                helperText={item.validationError}
+                helperText={item.validationError || item.helperText || item.description}
                 intent={item.validationError ? 'danger' : 'none'}
                 style={{ marginBottom: 0 }}
             >

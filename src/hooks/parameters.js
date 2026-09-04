@@ -1,5 +1,52 @@
 import {resolveSelector} from "../utils/selector.js";
 
+export function applyParameterCodec(value, codec) {
+    const rawName = typeof codec === 'string' ? codec : codec?.name;
+    const name = String(rawName || '').trim().toLowerCase();
+    if (!name || value === undefined || value === null) return value;
+
+    if (name.endsWith('[]')) {
+        const scalarCodec = name.substring(0, name.length - 2);
+        const values = Array.isArray(value) ? value : [value];
+        return values.map((entry) => applyParameterCodec(entry, scalarCodec));
+    }
+
+    switch (name) {
+        case 'int':
+        case 'integer': {
+            if (typeof value === 'number') return Number.isInteger(value) ? value : value;
+            const trimmed = typeof value === 'string' ? value.trim() : value;
+            if (trimmed === '') return value;
+            const numeric = Number(trimmed);
+            return Number.isInteger(numeric) ? numeric : value;
+        }
+        case 'float':
+        case 'number': {
+            if (typeof value === 'number') return value;
+            const trimmed = typeof value === 'string' ? value.trim() : value;
+            if (trimmed === '') return value;
+            const numeric = Number(trimmed);
+            return Number.isFinite(numeric) ? numeric : value;
+        }
+        case 'bool':
+        case 'boolean': {
+            if (typeof value === 'boolean') return value;
+            if (typeof value === 'string') {
+                const normalized = value.trim().toLowerCase();
+                if (normalized === 'true' || normalized === '1') return true;
+                if (normalized === 'false' || normalized === '0') return false;
+            }
+            if (value === 1) return true;
+            if (value === 0) return false;
+            return value;
+        }
+        case 'string':
+            return String(value);
+        default:
+            return value;
+    }
+}
+
 function shouldPreserveResolvedValue(existingValue, nextValue) {
     if (existingValue === undefined) {
         return false;
@@ -93,6 +140,7 @@ export function resolveParameters(parameterDefinitions = [], context) {
                     console.warn('resolveParameters: unsupported store in new-style param (M-1)', srcStore);
                     return;
             }
+            srcVal = applyParameterCodec(srcVal, param.codec);
 
             if (dstStore === 'input' || dstStore === 'query' || dstStore === 'path') {
                 // Simplistic handling: write into input store
@@ -170,7 +218,7 @@ export function resolveParameters(parameterDefinitions = [], context) {
         }
 
         const {name, in: inWhere, location} = param;
-        const value = resolveParameter(context, inWhere, location);
+        const value = applyParameterCodec(resolveParameter(context, inWhere, location), param.codec);
         if(name === "...") {
             resolved[toDataSource] = {...value}
         } else if(name.startsWith("[]")) {

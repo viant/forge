@@ -13,6 +13,7 @@ import {
     getControlSignal,
     findDialogSignal,
     getInputSignal,
+    getViewSignal,
     findFormSignal,
     findMetricsSignal,
     primeWindowSignals,
@@ -75,6 +76,21 @@ export function compileWindowAuthorizationMetadata(metadata, parameters = {}) {
     return {...result.metadata, authorizationSnapshot: authorization};
 }
 
+export function canUseInlineMetadataFallback(inlineMetadata) {
+    return !!inlineMetadata && (!inlineMetadata.authorization || !!inlineMetadata.authorizationSnapshot);
+}
+
+export function formatWindowMetadataError(error) {
+    if (!error) return '';
+    if (Number(error.status) === 403) {
+        return 'Access denied. You do not have permission to open this resource.';
+    }
+    if (Number(error.status) === 401 || error.isUnauthorized) {
+        return 'Authentication required. Please sign in to continue.';
+    }
+    return `Failed to load window: ${error.message || 'Unknown error'}`;
+}
+
 export async function applyWindowPermissionMetadata(completeMetadata, {
     services,
     windowKey,
@@ -122,6 +138,8 @@ export function resolveDefaultDataSourceRef(metadata) {
     return String(
         metadata?.view?.dataSourceRef
         || metadata?.view?.content?.dataSourceRef
+        || metadata?.window?.titleBinding?.dataSourceRef
+        || metadata?.window?.titleBinding?.ref
         || Object.keys(metadata?.dataSource || {})[0]
         || ''
     ).trim();
@@ -176,7 +194,7 @@ export function resolveWindowRootContainer(content = null, parameters = {}) {
     return next;
 }
 
-function collectRequiredDataSourceRefs(node, scope, refs) {
+function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}) {
     if (!node || typeof node !== 'object') return;
 
     const addRef = (ref) => {
@@ -205,13 +223,27 @@ function collectRequiredDataSourceRefs(node, scope, refs) {
     if (Array.isArray(node.items)) {
         for (const item of node.items) {
             addRef(item?.dataSourceRef);
+            addRef(item?.optionsDataSourceRef);
             addRef(resolveMappedRef(item));
         }
     }
 
     if (Array.isArray(node.containers)) {
-        for (const child of node.containers) {
-            collectRequiredDataSourceRefs(child, scope, refs);
+        let children = node.containers;
+        if (node.tabs?.renderActiveTabPanelOnly === true && children.length > 0) {
+            const panelId = String(node.id || children[0]?.id || 'root').trim();
+            const selectedId = String(
+                viewState?.tabs?.[panelId]
+                || node.tabs?.selectedTabId
+                || node.tabs?.defaultSelectedTabId
+                || children[0]?.id
+                || ''
+            ).trim();
+            const selected = children.find((child) => String(child?.id || '').trim() === selectedId) || children[0];
+            children = selected ? [selected] : [];
+        }
+        for (const child of children) {
+            collectRequiredDataSourceRefs(child, scope, refs, viewState);
         }
     }
 }
@@ -245,7 +277,7 @@ function expandRequiredDataSourceRefs(metadata, refs) {
     return Array.from(result);
 }
 
-export function resolveRequiredDataSourceRefs(metadata, defaultDataSourceRef = '', scope = {}) {
+export function resolveRequiredDataSourceRefs(metadata, defaultDataSourceRef = '', scope = {}, viewState = {}) {
     const refs = new Set();
     if (defaultDataSourceRef) refs.add(String(defaultDataSourceRef).trim());
     const titleBindingRef = String(
@@ -258,7 +290,7 @@ export function resolveRequiredDataSourceRefs(metadata, defaultDataSourceRef = '
     if (titleBindingRef) {
         refs.add(titleBindingRef);
     }
-    collectRequiredDataSourceRefs(metadata?.view?.content || null, scope, refs);
+    collectRequiredDataSourceRefs(metadata?.view?.content || null, scope, refs, viewState);
     return expandRequiredDataSourceRefs(metadata, refs);
 }
 
@@ -268,10 +300,11 @@ export function resolveFetcherOwnedDataSourceRefs(metadata) {
     return Array.from(refs);
 }
 
-export function shouldPrimeDataSourceFetch(dataSource = {}, prevInput = {}, collection = [], paramsChanged = false) {
+export function shouldPrimeDataSourceFetch(dataSource = {}, prevInput = {}, collection = [], paramsChanged = false, control = {}) {
     const autoFetchEnabled = dataSource?.autoFetch !== false;
     const hasCollection = Array.isArray(collection) && collection.length > 0;
-    return !!prevInput.fetch || (autoFetchEnabled && (paramsChanged || !hasCollection));
+    const hasCompletedLoad = control?.loaded === true;
+    return !!prevInput.fetch || (autoFetchEnabled && (paramsChanged || (!hasCollection && !hasCompletedLoad)));
 }
 
 export function resolveWindowDataSourceFetchFlag({
@@ -459,6 +492,7 @@ function WindowContentInner({window, metadata, services}) {
         ...resolveInitialWindowFormValues(metadata),
     }), [parameters, metadata]);
     const windowFormSignal = useMemo(() => findFormSignal(`${windowId}:windowForm`), [windowId]);
+    const windowViewSignal = useMemo(() => getViewSignal(windowId), [windowId]);
 
     const hookContext = Context(windowId, metadata, defaultDataSourceRef, services);
     const existingContext = getWindowContext(windowId);
@@ -476,6 +510,7 @@ function WindowContentInner({window, metadata, services}) {
     );
 
     const liveWindowForm = windowFormSignal?.value || {};
+    const liveWindowView = windowViewSignal?.value || {};
     const windowFormSnapshot = useMemo(() => ({
         ...initialWindowFormSeed,
         ...liveWindowForm,
@@ -682,7 +717,7 @@ function WindowContentInner({window, metadata, services}) {
      * ---------------------------------------------------------- */
 
     const requiredDataSourceRefs = useMemo(() => {
-        const resolvedRefs = resolveRequiredDataSourceRefs(metadata, defaultDataSourceRef, windowFormSnapshot);
+        const resolvedRefs = resolveRequiredDataSourceRefs(metadata, defaultDataSourceRef, windowFormSnapshot, liveWindowView);
         try {
             log.debug('[window.requiredDataSourceRefs]', {
                 windowId,
@@ -692,7 +727,7 @@ function WindowContentInner({window, metadata, services}) {
             });
         } catch (_) {}
         return resolvedRefs;
-    }, [metadata, defaultDataSourceRef, windowFormSnapshot]);
+    }, [metadata, defaultDataSourceRef, windowFormSnapshot, liveWindowView]);
     const fetcherOwnedDataSourceRefs = useMemo(
         () => new Set(resolveFetcherOwnedDataSourceRefs(metadata)),
         [metadata],
@@ -700,10 +735,7 @@ function WindowContentInner({window, metadata, services}) {
 
     useEffect(() => {
         const currentWindowForm = windowFormSignal?.value || {};
-        const resolvedRefs = resolveRequiredDataSourceRefs(metadata, defaultDataSourceRef, {
-            ...initialWindowFormSeed,
-            ...currentWindowForm,
-        });
+        const resolvedRefs = requiredDataSourceRefs;
         const dataSourceDefs = metadata?.dataSource || {};
         for (const ref of resolvedRefs) {
             const dsID = `${windowId}DS${ref}`;
@@ -732,7 +764,7 @@ function WindowContentInner({window, metadata, services}) {
             const paramsChanged = JSON.stringify(prevParams) !== JSON.stringify(nextParams);
             const collection = collectionSignal?.peek?.() || [];
             const control = controlSignal?.peek?.() || {};
-            const shouldFetch = shouldPrimeDataSourceFetch(dataSourceDef, prevInput, collection, paramsChanged);
+            const shouldFetch = shouldPrimeDataSourceFetch(dataSourceDef, prevInput, collection, paramsChanged, control);
             const fetchOwnedByContainer = fetcherOwnedDataSourceRefs.has(ref);
             if (!ownsParameters && !shouldFetch) {
                 continue;
@@ -773,7 +805,7 @@ function WindowContentInner({window, metadata, services}) {
                 }),
             };
         }
-    }, [windowFormSignal, metadata, defaultDataSourceRef, initialWindowFormSeed, context, parameters, windowId, log, fetcherOwnedDataSourceRefs]);
+    }, [windowFormSignal, metadata, defaultDataSourceRef, initialWindowFormSeed, context, parameters, windowId, log, fetcherOwnedDataSourceRefs, requiredDataSourceRefs]);
 
     const renderDataSources = () => {
         if (!context) return null;
@@ -1005,7 +1037,7 @@ export default function WindowContent({window, isInTab = false}) {
         setFetchError(null);
 
         let hasInlineFallback = false;
-        if (window && window.inlineMetadata && (!window.inlineMetadata.authorization || window.inlineMetadata.authorizationSnapshot)) {
+        if (window && canUseInlineMetadataFallback(window.inlineMetadata)) {
             try {
                 const resolvedMetadata = resolveWindowMetadataForTarget(window.inlineMetadata, targetContext);
                 injectActions(resolvedMetadata);
@@ -1086,13 +1118,10 @@ export default function WindowContent({window, isInTab = false}) {
     }
 
     if (!metadata) {
-        const isAuthError = fetchError && (fetchError.status === 401 || fetchError.status === 403 || fetchError.isUnauthorized);
         return (
             <div style={{ padding: 16, height: '100%', minHeight: 0, color: '#888' }}>
                 {fetchError
-                    ? isAuthError
-                        ? <span>Authentication required. Please sign in to continue.</span>
-                        : <span>Failed to load window: {fetchError.message}</span>
+                    ? <span>{formatWindowMetadataError(fetchError)}</span>
                     : <span>No metadata available for window "{windowKey}"</span>}
             </div>
         );

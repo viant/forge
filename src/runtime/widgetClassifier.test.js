@@ -20,6 +20,7 @@ const cases = [
     // Password format/type
     { item: { type: 'string', format: 'password' }, expected: 'password' },
     { item: { type: 'password' }, expected: 'password' },
+    { item: { type: 'file' }, expected: 'file' },
     // Object type
     { item: { type: 'object' }, expected: 'object' },
     // Markdown format/type
@@ -27,6 +28,7 @@ const cases = [
     { item: { type: 'markdown' }, expected: 'markdown' },
     // Multi-select type
     { item: { type: 'multiSelect' }, expected: 'multiSelect' },
+    { item: { type: 'chipList' }, expected: 'chipList' },
     { item: { type: 'dateRange' }, expected: 'dateRange' },
 ];
 

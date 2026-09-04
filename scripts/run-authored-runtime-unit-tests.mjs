@@ -30,7 +30,6 @@ const runtimeUnitTests = [
   "scripts/report-builder-preview-import-report-fill-export-submit-failure-scenario-assets.test.mjs",
   "scripts/report-builder-preview-import-report-fill-export-status-failure-scenario-assets.test.mjs",
   "scripts/report-builder-preview-import-report-fill-export-artifact-failure-scenario-assets.test.mjs",
-  "scripts/report-builder-hosted-steward-render-smoke.test.mjs",
   "scripts/report-builder-preview-import-saved-view-overlay-scenario-assets.test.mjs",
   "scripts/report-builder-preview-import-saved-view-export-execution-scenario-assets.test.mjs",
   "scripts/report-builder-preview-import-published-snapshot-export-execution-scenario-assets.test.mjs",

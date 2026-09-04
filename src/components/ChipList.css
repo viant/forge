@@ -1,0 +1,11 @@
+.forge-chip-list { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.forge-chip { display: inline-flex; max-width: 100%; align-items: center; gap: 5px; min-height: 28px; padding: 3px 8px; border: 1px solid; border-radius: 999px; font-size: 12px; line-height: 18px; }
+.forge-chip.is-included { border-color: #b8d5ef; background: #edf6fd; color: #174f7d; }
+.forge-chip.is-excluded { border-color: #efc0c0; background: #fff1f1; color: #8b2e2e; }
+.forge-chip__mode { flex: 0 0 auto; font-weight: 800; }
+.forge-chip__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.forge-chip__remove { flex: 0 0 auto; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: rgba(255,255,255,.7); color: currentColor; font: inherit; font-weight: 800; line-height: 16px; cursor: pointer; }
+.forge-chip__remove:focus-visible { outline: 2px solid #2563eb; outline-offset: 1px; }
+.forge-chip-list.is-compact .forge-chip { min-height: 26px; padding: 2px 7px; }
+.forge-chip-list__more.bp6-button { min-height: 26px; color: #315f8e; font-size: 12px; font-weight: 700; }
+.forge-chip-list__empty { color: #718096; font-size: 12px; font-style: italic; }

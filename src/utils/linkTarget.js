@@ -110,6 +110,32 @@ export function resolveLinkTarget({ linkConfig = null, row = null, value = null,
 
     const kind = normalizeString(linkConfig.kind || '');
     const windowKey = normalizeString(linkConfig.windowKey || '');
+    const dialogId = normalizeString(linkConfig.dialogId || linkConfig.dialog || '');
+
+    if (kind === 'dialog' || dialogId) {
+        if (!dialogId) {
+            return null;
+        }
+        const textSource = linkConfig.textSelector
+            ? resolveContextSourceValue({
+                source: linkConfig.textSource || 'row',
+                selector: linkConfig.textSelector,
+                context,
+                row,
+                value,
+            })
+            : linkConfig.label
+                ? resolveKey(row || {}, linkConfig.label)
+                : linkConfig.text ?? value;
+        return {
+            kind: 'dialog',
+            text: normalizeLinkText(textSource, dialogId),
+            title: normalizeString(linkConfig.title),
+            dialogId,
+            awaitResult: linkConfig.awaitResult === true,
+            parameters: resolveWindowParameters(linkConfig.parameters, {row, value, context}),
+        };
+    }
 
     if (kind === 'window' || windowKey) {
         if (!windowKey) {
@@ -171,9 +197,11 @@ export function resolveLinkTarget({ linkConfig = null, row = null, value = null,
     }
 
     const href = normalizeString(
-        linkConfig?.href
-            ? resolveKey(row || {}, linkConfig.href)
-            : objectValue?.href ?? ''
+        linkConfig?.hrefTemplate
+            ? resolveTemplateText(linkConfig.hrefTemplate, row || {})
+            : linkConfig?.href
+                ? resolveKey(row || {}, linkConfig.href)
+                : objectValue?.href ?? ''
     );
 
     if (!href) {
@@ -182,7 +210,7 @@ export function resolveLinkTarget({ linkConfig = null, row = null, value = null,
 
     const textSource = linkConfig?.label
         ? resolveKey(row || {}, linkConfig.label)
-        : objectValue?.label ?? objectValue?.text ?? value;
+        : linkConfig?.text ?? objectValue?.label ?? objectValue?.text ?? value;
     const text = normalizeLinkText(textSource, href);
 
     const target = normalizeString(objectValue?.target || linkConfig?.target) || '_blank';

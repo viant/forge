@@ -703,7 +703,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
         input.value = {
             ...input.peek(),
             page,
-            fetch: true,
+            fetch: String(dataSource?.paginationMode || '').toLowerCase() !== 'client',
         };
     };
 
@@ -712,12 +712,24 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
         return input.value?.page || 1;
     };
 
+    const setSort = ({columnId, direction = 'asc', fetch = true} = {}) => {
+        const field = String(columnId || '').trim();
+        input.value = {
+            ...input.peek(),
+            page: 1,
+            sort: field ? [{field, direction: String(direction || 'asc').toLowerCase() === 'desc' ? 'desc' : 'asc'}] : [],
+            fetch: fetch === true,
+        };
+    };
+
+    const getSort = () => input.value?.sort || [];
+
 
     const setFilter = ({filter = {}}) => {
         const value  = {
         ...input.value,
                 filter: filter,
-                fetch: true,
+                fetch: dataSource?.filterMode !== 'client',
         }
         input.value = value
     };
@@ -742,7 +754,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
 
 
     const pushFilterValues = ({filter = {}}) => {
-        input.value = {...input.value, fetch: true, filter: filter};
+        input.value = {...input.value, fetch: dataSource?.filterMode !== 'client', filter: filter};
     };
 
 
@@ -1020,6 +1032,8 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
         noSelection,
         setPage,
         getPage,
+        setSort,
+        getSort,
         setFilter,
         setSilentFilterValues,
 

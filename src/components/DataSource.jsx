@@ -86,6 +86,11 @@ export default function DataSource({context}) {
     const prevFilterRef = useRef({});
     const prevQuerySig = useRef('');
     const lastResolvedParametersRef = useRef({});
+    const mountedRef = useRef(true);
+
+    useEffect(() => () => {
+        mountedRef.current = false;
+    }, []);
 
     const {dataSource, signals, connector, handlers, identity} = context
     const {paging, selectors} = dataSource;
@@ -331,6 +336,8 @@ export default function DataSource({context}) {
             const payload = await connector.get({
                 filter: finalFilter
             })
+            if (!mountedRef.current) return;
+            control.value = {...control.peek(), loaded: true, error: null, stale: false};
 
 
             let {records} = extractData(selectors, paging, payload);
@@ -398,6 +405,7 @@ export default function DataSource({context}) {
             } catch (_) {
             }
         } catch (err) {
+            if (!mountedRef.current) return;
             setError(err);
             try {
                 if (events.onError && events.onError.isDefined()) {
@@ -407,7 +415,7 @@ export default function DataSource({context}) {
             } catch (_) {
             }
         } finally {
-            setLoading(false);
+            if (mountedRef.current) setLoading(false);
         }
     }
 
@@ -424,7 +432,7 @@ export default function DataSource({context}) {
         } catch (_) {
         }
         const inputVal = input.value || {};
-        let {page, filter = {}, parameters} = inputVal || {};
+        let {page, filter = {}, parameters, sort = []} = inputVal || {};
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, filter);
         if (!hasDeps) {
             const preservedParameters = lastResolvedParametersRef.current || {};
@@ -455,7 +463,7 @@ export default function DataSource({context}) {
         // the result). If unchanged, we keep existing collection; otherwise
         // we optimistically clear.
         // ------------------------------------------------------------------
-        const requestSig = JSON.stringify({filter, parameters, page});
+        const requestSig = JSON.stringify({filter, parameters, page, sort});
         // const queryChanged = requestSig !== prevQuerySig.current;
         // if (queryChanged) {
         //     setSelected({selected: null, rowIndex: -1});
@@ -488,8 +496,9 @@ export default function DataSource({context}) {
             const payload = await connector.get({
                 filter: finalFilter,
                 page,
-                inputParameters: parameters,
+                inputParameters: {...(parameters || {}), ...(sort?.length ? {sort} : {})},
             });
+            if (!mountedRef.current) return;
             try {
                 log.debug('[doFetchRecords] response', {
                     ds: context?.identity?.dataSourceRef,
@@ -534,9 +543,12 @@ export default function DataSource({context}) {
                 });
             } catch (_) {
             }
-            collectionInfo.value = withFetchedPageInfo(info, page, pagingEnabled);
+            collectionInfo.value = withFetchedPageInfo(info, page, pagingEnabled, {
+                returnedCount: records.length,
+                pageSize: paging?.size,
+            });
             metrics.value = stats;
-            control.value = { ...control.peek(), error: null, stale: false };
+            control.value = { ...control.peek(), loaded: true, error: null, stale: false };
             if (pagingEnabled) {
                 const currentInput = input.peek() || {};
                 if (Number(currentInput.page || 1) !== Number(page || 1)) {
@@ -585,6 +597,7 @@ export default function DataSource({context}) {
             } catch (_) {
             }
         } catch (err) {
+            if (!mountedRef.current) return;
             log.warn('doFetchRecords error', err)
             setError(err);
 
@@ -597,7 +610,7 @@ export default function DataSource({context}) {
             } catch (_) {
             }
         } finally {
-            setLoading(false);
+            if (mountedRef.current) setLoading(false);
         }
     }
 

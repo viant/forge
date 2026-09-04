@@ -32,6 +32,18 @@ const metadata = {
 const context = Context('W_ctx_override', metadata, 'lookup', {});
 context.init();
 
+const previewOpenTarget = () => 'preview-target';
+const mergedWindowHandlerContext = Context('W_ctx_window_handlers', metadata, 'lookup', {
+  window: {openTarget: previewOpenTarget},
+});
+assert.equal(mergedWindowHandlerContext.handlers.window.openTarget, previewOpenTarget);
+assert.equal(typeof mergedWindowHandlerContext.handlers.window.openDialog, 'function');
+assert.equal(typeof mergedWindowHandlerContext.handlers.window.closeDialog, 'function');
+const mergedWindowDataSourceContext = mergedWindowHandlerContext.Context('lookup');
+assert.equal(mergedWindowDataSourceContext.handlers.window.openTarget, previewOpenTarget);
+assert.equal(typeof mergedWindowDataSourceContext.handlers.window.openDialog, 'function');
+assert.equal(typeof mergedWindowDataSourceContext.handlers.window.closeDialog, 'function');
+
 const multiCtx = context.Context('lookup', {selectionMode: 'multi'});
 const rows = [{id: 'one'}, {id: 'two'}];
 multiCtx.signals.collection.value = rows;

@@ -45,7 +45,7 @@ export function createDataConnector(dataSource, runtime = {}) {
     const {paging, parameters = []} = dataSource;
 
     function notifyUnauthorized(error) {
-        if (!error || (error.status !== 401 && error.status !== 403)) {
+        if (!error || error.status !== 401 || error.authRequired !== true) {
             return;
         }
         for (const handlerName of ['handleUnauthorized', 'onUnauthorized', 'promptLogin', 'beginLogin']) {
@@ -127,6 +127,7 @@ export function createDataConnector(dataSource, runtime = {}) {
         error.status = resp.status;
         error.statusText = resp.statusText;
         error.isUnauthorized = resp.status === 401 || resp.status === 403;
+        error.authRequired = String(resp.headers?.get?.('X-Agently-Auth-Required') || '').toLowerCase() === 'true';
         if (detail) {
             error.detail = detail;
         }
@@ -274,7 +275,9 @@ export function createDataConnector(dataSource, runtime = {}) {
             let queryParams = new URLSearchParams();
             const requestMethod = String(method || 'GET').toUpperCase();
             const isDatasourceFetchRoute = /\/v1\/api\/datasources\/[^/]+\/fetch$/.test(url);
-            const pagingValues = resolvePagingValues(page, paging);
+            const pagingValues = String(dataSource?.paginationMode || '').toLowerCase() === 'client'
+                ? null
+                : resolvePagingValues(page, paging);
             const effectiveInputParameters = requestMethod === 'GET'
                 ? { ...(inputParameters || {}) }
                 : withPagingInputs(inputParameters, pagingValues);

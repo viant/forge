@@ -7,7 +7,8 @@ function normalizePositiveInteger(value = 0) {
     return Number.isSafeInteger(numeric) && numeric > 0 ? numeric : 0;
 }
 
-function normalizeNonNegativeInteger(value = null) {
+function normalizeNonNegativeInteger(value) {
+    if (value == null || value === '') return null;
     const numeric = Number(value);
     return Number.isSafeInteger(numeric) && numeric >= 0 ? numeric : null;
 }
@@ -58,13 +59,27 @@ export function resolveFetchPage({
         : 1;
 }
 
-export function withFetchedPageInfo(info = {}, page = 1, pagingEnabled = false) {
+export function withFetchedPageInfo(info = {}, page = 1, pagingEnabled = false, pageResult = {}) {
     const base = isPlainObject(info) ? cloneValue(info) : {};
     if (!pagingEnabled) {
         return base;
     }
-    const pageCount = normalizePositiveInteger(base.pageCount || base.totalPages);
-    const totalCount = normalizeNonNegativeInteger(base.totalCount ?? base.recordCount);
+    const returnedCount = normalizeNonNegativeInteger(pageResult?.returnedCount);
+    const pageSize = normalizePositiveInteger(pageResult?.pageSize);
+    const inconsistentEmptySummary = returnedCount > 0
+        && normalizeNonNegativeInteger(base.totalCount ?? base.recordCount) === 0;
+    if (inconsistentEmptySummary) {
+        delete base.pageCount;
+        delete base.totalPages;
+        delete base.totalCount;
+        delete base.recordCount;
+    }
+    const pageCount = inconsistentEmptySummary
+        ? 0
+        : normalizePositiveInteger(base.pageCount || base.totalPages);
+    const totalCount = inconsistentEmptySummary
+        ? null
+        : normalizeNonNegativeInteger(base.totalCount ?? base.recordCount);
     const requestedPage = normalizePositiveInteger(page)
         || normalizePositiveInteger(base.currentPage || base.page)
         || 1;
@@ -74,7 +89,9 @@ export function withFetchedPageInfo(info = {}, page = 1, pagingEnabled = false) 
     const hasPrevious = currentPage > 1;
     const hasNext = pageCount > 0
         ? currentPage < pageCount
-        : base.hasNext === true;
+        : (returnedCount != null && pageSize > 0
+            ? returnedCount >= pageSize
+            : base.hasNext === true);
     const hasMore = base.hasMore === true || hasNext;
     return {
         ...base,
@@ -82,6 +99,8 @@ export function withFetchedPageInfo(info = {}, page = 1, pagingEnabled = false) 
         page: currentPage,
         ...(pageCount > 0 ? { pageCount, totalPages: pageCount } : {}),
         ...(totalCount != null ? { totalCount, recordCount: totalCount } : {}),
+        ...(returnedCount != null ? { returnedCount } : {}),
+        ...(pageSize > 0 ? { pageSize } : {}),
         hasPrevious,
         hasNext,
         hasMore,

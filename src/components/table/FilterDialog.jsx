@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from "react";
-import { Button, Classes, Dialog, DialogBody, DialogFooter, InputGroup } from "@blueprintjs/core";
+import { Button, Checkbox, Classes, Dialog, DialogBody, DialogFooter, HTMLSelect, InputGroup } from "@blueprintjs/core";
 
 const FilterDialog = ({
                           isOpen,
@@ -18,12 +18,15 @@ const FilterDialog = ({
             setSelectedSet(defSet);
             setFilterValues(
                 defSet?.template?.reduce((acc, tpl) => {
-                    acc[tpl.id] = filter[tpl.id] || "";
+                    acc[tpl.id] = filter[tpl.id] ?? (tpl.type === 'boolean' ? false : "");
                     return acc;
                 }, {}) || {}
             );
         }
-    }, [isOpen, filterSets]);
+        // Initialize once per open transition. Depending on filterSets here resets
+        // in-progress edits because metadata arrays are commonly recreated per render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen]);
 
     const handleInputChange = (id, value) => {
         setFilterValues((prevValues) => ({
@@ -68,7 +71,7 @@ const FilterDialog = ({
                                         setSelectedSet(fs);
                                         setFilterValues(
                                             fs.template?.reduce((acc, tpl) => {
-                                                acc[tpl.id] = "";
+                                                acc[tpl.id] = tpl.type === 'boolean' ? false : "";
                                                 return acc;
                                             }, {}) || {}
                                         );
@@ -90,14 +93,35 @@ const FilterDialog = ({
                 >
                     {selectedSet?.template?.map((tpl) => (
                         <React.Fragment key={tpl.id}>
-                            <label style={{ textAlign: "right", paddingRight: "10px" }}>
+                            <label htmlFor={`forge-filter-${tpl.id}`} style={{ textAlign: "right", paddingRight: "10px" }}>
                                 {tpl.label}
                             </label>
-                            <InputGroup
-                                placeholder={tpl.operator}
-                                value={filterValues[tpl.id] || ""}
-                                onChange={(e) => handleInputChange(tpl.id, e.target.value)}
-                            />
+                            {tpl.type === 'boolean' ? (
+                                <Checkbox
+                                    id={`forge-filter-${tpl.id}`}
+                                    checked={filterValues[tpl.id] === true}
+                                    onChange={(e) => handleInputChange(tpl.id, e.target.checked)}
+                                />
+                            ) : Array.isArray(tpl.options) ? (
+                                <HTMLSelect
+                                    id={`forge-filter-${tpl.id}`}
+                                    fill
+                                    value={filterValues[tpl.id] || ''}
+                                    onChange={(e) => handleInputChange(tpl.id, e.target.value)}
+                                >
+                                    <option value="">All</option>
+                                    {tpl.options.map((option) => (
+                                        <option key={String(option.value)} value={option.value}>{option.label ?? option.value}</option>
+                                    ))}
+                                </HTMLSelect>
+                            ) : (
+                                <InputGroup
+                                    id={`forge-filter-${tpl.id}`}
+                                    placeholder={tpl.operator}
+                                    value={filterValues[tpl.id] || ""}
+                                    onChange={(e) => handleInputChange(tpl.id, e.target.value)}
+                                />
+                            )}
                         </React.Fragment>
                     ))}
                 </div>

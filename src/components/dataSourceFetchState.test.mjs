@@ -51,4 +51,30 @@ assert.deepEqual(withFetchedPageInfo({
 
 assert.deepEqual(withFetchedPageInfo({}, 2, false), {});
 
+assert.deepEqual(withFetchedPageInfo({}, 1, true, {
+    returnedCount: 20,
+    pageSize: 20,
+}), {
+    currentPage: 1,
+    page: 1,
+    returnedCount: 20,
+    pageSize: 20,
+    hasPrevious: false,
+    hasNext: true,
+    hasMore: true,
+});
+
+assert.deepEqual(withFetchedPageInfo({pageCount: 1, totalCount: 0}, 1, true, {
+    returnedCount: 7,
+    pageSize: 20,
+}), {
+    currentPage: 1,
+    page: 1,
+    returnedCount: 7,
+    pageSize: 20,
+    hasPrevious: false,
+    hasNext: false,
+    hasMore: false,
+});
+
 console.log("dataSourceFetchState ✓ stabilizes filter snapshots and paging metadata");

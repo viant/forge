@@ -3,7 +3,7 @@
 import React, {useState} from "react";
 import {Button} from "@blueprintjs/core";
 import {useSignalEffect} from "@preact/signals-react";
-import { resolvePaginationState } from "./PaginationState.js";
+import {canNavigateNext, resolvePaginationState} from "./PaginationState.js";
 
 const buttonProperties = {
     'pagination.first': {label: "First Page", icon: "double-chevron-left"},
@@ -18,6 +18,7 @@ const PaginationBar = ({
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(null);
     const [recordCount, setRecordCount] = useState(null);
+    const [hasMore, setHasMore] = useState(null);
     const [inactive, setInactive] = useState(false);
     const handlers = context.handlers;
 
@@ -34,6 +35,7 @@ const PaginationBar = ({
         setInactive(isInactive);
         setTotalPages(nextState.totalPages);
         setRecordCount(nextState.recordCount);
+        setHasMore(nextState.hasMore);
         setCurrentPage(nextState.currentPage);
     });
 
@@ -82,10 +84,12 @@ const PaginationBar = ({
     };
 
     const canGoPrevious = !inactive && currentPage > 1;
-    const canGoNext = !inactive && (totalPages == null || currentPage < totalPages);
+    const canGoNext = canNavigateNext({inactive, currentPage, totalPages, recordCount, hasMore});
     const canGoLast = !inactive && totalPages != null && currentPage < totalPages;
     const pageLabel = totalPages != null ? `Page ${currentPage} of ${totalPages}` : `Page ${currentPage}`;
-    const countLabel = recordCount != null ? ` (${recordCount})` : '';
+    const countLabel = recordCount != null
+        ? ` (${recordCount} ${recordCount === 1 ? 'record' : 'records'})`
+        : '';
 
     return (
         <div className="pagination-bar">
@@ -101,7 +105,7 @@ const PaginationBar = ({
 
 
                 {renderActionButton("pagination.next", onNextPage, !canGoNext)}
-                {renderActionButton("pagination.last", onLastPage, !canGoLast)}
+                {totalPages != null ? renderActionButton("pagination.last", onLastPage, !canGoLast) : null}
             </div>
         </div>
     );

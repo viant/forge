@@ -24,17 +24,23 @@ import {DashboardBlock} from "./dashboard/DashboardBlocks.jsx";
 import DashboardSurface from "./dashboard/DashboardSurface.jsx";
 import {createDashboardContext, getDashboardVisibleWhen, seedDashboardDefaultFilters} from "./dashboard/dashboardUtils.js";
 import { findDashboardFilterSignal, findDashboardSelectionSignal, getDashboardSelectionSignal } from "../core/store/signals.js";
+import {getViewSignal} from '../core/index.js';
 import {isDashboardRootContainer, isSemanticDashboardBlock, shouldSkipGenericNonVisualEarlyReturn} from "./containerSemantics.js";
 import {isContainerVisible, resolveChildContext, trackContainerVisibility} from "./visibleWhen.js";
+import {mergeSectionOpenState, resolveSectionOpenState, resolveSectionProperties} from './containerChrome.js';
+import AccessibleSection from './AccessibleSection.jsx';
+import {resolveDynamicDataSourceRef} from '../runtime/dataSourceRef.js';
 
-const wrapContainerChrome = (container, content, suppressTitle = false) => {
+const wrapContainerChrome = (container, content, suppressTitle = false, sectionPropertiesOverride = null) => {
     if (!container?.section && !container?.card) {
         return content;
     }
     const selfScroll = String(container?.scrollMode || '').trim().toLowerCase() === 'self';
+    const requestedMinHeight = container?.style?.minHeight;
+    const requestedHeight = container?.style?.height;
 
     const framedContent = (
-        <div style={{ width: '100%', height: '100%', flex: '1 1 auto', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: selfScroll ? 'auto' : 'visible' }}>
+        <div style={{ width: '100%', height: requestedHeight || '100%', flex: '1 1 auto', minHeight: requestedMinHeight || 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: selfScroll ? 'auto' : 'visible' }}>
             {content}
         </div>
     );
@@ -43,8 +49,8 @@ const wrapContainerChrome = (container, content, suppressTitle = false) => {
     if (container?.card) {
         const cardStyle = {
             flex: '1 1 auto',
-            height: '100%',
-            minHeight: 0,
+            height: requestedHeight || '100%',
+            minHeight: requestedMinHeight || 0,
             minWidth: 0,
             display: 'flex',
             flexDirection: 'column',
@@ -54,11 +60,12 @@ const wrapContainerChrome = (container, content, suppressTitle = false) => {
         wrapped = <Card {...container.card} style={cardStyle}>{wrapped}</Card>;
     }
     if (container?.section) {
-        const sectionProperties = container.section.properties || {};
+        const sectionProperties = sectionPropertiesOverride || resolveSectionProperties(container.section);
+        const SectionComponent = sectionProperties.collapsible === true ? AccessibleSection : Section;
         const sectionStyle = {
             flex: '1 1 auto',
-            height: '100%',
-            minHeight: 0,
+            height: requestedHeight || '100%',
+            minHeight: requestedMinHeight || 0,
             minWidth: 0,
             display: 'flex',
             flexDirection: 'column',
@@ -66,9 +73,9 @@ const wrapContainerChrome = (container, content, suppressTitle = false) => {
             ...(sectionProperties.style || {}),
         };
         wrapped = (
-            <Section {...(suppressTitle ? {} : {title: container.title || ''})} {...sectionProperties} style={sectionStyle}>
+            <SectionComponent {...(suppressTitle ? {} : {title: container.title || ''})} {...sectionProperties} style={sectionStyle}>
                 {wrapped}
-            </Section>
+            </SectionComponent>
         );
     }
     return wrapped;
@@ -114,7 +121,7 @@ const resolveContainerItemValue = (item, context) => {
     return item?.dataField ? resolveSelector(holder, item.dataField) : undefined;
 };
 
-const Container = ({context, container, isActive, suppressTitle = false}) => {
+const Container = ({context, container, isActive, suppressTitle = false, dataSourceFetchMode = 'always'}) => {
     useSignals();
     const isDashboardBlock = isSemanticDashboardBlock(container);
     const isDashboardRoot = isDashboardRootContainer(container, context);
@@ -126,6 +133,28 @@ const Container = ({context, container, isActive, suppressTitle = false}) => {
     const {identity} = effectiveContext
     const dataSourceRef = container.dataSourceRef || identity.dataSourceRef
     const dashboardKey = effectiveContext?.dashboardKey;
+    const windowId = effectiveContext?.identity?.windowId;
+    const sectionViewSignal = windowId && container?.section?.persistState === true ? getViewSignal(windowId) : null;
+    const sectionViewValue = sectionViewSignal?.value || {};
+    const persistentSectionProperties = useMemo(() => {
+        if (!sectionViewSignal || container?.section?.collapsible !== true) return null;
+        const authored = resolveSectionProperties(container.section);
+        const stateKey = String(container.section.stateKey || container.id || '').trim();
+        const isOpen = resolveSectionOpenState({...container.section, stateKey}, sectionViewValue);
+        const authoredToggle = authored?.collapseProps?.onToggle;
+        return {
+            ...authored,
+            collapseProps: {
+                ...(authored.collapseProps || {}),
+                isOpen,
+                onToggle: () => {
+                    if (typeof authoredToggle === 'function') authoredToggle();
+                    const previous = sectionViewSignal.peek?.() || {};
+                    sectionViewSignal.value = mergeSectionOpenState(previous, stateKey, !isOpen);
+                },
+            },
+        };
+    }, [sectionViewSignal, sectionViewValue, container?.section, container?.id]);
     if (dashboardKey) {
         findDashboardFilterSignal(dashboardKey)?.value;
         findDashboardSelectionSignal(dashboardKey)?.value;
@@ -153,7 +182,7 @@ const Container = ({context, container, isActive, suppressTitle = false}) => {
     let formPanel = null
     if (container.tabs) {
         formPanel = (<>
-            <FormPanel context={resolveChildContext(effectiveContext, dataSourceRef)} container={container} isActive={isActive}></FormPanel>
+            <FormPanel context={resolveChildContext(effectiveContext, dataSourceRef)} container={container} isActive={isActive} dataSourceFetchMode={dataSourceFetchMode}></FormPanel>
         </>);
     }
 
@@ -356,6 +385,7 @@ const Container = ({context, container, isActive, suppressTitle = false}) => {
                         context={resolveChildContext(effectiveContext, container.dataSourceRef || dataSourceRef)}
                         selectFirst={container.selectFirst === true}
                         fetchData={container.fetchData === true}
+                        fetchOnce={dataSourceFetchMode === 'once'}
                     />
                 )}
             </>
@@ -430,6 +460,7 @@ const Container = ({context, container, isActive, suppressTitle = false}) => {
                                 context={subCtx}
                                 container={entry}
                                 isActive={isActive}
+                                dataSourceFetchMode={dataSourceFetchMode}
                             />
                         </div>
                     )}
@@ -458,6 +489,7 @@ const Container = ({context, container, isActive, suppressTitle = false}) => {
                                 context={resolveChildContext(effectiveContext, subContainer.dataSourceRef || dataSourceRef)}
                                 container={subContainer}
                                 isActive={isActive}
+                                dataSourceFetchMode={dataSourceFetchMode}
                             />
                         </div>
                     ))}
@@ -483,7 +515,7 @@ const Container = ({context, container, isActive, suppressTitle = false}) => {
                         flex: isLast ? '1 1 auto' : '0 0 auto',
                         minHeight: 0,
                         minWidth: 0,
-                        overflow: 'hidden',
+                        overflow: isLast ? 'visible' : 'hidden',
                     };
                     return (
                         <div key={'dSc' + subContainer.id} style={childStyle}>
@@ -492,6 +524,7 @@ const Container = ({context, container, isActive, suppressTitle = false}) => {
                                 context={resolveChildContext(effectiveContext, subContainer.dataSourceRef || dataSourceRef)}
                                 container={subContainer}
                                 isActive={isActive}
+                                dataSourceFetchMode={dataSourceFetchMode}
                             />
                         </div>
                     )
@@ -520,6 +553,7 @@ const Container = ({context, container, isActive, suppressTitle = false}) => {
                 context={subCtx}
                 container={subContainer}
                 isActive={isActive}
+                dataSourceFetchMode={dataSourceFetchMode}
             />
         );
     };
@@ -541,6 +575,7 @@ const Container = ({context, container, isActive, suppressTitle = false}) => {
                         context={resolveChildContext(effectiveContext, container.dataSourceRef || dataSourceRef)}
                         selectFirst={container.selectFirst === true}
                         fetchData={container.fetchData === true}
+                        fetchOnce={dataSourceFetchMode === 'once'}
                     />
                 )}
             </>
@@ -564,6 +599,7 @@ const Container = ({context, container, isActive, suppressTitle = false}) => {
                         context={blockContext}
                         selectFirst={container.selectFirst === true}
                         fetchData={container.fetchData === true}
+                        fetchOnce={dataSourceFetchMode === 'once'}
                     />
                 )}
             </>
@@ -586,7 +622,8 @@ const Container = ({context, container, isActive, suppressTitle = false}) => {
         (!containers || containers.length === 0) &&
         boundLabelItems.length > 0 &&
         boundLabelItems.every((item) => {
-            const subCtx = resolveChildContext(effectiveContext, item.dataSourceRef || dataSourceRef);
+            const itemDataSourceRef = resolveDynamicDataSourceRef(item, effectiveContext, dataSourceRef);
+            const subCtx = resolveChildContext(effectiveContext, itemDataSourceRef);
             return isMissingBoundValue(resolveContainerItemValue(item, subCtx));
         });
     const shouldRenderVisualItems = !shouldRenderSectionNoDataState;
@@ -673,10 +710,11 @@ const Container = ({context, container, isActive, suppressTitle = false}) => {
                     context={resolveChildContext(effectiveContext, container.dataSourceRef || dataSourceRef)}
                     selectFirst={container.selectFirst === true}
                     fetchData={container.fetchData === true}
+                    fetchOnce={dataSourceFetchMode === 'once'}
                 />
             )}
         </>
-    ), suppressTitle);
+    ), suppressTitle, persistentSectionProperties);
 };
 
 export default Container;

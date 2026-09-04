@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const forgeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const dashboardCss = await fs.readFile(
-  "/Users/awitas/go/src/github.com/viant/forge/src/components/dashboard/Dashboard.css",
+  path.join(forgeRoot, "src/components/dashboard/Dashboard.css"),
   "utf8",
 );
 
