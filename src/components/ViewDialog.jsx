@@ -9,6 +9,7 @@ import {resolveTemplate} from "../utils/index.js";
 import { getLogger } from '../utils/logger.js';
 import { buildQuickFilterSeed, mergeQuickFilterValue } from './viewDialogQuickFilters.js';
 import {evaluatePlainVisibleWhen, trackVisibleWhen} from './visibleWhen.js';
+import {dialogCloseDisabledWhen, isDialogCloseDisabled} from './dialogClose.js';
 
 function normalizeQuickFilterSpecs(dialog) {
     const specs = Array.isArray(dialog?.properties?.quickFilters) && dialog.properties.quickFilters.length > 0
@@ -333,7 +334,9 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
     }, [dialogOpen, handlers, resolvedDataSourceRef, selectionModeOverride, context, dialog, events, quickFilterSpecs, fetchOnOpen, log]);
 
     const handleClose = () => {
+        if (isDialogCloseDisabled(dialog, dsCtx)) return false;
         handlers.dialog.close();
+        return true;
     };
 
     // Prepare a DS-scoped context for the dialog data source so hooks below
@@ -412,6 +415,9 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
     // Selection state to drive default footer button enablement (reactive)
     const selectionValue = dsCtx?.signals?.selection?.value;
     const canSelect = !!(selectionValue && (selectionValue.selected || (Array.isArray(selectionValue.selection) && selectionValue.selection.length > 0)));
+    const closeDisabledWhen = dialogCloseDisabledWhen(dialog);
+    trackVisibleWhen(closeDisabledWhen, dsCtx);
+    const closeDisabled = isDialogCloseDisabled(dialog, dsCtx);
 
     if (!dialogOpen) {
         return null;
@@ -468,7 +474,9 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
             isOpen={dialogOpen}
             onClose={handleClose}
             title={title}
-            isCloseButtonShown={true}
+            isCloseButtonShown={!closeDisabled}
+            canEscapeKeyClose={!closeDisabled}
+            canOutsideClickClose={!closeDisabled}
             className={dialogClassName || undefined}
             style={dialogStyle}
         >

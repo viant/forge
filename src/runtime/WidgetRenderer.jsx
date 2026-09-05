@@ -226,6 +226,11 @@ export default function WidgetRenderer({
 
     const baseValue = (dynValue !== undefined ? dynValue : adapter.get());
     const safeValue = widgetKey === 'label' ? baseValue : ((baseValue === null || baseValue === undefined) ? '' : baseValue);
+    const currencySelector = item?.currencySelector || item?.properties?.currencySelector || item?.properties?.currencyField;
+    const currencySource = item?.currencySource || item?.properties?.currencySource || item?.scope || 'form';
+    const resolvedCurrency = currencySelector
+        ? resolveItemBoundValue(resolvedContext, {dataField: currencySelector, scope: currencySource})
+        : item?.currency || item?.properties?.currency;
 
     const widgetProps = {
         id: item.id || undefined,
@@ -247,6 +252,10 @@ export default function WidgetRenderer({
         ...combinedProps,
         ...mergedEvents,
     };
+    if (resolvedCurrency) widgetProps.currency = resolvedCurrency;
+    delete widgetProps.currencyField;
+    delete widgetProps.currencySelector;
+    delete widgetProps.currencySource;
 
     if (item?.optionsDataSourceRef) {
         const hasResolvedValue = safeValue !== '' && safeValue !== null && safeValue !== undefined;

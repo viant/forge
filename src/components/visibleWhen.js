@@ -64,6 +64,9 @@ export const evaluatePlainVisibleWhen = (visibleWhen, context) => {
         case 'collection':
             scope = context.signals?.collection?.peek?.() || [];
             break;
+        case 'row':
+            scope = context.row || {};
+            break;
         case 'form':
         default:
             scope = context.handlers?.dataSource?.peekFormData?.() || {};

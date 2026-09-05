@@ -31,6 +31,7 @@ import {mergeSectionOpenState, resolveSectionOpenState, resolveSectionProperties
 import AccessibleSection from './AccessibleSection.jsx';
 import {resolveDynamicDataSourceRef} from '../runtime/dataSourceRef.js';
 import {isPureBoundLabelSection} from './containerEmptyState.js';
+import {containerAnchorProps} from './containerAnchor.js';
 
 const wrapContainerChrome = (container, content, suppressTitle = false, sectionPropertiesOverride = null) => {
     if (!container?.section && !container?.card) {
@@ -41,7 +42,7 @@ const wrapContainerChrome = (container, content, suppressTitle = false, sectionP
     const requestedHeight = container?.style?.height;
 
     const framedContent = (
-        <div style={{ width: '100%', height: requestedHeight || '100%', flex: '1 1 auto', minHeight: requestedMinHeight || 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: selfScroll ? 'auto' : 'visible' }}>
+        <div {...containerAnchorProps(container)} style={{ width: '100%', height: requestedHeight || '100%', flex: '1 1 auto', minHeight: requestedMinHeight || 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: selfScroll ? 'auto' : 'visible' }}>
             {content}
         </div>
     );

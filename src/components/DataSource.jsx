@@ -5,6 +5,8 @@ import {useSignals} from '@preact/signals-react/runtime';
 import { extractData, isDeferredCacheHitEnvelope } from "./dataSourceExtract.js";
 import { resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, withFetchedPageInfo } from "./dataSourceFetchState.js";
 import {reconcileMultiSelection} from "./dataSourceSelection.js";
+import {applyFetchTransform} from "./dataSourceTransform.js";
+import {hasResolvedDependencies} from "./dataSourceDependencies.js";
 import {
     findSelectionSignal,
 
@@ -17,33 +19,7 @@ import {
 import {useRef} from "react";
 
 
-/**
- * hasResolvedDependencies
- *  - Returns true if all defined parameters can be resolved from their locations.
- *  - If at least one parameter is missing, returns false.
- *  - If a parameter is missing but has a default value, the default is assigned.
- */
-export function hasResolvedDependencies(parameters = [], values = {}, filter = {}) {
-    if (!parameters || parameters.length === 0) return true; // no parameters => no dependencies
-
-    for (const paramDef of parameters) {
-        if (paramDef?.from === 'const') {
-            filter[paramDef.name] = paramDef.location;
-            continue;
-        }
-        const isDefined = (paramDef.name in values) && values[paramDef.name] !== undefined;
-        if (!isDefined) {
-            if ('default' in paramDef) {
-                values[paramDef.name] = paramDef.default;
-            } else if (paramDef.required === false) {
-                continue;
-            } else {
-                return false;
-            }
-        }
-    }
-    return true;
-}
+export {hasResolvedDependencies};
 
 
 // Helper function to get a node by nodePath in a tree structure
@@ -115,9 +91,7 @@ export default function DataSource({context}) {
             if (upstream.value.selected) {
                 let {records} = extractData(selectors, paging, upstream.value.selected);
 
-                if (events.onFetch.isDefined() && records.length > 0) {
-                    records = events.onFetch.execute({collection: records})
-                }
+                records = applyFetchTransform(events, records);
                 const currentCollection = Array.isArray(collection.peek()) ? collection.peek() : [];
                 const currentSelection = selection.peek() || {};
                 const nextSelected = dataSource.autoSelect === false
@@ -357,9 +331,7 @@ export default function DataSource({context}) {
 
             let {records} = extractData(selectors, paging, payload);
 
-            if (events.onFetch.isDefined() && records.length > 0) {
-                records = events.onFetch.execute({collection: records})
-            } 
+            records = applyFetchTransform(events, records);
 
             if (records.length > 0) {
                 const uid = getUniqueKeyValue(records[0]);
@@ -534,7 +506,7 @@ export default function DataSource({context}) {
                     stats = metrics.peek() || stats;
                 }
             }
-            if (events.onFetch.isDefined() && records.length > 0) {
+            if (events.onFetch.isDefined()) {
                 try {
                     log.debug('[doFetchRecords] onFetch:before', {
                         ds: context?.identity?.dataSourceRef,
@@ -542,7 +514,7 @@ export default function DataSource({context}) {
                     });
                 } catch (_) {
                 }
-                records = events.onFetch.execute({collection: records})
+                records = applyFetchTransform(events, records);
                 try {
                     log.debug('[doFetchRecords] onFetch:after', {
                         ds: context?.identity?.dataSourceRef,

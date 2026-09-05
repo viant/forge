@@ -7,6 +7,8 @@ assert.match(formatted, /15:33/);
 assert.doesNotMatch(formatted, /AM|PM/);
 assert.equal(formatDisplayValue(0.123, 'percentFraction'), '12.3%');
 assert.equal(formatDisplayValue(0.1234, 'percentFraction2'), '12.34%');
+assert.equal(formatDisplayValue(12.5, 'currency2', 'en-US', {currency: 'EUR'}), '€12.50');
+assert.equal(formatDisplayValue(12.5, 'currency2', 'en-US', {currency: 'invalid'}), '$12.50');
 assert.equal(mapDisplayValue(1, {'0': 'Inactive', '1': 'Active'}), 'Active');
 assert.equal(mapDisplayValue('BANNER', {BANNER: 'Banner'}), 'Banner');
 assert.equal(mapDisplayValue('unknown', {known: 'Known'}), 'unknown');

@@ -42,6 +42,7 @@ const TableCell = ({
                        onRowClick,
                        enforceColumnSize = true,
                        onShowFullContent,
+                       rowSelectionDisabled = false,
                    }) => {
     let {displayedText, value, align} = cell;
     const dataSource = context?.handlers?.dataSource || {};
@@ -136,8 +137,10 @@ const TableCell = ({
                     <input
                         type="checkbox"
                         checked={isSelected({...cellSelection})}
+                        disabled={rowSelectionDisabled}
                         onChange={(event) => {
                             event.stopPropagation();
+                            if (rowSelectionDisabled) return;
                             context?.handlers?.dataSource?.toggleSelection?.(cellSelection);
                         }}
                         onClick={(event) => event.stopPropagation()}

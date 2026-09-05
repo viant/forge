@@ -1,5 +1,6 @@
 import React from "react";
 import TableCell from "./TableCell.jsx";
+import {isRowSelectionDisabled} from '../rowSelection.js';
 
 /* ------------------------------------------------------------------
  * TableRow - Renders a single row from preparedData[rowIndex]
@@ -18,7 +19,11 @@ const TableRow = ({
                       onShowFullContent,
                   }) => {
 
+    const selectionColumn = columns.find((column) => column?.multiSelect === true);
+    const rowSelectionDisabled = isRowSelectionDisabled(selectionColumn?.selectionDisabledWhen, rowSelection.row, context);
+
     const handleRowClick = (event) => {
+        if (rowSelectionDisabled) return false;
         return onRowClick({ event, ...rowSelection });
     };
 
@@ -47,6 +52,7 @@ const TableRow = ({
                 onRowClick={onRowClick}
                 enforceColumnSize={enforceColumnSize}
                 onShowFullContent={onShowFullContent}
+                rowSelectionDisabled={rowSelectionDisabled}
             />
         );
     }
@@ -56,6 +62,7 @@ const TableRow = ({
             onClick={handleRowClick}
             className={[selected ? "selected-row" : "row", rowClassName].filter(Boolean).join(" ")}
             style={rowStyle}
+            aria-disabled={rowSelectionDisabled || undefined}
         >
             {cells}
         </tr>
