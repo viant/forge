@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { toolbarItemIcon, toolbarStatusValue } from './Toolbar.jsx';
+import { toolbarDisabledWrapperProps, toolbarItemIcon, toolbarItemLabel, toolbarStatusValue } from './Toolbar.jsx';
 
 describe('toolbarItemIcon', () => {
     it('renders the shared pdf token as a visible PDF glyph', () => {
@@ -12,6 +12,24 @@ describe('toolbarItemIcon', () => {
 
     it('preserves ordinary Blueprint icon names', () => {
         expect(toolbarItemIcon('refresh')).toBe('refresh');
+    });
+});
+
+describe('toolbarItemLabel', () => {
+    it('hides icon-only labels while preserving their accessible metadata elsewhere', () => {
+        expect(toolbarItemLabel({label: 'Save changes', hideLabel: true})).toBeNull();
+        expect(toolbarItemLabel({label: 'Save changes'})).toBe('Save changes');
+    });
+});
+
+describe('toolbarDisabledWrapperProps', () => {
+    it('keeps disabled icon controls focusable and exposes the tooltip name', () => {
+        expect(toolbarDisabledWrapperProps({label: 'Save changes', tooltip: 'Save changes'}, true)).toEqual({
+            title: 'Save changes',
+            'aria-label': 'Save changes',
+            tabIndex: 0,
+        });
+        expect(toolbarDisabledWrapperProps({label: 'Save changes'}, false)).toEqual({});
     });
 });
 

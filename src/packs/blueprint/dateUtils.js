@@ -1,9 +1,12 @@
 import { enUS } from 'date-fns/locale';
 import { format, parse } from 'date-fns';
+import {defaultDateInputMaxDate, defaultDateInputMinDate} from './dateInputBounds.js';
 
 // Build properties for Blueprint DateInput3 so behaviour matches legacy
 export function buildDateProps(item, { readOnly, properties = {} } = {}) {
     const merged = { ...properties };
+    if (!('minDate' in merged)) merged.minDate = defaultDateInputMinDate();
+    if (!('maxDate' in merged)) merged.maxDate = defaultDateInputMaxDate();
 
     const placeholderProp = merged.placeholder;
 

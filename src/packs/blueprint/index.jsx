@@ -756,11 +756,11 @@ export function registerPack() {
     /* -------------------- Currency ---------------------------------- */
     registerWidget(
         'currency',
-        ({ value = '', onChange, readOnly, ...rest }) => (
+        ({ value = '', onValueChange, readOnly, ...rest }) => (
             <NumericInput
                 {...rest}
                 value={value ?? ''}
-                onValueChange={(v) => onChange?.(v)}
+                onValueChange={(v) => onValueChange?.(v)}
                 readOnly={readOnly}
                 leftIcon="dollar"
                 majorStepSize={10}
