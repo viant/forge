@@ -460,8 +460,13 @@ function resolveFromDataSource(context, location, scope = 'form') {
 
     const dotIndex = location.indexOf('.');
     if (dotIndex === -1) {
-        dataSourceRef = location;
-        fieldPath = '';
+        if (context.dataSources?.[location]) {
+            dataSourceRef = location;
+            fieldPath = '';
+        } else {
+            dataSourceRef = context.identity.dataSourceRef;
+            fieldPath = location;
+        }
     } else {
         dataSourceRef = location.substring(0, dotIndex);
         fieldPath = location.substring(dotIndex + 1);
