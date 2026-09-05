@@ -48,6 +48,23 @@ assert.deepEqual(resolved, {
   publisherId: 8,
 });
 
+const filterContext = {
+  ...baseContext,
+  handlers: {
+    dataSource: {
+      ...baseContext.handlers.dataSource,
+      peekFilter: () => ({ Search: 'bid range' }),
+    },
+  },
+  Context(ref) {
+    assert.equal(ref, 'default', 'an unqualified filter location must stay on the current datasource');
+    return this;
+  },
+};
+assert.deepEqual(resolveParameters([
+  { name: 'Search', in: 'filter', location: 'Search' },
+], filterContext), { Search: 'bid range' });
+
 const crossDataSourceContext = {
   identity: { dataSourceRef: 'runs' },
   dataSources: { runs: {}, schedules: {} },
