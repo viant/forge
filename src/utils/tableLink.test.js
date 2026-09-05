@@ -141,6 +141,15 @@ assert.equal(
 
 assert.equal(
   resolveTableCellText({
+    row: {spend: 12345.67, currency: 'EUR'},
+    column: {id: 'spend', name: 'Spend', format: 'currency2', currencyField: 'currency'},
+    value: 12345.67,
+  }),
+  '€12,345.67',
+);
+
+assert.equal(
+  resolveTableCellText({
     row: { lifetimeSpend: null },
     column: { id: 'lifetimeSpend', name: 'Lifetime Spend', emptyText: 'No data' },
     value: null,

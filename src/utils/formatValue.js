@@ -73,15 +73,23 @@ export const formatDisplayValue = (value, format, locale = 'en-US', options = {}
     }
 
     switch (format) {
-        case 'currency':
-            return new Intl.NumberFormat(locale, {style: 'currency', currency: 'USD', maximumFractionDigits: 0}).format(numeric);
-        case 'currency2':
+        case 'currency': {
+            const currency = /^[A-Z]{3}$/.test(String(options?.currency || '').toUpperCase())
+                ? String(options.currency).toUpperCase()
+                : 'USD';
+            return new Intl.NumberFormat(locale, {style: 'currency', currency, maximumFractionDigits: 0}).format(numeric);
+        }
+        case 'currency2': {
+            const currency = /^[A-Z]{3}$/.test(String(options?.currency || '').toUpperCase())
+                ? String(options.currency).toUpperCase()
+                : 'USD';
             return new Intl.NumberFormat(locale, {
                 style: 'currency',
-                currency: 'USD',
+                currency,
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
             }).format(numeric);
+        }
         case 'compact':
         case 'compactNumber':
             return new Intl.NumberFormat(locale, {notation: 'compact', maximumFractionDigits: 1}).format(numeric);

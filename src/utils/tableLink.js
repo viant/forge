@@ -57,7 +57,10 @@ export function resolveTableCellText({row, column, value} = {}) {
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
         const timeZone = column?.timeZone
             || (column?.timeZoneSelector ? resolveSelector(row, column.timeZoneSelector) : undefined);
-        return formatDisplayValue(value, inferTableCellFormat(column), undefined, {timeZone});
+        const currency = column?.currency
+            || (column?.currencySelector ? resolveSelector(row, column.currencySelector) : undefined)
+            || (column?.currencyField ? resolveSelector(row, column.currencyField) : undefined);
+        return formatDisplayValue(value, inferTableCellFormat(column), undefined, {timeZone, currency});
     }
     if (column?.format) {
         return formatDisplayValue(value, inferTableCellFormat(column));

@@ -8,7 +8,7 @@ import PaginationBar from './PaginationBar.jsx';
 import "./Toolbar.css";
 import { useToolbarControlEvents } from '../../../hooks/event.js';
 import { DateRangePresetInput } from '../../../packs/blueprint/index.jsx';
-import {toolbarSelectLabel} from './toolbarSelect.js';
+import {dispatchToolbarSelectChange, toolbarSelectLabel} from './toolbarSelect.js';
 
 function sanitizeTestID(value) {
     return String(value || '')
@@ -225,7 +225,7 @@ const Toolbar = ({
                                         text={option.label ?? option.text ?? String(option.value)}
                                         active={String(option.value) === String(value ?? '')}
                                         icon={String(option.value) === String(value ?? '') ? 'tick' : undefined}
-                                        onClick={() => (events.onChange || directChange)({target: {value: option.value}})}
+                                        onClick={() => dispatchToolbarSelectChange({target: {value: option.value}}, directChange, events.onChange)}
                                     />
                                 ))}
                             </Menu>

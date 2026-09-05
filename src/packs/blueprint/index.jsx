@@ -43,6 +43,8 @@ import { formatDisplayValue, mapDisplayValue, resolveEmptyDisplayText } from '..
 import { resolveLinkTarget } from '../../utils/linkTarget.js';
 import { permittedOptions } from './permittedOptions.js';
 import ChipList from '../../components/ChipList.jsx';
+import {currencyInputIcon} from '../../utils/currency.js';
+import MediaPreview from '../../components/MediaPreview.jsx';
 import {formatPercentFraction2Input, parsePercentFraction2Input} from './percentFractionInput.js';
 import {resolveSelector} from '../../utils/selector.js';
 import {normalizeLifetimeStart, resolveDateRangePreset} from './dateRangePreset.js';
@@ -756,13 +758,15 @@ export function registerPack() {
     /* -------------------- Currency ---------------------------------- */
     registerWidget(
         'currency',
-        ({ value = '', onValueChange, readOnly, ...rest }) => (
+        ({ value = '', onValueChange, readOnly, currency = 'USD', ...rest }) => (
             <NumericInput
                 {...rest}
                 value={value ?? ''}
                 onValueChange={(v) => onValueChange?.(v)}
                 readOnly={readOnly}
-                leftIcon="dollar"
+                leftIcon={currencyInputIcon(currency)}
+                title={rest.title || String(currency).toUpperCase()}
+                aria-label={`${rest['aria-label'] || 'Amount'} (${String(currency).toUpperCase()})`}
                 majorStepSize={10}
                 minorStepSize={0.1}
             />
@@ -773,6 +777,8 @@ export function registerPack() {
     registerEventAdapter('currency', {
         onValueChange: ({ adapter }) => (v) => adapter.set(v),
     });
+
+    registerWidget('mediaPreview', (props) => <MediaPreview {...props} />, {framework: 'blueprint'});
 
     /* -------------------- Fractional percent input ----------------- */
     registerWidget(
