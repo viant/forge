@@ -40,6 +40,16 @@ export function toolbarItemIcon(icon) {
     return icon;
 }
 
+export function toolbarItemLabel(item = {}) {
+    return item.hideLabel === true ? null : (item.label || "");
+}
+
+export function toolbarDisabledWrapperProps(item = {}, disabled = false) {
+    if (!disabled) return {};
+    const label = item.ariaLabel || item.tooltip || item.label || item.id;
+    return {title: item.tooltip || item.label || item.id, 'aria-label': label, tabIndex: 0};
+}
+
 export function toolbarStatusValue(item = {}, form = {}, dirty = false) {
     if (dirty && item.dirtyValue !== undefined) return String(item.dirtyValue ?? '');
     const field = item.dataField || item.field || item.bind || item.id;
@@ -265,7 +275,11 @@ const Toolbar = ({
             : (align === 'right' ? { marginLeft: "10px" } : { marginRight: "10px" });
 
         return (
-            <span key={item.id} style={spanStyle}>
+            <span
+                key={item.id}
+                style={spanStyle}
+                {...toolbarDisabledWrapperProps(item, effectiveDisabled)}
+            >
                 <Button
                     key={item.id}
                     icon={toolbarItemIcon(item.icon)}
@@ -280,7 +294,7 @@ const Toolbar = ({
                     className={item.className}
                     style={item.style}
                 >
-                    {item.label || ""}
+                    {toolbarItemLabel(item)}
                 </Button>
             </span>
         );
