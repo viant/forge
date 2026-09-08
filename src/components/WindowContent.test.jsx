@@ -253,6 +253,7 @@ describe('resolveDataSourceOptions', () => {
       optionFilter: { field: 'group', source: 'form', selector: 'group' },
     }, context)).toEqual([{ value: 'age:5', label: '18-24' }]);
   });
+
 });
 
 describe('resolveDefaultDataSourceRef', () => {

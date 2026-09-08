@@ -7,6 +7,7 @@ type DraftFormSpec struct {
 	ValidWhen      map[string]interface{} `json:"validWhen,omitempty" yaml:"validWhen,omitempty"`
 	DirtyWhen      map[string]interface{} `json:"dirtyWhen,omitempty" yaml:"dirtyWhen,omitempty"`
 	ConfirmDiscard string                 `json:"confirmDiscard,omitempty" yaml:"confirmDiscard,omitempty"`
+	OnReset        string                 `json:"onReset,omitempty" yaml:"onReset,omitempty"`
 	Submit         *MutationCommand       `json:"submit,omitempty" yaml:"submit,omitempty"`
 }
 

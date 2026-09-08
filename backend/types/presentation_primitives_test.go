@@ -13,6 +13,7 @@ id: presentation
 draftForm:
   dataSourceRef: draft
   saveLabel: Apply
+  onReset: Host.refreshDerivedPresentation
   validWhen: {source: form, field: name, notEmpty: true}
   submit: {dataSourceRef: patch}
 queryToolbar:
@@ -68,7 +69,7 @@ masterDetail:
 	if err := yaml.Unmarshal(data, &container); err != nil {
 		t.Fatal(err)
 	}
-	if container.DraftForm == nil || container.DraftForm.Submit == nil || container.DraftForm.SaveLabel != "Apply" {
+	if container.DraftForm == nil || container.DraftForm.Submit == nil || container.DraftForm.SaveLabel != "Apply" || container.DraftForm.OnReset != "Host.refreshDerivedPresentation" {
 		t.Fatal("draftForm truncated")
 	}
 	if container.QueryToolbar == nil || len(container.QueryToolbar.Items) != 1 || container.StableTabs == nil {

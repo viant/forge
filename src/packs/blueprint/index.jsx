@@ -51,7 +51,8 @@ import {currencyInputIcon} from '../../utils/currency.js';
 import MediaPreview from '../../components/MediaPreview.jsx';
 import {formatPercentFraction2Input, parsePercentFraction2Input} from './percentFractionInput.js';
 import {resolveSelector} from '../../utils/selector.js';
-import {normalizeLifetimeStart, resolveDateRangePreset} from './dateRangePreset.js';
+import {normalizeLifetimeStart, resolveDateRangePreset, resolveDateRangePresetSyncPatch} from './dateRangePreset.js';
+import {commitSelectOption, isSelectOptionDisabled} from './selectOptionModel.js';
 
 /* ------------------------ Widget implementation ----------------------- */
 
@@ -140,12 +141,8 @@ export function DateRangePresetInput({
         const resolved = resolveDateRangePreset(value, new Date(), resolvedLifetimeStart, resolvedTimeZone);
         if (!resolved) return;
         const current = context?.signals?.windowForm?.peek?.() || context?.signals?.windowForm?.value || {};
-        if (current[startField] === resolved.start && current[endField] === resolved.end && current[granularityField] === resolved.granularity) return;
-        setDraftFields({
-            [startField]: resolved.start,
-            [endField]: resolved.end,
-            [granularityField]: resolved.granularity,
-        });
+        const patch = resolveDateRangePresetSyncPatch(current, resolved, {startField, endField, granularityField});
+        if (patch) setDraftFields(patch);
     }, [value, context, startField, endField, granularityField, resolvedLifetimeStart, resolvedTimeZone]);
     const choosePreset = (option) => {
         if (String(option?.value).toLowerCase() === 'custom') return;
@@ -551,13 +548,19 @@ export function registerPack() {
                     items={visibleOptions}
                     fill={fill}
                     itemRenderer={(item, { handleClick, modifiers }) => (
-                        <MenuItem key={item.value} text={item.label} active={modifiers.active} onClick={handleClick} />
+                        <MenuItem
+                            key={item.value}
+                            text={item.label}
+                            active={modifiers.active}
+                            disabled={isSelectOptionDisabled(item)}
+                            onClick={isSelectOptionDisabled(item) ? undefined : handleClick}
+                        />
                     )}
                     filterable={false}
                     disabled={readOnly}
                     popoverProps={{ minimal: true, matchTargetWidth: true, placement: 'bottom-start' }}
                     {...rest}
-                    onItemSelect={(item) => onChange?.(item.value)}
+                    onItemSelect={(item) => commitSelectOption(item, onChange)}
                 >
                     <Button id={id} aria-label={ariaLabel} fill={fill} text={selected?.label || rest.placeholder || 'Select…'} rightIcon="caret-down" disabled={readOnly} />
                 </Select>

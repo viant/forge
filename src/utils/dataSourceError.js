@@ -56,5 +56,11 @@ function resolveDisplayMessage(status, message) {
     if (status === 403) {
         return 'Access denied. You do not have permission to load this data.';
     }
+    if (status === 408 || status === 504 || /(?:timed?\s*out|timeout)/i.test(message)) {
+        return 'The request timed out. Retry in a moment.';
+    }
+    if ((status && status >= 500) || /(?:internal server error|parameter\s+"?(?:auth|sysconfig)"?|seed\s+"?[a-z0-9_]+"?\s*:)/i.test(message)) {
+        return 'This data is temporarily unavailable. Retry in a moment.';
+    }
     return message;
 }

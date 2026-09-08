@@ -19,6 +19,10 @@ export default function DraftForm({container, context}) {
     const values = JSON.parse(baseline || '{}');
     dataContext?.handlers?.dataSource?.setFormData?.({values});
     dataContext?.handlers?.dataSource?.resetFormDirty?.();
+    if (spec.onReset && typeof dataContext?.lookupHandler === 'function') {
+      const handler = dataContext.lookupHandler(spec.onReset);
+      if (typeof handler === 'function') setTimeout(() => handler({context: dataContext, values}), 0);
+    }
   };
   return <div className="forge-draft-form" data-forge-primitive="draftForm">
     <span className="forge-draft-form__status" aria-live="polite">{dirty ? 'Unsaved changes' : 'No unsaved changes'}</span>
