@@ -63,3 +63,17 @@ export function resolveDateRangePreset(value, now = new Date(), lifetimeStart = 
         granularity: durationDays <= 2 ? 'hour' : 'day',
     };
 }
+
+export function resolveDateRangePresetSyncPatch(current = {}, resolved = null, {
+    startField = 'customDateStart',
+    endField = 'customDateEnd',
+    granularityField = 'granularity',
+} = {}) {
+    if (!resolved) return null;
+    if (current?.[startField] === resolved.start && current?.[endField] === resolved.end) return null;
+    return {
+        [startField]: resolved.start,
+        [endField]: resolved.end,
+        [granularityField]: resolved.granularity,
+    };
+}

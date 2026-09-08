@@ -19,47 +19,9 @@ import {evaluatePlainVisibleWhen} from '../components/visibleWhen.js';
 import {resolveDynamicDataSourceRef} from './dataSourceRef.js';
 import {resolveRequiredControlState, usesResolvedRequiredPastel} from './requiredControlState.js';
 import MutationCommand from '../components/primitives/MutationCommand.jsx';
+import {filterDataSourceOptions, resolveDataSourceOptionRows} from './optionFilter.js';
 
 import ControlWrapper from './ControlWrapper.jsx';
-
-function resolveOptionFilterScope(context, source = 'form') {
-    switch (String(source || 'form').trim().toLowerCase()) {
-        case 'windowform':
-            return context?.signals?.windowForm?.value || {};
-        case 'input':
-        case 'filter':
-        case 'filters':
-            return context?.signals?.input?.value || {};
-        case 'selection': {
-            const selection = context?.handlers?.dataSource?.getSelection?.()
-                || context?.signals?.selection?.value
-                || {};
-            return selection?.selected ?? selection?.selection ?? selection;
-        }
-        case 'form':
-        default:
-            return context?.handlers?.dataSource?.getFormData?.()
-                || context?.signals?.form?.value
-                || {};
-    }
-}
-
-function filterDataSourceOptions(rows, optionFilter, context) {
-    const filters = Array.isArray(optionFilter) ? optionFilter : optionFilter ? [optionFilter] : [];
-    if (filters.length === 0) return rows;
-    return rows.filter((row) => filters.every((filter) => {
-        const expected = resolveSelector(
-            resolveOptionFilterScope(context, filter?.source),
-            filter?.selector || filter?.valueSelector || '',
-        );
-        if (expected === undefined || expected === null || expected === '') return true;
-        const actual = resolveSelector(row, filter?.field || filter?.rowSelector || '');
-        if (filter?.caseInsensitive === true) {
-            return String(actual ?? '').toLowerCase() === String(expected).toLowerCase();
-        }
-        return actual === expected;
-    }));
-}
 
 export function resolveDataSourceOptions(item = {}, context = {}, fallback = []) {
     const dataSourceRef = String(item?.optionsDataSourceRef || '').trim();
@@ -67,26 +29,26 @@ export function resolveDataSourceOptions(item = {}, context = {}, fallback = [])
         return Array.isArray(fallback) ? fallback : [];
     }
     try {
-        const optionContext = context.Context(dataSourceRef);
-        const rows = optionContext?.signals?.collection?.value
-            || optionContext?.signals?.collection?.peek?.()
-            || [];
+        const rows = resolveDataSourceOptionRows(item, context);
         if (!Array.isArray(rows)) return Array.isArray(fallback) ? fallback : [];
         const labelSelector = String(item?.optionLabelField || item?.optionLabelSelector || 'label').trim();
         const valueSelector = String(item?.optionValueField || item?.optionValueSelector || 'value').trim();
         const secondarySelector = String(item?.optionSecondaryField || item?.optionSecondarySelector || '').trim();
+        const disabledSelector = String(item?.optionDisabledField || item?.optionDisabledSelector || '').trim();
         const options = filterDataSourceOptions(rows, item?.optionFilter || item?.optionFilters, context)
             .map((row) => {
                 const value = resolveSelector(row, valueSelector);
                 const label = resolveSelector(row, labelSelector);
                 if (value === undefined || value === null || label === undefined || label === null) return null;
                 const secondary = secondarySelector ? resolveSelector(row, secondarySelector) : undefined;
+                const disabledValue = disabledSelector ? resolveSelector(row, disabledSelector) : false;
+                const disabled = disabledValue === true || Number(disabledValue) === 1;
                 const displayLabel = secondary === undefined || secondary === null || secondary === ''
                     ? String(label)
                     : `${String(label)} (${String(secondary)})`;
                 return secondary === undefined || secondary === null || secondary === ''
-                    ? {value, label: displayLabel}
-                    : {value, label: displayLabel, secondary};
+                    ? {value, label: displayLabel, disabled}
+                    : {value, label: displayLabel, secondary, disabled};
             })
             .filter(Boolean);
         if (item?.includeEmptyOption === true) {
