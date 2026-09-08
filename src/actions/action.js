@@ -34,7 +34,10 @@ export function injectActions(metadata) {
         const fn = new Function('context', 'utilities', 'with(context,utilities) { return ' + actionCode + ';}')
         metadata.actions['import'] = (context) => {
             const result = fn(context, utilities)
-            return {[namespace]: result}
+            const namespaces = [namespace, ...(Array.isArray(metadata.actionAliases) ? metadata.actionAliases : [])]
+                .map((candidate) => String(candidate || '').trim())
+                .filter((candidate, index, values) => candidate && values.indexOf(candidate) === index);
+            return Object.fromEntries(namespaces.map((candidate) => [candidate, result]))
         }
 
     } catch (error) {

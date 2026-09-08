@@ -232,6 +232,7 @@ type Window struct {
 	Dialogs               []Dialog                          `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
 	Actions               *Actions                          `json:"actions,omitempty" yaml:"actions,omitempty"`
 	ActionRefs            []string                          `json:"actionRefs,omitempty" yaml:"actionRefs,omitempty"`
+	ActionAliases         []string                          `json:"actionAliases,omitempty" yaml:"actionAliases,omitempty"`
 	On                    []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
 	Target                *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
 	TargetOverrides       map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
