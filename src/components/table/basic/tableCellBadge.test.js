@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 
 import {resolveTableCellBadge} from './tableCellBadge.js';
 
@@ -41,5 +42,9 @@ assert.deepEqual(resolveTableCellBadge({validationAlert: 'Creative has validatio
 }), {
   label: '', icon: 'warning-sign', tone: 'danger', className: '', tooltip: 'Creative has validation errors', replaceValue: false, hideLabel: true,
 });
+
+const styles = readFileSync(new URL('../Basic.css', import.meta.url), 'utf8');
+assert.match(styles, /\.forge-table-cell-badges\s*\{[\s\S]*display:\s*inline-flex;[\s\S]*white-space:\s*nowrap/);
+assert.match(styles, /\.forge-table-cell-badge\.is-danger,[\s\S]*color:\s*#b42318/);
 
 console.log('tableCellBadge ✓ conditionally resolves a generic row decoration');

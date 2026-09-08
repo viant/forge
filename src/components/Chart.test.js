@@ -9,6 +9,7 @@ import {
     materializeChartDisplayRows,
     resolveChartBodyState,
     resolveChartLoadingState,
+    resolveChartTableMinWidth,
     resolveVisibleChartState,
     transformData,
 } from './chartData.js';
@@ -21,6 +22,8 @@ assert.equal(formatChartXAxisValue(5), '5');
 assert.equal(formatChartXAxisValue('2026-05-14T12:00:00Z'), '2026-05-14T12:00:00Z');
 assert.equal(formatChartXAxisValue('2026-05-14T12:00:00Z', 'MM/dd'), '05/14');
 assert.equal(formatChartXAxisValue('2026-05-14T00:00:00Z', 'MM/dd', 'civil'), '05/14');
+assert.equal(resolveChartTableMinWidth([110, 110, 110]), 330);
+assert.equal(resolveChartTableMinWidth([160, 240, 320]), 720);
 
 assert.deepEqual(resolveVisibleChartState({
     chartData: [],
