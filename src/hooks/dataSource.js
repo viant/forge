@@ -725,14 +725,24 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
         return input.value?.page || 1;
     };
 
-    const setSort = ({columnId, direction = 'asc', fetch = true} = {}) => {
+    const setSort = ({columnId, direction = 'asc', fetch = true, parameter = '', value = null} = {}) => {
         const field = String(columnId || '').trim();
-        input.value = {
+        const destination = String(parameter || '').trim();
+        const next = {
             ...input.peek(),
             page: 1,
-            sort: field ? [{field, direction: String(direction || 'asc').toLowerCase() === 'desc' ? 'desc' : 'asc'}] : [],
             fetch: fetch === true,
         };
+        if (destination) {
+            next.parameters = {
+                ...(next.parameters || {}),
+                [destination]: value,
+            };
+            delete next.sort;
+        } else {
+            next.sort = field ? [{field, direction: String(direction || 'asc').toLowerCase() === 'desc' ? 'desc' : 'asc'}] : [];
+        }
+        input.value = next;
     };
 
     const getSort = () => input.value?.sort || [];
