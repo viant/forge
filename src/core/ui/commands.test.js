@@ -96,6 +96,35 @@ assert.deepEqual(
 );
 assert.equal(appendedHosted.windowId, activeWindows.peek()[3].windowId);
 
+const canonicalOrderFocus = await runUICommand({
+  method: 'ui.window.open',
+  params: {
+    windowKey: 'order',
+    windowTitle: 'Order 2656980 from Campaign',
+    inTab: true,
+    parameters: {AdOrderId: [2656980], CampaignId: [532743]},
+    options: {
+      conversationId: 'conv-1', presentation: 'hosted', region: 'chat.top', parentKey: 'chat/new',
+      replaceHostedRegion: false, identityParameters: ['AdOrderId'],
+    },
+  },
+});
+const canonicalOrderDirect = await runUICommand({
+  method: 'ui.window.open',
+  params: {
+    windowKey: 'order',
+    windowTitle: 'Order 2656980 direct',
+    inTab: true,
+    parameters: {AdOrderId: [2656980]},
+    options: {
+      conversationId: 'conv-1', presentation: 'hosted', region: 'chat.top', parentKey: 'chat/new',
+      replaceHostedRegion: false, identityParameters: ['AdOrderId'],
+    },
+  },
+});
+assert.equal(canonicalOrderFocus.windowId, canonicalOrderDirect.windowId);
+assert.deepEqual(activeWindows.peek().find((win) => win.windowId === canonicalOrderDirect.windowId).parameters, {AdOrderId: [2656980]});
+
 const crossConversationHosted = await runUICommand({
   method: 'ui.window.open',
   params: {

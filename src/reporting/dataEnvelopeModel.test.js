@@ -31,3 +31,34 @@ test("extractData preserves root-array records with a redundant legacy data sele
 
   assert.deepEqual(result.records, rows);
 });
+
+test("extractData converts a selected typed tabular dataset into object rows", () => {
+  const result = extractData({ data: "data.0" }, null, {
+    data: [{
+      name: "overview",
+      columns: [{ name: "campaign" }, { name: "impressions" }],
+      rows: [["Campaign A", 42], ["Campaign B"]],
+    }],
+  });
+  assert.deepEqual(result.records, [
+    { campaign: "Campaign A", impressions: 42 },
+    { campaign: "Campaign B", impressions: null },
+  ]);
+});
+
+test("extractData converts a BFF-normalized singleton tabular collection", () => {
+  const result = extractData({ data: "data.0" }, null, {
+    rows: [{
+      name: "conversionDevices",
+      columns: [{ name: "campaignId" }, { name: "impressions" }],
+      rows: [[544632, 5886978], [544349, 1048680]],
+    }],
+    metrics: { viewId: 1342 },
+  });
+
+  assert.deepEqual(result.records, [
+    { campaignId: 544632, impressions: 5886978 },
+    { campaignId: 544349, impressions: 1048680 },
+  ]);
+  assert.deepEqual(result.stats, { viewId: 1342 });
+});

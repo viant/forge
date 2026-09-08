@@ -4,6 +4,27 @@ import {Card, Section} from '@blueprintjs/core';
 import ControlRenderer from './ControlRenderer.jsx';
 import {useControlEvents} from "../hooks/index.js";
 import TablePanel from "./TablePanel.jsx";
+import EditableCollection from "./primitives/EditableCollection.jsx";
+import AssignmentPicker from "./primitives/AssignmentPicker.jsx";
+import DerivedDataSource from "./primitives/DerivedDataSource.jsx";
+import MutationCommand from "./primitives/MutationCommand.jsx";
+import StatusWorkflow from "./primitives/StatusWorkflow.jsx";
+import TreeEditor from "./primitives/TreeEditor.jsx";
+import Wizard from "./primitives/Wizard.jsx";
+import UploadCollection from "./primitives/UploadCollection.jsx";
+import PermissionBoundary from "./primitives/PermissionBoundary.jsx";
+import ResponsiveDataGrid from "./primitives/ResponsiveDataGrid.jsx";
+import HistoryDiff from "./primitives/HistoryDiff.jsx";
+import ScheduleEditor from "./primitives/ScheduleEditor.jsx";
+import DraftForm from "./primitives/DraftForm.jsx";
+import QueryToolbar from "./primitives/QueryToolbar.jsx";
+import ResourceHeader from "./primitives/ResourceHeader.jsx";
+import DataStateBoundary from "./primitives/DataStateBoundary.jsx";
+import RelationDrill from "./primitives/RelationDrill.jsx";
+import NotificationRules from "./primitives/NotificationRules.jsx";
+import MetricSummary from "./primitives/MetricSummary.jsx";
+import DetailView from "./primitives/DetailView.jsx";
+import MasterDetail from "./primitives/MasterDetail.jsx";
 import FormPanel from "./FormPanel.jsx";
 import Chart from "./Chart.jsx";
 import {resolveParameterValue, resolveSelector, resolveTemplate} from "../utils/selector.js";
@@ -183,18 +204,62 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
 
 
     let formPanel = null
-    if (container.tabs) {
+    if (container.tabs || container.stableTabs) {
+        const stableMountPolicy = container.stableTabs?.keepVisitedTabPanelsMounted === true ? 'visited' : container.stableTabs?.renderActiveTabPanelOnly === false ? 'all' : 'active';
+        const tabContainer = container.stableTabs ? {...container, tabs: {...container.stableTabs, mountPolicy: stableMountPolicy}} : container;
         formPanel = (<>
-            <FormPanel context={resolveChildContext(effectiveContext, dataSourceRef)} container={container} isActive={isActive} dataSourceFetchMode={dataSourceFetchMode}></FormPanel>
+            <FormPanel context={resolveChildContext(effectiveContext, dataSourceRef)} container={tabContainer} isActive={isActive} dataSourceFetchMode={dataSourceFetchMode}></FormPanel>
         </>);
     }
 
     let tablePanel = null
     if (table) {
-        tablePanel = (<>
-            <TablePanel context={resolveChildContext(effectiveContext, dataSourceRef)} container={container} isActive={isActive}></TablePanel>
-        </>);
+        const tableContext = resolveChildContext(effectiveContext, dataSourceRef);
+        tablePanel = container.editableCollection
+            ? <EditableCollection context={tableContext} container={container} isActive={isActive}/>
+            : container.responsiveDataGrid
+            ? <ResponsiveDataGrid context={tableContext} container={container} isActive={isActive}/>
+            : <TablePanel context={tableContext} container={container} isActive={isActive}/>;
     }
+
+    const assignmentPanel = container.assignmentPicker
+        ? <AssignmentPicker container={container} context={effectiveContext}/>
+        : null;
+    const derivedDataSourcePanel = container.derivedDataSource
+        ? <DerivedDataSource container={container} context={effectiveContext}/>
+        : null;
+    const mutationCommandPanel = container.mutationCommand
+        ? <MutationCommand command={container.mutationCommand} context={effectiveContext}/>
+        : null;
+    const statusWorkflowPanel = container.statusWorkflow
+        ? <StatusWorkflow container={container} context={effectiveContext}/>
+        : null;
+    const treeEditorPanel = container.treeEditor
+        ? <TreeEditor container={container} context={effectiveContext}/>
+        : null;
+    const uploadCollectionPanel = container.uploadCollection
+        ? <UploadCollection container={container} context={effectiveContext}/>
+        : null;
+    const historyDiffPanel = container.historyDiff
+        ? <HistoryDiff container={container} context={effectiveContext}/>
+        : null;
+    const scheduleEditorPanel = container.scheduleEditor
+        ? <ScheduleEditor container={container} context={effectiveContext}/>
+        : null;
+    const wizardPanel = container.wizard
+        ? <Wizard container={container} context={effectiveContext} renderStep={(step) => {
+            const stepContainer = (containers || []).find((entry) => entry.id === step.containerId);
+            return stepContainer ? <Container context={resolveChildContext(effectiveContext, stepContainer.dataSourceRef || dataSourceRef)} container={stepContainer} isActive={isActive} dataSourceFetchMode={dataSourceFetchMode}/> : null;
+        }}/>
+        : null;
+    const draftFormPanel = container.draftForm ? <DraftForm container={container} context={effectiveContext}/> : null;
+    const queryToolbarPanel = container.queryToolbar ? <QueryToolbar container={container} context={effectiveContext}/> : null;
+    const resourceHeaderPanel = container.resourceHeader ? <ResourceHeader container={container} context={effectiveContext}/> : null;
+    const relationDrillPanel = container.relationDrill ? <RelationDrill container={container} context={effectiveContext}/> : null;
+    const notificationRulesPanel = container.notificationRules ? <NotificationRules container={container} context={effectiveContext}/> : null;
+    const metricSummaryPanel = container.metricSummary ? <MetricSummary container={container} context={effectiveContext}/> : null;
+    const detailViewPanel = container.detailView ? <DetailView container={container} context={effectiveContext}/> : null;
+    const masterDetailPanel = container.masterDetail ? <MasterDetail container={container} context={effectiveContext} renderRegion={(entry) => entry ? <Container context={resolveChildContext(effectiveContext, entry.dataSourceRef || dataSourceRef)} container={entry} isActive={isActive} dataSourceFetchMode={dataSourceFetchMode}/> : null}/> : null;
 
     let chartPanel = null
     if (chart) {
@@ -378,7 +443,7 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
     const hasVisual =
         (visualItems?.length || 0) > 0 ||
         !!container.toolbar ||
-        tablePanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || treeBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
+        tablePanel || assignmentPanel || derivedDataSourcePanel || mutationCommandPanel || statusWorkflowPanel || treeEditorPanel || wizardPanel || uploadCollectionPanel || historyDiffPanel || scheduleEditorPanel || draftFormPanel || queryToolbarPanel || resourceHeaderPanel || relationDrillPanel || notificationRulesPanel || metricSummaryPanel || detailViewPanel || masterDetailPanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || treeBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
     if (!hasVisual && !shouldSkipGenericNonVisualEarlyReturn(container)) {
         return (
             <>
@@ -633,8 +698,16 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
     const shouldRenderVisualItems = !shouldRenderSectionNoDataState;
 
     return wrapContainerChrome(container, (
-        <>
+        <PermissionBoundary container={container} context={effectiveContext}>
+            <DataStateBoundary container={container} context={effectiveContext}>
             <div style={{ width: '100%', height: '100%', minHeight: 0, minWidth: 0, display: 'flex', flex: '1 1 auto', flexDirection: 'column' }}>
+                {resourceHeaderPanel}
+                {notificationRulesPanel}
+                {queryToolbarPanel}
+                {metricSummaryPanel}
+                {relationDrillPanel}
+                {detailViewPanel}
+                {masterDetailPanel}
                 {container.toolbar ? renderContainerToolbar() : null}
                 {shouldRenderVisualItems && (visualItems?.length || 0) > 0 ? (
                     container?.layout?.kind === 'grid' ? (
@@ -679,14 +752,24 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
                 ) : chartPanel}
                 {chatPanel}
                 {terminalPanel}
+                {derivedDataSourcePanel}
+                {assignmentPanel}
+                {mutationCommandPanel}
+                {statusWorkflowPanel}
+                {treeEditorPanel}
+                {wizardPanel}
+                {uploadCollectionPanel}
+                {historyDiffPanel}
+                {scheduleEditorPanel}
                 {tablePanel}
                 {fileBrowserPanel}
                 {treeBrowserPanel}
                 {editorPanel}
                 {schemaFormPanel}
-                {formPanel ? formPanel :
+                {formPanel ? formPanel : (wizardPanel || masterDetailPanel) ? null :
                     renderNestedContainers()
                 }
+                {draftFormPanel}
                 {shouldRenderSectionNoDataState ? (
                     <div
                         style={{
@@ -707,6 +790,7 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
                 ) : null}
 
             </div>
+            </DataStateBoundary>
             {/* Container-level fetcher */}
             {containerWantsFetcher && (
                 <DataSourceFetcher
@@ -717,7 +801,7 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
                     fetchOnce={dataSourceFetchMode === 'once'}
                 />
             )}
-        </>
+        </PermissionBoundary>
     ), suppressTitle, persistentSectionProperties);
 };
 

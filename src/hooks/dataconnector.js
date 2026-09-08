@@ -269,7 +269,7 @@ export function createDataConnector(dataSource, runtime = {}) {
     /**
      * GET method
      */
-    async function get({filter = {}, page, inputParameters = {}, cache = null}) {
+    async function get({filter = {}, page, inputParameters = {}, cache = null, invocationId = null}) {
         try {
             let {method, url, headers} = getUrlAndHeaders();
             let queryParams = new URLSearchParams();
@@ -306,8 +306,10 @@ export function createDataConnector(dataSource, runtime = {}) {
                     filter,
                     pagingValues,
                     cache,
+                    invocationId,
                 })
                 : body;
+            if (invocationId) headers = {...(headers || {}), 'X-Forge-Invocation-Id': String(invocationId)};
             ({url, method, headers, queryParams, body: payload} = applyRequestPreparation({
                 url,
                 method: requestMethod,

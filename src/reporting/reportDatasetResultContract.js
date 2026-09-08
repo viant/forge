@@ -47,6 +47,27 @@ export function normalizeReportDatasetResultContract(value = null) {
 }
 
 function coerceRows(value, shape = "rowSet") {
+  if (shape.toLowerCase() === "tabular") {
+    if (!isPlainObject(value) || !Array.isArray(value?.columns) || !Array.isArray(value?.rows)) {
+      return [];
+    }
+    const names = value.columns.map((column) => normalizeString(column?.name || column?.key || column?.id));
+    if (names.some((name) => !name)) {
+      return [];
+    }
+    return value.rows.map((row) => {
+      if (isPlainObject(row)) {
+        return row;
+      }
+      if (!Array.isArray(row)) {
+        return {};
+      }
+      return names.reduce((record, name, index) => {
+        record[name] = index < row.length ? row[index] : null;
+        return record;
+      }, {});
+    });
+  }
   if (Array.isArray(value)) {
     return value;
   }

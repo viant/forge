@@ -22,6 +22,16 @@ const findFocusable = (root) => {
 export default function ControlWrapper({ item, container, context, framework = 'core', children }) {
     // Allow per-item override to skip wrapper
     if (item?.wrapper === 'none') {
+        if (item?.validationError) {
+            return (
+                <div className="forge-control-validation-shell" data-forge-control-id={item?.id || undefined}>
+                    {children}
+                    <div className="forge-control-validation-message" role="alert">
+                        {item.validationError}
+                    </div>
+                </div>
+            );
+        }
         return children;
     }
 

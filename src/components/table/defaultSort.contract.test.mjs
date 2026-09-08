@@ -6,6 +6,8 @@ const model = fs.readFileSync(new URL('../../../backend/types/model.go', import.
 
 assert.match(basic, /container\?\.table\?\.defaultSort\?\.columnId/);
 assert.match(basic, /defaultSort\?\.direction/);
+assert.match(basic, /requestServerTableSort\(\{dataSource, handlers, columnId, direction: newDirection\}\)/, 'sortable header interaction must use the remote-source-aware server sort helper');
+assert.doesNotMatch(basic, /fetch:\s*!!dataSource\?\.service/, 'server sorting must not depend on the legacy service shape');
 assert.match(model, /DefaultSort\s+\*TableSort/);
 assert.match(model, /type TableSort struct/);
 

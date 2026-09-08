@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import {dataBoundaryState, isAuthoritativeMasterState, masterDetailIdentity, masterDetailResponsiveMode, metricSummaryValue, notificationActionState, relationDrillValue, resolveMasterDetailParameters, resolveMasterDetailSelection, resolveRelationDrillTarget} from './presentationModels.js';
+
+assert.equal(dataBoundaryState([{loaded: false}], [[]]).kind, 'loading');
+assert.equal(dataBoundaryState([{loaded: true}], [[]]).kind, 'empty');
+assert.equal(dataBoundaryState([{loaded: true, stale: true}], [[]]).kind, 'stale_empty');
+assert.equal(dataBoundaryState([{loaded: true, error: new Error('bad')}], [[{id: 1}]], true).kind, 'partial');
+assert.deepEqual(relationDrillValue({count: 1}, {countField: 'count', singularLabel: 'record', pluralLabel: 'records', link: {windowKey: 'record'}}), {count: 1, label: '1 record', actionable: true});
+assert.equal(relationDrillValue({count: 0}, {link: {windowKey: 'record'}}).actionable, false);
+assert.equal(resolveRelationDrillTarget({id: 1, count: 0}, {countField: 'count', link: {kind: 'window', windowKey: 'record'}}, {}), null);
+assert.deepEqual(resolveRelationDrillTarget({id: 1, count: 1}, {countField: 'count', link: {kind: 'window', windowKey: 'record', parameters: {Id: {source: 'row', selector: 'id', wrap: 'array'}}}}, {} ).parameters, {Id: [1]});
+assert.deepEqual(resolveRelationDrillTarget({id: 1, count: 3}, {countField: 'count', link: {kind: 'dialog', dialogId: 'records', parameters: {ParentId: {source: 'row', selector: 'id'}}}}, {}).parameters, {ParentId: 1});
+assert.deepEqual(notificationActionState({visibleWhen: {source: 'authorization', field: 'resource.capabilities.write', equals: true}}, {authorization: {resource: {capabilities: {write: false}}}}), {visible: false, disabled: true});
+assert.equal(metricSummaryValue({total: 12.5, delta: -1, currency: 'USD'}, {field: 'total', format: 'currency2', currencyField: 'currency', comparisonField: 'delta', betterWhen: 'lower'}).sentiment, 'positive');
+assert.equal(metricSummaryValue({total: 12.5}, {field: 'total', comparisonField: 'missing'}).comparison, null);
+const masterRows = [{accountId: 1, regionId: 2, name: 'A'}, {accountId: 3, regionId: 4, name: 'B'}];
+assert.equal(masterDetailIdentity(masterRows[0], ['accountId', 'regionId']), '1\u001f2');
+assert.equal(masterDetailIdentity({accountId: 1}, ['accountId', 'regionId']), '');
+assert.equal(resolveMasterDetailSelection(masterRows, null, {accountId: 3, regionId: 4}, ['accountId', 'regionId']).name, 'B');
+assert.equal(resolveMasterDetailSelection(masterRows, {accountId: 9, regionId: 9}, null, ['accountId', 'regionId']), null);
+assert.equal(resolveMasterDetailSelection([{id: 1}, {id: 1}], null, {id: 1}, ['id']), null);
+assert.deepEqual(resolveMasterDetailParameters(masterRows[0], {AccountId: {source: 'row', selector: 'accountId', wrap: 'array'}}, {}), {AccountId: [1]});
+assert.equal(masterDetailResponsiveMode({wide: 'split', narrow: 'drill'}, 'narrow'), 'drill');
+assert.equal(isAuthoritativeMasterState({loaded: true, loading: false, stale: false}), true);
+assert.equal(isAuthoritativeMasterState({loaded: true, loading: false, stale: true}), false);
+console.log('presentation primitive models passed');

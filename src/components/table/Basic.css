@@ -67,13 +67,13 @@
     padding: 10px 14px;
 }
 
-.basic-table-filterbar.is-compact .toolbar-container {
+.basic-table-filterbar.is-compact .toolbar-container:not(.is-responsive) {
     flex-wrap: nowrap;
     gap: 18px;
 }
 
-.basic-table-filterbar.is-compact .toolbar-left,
-.basic-table-filterbar.is-compact .toolbar-right {
+.basic-table-filterbar.is-compact .toolbar-container:not(.is-responsive) .toolbar-left,
+.basic-table-filterbar.is-compact .toolbar-container:not(.is-responsive) .toolbar-right {
     flex-wrap: nowrap;
     gap: 8px;
 }
@@ -240,6 +240,13 @@
     flex: 0 0 auto;
 }
 
+/* Footer pagination is an essential table control. Responsive primary
+   toolbars may hide their center lane, but a footer must keep its centered
+   pager visible at every viewport. */
+.basic-table-paginationbar .toolbar-container.is-responsive .toolbar-center {
+    display: flex;
+}
+
 .basic-table-wrapper.is-compact-density .basic-table-filterbar {
     min-height: 36px !important;
     padding: 3px 8px !important;
@@ -387,6 +394,7 @@
 }
 
 .forge-table-empty-state.is-compact {
+    flex: 0 0 auto;
     min-height: 180px;
     padding: 14px 18px 18px;
 }

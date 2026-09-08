@@ -10,6 +10,24 @@ import { getLogger } from '../utils/logger.js';
 import { buildQuickFilterSeed, mergeQuickFilterValue } from './viewDialogQuickFilters.js';
 import {evaluatePlainVisibleWhen, trackVisibleWhen} from './visibleWhen.js';
 import {dialogCloseDisabledWhen, isDialogCloseDisabled} from './dialogClose.js';
+import {dialogFreshFormSeed, shouldRefreshDialogDataSourceOnOpen} from './viewDialogFreshState.js';
+import MutationCommand from './primitives/MutationCommand.jsx';
+
+export function ViewDialogFooterAction({action, context, disabled = false, onClose, onInvoke}) {
+    if (action?.mutationCommand) {
+        return <MutationCommand
+            command={{...action.mutationCommand, commandId: action.mutationCommand.commandId || action.id, label: action.label || action.id, icon: action.icon || action.mutationCommand.icon, hideLabel: action.hideLabel === true, intent: action.intent || action.mutationCommand.intent}}
+            context={context}
+            disabled={disabled}
+        />;
+    }
+    return <Button
+        intent={action?.intent}
+        disabled={disabled}
+        title={action?.tooltip || action?.label || action?.id}
+        onClick={(event) => action?.close === true ? onClose?.() : onInvoke?.(event)}
+    >{action?.label}</Button>;
+}
 
 function normalizeQuickFilterSpecs(dialog) {
     const specs = Array.isArray(dialog?.properties?.quickFilters) && dialog.properties.quickFilters.length > 0
@@ -224,6 +242,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                 }
             })();
             const dialogDataSourceHandlers = dialogContext?.handlers?.dataSource;
+            const refreshOnOpen = shouldRefreshDialogDataSourceOnOpen(dialogContext?.dataSource);
             try {
                 const args = handlers.dialog.callerArgs();
                 const callerProps = handlers.dialog.callerProps?.() || {};
@@ -251,10 +270,15 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                 const nextFilterStr = JSON.stringify(nextFilter || {});
                 const prevFilterStr = JSON.stringify((current.filter || {}));
                 const inputChanged = nextArgsStr !== prevArgsStr || nextParamsStr !== prevParamsStr || nextFilterStr !== prevFilterStr;
-                if (inputChanged && fetchOnOpen) {
+                if ((inputChanged || refreshOnOpen) && fetchOnOpen) {
                     try {
+                        const formSeed = dialogFreshFormSeed(
+                            dialogContext?.dataSource,
+                            dialogContext?.signals?.collection?.peek?.() || [],
+                        );
                         dialogDataSourceHandlers?.resetSelection?.();
                         dialogDataSourceHandlers?.setCollection?.([]);
+                        dialogDataSourceHandlers?.setFormData?.({values: formSeed});
                         if (dialogContext?.signals?.collectionInfo) {
                             dialogContext.signals.collectionInfo.value = {};
                         }
@@ -318,7 +342,11 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                         );
                         log.debug('deferred fetch', { filter, args });
                         dsHandlers?.setInactive?.(false);
-                        dsHandlers?.setFilter?.({ filter });
+                        if (refreshOnOpen) {
+                            dsHandlers?.fetchCollection?.({filter, cache: {bypassCache: true}});
+                        } else {
+                            dsHandlers?.setFilter?.({ filter });
+                        }
                     } catch (err) {
                         log.warn('deferred fetch error', { error: String(err?.message || err) });
                     }
@@ -500,15 +528,13 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
             <DialogFooter actions={
                 (dialog.actions && dialog.actions.length > 0)
                     ? visibleDialogActions.map((action) => (
-                        <Button
+                        <ViewDialogFooterAction
                             key={action.id}
-                            intent={action.intent}
+                            action={action}
+                            context={dsCtx}
                             disabled={dialogActionDisabled(action)}
-                            title={action.tooltip || action.label || action.id}
-                            onClick={(e) => {
-                                if (action.close === true) {
-                                    return handleClose();
-                                }
+                            onClose={handleClose}
+                            onInvoke={(e) => {
                                 const handler = events.actions[action.id]
                                 if (handler?.onClick) {
                                     // Execute action handlers in the dialog's DS context so
@@ -516,7 +542,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                                     return handler.onClick.execute({event: e, action: action.id, context: dsCtx})
                                 }
                             }}
-                        >{action.label}</Button>
+                        />
                     ))
                     : renderFooterActions()
             }/>

@@ -1,7 +1,8 @@
-import { dataSourceEvents, useToolbarControlEvents } from './event.js';
+import { dataSourceEvents, dialogHandlers, useControlEvents, useToolbarControlEvents } from './event.js';
 
-const createContext = (calls) => ({
-    signals: {
+const createContext = (calls) => {
+    const context = {
+        signals: {
         message: {
             value: [],
             peek: () => [],
@@ -12,8 +13,9 @@ const createContext = (calls) => ({
                 return this.value;
             },
         },
-    },
-    lookupHandler: (id) => {
+        },
+    };
+    context.lookupHandler = (id) => {
         if (id === 'schedule.saveSchedule') {
             return () => {
                 calls.push(id);
@@ -32,9 +34,40 @@ const createContext = (calls) => ({
                 return true;
             };
         }
+        if (id === 'dataSource.setFormField') {
+            return ({item, value}) => {
+                calls.push(`${id}:${item.dataField}=${value}`);
+                context.signals.form.value = {...context.signals.form.value, [item.dataField]: value};
+                return true;
+            };
+        }
+        if (id === 'form.changed') {
+            return () => {
+                calls.push(`${id}:${context.signals.form.value.minimum}`);
+                return true;
+            };
+        }
+        if (id === 'form.validate') {
+            return ({value}) => value === 'invalid' ? 'Invalid value.' : undefined;
+        }
         throw new Error(`unexpected handler lookup: ${id}`);
-    },
-});
+    };
+    return context;
+};
+
+{
+    const context = createContext([]);
+    const handlers = dialogHandlers(context, {
+        actions: [
+            {id: 'close', label: 'Close', close: true},
+            {id: 'save', label: 'Save Record', mutationCommand: {dataSourceRef: 'record_patch'}},
+        ],
+    });
+    if (!handlers || Object.keys(handlers.actions).length !== 0) {
+        console.error('declarative dialog mutation actions must not require legacy on handlers');
+        process.exitCode = 1;
+    }
+}
 
 {
     const calls = [];
@@ -73,6 +106,46 @@ const createContext = (calls) => ({
     stateful.edit.events.onClick({type: 'click'});
     if (context.signals.windowForm.value.mode !== 'editor') {
         console.error('expected event metadata state to update shared window state');
+        process.exitCode = 1;
+    }
+}
+
+{
+    const calls = [];
+    const context = createContext(calls);
+    const result = useControlEvents(context, [{
+        id: 'domain',
+        type: 'text',
+        scope: 'form',
+        dataField: 'domain',
+        on: [{event: 'onValidate', handler: 'form.validate'}],
+    }]);
+
+    if (result.domain.stateEvents.onValidate({value: 'invalid'}) !== 'Invalid value.') {
+        console.error('expected control onValidate metadata to remain a synchronous state evaluator');
+        process.exitCode = 1;
+    }
+}
+
+{
+    const calls = [];
+    const context = createContext(calls);
+    context.signals.form = {value: {minimum: 12}, peek() { return this.value; }};
+    const result = useControlEvents(context, [{
+        id: 'minimum',
+        type: 'currency',
+        scope: 'form',
+        dataField: 'minimum',
+        on: [{event: 'onChange', handler: 'form.changed'}],
+    }]);
+
+    result.minimum.events.onValueChange(16);
+    if (context.signals.form.value.minimum !== 16) {
+        console.error('expected a custom currency onChange to retain the default form write');
+        process.exitCode = 1;
+    }
+    if (calls.join(',') !== 'dataSource.setFormField:minimum=16,form.changed:16') {
+        console.error(`expected form write before custom handler, got ${calls.join(',')}`);
         process.exitCode = 1;
     }
 }

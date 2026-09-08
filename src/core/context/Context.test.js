@@ -63,6 +63,19 @@ const singleCtx = context.Context('lookup');
 assert.equal(singleCtx.dataSource.selectionMode, 'single');
 assert.equal(multiCtx.dataSource.selectionMode, 'multi');
 
+const importedInstanceA = Context('W_import_instance_a', metadata, 'lookup', {});
+const importedInstanceB = Context('W_import_instance_b', metadata, 'lookup', {});
+importedInstanceA.init();
+importedInstanceB.init();
+const importedLookupA = importedInstanceA.Context('lookup');
+const importedLookupB = importedInstanceB.Context('lookup');
+importedLookupA.signals.collection.value = [{id: 'a'}];
+importedLookupA.signals.form.value = {query: 'only-a'};
+assert.notEqual(importedLookupA.signals.collection, importedLookupB.signals.collection);
+assert.notEqual(importedLookupA.signals.form, importedLookupB.signals.form);
+assert.deepEqual(importedLookupB.signals.collection.peek(), []);
+assert.deepEqual(importedLookupB.signals.form.peek(), {});
+
 const noSelectionCtx = context.Context('timeline');
 assert.equal(noSelectionCtx.dataSource.selectionMode, 'none');
 assert.equal(typeof noSelectionCtx.signals.collection?.peek, 'function');

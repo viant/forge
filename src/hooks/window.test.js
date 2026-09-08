@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import {useDialogHandlers, useWindowHandlers} from './window.js';
 import {setWindowContext, clearWindowContext} from '../core/context/registry.js';
-import {activeWindows, getDashboardFilterSignal, getDashboardSelectionSignal, getDialogSignal, removeWindow} from '../core/store/signals.js';
+import {activeWindows, getBusSignal, getDashboardFilterSignal, getDashboardSelectionSignal, getDialogSignal, removeWindow} from '../core/store/signals.js';
 
 const windowId = 'W_test_dashboard';
 const dashboardId = 'demoDashboard';
@@ -54,6 +54,15 @@ setWindowContext(windowId, {
 });
 
 const handlers = useWindowHandlers(windowId);
+
+assert.equal(handlers.selectTab({tabId: 'flights', containerId: 'primary'}), true);
+assert.deepEqual(getBusSignal(windowId).peek().at(-1), {
+  type: 'selectTab',
+  tabId: 'flights',
+  containerId: 'primary',
+});
+assert.equal(handlers.selectTab({}), false);
+console.log('selectTab ✓ publishes a window-scoped tab-selection message');
 
 handlers.setDashboardFilter({parameters: {dashboardId, patch: {dateRange: '30d', region: ['EMEA']}}});
 handlers.setDashboardSelection({parameters: {dashboardId, dimension: 'country', entityKey: 'GB'}});

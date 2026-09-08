@@ -116,6 +116,8 @@ export function maybeAutoStartUIBridge({ endpoints, connectorConfig, url, token 
         authReadyEvents: connectorConfig?.uiBridge?.authReadyEvents,
         startupReadyEvent: connectorConfig?.uiBridge?.startupReadyEvent,
         startupReadyTimeoutMs: connectorConfig?.uiBridge?.startupReadyTimeoutMs,
+        pollWhenHidden: connectorConfig?.uiBridge?.pollWhenHidden,
+        pollCycleDelayMs: connectorConfig?.uiBridge?.pollCycleDelayMs,
       });
       setGlobalBridgeState(true, stopFn);
       return stopFn;

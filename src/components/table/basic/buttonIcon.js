@@ -4,3 +4,8 @@ export function resolveButtonIcon(column = {}, value, fallback = undefined) {
     }
     return fallback;
 }
+
+export function resolveButtonPressed(column = {}, value) {
+    if (column?.pressedWhenValue === undefined) return undefined;
+    return String(value ?? '') === String(column.pressedWhenValue ?? '');
+}

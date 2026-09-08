@@ -1,12 +1,18 @@
 import assert from 'node:assert/strict';
 
-import { applyParameterCodec, resolveParameters } from './parameters.js';
+import { applyDataSourceParameterCodecs, applyParameterCodec, resolveParameters } from './parameters.js';
 
 assert.equal(applyParameterCodec('8', { name: 'int' }), 8);
 assert.equal(applyParameterCodec('8.5', { name: 'number' }), 8.5);
 assert.equal(applyParameterCodec('false', { name: 'boolean' }), false);
 assert.deepEqual(applyParameterCodec(['1', 2], { name: 'int[]' }), [1, 2]);
+assert.equal(applyParameterCodec(['532743'], { name: 'int' }), 532743);
+assert.deepEqual(applyParameterCodec(['1', '2'], { name: 'int' }), ['1', '2']);
 assert.equal(applyParameterCodec('not-an-int', { name: 'int' }), 'not-an-int');
+assert.deepEqual(applyDataSourceParameterCodecs(
+  {CampaignId: ['532743'], filters: {currencyId: ['0']}},
+  [{name: 'CampaignId', codec: {name: 'int'}}, {name: 'filters.currencyId', codec: {name: 'int'}}],
+), {CampaignId: 532743, filters: {currencyId: 0}});
 
 const baseContext = {
   identity: { dataSourceRef: 'default' },

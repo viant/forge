@@ -19,8 +19,11 @@ import {filterEmptyStateToolbarItems, resolveTableEmptyState, shouldRenderTableE
 import {preserveDeclaredColumnWidths, scrollableTableWidth, tableBackfillCount, withStickyColumnOffsets} from './tableSizing.js';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import {resolveClientPagination} from './clientPagination.js';
+import {requestServerTableSort} from './serverSort.js';
 import {useSignals} from '@preact/signals-react/runtime';
 import {applyClientFilters} from './clientFilters.js';
+import {resetPaginationScroll} from './paginationScroll.js';
+import PaginationBar from './basic/PaginationBar.jsx';
 
 const defaultCellWidth = 30; // Adjust as needed
 
@@ -128,7 +131,7 @@ export function reconcileConfiguredColumns(savedColumns = [], sourceColumns = []
     });
 }
 
-const Basic = ({ context, container, columns, pagination, children }) => {
+const Basic = ({ context, container, columns, pagination, children, renderRows }) => {
     useSignals();
     const tableRef = useRef(null);
     const scrollRef = useRef(null);
@@ -139,7 +142,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     const [popupContent, setPopupContent] = useState("");
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [horizontalOverflow, setHorizontalOverflow] = useState({left: false, right: false});
+    const [horizontalOverflow, setHorizontalOverflow] = useState({left: false, right: false, cueTop: null});
     const { collection: collectionData, loading, error } = useDataSourceState(context);
     const collection = collectionData; // keep old variable name for compatibility
 
@@ -186,6 +189,11 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     const requestedClientPage = Number(context?.signals?.input?.value?.page || 1);
     const clientPageState = resolveClientPagination(displayedCollection, requestedClientPage, pagingSize, clientPagination);
     const clientPage = clientPageState.page;
+    const pageScrollStateRef = useRef({
+        page: requestedClientPage,
+        collection,
+        pending: false,
+    });
     const toolbarContext = useMemo(() => {
         if (dataSource?.filterMode !== 'client' && !clientPagination) return context;
         return {
@@ -309,6 +317,26 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         if (!clientPagination || requestedClientPage === clientPage) return;
         handlers?.dataSource?.setPage?.(clientPage);
     }, [clientPagination, requestedClientPage, clientPage, handlers]);
+
+    useEffect(() => {
+        const state = pageScrollStateRef.current;
+        const pageChanged = state.page !== requestedClientPage;
+        const collectionChanged = state.collection !== collection;
+        state.page = requestedClientPage;
+        state.collection = collection;
+        if (pageChanged) state.pending = true;
+        if (!state.pending || (!pageChanged && !collectionChanged)) return;
+        resetPaginationScroll(
+            scrollRef.current,
+            container?.table?.pagination?.preserveScrollPosition === true,
+        );
+        if (clientPagination || collectionChanged) state.pending = false;
+    }, [
+        requestedClientPage,
+        collection,
+        clientPagination,
+        container?.table?.pagination?.preserveScrollPosition,
+    ]);
 
 
 
@@ -445,9 +473,7 @@ const Basic = ({ context, container, columns, pagination, children }) => {
         }
         setSortColumnId(columnId);
         setSortDirection(newDirection);
-        if (String(dataSource?.sortMode || '').toLowerCase() === 'server') {
-            handlers?.dataSource?.setSort?.({columnId, direction: newDirection, fetch: !!dataSource?.service});
-        }
+        requestServerTableSort({dataSource, handlers, columnId, direction: newDirection});
     };
 
     const backfillCount = tableBackfillCount(pagingSize, renderedCollection.length, loading);
@@ -480,17 +506,22 @@ const Basic = ({ context, container, columns, pagination, children }) => {
     useEffect(() => {
         const scroller = scrollRef.current;
         if (!scroller || showEmptyState) {
-            setHorizontalOverflow({left: false, right: false});
+            setHorizontalOverflow({left: false, right: false, cueTop: null});
             return undefined;
         }
         const update = () => {
             const maxLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+            const wrapperRect = tableRef.current?.getBoundingClientRect?.();
+            const scrollRect = scroller.getBoundingClientRect?.();
             const next = {
                 left: scroller.scrollLeft > 2,
                 right: scroller.scrollLeft < maxLeft - 2,
+                cueTop: wrapperRect && scrollRect
+                    ? Math.round((scrollRect.top - wrapperRect.top) + scrollRect.height / 2)
+                    : null,
             };
             setHorizontalOverflow((previous) => (
-                previous.left === next.left && previous.right === next.right ? previous : next
+                previous.left === next.left && previous.right === next.right && previous.cueTop === next.cueTop ? previous : next
             ));
         };
         update();
@@ -531,6 +562,9 @@ const Basic = ({ context, container, columns, pagination, children }) => {
                     <Toolbar
                         context={toolbarContext}
                         toolbarItems={primaryToolbarItems}
+                        exportRows={sortedCollection}
+                        exportPageRows={renderedCollection}
+                        exportColumns={columnsToUse}
                         density={toolbarConfig.density}
                         layout={toolbarConfig.layout}
                     />
@@ -540,7 +574,8 @@ const Basic = ({ context, container, columns, pagination, children }) => {
             {showEmptyState ? (
                 <TableEmptyState context={context} config={resolvedEmptyState}/>
             ) : (
-                <div className="basic-table-scroll" ref={scrollRef}>
+                <div className={`basic-table-scroll${renderRows ? ' has-responsive-cards' : ''}`} ref={scrollRef}>
+                    {renderRows ? renderRows({rows: renderedCollection, columns: columnsToUse, context: toolbarContext}) : (
                     <HTMLTable style={{width: resolvedTableWidth, minWidth: resolvedTableWidth, tableLayout: "fixed"}}>
                     {/* Table Header */}
                     <TableHeader
@@ -574,16 +609,25 @@ const Basic = ({ context, container, columns, pagination, children }) => {
                         />
                     ) : null}
                     </HTMLTable>
+                    )}
                 </div>
             )}
 
+            {renderRows && pagingSize > 0 && !hasFooterToolbar && !showEmptyState ? (
+                <div className="basic-table-paginationbar">
+                    <PaginationBar context={toolbarContext} events={events}/>
+                </div>
+            ) : null}
+
             {!showEmptyState && horizontalOverflow.left ? (
                 <button type="button" className="basic-table-overflow-cue is-left"
+                    style={horizontalOverflow.cueTop == null ? undefined : {top: horizontalOverflow.cueTop}}
                     aria-label="Scroll table left" title="More columns to the left"
                     onClick={() => scrollTableHorizontally(-1)}><span aria-hidden="true">‹</span></button>
             ) : null}
             {!showEmptyState && horizontalOverflow.right ? (
                 <button type="button" className="basic-table-overflow-cue is-right"
+                    style={horizontalOverflow.cueTop == null ? undefined : {top: horizontalOverflow.cueTop}}
                     aria-label="Scroll table right" title="More columns to the right"
                     onClick={() => scrollTableHorizontally(1)}><span aria-hidden="true">›</span></button>
             ) : null}
@@ -593,6 +637,9 @@ const Basic = ({ context, container, columns, pagination, children }) => {
                     <Toolbar
                         context={toolbarContext}
                         toolbarItems={footerToolbarItems}
+                        exportRows={sortedCollection}
+                        exportPageRows={renderedCollection}
+                        exportColumns={columnsToUse}
                         density={toolbarConfig.density}
                         layout={toolbarConfig.layout}
                     />

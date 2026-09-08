@@ -8,7 +8,7 @@ import Container from './Container';
 import {useSignals} from '@preact/signals-react/runtime';
 import {findBusSignal, getViewSignal} from "../core/index.js";
 import {isContainerVisible, trackContainerVisibility} from "./visibleWhen.js";
-import {mergeSelectedTab, nextBusMessage, resolveDataSourceFetchMode} from './FormPanelState';
+import {initialBusMessageState, mergeSelectedTab, nextBusMessage, resolveDataSourceFetchMode} from './FormPanelState';
 import SectionTabRail from './SectionTabRail.jsx';
 
 const FormPanel = ({context, container, children, dataSourceFetchMode = 'always'}) => {
@@ -21,7 +21,7 @@ const FormPanel = ({context, container, children, dataSourceFetchMode = 'always'
     const viewSignal = windowId ? getViewSignal(windowId) : null;
     const viewValue = viewSignal?.value || {};
     const busMessages = windowId ? ((findBusSignal(windowId)?.value) || []) : [];
-    const processedBusMessage = useRef({});
+    const processedBusMessage = useRef(initialBusMessageState(busMessages));
     const [browserPrintMode, setBrowserPrintMode] = useState(false);
     useEffect(() => {
         if (typeof window === 'undefined') return undefined;
@@ -47,15 +47,16 @@ const FormPanel = ({context, container, children, dataSourceFetchMode = 'always'
         return visibleContainers[0]?.id;
     };
     const selectedTabId = useMemo(resolveSelectedTabId, [viewValue, panelId, container?.tabs?.selectedTabId, container?.tabs?.defaultSelectedTabId, visibleContainers]);
-    const keepVisitedTabPanelsMounted = container?.tabs?.keepVisitedTabPanelsMounted === true;
+    const mountPolicy = String(container?.tabs?.mountPolicy || '').trim().toLowerCase();
+    const keepVisitedTabPanelsMounted = mountPolicy === 'visited' || container?.tabs?.keepVisitedTabPanelsMounted === true;
+    const renderAllTabPanels = mountPolicy === 'all';
     const [visitedTabIds, setVisitedTabIds] = useState([]);
     useEffect(() => {
         if (!keepVisitedTabPanelsMounted || !selectedTabId) return;
         setVisitedTabIds((previous) => previous.includes(selectedTabId) ? previous : [...previous, selectedTabId]);
     }, [keepVisitedTabPanelsMounted, selectedTabId]);
-    const shouldRenderTabPanel = (tabId) => !keepVisitedTabPanelsMounted
-        || String(tabId) === String(selectedTabId)
-        || visitedTabIds.includes(tabId);
+    const shouldRenderTabPanel = (tabId) => renderAllTabPanels
+        || (!keepVisitedTabPanelsMounted ? String(tabId) === String(selectedTabId) : String(tabId) === String(selectedTabId) || visitedTabIds.includes(tabId));
     const handleTabChange = (newTabId) => {
         if (viewSignal) {
             const previous = viewSignal.peek?.() || {};
@@ -119,7 +120,7 @@ const FormPanel = ({context, container, children, dataSourceFetchMode = 'always'
         const selectedIndex = Math.max(0, visibleContainers.findIndex((tab) => String(tab.id) === String(selected?.id)));
         const tabDOMPrefix = `forge-tabs-${String(panelId).replace(/[^A-Za-z0-9_-]/g, '-')}`;
         const tabPanelDOMId = `${tabDOMPrefix}-panel-${selectedIndex}`;
-        const renderedPanels = keepVisitedTabPanelsMounted
+        const renderedPanels = renderAllTabPanels ? visibleContainers : keepVisitedTabPanelsMounted
             ? visibleContainers.filter((tab) => shouldRenderTabPanel(tab.id))
             : [selected];
         return (
@@ -152,7 +153,7 @@ const FormPanel = ({context, container, children, dataSourceFetchMode = 'always'
     }
     return (
         <div className="form-panel">
-            <Tabs id={`form-tabs-${visibleContainers[0]?.id || 'root'}`} className={tabsClassName} selectedTabId={selectedTabId} onChange={handleTabChange} renderActiveTabPanelOnly={!keepVisitedTabPanelsMounted} animate={false}>
+            <Tabs id={`form-tabs-${visibleContainers[0]?.id || 'root'}`} className={tabsClassName} selectedTabId={selectedTabId} onChange={handleTabChange} renderActiveTabPanelOnly={mountPolicy ? mountPolicy === 'active' : !keepVisitedTabPanelsMounted} animate={false}>
                 {visibleContainers.map((tab) => (
                     <Tab
                         key={tab.id}

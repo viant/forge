@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, formatWindowMetadataError, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataForTarget, resolveWindowRootContainer, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
+import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowRootContainer, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
 import { resolveDataSourceOptions } from '../runtime/WidgetRenderer.jsx';
 
 describe('applyWindowPermissionMetadata', () => {
@@ -32,6 +32,21 @@ describe('window metadata authorization states', () => {
     expect(formatWindowMetadataError({status: 403})).toBe('Access denied. You do not have permission to open this resource.');
     expect(formatWindowMetadataError({status: 401})).toBe('Authentication required. Please sign in to continue.');
     expect(formatWindowMetadataError({status: 500, message: 'boom'})).toBe('Failed to load window: boom');
+  });
+
+  it('shows a terminal metadata error instead of leaving the window on its loading skeleton', () => {
+    expect(resolveWindowMetadataDisplayState({
+      loading: false,
+      signalsReady: false,
+      metadata: undefined,
+      fetchError: {status: 403},
+    })).toBe('error');
+    expect(resolveWindowMetadataDisplayState({
+      loading: true,
+      signalsReady: false,
+      metadata: undefined,
+      fetchError: null,
+    })).toBe('loading');
   });
 });
 
@@ -297,6 +312,22 @@ describe('resolveWindowMetadataForTarget', () => {
     ]);
     expect(resolveWindowMetadataForTarget(metadata, { platform: 'ios', formFactor: 'tablet' }).view.content.containers).toEqual([
       { id: 'mobileTabs' },
+    ]);
+  });
+
+  it('reapplies target overrides to metadata returned by permission compilation', () => {
+    const permitted = {
+      view: {
+        content: {
+          table: {columns: [{id: 'desktop'}]},
+          targetOverrides: {
+            phone: {table: {columns: [{id: 'stacked', type: 'stacked'}]}},
+          },
+        },
+      },
+    };
+    expect(compilePermissionAppliedMetadata(permitted, {platform: 'web', formFactor: 'phone'}).view.content.table.columns).toEqual([
+      {id: 'stacked', type: 'stacked'},
     ]);
   });
 });

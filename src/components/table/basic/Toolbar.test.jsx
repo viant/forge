@@ -1,7 +1,8 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { toolbarDisabledWrapperProps, toolbarItemIcon, toolbarItemLabel, toolbarStatusValue } from './Toolbar.jsx';
+import Toolbar, { clearToolbarStatusValue, toolbarDisabledWrapperProps, toolbarHasSelection, toolbarItemIcon, toolbarItemLabel, toolbarItemShouldRender, toolbarStatusAppearance, toolbarStatusShouldRender, toolbarStatusValue } from './Toolbar.jsx';
+import {toolbarBooleanValue, updateToolbarBoolean} from './toolbarBoolean.js';
 
 describe('toolbarItemIcon', () => {
     it('renders the shared pdf token as a visible PDF glyph', () => {
@@ -48,5 +49,152 @@ describe('toolbarStatusValue', () => {
             {mutationMessage: 'Changes saved.'},
             true,
         )).toBe('Unsaved changes');
+    });
+});
+
+describe('toolbarStatusShouldRender', () => {
+    it('can keep an idle feedback row out of action geometry', () => {
+        expect(toolbarStatusShouldRender({properties: {hideWhenEmpty: true}}, '')).toBe(false);
+        expect(toolbarStatusShouldRender({properties: {hideWhenEmpty: true}}, 'Saved.')).toBe(true);
+    });
+});
+
+describe('toolbarStatusAppearance', () => {
+    const item = {properties: {appearanceField: 'mutationState', appearanceMap: {pending: 'muted', success: 'success', error: 'danger'}}};
+
+    it('maps one status control to semantic mutation intent', () => {
+        expect(toolbarStatusAppearance(item, {mutationState: 'pending'})).toBe('muted');
+        expect(toolbarStatusAppearance(item, {mutationState: 'success'})).toBe('success');
+        expect(toolbarStatusAppearance(item, {mutationState: 'error'})).toBe('danger');
+    });
+
+    it('fails closed to a supported muted appearance', () => {
+        expect(toolbarStatusAppearance({appearance: 'unexpected'}, {})).toBe('muted');
+    });
+});
+
+describe('toolbarItemShouldRender', () => {
+    const context = {
+        signals: {
+            windowForm: {peek: () => ({mutationState: 'pending'})},
+        },
+    };
+
+    it('honors declarative visibleWhen and hiddenWhen for toolbar feedback', () => {
+        expect(toolbarItemShouldRender({visibleWhen: {source: 'windowForm', field: 'mutationState', equals: 'pending'}}, context)).toBe(true);
+        expect(toolbarItemShouldRender({visibleWhen: {source: 'windowForm', field: 'mutationState', equals: 'success'}}, context)).toBe(false);
+        expect(toolbarItemShouldRender({hiddenWhen: {source: 'windowForm', field: 'mutationState', equals: 'pending'}}, context)).toBe(false);
+    });
+
+    it('retains dynamic onVisible denial as authoritative', () => {
+        expect(toolbarItemShouldRender({}, context, false)).toBe(false);
+    });
+});
+
+describe('toolbarHasSelection', () => {
+    it('recognizes both single- and multi-select datasource state', () => {
+        expect(toolbarHasSelection({selected: {id: 1}})).toBe(true);
+        expect(toolbarHasSelection({selection: [{id: 1}]})).toBe(true);
+        expect(toolbarHasSelection({selected: null, selection: []})).toBe(false);
+    });
+});
+
+describe('clearToolbarStatusValue', () => {
+    it('clears only the feedback value that scheduled the dismissal', () => {
+        const signal = {value: {message: 'Saved.'}, peek() { return this.value; }};
+        expect(clearToolbarStatusValue(signal, 'message', 'Older message.')).toBe(false);
+        expect(signal.value.message).toBe('Saved.');
+        expect(clearToolbarStatusValue(signal, 'message', 'Saved.')).toBe(true);
+        expect(signal.value.message).toBe('');
+    });
+});
+
+describe('toolbar boolean control', () => {
+    it('renders an accessible real checkbox bound to window form state', () => {
+        const signal = (value) => ({value, peek() { return this.value; }});
+        const context = {
+            identity: {dataSourceRef: 'records'},
+            signals: {control: signal({inactive: false}), formStatus: signal({dirty: false}), selection: signal({}), windowForm: signal({enabled: true}), form: signal({})},
+            handlers: {dataSource: {}},
+            Context() { return this; },
+        };
+        const html = renderToStaticMarkup(<Toolbar context={context} toolbarItems={[{id: 'enabled', type: 'checkbox', scope: 'windowForm', dataField: 'enabled', label: 'Enabled'}]}/>);
+        expect(html).toContain('type="checkbox"');
+        expect(html).toContain('forge-blueprint-checkbox-compat');
+        expect(html).toContain('aria-label="Enabled"');
+        expect(html).toContain('checked=""');
+    });
+
+    it('reads a nested value from the declared datasource form instance', () => {
+        const signal = (value) => ({value, peek() { return this.value; }});
+        const child = {signals: {form: signal({filters: {activeOnly: 'yes'}})}};
+        const context = {
+            signals: {control: signal({inactive: false}), formStatus: signal({dirty: false}), selection: signal({}), windowForm: signal({}), form: signal({})},
+            handlers: {dataSource: {}},
+            Context(ref) { return ref === 'campaigns' ? child : this; },
+        };
+        const html = renderToStaticMarkup(<Toolbar context={context} toolbarItems={[{id: 'activeOnly', type: 'checkbox', dataSourceRef: 'campaigns', dataField: 'filters.activeOnly', label: 'Active only'}]}/>);
+        expect(html).toContain('aria-label="Active only"');
+        expect(html).toContain('checked=""');
+    });
+
+    it('renders declarative read-only state as non-interactive and accessible', () => {
+        const signal = (value) => ({value, peek() { return this.value; }});
+        const context = {
+            signals: {control: signal({inactive: false}), formStatus: signal({dirty: false}), selection: signal({}), windowForm: signal({locked: true, enabled: true}), form: signal({})},
+            handlers: {dataSource: {}},
+            Context() { return this; },
+        };
+        const html = renderToStaticMarkup(<Toolbar context={context} toolbarItems={[{id: 'enabled', type: 'checkbox', scope: 'windowForm', readOnlyWhen: {source: 'windowForm', field: 'locked', equals: true}, label: 'Enabled'}]}/>);
+        expect(html).toContain('aria-readonly="true"');
+        expect(html).toContain('disabled=""');
+    });
+});
+
+describe('toolbar boolean binding', () => {
+    it('normalizes metadata boolean values', () => {
+        expect(toolbarBooleanValue('YES')).toBe(true);
+        expect(toolbarBooleanValue('off')).toBe(false);
+        expect(toolbarBooleanValue(1)).toBe(true);
+    });
+
+    it('writes a nested selector before dispatching the metadata onChange event', () => {
+        const calls = [];
+        const signal = {value: {filters: {activeOnly: false}, untouched: 7}, peek() { return this.value; }};
+        const event = {currentTarget: {checked: true}};
+        expect(updateToolbarBoolean({
+            signal,
+            field: 'filters.activeOnly',
+            checked: true,
+            event,
+            onChange: (received) => calls.push({received, snapshot: signal.value}),
+        })).toBe(true);
+        expect(signal.value).toEqual({filters: {activeOnly: true}, untouched: 7});
+        expect(calls).toEqual([{received: event, snapshot: {filters: {activeOnly: true}, untouched: 7}}]);
+    });
+
+    it('does not dispatch without a bindable signal', () => {
+        let called = false;
+        expect(updateToolbarBoolean({field: 'enabled', checked: true, onChange: () => { called = true; }})).toBe(false);
+        expect(called).toBe(false);
+    });
+});
+
+describe('table export control', () => {
+    it('renders one accessible CSV/XLSX export menu and disables it without rows', () => {
+        const signal = (value) => ({value, peek() { return this.value; }});
+        const context = {
+            signals: {control: signal({inactive: false}), formStatus: signal({dirty: false}), selection: signal({}), windowForm: signal({}), form: signal({})},
+            handlers: {dataSource: {}},
+            Context() { return this; },
+        };
+        const item = {id: 'export', type: 'tableExport', label: 'Export', properties: {formats: ['csv', 'xlsx'], filename: 'records'}};
+        const enabled = renderToStaticMarkup(<Toolbar context={context} toolbarItems={[item]} exportRows={[{id: 1}]} exportColumns={[{id: 'id', name: 'ID'}]}/>);
+        expect(enabled).toContain('aria-label="Export"');
+        expect(enabled).not.toContain('disabled=""');
+        const empty = renderToStaticMarkup(<Toolbar context={context} toolbarItems={[item]} exportRows={[]} exportColumns={[{id: 'id', name: 'ID'}]}/>);
+        expect(empty).toContain('disabled=""');
+        const noColumns = renderToStaticMarkup(<Toolbar context={context} toolbarItems={[item]} exportRows={[{id: 1}]} exportColumns={[{id: '__select__', multiSelect: true}]}/>);
+        expect(noColumns).toContain('disabled=""');
     });
 });

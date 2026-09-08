@@ -32,7 +32,6 @@ func WindowHandler(loader *meta.Service, baseURL string, baseURI string) http.Ha
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
 		resp := WindowResponse{
 			Status: "ok",
 			Data:   aWindow,
@@ -42,8 +41,21 @@ func WindowHandler(loader *meta.Service, baseURL string, baseURI string) http.Ha
 	}
 }
 
-// LoadWindow loads window data using the file.Service.
+// LoadWindow loads and fully validates a self-contained window.
 func LoadWindow(ctx context.Context, loader *meta.Service, baseURL, key, subKey string, target *meta.TargetContext) (*types.Window, error) {
+	result, err := LoadWindowStructure(ctx, loader, baseURL, key, subKey, target)
+	if err != nil {
+		return nil, err
+	}
+	if err := types.ValidateResourceModels(result); err != nil {
+		return nil, fmt.Errorf("failed to validate window for key %s: %w", key, err)
+	}
+	return result, nil
+}
+
+// LoadWindowStructure loads and structurally validates a window whose host
+// will merge additional datasource assets before final validation.
+func LoadWindowStructure(ctx context.Context, loader *meta.Service, baseURL, key, subKey string, target *meta.TargetContext) (*types.Window, error) {
 	subPath := "main"
 	if subKey != "" {
 		subPath = subKey + "/main"
@@ -59,6 +71,9 @@ func LoadWindow(ctx context.Context, loader *meta.Service, baseURL, key, subKey 
 	result := &types.Window{}
 	if err := loader.LoadWithTarget(ctx, resolvedBase+".yaml", result, target); err != nil {
 		return nil, fmt.Errorf("failed to load window for key %s: %w", key, err)
+	}
+	if err := types.ValidateResourceModelStructure(result); err != nil {
+		return nil, fmt.Errorf("failed to validate window for key %s: %w", key, err)
 	}
 	assetPath, assetErr := loader.ResolveWindowAsset(ctx, resolvedBase, ".js", target)
 	if assetErr != nil {

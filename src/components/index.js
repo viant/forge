@@ -17,6 +17,15 @@ export { default as AvatarIcon } from './AvatarIcon.jsx';
 export { default as Terminal } from './Terminal.jsx';
 export { default as CompactFeedList } from './feed/CompactFeedList.jsx';
 export { default as LookupSelectionInput } from './lookup/LookupSelectionInput.jsx';
+export {
+    marshalResource,
+    prepareResourcePayload,
+    resourceModelRefForDataSource,
+    resolveResourceContract,
+    unmarshalResource,
+    unmarshalResourceCollection,
+    validateResource,
+} from './primitives/resourceModel.js';
 export { DashboardBlock } from './dashboard/DashboardBlocks.jsx';
 export { default as ReportRuntime } from './dashboard/ReportRuntime.jsx';
 export {

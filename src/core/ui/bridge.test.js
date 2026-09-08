@@ -587,6 +587,43 @@ try {
   stopOwner();
   assert.equal(ownerCalls.includes('ui.poll'), true);
   console.log('bridge polling owner ✓ hidden/unfocused tabs skip ui.poll until focus returns');
+
+  const backgroundOwnerCalls = [];
+  visibilityState = 'hidden';
+  focused = false;
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(String(options.body || '{}'));
+    backgroundOwnerCalls.push(body.method);
+    const headers = new Headers({ 'Mcp-Session-Id': 'session-background-owner' });
+    if (body.method === 'ui.hello') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.snapshot.get' || body.method === 'ui.snapshot') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+    }
+    if (body.method === 'ui.poll') {
+      return new Response('', { status: 202, headers });
+    }
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: {} }), { status: 200, headers });
+  };
+
+  const stopBackgroundOwner = startUIBridgeHTTP({
+    url: 'http://example.test/v1/ui/rpc',
+    snapshotIntervalMs: 10_000,
+    reconnectDelayMs: 25,
+    pollWhenHidden: true,
+    pollCycleDelayMs: 5,
+    snapshotBuilder: () => ({
+      selected: { windowId: 'chat/new', tabId: 'chat/new' },
+      windows: [],
+      conversationId: 'conv-background-owner'
+    })
+  });
+
+  await sleep(60);
+  stopBackgroundOwner();
+  assert.equal(backgroundOwnerCalls.includes('ui.poll'), true);
+  console.log('bridge polling owner ✓ explicit hidden polling keeps hosted command delivery alive');
 } finally {
   globalThis.fetch = originalFetch;
   globalThis.window = originalWindow;

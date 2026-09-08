@@ -20,4 +20,13 @@ assert.equal(hasResolvedDependencies([{name: 'filters.period', from: 'const', lo
 assert.equal(filter.filters.period, 'month');
 assert.equal(hasResolvedDependencies([{name: 'filters.optional', required: false}], {filters: {}}), true);
 
+const scopedParameters = [
+    {name: 'AdvertiserId', required: false},
+    {name: 'CampaignId', required: false},
+];
+assert.equal(hasResolvedDependencies(scopedParameters, {AdvertiserId: [85141]}, {}, ['AdvertiserId', 'CampaignId']), true);
+assert.equal(hasResolvedDependencies(scopedParameters, {CampaignId: [532743]}, {}, ['AdvertiserId', 'CampaignId']), true);
+assert.equal(hasResolvedDependencies(scopedParameters, {AdvertiserId: [], CampaignId: undefined}, {}, ['AdvertiserId', 'CampaignId']), false);
+assert.equal(hasResolvedDependencies(scopedParameters, {}, {}, ['AdvertiserId', 'CampaignId']), false);
+
 console.log('dataSourceDependencies ✓ resolves nested arguments and preserves zero values');

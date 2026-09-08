@@ -9,6 +9,7 @@ import (
 func TestContainerUnmarshal_PreservesPlainLabelItemType(t *testing.T) {
 	input := []byte(`
 id: pacingSummary
+className: forge-responsive-grid forge-compact-section
 visibleWhen:
   source: windowForm
   field: periodView
@@ -38,6 +39,9 @@ items:
 	}
 	if len(c.Items) != 1 {
 		t.Fatalf("expected one item, got %#v", c.Items)
+	}
+	if got := c.ClassName; got != "forge-responsive-grid forge-compact-section" {
+		t.Fatalf("expected container className to survive, got %q", got)
 	}
 	if got := c.Items[0].Widget; got != "label" {
 		t.Fatalf("expected item widget label, got %q (item=%#v)", got, c.Items[0])
@@ -80,6 +84,38 @@ optionSecondaryField: id
 	}
 	if item.OptionsDataSourceRef != "advertiser_categories" || item.OptionLabelField != "caption" || item.OptionValueField != "caption" || item.OptionSecondaryField != "id" {
 		t.Fatalf("datasource-backed options were not preserved: %#v", item)
+	}
+}
+
+func TestItemPreservesStaticReadOnly(t *testing.T) {
+	var item Item
+	input := []byte(`
+id: immutableId
+label: ID
+type: text
+readOnly: true
+`)
+	if err := yaml.Unmarshal(input, &item); err != nil {
+		t.Fatal(err)
+	}
+	if !item.ReadOnly {
+		t.Fatalf("static readOnly was not preserved: %#v", item)
+	}
+}
+
+func TestItemPreservesStandaloneControlPresentation(t *testing.T) {
+	var item Item
+	input := []byte(`
+id: addRelated
+label: Add Related Item
+type: button
+isStandalone: true
+`)
+	if err := yaml.Unmarshal(input, &item); err != nil {
+		t.Fatal(err)
+	}
+	if !item.IsStandalone {
+		t.Fatalf("standalone control presentation was not preserved: %#v", item)
 	}
 }
 

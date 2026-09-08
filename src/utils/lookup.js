@@ -7,11 +7,22 @@ import { getLogger } from './logger.js';
 
 const log = getLogger('lookup');
 
-function normalizeLookupInputs(inputs = []) {
+export function normalizeLookupInputs(inputs = [], targetDataSource = '') {
+    const target = String(targetDataSource || '').trim();
     return inputs.map((p) => ({
         ...p,
         from: p.from || ':form',
-        to: p.to || ':query',
+        to: (() => {
+            const destination = p.to || ':query';
+            if (!target || !String(destination).startsWith(':')) return destination;
+            // Lookup targets are Forge datasource refs, whose fetch contract
+            // consumes the parameters store. `:query` remains the concise
+            // metadata spelling, while an explicitly qualified destination
+            // retains its caller-selected store.
+            return String(destination) === ':query'
+                ? `${target}:parameters`
+                : `${target}${destination}`;
+        })(),
     }));
 }
 
@@ -47,7 +58,17 @@ export function applyLookupSelection({ item, context, adapter, outputs = [], rec
     const formParams = normalizedOutputs.filter((p) => p.to === ':form');
     mapParameters(formParams, record, formObj);
 
-    let selfVal = formObj[item.id];
+    const fieldKey = item?.dataField || item?.bindingPath || item?.id;
+    const displaySelector = String(item?.lookup?.display || '').trim();
+    if (displaySelector) {
+        const rawDisplay = resolveSelector(record, displaySelector);
+        if (rawDisplay !== undefined && rawDisplay !== null) {
+            formObj[fieldKey] = Array.isArray(rawDisplay) ? rawDisplay.join(' / ') : rawDisplay;
+        }
+    }
+
+    let selfVal = formObj[fieldKey];
+    if (selfVal === undefined && fieldKey !== item.id) selfVal = formObj[item.id];
     if (selfVal === undefined) {
         const firstOut = formParams[0] || normalizedOutputs[0];
         if (firstOut) {
@@ -56,7 +77,7 @@ export function applyLookupSelection({ item, context, adapter, outputs = [], rec
                 if (loc) {
                     const fallback = resolveSelector(record, loc);
                     if (fallback !== undefined) {
-                        formObj[item.id] = fallback;
+                        formObj[fieldKey] = fallback;
                         selfVal = fallback;
                     }
                 }
@@ -71,7 +92,16 @@ export function applyLookupSelection({ item, context, adapter, outputs = [], rec
 
     log.debug('form (after)', formObj);
     formSignal.value = formObj;
-    return { form: formObj, value: selfVal };
+    const applied = { form: formObj, value: selfVal };
+    const callback = Array.isArray(item?.on) ? item.on.find((entry) => entry?.event === 'onLookup') : null;
+    if (callback?.handler && typeof context?.lookupHandler === 'function') {
+        try {
+            context.lookupHandler(callback.handler)?.({item, context, value: selfVal, record, applied});
+        } catch (error) {
+            console.error('[lookup] onLookup handler failed', error);
+        }
+    }
+    return applied;
 }
 
 export async function resolveLookupValue({ item, value }) {
@@ -115,7 +145,7 @@ export async function openLookup({ item, context, adapter, value }) {
     //    • outputs: default from=:output to=:form
     // ------------------------------------------------------------------
 
-    inputs = normalizeLookupInputs(inputs);
+    inputs = normalizeLookupInputs(inputs, item.lookup.dataSource);
     outputs = normalizeLookupOutputs(outputs);
     // Prefer dialogId when provided; fallback to windowId for regular window
     if (!dialogId && !windowId) {

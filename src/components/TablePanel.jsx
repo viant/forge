@@ -7,6 +7,7 @@ const TablePanel = ({
                         context,
                         children,
                         tableType = "html",
+                        renderRows,
                     }) => {
 
     const [formattingRules, setFormattingRules] = useState([]);
@@ -78,6 +79,7 @@ const TablePanel = ({
                     container={container}
                     columns={configuredColumns}
                     pagination={pagination}
+                    renderRows={renderRows}
                 >
                 {children}
                 </Basic>

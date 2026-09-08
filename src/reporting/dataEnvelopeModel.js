@@ -58,6 +58,31 @@ function extractCsvDatasetRecords(value) {
   return csvParse(csv, autoType).map((row) => ({ ...row }));
 }
 
+function extractTabularDatasetRecords(value) {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  if (!Array.isArray(value.columns) || !Array.isArray(value.rows)) {
+    return undefined;
+  }
+  const names = value.columns.map((column) => String(column?.name || column?.key || column?.id || "").trim());
+  if (names.some((name) => !name)) {
+    return undefined;
+  }
+  return value.rows.map((row) => {
+    if (row && typeof row === "object" && !Array.isArray(row)) {
+      return row;
+    }
+    if (!Array.isArray(row)) {
+      return {};
+    }
+    return names.reduce((record, name, index) => {
+      record[name] = index < row.length ? row[index] : null;
+      return record;
+    }, {});
+  });
+}
+
 export function isDeferredCacheHitEnvelope(data) {
   if (data == null || typeof data !== "object" || Array.isArray(data)) {
     return false;
@@ -94,8 +119,14 @@ export function extractData(selectors = {}, paging, data) {
     }
   }
 
+  const tabularCandidate = Array.isArray(respData) && respData.length === 1
+    ? respData[0]
+    : respData;
   const csvDatasetRecords = extractCsvDatasetRecords(respData);
-  if (Array.isArray(respData)) {
+  const tabularDatasetRecords = extractTabularDatasetRecords(tabularCandidate);
+  if (Array.isArray(tabularDatasetRecords)) {
+    records = tabularDatasetRecords;
+  } else if (Array.isArray(respData)) {
     records = respData;
   } else if (Array.isArray(csvDatasetRecords)) {
     records = csvDatasetRecords;

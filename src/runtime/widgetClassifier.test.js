@@ -9,6 +9,7 @@ import { classify } from './widgetClassifier.js';
 const cases = [
     // Format-based classification
     { item: { type: 'string', format: 'date' }, expected: 'date' },
+    { item: { type: 'label', format: 'date' }, expected: 'label' },
     { item: { type: 'string', format: 'date-time' }, expected: 'datetime' },
     { item: { type: 'string', format: 'datetime' }, expected: 'datetime' },
 

@@ -2,6 +2,17 @@
     direction: rtl; text-align: right;
 }
 
+/* Blueprint Core 6.0 alpha omits the input class expected by the 6.10 host
+   stylesheet. Hide the native checkbox while retaining the sibling indicator
+   and native input semantics. */
+.forge-blueprint-checkbox-compat > input[type="checkbox"] {
+    left: 0;
+    opacity: 0;
+    position: absolute;
+    top: 0;
+    z-index: -1;
+}
+
 .form-panel,
 .forge-form-panel-tabs.bp4-tabs,
 .forge-form-panel-tabs.bp5-tabs,
@@ -150,15 +161,15 @@
     box-shadow: 0 1px 3px rgba(33, 79, 154, 0.13), 0 0 0 1px rgba(75, 112, 181, 0.13);
 }
 
-/* Dictionary-backed inputs stay neutral while empty and use a restrained
-   lavender-gray surface once the value resolves against its datasource. */
+/* Lookup/signal controls use a restrained green surface only after a value
+   resolves against their datasource. */
 .forge-dictionary-input.is-resolved,
 .forge-dictionary-input.is-resolved select {
-    background-color: #f6f5fa;
+    background-color: #f1f8f2;
 }
 
 .forge-dictionary-input.is-resolved select {
-    border-color: #c9c5d8;
+    border-color: #bfd7c4;
 }
 
 .forge-dictionary-input select:focus {
@@ -166,21 +177,139 @@
     box-shadow: 0 0 0 2px rgba(75, 120, 207, 0.16);
 }
 
-.advertiser-properties-shell.bp6-section,
-.advertiser-properties-shell.bp5-section,
-.advertiser-properties-shell.bp4-section {
+/* Required controls retain a light rose fill and required frame. A resolved
+   dictionary/lookup alone gets a green fill while keeping that red frame;
+   ordinary text, numeric, date, and static-option inputs never turn green. */
+.forge-required-input
+    :where(:is(.bp4-input:not(:disabled), .bp5-input:not(:disabled), .bp6-input:not(:disabled),
+        .bp4-button:not(:disabled), .bp5-button:not(:disabled), .bp6-button:not(:disabled),
+        .bp4-file-input, .bp5-file-input, .bp6-file-input)
+        :not(.bp4-intent-danger):not(.bp5-intent-danger):not(.bp6-intent-danger)) {
+    border-color: #d58f98;
+    background-color: #fff3f4;
+}
+
+/* Blueprint's numeric-input control-group rule has greater specificity than
+   the intentionally low-specificity base rule above. Keep required numeric
+   editors in the same visual state as every other required input. */
+.forge-required-input .bp4-numeric-input .bp4-input:not(:disabled),
+.forge-required-input .bp5-numeric-input .bp5-input:not(:disabled),
+.forge-required-input .bp6-numeric-input .bp6-input:not(:disabled) {
+    border-color: #d58f98;
+    background-color: #fff3f4;
+}
+
+.forge-required-input
+    :is(.forge-required-resolved,
+        .forge-required-resolved.bp4-input, .forge-required-resolved.bp5-input, .forge-required-resolved.bp6-input,
+        .forge-required-resolved.bp4-button, .forge-required-resolved.bp5-button, .forge-required-resolved.bp6-button),
+.forge-required-input .forge-required-resolved
+    :is(.bp4-input, .bp5-input, .bp6-input, .bp4-button, .bp5-button, .bp6-button, select) {
+    border-color: #d58f98;
+    background-color: #f1f8f2;
+}
+
+.forge-required-input
+    :is(.forge-required-missing,
+        .forge-required-missing.bp4-input, .forge-required-missing.bp5-input, .forge-required-missing.bp6-input,
+        .forge-required-missing.bp4-button, .forge-required-missing.bp5-button, .forge-required-missing.bp6-button),
+.forge-required-input .forge-required-missing
+    :is(.bp4-input, .bp5-input, .bp6-input, .bp4-button, .bp5-button, .bp6-button, select) {
+    border-color: #d58f98;
+    background-color: #fff3f4;
+}
+
+.forge-required-input
+    :is(.forge-required-invalid,
+        .forge-required-invalid.bp4-input, .forge-required-invalid.bp5-input, .forge-required-invalid.bp6-input,
+        .forge-required-invalid.bp4-button, .forge-required-invalid.bp5-button, .forge-required-invalid.bp6-button),
+.forge-required-input .forge-required-invalid
+    :is(.bp4-input, .bp5-input, .bp6-input, .bp4-button, .bp5-button, .bp6-button, select) {
+    border-color: #c9372c;
+    background-color: #fff3f4;
+}
+
+/* A resolved dictionary/lookup remains semantically green even when the field
+   is required; the required marker still communicates mandatory input. */
+.forge-required-input
+    :is(.forge-dictionary-input.is-resolved,
+        .forge-dictionary-input.is-resolved select,
+        .forge-dictionary-input.is-resolved .bp4-button,
+        .forge-dictionary-input.is-resolved .bp5-button,
+        .forge-dictionary-input.is-resolved .bp6-button) {
+    border-color: #d58f98;
+    background-color: #f1f8f2;
+}
+
+/* Keep resolved lookup semantics ahead of the required-field hint. The
+   validation danger intent remains stronger because it is excluded here. */
+.forge-required-input .forge-dictionary-input.is-resolved
+    :is(select, .bp4-button, .bp5-button, .bp6-button):not(.bp4-intent-danger):not(.bp5-intent-danger):not(.bp6-intent-danger) {
+    border-color: #d58f98;
+    background-color: #f1f8f2;
+}
+
+.forge-control-validation-shell {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    width: 100%;
+}
+
+.forge-control-validation-message {
+    color: #b42318;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.forge-view-dialog :is(.bp4-dialog-body, .bp5-dialog-body, .bp6-dialog-body),
+.forge-view-dialog .forge-grid-control-cell {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.forge-view-dialog :is(.bp4-dialog-body, .bp5-dialog-body, .bp6-dialog-body) {
+    overflow-x: hidden;
+}
+
+.forge-view-dialog .forge-grid-control-cell > *,
+.forge-view-dialog :is(.bp4-input-group, .bp5-input-group, .bp6-input-group,
+                       .bp4-numeric-input, .bp5-numeric-input, .bp6-numeric-input) {
+    min-width: 0;
+    max-width: 100%;
+}
+
+@media (max-width: 600px) {
+    .forge-grid-collapse-phone {
+        grid-template-columns: minmax(0, 1fr) !important;
+        grid-template-rows: none !important;
+    }
+
+    .forge-grid-collapse-phone > *,
+    .forge-grid-collapse-phone .forge-grid-control-cell {
+        grid-column: 1 / -1 !important;
+        grid-row: auto !important;
+        min-width: 0;
+        max-width: 100%;
+    }
+}
+
+.forge-primary-form-shell.bp6-section,
+.forge-primary-form-shell.bp5-section,
+.forge-primary-form-shell.bp4-section {
     border-color: #dedce7;
     background: #ffffff;
     box-shadow: 0 4px 14px rgba(43, 46, 69, 0.045);
 }
 
-.advertiser-properties-shell > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) {
+.forge-primary-form-shell > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) {
     min-height: 36px;
     border-bottom: 1px solid #dedce7;
     background: #f4f3f8;
 }
 
-.advertiser-properties-shell > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) :is(.bp6-heading, .bp5-heading, .bp4-heading) {
+.forge-primary-form-shell > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) :is(.bp6-heading, .bp5-heading, .bp4-heading) {
     color: #35364a;
 }
 
@@ -204,43 +333,43 @@
     font-size: 13px;
 }
 
-.advertiser-pastel-section.bp6-section,
-.advertiser-pastel-section.bp5-section,
-.advertiser-pastel-section.bp4-section {
+.forge-compact-section.bp6-section,
+.forge-compact-section.bp5-section,
+.forge-compact-section.bp4-section {
     border-color: #e3e1ea;
     border-radius: 10px;
     background: #ffffff;
     box-shadow: 0 3px 10px rgba(43, 46, 69, 0.035);
 }
 
-.advertiser-pastel-section > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) {
+.forge-compact-section > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) {
     min-height: 32px;
     padding: 3px 10px;
     border-bottom: 1px solid #e3e1ea;
     background: #f7f6fa;
 }
 
-.advertiser-pastel-section > :is(.bp6-card, .bp5-card, .bp4-card) {
+.forge-compact-section > :is(.bp6-card, .bp5-card, .bp4-card) {
     padding: 10px;
     border: 0;
     border-radius: 0 0 10px 10px;
     box-shadow: none;
 }
 
-.advertiser-pastel-section > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) :is(.bp6-heading, .bp5-heading, .bp4-heading) {
+.forge-compact-section > :is(.bp6-section-header, .bp5-section-header, .bp4-section-header) :is(.bp6-heading, .bp5-heading, .bp4-heading) {
     color: #424258;
     font-size: 13px;
 }
 
-.advertiser-pastel-section :is(.bp6-form-group, .bp5-form-group, .bp4-form-group) {
+.forge-compact-section :is(.bp6-form-group, .bp5-form-group, .bp4-form-group) {
     margin-bottom: 4px;
 }
 
-.advertiser-pastel-section :is(label, .bp6-label, .bp5-label, .bp4-label) {
+.forge-compact-section :is(label, .bp6-label, .bp5-label, .bp4-label) {
     font-size: 12px;
 }
 
-.advertiser-pastel-section :is(.bp6-input, .bp5-input, .bp4-input, select) {
+.forge-compact-section :is(.bp6-input, .bp5-input, .bp4-input, select) {
     box-sizing: border-box;
     width: 100%;
     max-width: 100%;
@@ -249,30 +378,37 @@
     font-size: 13px;
 }
 
-.advertiser-pastel-section :is(.bp6-numeric-input, .bp5-numeric-input, .bp4-numeric-input),
-.advertiser-pastel-section [data-forge-control-id] {
+.forge-compact-section :is(.bp6-numeric-input, .bp5-numeric-input, .bp4-numeric-input),
+.forge-compact-section [data-forge-control-id] {
     width: 100%;
     min-width: 0;
     max-width: 100%;
 }
 
-@media (max-width: 1000px) {
-    .forge-form-panel-section-tabs__panel:has(#propertyCategory) > div > div {
+@media (max-width: 760px) {
+    .forge-responsive-grid {
         grid-template-columns: minmax(0, 1fr) !important;
         grid-template-rows: none !important;
     }
 
-    .forge-form-panel-section-tabs__panel:has(#propertyCategory) > div > div > div {
+    .forge-responsive-grid > * {
         grid-column: 1 / -1 !important;
         grid-row: auto !important;
     }
-}
 
-@media (max-width: 760px) {
-    .advertiser-pastel-section :is(.bp6-input, .bp5-input, .bp4-input, select) {
+    .forge-compact-section :is(.bp6-input, .bp5-input, .bp4-input, select) {
         min-height: 44px;
         height: 44px;
         font-size: 16px;
+    }
+
+    .forge-compact-section [data-forge-control-id] > :is(.bp6-popover-target, .bp5-popover-target, .bp4-popover-target),
+    .forge-compact-section [data-forge-control-id] > :is(.bp6-popover-target, .bp5-popover-target, .bp4-popover-target) > :is(.bp6-button, .bp5-button, .bp4-button),
+    .forge-compact-section :is(.bp6-file-input, .bp5-file-input, .bp4-file-input),
+    .forge-compact-section :is(.bp6-file-upload-input, .bp5-file-upload-input, .bp4-file-upload-input) {
+        box-sizing: border-box;
+        min-height: 44px;
+        height: 44px;
     }
     .forge-form-panel-tabs.forge-form-panel-tabs--pills .forge-form-panel-tab-title .bp4-icon,
     .forge-form-panel-tabs.forge-form-panel-tabs--pills .forge-form-panel-tab-title .bp5-icon,

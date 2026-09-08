@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/viant/afs"
@@ -279,6 +280,48 @@ func TestLoadWithTarget_RootImport(t *testing.T) {
 	}
 }
 
+func TestLoadWithTarget_ChainedRootImport(t *testing.T) {
+	root := t.TempDir()
+	base := filepath.Join(root, "window", "campaign")
+	mustWriteMetaFile(t, filepath.Join(root, "window", "campaign.yaml"), "$import(campaign/shared/main.yaml)\n")
+	mustWriteMetaFile(t, filepath.Join(base, "shared", "main.yaml"), "$import(web/main.yaml)\n")
+	mustWriteMetaFile(t, filepath.Join(base, "shared", "web", "main.yaml"), "namespace: imported-through-chain\nview:\n  content: {}\n")
+
+	service := New(afs.New(), filepath.Join(root, "window"))
+	var decoded windowFixture
+	if err := service.LoadWithTarget(context.Background(), "campaign.yaml", &decoded, &TargetContext{
+		Platform:   "web",
+		FormFactor: "desktop",
+	}); err != nil {
+		t.Fatalf("unexpected chained root import error: %v", err)
+	}
+	if decoded.Namespace != "imported-through-chain" {
+		t.Fatalf("expected chained import namespace, got %q", decoded.Namespace)
+	}
+}
+
+func TestLoadWithTarget_ChainedRootImportFileURLBase(t *testing.T) {
+	root := t.TempDir()
+	base := filepath.Join(root, "window", "advertiser")
+	mustWriteMetaFile(t, filepath.Join(root, "window", "advertiser.yaml"), "$import(advertiser/shared/main.yaml)\n")
+	mustWriteMetaFile(t, filepath.Join(base, "shared", "main.yaml"), "namespace: advertiser\nview:\n  content:\n    $import(content.yaml)\n")
+	mustWriteMetaFile(t, filepath.Join(base, "shared", "content.yaml"), "id: advertiserRoot\ncontainers:\n  - $import(tabs/defaults.yaml)\n")
+	mustWriteMetaFile(t, filepath.Join(base, "shared", "tabs", "defaults.yaml"), "id: defaults\nsection: $import(../../../shared/targeting/category.yaml:section)\n")
+	mustWriteMetaFile(t, filepath.Join(root, "window", "shared", "targeting", "category.yaml"), "section:\n  collapsible: true\n")
+
+	service := New(afs.New(), "file://"+filepath.ToSlash(filepath.Join(root, "window")))
+	var decoded windowFixture
+	if err := service.LoadWithTarget(context.Background(), "advertiser.yaml", &decoded, &TargetContext{
+		Platform:   "web",
+		FormFactor: "desktop",
+	}); err != nil {
+		t.Fatalf("unexpected file URL chained import error: %v", err)
+	}
+	if decoded.Namespace != "advertiser" {
+		t.Fatalf("expected advertiser namespace, got %q", decoded.Namespace)
+	}
+}
+
 func TestLoadWithTarget_FolderizedWindowImportsSharedContentByKey(t *testing.T) {
 	root := t.TempDir()
 	base := filepath.Join(root, "window", "analyticsBuilder")
@@ -375,6 +418,119 @@ view:
 	}
 	if _, ok := typed.View.Content.TargetOverrides["mobile"]; !ok {
 		t.Fatalf("expected typed content targetOverrides to retain mobile override, got %#v", typed.View.Content.TargetOverrides)
+	}
+}
+
+func TestLoad_ParameterizedImportInstantiatesIndependentTargetingCards(t *testing.T) {
+	root := t.TempDir()
+	mustWriteMetaFile(t, filepath.Join(root, "main.yaml"), `
+containers:
+  - '$import(shared/targeting.yaml:card, {"prefix":"advertiser","dataSourceRef":"advertiser_defaults","dataRoot":"targetingGroups","handlerNamespace":"Advertiser Workspace","readOnly":false,"layout":{"kind":"grid","columns":2},"visibleWhen":{"source":"authorization","field":"resource.capabilities.write","equals":true},"options":["context","location"]})'
+  - '$import(shared/targeting.yaml:card, {"prefix":"line","dataSourceRef":"line_properties","dataRoot":"targeting","handlerNamespace":"Line Workspace","readOnly":true,"layout":{"kind":"grid","columns":1},"visibleWhen":{"source":"authorization","field":"resource.capabilities.read","equals":true},"options":["location"]})'
+`)
+	mustWriteMetaFile(t, filepath.Join(root, "shared", "targeting.yaml"), `
+card:
+  id: $param(prefix)Targeting
+  dataSourceRef: $param(dataSourceRef)
+  stateKey: $param(prefix)-$param(dataRoot)-collapsed
+  readOnly: $param(readOnly)
+  layout: $param(layout)
+  visibleWhen: $param(visibleWhen)
+  options: $param(options)
+  items:
+    - '$import(nested/item.yaml:item, {"prefix":"nested","dataRoot":"$param(dataRoot)"})'
+    - id: $param(prefix)Sibling
+      dataField: $param(dataRoot).context
+      handler: $param(handlerNamespace).updateTargeting
+`)
+	mustWriteMetaFile(t, filepath.Join(root, "shared", "nested", "item.yaml"), `
+item:
+  id: $param(prefix)Item
+  dataField: $param(dataRoot).location
+`)
+
+	var actual struct {
+		Containers []struct {
+			ID            string                 `yaml:"id"`
+			DataSourceRef string                 `yaml:"dataSourceRef"`
+			StateKey      string                 `yaml:"stateKey"`
+			ReadOnly      bool                   `yaml:"readOnly"`
+			Layout        map[string]interface{} `yaml:"layout"`
+			VisibleWhen   map[string]interface{} `yaml:"visibleWhen"`
+			Options       []string               `yaml:"options"`
+			Items         []struct {
+				ID        string `yaml:"id"`
+				DataField string `yaml:"dataField"`
+				Handler   string `yaml:"handler"`
+			} `yaml:"items"`
+		} `yaml:"containers"`
+	}
+	service := New(afs.New(), root)
+	if err := service.Load(context.Background(), "main.yaml", &actual); err != nil {
+		t.Fatalf("load parameterized imports: %v", err)
+	}
+	if len(actual.Containers) != 2 {
+		t.Fatalf("expected two independent cards, got %#v", actual.Containers)
+	}
+	advertiser, line := actual.Containers[0], actual.Containers[1]
+	if advertiser.ID != "advertiserTargeting" || advertiser.DataSourceRef != "advertiser_defaults" || advertiser.StateKey != "advertiser-targetingGroups-collapsed" {
+		t.Fatalf("unexpected advertiser card identity: %#v", advertiser)
+	}
+	if line.ID != "lineTargeting" || line.DataSourceRef != "line_properties" || line.StateKey != "line-targeting-collapsed" {
+		t.Fatalf("unexpected line card identity: %#v", line)
+	}
+	if advertiser.ReadOnly || !line.ReadOnly || advertiser.Layout["columns"] != 2 || line.Layout["columns"] != 1 {
+		t.Fatalf("typed parameters were not preserved: advertiser=%#v line=%#v", advertiser, line)
+	}
+	if len(advertiser.Options) != 2 || len(line.Options) != 1 {
+		t.Fatalf("list parameters were not preserved: advertiser=%#v line=%#v", advertiser.Options, line.Options)
+	}
+	if advertiser.Items[0].ID != "nestedItem" || line.Items[0].ID != "nestedItem" {
+		t.Fatalf("nested override did not apply: advertiser=%#v line=%#v", advertiser.Items, line.Items)
+	}
+	if advertiser.Items[1].ID != "advertiserSibling" || line.Items[1].ID != "lineSibling" {
+		t.Fatalf("nested override leaked to a sibling: advertiser=%#v line=%#v", advertiser.Items, line.Items)
+	}
+	if advertiser.Items[1].Handler != "Advertiser Workspace.updateTargeting" || line.Items[1].Handler != "Line Workspace.updateTargeting" {
+		t.Fatalf("embedded handler interpolation failed: advertiser=%#v line=%#v", advertiser.Items[1], line.Items[1])
+	}
+}
+
+func TestLoad_ParameterizedImportFailsOnMissingParameter(t *testing.T) {
+	root := t.TempDir()
+	mustWriteMetaFile(t, filepath.Join(root, "main.yaml"), `$import(fragment.yaml, {"prefix":"advertiser"})`)
+	mustWriteMetaFile(t, filepath.Join(root, "fragment.yaml"), "id: $param(missing)\n")
+	var actual map[string]interface{}
+	err := New(afs.New(), root).Load(context.Background(), "main.yaml", &actual)
+	if err == nil || !strings.Contains(err.Error(), `missing import parameter "missing"`) {
+		t.Fatalf("expected missing-parameter error, got %v", err)
+	}
+}
+
+func TestGetImportPathKeyAndParams_PreservesExtensionlessKeyedImports(t *testing.T) {
+	path, key, params, err := getImportPathKeyAndParams(`$import(shared/card:content, {"prefix":"advertiser"})`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != "shared/card.yaml" || key != "content" || params["prefix"] != "advertiser" {
+		t.Fatalf("unexpected extensionless import parse: path=%q key=%q params=%#v", path, key, params)
+	}
+}
+
+func TestLoad_KeyedImportDoesNotEvaluateUnselectedParameterizedSibling(t *testing.T) {
+	root := t.TempDir()
+	mustWriteMetaFile(t, filepath.Join(root, "main.yaml"), "selected: $import(fragment.yaml:selected)\n")
+	mustWriteMetaFile(t, filepath.Join(root, "fragment.yaml"), "selected:\n  id: ready\nunselected:\n  id: $param(missing)\n")
+	var actual struct {
+		Selected struct {
+			ID string `yaml:"id"`
+		} `yaml:"selected"`
+	}
+	if err := New(afs.New(), root).Load(context.Background(), "main.yaml", &actual); err != nil {
+		t.Fatalf("unselected sibling consumed parameters: %v", err)
+	}
+	if actual.Selected.ID != "ready" {
+		t.Fatalf("unexpected selected fragment: %#v", actual)
 	}
 }
 

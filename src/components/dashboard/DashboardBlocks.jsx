@@ -18,6 +18,7 @@ import { withFrozenIdentifierColumn } from "./tableFrozenIdentifier.js";
 import LookupSelectionInput from "../lookup/LookupSelectionInput.jsx";
 import { dashboardStatusTone, isDashboardStatusValue, titleizeDashboardKey, toneColors } from "./dashboardVisualUtils.jsx";
 import { DashboardErrorBoundary } from "./dashboardErrorBoundary.js";
+import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import "./Dashboard.css";
 
 const EMPTY_REPORT_RUNTIME_SPEC = {};
@@ -1374,8 +1375,12 @@ export function DashboardEditableTable({container, context, embedded = false}) {
     const currentRows = () => dataSource?.peekFullCollection?.() || dataSource?.peekCollection?.() || [];
     const rows = currentRows();
     const columns = Array.isArray(container?.columns) ? container.columns : [];
+    const authorization = context?.signals?.authorization?.value || context?.authorization || {};
     const runtimeColumns = useMemo(() => buildTableRuntimeColumns(columns, rows), [columns, rows]);
-    const tableColumns = useMemo(() => withFrozenIdentifierColumn(runtimeColumns), [runtimeColumns]);
+    const visibleRuntimeColumns = useMemo(() => runtimeColumns.filter((column) => (
+        !column?.visibleWhen || evaluatePlainVisibleWhen(column.visibleWhen, context)
+    )), [runtimeColumns, context, authorization]);
+    const tableColumns = useMemo(() => withFrozenIdentifierColumn(visibleRuntimeColumns), [visibleRuntimeColumns]);
     const pageSize = Math.max(1, Number(container?.pageSize || 20));
     const normalizedFilter = filterText.trim().toLowerCase();
     const filteredEntries = rows.map((row, index) => ({row, index})).filter(({row}) => !normalizedFilter || columns.some((column) => (
@@ -1393,7 +1398,24 @@ export function DashboardEditableTable({container, context, embedded = false}) {
     )));
     const addRow = () => {
         const latest = currentRows();
-        commit([...latest, {...(container?.addRow?.defaults || {})}]);
+        const addRowConfig = container?.addRow || {};
+        let derived = {};
+        const handlerName = String(addRowConfig?.deriveHandler || '').trim();
+        if (handlerName && typeof context?.lookupHandler === 'function') {
+            try {
+                const handler = context.lookupHandler(handlerName);
+                const result = handler?.({
+                    context,
+                    collection: latest,
+                    row: latest[latest.length - 1] || null,
+                    defaults: {...(addRowConfig.defaults || {})},
+                });
+                if (result && typeof result === 'object' && !Array.isArray(result)) derived = result;
+            } catch (error) {
+                console.error('[DashboardEditableTable] add-row derivation failed', handlerName, error);
+            }
+        }
+        commit([...latest, {...(addRowConfig.defaults || {}), ...derived}]);
         setPage(Math.ceil((latest.length + 1) / pageSize));
     };
     const removeRow = (rowIndex) => commit(currentRows().filter((_, index) => index !== rowIndex));
@@ -1430,6 +1452,7 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                                 <tr key={rowIndex}>
                                     {tableColumns.map((column) => {
                                         const editor = column.editor === false ? null : (column.editor || {type: 'text'});
+                                        const editorDisabled = !!(editor?.disabledWhen && evaluatePlainVisibleWhen(editor.disabledWhen, context, row));
                                         const value = row?.[column.key] ?? '';
                                         return (
                                             <td key={column.key} className={column.frozen ? 'forge-table-frozen-identifier' : undefined} style={column.frozen ? {'--forge-frozen-column-width': `${column.resolvedCompactWidth}px`} : undefined}>
@@ -1446,7 +1469,7 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                                                         </div>;
                                                     })()
                                                     : editor.type === 'select' ? (
-                                                        <select aria-label={`${column.label || column.key} row ${rowIndex + 1}`} value={value}
+                                                        <select aria-label={`${column.label || column.key} row ${rowIndex + 1}`} value={value} disabled={editorDisabled}
                                                             onChange={(event) => updateCell(rowIndex, column.key, event.target.value)}>
                                                             {(editor.options || []).map((option) => {
                                                                 const normalized = option && typeof option === 'object' ? option : {label: option, value: option};
@@ -1454,7 +1477,7 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                                                             })}
                                                         </select>
                                                     ) : /rationale|reason|description/i.test(`${column.key} ${column.label || ''}`) ? (
-                                                        <textarea aria-label={`${column.label || column.key} row ${rowIndex + 1}`}
+                                                        <textarea aria-label={`${column.label || column.key} row ${rowIndex + 1}`} disabled={editorDisabled}
                                                             rows={1}
                                                             ref={(node) => {
                                                                 if (!node) return;
@@ -1470,7 +1493,11 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                                                             }}/>
                                                     ) : (
                                                         <input aria-label={`${column.label || column.key} row ${rowIndex + 1}`}
-                                                            type={editor.type === 'number' ? 'number' : editor.type === 'time' ? 'time' : 'text'}
+                                                            type={editor.type === 'number' ? 'number' : editor.type === 'time' ? 'time' : editor.type === 'date' ? 'date' : editor.type === 'datetime-local' ? 'datetime-local' : 'text'}
+                                                            min={editor.min}
+                                                            max={editor.max}
+                                                            step={editor.step}
+                                                            disabled={editorDisabled}
                                                             style={editableCellStyle(row, column)}
                                                             value={editor.type === 'tags' && Array.isArray(value) ? value.join(', ') : value} placeholder={editor.placeholder || ''}
                                                             onChange={(event) => updateCell(rowIndex, column.key,
@@ -1482,7 +1509,9 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                                         );
                                     })}
                                     <td className="forge-editable-collection__actions">
-                                        <button type="button" aria-label={`${container?.removeRowLabel || 'Remove row'} ${rowIndex + 1}`} title={container?.removeRowLabel || 'Remove row'} onClick={() => removeRow(rowIndex)}><Icon icon="trash" size={14}/></button>
+                                        {container?.allowRemove !== false ? (
+                                            <button type="button" disabled={rows.length <= Math.max(0, Number(container?.minRows || 0))} aria-label={`${container?.removeRowLabel || 'Remove row'} ${rowIndex + 1}`} title={container?.removeRowLabel || 'Remove row'} onClick={() => removeRow(rowIndex)}><Icon icon="trash" size={14}/></button>
+                                        ) : null}
                                     </td>
                                 </tr>
                             ))}
