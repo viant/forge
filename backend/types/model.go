@@ -223,6 +223,7 @@ type QuickFilterSpec struct {
 
 type Window struct {
 	Ns                    []string                          `json:"ns,omitempty" yaml:"ns,omitempty"`
+	WindowKey             string                            `json:"windowKey,omitempty" yaml:"windowKey,omitempty"`
 	Namespace             string                            `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	Presentation          string                            `json:"presentation,omitempty" yaml:"presentation,omitempty"`
 	Region                string                            `json:"region,omitempty" yaml:"region,omitempty"`
