@@ -1,10 +1,15 @@
 import React from 'react';
+import {Button} from '@blueprintjs/core';
 import {useSignals} from '@preact/signals-react/runtime';
 import TablePanel from '../TablePanel.jsx';
 import {resolveSelector} from '../../utils/selector.js';
 import {formatDisplayValue, mapDisplayValue} from '../../utils/formatValue.js';
 import {primitiveIdentity, responsiveDataGridState} from './workflowModels.js';
 import {resolveLinkTarget} from '../../utils/linkTarget.js';
+import {useCellEvents} from '../../hooks/event.js';
+import {applyDynamicCellProperties} from '../table/basic/cellProperties.js';
+import {isolateButtonCellProps} from '../table/basic/buttonCellEvents.js';
+import {resolveButtonIcon, resolveButtonPressed} from '../table/basic/buttonIcon.js';
 
 function openCardTarget(target, context) {
   if (target?.kind === 'dialog') return context?.handlers?.window?.openDialog?.({context, execution: {args: [target.dialogId, {awaitResult: target.awaitResult === true}]}, parameters: target.parameters});
@@ -23,16 +28,55 @@ export function responsiveTarget(width) {
   return 'desktop';
 }
 
-export function ResponsiveCardRows({rows, columns, context, identityColumns = ['id']}) {
-  return <div className="forge-responsive-grid__cards" role="list">{rows.map((row, index) => <article className="forge-responsive-grid__card" role="listitem" key={primitiveIdentity(row, identityColumns) || String(index)}><dl>{columns.map((column) => {
-    const field = column.dataField || column.field || column.id;
-    const value = mapDisplayValue(resolveSelector(row, field), column.valueMap);
-    const currency = column.currencyField ? resolveSelector(row, column.currencyField) : undefined;
-    const timeZone = context?.resource?.timeZone;
-    const display = value == null || value === '' ? column.emptyText || '—' : formatDisplayValue(value, column.format || 'raw', 'en-US', {currency, timeZone});
-    const target = column.link ? resolveLinkTarget({linkConfig: column.link, row, value, context}) : null;
-    return <div className="forge-responsive-grid__field" key={field}><dt>{column.name || column.label || field}</dt><dd>{target ? <button type="button" className="forge-responsive-grid__link" onClick={() => openCardTarget(target, context)}>{display}</button> : display}</dd></div>;
-  })}</dl></article>)}</div>;
+function readCardState(stateEvents, name, fallback) {
+  try {
+    return typeof stateEvents?.[name] === 'function' ? stateEvents[name]() : fallback;
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function ResponsiveCardField({row, rowIndex, column, colIndex, context, columnHandlers, onRowClick}) {
+  const field = column.dataField || column.field || column.id;
+  const cellSelection = {row, rowIndex, col: column, colIndex};
+  const {events, stateEvents} = useCellEvents({
+    context,
+    cellSelection,
+    columnHandlers: columnHandlers?.[column.id] || {},
+    onRowClick,
+  });
+  if (readCardState(stateEvents, 'onVisible', true) === false) return null;
+  let value = mapDisplayValue(resolveSelector(row, field), column.valueMap);
+  const computed = readCardState(stateEvents, 'onValue', undefined);
+  if (computed !== undefined) value = computed;
+  const currency = column.currencyField ? resolveSelector(row, column.currencyField) : undefined;
+  const timeZone = context?.resource?.timeZone;
+  const display = value == null || value === '' ? column.emptyText || '—' : formatDisplayValue(value, column.format || 'raw', 'en-US', {currency, timeZone});
+  const label = column.name || column.label || column.cellProperties?.['aria-label'] || field;
+  if (column.type === 'button') {
+    const properties = applyDynamicCellProperties({
+      icon: column.icon,
+      title: column.tooltip,
+      minimal: true,
+      small: true,
+      ...(column.cellProperties || {}),
+      ...events,
+    }, stateEvents);
+    if (readCardState(stateEvents, 'onReadonly', false)) properties.disabled = true;
+    return <div className="forge-responsive-grid__field forge-responsive-grid__field--action" key={field}><dt>{label}</dt><dd><Button
+      {...isolateButtonCellProps(properties)}
+      icon={resolveButtonIcon(column, value, properties.icon)}
+      aria-pressed={resolveButtonPressed(column, value)}
+    /></dd></div>;
+  }
+  const target = column.link ? resolveLinkTarget({linkConfig: column.link, row, value, context}) : null;
+  return <div className="forge-responsive-grid__field" key={field}><dt>{label}</dt><dd>{target ? <button type="button" className="forge-responsive-grid__link" onClick={() => openCardTarget(target, context)}>{display}</button> : display}</dd></div>;
+}
+
+export function ResponsiveCardRows({rows, columns, context, identityColumns = ['id'], columnHandlers, onRowClick}) {
+  return <div className="forge-responsive-grid__cards" role="list">{rows.map((row, rowIndex) => <article className="forge-responsive-grid__card" role="listitem" key={primitiveIdentity(row, identityColumns) || String(rowIndex)}><dl>{columns.map((column, colIndex) => (
+    <ResponsiveCardField key={column.id || column.dataField || column.field || String(colIndex)} row={row} rowIndex={rowIndex} column={column} colIndex={colIndex} context={context} columnHandlers={columnHandlers} onRowClick={onRowClick}/>
+  ))}</dl></article>)}</div>;
 }
 
 export default function ResponsiveDataGrid({container, context, isActive}) {
@@ -59,8 +103,8 @@ export default function ResponsiveDataGrid({container, context, isActive}) {
         container={{...container, table}}
         context={dataContext}
         isActive={isActive}
-        renderRows={({rows, columns: renderedColumns, context: rowContext}) => (
-          <ResponsiveCardRows rows={rows} columns={renderedColumns} context={rowContext} identityColumns={container.responsiveDataGrid?.identityColumns}/>
+        renderRows={({rows, columns: renderedColumns, context: rowContext, columnHandlers, onRowClick}) => (
+          <ResponsiveCardRows rows={rows} columns={renderedColumns} context={rowContext} identityColumns={container.responsiveDataGrid?.identityColumns} columnHandlers={columnHandlers} onRowClick={onRowClick}/>
         )}
       />
     </div>;
