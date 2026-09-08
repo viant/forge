@@ -34,6 +34,14 @@ export function responsiveGridStyle(state = {}) {
   return {...style, flexShrink: 0};
 }
 
+export function projectResponsiveColumns(authoredColumns = [], columnIDs = []) {
+  const authored = Array.isArray(authoredColumns) ? authoredColumns : [];
+  const requested = Array.isArray(columnIDs) ? columnIDs.filter((id) => id !== '__select__') : [];
+  if (!requested.length) return authored;
+  const byID = new Map(authored.map((column) => [column.id || column.dataField || column.field, column]));
+  return requested.map((id) => byID.get(id)).filter(Boolean);
+}
+
 function readCardState(stateEvents, name, fallback) {
   try {
     return typeof stateEvents?.[name] === 'function' ? stateEvents[name]() : fallback;
@@ -99,9 +107,8 @@ export default function ResponsiveDataGrid({container, context, isActive}) {
   const responsiveStyle = responsiveGridStyle(state);
   const dataContext = container.dataSourceRef && context?.identity?.dataSourceRef !== container.dataSourceRef ? context.Context?.(container.dataSourceRef) || context : context;
   const authoredColumns = container.table?.columns || [];
-  const visible = new Set(state.columns || []);
   const sticky = new Set(state.stickyColumns || []);
-  const projected = visible.size ? authoredColumns.filter((column) => visible.has(column.id || column.dataField || column.field)) : authoredColumns;
+  const projected = projectResponsiveColumns(authoredColumns, state.columns);
   const columns = projected.map((column) => sticky.has(column.id || column.dataField || column.field) ? {...column, sticky: 'left'} : column);
   const table = {...container.table, columns, density: state.density || container.table?.density};
   if (target === 'phone' && state.rowLayout === 'cards' && state.readOnlyCards === true && responsiveCardsSupported(container.table, dataContext?.dataSource)) {

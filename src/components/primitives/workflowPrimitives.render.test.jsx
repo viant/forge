@@ -8,7 +8,7 @@ import StatusWorkflow from './StatusWorkflow.jsx';
 import TreeEditor from './TreeEditor.jsx';
 import UploadCollection from './UploadCollection.jsx';
 import Wizard from './Wizard.jsx';
-import {ResponsiveCardRows, responsiveCardsSupported, responsiveGridStyle, responsiveTarget} from './ResponsiveDataGrid.jsx';
+import {projectResponsiveColumns, ResponsiveCardRows, responsiveCardsSupported, responsiveGridStyle, responsiveTarget} from './ResponsiveDataGrid.jsx';
 import {derivedSourceState, nextDerivedControl} from './DerivedDataSource.jsx';
 
 const signal = (value) => ({value, peek: () => value});
@@ -58,6 +58,7 @@ if (permissionBoundaryAllows({mode: 'selection', dataSourceRef: 'authorization',
 if (!permissionBoundaryAllows({mode: 'resource', capability: 'write'}, root)) throw new Error('resource permission must not be rewritten as selection permission');
 if (responsiveTarget(390) !== 'phone' || responsiveTarget(900) !== 'narrow' || responsiveTarget(1200) !== 'desktop') throw new Error('responsive targets are not stable');
 if (responsiveGridStyle({style: {height: '300px'}}).flexShrink !== 0) throw new Error('explicit responsive height may not be silently flex-shrunk');
+if (projectResponsiveColumns([{id: 'status'}, {id: 'name'}, {id: 'id'}], ['__select__', 'name', 'id', 'status']).map((column) => column.id).join(',') !== 'name,id,status') throw new Error('responsive breakpoint column order is not authoritative');
 const cards = renderToStaticMarkup(<ResponsiveCardRows rows={[{id: 1, name: 'Example'}]} columns={[{id: 'name', name: 'Name'}]}/>);
 includes(cards, '<dt>Name</dt><dd>Example</dd>');
 const utcCards = renderToStaticMarkup(<ResponsiveCardRows rows={[{id: 1, created: '2026-09-08T18:58:00Z'}]} columns={[{id: 'created', name: 'Time (GMT)', format: 'dateTime24', timeZone: 'UTC'}]}/>);

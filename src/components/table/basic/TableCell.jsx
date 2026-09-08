@@ -316,9 +316,9 @@ const TableCell = ({
     const resolvedBadges = [col.badge, ...(Array.isArray(col.badges) ? col.badges : [])]
         .map((badge) => resolveTableCellBadge(row, badge, context))
         .filter(Boolean);
-    for (const resolvedBadge of resolvedBadges) {
-        const badgeContent = (
+    const renderBadge = (resolvedBadge, key) => (
             <span
+                key={key}
                 className={`forge-table-cell-badge is-${resolvedBadge.tone}${resolvedBadge.className ? ` ${resolvedBadge.className}` : ''}`}
                 title={resolvedBadge.tooltip}
                 aria-label={resolvedBadge.hideLabel ? resolvedBadge.tooltip : undefined}
@@ -328,11 +328,25 @@ const TableCell = ({
                     : (resolvedBadge.icon ? <Icon icon={resolvedBadge.icon} size={12}/> : null)}
                 {resolvedBadge.hideLabel ? null : <span>{resolvedBadge.label}</span>}
             </span>
-        );
+    );
+    if (resolvedBadges.length === 1) {
+        const resolvedBadge = resolvedBadges[0];
+        const badgeContent = renderBadge(resolvedBadge, 'badge');
         cellContent = resolvedBadge.replaceValue ? badgeContent : (
             <div className="forge-table-cell-stack">
                 <div className="forge-table-cell-stack__primary">{cellContent}</div>
                 {badgeContent}
+            </div>
+        );
+    } else if (resolvedBadges.length > 1) {
+        const replacement = resolvedBadges.filter((badge) => badge.replaceValue);
+        const supplemental = resolvedBadges.filter((badge) => !badge.replaceValue);
+        cellContent = (
+            <div className="forge-table-cell-badges">
+                {replacement.length > 0
+                    ? replacement.map((badge, index) => renderBadge(badge, `replacement-${index}`))
+                    : <span className="forge-table-cell-badges__primary">{cellContent}</span>}
+                {supplemental.map((badge, index) => renderBadge(badge, `supplemental-${index}`))}
             </div>
         );
     }

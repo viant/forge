@@ -54,13 +54,14 @@ type ResourceHeaderAction struct {
 }
 
 type DataStateBoundarySpec struct {
-	DataSourceRefs     []string `json:"dataSourceRefs,omitempty" yaml:"dataSourceRefs,omitempty"`
-	AllowPartial       bool     `json:"allowPartial,omitempty" yaml:"allowPartial,omitempty"`
-	RenderEmptyContent bool     `json:"renderEmptyContent,omitempty" yaml:"renderEmptyContent,omitempty"`
-	LoadingMessage     string   `json:"loadingMessage,omitempty" yaml:"loadingMessage,omitempty"`
-	EmptyMessage       string   `json:"emptyMessage,omitempty" yaml:"emptyMessage,omitempty"`
-	ErrorMessage       string   `json:"errorMessage,omitempty" yaml:"errorMessage,omitempty"`
-	StaleMessage       string   `json:"staleMessage,omitempty" yaml:"staleMessage,omitempty"`
+	DataSourceRefs     []string               `json:"dataSourceRefs,omitempty" yaml:"dataSourceRefs,omitempty"`
+	AllowPartial       bool                   `json:"allowPartial,omitempty" yaml:"allowPartial,omitempty"`
+	RenderEmptyContent bool                   `json:"renderEmptyContent,omitempty" yaml:"renderEmptyContent,omitempty"`
+	LoadingMessage     string                 `json:"loadingMessage,omitempty" yaml:"loadingMessage,omitempty"`
+	EmptyMessage       string                 `json:"emptyMessage,omitempty" yaml:"emptyMessage,omitempty"`
+	ErrorMessage       string                 `json:"errorMessage,omitempty" yaml:"errorMessage,omitempty"`
+	StaleMessage       string                 `json:"staleMessage,omitempty" yaml:"staleMessage,omitempty"`
+	SuppressErrorWhen  map[string]interface{} `json:"suppressErrorWhen,omitempty" yaml:"suppressErrorWhen,omitempty"`
 }
 
 type RelationDrillSpec struct {
