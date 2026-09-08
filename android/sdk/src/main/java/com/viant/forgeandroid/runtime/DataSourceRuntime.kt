@@ -119,7 +119,7 @@ class DataSourceRuntime(
         try {
             val loaderResult = collectionLoader?.invoke(ctx)
             if (loaderResult != null) {
-                val data = applyCollectionHook(ctx, loaderResult.rows)
+                val data = applyCollectionHook(ctx, applyResourceModel(ctx, loaderResult.rows))
                 ctx.collection.set(data)
                 if (loaderResult.form != null) {
                     ctx.form.set(loaderResult.form)
@@ -158,7 +158,7 @@ class DataSourceRuntime(
             val response = executeRequest(endpoint, request)
             val data = applyCollectionHook(
                 ctx,
-                normalizeCollection(response, ctx.dataSource.selectors?.data)
+                applyResourceModel(ctx, normalizeCollection(response, ctx.dataSource.selectors?.data))
             )
             val dataInfo = normalizeDataInfo(response, ctx.dataSource.selectors?.dataInfo)
             ctx.collection.set(data)
@@ -221,6 +221,19 @@ class DataSourceRuntime(
                 row.entries.associate { it.key.toString() to it.value }
             }
             else -> rows
+        }
+    }
+
+    private suspend fun applyResourceModel(ctx: DataSourceContext, rows: List<Map<String, Any?>>): List<Map<String, Any?>> {
+        val modelRef = ctx.dataSource.resourceModelRef ?: return rows
+        val metadata = ctx.window.metadata.peek() ?: return rows
+        val code = metadata.actions?.code?.trim().orEmpty()
+        val hook: ResourceModelHook? = if (code.isBlank()) null else { name, value ->
+            val result = ActionHookRuntime.invoke(code, name, JsonUtil.anyToElement(value))
+            result?.let(JsonUtil::elementToAny) ?: value
+        }
+        return rows.map { row ->
+            JsonUtil.asStringMap(ResourceModelRuntime.unmarshal(row, modelRef, metadata.schemas, metadata.resourceModels, hook))
         }
     }
 

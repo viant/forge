@@ -34,7 +34,10 @@ data class WindowMetadata(
     val actions: ActionsDef? = null,
     val on: List<ExecutionDef> = emptyList(),
     val target: JsonElement? = null,
-    val targetOverrides: Map<String, JsonElement> = emptyMap()
+    val targetOverrides: Map<String, JsonElement> = emptyMap(),
+    val authorizationSnapshot: Map<String, JsonElement> = emptyMap(),
+    val schemas: Map<String, ResourceSchemaDef> = emptyMap(),
+    val resourceModels: Map<String, ResourceModelDef> = emptyMap()
 )
 
 @Serializable
@@ -133,6 +136,28 @@ data class ContainerDef(
     val dashboard: DashboardDef? = null,
     val reportRuntime: JsonElement? = null,
     val stateKey: String? = null,
+    val dataStateBoundary: DataStateBoundarySpec? = null,
+    val relationDrill: RelationDrillSpec? = null,
+    val notificationRules: NotificationRulesSpec? = null,
+    val metricSummary: MetricSummarySpec? = null,
+    val detailView: DetailViewSpec? = null,
+    val masterDetail: MasterDetailSpec? = null,
+    val mutationCommand: MutationCommandDef? = null,
+    val editableCollection: EditableCollectionSpec? = null,
+    val assignmentPicker: AssignmentPickerSpec? = null,
+    val statusWorkflow: StatusWorkflowSpec? = null,
+    val treeEditor: TreeEditorSpec? = null,
+    val wizard: WizardSpec? = null,
+    val uploadCollection: UploadCollectionSpec? = null,
+    val derivedDataSource: DerivedDataSourceSpec? = null,
+    val permissionBoundary: PermissionBoundarySpec? = null,
+    val responsiveDataGrid: ResponsiveDataGridSpec? = null,
+    val historyDiff: HistoryDiffSpec? = null,
+    val scheduleEditor: ScheduleEditorSpec? = null,
+    val draftForm: DraftFormSpec? = null,
+    val queryToolbar: QueryToolbarSpec? = null,
+    val stableTabs: StableTabsSpec? = null,
+    val resourceHeader: ResourceHeaderSpec? = null,
     val actions: List<ActionDef> = emptyList(),
     val on: List<ExecutionDef> = emptyList(),
     val selectFirst: Boolean? = null,
@@ -1169,7 +1194,8 @@ data class DataSourceDef(
     val filterSet: List<FilterSetDef> = emptyList(),
     val quickFilterSet: String? = null,
     val target: JsonElement? = null,
-    val targetOverrides: Map<String, JsonElement> = emptyMap()
+    val targetOverrides: Map<String, JsonElement> = emptyMap(),
+    val resourceModelRef: String? = null
 )
 
 @Serializable
@@ -1379,7 +1405,8 @@ data class ControlState(
     val loading: Boolean = false,
     val error: String? = null,
     val inactive: Boolean = false,
-    val resolved: Boolean = false
+    val resolved: Boolean = false,
+    val warnings: List<String> = emptyList()
 )
 
 data class DialogState(

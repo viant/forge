@@ -10,6 +10,9 @@ public struct WindowMetadata: Codable, Sendable {
     public let on: [EventExecutionDef]
     public let target: JSONValue?
     public let targetOverrides: [String: JSONValue]
+    public let authorizationSnapshot: [String: JSONValue]
+    public let schemas: [String: ResourceSchemaDef]
+    public let resourceModels: [String: ResourceModelDef]
 
     enum CodingKeys: String, CodingKey {
         case namespace
@@ -21,6 +24,9 @@ public struct WindowMetadata: Codable, Sendable {
         case on
         case target
         case targetOverrides
+        case authorizationSnapshot
+        case schemas
+        case resourceModels
     }
 
     enum LegacyCodingKeys: String, CodingKey {
@@ -37,7 +43,10 @@ public struct WindowMetadata: Codable, Sendable {
         actions: ActionsDef? = nil,
         on: [EventExecutionDef] = [],
         target: JSONValue? = nil,
-        targetOverrides: [String: JSONValue] = [:]
+        targetOverrides: [String: JSONValue] = [:],
+        authorizationSnapshot: [String: JSONValue] = [:],
+        schemas: [String: ResourceSchemaDef] = [:],
+        resourceModels: [String: ResourceModelDef] = [:]
     ) {
         self.namespace = namespace
         self.view = view
@@ -48,6 +57,9 @@ public struct WindowMetadata: Codable, Sendable {
         self.on = on
         self.target = target
         self.targetOverrides = targetOverrides
+        self.authorizationSnapshot = authorizationSnapshot
+        self.schemas = schemas
+        self.resourceModels = resourceModels
     }
 
     public init(from decoder: Decoder) throws {
@@ -64,6 +76,9 @@ public struct WindowMetadata: Codable, Sendable {
         on = try container.decodeIfPresent([EventExecutionDef].self, forKey: .on) ?? []
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
         targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
+        authorizationSnapshot = try container.decodeIfPresent([String: JSONValue].self, forKey: .authorizationSnapshot) ?? [:]
+        schemas = try container.decodeIfPresent([String: ResourceSchemaDef].self, forKey: .schemas) ?? [:]
+        resourceModels = try container.decodeIfPresent([String: ResourceModelDef].self, forKey: .resourceModels) ?? [:]
         if let decodedView,
            Self.isMeaningfulView(decodedView) {
             view = decodedView
@@ -158,6 +173,28 @@ public struct WindowMetadata: Codable, Sendable {
             || container.toolbar != nil
             || container.schemaBasedForm != nil
             || container.tabs != nil
+            || container.dataStateBoundary != nil
+            || container.relationDrill != nil
+            || container.notificationRules != nil
+            || container.metricSummary != nil
+            || container.detailView != nil
+            || container.masterDetail != nil
+            || container.mutationCommand != nil
+            || container.editableCollection != nil
+            || container.assignmentPicker != nil
+            || container.statusWorkflow != nil
+            || container.treeEditor != nil
+            || container.wizard != nil
+            || container.uploadCollection != nil
+            || container.derivedDataSource != nil
+            || container.permissionBoundary != nil
+            || container.responsiveDataGrid != nil
+            || container.historyDiff != nil
+            || container.scheduleEditor != nil
+            || container.draftForm != nil
+            || container.queryToolbar != nil
+            || container.stableTabs != nil
+            || container.resourceHeader != nil
             || container.chat != nil
             || container.terminal != nil
             || !container.actions.isEmpty
@@ -536,6 +573,28 @@ public struct ContentDef: Codable, Sendable {
             || container.toolbar != nil
             || container.schemaBasedForm != nil
             || container.tabs != nil
+            || container.dataStateBoundary != nil
+            || container.relationDrill != nil
+            || container.notificationRules != nil
+            || container.metricSummary != nil
+            || container.detailView != nil
+            || container.masterDetail != nil
+            || container.mutationCommand != nil
+            || container.editableCollection != nil
+            || container.assignmentPicker != nil
+            || container.statusWorkflow != nil
+            || container.treeEditor != nil
+            || container.wizard != nil
+            || container.uploadCollection != nil
+            || container.derivedDataSource != nil
+            || container.permissionBoundary != nil
+            || container.responsiveDataGrid != nil
+            || container.historyDiff != nil
+            || container.scheduleEditor != nil
+            || container.draftForm != nil
+            || container.queryToolbar != nil
+            || container.stableTabs != nil
+            || container.resourceHeader != nil
             || container.chat != nil
             || container.terminal != nil
             || !container.actions.isEmpty
@@ -588,6 +647,28 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
     public let dashboard: DashboardDef?
     public let reportRuntime: JSONValue?
     public let tabs: TabsDef?
+    public let dataStateBoundary: DataStateBoundarySpec?
+    public let relationDrill: RelationDrillSpec?
+    public let notificationRules: NotificationRulesSpec?
+    public let metricSummary: MetricSummarySpec?
+    public let detailView: DetailViewSpec?
+    public let masterDetail: MasterDetailSpec?
+    public let mutationCommand: MutationCommandDef?
+    public let editableCollection: EditableCollectionSpec?
+    public let assignmentPicker: AssignmentPickerSpec?
+    public let statusWorkflow: StatusWorkflowSpec?
+    public let treeEditor: TreeEditorSpec?
+    public let wizard: WizardSpec?
+    public let uploadCollection: UploadCollectionSpec?
+    public let derivedDataSource: DerivedDataSourceSpec?
+    public let permissionBoundary: PermissionBoundarySpec?
+    public let responsiveDataGrid: ResponsiveDataGridSpec?
+    public let historyDiff: HistoryDiffSpec?
+    public let scheduleEditor: ScheduleEditorSpec?
+    public let draftForm: DraftFormSpec?
+    public let queryToolbar: QueryToolbarSpec?
+    public let stableTabs: StableTabsSpec?
+    public let resourceHeader: ResourceHeaderSpec?
     public let items: [ItemDef]
     public let chart: ChartDef?
     public let table: TableDef?
@@ -669,6 +750,16 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         case reportBuilder
         case detail
         case tabs
+        case dataStateBoundary
+        case relationDrill
+        case notificationRules
+        case metricSummary
+        case detailView
+        case masterDetail
+        case mutationCommand
+        case editableCollection, assignmentPicker, statusWorkflow, treeEditor, wizard, uploadCollection
+        case derivedDataSource, permissionBoundary, responsiveDataGrid, historyDiff, scheduleEditor
+        case draftForm, queryToolbar, stableTabs, resourceHeader
         case items
         case chart
         case table
@@ -742,6 +833,28 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         dashboard: DashboardDef? = nil,
         reportRuntime: JSONValue? = nil,
         tabs: TabsDef? = nil,
+        dataStateBoundary: DataStateBoundarySpec? = nil,
+        relationDrill: RelationDrillSpec? = nil,
+        notificationRules: NotificationRulesSpec? = nil,
+        metricSummary: MetricSummarySpec? = nil,
+        detailView: DetailViewSpec? = nil,
+        masterDetail: MasterDetailSpec? = nil,
+        mutationCommand: MutationCommandDef? = nil,
+        editableCollection: EditableCollectionSpec? = nil,
+        assignmentPicker: AssignmentPickerSpec? = nil,
+        statusWorkflow: StatusWorkflowSpec? = nil,
+        treeEditor: TreeEditorSpec? = nil,
+        wizard: WizardSpec? = nil,
+        uploadCollection: UploadCollectionSpec? = nil,
+        derivedDataSource: DerivedDataSourceSpec? = nil,
+        permissionBoundary: PermissionBoundarySpec? = nil,
+        responsiveDataGrid: ResponsiveDataGridSpec? = nil,
+        historyDiff: HistoryDiffSpec? = nil,
+        scheduleEditor: ScheduleEditorSpec? = nil,
+        draftForm: DraftFormSpec? = nil,
+        queryToolbar: QueryToolbarSpec? = nil,
+        stableTabs: StableTabsSpec? = nil,
+        resourceHeader: ResourceHeaderSpec? = nil,
         items: [ItemDef] = [],
         chart: ChartDef? = nil,
         table: TableDef? = nil,
@@ -809,6 +922,28 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         self.dashboard = dashboard
         self.reportRuntime = reportRuntime
         self.tabs = tabs
+        self.dataStateBoundary = dataStateBoundary
+        self.relationDrill = relationDrill
+        self.notificationRules = notificationRules
+        self.metricSummary = metricSummary
+        self.detailView = detailView
+        self.masterDetail = masterDetail
+        self.mutationCommand = mutationCommand
+        self.editableCollection = editableCollection
+        self.assignmentPicker = assignmentPicker
+        self.statusWorkflow = statusWorkflow
+        self.treeEditor = treeEditor
+        self.wizard = wizard
+        self.uploadCollection = uploadCollection
+        self.derivedDataSource = derivedDataSource
+        self.permissionBoundary = permissionBoundary
+        self.responsiveDataGrid = responsiveDataGrid
+        self.historyDiff = historyDiff
+        self.scheduleEditor = scheduleEditor
+        self.draftForm = draftForm
+        self.queryToolbar = queryToolbar
+        self.stableTabs = stableTabs
+        self.resourceHeader = resourceHeader
         self.items = items
         self.chart = chart
         self.table = table
@@ -891,6 +1026,28 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         dashboard = try container.decodeIfPresent(DashboardDef.self, forKey: .dashboard)
             ?? Self.synthesizedDashboard(from: container)
         tabs = try container.decodeIfPresent(TabsDef.self, forKey: .tabs)
+        dataStateBoundary = try container.decodeIfPresent(DataStateBoundarySpec.self, forKey: .dataStateBoundary)
+        relationDrill = try container.decodeIfPresent(RelationDrillSpec.self, forKey: .relationDrill)
+        notificationRules = try container.decodeIfPresent(NotificationRulesSpec.self, forKey: .notificationRules)
+        metricSummary = try container.decodeIfPresent(MetricSummarySpec.self, forKey: .metricSummary)
+        detailView = try container.decodeIfPresent(DetailViewSpec.self, forKey: .detailView)
+        masterDetail = try container.decodeIfPresent(MasterDetailSpec.self, forKey: .masterDetail)
+        mutationCommand = try container.decodeIfPresent(MutationCommandDef.self, forKey: .mutationCommand)
+        editableCollection = try container.decodeIfPresent(EditableCollectionSpec.self, forKey: .editableCollection)
+        assignmentPicker = try container.decodeIfPresent(AssignmentPickerSpec.self, forKey: .assignmentPicker)
+        statusWorkflow = try container.decodeIfPresent(StatusWorkflowSpec.self, forKey: .statusWorkflow)
+        treeEditor = try container.decodeIfPresent(TreeEditorSpec.self, forKey: .treeEditor)
+        wizard = try container.decodeIfPresent(WizardSpec.self, forKey: .wizard)
+        uploadCollection = try container.decodeIfPresent(UploadCollectionSpec.self, forKey: .uploadCollection)
+        derivedDataSource = try container.decodeIfPresent(DerivedDataSourceSpec.self, forKey: .derivedDataSource)
+        permissionBoundary = try container.decodeIfPresent(PermissionBoundarySpec.self, forKey: .permissionBoundary)
+        responsiveDataGrid = try container.decodeIfPresent(ResponsiveDataGridSpec.self, forKey: .responsiveDataGrid)
+        historyDiff = try container.decodeIfPresent(HistoryDiffSpec.self, forKey: .historyDiff)
+        scheduleEditor = try container.decodeIfPresent(ScheduleEditorSpec.self, forKey: .scheduleEditor)
+        draftForm = try container.decodeIfPresent(DraftFormSpec.self, forKey: .draftForm)
+        queryToolbar = try container.decodeIfPresent(QueryToolbarSpec.self, forKey: .queryToolbar)
+        stableTabs = try container.decodeIfPresent(StableTabsSpec.self, forKey: .stableTabs)
+        resourceHeader = try container.decodeIfPresent(ResourceHeaderSpec.self, forKey: .resourceHeader)
         items = try container.decodeIfPresent([ItemDef].self, forKey: .items) ?? []
         chart = try container.decodeIfPresent(ChartDef.self, forKey: .chart)
         table = try container.decodeIfPresent(TableDef.self, forKey: .table)
@@ -961,6 +1118,28 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         try container.encodeIfPresent(dashboard, forKey: .dashboard)
         try container.encodeIfPresent(reportRuntime, forKey: .reportRuntime)
         try container.encodeIfPresent(tabs, forKey: .tabs)
+        try container.encodeIfPresent(dataStateBoundary, forKey: .dataStateBoundary)
+        try container.encodeIfPresent(relationDrill, forKey: .relationDrill)
+        try container.encodeIfPresent(notificationRules, forKey: .notificationRules)
+        try container.encodeIfPresent(metricSummary, forKey: .metricSummary)
+        try container.encodeIfPresent(detailView, forKey: .detailView)
+        try container.encodeIfPresent(masterDetail, forKey: .masterDetail)
+        try container.encodeIfPresent(mutationCommand, forKey: .mutationCommand)
+        try container.encodeIfPresent(editableCollection, forKey: .editableCollection)
+        try container.encodeIfPresent(assignmentPicker, forKey: .assignmentPicker)
+        try container.encodeIfPresent(statusWorkflow, forKey: .statusWorkflow)
+        try container.encodeIfPresent(treeEditor, forKey: .treeEditor)
+        try container.encodeIfPresent(wizard, forKey: .wizard)
+        try container.encodeIfPresent(uploadCollection, forKey: .uploadCollection)
+        try container.encodeIfPresent(derivedDataSource, forKey: .derivedDataSource)
+        try container.encodeIfPresent(permissionBoundary, forKey: .permissionBoundary)
+        try container.encodeIfPresent(responsiveDataGrid, forKey: .responsiveDataGrid)
+        try container.encodeIfPresent(historyDiff, forKey: .historyDiff)
+        try container.encodeIfPresent(scheduleEditor, forKey: .scheduleEditor)
+        try container.encodeIfPresent(draftForm, forKey: .draftForm)
+        try container.encodeIfPresent(queryToolbar, forKey: .queryToolbar)
+        try container.encodeIfPresent(stableTabs, forKey: .stableTabs)
+        try container.encodeIfPresent(resourceHeader, forKey: .resourceHeader)
         try container.encode(items, forKey: .items)
         try container.encodeIfPresent(chart, forKey: .chart)
         try container.encodeIfPresent(table, forKey: .table)
@@ -1087,6 +1266,7 @@ public struct DataSourceDef: Codable, Sendable {
     public let on: [ExecutionDef]
     public let target: JSONValue?
     public let targetOverrides: [String: JSONValue]
+    public let resourceModelRef: String?
 
     enum CodingKeys: String, CodingKey {
         case service
@@ -1103,6 +1283,7 @@ public struct DataSourceDef: Codable, Sendable {
         case on
         case target
         case targetOverrides
+        case resourceModelRef
     }
 
     public init(
@@ -1119,7 +1300,8 @@ public struct DataSourceDef: Codable, Sendable {
         method: String? = nil,
         on: [ExecutionDef] = [],
         target: JSONValue? = nil,
-        targetOverrides: [String: JSONValue] = [:]
+        targetOverrides: [String: JSONValue] = [:],
+        resourceModelRef: String? = nil
     ) {
         self.service = service
         self.selectionMode = selectionMode
@@ -1135,6 +1317,7 @@ public struct DataSourceDef: Codable, Sendable {
         self.on = on
         self.target = target
         self.targetOverrides = targetOverrides
+        self.resourceModelRef = resourceModelRef
     }
 
     public init(from decoder: Decoder) throws {
@@ -1153,6 +1336,7 @@ public struct DataSourceDef: Codable, Sendable {
         on = try container.decodeIfPresent([ExecutionDef].self, forKey: .on) ?? []
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
         targetOverrides = try container.decodeIfPresent([String: JSONValue].self, forKey: .targetOverrides) ?? [:]
+        resourceModelRef = try container.decodeIfPresent(String.self, forKey: .resourceModelRef)
     }
 }
 

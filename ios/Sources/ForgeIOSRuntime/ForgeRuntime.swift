@@ -107,6 +107,9 @@ public actor ForgeRuntime {
     private var windowMetadataRequestLoader: (@Sendable (WindowMetadataRequest) async throws -> WindowMetadata?)?
     private var feedPatchHandler: (@Sendable (String, FeedPatchOperation) async throws -> Bool)?
     private var interactionObserver: (@Sendable (ForgeInteraction) async -> Void)?
+    var mutationCommandStates: [String: MutationCommandState] = [:]
+    var guardedMutationCommands: Set<String> = []
+    var guardedMutationTransports: Set<String> = []
 
     var handlers: [String: ForgeHandler] = [:]
     private var pendingDialogs: [String: PendingDialog] = [:]
@@ -478,6 +481,12 @@ public actor ForgeRuntime {
         return await dataSourceRuntime.control(dataSourceID: dataSourceID)
     }
 
+    public func setDataSourceControl(windowID: String, dataSourceRef: String, control: ControlState) async {
+        let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: control)
+        await (await signals.control(dataSourceID: dataSourceID)).set(control)
+    }
+
     /// Loads one logical report dataset into an isolated instance while using
     /// the declared datasource transport. Authored reports commonly reference
     /// several date-window datasets backed by the same cube; storing them under
@@ -524,7 +533,7 @@ public actor ForgeRuntime {
                 )
             )
             guard dataSourceFetchGenerations[dataSourceID] == generation else { return }
-            let rows = applyCollectionHook(metadata: metadata, rows: result?.rows ?? [])
+            let rows = applyCollectionHook(metadata: metadata, rows: try unmarshalResourceRows(result?.rows ?? [], dataSource: dataSource, metadata: metadata))
             let control = ControlState()
             await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: rows)
             await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: result?.metrics ?? [:])
@@ -625,7 +634,7 @@ public actor ForgeRuntime {
                     guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration else {
                         return
                     }
-                    let hookedRows = applyCollectionHook(metadata: metadata, rows: result.rows)
+                    let hookedRows = applyCollectionHook(metadata: metadata, rows: try unmarshalResourceRows(result.rows, dataSource: dataSource, metadata: metadata))
                     await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows)
                     await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: result.metrics)
                     await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: ControlState())

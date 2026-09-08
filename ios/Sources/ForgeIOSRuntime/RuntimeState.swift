@@ -42,11 +42,13 @@ public struct ControlState: Sendable, Equatable {
     public let loading: Bool
     public let error: String?
     public let inactive: Bool
+    public let warnings: [String]
 
-    public init(loading: Bool = false, error: String? = nil, inactive: Bool = false) {
+    public init(loading: Bool = false, error: String? = nil, inactive: Bool = false, warnings: [String] = []) {
         self.loading = loading
         self.error = error
         self.inactive = inactive
+        self.warnings = warnings
     }
 }
 
