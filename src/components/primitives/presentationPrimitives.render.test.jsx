@@ -31,6 +31,9 @@ has(renderToStaticMarkup(<DataStateBoundary context={context} container={{dataSo
 const emptyDataContext = {...dataContext, signals: {...dataContext.signals, form: signal({}), collection: signal([]), metrics: signal({}), control: signal({loaded: true})}};
 const emptyBoundaryContext = {...context, Context: () => emptyDataContext};
 has(renderToStaticMarkup(<DataStateBoundary context={emptyBoundaryContext} container={{dataSourceRef: 'record', dataStateBoundary: {dataSourceRefs: ['record'], renderEmptyContent: true}}}><span>Table-owned empty state</span></DataStateBoundary>), 'Table-owned empty state');
+const errorDataContext = {...dataContext, signals: {...dataContext.signals, control: signal({loaded: true, error: new Error('duplicate error')}), windowForm: signal({sharedError: 'Actionable parent error'})}};
+const suppressedErrorMarkup = renderToStaticMarkup(<DataStateBoundary context={{...context, signals: errorDataContext.signals, Context: () => errorDataContext}} container={{dataSourceRef: 'record', dataStateBoundary: {dataSourceRefs: ['record'], suppressErrorWhen: {source: 'windowForm', field: 'sharedError', notEmpty: true}}}}/>);
+if (suppressedErrorMarkup.includes('duplicate error')) throw new Error(`duplicate datasource error was not suppressed: ${suppressedErrorMarkup}`);
 has(renderToStaticMarkup(<RelationDrill context={context} container={{relationDrill: {countField: 'childCount', emptyText: 'No children', link: {windowKey: 'children'}}}}/>), 'No children');
 has(renderToStaticMarkup(<NotificationRules context={context} container={{notificationRules: {rules: [{id: 'notice', message: 'Review input', intent: 'warning'}]}}}/>), 'Review input');
 has(renderToStaticMarkup(<MetricSummary context={context} container={{metricSummary: {dataSourceRef: 'summary', metrics: [{id: 'total', label: 'Total', field: 'total', format: 'currency2'}]}}}/>), '$12.50');

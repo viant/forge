@@ -33,6 +33,7 @@ dataStateBoundary:
   dataSourceRefs: [records, summary]
   allowPartial: true
   renderEmptyContent: true
+  suppressErrorWhen: {source: windowForm, field: sharedError, notEmpty: true}
 relationDrill:
   dataSourceRef: record
   countField: childCount
@@ -78,7 +79,7 @@ masterDetail:
 	if container.ResourceHeader == nil || len(container.ResourceHeader.Actions) != 1 || container.ResourceHeader.Actions[0].Handler != "Host.watch" {
 		t.Fatal("resourceHeader truncated")
 	}
-	if container.DataStateBoundary == nil || !container.DataStateBoundary.AllowPartial || !container.DataStateBoundary.RenderEmptyContent || container.RelationDrill == nil {
+	if container.DataStateBoundary == nil || !container.DataStateBoundary.AllowPartial || !container.DataStateBoundary.RenderEmptyContent || container.DataStateBoundary.SuppressErrorWhen["field"] != "sharedError" || container.RelationDrill == nil {
 		t.Fatal("data state/relation truncated")
 	}
 	if container.NotificationRules == nil || len(container.NotificationRules.Rules) != 1 || container.MetricSummary == nil || len(container.MetricSummary.Metrics) != 1 {

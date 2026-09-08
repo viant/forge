@@ -42,6 +42,7 @@ import {
     resolveChartLoadingState,
     resolveVisibleChartState,
     transformData,
+    resolveChartTableMinWidth,
 } from "./chartData.js";
 import {
     normalizeSelectorLookupKey,
@@ -1109,17 +1110,19 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const computedWidthByCol = React.useMemo(() => {
         const out = {};
         allTableColumns.forEach((key) => {
-            const headerLen = String(key || "").length;
+            const meta = chartTableColumnMeta(key, xAxis, seriesDefinitions);
+            const headerLen = String(meta.label || key || "").length;
             let maxLen = headerLen;
             chartData.forEach((row) => {
-                const len = String(readChartDataValue(row, key) ?? "").length;
+                const raw = readChartDataValue(row, key) ?? "";
+                const len = String(formatChartTableCell(raw, meta, resolvedTickFormat, resolvedTickValueMode) ?? "").length;
                 if (len > maxLen) maxLen = len;
             });
             const w = Math.max(110, Math.min(420, maxLen * 8 + 28));
             out[key] = w;
         });
         return out;
-    }, [allTableColumns, chartData]);
+    }, [allTableColumns, chartData, resolvedTickFormat, resolvedTickValueMode, seriesDefinitions, xAxis]);
 
     const tableColumnWidths = visibleColumns.map((key) => {
         const persisted = Number(columnWidths[key]);
@@ -1453,7 +1456,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 </div>
             ) : (
                 <div className="forge-chart-table-scroll">
-                    <table className="forge-chart-table" style={{minWidth: Math.max(640, tableColumnWidths.reduce((sum, widthValue) => sum + widthValue, 0))}}>
+                    <table className="forge-chart-table" style={{minWidth: resolveChartTableMinWidth(tableColumnWidths)}}>
                         <colgroup>
                             {tableColumnWidths.map((widthValue, index) => <col key={`${visibleColumns[index]}-width`} style={{width: widthValue}}/>)}
                         </colgroup>

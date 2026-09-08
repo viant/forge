@@ -279,6 +279,14 @@ export function formatChartXAxisValue(value, tickFormat = "", valueMode = "") {
     return formatTimestamp(value, normalizedTickFormat, valueMode);
 }
 
+export function resolveChartTableMinWidth(widths = []) {
+    const total = (Array.isArray(widths) ? widths : []).reduce((sum, value) => {
+        const width = Number(value);
+        return sum + (Number.isFinite(width) && width > 0 ? width : 0);
+    }, 0);
+    return Math.max(320, total);
+}
+
 export function fillMissingTemporalBuckets(chartData = [], xAxisKey = "", seriesDefinitions = [], step = "") {
     const rows = Array.isArray(chartData) ? chartData : [];
     const key = normalizeChartKey(xAxisKey);
