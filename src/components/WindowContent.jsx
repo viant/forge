@@ -37,6 +37,7 @@ import { resolveMetadataForTarget } from '../runtime/metadataResolver.js';
 import {compilePermittedView, normalizeAuthorizationSnapshot} from '../runtime/permittedView.js';
 import { applyDataSourceParameterCodecs, resolveParameters } from '../hooks/parameters.js';
 import { resolveSelector } from '../utils/selector.js';
+import { evaluatePlainVisibleWhen } from './visibleWhen.js';
 import { getLogger } from '../utils/logger.js';
 import { runWindowLifecycleHandlers } from './windowLifecycle.js';
 import { buildReportBuilderHostServices } from './dashboard/reportBuilderHostServices.js';
@@ -209,6 +210,20 @@ export function resolveWindowRootContainer(content = null, parameters = {}) {
 function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}) {
     if (!node || typeof node !== 'object') return;
 
+    const isWindowFormPredicate = (condition) => {
+        if (!condition || typeof condition !== 'object') return false;
+        if (Array.isArray(condition.all)) return condition.all.length > 0 && condition.all.every(isWindowFormPredicate);
+        if (Array.isArray(condition.any)) return condition.any.length > 0 && condition.any.every(isWindowFormPredicate);
+        if (condition.not) return isWindowFormPredicate(condition.not);
+        return String(condition.source || '').toLowerCase() === 'windowform';
+    };
+    const visibleInWindowForm = (entry) => {
+        if (!entry?.visibleWhen || !isWindowFormPredicate(entry.visibleWhen)) return true;
+        return evaluatePlainVisibleWhen(entry.visibleWhen, {signals: {windowForm: {peek: () => scope || {}}}});
+    };
+
+    if (!visibleInWindowForm(node)) return;
+
     const addRef = (ref) => {
         const value = String(ref || '').trim();
         if (value) refs.add(value);
@@ -234,6 +249,7 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}) {
 
     if (Array.isArray(node.items)) {
         for (const item of node.items) {
+            if (!visibleInWindowForm(item)) continue;
             addRef(item?.dataSourceRef);
             addRef(item?.optionsDataSourceRef);
             addRef(item?.fallbackOptionsDataSourceRef);
@@ -315,10 +331,14 @@ export function resolveFetcherOwnedDataSourceRefs(metadata) {
 
 export function shouldPrimeDataSourceFetch(dataSource = {}, prevInput = {}, collection = [], paramsChanged = false, control = {}) {
     if (control?.loading === true) return false;
+    if (prevInput.fetch) return true;
     const autoFetchEnabled = dataSource?.autoFetch !== false;
+    if (!autoFetchEnabled) return false;
+    if (paramsChanged) return true;
+    if (control?.error) return false;
     const hasCollection = Array.isArray(collection) && collection.length > 0;
     const hasCompletedLoad = control?.loaded === true;
-    return !!prevInput.fetch || (autoFetchEnabled && (paramsChanged || (!hasCollection && !hasCompletedLoad)));
+    return !hasCollection && !hasCompletedLoad;
 }
 
 export function resolveWindowDataSourceFetchFlag({

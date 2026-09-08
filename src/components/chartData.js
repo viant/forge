@@ -255,23 +255,28 @@ export function buildPieSliceCellKey(entry = {}, index = 0) {
     return `${label}-${index}`;
 }
 
-export function formatTimestamp(timestamp, fmt = "MM/dd") {
+export function formatTimestamp(timestamp, fmt = "MM/dd", valueMode = "") {
     if (timestamp === null || timestamp === undefined || timestamp === "") {
         return "";
     }
-    const date = new Date(timestamp);
+    const civilMatch = valueMode === "civil" && typeof timestamp === "string"
+        ? timestamp.match(/^(\d{4})-(\d{2})-(\d{2})/)
+        : null;
+    const date = civilMatch
+        ? new Date(Number(civilMatch[1]), Number(civilMatch[2]) - 1, Number(civilMatch[3]), 12)
+        : new Date(timestamp);
     if (Number.isNaN(date.getTime())) {
         return String(timestamp);
     }
     return format(date, fmt);
 }
 
-export function formatChartXAxisValue(value, tickFormat = "") {
+export function formatChartXAxisValue(value, tickFormat = "", valueMode = "") {
     const normalizedTickFormat = String(tickFormat || "").trim();
     if (!normalizedTickFormat) {
         return value === null || value === undefined ? "" : String(value);
     }
-    return formatTimestamp(value, normalizedTickFormat);
+    return formatTimestamp(value, normalizedTickFormat, valueMode);
 }
 
 export function fillMissingTemporalBuckets(chartData = [], xAxisKey = "", seriesDefinitions = [], step = "") {

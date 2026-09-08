@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {dispatchMutationCommand, executeCommand, getCommandState, mergeCommandParameters, resolveIndeterminateCommand} from './commandExecutor.js';
+import {dispatchMutationCommand, executeCommand, getCommandState, mergeCommandParameters, resolveCommandConfirmation, resolveIndeterminateCommand} from './commandExecutor.js';
 
 const mutableSignal = (initial) => {
   let value = initial;
@@ -29,6 +29,8 @@ const rows = {signals: {collection: rowsSignal}, handlers: {dataSource: {resetSe
 const context = {authorization: {resource: {capabilities: {write: true}}}, Context: (ref) => ({patch, rows}[ref])};
 
 const order = [];
+assert.equal(resolveCommandConfirmation({confirmSelection: {action: 'Remove', singularLabel: 'Creative', pluralLabel: 'Creatives', labelField: 'name', identityField: 'id', maxItems: 2, suffix: 'Inventory is retained.'}}, {selectedRows: [{id: 7, name: 'Alpha'}]}), 'Remove 1 Creative: Alpha (7)? Inventory is retained.');
+assert.equal(resolveCommandConfirmation({confirmSelection: {action: 'Remove', singularLabel: 'Creative', pluralLabel: 'Creatives', labelField: 'name', identityField: 'id', maxItems: 2}}, {selectedRows: [{id: 7, name: 'Alpha'}, {id: 8, name: 'Beta'}, {id: 9, name: 'Gamma'}]}), 'Remove 3 Creatives: Alpha (7), Beta (8), +1 more?');
 const command = {
   dataSourceRef: 'patch',
   validateWhen: {source: 'authorization', field: 'resource.capabilities.write', equals: true},

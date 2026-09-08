@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import Toolbar, { clearToolbarStatusValue, toolbarDisabledWrapperProps, toolbarHasSelection, toolbarItemIcon, toolbarItemLabel, toolbarItemShouldRender, toolbarStatusAppearance, toolbarStatusShouldRender, toolbarStatusValue } from './Toolbar.jsx';
+import Toolbar, { clearToolbarStatusValue, collectionCountValue, toolbarDisabledWrapperProps, toolbarHasSelection, toolbarItemIcon, toolbarItemLabel, toolbarItemShouldRender, toolbarStatusAppearance, toolbarStatusShouldRender, toolbarStatusValue } from './Toolbar.jsx';
 import {toolbarBooleanValue, updateToolbarBoolean} from './toolbarBoolean.js';
 
 describe('toolbarItemIcon', () => {
@@ -96,6 +96,18 @@ describe('toolbarHasSelection', () => {
         expect(toolbarHasSelection({selected: {id: 1}})).toBe(true);
         expect(toolbarHasSelection({selection: [{id: 1}]})).toBe(true);
         expect(toolbarHasSelection({selected: null, selection: []})).toBe(false);
+    });
+});
+
+describe('collectionCountValue', () => {
+    it('uses authoritative totals and semantic singular/plural labels', () => {
+        const item = {properties: {singularLabel: 'Creative', pluralLabel: 'Creatives'}};
+        expect(collectionCountValue({totalCount: 7}, [{id: 1}], item)).toBe('7 Creatives');
+        expect(collectionCountValue({recordCount: 1}, [], item)).toBe('1 Creative');
+    });
+
+    it('rejects an inconsistent zero summary when loaded rows exist', () => {
+        expect(collectionCountValue({totalCount: 0}, [{id: 1}, {id: 2}], {properties: {pluralLabel: 'Creatives'}})).toBe('2 Creatives');
     });
 });
 

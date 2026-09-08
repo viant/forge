@@ -198,8 +198,8 @@ export function chartTableColumnMeta(columnKey, xAxis = {}, seriesDefinitions = 
     return {key: columnKey, label: series.label || series.name || columnKey, format: series.format || ''};
 }
 
-export function formatChartTableCell(value, meta = {}, resolvedTickFormat = '') {
-    if (meta.format === 'xAxis') return formatChartXAxisValue(value, resolvedTickFormat);
+export function formatChartTableCell(value, meta = {}, resolvedTickFormat = '', resolvedTickValueMode = '') {
+    if (meta.format === 'xAxis') return formatChartXAxisValue(value, resolvedTickFormat, resolvedTickValueMode);
     return formatValueByFormat(value, meta.format);
 }
 
@@ -498,6 +498,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         } catch (_) {}
     }, [chart?.dataSourceRefSelector, chart?.dataSourceSelector, chartContext, container?.id, context?.identity?.dataSourceRef]);
     const resolvedTickFormat = resolveMappedConfigValue(context, xAxis, "tickFormat", "windowForm");
+    const resolvedTickValueMode = resolveMappedConfigValue(context, xAxis, "valueMode", "windowForm");
     const { collection, loading, error } = useDataSourceState(chartContext);
     const chartMetrics = chartContext?.signals?.metrics?.value || {};
     const collectionOverride = Array.isArray(container?.collection) ? container.collection : null;
@@ -896,7 +897,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             {resolvedChartAnnotations.background}
             <XAxis
                 dataKey={xAxis?.dataKey || "name"}
-                tickFormatter={(val) => formatChartXAxisValue(val, resolvedTickFormat)}
+                tickFormatter={(val) => formatChartXAxisValue(val, resolvedTickFormat, resolvedTickValueMode)}
                 tick={axisTickStyle}
                 axisLine={false}
                 tickLine={false}
@@ -942,7 +943,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 />
             ) : null}
             <Tooltip
-                labelFormatter={(val) => formatChartXAxisValue(val, resolvedTickFormat)}
+                labelFormatter={(val) => formatChartXAxisValue(val, resolvedTickFormat, resolvedTickValueMode)}
                 formatter={(value, name, item) => {
                     const formatType = item?.payload?.__seriesFormats?.[item?.dataKey] || item?.payload?.__seriesAxes?.[item?.dataKey];
                     return [tooltipFormatterForFormat(formatType)(value), name];
@@ -1464,7 +1465,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                                 <tr key={row?.[xAxis?.dataKey] || rowIndex}>
                                     {tableColumnMeta.map((meta) => {
                                         const raw = readChartDataValue(row, meta.key) ?? '';
-                                        const formatted = formatChartTableCell(raw, meta, resolvedTickFormat);
+                                        const formatted = formatChartTableCell(raw, meta, resolvedTickFormat, resolvedTickValueMode);
                                         const text = String(formatted ?? '');
                                         const isLong = text.length > 120;
                                         return (

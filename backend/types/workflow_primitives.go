@@ -10,6 +10,7 @@ type MutationCommand struct {
 	HideLabel           bool                        `json:"hideLabel,omitempty" yaml:"hideLabel,omitempty"`
 	Intent              string                      `json:"intent,omitempty" yaml:"intent,omitempty"`
 	Confirm             string                      `json:"confirm,omitempty" yaml:"confirm,omitempty"`
+	ConfirmSelection    *SelectionConfirmation      `json:"confirmSelection,omitempty" yaml:"confirmSelection,omitempty"`
 	InvalidMessage      string                      `json:"invalidMessage,omitempty" yaml:"invalidMessage,omitempty"`
 	TimeoutMs           int                         `json:"timeoutMs,omitempty" yaml:"timeoutMs,omitempty"`
 	InvocationParameter string                      `json:"invocationParameter,omitempty" yaml:"invocationParameter,omitempty"`
@@ -23,6 +24,16 @@ type MutationCommand struct {
 	IndeterminateState  map[string]interface{}      `json:"indeterminateState,omitempty" yaml:"indeterminateState,omitempty"`
 	Reconcile           *ReconcileSpec              `json:"reconcile,omitempty" yaml:"reconcile,omitempty"`
 	Refresh             []RefreshSpec               `json:"refresh,omitempty" yaml:"refresh,omitempty"`
+}
+
+type SelectionConfirmation struct {
+	Action        string `json:"action,omitempty" yaml:"action,omitempty"`
+	SingularLabel string `json:"singularLabel,omitempty" yaml:"singularLabel,omitempty"`
+	PluralLabel   string `json:"pluralLabel,omitempty" yaml:"pluralLabel,omitempty"`
+	LabelField    string `json:"labelField,omitempty" yaml:"labelField,omitempty"`
+	IdentityField string `json:"identityField,omitempty" yaml:"identityField,omitempty"`
+	MaxItems      int    `json:"maxItems,omitempty" yaml:"maxItems,omitempty"`
+	Suffix        string `json:"suffix,omitempty" yaml:"suffix,omitempty"`
 }
 
 type ReconcileSpec struct {

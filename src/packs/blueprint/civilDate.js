@@ -10,6 +10,19 @@ function civilDateKey(value) {
     return `${year}-${month}-${day}`;
 }
 
+export function parseCivilDateInput(value) {
+    const match = typeof value === 'string' && value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return undefined;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const parsed = new Date(year, month - 1, day, 12);
+    if (parsed.getFullYear() !== year || parsed.getMonth() !== month - 1 || parsed.getDate() !== day) {
+        return new Date(Number.NaN);
+    }
+    return parsed;
+}
+
 export function normalizeDateInputValue(value, valueMode) {
     if (valueMode !== 'civil') return value;
     const key = civilDateKey(value);

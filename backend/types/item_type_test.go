@@ -234,6 +234,7 @@ chart:
     tickFormats:
       hour: MM/dd h a
       day: MM/dd
+    valueMode: civil
   yAxis:
     label: Spend
     format: currency
@@ -273,6 +274,9 @@ chart:
 	}
 	if c.Chart.XAxis.TickFormatSelector != "granularity" || c.Chart.XAxis.TickFormats["hour"] != "MM/dd h a" {
 		t.Fatalf("expected mapped xAxis tick formats to survive, got %#v", c.Chart.XAxis)
+	}
+	if c.Chart.XAxis.ValueMode != "civil" {
+		t.Fatalf("expected xAxis.valueMode to survive, got %#v", c.Chart.XAxis)
 	}
 	if c.Chart.Axes == nil || c.Chart.Axes.Right == nil || c.Chart.Axes.Right.Format != "compactNumber" {
 		t.Fatalf("expected axes.right.format to survive, got %#v", c.Chart.Axes)

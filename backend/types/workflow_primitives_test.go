@@ -18,6 +18,7 @@ mutationCommand:
   icon: floppy-disk
   hideLabel: true
   intent: primary
+  confirmSelection: {action: Remove, singularLabel: Creative, pluralLabel: Creatives, labelField: name, identityField: id, maxItems: 5, suffix: Inventory is retained.}
   invalidMessage: Complete required fields.
   timeoutMs: 45000
   invocationParameter: RequestId
@@ -145,6 +146,9 @@ scheduleEditor:
 	}
 	if container.MutationCommand.Icon != "floppy-disk" || !container.MutationCommand.HideLabel || container.MutationCommand.IndeterminateState["saveOutcome"] != "unknown" {
 		t.Fatal("command presentation/indeterminate state missing")
+	}
+	if confirmation := container.MutationCommand.ConfirmSelection; confirmation == nil || confirmation.LabelField != "name" || confirmation.IdentityField != "id" || confirmation.MaxItems != 5 {
+		t.Fatalf("selection confirmation contract missing: %#v", confirmation)
 	}
 	if container.MutationCommand.InvalidMessage == "" || container.MutationCommand.TimeoutMs != 45000 {
 		t.Fatal("mutation validation/timeout contract missing")

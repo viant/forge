@@ -16,13 +16,15 @@ export function resolveTableCellBadge(row = {}, badge = null, context = null) {
         ? badge.toneMap[mapKey]
         : undefined;
     const label = String(mappedLabel ?? badge.label ?? '').trim();
-    if (!label) return null;
+    const icon = String(badge.icon || '').trim();
+    if (!label && !icon) return null;
     return {
         label,
-        icon: String(badge.icon || '').trim(),
+        icon,
         tone: String(mappedTone || badge.tone || 'neutral').trim().toLowerCase(),
         className: String(badge.className || '').trim(),
-        tooltip: String(badge.tooltip || label).trim(),
+        tooltip: String(badge.tooltip || (badge.hideLabel ? actual : label) || label).trim(),
         replaceValue: badge.replaceValue === true,
+        hideLabel: badge.hideLabel === true,
     };
 }
