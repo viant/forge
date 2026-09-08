@@ -285,6 +285,10 @@ export function startUIBridgeHTTP(options = {}) {
   const snapshotIntervalMs = Math.max(200, options.snapshotIntervalMs || 1000);
   const snapshotStatusIntervalMs = Math.max(1000, options.snapshotStatusIntervalMs || 5000);
   const reconnectDelayMs = Math.max(500, options.reconnectDelayMs || 1000);
+  const pollWhenHidden = options.pollWhenHidden === true;
+  const pollCycleDelayMs = options.pollCycleDelayMs === 0
+    ? 0
+    : Math.max(0, Number(options.pollCycleDelayMs ?? reconnectDelayMs) || 0);
   const sessionHeader = options.sessionHeader || 'Mcp-Session-Id';
   const snapshotEvents = normalizeEventList(options.snapshotEvents, DEFAULT_SNAPSHOT_EVENTS);
   const authReadyEvents = normalizeEventList(options.authReadyEvents, DEFAULT_AUTH_READY_EVENTS);
@@ -429,7 +433,7 @@ export function startUIBridgeHTTP(options = {}) {
     };
   };
 
-  const isPollingOwner = () => visibilityState === 'visible';
+  const isPollingOwner = () => pollWhenHidden || visibilityState === 'visible';
 
   const bindOwnerListeners = () => {
     if (typeof document === 'undefined' || typeof window === 'undefined') return () => {};
@@ -582,10 +586,12 @@ export function startUIBridgeHTTP(options = {}) {
         if (isMissingSessionError(err)) {
           resetSessionAndRestart();
         }
-      } finally {
-        streamAbort = null;
+        await sleep(reconnectDelayMs);
       }
-      await sleep(reconnectDelayMs);
+      streamAbort = null;
+      if (pollCycleDelayMs > 0) {
+        await sleep(pollCycleDelayMs);
+      }
     }
   };
 

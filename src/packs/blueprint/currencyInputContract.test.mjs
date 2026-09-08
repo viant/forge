@@ -6,7 +6,8 @@ const currency = source.match(/registerWidget\(\s*'currency',[\s\S]*?registerEve
 
 assert.ok(currency, 'currency widget contract should exist');
 assert.match(currency, /\(\{ value = '', onValueChange, readOnly/);
-assert.match(currency, /onValueChange=\{\(v\) => onValueChange\?\.\(v\)\}/);
+assert.match(currency, /min=\{nullable \? undefined : min\}/, 'nullable currency must allow clearing before configured-value validation');
+assert.match(currency, /String\(valueAsString \|\| ''\)\.trim\(\) === '' \? null : valueAsNumber/);
 assert.match(currency, /registerEventAdapter\('currency',[\s\S]*onValueChange:[\s\S]*adapter\.set\(v\)/);
 assert.doesNotMatch(currency, /\(\{ value = '', onChange, readOnly/);
 

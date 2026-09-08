@@ -82,4 +82,18 @@ assert.deepEqual(withFetchedPageInfo({pageCount: 1, totalCount: 0}, 1, true, {
     hasMore: false,
 });
 
+assert.deepEqual(withFetchedPageInfo({pageCount: 1, totalCount: 100}, 1, true, {
+    returnedCount: 100,
+    pageSize: 100,
+    openEnded: true,
+}), {
+    currentPage: 1,
+    page: 1,
+    returnedCount: 100,
+    pageSize: 100,
+    hasPrevious: false,
+    hasNext: true,
+    hasMore: true,
+});
+
 console.log("dataSourceFetchState ✓ stabilizes filter snapshots and paging metadata");

@@ -35,7 +35,7 @@ import { mergeWindowFormValues } from '../hooks/dataSource.js';
 import {injectActions} from '../actions';
 import { resolveMetadataForTarget } from '../runtime/metadataResolver.js';
 import {compilePermittedView, normalizeAuthorizationSnapshot} from '../runtime/permittedView.js';
-import { resolveParameters } from '../hooks/parameters.js';
+import { applyDataSourceParameterCodecs, resolveParameters } from '../hooks/parameters.js';
 import { resolveSelector } from '../utils/selector.js';
 import { getLogger } from '../utils/logger.js';
 import { runWindowLifecycleHandlers } from './windowLifecycle.js';
@@ -89,6 +89,13 @@ export function formatWindowMetadataError(error) {
         return 'Authentication required. Please sign in to continue.';
     }
     return `Failed to load window: ${error.message || 'Unknown error'}`;
+}
+
+export function resolveWindowMetadataDisplayState({loading, signalsReady, metadata, fetchError}) {
+    if (fetchError && !signalsReady) return 'error';
+    if (loading || !signalsReady) return 'loading';
+    if (!metadata) return 'empty';
+    return 'ready';
 }
 
 export async function applyWindowPermissionMetadata(completeMetadata, {
@@ -159,6 +166,11 @@ function normalizeTargetKey(targetContext = {}) {
 
 export function resolveWindowMetadataForTarget(metadata, targetContext = {}) {
     return resolveMetadataForTarget(metadata, targetContext) || metadata;
+}
+
+export function compilePermissionAppliedMetadata(metadata, targetContext = {}, parameters = {}) {
+    const targetResolved = resolveWindowMetadataForTarget(metadata, targetContext);
+    return compileWindowAuthorizationMetadata(targetResolved, parameters);
 }
 
 export function resolveWindowRootContainer(content = null, parameters = {}) {
@@ -756,10 +768,10 @@ function WindowContentInner({window, metadata, services}) {
             const resolvedMetaParams = resolvedMetaParamsRaw && typeof resolvedMetaParamsRaw === 'object' && resolvedMetaParamsRaw.inbound
                 ? resolvedMetaParamsRaw.inbound
                 : (resolvedMetaParamsRaw || {});
-            let nextParams = {
+            let nextParams = applyDataSourceParameterCodecs({
                 ...(resolvedMetaParams || {}),
                 ...(explicitWindowParams || {}),
-            };
+            }, dataSourceDefs?.[ref]?.parameters);
             if (shouldPreserveMissingResolvedParameters(dataSourceDef, prevParams, resolvedMetaParams, explicitWindowParams)) {
                 nextParams = { ...prevParams };
             }
@@ -1070,7 +1082,7 @@ export default function WindowContent({window, isInTab = false}) {
                     targetContext,
                 });
                 if (cancelled) return;
-                const resolvedMetadata = compileWindowAuthorizationMetadata(permissionAppliedMetadata, window?.parameters || {});
+                const resolvedMetadata = compilePermissionAppliedMetadata(permissionAppliedMetadata, targetContext, window?.parameters || {});
                 if (!resolvedMetadata) {
                     throw Object.assign(new Error('Resource not found or access denied'), {status: 403});
                 }
@@ -1110,7 +1122,28 @@ export default function WindowContent({window, isInTab = false}) {
 
     const metadata = metadataSignalHandle?.peek?.();
 
-    if (loading || !signalsReady) {
+    const displayState = resolveWindowMetadataDisplayState({loading, signalsReady, metadata, fetchError});
+
+    if (displayState === 'error') {
+        return (
+            <div
+                role="alert"
+                style={{
+                    margin: 16,
+                    padding: '14px 16px',
+                    border: '1px solid #efc7c2',
+                    borderRadius: 8,
+                    background: '#fff7f6',
+                    color: '#7a271a',
+                    lineHeight: 1.4,
+                }}
+            >
+                {formatWindowMetadataError(fetchError)}
+            </div>
+        );
+    }
+
+    if (displayState === 'loading') {
         // Soft loading placeholder for window content
         return (
             <div style={{ padding: 16, height: '100%', minHeight: 0 }}>
@@ -1120,7 +1153,7 @@ export default function WindowContent({window, isInTab = false}) {
         );
     }
 
-    if (!metadata) {
+    if (displayState === 'empty') {
         return (
             <div style={{ padding: 16, height: '100%', minHeight: 0, color: '#888' }}>
                 {fetchError

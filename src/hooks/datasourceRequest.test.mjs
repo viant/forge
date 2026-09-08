@@ -64,12 +64,14 @@ assert.deepEqual(
     inputParameters: {AdvertiserId: [85141]},
     filter: {},
     cache: {bypassCache: true},
+    invocationId: 'cmd-123',
   }),
   {
     inputs: {AdvertiserId: [85141]},
     cache: {bypassCache: true},
+    invocationId: 'cmd-123',
   },
 );
-console.log('buildDatasourceFetchPayload ✓ carries one-shot cache bypass hints');
+console.log('buildDatasourceFetchPayload ✓ carries cache hints and invocation correlation');
 
 console.log('\nDATASOURCE REQUEST TESTS PASSED');

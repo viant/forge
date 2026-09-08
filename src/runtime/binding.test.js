@@ -20,6 +20,33 @@ const inputAdapter = resolveStateAdapter('input')(
   { dataField: 'nested.actual' },
 );
 assert.equal(inputAdapter.get(), 'reactive');
+inputAdapter.set('edited');
+assert.equal(inputAdapter.get(), 'edited');
+
+const hydratedInputAdapter = resolveStateAdapter('input')(
+  {
+    signals: {
+      input: signalState({}, { parameters: { startDate: '2031-12-02' } }),
+    },
+  },
+  { dataField: 'parameters.startDate' },
+);
+assert.equal(hydratedInputAdapter.get(), '2031-12-02');
+
+const inputSignal = {
+  value: { parameters: { Name: 'before', Id: 7 } },
+  peek() {
+    return this.value;
+  },
+};
+const nestedInputAdapter = resolveStateAdapter('input')(
+  { signals: { input: inputSignal } },
+  { dataField: 'parameters.Name' },
+);
+nestedInputAdapter.set('after');
+assert.equal(inputSignal.value.parameters.Name, 'after');
+assert.equal(inputSignal.value.parameters.Id, 7);
+assert.equal(inputSignal.value['parameters.Name'], undefined);
 
 const selectionAdapter = resolveStateAdapter('selection')(
   {

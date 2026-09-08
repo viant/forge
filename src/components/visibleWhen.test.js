@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import {isContainerVisible, resolveChildContext} from './visibleWhen.js';
+import {evaluatePlainVisibleWhen, isContainerVisible, resolveChildContext} from './visibleWhen.js';
 
 const metricsContext = (metrics, overrides = {}) => ({
     identity: {
@@ -166,5 +166,33 @@ assert.equal(isContainerVisible({
     id: 'invalidNumericValue',
     visibleWhen: {source: 'metrics', field: 'windowHours', gt: 0},
 }, metricsContext({windowHours: ''})), false);
+
+assert.equal(evaluatePlainVisibleWhen(
+    {source: 'row', field: 'implementation', equals: 'available'},
+    metricsContext({}),
+    {implementation: 'available'},
+), true);
+assert.equal(evaluatePlainVisibleWhen(
+    {source: 'row', field: 'implementation', equals: 'available'},
+    metricsContext({}),
+    {implementation: 'unavailable'},
+), false);
+
+const dirtyFormContext = metricsContext({}, {
+    signals: {
+        formStatus: {
+            peek: () => ({dirty: true}),
+            value: {dirty: true},
+        },
+    },
+});
+assert.equal(evaluatePlainVisibleWhen(
+    {source: 'formStatus', field: 'dirty', equals: true},
+    dirtyFormContext,
+), true, 'generic mutation predicates can gate on the scoped datasource dirty state');
+assert.equal(evaluatePlainVisibleWhen(
+    {source: 'formStatus', field: 'dirty', equals: false},
+    dirtyFormContext,
+), false);
 
 console.log('visibleWhen ✓');

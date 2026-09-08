@@ -4,9 +4,13 @@ import {getLogger} from "../utils/logger.js";
 import {useSignals} from '@preact/signals-react/runtime';
 import { extractData, isDeferredCacheHitEnvelope } from "./dataSourceExtract.js";
 import { resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, withFetchedPageInfo } from "./dataSourceFetchState.js";
-import {reconcileMultiSelection} from "./dataSourceSelection.js";
+import {reconcileMultiSelection, reconcileSingleSelection} from "./dataSourceSelection.js";
 import {applyFetchTransform} from "./dataSourceTransform.js";
 import {hasResolvedDependencies} from "./dataSourceDependencies.js";
+import {bindingFinalizationAction, isCurrentBindingGeneration} from "./primitives/bindingGeneration.js";
+import {resourceModelRefForDataSource, unmarshalResourceCollection} from "./primitives/resourceModel.js";
+import {settleDataSourceRequest} from './dataSourceRequestLifecycle.js';
+import {shouldDispatchSelectionEvent} from './selectionEventModel.js';
 import {
     findSelectionSignal,
 
@@ -78,6 +82,7 @@ export default function DataSource({context}) {
     const {input, collection, selection, collectionInfo, metrics, form, control} = signals
     const {getUniqueKeyValue, setSelected, setLoading, setError, setInactive} = handlers.dataSource
     const events = dataSourceEvents(context, dataSource);
+    const resourceModelRef = resourceModelRefForDataSource(context, dataSource.resourceModelRef);
     const selectionMode = dataSource.selectionMode || 'single';
     // Ensure the upstream selection signal is always initialised with an
     // object so that downstream code can safely access `.selected` without
@@ -91,6 +96,7 @@ export default function DataSource({context}) {
             if (upstream.value.selected) {
                 let {records} = extractData(selectors, paging, upstream.value.selected);
 
+                records = unmarshalResourceCollection(records, context, resourceModelRef);
                 records = applyFetchTransform(events, records);
                 const currentCollection = Array.isArray(collection.peek()) ? collection.peek() : [];
                 const currentSelection = selection.peek() || {};
@@ -257,15 +263,7 @@ export default function DataSource({context}) {
             prevSelectionKey.current = key;
 
             // Only fire when there is a meaningful selection
-            const hasMeaningfulSelection = (() => {
-                if (selectionMode === 'multi') {
-                    return Array.isArray(sel.selection) && sel.selection.length > 0;
-                }
-                if (dataSource.selfReference) {
-                    return !!(sel && sel.selected && Array.isArray(sel.nodePath) && sel.nodePath.length > 0);
-                }
-                return !!(sel && sel.selected && (sel.rowIndex ?? -1) >= 0);
-            })();
+            const hasMeaningfulSelection = shouldDispatchSelectionEvent(selectionMode, sel, {selfReference: dataSource.selfReference});
             if (!hasMeaningfulSelection) return;
 
             // Execute custom selection handlers if present
@@ -287,6 +285,7 @@ export default function DataSource({context}) {
             ...input.peek(),
             fetch: false,
             refresh: false,
+            invocationId: null,
         };
     }
 
@@ -294,7 +293,7 @@ export default function DataSource({context}) {
     async function refreshRecords() {
         const inputVal = input.value || {};
         let {refreshFilter, parameters} = inputVal || {};
-        const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, refreshFilter)
+        const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, refreshFilter, dataSource.requiredAnyParameters)
         if (!hasDeps) {
             const preservedParameters = lastResolvedParametersRef.current || {};
             if (dataSource?.preserveParametersOnMissingDependencies === true && Object.keys(preservedParameters).length > 0) {
@@ -331,6 +330,7 @@ export default function DataSource({context}) {
 
             let {records} = extractData(selectors, paging, payload);
 
+            records = unmarshalResourceCollection(records, context, resourceModelRef);
             records = applyFetchTransform(events, records);
 
             if (records.length > 0) {
@@ -419,8 +419,10 @@ export default function DataSource({context}) {
         } catch (_) {
         }
         const inputVal = input.value || {};
-        let {page, filter = {}, parameters, sort = [], cache = null} = inputVal || {};
-        const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, filter);
+        let {page, filter = {}, parameters, sort = [], cache = null, invocationId = null, bindingGeneration = null} = inputVal || {};
+        const requestId = bindingGeneration || invocationId;
+        const requestDataSourceId = context?.identity?.dataSourceId;
+        const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, filter, dataSource.requiredAnyParameters);
         if (!hasDeps) {
             const preservedParameters = lastResolvedParametersRef.current || {};
             if (dataSource?.preserveParametersOnMissingDependencies === true && Object.keys(preservedParameters).length > 0) {
@@ -435,6 +437,7 @@ export default function DataSource({context}) {
                 };
                 setInactive(false);
             } else {
+                settleDataSourceRequest(requestDataSourceId, requestId, new Error('Datasource dependencies are not resolved.'));
                 setSelected({selected: null, rowIndex: -1});
                 collection.value = [];
                 flagReadDone();
@@ -485,8 +488,17 @@ export default function DataSource({context}) {
                 page,
                 inputParameters: {...(parameters || {}), ...(sort?.length ? {sort} : {})},
                 cache,
+                invocationId,
             });
-            if (!mountedRef.current) return;
+            if (!mountedRef.current) {
+                settleDataSourceRequest(requestDataSourceId, requestId, new Error('Datasource unmounted before request completion.'));
+                return;
+            }
+            if (!isCurrentBindingGeneration(input.peek()?.bindingGeneration, bindingGeneration)) {
+                settleDataSourceRequest(requestDataSourceId, requestId, null, payload);
+                try { log.debug('[doFetchRecords] ignored stale binding generation', {ds: context?.identity?.dataSourceRef, bindingGeneration}); } catch (_) {}
+                return;
+            }
             try {
                 log.debug('[doFetchRecords] response', {
                     ds: context?.identity?.dataSourceRef,
@@ -506,6 +518,7 @@ export default function DataSource({context}) {
                     stats = metrics.peek() || stats;
                 }
             }
+            records = unmarshalResourceCollection(records, context, resourceModelRef);
             if (events.onFetch.isDefined()) {
                 try {
                     log.debug('[doFetchRecords] onFetch:before', {
@@ -534,12 +547,21 @@ export default function DataSource({context}) {
             collectionInfo.value = withFetchedPageInfo(info, page, pagingEnabled, {
                 returnedCount: records.length,
                 pageSize: paging?.size,
+                openEnded: paging?.openEnded === true,
             });
             metrics.value = stats;
             control.value = { ...control.peek(), loaded: true, error: null, stale: false };
             if (selectionMode === 'multi') {
                 const reconciledSelection = reconcileMultiSelection(currentSelection, records, getUniqueKeyValue);
                 if (stableSnapshotSignature(currentSelection?.selection) !== stableSnapshotSignature(reconciledSelection.selection)) {
+                    setSelected(reconciledSelection);
+                }
+            } else if (selectionMode === 'single' && currentSelection?.selected) {
+                const reconciledSelection = reconcileSingleSelection(currentSelection, records, getUniqueKeyValue);
+                if (
+                    Number(currentSelection?.rowIndex ?? -1) !== Number(reconciledSelection.rowIndex)
+                    || stableSnapshotSignature(currentSelection?.selected) !== stableSnapshotSignature(reconciledSelection.selected)
+                ) {
                     setSelected(reconciledSelection);
                 }
             }
@@ -590,8 +612,17 @@ export default function DataSource({context}) {
                 }
             } catch (_) {
             }
+            settleDataSourceRequest(requestDataSourceId, requestId, null, payload);
         } catch (err) {
-            if (!mountedRef.current) return;
+            if (!mountedRef.current) {
+                settleDataSourceRequest(requestDataSourceId, requestId, err);
+                return;
+            }
+            settleDataSourceRequest(requestDataSourceId, requestId, err);
+            if (!isCurrentBindingGeneration(input.peek()?.bindingGeneration, bindingGeneration)) {
+                try { log.debug('[doFetchRecords] ignored stale binding error', {ds: context?.identity?.dataSourceRef, bindingGeneration}); } catch (_) {}
+                return;
+            }
             log.warn('doFetchRecords error', err)
             setError(err);
 
@@ -604,9 +635,20 @@ export default function DataSource({context}) {
             } catch (_) {
             }
         } finally {
-            if (mountedRef.current) setLoading(false);
-            if (cache && mountedRef.current) {
+            const bindingIsCurrent = isCurrentBindingGeneration(input.peek()?.bindingGeneration, bindingGeneration);
+            const nextInput = input.peek() || {};
+            const finalization = bindingFinalizationAction(bindingIsCurrent, !!(nextInput.fetch || nextInput.refresh));
+            if (mountedRef.current && (finalization === 'complete' || finalization === 'close')) setLoading(false);
+            if (cache && mountedRef.current && finalization === 'complete') {
                 input.value = {...input.peek(), cache: null};
+            }
+            if (mountedRef.current && finalization === 'continue') {
+                input.value = {...nextInput, fetch: false, refresh: false};
+                queueMicrotask(() => {
+                    if (!mountedRef.current) return;
+                    if (dataSource.dataSourceRef) handleUpstream();
+                    else void doFetchRecords();
+                });
             }
         }
     }

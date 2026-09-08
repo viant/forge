@@ -179,6 +179,21 @@ assert.equal(
   true,
   "Hosted execute-on-open must exclusively own automatic dispatch while generic surface auto-run remains non-hosted.",
 );
+
+assert.equal(
+  !source.includes("requestTransform:")
+    && source.includes("const runtimePreviewCanonicalRequest = useMemo(")
+    && source.includes("applyReportBuilderRequestHook(\n                builderContext,\n                displayConfig,\n                state,\n                runtimePreviewCanonicalRequest,")
+    && source.includes("applyReportBuilderRequestHook(builderContext, displayConfig, state, canonicalRequest)"),
+  true,
+  "Durable report artifacts retain canonical requests while provider hooks run only at primary and published datasource dispatch boundaries.",
+);
+
+assert.equal(
+  !source.includes("omitConversationId: true"),
+  true,
+  "Auth-scoped runtime and chart datasource refreshes must retain the active conversation context.",
+);
 assert.equal(
   source.includes("const hostedReportExecutionIdentity = resolveHostedReportExecutionIdentity(container, state)")
     && source.includes("const executeIdentity = hostedReportExecutionIdentity")
@@ -389,14 +404,16 @@ assert.equal(
   "Manual null-conversation adoption remains reachable only for the exact selected run in the current trusted conversation.",
 );
 assert.equal(
-  source.includes("reportRunId: nextRun.durable ? nextRun.reportRunId : \"\"")
-    && source.includes("revision: nextRun.durable ? nextRun.revision : null")
-    && source.includes("reportRunId: settled.durable ? settled.reportRunId : \"\"")
-    && source.includes("status: settled.durable ? settled.status : status")
+  source.includes("canEmitDurableReportBuilderRunEvent(nextRun)")
+    && source.includes("canEmitDurableReportBuilderRunEvent(settled)")
+    && source.includes("canEmitDurableReportBuilderRunEvent(supersededRun)")
+    && source.includes("canEmitDurableReportBuilderRunEvent(failedRun)")
+    && source.includes("reportRunId: settled.reportRunId")
+    && source.includes("status: settled.status")
     && source.includes("}, settled.invocation?.metadata);")
     && source.includes("}, failedRun.invocation?.metadata);"),
   true,
-  "Durable terminal events should add authoritative identity and retain the run-captured metadata.",
+  "Run lifecycle events require a durable server identity and retain the run-captured metadata.",
 );
 
 const draftConfigStart = exportConfigsSource.indexOf("draft: {");

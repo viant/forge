@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -71,6 +72,34 @@ table:
 	}
 	if string(payload) != `{"id":"startDate","name":"Start","format":"date","visible":false,"tooltip":""}` {
 		t.Fatalf("unexpected column JSON: %s", payload)
+	}
+}
+
+func TestTableColumnRetainsRowSelectionGate(t *testing.T) {
+	source := []byte(`
+id: flights
+table:
+  columns:
+    - id: __select__
+      name: ''
+      type: checkbox
+      multiSelect: true
+      selectionDisabledWhen: {source: row, field: statusLabel, in: [Completed, Locked]}
+`)
+	container := &Container{}
+	if err := yaml.Unmarshal(source, container); err != nil {
+		t.Fatal(err)
+	}
+	column := container.Table.Columns[0]
+	if column.SelectionDisabledWhen == nil || column.SelectionDisabledWhen["source"] != "row" || column.SelectionDisabledWhen["field"] != "statusLabel" {
+		t.Fatalf("row selection gate was not retained: %#v", column)
+	}
+	payload, err := json.Marshal(column)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(payload), `"selectionDisabledWhen":{"field":"statusLabel","in":["Completed","Locked"],"source":"row"}`) {
+		t.Fatalf("row selection gate was not emitted: %s", payload)
 	}
 }
 
@@ -147,13 +176,16 @@ title: Draft
 content: {id: body}
 actions:
   - {id: cancel, label: Cancel, close: true}
-  - {id: create, label: Create, disabled: true}
+  - id: create
+    label: Create
+    disabled: true
+    mutationCommand: {commandId: create-record, dataSourceRef: record_patch}
 `)
 	dialog := &Dialog{}
 	if err := yaml.Unmarshal(source, dialog); err != nil {
 		t.Fatal(err)
 	}
-	if len(dialog.Actions) != 2 || !dialog.Actions[0].Close || !dialog.Actions[1].Disabled {
+	if len(dialog.Actions) != 2 || !dialog.Actions[0].Close || !dialog.Actions[1].Disabled || dialog.Actions[1].MutationCommand == nil || dialog.Actions[1].MutationCommand.DataSourceRef != "record_patch" {
 		t.Fatalf("dialog action state was not retained: %#v", dialog.Actions)
 	}
 }

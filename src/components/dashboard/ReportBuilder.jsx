@@ -461,6 +461,7 @@ import {
 import {
     buildReportBuilderExportEventDetail,
     buildReportBuilderRunEvent,
+    canEmitDurableReportBuilderRunEvent,
     emitReportBuilderUIEvent,
     resolveReportBuilderEventHandler,
 } from "./reportBuilderUIEvents.js";
@@ -728,6 +729,7 @@ import {
     resolveReportBuilderVariant,
     resolveReportBuilderVariantStateKey,
 } from "./reportBuilderVariantModel.js";
+import { applyReportBuilderRuntimeFieldCatalog } from "./reportBuilderRuntimeFieldCatalog.js";
 
 function getBuilderConfig(container = {}) {
     return container.dashboard?.reportBuilder || container.reportBuilder || container.builder || {};
@@ -1842,7 +1844,10 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             reportBuilder: activeBuilderVariant.reportBuilder,
         },
     }), [activeBuilderVariant.builderRef, activeBuilderVariant.dataSourceRef, activeBuilderVariant.reportBuilder, sourceContainer]);
-    const baseConfig = getBuilderConfig(container);
+    const baseConfig = useMemo(
+        () => applyReportBuilderRuntimeFieldCatalog(getBuilderConfig(container), rootWindowFormValue),
+        [container, rootWindowFormValue],
+    );
     const builderContext = container?.dataSourceRef && typeof context?.Context === "function"
         ? context.Context(container.dataSourceRef)
         : context;
@@ -8047,7 +8052,8 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                             code: "browser_run_superseded",
                             message: "A newer builder request superseded this run before terminal settlement.",
                         });
-                        if (supersededRun.status === "failed") {
+                        if (supersededRun.status === "failed"
+                            && canEmitDurableReportBuilderRunEvent(supersededRun)) {
                             emitRunLifecycleEvent("report.run", {
                                 runId: supersededRun.runId,
                                 reportRunId: supersededRun.reportRunId,
@@ -8158,7 +8164,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                 });
                 setCompletedDurableRunSignal(null);
                 completedRunEventKeyRef.current = "";
-                if (!retainedDisabledLegacyRun) {
+                if (!retainedDisabledLegacyRun && canEmitDurableReportBuilderRunEvent(nextRun)) {
                     emitRunLifecycleEvent("report.run_start", {
                         runId: nextRun.runId,
                         reportRunId: nextRun.durable ? nextRun.reportRunId : "",
@@ -8446,13 +8452,15 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                     ),
                 } : null);
                 completedRunEventKeyRef.current = eventKey;
-                emitRunLifecycleEvent("report.run", {
-                    runId: settled.runId,
-                    reportRunId: settled.durable ? settled.reportRunId : "",
-                    revision: settled.durable ? settled.revision : null,
-                    status: settled.durable ? settled.status : status,
-                    rowCount,
-                }, settled.invocation?.metadata);
+                if (canEmitDurableReportBuilderRunEvent(settled)) {
+                    emitRunLifecycleEvent("report.run", {
+                        runId: settled.runId,
+                        reportRunId: settled.reportRunId,
+                        revision: settled.revision,
+                        status: settled.status,
+                        rowCount,
+                    }, settled.invocation?.metadata);
+                }
                 return settled;
             } catch (persistenceError) {
                 if (activeRun.durable && status !== "failed" && isStillCurrent()) {
@@ -8462,13 +8470,15 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                             activeRunEventRef.current = failedRun;
                             setCompletedDurableRunSignal(null);
                             completedRunEventKeyRef.current = `${activeRun.invocation.runId}:${settlementFingerprint}:failed`;
-                            emitRunLifecycleEvent("report.run", {
-                                runId: failedRun.runId,
-                                reportRunId: failedRun.reportRunId,
-                                revision: failedRun.revision,
-                                status: failedRun.status,
-                                rowCount: 0,
-                            }, failedRun.invocation?.metadata);
+                            if (canEmitDurableReportBuilderRunEvent(failedRun)) {
+                                emitRunLifecycleEvent("report.run", {
+                                    runId: failedRun.runId,
+                                    reportRunId: failedRun.reportRunId,
+                                    revision: failedRun.revision,
+                                    status: failedRun.status,
+                                    rowCount: 0,
+                                }, failedRun.invocation?.metadata);
+                            }
                         }
                     } catch (_) {
                         // Preserve the original persistence failure for the UI.
@@ -9559,15 +9569,8 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             semanticSummary: semanticRuntimeSummary,
             binding: semanticBinding,
             semanticModel: semanticModelState.model,
-            requestTransform: ({ request, state: runtimeState }) => applyReportBuilderRequestHook(
-                builderContext,
-                displayConfig,
-                runtimeState,
-                request,
-            ),
         });
     }, [
-        builderContext,
         container,
         displayConfig,
         runtimePreviewDrillTransitions,
@@ -9662,15 +9665,8 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             binding: semanticBinding,
             semanticModel: semanticModelState.model,
             includePrimaryBlocks: false,
-            requestTransform: ({ request, state: runtimeState }) => applyReportBuilderRequestHook(
-                builderContext,
-                displayConfig,
-                runtimeState,
-                request,
-            ),
         });
     }, [
-        builderContext,
         compiledRuntimePreviewModel,
         container,
         displayConfig,
@@ -9700,16 +9696,26 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             : null),
         [runtimePreviewFetchReportSpec],
     );
-    const runtimePreviewRequest = useMemo(
+    const runtimePreviewCanonicalRequest = useMemo(
         () => (runtimePreviewPrimaryDataset?.request && typeof runtimePreviewPrimaryDataset.request === "object"
             ? runtimePreviewPrimaryDataset.request
             : null),
         [runtimePreviewPrimaryDataset],
     );
+    const runtimePreviewRequest = useMemo(
+        () => (runtimePreviewCanonicalRequest
+            ? applyReportBuilderRequestHook(
+                builderContext,
+                displayConfig,
+                state,
+                runtimePreviewCanonicalRequest,
+            )
+            : null),
+        [builderContext, displayConfig, runtimePreviewCanonicalRequest, state],
+    );
     const runtimePreviewPrimaryFetcher = useMemo(
         () => resolveReportBuilderDatasetPreviewFetcher(builderContext, runtimePreviewPrimaryDataset, {
             preferDataSourceRoute: true,
-            omitConversationId: true,
         }),
         [builderContext, runtimePreviewPrimaryDataset],
     );
@@ -9783,24 +9789,29 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                 const datasetId = normalizeString(dataset?.id);
                 return datasetId && !staticDatasetIds.has(datasetId);
             })
-            .map((dataset) => ({
-                id: normalizeString(dataset?.id),
-                dataSourceRef: normalizeString(dataset?.dataSourceRef),
-                request: dataset?.request && typeof dataset.request === "object" && !Array.isArray(dataset.request)
+            .map((dataset) => {
+                const canonicalRequest = dataset?.request && typeof dataset.request === "object" && !Array.isArray(dataset.request)
                     ? cloneReportBuilderValue(dataset.request)
-                    : null,
-                resultContract: dataset?.resultContract && typeof dataset.resultContract === "object" && !Array.isArray(dataset.resultContract)
-                    ? cloneReportBuilderValue(dataset.resultContract)
-                    : null,
-                label: normalizeString(
-                    authoredDatasetOptionIndex.get(normalizeString(dataset?.id))?.label
-                    || authoredDatasetOptionIndex.get(normalizeString(dataset?.dataSourceRef))?.label
-                    || dataset?.id
-                    || dataset?.dataSourceRef,
-                ),
-            }))
+                    : null;
+                return {
+                    id: normalizeString(dataset?.id),
+                    dataSourceRef: normalizeString(dataset?.dataSourceRef),
+                    request: canonicalRequest
+                        ? applyReportBuilderRequestHook(builderContext, displayConfig, state, canonicalRequest)
+                        : null,
+                    resultContract: dataset?.resultContract && typeof dataset.resultContract === "object" && !Array.isArray(dataset.resultContract)
+                        ? cloneReportBuilderValue(dataset.resultContract)
+                        : null,
+                    label: normalizeString(
+                        authoredDatasetOptionIndex.get(normalizeString(dataset?.id))?.label
+                        || authoredDatasetOptionIndex.get(normalizeString(dataset?.dataSourceRef))?.label
+                        || dataset?.id
+                        || dataset?.dataSourceRef,
+                    ),
+                };
+            })
             .filter((dataset) => dataset.id && dataset.dataSourceRef && dataset.request);
-    }, [authoredDatasetOptionIndex, authoredRuntimePreviewModel?.reportSpec?.datasets, authoredRuntimePreviewModel?.staticDatasetPayloads]);
+    }, [authoredDatasetOptionIndex, authoredRuntimePreviewModel?.reportSpec?.datasets, authoredRuntimePreviewModel?.staticDatasetPayloads, builderContext, displayConfig, state]);
     const runtimePreviewPublishedDatasetsRequestKey = useMemo(() => JSON.stringify({
         previewRequestKey: runtimePreviewRequestKey,
         datasets: runtimePreviewPublishedDatasets,
@@ -9818,7 +9829,6 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         requestKey: runtimePreviewPublishedDatasetsRequestKey,
         fetcherOptions: {
             preferDataSourceRoute: true,
-            omitConversationId: true,
         },
     });
     const runtimePreviewRowsSource = resolveReportBuilderRuntimePreviewRowsSource({

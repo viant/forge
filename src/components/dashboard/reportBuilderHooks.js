@@ -121,13 +121,20 @@ export function prefillSignature(windowForm = {}) {
 
 export function reportDefinitionSignature(windowForm = {}) {
     const reportDefinition = windowForm?.reportDefinition;
-    if (!reportDefinition || typeof reportDefinition !== "object" || Array.isArray(reportDefinition)) {
+    const hasReportDefinition = !!reportDefinition && typeof reportDefinition === "object" && !Array.isArray(reportDefinition);
+    const runtimeFieldCatalog = windowForm?.FieldCatalog;
+    const hasRuntimeFieldCatalog = !!runtimeFieldCatalog && typeof runtimeFieldCatalog === "object" && !Array.isArray(runtimeFieldCatalog);
+    if (!hasReportDefinition && !hasRuntimeFieldCatalog) {
         return "";
     }
     const revision = Number(windowForm?.__forge?.reportDefinitionRevision || 0);
     return JSON.stringify({
         revision: Number.isFinite(revision) ? revision : 0,
-        reportDefinition,
+        ...(hasReportDefinition ? {reportDefinition} : {}),
+        ...(hasRuntimeFieldCatalog ? {
+            runtimeFieldCatalog,
+            reportName: String(windowForm?.ReportName || "").trim(),
+        } : {}),
     });
 }
 

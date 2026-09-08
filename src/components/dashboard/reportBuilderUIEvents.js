@@ -148,6 +148,15 @@ export function buildReportBuilderRunEvent({
     };
 }
 
+export function canEmitDurableReportBuilderRunEvent(run = null) {
+    const reportRunId = normalizeString(run?.reportRunId);
+    const revision = Number(run?.revision);
+    return run?.durable === true
+        && !!reportRunId
+        && Number.isInteger(revision)
+        && revision > 0;
+}
+
 export async function emitReportBuilderUIEvent(handler = null, event = {}) {
     if (typeof handler?.emit !== "function") {
         return false;

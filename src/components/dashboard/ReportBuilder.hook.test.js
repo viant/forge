@@ -30,6 +30,10 @@ assert.notEqual(
 );
 assert.equal(reportDefinitionSignature({}), "");
 assert.notEqual(
+    reportDefinitionSignature({FieldCatalog: {columns: [{name: "channel"}]}, ReportName: "First"}),
+    reportDefinitionSignature({FieldCatalog: {columns: [{name: "channel"}]}, ReportName: "Second"}),
+);
+assert.notEqual(
     reportDefinitionSignature({
         reportDefinition: { documentPatch: { title: "First" } },
         __forge: { reportDefinitionRevision: 1 },

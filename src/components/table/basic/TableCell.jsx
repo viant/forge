@@ -7,8 +7,9 @@ import { resolveLinkTarget } from "../../../utils/linkTarget.js";
 import { evaluatePlainVisibleWhen } from "../../visibleWhen.js";
 import {resolveTableCellBadge} from './tableCellBadge.js';
 import {resolveTableStackedValue} from './tableStackedValue.js';
-import {resolveButtonIcon} from './buttonIcon.js';
+import {resolveButtonIcon, resolveButtonPressed} from './buttonIcon.js';
 import {isolateButtonCellProps} from './buttonCellEvents.js';
+import {applyDynamicCellProperties} from './cellProperties.js';
 
 const defaultCellProperties = (item) => {
     const properties = {};
@@ -66,7 +67,10 @@ const TableCell = ({
     const filteredProps = Object.fromEntries(
         Object.entries(cellProperties || {}).filter(([k]) => !/Expr$/.test(k))
     );
-    const cellProps = {...defaultCellProperties(col), ...filteredProps, ...events};
+    const cellProps = applyDynamicCellProperties(
+        {...defaultCellProperties(col), ...filteredProps, ...events},
+        stateEvents,
+    );
     // Allow dynamic readonly/disabled
     if (stateEvents.onReadonly) {
         try {
@@ -124,7 +128,11 @@ const TableCell = ({
             />
             break;
         case "button":
-            cellContent = <Button {...isolateButtonCellProps(cellProps)} icon={resolveButtonIcon(col, value, cellProps.icon)} />;
+            cellContent = <Button
+                {...isolateButtonCellProps(cellProps)}
+                icon={resolveButtonIcon(col, value, cellProps.icon)}
+                aria-pressed={resolveButtonPressed(col, value)}
+            />;
             break;
         case "progress":
             cellContent = (
@@ -138,6 +146,7 @@ const TableCell = ({
                         type="checkbox"
                         checked={isSelected({...cellSelection})}
                         disabled={rowSelectionDisabled}
+                        aria-label={rowSelectionDisabled ? 'Row selection unavailable' : 'Select row'}
                         onChange={(event) => {
                             event.stopPropagation();
                             if (rowSelectionDisabled) return;
@@ -165,7 +174,7 @@ const TableCell = ({
                 cellContent = displayedText;
                 break;
             }
-            if (col?.link?.visibleWhen && !evaluatePlainVisibleWhen(col.link.visibleWhen, context)) {
+            if (col?.link?.visibleWhen && !evaluatePlainVisibleWhen(col.link.visibleWhen, context, row)) {
                 cellContent = displayedText;
                 break;
             }

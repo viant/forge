@@ -7,10 +7,12 @@ const styles = readFileSync(new URL('./SectionTabRail.css', import.meta.url), 'u
 assert.match(source, /aria-controls=\{panelId \|\| undefined\}/);
 assert.match(source, /tabIndex=\{selected[\s\S]*?0\s*:\s*-1\}/);
 assert.match(source, /ArrowRight[\s\S]*ArrowLeft[\s\S]*Home[\s\S]*End/);
-assert.match(source, /scrollIntoView/);
+assert.match(source, /selected\.offsetLeft[\s\S]*rail\.clientWidth[\s\S]*selected\.offsetWidth/);
+assert.match(source, /Math\.max\(0,\s*Math\.min\(maxLeft,\s*centered\)\)/);
 assert.match(source, /Scroll tabs left/);
 assert.match(source, /Scroll tabs right/);
-assert.match(source, /hasOverflow[\s\S]*?inline:\s*hasOverflow\s*\?\s*['"]center['"]\s*:\s*['"]nearest['"]/);
+assert.match(styles, /scroll-padding-inline:\s*44px/);
+assert.match(styles, /scroll-margin-inline:\s*44px/);
 assert.match(styles, /\.forge-section-tab\s*\{[\s\S]*?flex:\s*0 0 auto/);
 assert.match(styles, /\.forge-section-tab-rail\s*\{[\s\S]*?flex:\s*0 0 auto/);
 assert.match(styles, /\.forge-section-tab-rail\.is-compact\s*\{[\s\S]*?min-height:\s*35px/);

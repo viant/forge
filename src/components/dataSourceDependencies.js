@@ -9,6 +9,24 @@ function hasDefinedPath(target, path) {
     return current !== undefined;
 }
 
+function resolvedPathValue(target, path) {
+    const parts = String(path || '').split('.').filter(Boolean);
+    if (parts.length === 0) return undefined;
+    let current = target;
+    for (const part of parts) {
+        if (current == null || typeof current !== 'object' || !Object.prototype.hasOwnProperty.call(current, part)) return undefined;
+        current = current[part];
+    }
+    return current;
+}
+
+function isMeaningfulDependencyValue(value) {
+    if (value === undefined || value === null) return false;
+    if (typeof value === 'string') return value.trim() !== '';
+    if (Array.isArray(value)) return value.some((entry) => isMeaningfulDependencyValue(entry));
+    return true;
+}
+
 function assignPath(target, path, value) {
     const parts = String(path || '').split('.').filter(Boolean);
     if (parts.length === 0 || !target || typeof target !== 'object') return;
@@ -21,7 +39,7 @@ function assignPath(target, path, value) {
     current[parts[parts.length - 1]] = value;
 }
 
-export function hasResolvedDependencies(parameters = [], values = {}, filter = {}) {
+export function hasResolvedDependencies(parameters = [], values = {}, filter = {}, requiredAnyParameters = []) {
     if (!parameters || parameters.length === 0) return true;
 
     for (const paramDef of parameters) {
@@ -35,6 +53,12 @@ export function hasResolvedDependencies(parameters = [], values = {}, filter = {
             continue;
         }
         if (paramDef.required === false) continue;
+        return false;
+    }
+    const requiredAny = Array.isArray(requiredAnyParameters)
+        ? requiredAnyParameters.map((name) => String(name || '').trim()).filter(Boolean)
+        : [];
+    if (requiredAny.length > 0 && !requiredAny.some((name) => isMeaningfulDependencyValue(resolvedPathValue(values, name)))) {
         return false;
     }
     return true;

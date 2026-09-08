@@ -9,9 +9,22 @@ import { getLogger } from "../utils/logger.js";
 import equal from 'fast-deep-equal';
 import { mapParameters } from '../utils/parameterMapper.js';
 import { normalizeDataSourceError } from '../utils/dataSourceError.js';
+import {beginDataSourceRequest, settleDataSourceRequest} from '../components/dataSourceRequestLifecycle.js';
 
 function isPlainObject(value) {
     return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function buildFetchCollectionSignal(current = {}, props = {}) {
+    const {filter = {}, cache = null, invocationId = null, bindingGeneration = null} = props || {};
+    return {
+        ...(current || {}),
+        filter: {...((current || {}).filter || {}), ...filter},
+        fetch: true,
+        cache,
+        invocationId,
+        bindingGeneration,
+    };
 }
 
 const WINDOW_FORM_META_KEY = "__forge";
@@ -954,19 +967,22 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
     }
 
     const fetchCollection = (props) => {
-        const {filter = {}, cache = null} = props || {}
-        const inputFilter = input.value.filter || {};
-        const newValue =  {
-            ...input.peek(),
-            filter: {...inputFilter, ...filter},
-            fetch: true,
-            cache,
-        };
+        const previous = input.peek() || {};
+        const newValue = buildFetchCollectionSignal(previous, props);
+        const previousRequestId = previous.bindingGeneration || previous.invocationId;
+        const requestId = newValue.bindingGeneration || newValue.invocationId;
+        if (previousRequestId && requestId && String(previousRequestId) !== String(requestId)) {
+            const superseded = new Error('Datasource request was superseded before completion.');
+            superseded.code = 'request_superseded';
+            settleDataSourceRequest(identity?.dataSourceId, previousRequestId, superseded);
+        }
+        const completion = requestId ? beginDataSourceRequest(identity?.dataSourceId, requestId) : null;
         try {
             const log = getLogger('ds');
             log.debug('[fetchCollection]', { ds: identity?.dataSourceRef, filter: newValue.filter });
         } catch (_) {}
         input.value =newValue
+        return completion;
     };
 
     const fetchRecords = async (props = {}) => {

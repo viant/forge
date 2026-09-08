@@ -37,6 +37,9 @@ registerClassifier(
     (item) => {
         try {
             if (!item) return undefined;
+            // A label is an explicit presentation widget. Its format controls
+            // display formatting only and must not promote it to an editor.
+            if (String(item.type || '').toLowerCase() === 'label') return undefined;
             switch (item.format) {
                 case 'json':
                     return 'object';

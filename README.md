@@ -136,6 +136,33 @@ search in this order:
 Without this, platform folder branches are brittle because target-specific
 `main.yaml` files can still import the wrong child metadata.
 
+#### Parameterized imports
+
+Metadata fragments can be instantiated with a scoped parameter map. Quote the
+directive when the inline map contains YAML punctuation:
+
+```yaml
+containers:
+  - '$import(shared/targeting.yaml:card, {"prefix":"advertiser","dataSourceRef":"advertiser_defaults","readOnly":false})'
+```
+
+The imported fragment reads parameters with `$param(name)`:
+
+```yaml
+card:
+  id: $param(prefix)Targeting
+  dataSourceRef: $param(dataSourceRef)
+  readOnly: $param(readOnly)
+```
+
+An exact `$param(name)` scalar preserves the supplied YAML type, including maps,
+lists, booleans, and numbers. Embedded occurrences interpolate scalar values into
+text, which supports IDs, handler names, selectors, data fields, and state keys.
+Nested imports inherit the current scope and may override selected values without
+changing sibling scopes. Missing parameters, malformed maps, and attempts to
+interpolate a map or list into text fail loading with an explicit error. Existing
+`$import(path.yaml)` and `$import(path.yaml:key)` directives remain compatible.
+
 ## Installation
 
 ### Prerequisites

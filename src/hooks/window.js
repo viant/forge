@@ -10,6 +10,7 @@ import { resolveParameters } from './parameters.js';
 import {buildStandaloneDashboardDocument, downloadDashboardHtml} from "../core/ui/dashboardExport.js";
 import {getBusSignal, getDashboardFilterSignal, getDashboardSelectionSignal} from "../core/store/signals.js";
 import {buildDashboardDefaultFilters, setDashboardSelectionState} from "../components/dashboard/dashboardUtils.js";
+import {sendBusMessage} from "../core/bus.js";
 
 const openViewDialog = (dialogSignal, props) => {
     dialogSignal.value = {...dialogSignal.peek(), open: true, props};
@@ -250,6 +251,7 @@ export function useWindowHandlers(windowId) {
                 || maybe.workspaceSharePct !== undefined
                 || maybe.workspaceMinHeight !== undefined
                 || maybe.workspaceCollapsed !== undefined
+                || maybe.identityParameters !== undefined
             )) {
                 options = rawArgs.pop();
             }
@@ -321,6 +323,7 @@ export function useWindowHandlers(windowId) {
                 workspaceMinHeight: options.workspaceMinHeight,
                 navigation: options.navigation,
                 workspaceCollapsed: options.workspaceCollapsed,
+                identityParameters: options.identityParameters,
             }
         );
 
@@ -354,6 +357,28 @@ export function useWindowHandlers(windowId) {
         removeSignalsForKey(windowId);
     }
 
+    const selectTab = (props = {}) => {
+        const parameters = props?.parameters || {};
+        const args = Array.isArray(props?.execution?.args) ? props.execution.args : [];
+        const tabId = String(props?.tabId ?? parameters.tabId ?? args[0] ?? '').trim();
+        const containerId = String(props?.containerId ?? parameters.containerId ?? args[1] ?? '').trim();
+        const focusSelector = String(props?.focusSelector ?? parameters.focusSelector ?? args[2] ?? '').trim();
+        if (!windowId || !tabId) return false;
+        sendBusMessage(windowId, {
+            type: 'selectTab',
+            tabId,
+            ...(containerId ? {containerId} : {}),
+        });
+        if (focusSelector && typeof document !== 'undefined') {
+            setTimeout(() => {
+                try {
+                    document.querySelector(focusSelector)?.focus?.({preventScroll: true});
+                } catch (_) {}
+            }, 0);
+        }
+        return true;
+    }
+
     const openTarget = (props = {}) => {
         const target = props?.target;
         if (!target || typeof target !== 'object') {
@@ -371,6 +396,9 @@ export function useWindowHandlers(windowId) {
         if (target.width !== undefined) options.width = target.width;
         if (target.height !== undefined) options.height = target.height;
         if (target.footer !== undefined) options.footer = target.footer;
+        if (Array.isArray(target.identityParameters) && target.identityParameters.length > 0) {
+            options.identityParameters = [...target.identityParameters];
+        }
         const currentWindow =
             activeWindows.peek().find((entry) => String(entry?.windowId || '').trim() === String(windowId || '').trim())
             || props?.context?.windowState
@@ -796,6 +824,7 @@ export function useWindowHandlers(windowId) {
     return {
         openWindow,
         openTarget,
+        selectTab,
         closeWindow,
         exportDashboard,
         setDashboardFilter,

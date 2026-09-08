@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import {applyScheduleTimeZone, applyWallTimeDraft, instantToWallTime, isValidTimeZone, wallTimeToInstant} from './scheduleTimeZone.js';
+
+assert.equal(instantToWallTime('2026-01-15T20:30:00.000Z', 'America/Los_Angeles'), '2026-01-15T12:30');
+assert.equal(wallTimeToInstant('2026-01-15T12:30', 'America/Los_Angeles'), '2026-01-15T20:30:00.000Z');
+assert.equal(instantToWallTime('2026-07-15T19:30:00.000Z', 'America/Los_Angeles'), '2026-07-15T12:30');
+assert.equal(wallTimeToInstant('2026-07-15T12:30', 'America/Los_Angeles'), '2026-07-15T19:30:00.000Z');
+assert.equal(wallTimeToInstant('2026-03-08T01:30', 'America/Los_Angeles'), '2026-03-08T09:30:00.000Z');
+assert.equal(wallTimeToInstant('2026-03-08T03:30', 'America/Los_Angeles'), '2026-03-08T10:30:00.000Z');
+assert.throws(() => wallTimeToInstant('2026-03-08T02:30', 'America/Los_Angeles'), /does not exist/);
+assert.throws(() => wallTimeToInstant('2026-11-01T01:30', 'America/Los_Angeles'), /occurs twice/);
+assert.equal(wallTimeToInstant('2026-11-01T01:30', 'America/Los_Angeles', 'earlier'), '2026-11-01T08:30:00.000Z');
+assert.equal(wallTimeToInstant('2026-11-01T01:30', 'America/Los_Angeles', 'later'), '2026-11-01T09:30:00.000Z');
+assert.equal(isValidTimeZone('Not/AZone'), false);
+assert.throws(() => wallTimeToInstant('2026-01-01T12:00', 'Not/AZone'), /Invalid time zone/);
+let row = applyWallTimeDraft({}, 'start', '2026-03-08T02:30', 'America/Los_Angeles');
+row = applyWallTimeDraft(row, 'end', '2026-11-01T01:30', 'America/Los_Angeles');
+assert.deepEqual(Object.keys(row._scheduleErrors).sort(), ['end', 'start']);
+row = applyWallTimeDraft(row, 'start', '2026-03-08T03:30', 'America/Los_Angeles');
+assert.deepEqual(Object.keys(row._scheduleErrors), ['end']);
+row = applyScheduleTimeZone(row, 'timeZone', 'UTC', ['start', 'end']);
+assert.equal(row._scheduleErrors.end, undefined);
+assert.equal(row.end, '2026-11-01T01:30:00.000Z');
+console.log('schedule timezone codec passed');

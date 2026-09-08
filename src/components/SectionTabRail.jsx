@@ -2,6 +2,19 @@ import React from 'react';
 import {Icon} from '@blueprintjs/core';
 import './SectionTabRail.css';
 
+export function revealSelectedTab(rail, selected, behavior) {
+    if (!selected) return false;
+    const hasOverflow = !!rail && rail.scrollWidth > rail.clientWidth + 1;
+    if (hasOverflow) {
+        const maxLeft = Math.max(0, rail.scrollWidth - rail.clientWidth);
+        const centered = selected.offsetLeft - ((rail.clientWidth - selected.offsetWidth) / 2);
+        rail.scrollTo?.({left: Math.max(0, Math.min(maxLeft, centered)), ...(behavior ? {behavior} : {})});
+        return true;
+    }
+    selected.scrollIntoView?.({block: 'nearest', inline: 'nearest'});
+    return true;
+}
+
 /** Shared visual navigation primitive used by report sections and form panels. */
 export default function SectionTabRail({items = [], selectedId = '', onChange, ariaLabel = 'Sections', showIcons = false, compact = false, idPrefix = '', panelId = ''}) {
     const tabRefs = React.useRef([]);
@@ -10,24 +23,13 @@ export default function SectionTabRail({items = [], selectedId = '', onChange, a
     const generatedId = React.useId().replace(/:/g, '');
     const baseId = String(idPrefix || generatedId).replace(/[^A-Za-z0-9_-]/g, '-');
     const selectedIndex = Math.max(0, items.findIndex((item) => String(item?.id || '') === String(selectedId || '')));
+    const revealSelected = React.useCallback((behavior) => {
+        revealSelectedTab(railRef.current, tabRefs.current[selectedIndex], behavior);
+    }, [selectedIndex]);
     React.useLayoutEffect(() => {
-        const frame = requestAnimationFrame(() => {
-            const selected = tabRefs.current[selectedIndex];
-            const rail = railRef.current;
-            const hasOverflow = !!rail && rail.scrollWidth > rail.clientWidth + 1;
-            if (hasOverflow && selectedIndex === 0) {
-                rail.scrollTo({left: 0});
-            } else if (hasOverflow && selectedIndex === items.length - 1) {
-                rail.scrollTo({left: rail.scrollWidth - rail.clientWidth});
-            } else {
-                selected?.scrollIntoView?.({
-                    block: 'nearest',
-                    inline: hasOverflow ? 'center' : 'nearest',
-                });
-            }
-        });
+        const frame = requestAnimationFrame(() => revealSelected());
         return () => cancelAnimationFrame(frame);
-    }, [selectedIndex, items.length, compact]);
+    }, [revealSelected, items.length, compact]);
     React.useEffect(() => {
         const rail = railRef.current;
         if (!rail) return undefined;
@@ -42,14 +44,17 @@ export default function SectionTabRail({items = [], selectedId = '', onChange, a
         };
         const frame = requestAnimationFrame(update);
         rail.addEventListener('scroll', update, {passive: true});
-        const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(update) : null;
+        const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {
+            update();
+            revealSelected('auto');
+        }) : null;
         observer?.observe(rail);
         return () => {
             cancelAnimationFrame(frame);
             rail.removeEventListener('scroll', update);
             observer?.disconnect();
         };
-    }, [items.length, compact]);
+    }, [items.length, compact, revealSelected]);
     const scrollRail = (direction) => {
         const rail = railRef.current;
         if (!rail) return;

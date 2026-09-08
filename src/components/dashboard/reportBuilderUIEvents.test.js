@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+    canEmitDurableReportBuilderRunEvent,
     buildReportBuilderEventFilters,
     buildReportBuilderExportEventDetail,
     buildReportBuilderRunEvent,
@@ -52,6 +53,9 @@ assert.deepEqual(buildReportBuilderExportEventDetail({
 assert.equal(normalizeReportBuilderLifecycleSourceKind("savedView"), "report");
 assert.equal(normalizeReportBuilderLifecycleSourceKind("draft"), "inline");
 assert.equal(normalizeReportBuilderLifecycleSourceKind("preset"), "preset");
+assert.equal(canEmitDurableReportBuilderRunEvent({durable: false, runId: "legacy"}), false);
+assert.equal(canEmitDurableReportBuilderRunEvent({durable: true, reportRunId: "run-1"}), false);
+assert.equal(canEmitDurableReportBuilderRunEvent({durable: true, reportRunId: "run-1", revision: 2}), true);
 assert.equal(buildReportBuilderExportEventDetail({
     request: {
         ...request,

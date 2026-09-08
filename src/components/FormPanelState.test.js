@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {mergeSelectedTab, nextBusMessage, resolveDataSourceFetchMode} from './FormPanelState.js';
+import {initialBusMessageState, mergeSelectedTab, nextBusMessage, resolveDataSourceFetchMode} from './FormPanelState.js';
 
 {
     const previous = {tabs: {root: 'general'}, other: true};
@@ -38,6 +38,14 @@ assert.equal(resolveDataSourceFetchMode('unsupported', 'always'), 'always');
 
     const replay = nextBusMessage(messages, result.state);
     assert.equal(replay.changed, false);
+    assert.equal(replay.message, null);
+}
+
+{
+    const stale = {type: 'selectTab', tabId: 'flights'};
+    const initial = initialBusMessageState([stale]);
+    const replay = nextBusMessage([stale], initial);
+    assert.equal(replay.changed, false, 'a remounted panel must not replay a previously handled tab command');
     assert.equal(replay.message, null);
 }
 

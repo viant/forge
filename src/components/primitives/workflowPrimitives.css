@@ -1,0 +1,165 @@
+.forge-editable-collection {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  flex-direction: column;
+}
+
+.forge-editable-collection__operation-bar {
+  display: flex !important;
+  flex: 0 0 auto !important;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  height: auto !important;
+  min-width: 0;
+  min-height: 0;
+  margin: 0 0 8px;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.forge-editable-collection__operation-bar > .forge-mutation-command,
+.forge-editable-collection__operation-bar > .bp6-button,
+.forge-editable-collection__operation-bar > .bp5-button,
+.forge-editable-collection__operation-bar > .bp4-button {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 100%;
+}
+
+.forge-editable-collection__operation-bar .bp6-button,
+.forge-editable-collection__operation-bar .bp5-button,
+.forge-editable-collection__operation-bar .bp4-button {
+  white-space: nowrap;
+}
+
+.forge-assignment-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.forge-assignment-picker__list {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #d8e1ea;
+  border-radius: 8px;
+}
+
+.forge-assignment-picker__list h4 { margin: 0 0 8px; }
+.forge-assignment-picker__rows { max-height: 320px; overflow: auto; }
+.forge-assignment-picker__actions { display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+.forge-mutation-command { display: inline-flex; align-items: center; gap: 6px; }
+.forge-mutation-command__status { color: #617184; font-size: 12px; }
+.forge-mutation-command__status:empty { display: none; }
+
+.forge-status-workflow,
+.forge-schedule-editor__actions,
+.forge-upload-collection {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.forge-tree-editor,
+.forge-wizard,
+.forge-history-diff,
+.forge-schedule-editor {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 12px;
+}
+
+.forge-tree-editor__nodes { max-height: 420px; overflow: auto; padding: 8px; border: 1px solid #d8e1ea; border-radius: 8px; }
+.forge-tree-editor__node { margin-left: calc(var(--forge-tree-depth, 0) * 18px); }
+.forge-tree-editor__children { border-left: 1px solid #d8e1ea; }
+.forge-tree-editor__choice { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.forge-tree-editor__actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+.forge-wizard__steps { display: flex; gap: 8px; padding: 0; margin: 0; list-style: none; overflow-x: auto; }
+.forge-wizard__steps li { color: #738091; border-bottom: 2px solid #d8e1ea; padding: 6px 10px; white-space: nowrap; }
+.forge-wizard__steps li.is-active { color: #1c5d99; border-color: #2383c4; font-weight: 600; }
+.forge-wizard__steps li.is-complete { color: #276749; border-color: #70b98b; }
+.forge-wizard__body { min-height: 120px; }
+.forge-wizard__actions { justify-content: flex-end; }
+
+.forge-upload-collection__files { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
+.forge-history-diff, .forge-schedule-editor { overflow-x: auto; }
+.forge-history-diff table, .forge-schedule-editor table { width: 100%; }
+.forge-history-diff td { max-width: 360px; overflow-wrap: anywhere; }
+
+.forge-responsive-grid { min-width: 0; overflow: auto; }
+.forge-responsive-grid__cards { display: grid; gap: 8px; }
+.forge-responsive-grid__card { border: 1px solid #d8e1ea; border-radius: 8px; padding: 10px; background: #fff; }
+.forge-responsive-grid__card dl { margin: 0; display: grid; gap: 6px; }
+.forge-responsive-grid__field { display: grid; grid-template-columns: minmax(90px, 0.8fr) minmax(0, 1.2fr); gap: 8px; }
+.forge-responsive-grid__field dt { color: #617184; font-size: 12px; }
+.forge-responsive-grid__field dd { margin: 0; overflow-wrap: anywhere; }
+
+.forge-draft-form { position: sticky; bottom: 0; z-index: 4; display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid #d8e1ea; background: rgba(255,255,255,.96); }
+.forge-draft-form__status { margin-right: auto; color: #617184; font-size: 12px; }
+.forge-resource-header { display: grid; grid-template-columns: minmax(180px,1fr) auto auto; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid #d8e1ea; }
+.forge-resource-header h2,.forge-resource-header p { margin: 0; }
+.forge-resource-header p { color: #617184; font-size: 12px; }
+.forge-resource-header dl { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; }
+.forge-resource-header dl div { display: grid; gap: 2px; }
+.forge-resource-header dt { color: #617184; font-size: 11px; }
+.forge-resource-header dd { margin: 0; font-weight: 600; }
+.forge-data-state { min-height: 120px; display: flex; align-items: center; justify-content: center; gap: 8px; color: #617184; }
+.forge-notification-rules { display: grid; gap: 8px; }
+.forge-notification-rules__action { margin-top: 8px; }
+.forge-metric-summary { display: grid; grid-template-columns: repeat(var(--forge-metric-columns),minmax(0,1fr)); gap: 8px; }
+.forge-metric-summary__item { display: grid; gap: 3px; padding: 10px; border: 1px solid #d8e1ea; border-radius: 8px; background: #fff; }
+.forge-metric-summary__item span,.forge-metric-summary__item small { color: #617184; font-size: 11px; }
+.forge-metric-summary__item strong { font-size: 18px; }
+.forge-metric-summary__item.is-positive small { color: #276749; }
+.forge-metric-summary__item.is-negative small { color: #a33a3a; }
+.forge-relation-drill { display: inline-flex; }
+.forge-detail-view { display: grid; gap: 12px; min-width: 0; }
+.forge-detail-view section { display: grid; gap: 6px; }
+.forge-detail-view h3,.forge-detail-view p { margin: 0; }
+.forge-detail-view section > p { color: #617184; font-size: 12px; }
+.forge-detail-view dl { display: grid; grid-template-columns: repeat(var(--forge-detail-columns),minmax(0,1fr)); gap: 10px 14px; margin: 0; }
+.forge-detail-view__field { grid-column: span var(--forge-detail-span); min-width: 0; }
+.forge-detail-view__field dt { color: #617184; font-size: 11px; }
+.forge-detail-view__field dd { display: flex; align-items: center; gap: 4px; margin: 2px 0 0; min-width: 0; overflow-wrap: anywhere; }
+.forge-detail-view__link { padding: 0; border: 0; background: none; color: #175fa3; text-align: left; cursor: pointer; }
+.forge-detail-view__copy-status:empty { display: none; }
+.forge-detail-view__copy-status { color: #617184; font-size: 11px; }
+.forge-master-detail { display: grid; min-width: 0; min-height: 0; gap: 12px; }
+.forge-master-detail.is-split { grid-template-columns: minmax(240px,.8fr) minmax(0,1.2fr); }
+.forge-master-detail.is-drill { grid-template-columns: minmax(0,1fr); }
+.forge-master-detail__master,.forge-master-detail__detail { min-width: 0; min-height: 0; overflow: auto; }
+.forge-master-detail__announcement { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 700px) {
+  .forge-assignment-picker { grid-template-columns: 1fr; }
+  .forge-assignment-picker__actions { flex-direction: row; }
+  .forge-resource-header { grid-template-columns: 1fr; align-items: start; }
+  .forge-metric-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .forge-detail-view dl { grid-template-columns: 1fr; }
+  .forge-master-detail.is-split { grid-template-columns: 1fr; }
+  .forge-editable-collection__operation-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+  }
+  .forge-editable-collection__operation-bar > .forge-mutation-command,
+  .forge-editable-collection__operation-bar > .bp6-button,
+  .forge-editable-collection__operation-bar > .bp5-button,
+  .forge-editable-collection__operation-bar > .bp4-button { flex: 0 0 auto; width: auto; }
+  .forge-editable-collection__operation-bar > .forge-mutation-command > .bp6-button,
+  .forge-editable-collection__operation-bar > .forge-mutation-command > .bp5-button,
+  .forge-editable-collection__operation-bar > .forge-mutation-command > .bp4-button { width: auto; min-height: 44px; }
+  .forge-editable-collection__operation-bar > .bp6-button,
+  .forge-editable-collection__operation-bar > .bp5-button,
+  .forge-editable-collection__operation-bar > .bp4-button { min-height: 44px; }
+}

@@ -85,14 +85,37 @@ function placeItems(items, columns, dense = true) {
     return { placements, rowCount };
 }
 
+export function resolveGridSpacing(layout = {}, labelMode = 'left') {
+    const gap = layout?.gap;
+    const rowGap = layout?.rowGap;
+    const columnGap = layout?.columnGap;
+    if (labelMode === 'top') {
+        return {
+            rowGap: rowGap !== undefined ? rowGap : 6,
+            columnGap: columnGap !== undefined ? columnGap : 12,
+            controlPaddingBottom: 10,
+        };
+    }
+    if (labelMode === 'left') {
+        return {
+            rowGap: rowGap !== undefined ? rowGap : 16,
+            columnGap: columnGap !== undefined ? columnGap : 12,
+            controlPaddingBottom: 0,
+        };
+    }
+    return {
+        rowGap: rowGap !== undefined ? rowGap : gap,
+        columnGap: columnGap !== undefined ? columnGap : gap,
+        controlPaddingBottom: 0,
+    };
+}
+
 function buildContainerStyle(layout, rows) {
     const columns = layout?.columns || 1;
     const labels = layout?.labels || {};
     const labelMode = (labels.mode || 'left');
     const align = labels.align || (labelMode === 'left' ? 'baseline' : (labelMode === 'top' ? 'start' : 'start'));
-    const gap = layout?.gap;
-    const rowGap = layout?.rowGap;
-    const columnGap = layout?.columnGap;
+    const spacing = resolveGridSpacing(layout, labelMode);
 
     const style = {
         width: '100%',
@@ -118,9 +141,8 @@ function buildContainerStyle(layout, rows) {
         style.alignItems = align;
     }
 
-    if (gap !== undefined) style.gap = gap;
-    if (rowGap !== undefined) style.rowGap = rowGap;
-    if (columnGap !== undefined) style.columnGap = columnGap;
+    if (spacing.rowGap !== undefined) style.rowGap = spacing.rowGap;
+    if (spacing.columnGap !== undefined) style.columnGap = spacing.columnGap;
     return style;
 }
 
@@ -163,6 +185,7 @@ export default function GridLayoutRenderer({
     const labels = layout?.labels || {};
     const labelMode = (labels.mode || 'left');
     const controlGap = labels?.controlGap !== undefined ? Number(labels.controlGap) : 8;
+    const gridSpacing = resolveGridSpacing(layout, labelMode);
     const labelStyle = { fontWeight: 700, color: '#1f2937', ...(labels.style || labels.labelStyle || {}) };
     const sourceEntries = entries || items || [];
     sourceEntries.forEach((item) => {
@@ -183,9 +206,13 @@ export default function GridLayoutRenderer({
     const { placements, rowCount } = useMemo(() => placeItems(visibleEntries, columns, dense), [visibleEntries, columns, dense]);
 
     const containerStyle = useMemo(() => ({ ...styleOverride, ...buildContainerStyle(layout, rowCount) }), [layout, rowCount, styleOverride]);
+    const collapseClass = String(layout?.collapseAt || '').trim().toLowerCase() === 'phone'
+        ? 'forge-grid-collapse-phone'
+        : '';
+    const gridClassName = [container?.className, collapseClass].filter(Boolean).join(' ') || undefined;
 
     return (
-        <div style={containerStyle}>
+        <div className={gridClassName} style={containerStyle}>
             {placements.map(({ item, r, c, w, h }) => {
                 const dsRef = item.dataSourceRef || baseDataSourceRef;
                 const subCtx = typeof context?.Context === 'function' ? context.Context(dsRef) : context;
@@ -225,12 +252,23 @@ export default function GridLayoutRenderer({
 
                 // Control cell
                 const controlItem = hasLabel ? { ...item, wrapper: 'none' } : item;
+                const required = !!(item?.required || item?.properties?.required);
+                const requiredEditable = required && !item?.readOnly && !item?.disabled;
                 const ev = handlers[item.id]?.events || {};
                 const st = handlers[item.id]?.stateEvents || {};
                 const ctrlNode = (
                     <div
                         key={`${item.id || item.name}-control`}
-                        style={{ display: 'flex', alignItems: (labels.align || (labelMode === 'left' ? 'baseline' : 'center')), marginLeft: (labelMode === 'left' ? controlGap : 0), ...css.ctrl }}
+                        className={['forge-grid-control-cell', requiredEditable ? 'forge-required-input' : ''].filter(Boolean).join(' ')}
+                        data-forge-control-id={item.id || undefined}
+                        style={{
+                            display: 'flex',
+                            alignItems: (labels.align || (labelMode === 'left' ? 'baseline' : 'center')),
+                            marginLeft: (labelMode === 'left' ? controlGap : 0),
+                            paddingBottom: gridSpacing.controlPaddingBottom || 0,
+                            boxSizing: 'border-box',
+                            ...css.ctrl,
+                        }}
                     >
                         <ControlRenderer
                             key={`${item.id || item.name}`}

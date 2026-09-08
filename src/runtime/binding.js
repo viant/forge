@@ -47,7 +47,7 @@ registerStateAdapter('local', (ctx, item, pair) => {
  * reads/writes via context.handlers.dataSource {getFormData, setFormField}.
  * ------------------------------------------------------------------ */
 
-import { resolveSelector } from '../utils/selector.js';
+import { resolveSelector, setSelector } from '../utils/selector.js';
 
 registerStateAdapter('form', (ctx, item) => {
     const dsHandlers = ctx?.handlers?.dataSource;
@@ -87,12 +87,17 @@ registerStateAdapter('filter', (ctx, item) => {
 registerStateAdapter('input', (ctx, item) => {
     const fieldKey = item.dataField || item.bindingPath || item.id;
     return {
-        get: () => resolveSelector(ctx?.signals?.input?.value || {}, fieldKey),
+        get: () => {
+            const signal = ctx?.signals?.input;
+            const reactiveValue = resolveSelector(signal?.value || {}, fieldKey);
+            if (reactiveValue !== undefined) return reactiveValue;
+            return resolveSelector(signal?.peek?.() || {}, fieldKey);
+        },
         getOptions: () => [],
         set: (v) => {
             const prev = ctx?.signals?.input?.peek?.() || {};
             if (ctx?.signals?.input) {
-                ctx.signals.input.value = { ...prev, [fieldKey]: v };
+                ctx.signals.input.value = setSelector(prev, fieldKey, v);
             }
         },
     };

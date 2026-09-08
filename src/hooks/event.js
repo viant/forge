@@ -146,9 +146,13 @@ const Execution = (context, messageBus) => {
         executions.push(execution);
     };
 
+    const prepend = (execution) => {
+        executions.unshift(execution);
+    };
+
     const size = () => executions.length;
     const hasExecution = () => (executions?.length || 0) > 0;
-    return {execute, push, size, handlerName, isDefined: hasExecution};
+    return {execute, push, prepend, size, handlerName, isDefined: hasExecution};
 };
 
 function indexExecution(context, on, handlers, messageBus) {
@@ -164,7 +168,7 @@ function indexExecution(context, on, handlers, messageBus) {
 }
 
 const isStateEvent = (key) => {
-    return ["onValue", "onProperties", "onReadonly", "onVisible"].includes(key);
+    return ["onValue", "onProperties", "onReadonly", "onValidate", "onVisible"].includes(key);
 };
 
 export const useControlEvents = (context, items = [], state) => {
@@ -208,7 +212,12 @@ export const useControlEvents = (context, items = [], state) => {
             result[item.id] = {events: {}, stateEvents: {}};
             return;
         }
-        indexExecution(context, on, handlers, message);
+        const normalizedOn = on.map((execution) => (
+            execution?.event === 'onChange' && ['number', 'numeric', 'currency'].includes(item.type)
+                ? {...execution, event: 'onValueChange'}
+                : execution
+        ));
+        indexExecution(context, normalizedOn, handlers, message);
         if (state) {
             const [data, setData] = state;
             const execution = {
@@ -229,14 +238,14 @@ export const useControlEvents = (context, items = [], state) => {
                 }
             }
 
-            if (handlers.onChange && !handlers.onChange.isDefined()) {
-                handlers.onChange.push(execution);
+            if (handlers.onChange) {
+                handlers.onChange.isDefined() ? handlers.onChange.prepend(execution) : handlers.onChange.push(execution);
             }
-            if (handlers.onValueChange && !handlers.onValueChange.isDefined()) {
-                handlers.onValueChange.push(execution);
+            if (handlers.onValueChange) {
+                handlers.onValueChange.isDefined() ? handlers.onValueChange.prepend(execution) : handlers.onValueChange.push(execution);
             }
-            if (handlers.onItemSelect && !handlers.onItemSelect.isDefined()) {
-                handlers.onItemSelect.push(execution);
+            if (handlers.onItemSelect) {
+                handlers.onItemSelect.isDefined() ? handlers.onItemSelect.prepend(execution) : handlers.onItemSelect.push(execution);
             }
         } else {
 
@@ -253,14 +262,17 @@ export const useControlEvents = (context, items = [], state) => {
                     changeHandler = 'dataSource.setFormField';
                     break;
             }
-            if (handlers.onChange && !handlers.onChange.isDefined()) {
-                handlers.onChange.push({id: changeHandler});
+            if (handlers.onChange) {
+                const execution = {id: changeHandler};
+                handlers.onChange.isDefined() ? handlers.onChange.prepend(execution) : handlers.onChange.push(execution);
             }
-            if (handlers.onValueChange && !handlers.onValueChange.isDefined()) {
-                handlers.onValueChange.push({id: changeHandler});
+            if (handlers.onValueChange) {
+                const execution = {id: changeHandler};
+                handlers.onValueChange.isDefined() ? handlers.onValueChange.prepend(execution) : handlers.onValueChange.push(execution);
             }
-            if (handlers.onItemSelect && !handlers.onItemSelect.isDefined()) {
-                handlers.onItemSelect.push({id: changeHandler});
+            if (handlers.onItemSelect) {
+                const execution = {id: changeHandler};
+                handlers.onItemSelect.isDefined() ? handlers.onItemSelect.prepend(execution) : handlers.onItemSelect.push(execution);
             }
         }
 
@@ -435,7 +447,7 @@ export const dialogHandlers = (context, container) => {
     };
     actions.forEach((action) => {
         if (!action.on) {
-            if (action.close === true || action.disabled === true) {
+            if (action.close === true || action.disabled === true || action.mutationCommand) {
                 return;
             }
             throw new Error(`Action '${action.id}' 'on' attribute is required`);

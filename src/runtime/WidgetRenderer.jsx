@@ -17,6 +17,8 @@ import {resolveSelector} from '../utils/selector.js';
 import { resolveLinkTarget } from '../utils/linkTarget.js';
 import {evaluatePlainVisibleWhen} from '../components/visibleWhen.js';
 import {resolveDynamicDataSourceRef} from './dataSourceRef.js';
+import {resolveRequiredControlState, usesResolvedRequiredPastel} from './requiredControlState.js';
+import MutationCommand from '../components/primitives/MutationCommand.jsx';
 
 import ControlWrapper from './ControlWrapper.jsx';
 
@@ -176,6 +178,10 @@ export default function WidgetRenderer({
     if (stateEvents?.onReadonly) {
         dynReadonlyLocal = stateEvents.onReadonly({ data: undefined, item, value: adapter.get(), context: resolvedContext });
     }
+    let validationMsgLocal = undefined;
+    if (stateEvents?.onValidate) {
+        validationMsgLocal = stateEvents.onValidate({ data: undefined, item, value: adapter.get(), context: resolvedContext });
+    }
     let dynPropsLocal = {};
     if (stateEvents?.onProperties) {
         dynPropsLocal = stateEvents.onProperties({ data: undefined, item, value: adapter.get(), context: resolvedContext }) || {};
@@ -185,7 +191,8 @@ export default function WidgetRenderer({
 
     const dynReadonlyGlobal = runDynamicEvaluators('onReadonly', { item, context: resolvedContext, value: currentVal });
     const dynDisabledGlobal = runDynamicEvaluators('onDisabled', { item, context: resolvedContext, value: currentVal });
-    const validationMsg = runDynamicEvaluators('onValidate', { item, context: resolvedContext, value: currentVal });
+    const validationMsgGlobal = runDynamicEvaluators('onValidate', { item, context: resolvedContext, value: currentVal });
+    const validationMsg = validationMsgLocal !== undefined ? validationMsgLocal : validationMsgGlobal;
     const dynPropsGlobal = runDynamicEvaluators('onProperties', { item, context: resolvedContext, value: adapter.get() }) || {};
 
     const combinedProps = { ...dynPropsGlobal, ...dynPropsLocal };
@@ -224,7 +231,13 @@ export default function WidgetRenderer({
 
     const options = item.options || resolveDataSourceOptions(item, resolvedContext, adapter.getOptions())
 
-    const baseValue = (dynValue !== undefined ? dynValue : adapter.get());
+    const boundValue = adapter.get();
+    const literalValue = item?.properties?.value !== undefined
+        ? item.properties.value
+        : item?.value;
+    const baseValue = dynValue !== undefined
+        ? dynValue
+        : (boundValue !== undefined ? boundValue : literalValue);
     const safeValue = widgetKey === 'label' ? baseValue : ((baseValue === null || baseValue === undefined) ? '' : baseValue);
     const currencySelector = item?.currencySelector || item?.properties?.currencySelector || item?.properties?.currencyField;
     const currencySource = item?.currencySource || item?.properties?.currencySource || item?.scope || 'form';
@@ -272,7 +285,7 @@ export default function WidgetRenderer({
     // ------------------------------------------------------------------
     // 5. Pass-through of common display properties present directly on item
     // ------------------------------------------------------------------
-    ['icon', 'leftIcon', 'rightIcon', 'intent', 'appearance', 'link', 'format', 'className', 'style', 'title'].forEach((k) => {
+    ['icon', 'leftIcon', 'rightIcon', 'intent', 'appearance', 'link', 'format', 'className', 'style', 'title', 'hideLabel'].forEach((k) => {
         if (item?.[k] !== undefined && widgetProps[k] === undefined) {
             widgetProps[k] = item[k];
         }
@@ -311,7 +324,40 @@ export default function WidgetRenderer({
     if (item?.disabledWhen && evaluatePlainVisibleWhen(item.disabledWhen, resolvedContext)) widgetProps.disabled = true;
     if (item?.readOnlyWhen && evaluatePlainVisibleWhen(item.readOnlyWhen, resolvedContext)) widgetProps.readOnly = true;
 
-    const itemWithError = validationMsg ? { ...item, validationError: validationMsg } : item;
+    if (item?.mutationCommand) {
+        const command = {
+            ...item.mutationCommand,
+            commandId: item.mutationCommand.commandId || item.id,
+            label: item.label || item.id,
+            icon: item.icon || item.mutationCommand.icon,
+            intent: item.intent || item.mutationCommand.intent,
+        };
+        return (
+            <ControlWrapper item={item} container={container} context={resolvedContext} framework={framework}>
+                <MutationCommand command={command} context={resolvedContext} disabled={widgetProps.disabled === true}/>
+            </ControlWrapper>
+        );
+    }
+
+    const requiredState = resolveRequiredControlState({
+        required: !!(item?.required || item?.properties?.required),
+        readOnly: widgetProps.readOnly,
+        disabled: widgetProps.disabled,
+        value: safeValue,
+        validationError: validationMsg,
+    });
+    const renderRequiredState = requiredState && (
+        requiredState !== 'resolved' || usesResolvedRequiredPastel({widgetKey, item})
+    );
+    if (renderRequiredState) {
+        widgetProps.className = [widgetProps.className, `forge-required-${requiredState}`].filter(Boolean).join(' ');
+        widgetProps['aria-invalid'] = requiredState === 'invalid' || requiredState === 'missing';
+    } else if (requiredState) {
+        widgetProps['aria-invalid'] = false;
+    }
+    const itemWithError = validationMsg || requiredState
+        ? { ...item, validationError: validationMsg || undefined, requiredState }
+        : item;
 
     if (validationMsg) {
         widgetProps.intent = 'danger';

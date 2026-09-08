@@ -70,6 +70,13 @@ export function withFetchedPageInfo(info = {}, page = 1, pagingEnabled = false, 
     }
     const returnedCount = normalizeNonNegativeInteger(pageResult?.returnedCount);
     const pageSize = normalizePositiveInteger(pageResult?.pageSize);
+    const openEnded = pageResult?.openEnded === true;
+    if (openEnded) {
+        delete base.pageCount;
+        delete base.totalPages;
+        delete base.totalCount;
+        delete base.recordCount;
+    }
     const inconsistentEmptySummary = returnedCount > 0
         && normalizeNonNegativeInteger(base.totalCount ?? base.recordCount) === 0;
     if (inconsistentEmptySummary) {

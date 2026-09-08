@@ -26,16 +26,16 @@ const containsValue = (actual, expected) => {
     return false;
 };
 
-export const evaluatePlainVisibleWhen = (visibleWhen, context) => {
+export const evaluatePlainVisibleWhen = (visibleWhen, context, row = undefined) => {
     if (!visibleWhen || !context) return true;
     if (Array.isArray(visibleWhen.all)) {
-        return visibleWhen.all.every((condition) => evaluatePlainVisibleWhen(condition, context));
+        return visibleWhen.all.every((condition) => evaluatePlainVisibleWhen(condition, context, row));
     }
     if (Array.isArray(visibleWhen.any)) {
-        return visibleWhen.any.some((condition) => evaluatePlainVisibleWhen(condition, context));
+        return visibleWhen.any.some((condition) => evaluatePlainVisibleWhen(condition, context, row));
     }
     if (visibleWhen.not) {
-        return !evaluatePlainVisibleWhen(visibleWhen.not, context);
+        return !evaluatePlainVisibleWhen(visibleWhen.not, context, row);
     }
     const source = String(visibleWhen.source || 'form').toLowerCase();
     const field = visibleWhen.field || visibleWhen.selector || visibleWhen.key;
@@ -64,8 +64,11 @@ export const evaluatePlainVisibleWhen = (visibleWhen, context) => {
         case 'collection':
             scope = context.signals?.collection?.peek?.() || [];
             break;
+        case 'formstatus':
+            scope = context.signals?.formStatus?.peek?.() || context.signals?.formStatus?.value || {};
+            break;
         case 'row':
-            scope = context.row || {};
+            scope = row || context.row || {};
             break;
         case 'form':
         default:
@@ -158,6 +161,9 @@ export const trackVisibleWhen = (visibleWhen, context) => {
             break;
         case 'collection':
             context?.signals?.collection?.value;
+            break;
+        case 'formstatus':
+            context?.signals?.formStatus?.value;
             break;
         case 'form':
         default:

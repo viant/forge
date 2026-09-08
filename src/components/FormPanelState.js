@@ -36,6 +36,16 @@ export function nextBusMessage(messages, previous = {}) {
     };
 }
 
+// Bus commands are transient. A panel mounting after a command was already
+// handled must start at the current tail instead of replaying stale commands
+// after metadata/target remounts (for example, a responsive viewport change).
+export function initialBusMessageState(messages = []) {
+    if (!Array.isArray(messages) || messages.length === 0) {
+        return {};
+    }
+    return {length: messages.length, message: messages[messages.length - 1]};
+}
+
 export function resolveDataSourceFetchMode(configuredMode, inheritedMode = 'always') {
     const normalized = String(configuredMode || '').trim().toLowerCase();
     if (normalized === 'once' || normalized === 'always') {

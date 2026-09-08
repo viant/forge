@@ -112,6 +112,43 @@ export function resolveLinkTarget({ linkConfig = null, row = null, value = null,
     const windowKey = normalizeString(linkConfig.windowKey || '');
     const dialogId = normalizeString(linkConfig.dialogId || linkConfig.dialog || '');
 
+    // A relation-count cell has three honest states: zero is inert, one opens
+    // the exact entity, and many opens a chooser carrying the complete bounded
+    // association set. The single-row parameter specs resolve against the
+    // relationship object itself, avoiding fragile selectors such as `0.id`.
+    if (kind === 'association') {
+        const associations = Array.isArray(value)
+            ? value.filter((entry) => entry != null)
+            : [];
+        if (associations.length === 0) {
+            return null;
+        }
+        if (associations.length === 1 && windowKey) {
+            return resolveLinkTarget({
+                linkConfig: {...linkConfig, kind: 'window', dialogId: '', dialog: ''},
+                row,
+                value: associations[0],
+                context,
+            });
+        }
+        if (!dialogId) {
+            return null;
+        }
+        return {
+            kind: 'dialog',
+            text: normalizeLinkText(value, dialogId),
+            title: normalizeString(linkConfig.title),
+            dialogId,
+            awaitResult: linkConfig.awaitResult === true,
+            parameters: {
+                associations,
+                associationIds: associations
+                    .map((entry) => Number(entry?.id ?? entry?.adOrderId ?? entry))
+                    .filter((id) => Number.isInteger(id) && id > 0),
+            },
+        };
+    }
+
     if (kind === 'dialog' || dialogId) {
         if (!dialogId) {
             return null;
@@ -182,6 +219,9 @@ export function resolveLinkTarget({ linkConfig = null, row = null, value = null,
             text,
             title: normalizeString(linkConfig.title),
             windowKey,
+            ...(Array.isArray(linkConfig.identityParameters) && linkConfig.identityParameters.length > 0
+                ? {identityParameters: [...linkConfig.identityParameters]}
+                : {}),
             windowTitle,
             inTab: linkConfig.inTab !== false,
             newInstance: linkConfig.newInstance === true,

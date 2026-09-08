@@ -98,3 +98,27 @@ func assertStringSlice(t *testing.T, label string, actual, expected []string) {
 		t.Fatalf("expected %s %#v, got %#v", label, expected, actual)
 	}
 }
+
+func TestTableYAMLPreservesTargetOverrides(t *testing.T) {
+	var container Container
+	raw := []byte(`
+id: records
+table:
+  columns: [{id: id, name: ID}]
+  targetOverrides:
+    phone:
+      columns:
+        - {id: name, name: Name}
+`)
+	if err := yaml.Unmarshal(raw, &container); err != nil {
+		t.Fatal(err)
+	}
+	if container.Table == nil || container.Table.TargetOverrides == nil {
+		t.Fatalf("table target overrides were dropped: %#v", container.Table)
+	}
+	phone := container.Table.TargetOverrides["phone"]
+	columns, ok := phone["columns"].([]interface{})
+	if !ok || len(columns) != 1 {
+		t.Fatalf("phone columns were not retained: %#v", phone)
+	}
+}

@@ -402,6 +402,18 @@ export const removeSignalsForKey = (windowId) => {
         }
     }
 
+    // Window-level signals do not necessarily have a datasource collection
+    // entry, so clear them independently from the datasource-key loop above.
+    delete newDataControlSignals[windowId];
+    delete newViewSignals[windowId];
+    delete newFormSignals[`${windowId}:windowForm`];
+    delete newMessageSignals[windowId];
+    for (const key in newDialogSignals) {
+        if (key.startsWith(`${windowId}Dialog`)) {
+            delete newDialogSignals[key];
+        }
+    }
+
     // Remove bus signal for this window (exact match, not startsWith)
     delete newBusSignals[windowId];
     for (const key in newDashboardFilterSignals) {
@@ -486,23 +498,44 @@ function shouldRevalidateRestoredDatasourceSnapshot(snapshot = null, controlSnap
     return false;
 }
 
+function isSnapshotSerializationMarker(value) {
+    return value === '[MaxDepth]' || value === '[Circular]';
+}
+
+function containsSnapshotSerializationMarker(value, seen = new WeakSet()) {
+    if (isSnapshotSerializationMarker(value)) {
+        return true;
+    }
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+    if (seen.has(value)) {
+        return false;
+    }
+    seen.add(value);
+    if (Array.isArray(value)) {
+        return value.some((entry) => containsSnapshotSerializationMarker(entry, seen));
+    }
+    return Object.values(value).some((entry) => containsSnapshotSerializationMarker(entry, seen));
+}
+
 function restoreWindowSignalsFromSnapshot(win) {
     const windowId = String(win?.windowId || '').trim();
     if (!windowId) return;
 
     const inlineMetadata = win?.inlineMetadata;
-    if (inlineMetadata && typeof inlineMetadata === 'object') {
+    if (inlineMetadata && typeof inlineMetadata === 'object' && !containsSnapshotSerializationMarker(inlineMetadata)) {
         try {
             injectActions(inlineMetadata);
             getMetadataSignal(windowId).value = inlineMetadata;
         } catch (_) {}
     }
 
-    if (win?.windowForm && typeof win.windowForm === 'object') {
+    if (win?.windowForm && typeof win.windowForm === 'object' && !containsSnapshotSerializationMarker(win.windowForm)) {
         getFormSignal(`${windowId}:windowForm`).value = win.windowForm;
     }
 
-    if (win?.viewState && typeof win.viewState === 'object') {
+    if (win?.viewState && typeof win.viewState === 'object' && !containsSnapshotSerializationMarker(win.viewState)) {
         getViewSignal(windowId).value = win.viewState;
     }
 
@@ -519,7 +552,23 @@ function restoreWindowSignalsFromSnapshot(win) {
         let nextControl = snapshot?.control && typeof snapshot.control === 'object'
             ? { ...snapshot.control }
             : null;
-        if (shouldRevalidateRestoredDatasourceSnapshot(snapshot, nextControl)) {
+        const hasSerializationMarker = [
+            snapshot?.input,
+            snapshot?.control,
+            snapshot?.form,
+            snapshot?.selection,
+            snapshot?.collection,
+            snapshot?.collectionInfo,
+            snapshot?.metrics,
+            snapshot?.formStatus,
+        ].some((value) => containsSnapshotSerializationMarker(value));
+        if (containsSnapshotSerializationMarker(nextInput)) {
+            nextInput = null;
+        }
+        if (containsSnapshotSerializationMarker(nextControl)) {
+            nextControl = null;
+        }
+        if (hasSerializationMarker || shouldRevalidateRestoredDatasourceSnapshot(snapshot, nextControl)) {
             nextInput = {
                 ...(nextInput || {}),
                 fetch: true,
@@ -528,7 +577,7 @@ function restoreWindowSignalsFromSnapshot(win) {
             nextControl = {
                 ...nextControl,
                 loading: false,
-                ...(Object.prototype.hasOwnProperty.call(nextControl || {}, 'loaded') ? {loaded: false} : {}),
+                ...(hasSerializationMarker || Object.prototype.hasOwnProperty.call(nextControl || {}, 'loaded') ? {loaded: false} : {}),
                 error: null,
                 stale: false,
             };
@@ -538,6 +587,15 @@ function restoreWindowSignalsFromSnapshot(win) {
         }
         if (nextControl && typeof nextControl === 'object') {
             getControlSignal(dataSourceId).value = nextControl;
+        }
+        if (hasSerializationMarker) {
+            getFormSignal(dataSourceId).value = {};
+            getSelectionSignal(dataSourceId, null).value = null;
+            getCollectionSignal(dataSourceId).value = [];
+            getCollectionInfoSignal(dataSourceId).value = {};
+            getMetricsSignal(dataSourceId).value = {};
+            getFormStatusSignal(dataSourceId).value = {dirty: false, version: 0};
+            continue;
         }
         if (snapshot?.form && typeof snapshot.form === 'object') {
             getFormSignal(dataSourceId).value = snapshot.form;
@@ -561,6 +619,7 @@ function restoreWindowSignalsFromSnapshot(win) {
 
     const dialogs = Array.isArray(win?.dialogs) ? win.dialogs : [];
     for (const dialog of dialogs) {
+        if (containsSnapshotSerializationMarker(dialog)) continue;
         const dialogId = String(dialog?.id || '').trim();
         if (!dialogId) continue;
         const signal = getDialogSignal(`${windowId}Dialog${dialogId}`);
@@ -594,19 +653,19 @@ export const restoreWindowsFromSnapshot = (snapshot) => {
         region: win?.region || '',
         workspaceSharePct: win?.workspaceSharePct ?? undefined,
         workspaceMinHeight: win?.workspaceMinHeight ?? undefined,
-        navigation: win?.navigation && typeof win.navigation === 'object' ? { ...win.navigation } : undefined,
-        mcpUI: win?.mcpUI && typeof win.mcpUI === 'object' ? { ...win.mcpUI } : undefined,
+        navigation: win?.navigation && typeof win.navigation === 'object' && !containsSnapshotSerializationMarker(win.navigation) ? { ...win.navigation } : undefined,
+        mcpUI: win?.mcpUI && typeof win.mcpUI === 'object' && !containsSnapshotSerializationMarker(win.mcpUI) ? { ...win.mcpUI } : undefined,
         workspaceCollapsed: win?.workspaceCollapsed === true,
-        windowData: win?.windowData || '',
+        windowData: containsSnapshotSerializationMarker(win?.windowData) ? '' : (win?.windowData || ''),
         inTab: win?.inTab !== false,
-        parameters: win?.parameters || {},
+        parameters: containsSnapshotSerializationMarker(win?.parameters) ? {} : (win?.parameters || {}),
         isModal: !!win?.isModal,
         isMinimized: !!win?.isMinimized,
         zIndex: win?.zIndex ?? null,
         x: win?.position?.x ?? win?.x ?? undefined,
         y: win?.position?.y ?? win?.y ?? undefined,
-        size: win?.size || undefined,
-        inlineMetadata: win?.inlineMetadata && typeof win.inlineMetadata === 'object' ? win.inlineMetadata : undefined,
+        size: win?.size && !containsSnapshotSerializationMarker(win.size) ? win.size : undefined,
+        inlineMetadata: win?.inlineMetadata && typeof win.inlineMetadata === 'object' && !containsSnapshotSerializationMarker(win.inlineMetadata) ? win.inlineMetadata : undefined,
     }));
     for (const win of windows) {
         restoreWindowSignalsFromSnapshot(win);
@@ -713,7 +772,13 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
         parameters['windowData'] = windowData;
     }
     const explicitWindowId = String(options.windowId || '').trim();
-    const hash = Object.keys(parameters).length > 0 ? generateIntHash(parameters) : ''
+    const identityParameterNames = Array.isArray(options.identityParameters)
+        ? options.identityParameters.map((name) => String(name || '').trim()).filter(Boolean)
+        : [];
+    const identityParameters = identityParameterNames.length > 0
+        ? Object.fromEntries(identityParameterNames.filter((name) => Object.prototype.hasOwnProperty.call(parameters, name)).map((name) => [name, parameters[name]]))
+        : parameters;
+    const hash = Object.keys(identityParameters).length > 0 ? generateIntHash(identityParameters) : ''
     const baseWindowId = hash ? `${windowKey}_${hash}` : windowKey;
     const scopedBaseWindowId = computeHostedConversationScopedWindowId(baseWindowId, options);
 
@@ -750,6 +815,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
             windowData,
             inTab,
             parameters,
+            identityParameters: identityParameterNames,
             isModal: !!options.modal,
         };
         if (options.inlineMetadata) {
@@ -811,6 +877,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
             windowData,
             inTab,
             parameters,
+            identityParameters: identityParameterNames,
             isModal: !!options.modal,
         };
         if (options.inlineMetadata !== undefined) {

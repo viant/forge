@@ -7,12 +7,14 @@
  * ---------------------------------------------------------------------- */
 
 import React from 'react';
+import {fileToMCPBlob} from './fileBlob.js';
 import {createPortal} from 'react-dom';
 import {
     InputGroup,
     Checkbox,
     Switch,
     Button,
+    Icon,
     MenuItem,
     TextArea,
     RadioGroup,
@@ -22,6 +24,7 @@ import {
     Tooltip,
     FormGroup,
     AnchorButton,
+    FileInput,
 } from '@blueprintjs/core';
 import TextLookup from './TextLookup.jsx';
 import { Select, MultiSelect } from '@blueprintjs/select';
@@ -35,6 +38,7 @@ import { registerWidget } from '../../runtime/widgetRegistry.jsx';
 import { registerEventAdapter } from '../../runtime/binding.js';
 import { registerClassifier } from '../../runtime/widgetClassifier.js';
 import { buildDateProps } from './dateUtils.js';
+import { normalizeDateInputValue, serializeDateInputValue } from './civilDate.js';
 import { registerWrapper } from '../../runtime/wrapperRegistry.js';
 import TreeMultiSelect from '../../components/TreeMultiSelect.jsx';
 import MarkdownView from '../../components/MarkdownView.jsx';
@@ -261,6 +265,7 @@ export function DateRangePresetInput({
                     <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10}}>
                         <span style={{display: 'grid', gap: 4, color: '#6c7587', fontSize: 10, lineHeight: 1.3}}>
                             <Checkbox
+                                className="forge-blueprint-checkbox-compat"
                                 checked={includePartialData}
                                 label="Include today's partial data"
                                 onChange={(event) => setDraftField(includePartialDataField, event.target.checked)}
@@ -315,24 +320,39 @@ export function registerPack() {
     registerWidget('file', ({onChange, readOnly, disabled, value, item, style, context, adapter, options, ...rest}) => {
         const selectedName = value && typeof value === 'object' ? value.name : String(value || '');
         return (
-            <div style={{display: 'grid', gap: 6, width: '100%', ...(style || {})}}>
-                <input
-                    {...rest}
-                    type="file"
-                    accept={rest.accept || item?.accept || item?.properties?.accept || '.csv'}
+            <div style={{display: 'flex', alignItems: 'center', gap: 6, width: '100%', minWidth: 0, ...(style || {})}}>
+                <FileInput
+                    fill
+                    style={{minWidth: 0, flex: '1 1 auto'}}
+                    text={selectedName || 'No file selected'}
+                    buttonText="Browse"
+                    hasSelection={!!selectedName}
                     disabled={disabled || readOnly}
-                    onChange={onChange}
-                    className={`bp6-input${rest.className ? ` ${rest.className}` : ''}`}
+                    inputProps={{
+                        ...rest,
+                        accept: rest.accept || item?.accept || item?.properties?.accept || '.csv',
+                    }}
+                    onInputChange={onChange}
                 />
-                {selectedName ? <span style={{color: '#526579', fontSize: 12}}>Selected locally: {selectedName}</span> : null}
+                {selectedName ? (
+                    <Button
+                        minimal
+                        small
+                        icon="cross"
+                        aria-label="Clear selected file"
+                        title="Clear selected file"
+                        disabled={disabled || readOnly}
+                        onClick={() => adapter?.set?.(null)}
+                    />
+                ) : null}
             </div>
         );
     }, {framework: 'blueprint'});
 
     registerEventAdapter('file', {
-        onChange: ({adapter}) => (event) => {
+        onChange: ({adapter}) => async (event) => {
             const file = event?.target?.files?.[0];
-            adapter.set(file ? {name: file.name, size: file.size, type: file.type} : null);
+            adapter.set(await fileToMCPBlob(file));
         },
     });
 
@@ -423,9 +443,10 @@ export function registerPack() {
     /* -------------------- Checkbox / Toggle ------------------------- */
     registerWidget(
         'checkbox',
-        ({ value = false, onChange, readOnly, ...rest }) => (
+        ({ value = false, onChange, readOnly, className, ...rest }) => (
             <Checkbox
                 {...rest}
+                className={[className, 'forge-blueprint-checkbox-compat'].filter(Boolean).join(' ')}
                 checked={!!value}
                 onChange={(e) => onChange?.(e.target.checked)}
                 disabled={readOnly}
@@ -445,10 +466,10 @@ export function registerPack() {
 
     // Explicit switch uses a small native button shell so it remains visually
     // stable even when host and embedded Blueprint CSS versions differ.
-    registerWidget('switch', ({ value = false, onChange, readOnly, disabled, 'aria-label': ariaLabel, item, title }) => {
+    registerWidget('switch', ({ value = false, onChange, readOnly, disabled, 'aria-label': ariaLabel, item, title, trueLabel, falseLabel }) => {
         const checked = !!value;
         const unavailable = readOnly || disabled;
-        return (
+        const control = (
             <button
                 type="button"
                 role="switch"
@@ -483,6 +504,14 @@ export function registerPack() {
                 }}/>
             </button>
         );
+        const stateLabel = checked ? trueLabel : falseLabel;
+        if (!stateLabel) return control;
+        return (
+            <span style={{display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0}}>
+                {control}
+                <span>{stateLabel}</span>
+            </span>
+        );
     }, { framework: 'blueprint' });
     registerWidget('booleanPill', (props) => <BooleanPill {...props}/>, { framework: 'blueprint' });
     registerWidget('chipList', (props) => <ChipList {...props}/>, { framework: 'blueprint' });
@@ -516,7 +545,7 @@ export function registerPack() {
         'select',
         function BPSelect({ value, onChange, readOnly, options = [], context, fill = false, id, 'aria-label': ariaLabel, ...rest }) {
             const visibleOptions = permittedOptions(options, context);
-            const selected = visibleOptions.find((o) => o.value === value);
+            const selected = visibleOptions.find((o) => String(o.value) === String(value));
             return (
                 <Select
                     items={visibleOptions}
@@ -584,9 +613,13 @@ export function registerPack() {
                         {normalizedOptions.map((opt) => {
                             const optionValue = `${opt?.value ?? ''}`;
                             const selected = selectedSet.has(optionValue);
+                            const optionLabel = opt?.label || optionValue;
                             return (
                                 <Button
                                     key={optionValue}
+                                    aria-label={optionLabel}
+                                    aria-pressed={selected}
+                                    data-selected={selected ? 'true' : 'false'}
                                     small
                                     disabled={readOnly}
                                     outlined={false}
@@ -602,7 +635,7 @@ export function registerPack() {
                                     }}
                                     onClick={() => toggle(opt)}
                                 >
-                                    {opt?.label || optionValue}
+                                    <span className="forge-pill-label">{optionLabel}</span>
                                 </Button>
                             );
                         })}
@@ -758,19 +791,25 @@ export function registerPack() {
     /* -------------------- Currency ---------------------------------- */
     registerWidget(
         'currency',
-        ({ value = '', onValueChange, readOnly, currency = 'USD', ...rest }) => (
-            <NumericInput
-                {...rest}
-                value={value ?? ''}
-                onValueChange={(v) => onValueChange?.(v)}
-                readOnly={readOnly}
-                leftIcon={currencyInputIcon(currency)}
-                title={rest.title || String(currency).toUpperCase()}
-                aria-label={`${rest['aria-label'] || 'Amount'} (${String(currency).toUpperCase()})`}
-                majorStepSize={10}
-                minorStepSize={0.1}
-            />
-        ),
+        ({ value = '', onValueChange, readOnly, currency = 'USD', nullable = false, min, ...rest }) => {
+            const empty = nullable && (value === '' || value === null || value === undefined);
+            return (
+                <NumericInput
+                    {...rest}
+                    value={empty ? '' : (value ?? '')}
+                    min={nullable ? undefined : min}
+                    onValueChange={(valueAsNumber, valueAsString) => {
+                        onValueChange?.(nullable && String(valueAsString || '').trim() === '' ? null : valueAsNumber);
+                    }}
+                    readOnly={readOnly}
+                    leftIcon={currencyInputIcon(currency)}
+                    title={rest.title || String(currency).toUpperCase()}
+                    aria-label={`${rest['aria-label'] || 'Amount'} (${String(currency).toUpperCase()})`}
+                    majorStepSize={10}
+                    minorStepSize={0.1}
+                />
+            );
+        },
         { framework: 'blueprint' }
     );
 
@@ -812,11 +851,12 @@ export function registerPack() {
     const registerDateKind = (kind) => {
         registerWidget(
             kind,
-            ({ value, onChange, readOnly, dateFnsFormat, ...rest }) => (
+            ({ value, onChange, readOnly, dateFnsFormat, valueMode, ...rest }) => (
                 <DateInput3
                     {...buildDateProps({ type: kind, dateFnsFormat }, { readOnly, properties: rest })}
-                    value={value}
-                    onChange={(sel) => onChange?.(sel)}
+                    timezone={valueMode === 'civil' ? 'UTC' : rest.timezone}
+                    value={normalizeDateInputValue(value, valueMode)}
+                    onChange={(sel) => onChange?.(serializeDateInputValue(sel, valueMode))}
                 />
             ),
             { framework: 'blueprint' }
@@ -1006,7 +1046,7 @@ export function registerPack() {
     ), { framework: 'blueprint' });
 
     /* -------------------- Button ------------------------------------ */
-    registerWidget('button', ({ onClick, readOnly, intent, children, className, style, title, item, ...rest }) => {
+    registerWidget('button', ({ onClick, readOnly, intent, children, className, style, title, item, icon, hideLabel, ...rest }) => {
         const intentColors = {
             primary: { background: '#2f6de1', border: '#2f6de1', color: '#fff' },
             success: { background: '#0f9960', border: '#0f9960', color: '#fff' },
@@ -1027,7 +1067,8 @@ export function registerPack() {
                     justifyContent: 'center',
                     gap: 6,
                     minHeight: 30,
-                    padding: '0 12px',
+                    minWidth: hideLabel ? 30 : undefined,
+                    padding: hideLabel ? '0 7px' : '0 12px',
                     borderRadius: 8,
                     border: `1px solid ${palette?.border || '#d0daea'}`,
                     background: palette?.background || '#f5f8fd',
@@ -1040,7 +1081,8 @@ export function registerPack() {
                 }}
                 {...rest}
             >
-                {children || item?.label || title}
+                {icon ? <Icon icon={icon} size={14}/> : null}
+                {hideLabel ? null : (children || item?.label || title)}
             </button>
         );
     }, { framework: 'blueprint' });
@@ -1157,6 +1199,8 @@ registerPack();
 // Register Blueprint wrapper globally
 registerWrapper('blueprint', (item, container, children) => {
         const inline = (item.labelPosition || container?.layout?.labelPosition) === 'left';
+        const required = !!(item?.required || item?.properties?.required);
+        const requiredEditable = required && !item?.readOnly && !item?.disabled;
         // Stand-alone controls like button can disable FormGroup
         if (item.isStandalone) return children;
 
@@ -1172,8 +1216,12 @@ registerWrapper('blueprint', (item, container, children) => {
 
         return (
             <FormGroup
+                className={[
+                    requiredEditable ? 'forge-required-input' : '',
+                    item?.requiredState ? `forge-required-${item.requiredState}` : '',
+                ].filter(Boolean).join(' ') || undefined}
                 label={labelContent}
-                labelInfo={(item?.required || item?.properties?.required) ? <span aria-hidden="true">*</span> : undefined}
+                labelInfo={required ? <span aria-hidden="true">*</span> : undefined}
                 inline={inline}
                 labelFor={item.id}
                 helperText={item.validationError || item.helperText || item.description}

@@ -236,6 +236,8 @@ type Window struct {
 	Target                *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
 	TargetOverrides       map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
 	Authorization         *AuthorizationSpec                `json:"authorization,omitempty" yaml:"authorization,omitempty"`
+	Schemas               map[string]ResourceSchema         `json:"schemas,omitempty" yaml:"schemas,omitempty"`
+	ResourceModels        map[string]ResourceModel          `json:"resourceModels,omitempty" yaml:"resourceModels,omitempty"`
 	AuthorizationSnapshot map[string]interface{}            `json:"authorizationSnapshot,omitempty" yaml:"-"`
 }
 
@@ -309,9 +311,11 @@ type Layout struct {
 	Orientation   string   `json:"orientation" yaml:"orientation"`
 	Rows          int      `json:"rows" yaml:"rows"`
 	Columns       int      `json:"columns,omitempty" yaml:"columns,omitempty"`
+	ItemStretch   *bool    `json:"itemStretch,omitempty" yaml:"itemStretch,omitempty"`
 	Gap           string   `json:"gap,omitempty" yaml:"gap,omitempty"`
 	RowGap        string   `json:"rowGap,omitempty" yaml:"rowGap,omitempty"`
 	ColumnGap     string   `json:"columnGap,omitempty" yaml:"columnGap,omitempty"`
+	CollapseAt    string   `json:"collapseAt,omitempty" yaml:"collapseAt,omitempty"`
 	LabelPosition string   `json:"labelPosition,omitempty" yaml:"labelPosition,omitempty"`
 	Labels        *Labels  `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Divider       *Divider `json:"divider,omitempty" yaml:"divider,omitempty"`
@@ -475,49 +479,97 @@ type UnitedSize struct {
 }
 
 type Container struct {
-	ID                string `json:"id" yaml:"id"`
-	Binding           `yaml:",inline"`
-	Target            *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
-	TargetOverrides   map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
-	State             *Parameter                        `json:"state,omitempty" yaml:"state,omitempty"`
-	Title             string                            `json:"title,omitempty" yaml:"title,omitempty"`
-	Subtitle          string                            `json:"subtitle,omitempty" yaml:"subtitle,omitempty"`
-	Kind              string                            `json:"kind,omitempty" yaml:"kind,omitempty"`
-	Role              string                            `json:"role,omitempty" yaml:"role,omitempty"`
-	ScrollMode        string                            `json:"scrollMode,omitempty" yaml:"scrollMode,omitempty"`
-	FilterBindings    map[string]string                 `json:"filterBindings,omitempty" yaml:"filterBindings,omitempty"`
-	SelectionBindings map[string]string                 `json:"selectionBindings,omitempty" yaml:"selectionBindings,omitempty"`
-	ColumnSpan        int                               `json:"columnSpan,omitempty" yaml:"columnSpan,omitempty"`
-	RowSpan           int                               `json:"rowSpan,omitempty" yaml:"rowSpan,omitempty"`
-	DefaultMode       string                            `json:"defaultMode,omitempty" yaml:"defaultMode,omitempty"`
-	ViewModes         []string                          `json:"viewModes,omitempty" yaml:"viewModes,omitempty"`
-	Layout            *Layout                           `json:"layout,omitempty" yaml:"layout,omitempty"`
-	Style             *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
-	VisibleWhen       map[string]interface{}            `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
-	HiddenWhen        map[string]interface{}            `json:"hiddenWhen,omitempty" yaml:"hiddenWhen,omitempty"`
-	DisabledWhen      map[string]interface{}            `json:"disabledWhen,omitempty" yaml:"disabledWhen,omitempty"`
-	ReadOnlyWhen      map[string]interface{}            `json:"readOnlyWhen,omitempty" yaml:"readOnlyWhen,omitempty"`
-	Toolbar           *Toolbar                          `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
-	Table             *Table                            `json:"table,omitempty" yaml:"table,omitempty"`
-	FileBrowser       *FileBrowser                      `json:"fileBrowser,omitempty" yaml:"fileBrowser,omitempty"`
-	TreeBrowser       *TreeBrowser                      `json:"treeBrowser,omitempty" yaml:"treeBrowser,omitempty"`
-	Editor            *Editor                           `json:"editor,omitempty" yaml:"editor,omitempty"`
-	Terminal          *Terminal                         `json:"terminal,omitempty" yaml:"terminal,omitempty"`
-	Chart             *Chart                            `json:"chart,omitempty" yaml:"chart,omitempty"`
-	Chat              *Chat                             `json:"chat,omitempty" yaml:"chat,omitempty"`
-	Section           *Section                          `json:"section,omitempty" yaml:"section,omitempty"`
-	Items             []Item                            `json:"items,omitempty" yaml:"items,omitempty"`
-	Card              *Card                             `json:"card,omitempty" yaml:"card,omitempty"`
-	Footer            *Container                        `json:"footer,omitempty" yaml:"footer,omitempty"`
-	Containers        []Container                       `json:"containers,omitempty" yaml:"containers,omitempty"`
-	SchemaBasedForm   *SchemaBasedForm                  `json:"schemaBasedForm,omitempty" yaml:"schemaBasedForm,omitempty"`
-	On                []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
-	Tabs              *Tabs                             `json:"tabs,omitempty" yaml:"tabs,omitempty"`
-	Dialogs           []string                          `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
-	Repeat            *Repeat                           `json:"repeat,omitempty" yaml:"repeat,omitempty"`
-	SelectFirst       bool                              `json:"selectFirst,omitempty"  yaml:"selectFirst,omitempty"`
-	FetchData         bool                              `json:"fetchData,omitempty"  yaml:"fetchData,omitempty"`
-	Dashboard         *Dashboard                        `json:"dashboard,omitempty" yaml:"dashboard,omitempty"`
+	ID                 string `json:"id" yaml:"id"`
+	ClassName          string `json:"className,omitempty" yaml:"className,omitempty"`
+	Binding            `yaml:",inline"`
+	Target             *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides    map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
+	State              *Parameter                        `json:"state,omitempty" yaml:"state,omitempty"`
+	Title              string                            `json:"title,omitempty" yaml:"title,omitempty"`
+	Subtitle           string                            `json:"subtitle,omitempty" yaml:"subtitle,omitempty"`
+	Kind               string                            `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Role               string                            `json:"role,omitempty" yaml:"role,omitempty"`
+	ScrollMode         string                            `json:"scrollMode,omitempty" yaml:"scrollMode,omitempty"`
+	FilterBindings     map[string]string                 `json:"filterBindings,omitempty" yaml:"filterBindings,omitempty"`
+	SelectionBindings  map[string]string                 `json:"selectionBindings,omitempty" yaml:"selectionBindings,omitempty"`
+	ColumnSpan         int                               `json:"columnSpan,omitempty" yaml:"columnSpan,omitempty"`
+	RowSpan            int                               `json:"rowSpan,omitempty" yaml:"rowSpan,omitempty"`
+	DefaultMode        string                            `json:"defaultMode,omitempty" yaml:"defaultMode,omitempty"`
+	ViewModes          []string                          `json:"viewModes,omitempty" yaml:"viewModes,omitempty"`
+	Layout             *Layout                           `json:"layout,omitempty" yaml:"layout,omitempty"`
+	Style              *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
+	VisibleWhen        map[string]interface{}            `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+	HiddenWhen         map[string]interface{}            `json:"hiddenWhen,omitempty" yaml:"hiddenWhen,omitempty"`
+	DisabledWhen       map[string]interface{}            `json:"disabledWhen,omitempty" yaml:"disabledWhen,omitempty"`
+	ReadOnlyWhen       map[string]interface{}            `json:"readOnlyWhen,omitempty" yaml:"readOnlyWhen,omitempty"`
+	Toolbar            *Toolbar                          `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
+	Table              *Table                            `json:"table,omitempty" yaml:"table,omitempty"`
+	FileBrowser        *FileBrowser                      `json:"fileBrowser,omitempty" yaml:"fileBrowser,omitempty"`
+	TreeBrowser        *TreeBrowser                      `json:"treeBrowser,omitempty" yaml:"treeBrowser,omitempty"`
+	Editor             *Editor                           `json:"editor,omitempty" yaml:"editor,omitempty"`
+	Terminal           *Terminal                         `json:"terminal,omitempty" yaml:"terminal,omitempty"`
+	Chart              *Chart                            `json:"chart,omitempty" yaml:"chart,omitempty"`
+	Chat               *Chat                             `json:"chat,omitempty" yaml:"chat,omitempty"`
+	Section            *Section                          `json:"section,omitempty" yaml:"section,omitempty"`
+	Items              []Item                            `json:"items,omitempty" yaml:"items,omitempty"`
+	Card               *Card                             `json:"card,omitempty" yaml:"card,omitempty"`
+	Footer             *Container                        `json:"footer,omitempty" yaml:"footer,omitempty"`
+	Containers         []Container                       `json:"containers,omitempty" yaml:"containers,omitempty"`
+	SchemaBasedForm    *SchemaBasedForm                  `json:"schemaBasedForm,omitempty" yaml:"schemaBasedForm,omitempty"`
+	On                 []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
+	Tabs               *Tabs                             `json:"tabs,omitempty" yaml:"tabs,omitempty"`
+	Dialogs            []string                          `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
+	Repeat             *Repeat                           `json:"repeat,omitempty" yaml:"repeat,omitempty"`
+	SelectFirst        bool                              `json:"selectFirst,omitempty"  yaml:"selectFirst,omitempty"`
+	FetchData          bool                              `json:"fetchData,omitempty"  yaml:"fetchData,omitempty"`
+	Dashboard          *Dashboard                        `json:"dashboard,omitempty" yaml:"dashboard,omitempty"`
+	MutationCommand    *MutationCommand                  `json:"mutationCommand,omitempty" yaml:"mutationCommand,omitempty"`
+	EditableCollection *EditableCollection               `json:"editableCollection,omitempty" yaml:"editableCollection,omitempty"`
+	AssignmentPicker   *AssignmentPicker                 `json:"assignmentPicker,omitempty" yaml:"assignmentPicker,omitempty"`
+	StatusWorkflow     *StatusWorkflow                   `json:"statusWorkflow,omitempty" yaml:"statusWorkflow,omitempty"`
+	TreeEditor         *TreeEditorSpec                   `json:"treeEditor,omitempty" yaml:"treeEditor,omitempty"`
+	Wizard             *WizardSpec                       `json:"wizard,omitempty" yaml:"wizard,omitempty"`
+	UploadCollection   *UploadCollectionSpec             `json:"uploadCollection,omitempty" yaml:"uploadCollection,omitempty"`
+	DerivedDataSource  *DerivedDataSourceSpec            `json:"derivedDataSource,omitempty" yaml:"derivedDataSource,omitempty"`
+	PermissionBoundary *PermissionBoundarySpec           `json:"permissionBoundary,omitempty" yaml:"permissionBoundary,omitempty"`
+	ResponsiveDataGrid *ResponsiveDataGridSpec           `json:"responsiveDataGrid,omitempty" yaml:"responsiveDataGrid,omitempty"`
+	HistoryDiff        *HistoryDiffSpec                  `json:"historyDiff,omitempty" yaml:"historyDiff,omitempty"`
+	ScheduleEditor     *ScheduleEditorSpec               `json:"scheduleEditor,omitempty" yaml:"scheduleEditor,omitempty"`
+	DraftForm          *DraftFormSpec                    `json:"draftForm,omitempty" yaml:"draftForm,omitempty"`
+	QueryToolbar       *QueryToolbarSpec                 `json:"queryToolbar,omitempty" yaml:"queryToolbar,omitempty"`
+	StableTabs         *StableTabsSpec                   `json:"stableTabs,omitempty" yaml:"stableTabs,omitempty"`
+	ResourceHeader     *ResourceHeaderSpec               `json:"resourceHeader,omitempty" yaml:"resourceHeader,omitempty"`
+	DataStateBoundary  *DataStateBoundarySpec            `json:"dataStateBoundary,omitempty" yaml:"dataStateBoundary,omitempty"`
+	RelationDrill      *RelationDrillSpec                `json:"relationDrill,omitempty" yaml:"relationDrill,omitempty"`
+	NotificationRules  *NotificationRulesSpec            `json:"notificationRules,omitempty" yaml:"notificationRules,omitempty"`
+	MetricSummary      *MetricSummarySpec                `json:"metricSummary,omitempty" yaml:"metricSummary,omitempty"`
+	DetailView         *DetailViewSpec                   `json:"detailView,omitempty" yaml:"detailView,omitempty"`
+	MasterDetail       *MasterDetailSpec                 `json:"masterDetail,omitempty" yaml:"masterDetail,omitempty"`
+	// Editable-table fields are first-class because authored dashboard.editableTable
+	// metadata must survive YAML -> Go -> JSON without losing explicit false values.
+	Columns        []DashboardEditableTableColumn `json:"columns,omitempty" yaml:"columns,omitempty"`
+	AllowAdd       *bool                          `json:"allowAdd,omitempty" yaml:"allowAdd,omitempty"`
+	AllowRemove    *bool                          `json:"allowRemove,omitempty" yaml:"allowRemove,omitempty"`
+	MinRows        int                            `json:"minRows,omitempty" yaml:"minRows,omitempty"`
+	QuickFilter    *bool                          `json:"quickFilter,omitempty" yaml:"quickFilter,omitempty"`
+	PageSize       int                            `json:"pageSize,omitempty" yaml:"pageSize,omitempty"`
+	AddRow         *DashboardEditableTableAddRow  `json:"addRow,omitempty" yaml:"addRow,omitempty"`
+	RemoveRowLabel string                         `json:"removeRowLabel,omitempty" yaml:"removeRowLabel,omitempty"`
+}
+
+type DashboardEditableTableColumn struct {
+	Key         string                 `json:"key,omitempty" yaml:"key,omitempty"`
+	Label       string                 `json:"label,omitempty" yaml:"label,omitempty"`
+	Format      string                 `json:"format,omitempty" yaml:"format,omitempty"`
+	Frozen      bool                   `json:"frozen,omitempty" yaml:"frozen,omitempty"`
+	Editor      any                    `json:"editor,omitempty" yaml:"editor,omitempty"`
+	VisibleWhen map[string]interface{} `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+}
+
+type DashboardEditableTableAddRow struct {
+	Label         string                 `json:"label,omitempty" yaml:"label,omitempty"`
+	DeriveHandler string                 `json:"deriveHandler,omitempty" yaml:"deriveHandler,omitempty"`
+	Defaults      map[string]interface{} `json:"defaults,omitempty" yaml:"defaults,omitempty"`
 }
 
 func (c *Container) UnmarshalJSON(data []byte) error {
@@ -1218,18 +1270,20 @@ type Card struct {
 }
 
 type Table struct {
-	Columns           []Column               `json:"columns" yaml:"columns"`
-	Presentation      string                 `json:"presentation,omitempty" yaml:"presentation,omitempty"`
-	Density           string                 `json:"density,omitempty" yaml:"density,omitempty"`
-	Toolbar           *Toolbar               `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
-	EnforceColumnSize *bool                  `json:"enforceColumnSize,omitempty" yaml:"enforceColumnSize,omitempty"`
-	Width             string                 `json:"width,omitempty" yaml:"width,omitempty"`
-	FullWidth         *bool                  `json:"fullWidth,omitempty" yaml:"fullWidth,omitempty"`
-	Pagination        interface{}            `json:"pagination,omitempty" yaml:"pagination,omitempty"`
-	FormattingRules   []TableFormattingRule  `json:"formattingRules,omitempty" yaml:"formattingRules,omitempty"`
-	On                []*Execute             `json:"on,omitempty" yaml:"on,omitempty"`
-	EmptyState        map[string]interface{} `json:"emptyState,omitempty" yaml:"emptyState,omitempty"`
-	DefaultSort       *TableSort             `json:"defaultSort,omitempty" yaml:"defaultSort,omitempty"`
+	Columns           []Column                          `json:"columns" yaml:"columns"`
+	Target            *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides   map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
+	Presentation      string                            `json:"presentation,omitempty" yaml:"presentation,omitempty"`
+	Density           string                            `json:"density,omitempty" yaml:"density,omitempty"`
+	Toolbar           *Toolbar                          `json:"toolbar,omitempty" yaml:"toolbar,omitempty"`
+	EnforceColumnSize *bool                             `json:"enforceColumnSize,omitempty" yaml:"enforceColumnSize,omitempty"`
+	Width             string                            `json:"width,omitempty" yaml:"width,omitempty"`
+	FullWidth         *bool                             `json:"fullWidth,omitempty" yaml:"fullWidth,omitempty"`
+	Pagination        interface{}                       `json:"pagination,omitempty" yaml:"pagination,omitempty"`
+	FormattingRules   []TableFormattingRule             `json:"formattingRules,omitempty" yaml:"formattingRules,omitempty"`
+	On                []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
+	EmptyState        map[string]interface{}            `json:"emptyState,omitempty" yaml:"emptyState,omitempty"`
+	DefaultSort       *TableSort                        `json:"defaultSort,omitempty" yaml:"defaultSort,omitempty"`
 }
 
 type TableSort struct {
@@ -1260,6 +1314,7 @@ type TableLink struct {
 	Rel                 string                 `json:"rel,omitempty" yaml:"rel,omitempty"`
 	DialogId            string                 `json:"dialogId,omitempty" yaml:"dialogId,omitempty"`
 	WindowKey           string                 `json:"windowKey,omitempty" yaml:"windowKey,omitempty"`
+	IdentityParameters  []string               `json:"identityParameters,omitempty" yaml:"identityParameters,omitempty"`
 	WindowTitle         string                 `json:"windowTitle,omitempty" yaml:"windowTitle,omitempty"`
 	WindowTitleSelector string                 `json:"windowTitleSelector,omitempty" yaml:"windowTitleSelector,omitempty"`
 	WindowTitleSource   string                 `json:"windowTitleSource,omitempty" yaml:"windowTitleSource,omitempty"`
@@ -1290,37 +1345,39 @@ type Toolbar struct {
 }
 
 type Column struct {
-	ID                string                 `json:"id" yaml:"id"`
-	Name              string                 `json:"name" yaml:"name"`
-	Width             int                    `json:"width,omitempty" yaml:"width,omitempty"`
-	Sticky            string                 `json:"sticky,omitempty" yaml:"sticky,omitempty"`
-	Align             string                 `json:"align,omitempty" yaml:"align,omitempty"`
-	Format            string                 `json:"format,omitempty" yaml:"format,omitempty"`
-	TimeZone          string                 `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
-	TimeZoneSelector  string                 `json:"timeZoneSelector,omitempty" yaml:"timeZoneSelector,omitempty"`
-	ValueMap          map[string]interface{} `json:"valueMap,omitempty" yaml:"valueMap,omitempty"`
-	NumericFormat     string                 `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
-	EmptyText         string                 `json:"emptyText,omitempty" yaml:"emptyText,omitempty"`
-	SingularLabel     string                 `json:"singularLabel,omitempty" yaml:"singularLabel,omitempty"`
-	PluralLabel       string                 `json:"pluralLabel,omitempty" yaml:"pluralLabel,omitempty"`
-	Visible           *bool                  `json:"visible,omitempty" yaml:"visible,omitempty"`
-	Sortable          bool                   `json:"sortable,omitempty" yaml:"sortable,omitempty"`
-	Icon              string                 `json:"icon,omitempty" yaml:"icon,omitempty"`
-	IconFromValue     bool                   `json:"iconFromValue,omitempty" yaml:"iconFromValue,omitempty"`
-	Type              string                 `json:"type,omitempty" yaml:"type,omitempty"`
-	MultiSelect       bool                   `json:"multiSelect,omitempty" yaml:"multiSelect,omitempty"`
-	EnforceColumnSize bool                   `json:"enforceColumnSize,omitempty" yaml:"enforceColumnSize,omitempty"`
-	Link              *TableLink             `json:"link,omitempty" yaml:"link,omitempty"`
-	Badge             *TableCellBadge        `json:"badge,omitempty" yaml:"badge,omitempty"`
-	CellProperties    map[string]interface{} `json:"cellProperties,omitempty" yaml:"cellProperties,omitempty"`
-	HeadProperties    map[string]interface{} `json:"headProperties,omitempty" yaml:"headProperties,omitempty"`
-	Progress          *Progress              `json:"progress,omitempty" yaml:"progress,omitempty"`
-	On                []*Execute             `json:"on,omitempty" yaml:"on,omitempty"`
-	ToolTip           string                 `json:"tooltip" yaml:"tooltip"`
-	VisibleWhen       map[string]interface{} `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
-	HiddenWhen        map[string]interface{} `json:"hiddenWhen,omitempty" yaml:"hiddenWhen,omitempty"`
-	DisabledWhen      map[string]interface{} `json:"disabledWhen,omitempty" yaml:"disabledWhen,omitempty"`
-	ReadOnlyWhen      map[string]interface{} `json:"readOnlyWhen,omitempty" yaml:"readOnlyWhen,omitempty"`
+	ID                    string                 `json:"id" yaml:"id"`
+	Name                  string                 `json:"name" yaml:"name"`
+	Width                 int                    `json:"width,omitempty" yaml:"width,omitempty"`
+	Sticky                string                 `json:"sticky,omitempty" yaml:"sticky,omitempty"`
+	Align                 string                 `json:"align,omitempty" yaml:"align,omitempty"`
+	Format                string                 `json:"format,omitempty" yaml:"format,omitempty"`
+	TimeZone              string                 `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
+	TimeZoneSelector      string                 `json:"timeZoneSelector,omitempty" yaml:"timeZoneSelector,omitempty"`
+	ValueMap              map[string]interface{} `json:"valueMap,omitempty" yaml:"valueMap,omitempty"`
+	NumericFormat         string                 `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
+	EmptyText             string                 `json:"emptyText,omitempty" yaml:"emptyText,omitempty"`
+	SingularLabel         string                 `json:"singularLabel,omitempty" yaml:"singularLabel,omitempty"`
+	PluralLabel           string                 `json:"pluralLabel,omitempty" yaml:"pluralLabel,omitempty"`
+	Visible               *bool                  `json:"visible,omitempty" yaml:"visible,omitempty"`
+	Sortable              bool                   `json:"sortable,omitempty" yaml:"sortable,omitempty"`
+	Icon                  string                 `json:"icon,omitempty" yaml:"icon,omitempty"`
+	IconFromValue         bool                   `json:"iconFromValue,omitempty" yaml:"iconFromValue,omitempty"`
+	PressedWhenValue      interface{}            `json:"pressedWhenValue,omitempty" yaml:"pressedWhenValue,omitempty"`
+	Type                  string                 `json:"type,omitempty" yaml:"type,omitempty"`
+	MultiSelect           bool                   `json:"multiSelect,omitempty" yaml:"multiSelect,omitempty"`
+	SelectionDisabledWhen map[string]interface{} `json:"selectionDisabledWhen,omitempty" yaml:"selectionDisabledWhen,omitempty"`
+	EnforceColumnSize     bool                   `json:"enforceColumnSize,omitempty" yaml:"enforceColumnSize,omitempty"`
+	Link                  *TableLink             `json:"link,omitempty" yaml:"link,omitempty"`
+	Badge                 *TableCellBadge        `json:"badge,omitempty" yaml:"badge,omitempty"`
+	CellProperties        map[string]interface{} `json:"cellProperties,omitempty" yaml:"cellProperties,omitempty"`
+	HeadProperties        map[string]interface{} `json:"headProperties,omitempty" yaml:"headProperties,omitempty"`
+	Progress              *Progress              `json:"progress,omitempty" yaml:"progress,omitempty"`
+	On                    []*Execute             `json:"on,omitempty" yaml:"on,omitempty"`
+	ToolTip               string                 `json:"tooltip" yaml:"tooltip"`
+	VisibleWhen           map[string]interface{} `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+	HiddenWhen            map[string]interface{} `json:"hiddenWhen,omitempty" yaml:"hiddenWhen,omitempty"`
+	DisabledWhen          map[string]interface{} `json:"disabledWhen,omitempty" yaml:"disabledWhen,omitempty"`
+	ReadOnlyWhen          map[string]interface{} `json:"readOnlyWhen,omitempty" yaml:"readOnlyWhen,omitempty"`
 }
 
 type TableCellBadge struct {
@@ -1400,6 +1457,8 @@ type Item struct {
 	OptionLabelField     string                            `json:"optionLabelField,omitempty" yaml:"optionLabelField,omitempty"`
 	OptionValueField     string                            `json:"optionValueField,omitempty" yaml:"optionValueField,omitempty"`
 	OptionSecondaryField string                            `json:"optionSecondaryField,omitempty" yaml:"optionSecondaryField,omitempty"`
+	OptionFilter         interface{}                       `json:"optionFilter,omitempty" yaml:"optionFilter,omitempty"`
+	OptionFilters        interface{}                       `json:"optionFilters,omitempty" yaml:"optionFilters,omitempty"`
 	IncludeEmptyOption   bool                              `json:"includeEmptyOption,omitempty" yaml:"includeEmptyOption,omitempty"`
 	EmptyOptionLabel     string                            `json:"emptyOptionLabel,omitempty" yaml:"emptyOptionLabel,omitempty"`
 	DateFnsFormat        string                            `json:"dateFnsFormat,omitempty" yaml:"dateFnsFormat,omitempty"`
@@ -1415,10 +1474,12 @@ type Item struct {
 	Widget               string                            `json:"widget,omitempty" yaml:"widget,omitempty"`
 	Appearance           string                            `json:"appearance,omitempty" yaml:"appearance,omitempty"`
 	HideLabel            bool                              `json:"hideLabel,omitempty" yaml:"hideLabel,omitempty"`
+	IsStandalone         bool                              `json:"isStandalone,omitempty" yaml:"isStandalone,omitempty"`
 	VisibleWhen          map[string]interface{}            `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
 	HiddenWhen           map[string]interface{}            `json:"hiddenWhen,omitempty" yaml:"hiddenWhen,omitempty"`
 	DisabledWhen         map[string]interface{}            `json:"disabledWhen,omitempty" yaml:"disabledWhen,omitempty"`
 	ReadOnlyWhen         map[string]interface{}            `json:"readOnlyWhen,omitempty" yaml:"readOnlyWhen,omitempty"`
+	ReadOnly             bool                              `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
 	// ColumnSpan defines how many columns this item occupies in a grid layout.
 	// Alternative casings ColSpan/colspan are accepted for backward compatibility.
 	ColumnSpan          int                    `json:"columnSpan,omitempty" yaml:"columnSpan,omitempty"`
@@ -1428,6 +1489,7 @@ type Item struct {
 	Disabled            bool                   `json:"disabled,omitempty" yaml:"disabled,omitempty"`
 	EnableWhenSelection bool                   `json:"enableWhenSelection,omitempty" yaml:"enableWhenSelection,omitempty"`
 	Close               bool                   `json:"close,omitempty" yaml:"close,omitempty"`
+	MutationCommand     *MutationCommand       `json:"mutationCommand,omitempty" yaml:"mutationCommand,omitempty"`
 	Enabled             bool                   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	MenuItems           []Item                 `json:"menuItems,omitempty" yaml:"menuItems,omitempty"`
 	On                  []*Execute             `json:"on,omitempty" yaml:"on,omitempty"` // For message-bus events
@@ -1510,6 +1572,7 @@ type Option struct {
 type DataSource struct {
 	Service                                 *Service                          `json:"service,omitempty" yaml:"service,omitempty"`
 	DataSourceRef                           string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	ResourceModelRef                        string                            `json:"resourceModelRef,omitempty" yaml:"resourceModelRef,omitempty"`
 	Target                                  *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
 	TargetOverrides                         map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
 	UniqueKey                               []*UniqueKey                      `json:"uniqueKey,omitempty" yaml:"uniqueKey,omitempty"`
@@ -1523,7 +1586,9 @@ type DataSource struct {
 	AutoSelect                              *bool                             `json:"autoSelect,omitempty" yaml:"autoSelect,omitempty"`
 	AutoFetch                               *bool                             `json:"autoFetch,omitempty" yaml:"autoFetch,omitempty"`
 	ReplayPendingFetchOnRestore             *bool                             `json:"replayPendingFetchOnRestore,omitempty" yaml:"replayPendingFetchOnRestore,omitempty"`
+	PreserveDialogStateOnReopen             *bool                             `json:"preserveDialogStateOnReopen,omitempty" yaml:"preserveDialogStateOnReopen,omitempty"`
 	PreserveParametersOnMissingDependencies *bool                             `json:"preserveParametersOnMissingDependencies,omitempty" yaml:"preserveParametersOnMissingDependencies,omitempty"`
+	RequiredAnyParameters                   []string                          `json:"requiredAnyParameters,omitempty" yaml:"requiredAnyParameters,omitempty"`
 	SelfReference                           string                            `json:"selfReference,omitempty" yaml:"selfReference,omitempty"`
 	SortMode                                string                            `json:"sortMode,omitempty" yaml:"sortMode,omitempty"`
 	FilterMode                              string                            `json:"filterMode,omitempty" yaml:"filterMode,omitempty"`
@@ -1556,6 +1621,7 @@ type Selectors struct {
 type PagingConfig struct {
 	Size              int                `json:"size" yaml:"size"`
 	Enabled           bool               `json:"enabled" yaml:"enabled"`
+	OpenEnded         bool               `json:"openEnded,omitempty" yaml:"openEnded,omitempty"`
 	Parameters        *PagingParameters  `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 	DataInfoSelectors *DataInfoSelectors `json:"dataInfoSelectors,omitempty" yaml:"dataInfoSelectors,omitempty"`
 }

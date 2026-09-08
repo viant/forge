@@ -1,9 +1,13 @@
-import {resolveSelector} from "../utils/selector.js";
+import {resolveSelector, setSelector} from "../utils/selector.js";
 
 export function applyParameterCodec(value, codec) {
     const rawName = typeof codec === 'string' ? codec : codec?.name;
     const name = String(rawName || '').trim().toLowerCase();
     if (!name || value === undefined || value === null) return value;
+
+    if (Array.isArray(value) && !name.endsWith('[]')) {
+        return value.length === 1 ? applyParameterCodec(value[0], codec) : value;
+    }
 
     if (name.endsWith('[]')) {
         const scalarCodec = name.substring(0, name.length - 2);
@@ -45,6 +49,18 @@ export function applyParameterCodec(value, codec) {
         default:
             return value;
     }
+}
+
+export function applyDataSourceParameterCodecs(values = {}, parameterDefinitions = []) {
+    let result = {...(values || {})};
+    for (const parameter of Array.isArray(parameterDefinitions) ? parameterDefinitions : []) {
+        const name = String(parameter?.name || '').trim();
+        if (!name || !parameter?.codec) continue;
+        const current = resolveSelector(result, name);
+        if (current === undefined) continue;
+        result = setSelector(result, name, applyParameterCodec(current, parameter.codec));
+    }
+    return result;
 }
 
 function shouldPreserveResolvedValue(existingValue, nextValue) {

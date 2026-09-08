@@ -22,6 +22,52 @@ const row = {
   url: 'https://example.com/orders/123',
 };
 
+assert.equal(resolveLinkTarget({
+  row,
+  value: [],
+  linkConfig: {kind: 'association', windowKey: 'order', dialogId: 'associatedOrders'},
+}), null);
+
+assert.deepEqual(resolveLinkTarget({
+  row,
+  value: [{id: 123, name: 'Order Alpha'}],
+  linkConfig: {
+    kind: 'association',
+    windowKey: 'order',
+    dialogId: 'associatedOrders',
+    parameters: {AdOrderId: {source: 'value', selector: 'id', wrap: 'array'}},
+  },
+}), {
+  kind: 'window',
+  text: 'order',
+  title: '',
+  windowKey: 'order',
+  windowTitle: '',
+  inTab: true,
+  newInstance: false,
+  autoIndexTitle: false,
+  awaitResult: false,
+  modal: false,
+  size: undefined,
+  width: undefined,
+  height: undefined,
+  footer: undefined,
+  parameters: {AdOrderId: [123]},
+});
+
+assert.deepEqual(resolveLinkTarget({
+  row,
+  value: [{id: 123}, {id: 124}],
+  linkConfig: {kind: 'association', windowKey: 'order', dialogId: 'associatedOrders'},
+}), {
+  kind: 'dialog',
+  text: 'associatedOrders',
+  title: '',
+  dialogId: 'associatedOrders',
+  awaitResult: false,
+  parameters: {associations: [{id: 123}, {id: 124}], associationIds: [123, 124]},
+});
+
 assert.deepEqual(
   resolveLinkTarget({
     row,
@@ -39,6 +85,23 @@ assert.deepEqual(
     rel: 'noopener noreferrer',
     title: '',
   },
+);
+
+assert.deepEqual(
+  resolveLinkTarget({
+    row,
+    value: row.name,
+    linkConfig: {
+      kind: 'window',
+      windowKey: 'order',
+      identityParameters: ['AdOrderId'],
+      parameters: {
+        AdOrderId: {source: 'row', selector: 'id', wrap: 'array'},
+        CampaignId: {source: 'row', selector: 'campaignId', wrap: 'array'},
+      },
+    },
+  }).identityParameters,
+  ['AdOrderId'],
 );
 
 assert.deepEqual(

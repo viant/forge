@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +13,50 @@ import (
 	afsurl "github.com/viant/afs/url"
 	"github.com/viant/forge/backend/service/meta"
 )
+
+func TestWindowHandlerRejectsFinalResourceModelDatasourceMismatch(t *testing.T) {
+	tests := map[string]string{
+		"reader": `
+schemas: {record: {type: object, properties: {id: {type: integer}}}}
+resourceModels:
+  record: {schemaRef: record, read: {dataSourceRef: read}, fields: {id: {write: Id}}}
+  other: {schemaRef: record, read: {dataSourceRef: otherRead}, fields: {id: {write: Id}}}
+dataSource:
+  read: {resourceModelRef: other, cardinality: collection}
+  otherRead: {resourceModelRef: other, cardinality: collection}
+view: {content: {id: root}}
+`,
+		"writer": `
+schemas: {record: {type: object, properties: {id: {type: integer}}}}
+resourceModels:
+  record: {schemaRef: record, write: {dataSourceRef: patch, inputPath: Records}, fields: {id: {write: Id}}}
+dataSource: {patch: {cardinality: object}, otherPatch: {cardinality: object}}
+view:
+  content:
+    id: root
+    mutationCommand:
+      dataSourceRef: otherPatch
+      payload: {modelRef: record, source: {scope: extras, selector: data}}
+`,
+	}
+	for name, source := range tests {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			mustWriteHandlerMetaFile(t, filepath.Join(root, "window", "record.yaml"), source)
+			baseURL := "file://" + filepath.ToSlash(filepath.Join(root, "window"))
+			loader := meta.New(afs.New(), baseURL)
+			if _, err := LoadWindow(context.Background(), loader, baseURL, "record", "", nil); err == nil {
+				t.Fatal("public LoadWindow accepted a datasource symmetry mismatch")
+			}
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodGet, "/v1/window/record", nil)
+			WindowHandler(loader, baseURL, "/v1/window/").ServeHTTP(recorder, request)
+			if recorder.Code != http.StatusInternalServerError || !strings.Contains(recorder.Body.String(), "resource model") {
+				t.Fatalf("expected final resource-model validation failure, status=%d body=%s", recorder.Code, recorder.Body.String())
+			}
+		})
+	}
+}
 
 func TestLoadWindow_LoadsSharedWebActionCodeForWebTarget(t *testing.T) {
 	root := t.TempDir()

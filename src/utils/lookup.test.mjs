@@ -1,5 +1,15 @@
 import assert from 'node:assert/strict';
-import { applyLookupSelection, resolveLookupValue } from './lookup.js';
+import { applyLookupSelection, normalizeLookupInputs, resolveLookupValue } from './lookup.js';
+
+function testNormalizeLookupInputsTargetsDeclaredDataSource() {
+  assert.deepEqual(normalizeLookupInputs([
+    {name: 'Field'},
+    {name: 'Page', to: 'other:query'},
+  ], 'targeting_tree_lookup'), [
+    {name: 'Field', from: ':form', to: 'targeting_tree_lookup:parameters'},
+    {name: 'Page', from: ':form', to: 'other:query'},
+  ]);
+}
 
 async function testResolveLookupValueUsesDeclaredResolveInput() {
   const calls = [];
@@ -91,7 +101,43 @@ function testApplyLookupSelectionMapsOutputs() {
   console.log('applyLookupSelection ✓ maps outputs and updates adapter');
 }
 
+function testApplyLookupSelectionHonorsDataFieldDisplayAndCallback() {
+  const formSignal = {
+    _value: {},
+    peek() { return this._value; },
+    set value(next) { this._value = next; },
+    get value() { return this._value; },
+  };
+  let adapterValue = null;
+  let callbackRecord = null;
+  const result = applyLookupSelection({
+    item: {
+      id: 'targetLookup',
+      dataField: 'selectedLabel',
+      lookup: {display: 'path'},
+      on: [{event: 'onLookup', handler: 'workspace.afterLookup'}],
+    },
+    context: {
+      signals: {form: formSignal},
+      lookupHandler(name) {
+        assert.equal(name, 'workspace.afterLookup');
+        return ({record}) => { callbackRecord = record; };
+      },
+    },
+    adapter: { set(v) { adapterValue = v; } },
+    outputs: [{from: ':output', to: ':form', location: 'value', name: 'selectedId'}],
+    record: {value: '42', path: ['Device', 'Mobile']},
+  });
+  assert.equal(adapterValue, 'Device / Mobile');
+  assert.equal(formSignal.value.selectedLabel, 'Device / Mobile');
+  assert.equal(formSignal.value.selectedId, '42');
+  assert.equal(callbackRecord.value, '42');
+  assert.equal(result.value, 'Device / Mobile');
+}
+
 await testResolveLookupValueUsesDeclaredResolveInput();
 await testResolveLookupValueRejectsAmbiguousMatches();
+testNormalizeLookupInputsTargetsDeclaredDataSource();
 testApplyLookupSelectionMapsOutputs();
+testApplyLookupSelectionHonorsDataFieldDisplayAndCallback();
 console.log('\nLOOKUP UTILS TESTS PASSED');
