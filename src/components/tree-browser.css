@@ -149,6 +149,10 @@
         0 0 0 1px rgba(255, 255, 255, 0.7) inset;
 }
 
+.steward-targeting-tree-portal > :is(.bp6-overlay, .bp5-overlay, .bp4-overlay) {
+    z-index: 30;
+}
+
 .forge-lookup-dialog .bp6-dialog-header,
 .forge-lookup-dialog .bp5-dialog-header,
 .forge-lookup-dialog .bp4-dialog-header {
