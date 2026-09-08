@@ -28,6 +28,12 @@ export function responsiveTarget(width) {
   return 'desktop';
 }
 
+export function responsiveGridStyle(state = {}) {
+  const style = state?.style && typeof state.style === 'object' ? state.style : undefined;
+  if (!style?.height || style.flexShrink != null) return style;
+  return {...style, flexShrink: 0};
+}
+
 function readCardState(stateEvents, name, fallback) {
   try {
     return typeof stateEvents?.[name] === 'function' ? stateEvents[name]() : fallback;
@@ -90,6 +96,7 @@ export default function ResponsiveDataGrid({container, context, isActive}) {
     return () => observer.disconnect();
   }, []);
   const state = responsiveDataGridState(container.responsiveDataGrid, target);
+  const responsiveStyle = responsiveGridStyle(state);
   const dataContext = container.dataSourceRef && context?.identity?.dataSourceRef !== container.dataSourceRef ? context.Context?.(container.dataSourceRef) || context : context;
   const authoredColumns = container.table?.columns || [];
   const visible = new Set(state.columns || []);
@@ -98,7 +105,7 @@ export default function ResponsiveDataGrid({container, context, isActive}) {
   const columns = projected.map((column) => sticky.has(column.id || column.dataField || column.field) ? {...column, sticky: 'left'} : column);
   const table = {...container.table, columns, density: state.density || container.table?.density};
   if (target === 'phone' && state.rowLayout === 'cards' && state.readOnlyCards === true && responsiveCardsSupported(container.table, dataContext?.dataSource)) {
-    return <div ref={host} className="forge-responsive-grid forge-responsive-grid--phone" data-forge-primitive="responsiveDataGrid" data-row-layout="cards" style={state.style}>
+    return <div ref={host} className="forge-responsive-grid forge-responsive-grid--phone" data-forge-primitive="responsiveDataGrid" data-row-layout="cards" style={responsiveStyle}>
       <TablePanel
         container={{...container, table}}
         context={dataContext}
@@ -109,5 +116,5 @@ export default function ResponsiveDataGrid({container, context, isActive}) {
       />
     </div>;
   }
-  return <div ref={host} className={`forge-responsive-grid forge-responsive-grid--${target}`} data-forge-primitive="responsiveDataGrid" data-row-layout="table" style={state.style}><TablePanel container={{...container, table}} context={dataContext} isActive={isActive}/></div>;
+  return <div ref={host} className={`forge-responsive-grid forge-responsive-grid--${target}`} data-forge-primitive="responsiveDataGrid" data-row-layout="table" style={responsiveStyle}><TablePanel container={{...container, table}} context={dataContext} isActive={isActive}/></div>;
 }

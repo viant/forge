@@ -232,6 +232,12 @@
     backdrop-filter: blur(12px);
 }
 
+.basic-table-paginationbar.is-responsive-rows {
+    position: relative;
+    bottom: auto;
+    flex: 0 0 auto;
+}
+
 .basic-table-paginationbar .toolbar-container {
     justify-content: center;
 }

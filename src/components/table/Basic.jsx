@@ -627,7 +627,7 @@ const Basic = ({ context, container, columns, pagination, children, renderRows }
             )}
 
             {renderRows && pagingSize > 0 && !hasFooterToolbar && !showEmptyState ? (
-                <div className="basic-table-paginationbar">
+                <div className="basic-table-paginationbar is-responsive-rows">
                     <PaginationBar context={toolbarContext} events={events}/>
                 </div>
             ) : null}
