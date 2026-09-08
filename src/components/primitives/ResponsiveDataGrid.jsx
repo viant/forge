@@ -98,7 +98,7 @@ export default function ResponsiveDataGrid({container, context, isActive}) {
   const columns = projected.map((column) => sticky.has(column.id || column.dataField || column.field) ? {...column, sticky: 'left'} : column);
   const table = {...container.table, columns, density: state.density || container.table?.density};
   if (target === 'phone' && state.rowLayout === 'cards' && state.readOnlyCards === true && responsiveCardsSupported(container.table, dataContext?.dataSource)) {
-    return <div ref={host} className="forge-responsive-grid forge-responsive-grid--phone" data-forge-primitive="responsiveDataGrid" data-row-layout="cards">
+    return <div ref={host} className="forge-responsive-grid forge-responsive-grid--phone" data-forge-primitive="responsiveDataGrid" data-row-layout="cards" style={state.style}>
       <TablePanel
         container={{...container, table}}
         context={dataContext}
@@ -109,5 +109,5 @@ export default function ResponsiveDataGrid({container, context, isActive}) {
       />
     </div>;
   }
-  return <div ref={host} className={`forge-responsive-grid forge-responsive-grid--${target}`} data-forge-primitive="responsiveDataGrid" data-row-layout="table"><TablePanel container={{...container, table}} context={dataContext} isActive={isActive}/></div>;
+  return <div ref={host} className={`forge-responsive-grid forge-responsive-grid--${target}`} data-forge-primitive="responsiveDataGrid" data-row-layout="table" style={state.style}><TablePanel container={{...container, table}} context={dataContext} isActive={isActive}/></div>;
 }
