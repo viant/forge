@@ -96,6 +96,25 @@ export function toolbarHasSelection(selectionState = {}) {
     return selectedRows.length > 0 || !!selectionState?.selected;
 }
 
+export function collectionCountValue(info = {}, rows = [], item = {}) {
+    const loadedRows = Array.isArray(rows) ? rows.length : 0;
+    const candidate = Number(info?.totalCount ?? info?.recordCount ?? info?.cnt);
+    const count = Number.isSafeInteger(candidate) && candidate >= 0 && !(candidate === 0 && loadedRows > 0) ? candidate : loadedRows;
+    const properties = item?.properties || {};
+    const label = count === 1 ? properties.singularLabel || 'item' : properties.pluralLabel || 'items';
+    return `${count.toLocaleString('en-US')} ${label}`;
+}
+
+function CollectionCountStatus({item, context, align}) {
+    useSignals();
+    const ctx = item.dataSourceRef ? context?.Context?.(item.dataSourceRef) || context : context;
+    const rows = ctx?.signals?.collection?.value || [];
+    const info = ctx?.handlers?.dataSource?.getCollectionInfo?.() || {};
+    const value = collectionCountValue(info, rows, item);
+    const spanStyle = align === 'right' ? {marginLeft: 10} : {marginRight: 10};
+    return <span className="forge-toolbar-status is-muted" style={{...spanStyle, ...(item.style || {})}} role="status" aria-live="polite">{value}</span>;
+}
+
 function ToolbarStatus({item, context, align}) {
     useSignals();
     const ctx = item.dataSourceRef ? context?.Context?.(item.dataSourceRef) || context : context;
@@ -232,6 +251,9 @@ const Toolbar = ({
         if (item.type === 'tableExport' || item.widget === 'tableExport') {
             const rows = tableExportRows({filteredSortedRows: exportRows, pageRows: exportPageRows, scope: item?.properties?.scope});
             return <TableExportControl key={`table-export-${item.id}-${align}`} item={item} align={align} disabled={item.disabled === true || disabled || isReadonly} rows={rows} columns={exportColumns}/>;
+        }
+        if (item.type === 'collectionCount' || item.widget === 'collectionCount') {
+            return <CollectionCountStatus key={`collection-count-${item.id}-${align}`} item={item} context={context} align={align}/>;
         }
         if ((item.type === 'menu' || item.widget === 'menu' || item.type === 'dropdown') && Array.isArray(item.menuItems)) {
             const menuEvents = useToolbarControlEvents(context, item.menuItems);

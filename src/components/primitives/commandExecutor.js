@@ -160,6 +160,30 @@ export function mergeCommandParameters(base, prepared) {
   return result;
 }
 
+export function resolveCommandConfirmation(command = {}, extras = {}) {
+  const spec = command.confirmSelection;
+  if (!spec || typeof spec !== 'object') return String(command.confirm || '');
+  const rows = Array.isArray(extras?.selectedRows) ? extras.selectedRows : [];
+  if (!rows.length) return String(command.confirm || '');
+  const count = rows.length;
+  const maxItems = Math.min(20, Math.max(1, Number(spec.maxItems) || 5));
+  const labelField = String(spec.labelField || 'name');
+  const identityField = String(spec.identityField || 'id');
+  const items = rows.slice(0, maxItems).map((row) => {
+    const label = resolveSelector(row, labelField);
+    const identity = resolveSelector(row, identityField);
+    if (label != null && String(label).trim() && identity != null && String(identity).trim()) return `${String(label).trim()} (${String(identity).trim()})`;
+    if (label != null && String(label).trim()) return String(label).trim();
+    if (identity != null && String(identity).trim()) return String(identity).trim();
+    return 'Unnamed item';
+  });
+  if (count > maxItems) items.push(`+${count - maxItems} more`);
+  const action = String(spec.action || 'Confirm').trim();
+  const entity = count === 1 ? String(spec.singularLabel || 'item') : String(spec.pluralLabel || `${spec.singularLabel || 'item'}s`);
+  const suffix = String(spec.suffix || '').trim();
+  return `${action} ${count} ${entity}: ${items.join(', ')}?${suffix ? ` ${suffix}` : ''}`;
+}
+
 export function resolveIndeterminateCommand(context, command = {}, message = '') {
   const key = commandGuardKey(command);
   const current = getCommandState(context, command);
@@ -190,14 +214,15 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     const baseParameters = mutationCommandTargetParameters(resolved, targetRef);
     const preparedParameters = command.payload ? prepareResourcePayload(context, command.payload, extras) : extras;
     const preparedSnapshot = mergeCommandParameters(baseParameters, preparedParameters);
-    if (command.confirm) {
+    const confirmation = resolveCommandConfirmation(command, extras);
+    if (confirmation) {
       if (typeof lifecycle.confirm !== 'function') {
         const error = new Error('Confirmation is required but no confirmation service is available.');
         publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error, message: error.message, writerStatus: 'not_invoked'});
         return {accepted: false, status: 'confirmation_unavailable', error};
       }
-      publish(context, key, {phase: 'confirming', guarded: true, message: command.confirm});
-      if (!await lifecycle.confirm(command.confirm)) {
+      publish(context, key, {phase: 'confirming', guarded: true, message: confirmation});
+      if (!await lifecycle.confirm(confirmation)) {
         publish(context, key, {phase: 'idle', guarded: false, pending: false, retryAllowed: true, error: null, message: '', writerStatus: 'not_invoked', syncStatus: 'not_started'});
         return {accepted: false, status: 'cancelled'};
       }
@@ -265,7 +290,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
 
 export function dispatchMutationCommand(context, command = {}, extras = {}, lifecycle = {}) {
   if (!command.dataSourceRef || getCommandState(context, command).guarded) return false;
-  if (command.confirm && typeof lifecycle.confirm !== 'function') {
+  if ((command.confirm || command.confirmSelection) && typeof lifecycle.confirm !== 'function') {
     void executeCommand(context, command, extras, lifecycle);
     return false;
   }

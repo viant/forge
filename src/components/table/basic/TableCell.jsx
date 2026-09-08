@@ -313,17 +313,20 @@ const TableCell = ({
             break;
     }
 
-    const resolvedBadge = resolveTableCellBadge(row, col.badge, context);
-    if (resolvedBadge) {
+    const resolvedBadges = [col.badge, ...(Array.isArray(col.badges) ? col.badges : [])]
+        .map((badge) => resolveTableCellBadge(row, badge, context))
+        .filter(Boolean);
+    for (const resolvedBadge of resolvedBadges) {
         const badgeContent = (
             <span
                 className={`forge-table-cell-badge is-${resolvedBadge.tone}${resolvedBadge.className ? ` ${resolvedBadge.className}` : ''}`}
                 title={resolvedBadge.tooltip}
+                aria-label={resolvedBadge.hideLabel ? resolvedBadge.tooltip : undefined}
             >
                 {resolvedBadge.icon === 'sparkles'
                     ? <span className="forge-sparkles-icon" aria-hidden="true">✦</span>
                     : (resolvedBadge.icon ? <Icon icon={resolvedBadge.icon} size={12}/> : null)}
-                <span>{resolvedBadge.label}</span>
+                {resolvedBadge.hideLabel ? null : <span>{resolvedBadge.label}</span>}
             </span>
         );
         cellContent = resolvedBadge.replaceValue ? badgeContent : (

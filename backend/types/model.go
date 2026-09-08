@@ -117,6 +117,7 @@ type ChartXAxis struct {
 	TickFormatSource   string            `json:"tickFormatSource,omitempty" yaml:"tickFormatSource,omitempty"`
 	TickFormatSelector string            `json:"tickFormatSelector,omitempty" yaml:"tickFormatSelector,omitempty"`
 	TickFormats        map[string]string `json:"tickFormats,omitempty" yaml:"tickFormats,omitempty"`
+	ValueMode          string            `json:"valueMode,omitempty" yaml:"valueMode,omitempty"`
 }
 
 type ChartYAxis struct {
@@ -1388,6 +1389,7 @@ type Column struct {
 	ShowFullContent       *bool                  `json:"showFullContent,omitempty" yaml:"showFullContent,omitempty"`
 	Link                  *TableLink             `json:"link,omitempty" yaml:"link,omitempty"`
 	Badge                 *TableCellBadge        `json:"badge,omitempty" yaml:"badge,omitempty"`
+	Badges                []*TableCellBadge      `json:"badges,omitempty" yaml:"badges,omitempty"`
 	CellProperties        map[string]interface{} `json:"cellProperties,omitempty" yaml:"cellProperties,omitempty"`
 	HeadProperties        map[string]interface{} `json:"headProperties,omitempty" yaml:"headProperties,omitempty"`
 	Progress              *Progress              `json:"progress,omitempty" yaml:"progress,omitempty"`
@@ -1408,6 +1410,7 @@ type TableCellBadge struct {
 	ValueMap     map[string]interface{} `json:"valueMap,omitempty" yaml:"valueMap,omitempty"`
 	ToneMap      map[string]string      `json:"toneMap,omitempty" yaml:"toneMap,omitempty"`
 	ReplaceValue bool                   `json:"replaceValue,omitempty" yaml:"replaceValue,omitempty"`
+	HideLabel    bool                   `json:"hideLabel,omitempty" yaml:"hideLabel,omitempty"`
 	ClassName    string                 `json:"className,omitempty" yaml:"className,omitempty"`
 	Tooltip      string                 `json:"tooltip,omitempty" yaml:"tooltip,omitempty"`
 	VisibleWhen  map[string]interface{} `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`

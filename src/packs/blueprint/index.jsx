@@ -604,6 +604,41 @@ export function registerPack() {
                 onChange?.(next);
             };
 
+            if (String(appearance || '').toLowerCase() === 'checkboxes') {
+                const checkboxContainerStyle = {
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    columnGap: 18,
+                    rowGap: 10,
+                    alignItems: 'start',
+                    ...(style || {}),
+                };
+                return (
+                    <div style={checkboxContainerStyle} className="forge-checkboxes-container">
+                        {normalizedOptions.map((opt) => {
+                            const optionValue = `${opt?.value ?? ''}`;
+                            const optionLabel = opt?.label || optionValue;
+                            return (
+                                <label
+                                    key={optionValue}
+                                    style={{display: 'flex', alignItems: 'center', gap: 8, minWidth: 128, cursor: readOnly ? 'default' : 'pointer'}}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        aria-label={optionLabel}
+                                        checked={selectedSet.has(optionValue)}
+                                        disabled={readOnly}
+                                        style={{width: 16, height: 16, margin: 0, accentColor: '#2563eb'}}
+                                        onChange={() => toggle(opt)}
+                                    />
+                                    <span>{optionLabel}</span>
+                                </label>
+                            );
+                        })}
+                    </div>
+                );
+            }
+
             if (String(appearance || '').toLowerCase() === 'pills') {
                 const pillContainerStyle = {
                     display: 'flex',
@@ -857,7 +892,7 @@ export function registerPack() {
             kind,
             ({ value, onChange, readOnly, dateFnsFormat, valueMode, ...rest }) => (
                 <DateInput3
-                    {...buildDateProps({ type: kind, dateFnsFormat }, { readOnly, properties: rest })}
+                    {...buildDateProps({ type: kind, dateFnsFormat, valueMode }, { readOnly, properties: rest })}
                     timezone={valueMode === 'civil' ? 'UTC' : rest.timezone}
                     value={normalizeDateInputValue(value, valueMode)}
                     onChange={(sel) => onChange?.(serializeDateInputValue(sel, valueMode))}

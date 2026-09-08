@@ -14,7 +14,7 @@ const badge = {
 
 assert.equal(resolveTableCellBadge({planType: 1}, badge, context), null);
 assert.deepEqual(resolveTableCellBadge({planType: 2}, badge, context), {
-  label: 'Priority', icon: 'endorsed', tone: 'accent', className: '', tooltip: 'Priority', replaceValue: false,
+  label: 'Priority', icon: 'endorsed', tone: 'accent', className: '', tooltip: 'Priority', replaceValue: false, hideLabel: false,
 });
 assert.equal(resolveTableCellBadge({planType: 2}, badge, {signals: {authorization: {peek: () => ({principal: {features: []}})}}}), null);
 
@@ -24,7 +24,7 @@ assert.deepEqual(resolveTableCellBadge({status: 4}, {
   toneMap: {'0': 'neutral', '4': 'info'},
   replaceValue: true,
 }), {
-  label: 'Completed', icon: '', tone: 'info', className: '', tooltip: 'Completed', replaceValue: true,
+  label: 'Completed', icon: '', tone: 'info', className: '', tooltip: 'Completed', replaceValue: true, hideLabel: false,
 });
 
 assert.deepEqual(resolveTableCellBadge({status: 0}, {
@@ -33,7 +33,13 @@ assert.deepEqual(resolveTableCellBadge({status: 0}, {
   toneMap: {'0': 'neutral'},
   replaceValue: true,
 }), {
-  label: 'Inactive', icon: '', tone: 'neutral', className: '', tooltip: 'Inactive', replaceValue: true,
+  label: 'Inactive', icon: '', tone: 'neutral', className: '', tooltip: 'Inactive', replaceValue: true, hideLabel: false,
+});
+
+assert.deepEqual(resolveTableCellBadge({validationAlert: 'Creative has validation errors'}, {
+  field: 'validationAlert', icon: 'warning-sign', tone: 'danger', hideLabel: true,
+}), {
+  label: '', icon: 'warning-sign', tone: 'danger', className: '', tooltip: 'Creative has validation errors', replaceValue: false, hideLabel: true,
 });
 
 console.log('tableCellBadge ✓ conditionally resolves a generic row decoration');

@@ -127,6 +127,28 @@ describe('resolveRequiredDataSourceRefs', () => {
     ]);
   });
 
+  it('does not mount datasource refs owned by windowForm-hidden period panels', () => {
+    const metadata = {
+      dataSource: {
+        report_period_today: {},
+        report_period_30d: {},
+        report_period_custom: {},
+      },
+      view: {content: {containers: [
+        {id: 'today', dataSourceRef: 'report_period_today', visibleWhen: {source: 'windowForm', field: 'periodView', equals: 'today'}},
+        {id: 'month', dataSourceRef: 'report_period_30d', visibleWhen: {source: 'windowForm', field: 'periodView', equals: '30d'}},
+        {id: 'custom', dataSourceRef: 'report_period_custom', visibleWhen: {all: [
+          {source: 'windowForm', field: 'periodView', equals: 'custom'},
+          {source: 'windowForm', field: 'linePerformanceValidationError', empty: true},
+        ]}},
+      ]}},
+    };
+
+    expect(resolveRequiredDataSourceRefs(metadata, '', {periodView: '30d'})).toEqual(['report_period_30d']);
+    expect(resolveRequiredDataSourceRefs(metadata, '', {periodView: 'custom', linePerformanceValidationError: 'Choose both dates.'})).toEqual([]);
+    expect(resolveRequiredDataSourceRefs(metadata, '', {periodView: 'custom', linePerformanceValidationError: ''})).toEqual(['report_period_custom']);
+  });
+
   it('includes an options datasource used by a form select', () => {
     const metadata = {
       dataSource: { product: {}, product_categories: {}, fallback_categories: {} },
@@ -407,6 +429,12 @@ describe('shouldPrimeDataSourceFetch', () => {
     it('does not re-prime an in-flight empty datasource', () => {
       expect(shouldPrimeDataSourceFetch({}, {fetch: false}, [], false, {loaded: false, loading: true})).toBe(false);
     });
+  it('settles an automatic failed fetch until Retry or parameters change', () => {
+    const error = {message: 'failed'};
+    expect(shouldPrimeDataSourceFetch({}, {fetch: false}, [], false, {loaded: false, loading: false, error})).toBe(false);
+    expect(shouldPrimeDataSourceFetch({}, {fetch: true}, [], false, {loaded: false, loading: false, error})).toBe(true);
+    expect(shouldPrimeDataSourceFetch({}, {fetch: false}, [], true, {loaded: false, loading: false, error})).toBe(true);
+  });
   it('does not auto-fetch empty user-driven datasources', () => {
     expect(
       shouldPrimeDataSourceFetch({ autoFetch: false }, { parameters: {} }, [], true),

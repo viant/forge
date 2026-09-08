@@ -1,6 +1,7 @@
 import { enUS } from 'date-fns/locale';
 import { format, parse } from 'date-fns';
 import {defaultDateInputMaxDate, defaultDateInputMinDate} from './dateInputBounds.js';
+import {parseCivilDateInput} from './civilDate.js';
 
 // Build properties for Blueprint DateInput3 so behaviour matches legacy
 export function buildDateProps(item, { readOnly, properties = {} } = {}) {
@@ -29,6 +30,7 @@ export function buildDateProps(item, { readOnly, properties = {} } = {}) {
     }
 
     const fmt = item.dateFnsFormat;
+    const civil = item.valueMode === 'civil';
 
     merged.formatDate = (d) => {
         if (!d) return '';
@@ -37,6 +39,9 @@ export function buildDateProps(item, { readOnly, properties = {} } = {}) {
 
     merged.parseDate = (str) => {
         if (!str) return undefined;
+        if (civil && /^\d{4}-\d{2}-\d{2}$/.test(str)) {
+            return parseCivilDateInput(str);
+        }
         return fmt ? parse(str, fmt, new Date(), { locale: enUS }) : new Date(str);
     };
 
