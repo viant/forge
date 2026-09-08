@@ -580,7 +580,13 @@ const Basic = ({ context, container, columns, pagination, children, renderRows }
                 <TableEmptyState context={context} config={resolvedEmptyState}/>
             ) : (
                 <div className={`basic-table-scroll${renderRows ? ' has-responsive-cards' : ''}`} ref={scrollRef}>
-                    {renderRows ? renderRows({rows: renderedCollection, columns: columnsToUse, context: toolbarContext}) : (
+                    {renderRows ? renderRows({
+                        rows: renderedCollection,
+                        columns: columnsToUse,
+                        context: toolbarContext,
+                        columnHandlers: columnsHandlers,
+                        onRowClick: events.onRowSelect.execute,
+                    }) : (
                     <HTMLTable style={{width: resolvedTableWidth, minWidth: resolvedTableWidth, tableLayout: "fixed"}}>
                     {/* Table Header */}
                     <TableHeader

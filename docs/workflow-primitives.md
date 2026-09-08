@@ -223,7 +223,7 @@ Each editable operation may override the collection-level `selection` contract. 
 | `uploadCollection` | `upload` | `accept`, `multiple`, limits, `transport: mcpBlob`, blob/metadata fields | validate files, encode actual bytes plus filename/MIME, lock pending input, submit one writer |
 | `derivedDataSource` | `sources`, `pipeline` | `version`, `maxRows`, projections, group measures, join type/cardinality | bounded declarative client composition; reject malformed/oversized plans and propagate source state |
 | `permissionBoundary` | `capability` | `mode: resource|row|selection`, authorization datasource, identity field, denied message | fail closed without hiding selection producers; clear protected stale selection |
-| `responsiveDataGrid` | `breakpoints` | `identityColumns`, visible/sticky columns, density, row layout, `readOnlyCards` | preserve table behavior; semantic cards only when explicitly safe/read-only |
+| `responsiveDataGrid` | `breakpoints` | `identityColumns`, visible/sticky columns, density, row layout, `readOnlyCards` | preserve table behavior; semantic cards only when the row is explicitly read-only, while declared cell actions retain their normal visibility/read-only/property/click handlers |
 | `historyDiff` | before/after fields | ignored/redacted fields, field labels, array strategy, record label | canonical nested diff with sensitive-value masking |
 | `scheduleEditor` | start/end fields | timezone field, overlap/minimum duration, add/remove, ambiguity policy, mutation | explicit instant/wall-time conversion, DST gap/fold handling, per-field draft errors, clean payload |
 

@@ -59,6 +59,17 @@ if (!permissionBoundaryAllows({mode: 'resource', capability: 'write'}, root)) th
 if (responsiveTarget(390) !== 'phone' || responsiveTarget(900) !== 'narrow' || responsiveTarget(1200) !== 'desktop') throw new Error('responsive targets are not stable');
 const cards = renderToStaticMarkup(<ResponsiveCardRows rows={[{id: 1, name: 'Example'}]} columns={[{id: 'name', name: 'Name'}]}/>);
 includes(cards, '<dt>Name</dt><dd>Example</dd>');
+const handler = (value) => ({isDefined: () => true, execute: () => value});
+const actionCards = renderToStaticMarkup(<ResponsiveCardRows
+  rows={[{id: 1, watching: false}]}
+  columns={[{id: 'watching', type: 'button', icon: 'star-empty', iconFromValue: true, pressedWhenValue: 'star', cellProperties: {'aria-label': 'Campaign watch'}}]}
+  context={root}
+  columnHandlers={{watching: {onValue: handler('star'), onProperties: handler({'aria-label': 'Unwatch Campaign'}), onReadonly: handler(true), onClick: handler(true)}}}
+  onRowClick={() => true}
+/>);
+includes(actionCards, 'aria-label="Unwatch Campaign"');
+includes(actionCards, 'aria-pressed="true"');
+includes(actionCards, 'disabled=""');
 if (!responsiveCardsSupported({selectionEnabled: false, toolbar: {items: []}, pagination: {pageSize: 20}}, {selectionMode: 'none'})) throw new Error('read-only cards rejected toolbar or pagination');
 if (responsiveCardsSupported({}, {selectionMode: 'multi'})) throw new Error('editable multi-selection table was unsafely rendered as read-only cards');
 if (derivedSourceState([{loaded: false}, {loaded: true}]).ready) throw new Error('derived source published before all inputs loaded');
