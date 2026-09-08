@@ -1591,11 +1591,18 @@ type DataSource struct {
 	RequiredAnyParameters                   []string                          `json:"requiredAnyParameters,omitempty" yaml:"requiredAnyParameters,omitempty"`
 	SelfReference                           string                            `json:"selfReference,omitempty" yaml:"selfReference,omitempty"`
 	SortMode                                string                            `json:"sortMode,omitempty" yaml:"sortMode,omitempty"`
+	SortMapping                             *SortMapping                      `json:"sortMapping,omitempty" yaml:"sortMapping,omitempty"`
 	FilterMode                              string                            `json:"filterMode,omitempty" yaml:"filterMode,omitempty"`
 	PaginationMode                          string                            `json:"paginationMode,omitempty" yaml:"paginationMode,omitempty"`
 	// QuickFilterSet selects which filterSet should be rendered in the toolbar as quick filters.
 	// Accepts either a string (filterSet.name) or an integer index (0-based).
 	QuickFilterSet interface{} `json:"quickFilterSet,omitempty" yaml:"quickFilterSet,omitempty"`
+}
+
+type SortMapping struct {
+	Parameter string            `json:"parameter" yaml:"parameter"`
+	Template  string            `json:"template" yaml:"template"`
+	Fields    map[string]string `json:"fields" yaml:"fields"`
 }
 
 type SelectionMode string

@@ -15,6 +15,41 @@ for (const dataSource of [
     assert.deepEqual(calls, [{columnId: 'name', direction: 'desc', fetch: true}]);
 }
 
+const mappedCalls = [];
+assert.equal(requestServerTableSort({
+    dataSource: {
+        sortMode: 'server',
+        backend: {kind: 'mcp_tool'},
+        sortMapping: {
+            parameter: 'OrderBy',
+            template: '{{field}}:{{direction}}',
+            fields: {campaignId: 'campaign_id'},
+        },
+    },
+    handlers: {dataSource: {setSort: (input) => mappedCalls.push(input)}},
+    columnId: 'campaignId',
+    direction: 'desc',
+}), true);
+assert.deepEqual(mappedCalls, [{
+    columnId: 'campaignId',
+    direction: 'desc',
+    fetch: true,
+    parameter: 'OrderBy',
+    value: ['campaign_id:desc'],
+}]);
+
+const unknownCalls = [];
+assert.equal(requestServerTableSort({
+    dataSource: {
+        sortMode: 'server',
+        backend: {kind: 'mcp_tool'},
+        sortMapping: {parameter: 'OrderBy', template: '{{field}}:{{direction}}', fields: {campaignId: 'campaign_id'}},
+    },
+    handlers: {dataSource: {setSort: (input) => unknownCalls.push(input)}},
+    columnId: 'unmappedField',
+}), false);
+assert.deepEqual(unknownCalls, []);
+
 const clientCalls = [];
 assert.equal(requestServerTableSort({
     dataSource: {sortMode: 'client', backend: {kind: 'mcp_tool'}},

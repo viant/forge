@@ -471,9 +471,14 @@ const Basic = ({ context, container, columns, pagination, children, renderRows }
         if (sortColumnId === columnId) {
             newDirection = sortDirection === "asc" ? "desc" : "asc";
         }
+        if (
+            String(dataSource?.sortMode || '').toLowerCase() === 'server'
+            && !requestServerTableSort({dataSource, handlers, columnId, direction: newDirection})
+        ) {
+            return;
+        }
         setSortColumnId(columnId);
         setSortDirection(newDirection);
-        requestServerTableSort({dataSource, handlers, columnId, direction: newDirection});
     };
 
     const backfillCount = tableBackfillCount(pagingSize, renderedCollection.length, loading);
