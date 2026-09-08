@@ -506,6 +506,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
             canEscapeKeyClose={!closeDisabled}
             canOutsideClickClose={!closeDisabled}
             className={dialogClassName || undefined}
+            portalClassName={dialog?.properties?.portalClassName || undefined}
             style={dialogStyle}
         >
             <DialogBody className={bodyClassName} style={bodyStyle}>
