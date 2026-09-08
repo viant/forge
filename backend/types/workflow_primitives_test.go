@@ -98,7 +98,7 @@ permissionBoundary:
 responsiveDataGrid:
   identityColumns: [id, name]
   breakpoints:
-    phone: {columns: [id, name, status], stickyColumns: [id], density: compact, rowLayout: cards, readOnlyCards: true}
+    phone: {columns: [id, name, status], stickyColumns: [id], density: compact, rowLayout: cards, readOnlyCards: true, style: {height: 300px}}
 historyDiff:
   dataSourceRef: history
   identityField: id
@@ -181,6 +181,9 @@ scheduleEditor:
 	}
 	if !container.ResponsiveDataGrid.Breakpoints["phone"].ReadOnlyCards || container.ScheduleEditor.AmbiguousTimePolicy != "later" {
 		t.Fatal("responsive card safety or DST ambiguity policy missing")
+	}
+	if container.ResponsiveDataGrid.Breakpoints["phone"].Style["height"] != "300px" {
+		t.Fatal("responsive grid breakpoint style was truncated")
 	}
 	if container.HistoryDiff.FieldLabels["name"] != "Name" || container.ScheduleEditor.AllowRemove == nil || *container.ScheduleEditor.AllowRemove {
 		t.Fatal("history labels or explicit schedule removal policy was truncated")
