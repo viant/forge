@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -16,6 +17,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.padding
@@ -31,6 +34,9 @@ import com.viant.forgeandroid.runtime.LayoutDef
 import com.viant.forgeandroid.runtime.SelectorUtil
 import com.viant.forgeandroid.runtime.SelectionState
 import com.viant.forgeandroid.runtime.WindowContext
+import com.viant.forgeandroid.runtime.DataStateBoundaryKind
+import com.viant.forgeandroid.runtime.WorkflowPrimitiveRuntime
+import com.viant.forgeandroid.runtime.JsonUtil
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -75,14 +81,80 @@ fun ContainerRenderer(
     } else {
         androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(SelectionState()) }
     }
+    val boundaryContexts = if (container.dataStateBoundary != null) {
+        container.dataStateBoundary.dataSourceRefs
+            .mapNotNull(window::contextOrNull)
+            .distinctBy { it.dataSourceRef }
+            .ifEmpty { listOfNotNull(visibilityContext) }
+    } else {
+        emptyList()
+    }
+    val boundaryControls = mutableListOf<com.viant.forgeandroid.runtime.ControlState>()
+    val boundaryCollections = mutableListOf<List<Map<String, Any?>>>()
+    for (boundaryContext in boundaryContexts) {
+        val boundaryControl by boundaryContext.control.flow.collectAsState(initial = boundaryContext.control.peek())
+        val boundaryCollection by boundaryContext.collection.flow.collectAsState(initial = boundaryContext.collection.peek())
+        val boundaryForm by boundaryContext.form.flow.collectAsState(initial = boundaryContext.form.peek())
+        val boundaryMetrics by boundaryContext.metrics.flow.collectAsState(initial = boundaryContext.metrics.peek())
+        boundaryControls += boundaryControl
+        boundaryCollections += effectiveBoundaryRows(boundaryCollection, boundaryForm, boundaryMetrics)
+    }
+    val permissionContext = container.permissionBoundary?.dataSourceRef?.takeIf(String::isNotBlank)?.let(window::contextOrNull)
+    val permissionGrants by if (permissionContext != null) {
+        permissionContext.collection.flow.collectAsState(initial = permissionContext.collection.peek())
+    } else {
+        remember { androidx.compose.runtime.mutableStateOf(emptyList()) }
+    }
+    val permissionSpec = container.permissionBoundary
+    val permissionMode = permissionSpec?.mode?.trim()?.lowercase() ?: "resource"
+    val permissionRows = when (permissionMode) {
+        "selection" -> visibilitySelection.selection.ifEmpty { visibilitySelection.selected?.let(::listOf).orEmpty() }
+        "row" -> visibilityCollection
+        else -> emptyList()
+    }
+    val authorizationSnapshot = window.metadata.peek()?.authorizationSnapshot
+        ?.mapValues { JsonUtil.elementToAny(it.value) }
+        .orEmpty()
+    val permissionPredicateAllows = permissionSpec?.visibleWhen == null || evaluateDashboardCondition(
+        permissionSpec.visibleWhen,
+        metrics = visibilityMetrics,
+        form = visibilityForm,
+        windowForm = windowForm,
+        collection = visibilityCollection
+    )
+    val permissionAllowed = permissionSpec == null || (permissionPredicateAllows && WorkflowPrimitiveRuntime.permissionAllows(
+        permissionSpec,
+        authorizationSnapshot,
+        permissionRows,
+        permissionGrants
+    ))
     val kind = container.kind?.trim().orEmpty()
     val customRenderer = LocalForgeContainerRendererRegistry.current.renderer(kind)
     val presentationDensity = LocalForgePresentationDensity.current
 
     LaunchedEffect(container.id, visibilityContext?.dataSourceRef) {
-        if (container.visibleWhen != null && visibilityContext != null && visibilityContext.dataSource.autoFetch != false) {
+        val observesPrimitiveState = container.visibleWhen != null ||
+            container.dataStateBoundary != null ||
+            container.relationDrill != null ||
+            container.notificationRules != null ||
+            container.metricSummary != null ||
+            container.detailView != null ||
+            container.mutationCommand != null
+        if (observesPrimitiveState && container.dataStateBoundary == null && visibilityContext != null && visibilityContext.dataSource.autoFetch != false) {
             visibilityContext.fetchCollection()
         }
+    }
+
+    LaunchedEffect(container.id, boundaryContexts.map { it.dataSourceRef }) {
+        if (container.dataStateBoundary != null && container.fetchData != false) {
+            boundaryContexts.forEach { boundaryContext ->
+                if (boundaryContext.dataSource.autoFetch != false) boundaryContext.fetchCollection()
+            }
+        }
+    }
+
+    LaunchedEffect(container.id, permissionAllowed, permissionMode, visibilityContext?.dataSourceRef) {
+        if (!permissionAllowed && permissionMode == "selection") visibilityContext?.resetSelection()
     }
 
     if (kind != "dashboard" && !kind.startsWith("dashboard.") &&
@@ -107,6 +179,51 @@ fun ContainerRenderer(
             )
         )
     ) {
+        return
+    }
+
+    val dataBoundaryKind = container.dataStateBoundary?.let { boundary ->
+        WorkflowPrimitiveRuntime.dataStateBoundaryKind(
+            controls = boundaryControls,
+            collections = boundaryCollections,
+            allowPartial = boundary.allowPartial
+        )
+    }
+    container.dataStateBoundary?.let { boundary ->
+        when (dataBoundaryKind) {
+            DataStateBoundaryKind.Loading -> {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = modifier.padding(12.dp)) {
+                    CircularProgressIndicator()
+                    Text(boundary.loadingMessage ?: "Loading…")
+                }
+                return
+            }
+            DataStateBoundaryKind.Error -> {
+                Text(
+                    boundary.errorMessage ?: visibilityContext?.control?.peek()?.error ?: "Unable to load data.",
+                    color = Color(0xFFB42318),
+                    modifier = modifier.fillMaxWidth().padding(12.dp)
+                )
+                return
+            }
+            DataStateBoundaryKind.Empty -> if (!boundary.renderEmptyContent) {
+                Text(
+                    boundary.emptyMessage ?: "No data",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = modifier.fillMaxWidth().padding(12.dp)
+                )
+                return
+            }
+            else -> Unit
+        }
+    }
+
+    if (permissionSpec != null && permissionMode == "resource" && !permissionAllowed) {
+        Text(
+            permissionSpec.deniedMessage ?: "You do not have permission to view this content.",
+            color = Color(0xFFB54708),
+            modifier = modifier.fillMaxWidth().padding(12.dp).semantics { contentDescription = "Permission denied" }
+        )
         return
     }
 
@@ -179,6 +296,62 @@ fun ContainerRenderer(
             }
         }
 
+        if (dataBoundaryKind == DataStateBoundaryKind.Partial) {
+            Text(
+                container.dataStateBoundary?.staleMessage ?: "Some data is unavailable.",
+                color = Color(0xFFB54708),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            )
+        }
+
+        if (permissionSpec != null && !permissionAllowed) {
+            Text(
+                permissionSpec.deniedMessage ?: "The current selection is not permitted.",
+                color = Color(0xFFB54708),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            )
+        }
+
+        WorkflowPresentationPrimitives(
+            runtime = runtime,
+            window = window,
+            container = container,
+            context = visibilityContext,
+            windowForm = windowForm
+        )
+
+        if (container.wizard != null) {
+            WorkflowWizardRenderer(runtime, window, container, visibilityContext, windowForm)
+            return@Column
+        }
+
+        if (container.assignmentPicker != null) {
+            AssignmentPickerRenderer(runtime, window, container)
+            return@Column
+        }
+
+        if (container.scheduleEditor != null) {
+            ScheduleEditorRenderer(runtime, window, container)
+            return@Column
+        }
+
+        if (container.treeEditor != null) {
+            TreeEditorRenderer(runtime, window, container)
+            return@Column
+        }
+
+        if (container.uploadCollection != null) {
+            UploadCollectionRenderer(runtime, window, container)
+            return@Column
+        }
+
+        if (container.masterDetail != null) {
+            MasterDetailRenderer(runtime, window, container)
+            return@Column
+        }
+
         if (container.toolbar != null &&
             container.toolbar.placement?.lowercase() !in setOf("afternavigation", "windowheader") &&
             effectiveDataSourceRef.isNotBlank()
@@ -191,8 +364,14 @@ fun ContainerRenderer(
             }
         }
 
-        if (container.tabs != null && container.containers.isNotEmpty()) {
-            TabsRenderer(runtime, window, container)
+        if ((container.tabs != null || container.stableTabs != null) && container.containers.isNotEmpty()) {
+            val tabContainer = if (container.tabs != null) container else container.copy(
+                tabs = com.viant.forgeandroid.runtime.TabsDef(
+                    defaultSelectedTabId = container.stableTabs?.defaultSelectedTabId,
+                    style = container.stableTabs?.appearance
+                )
+            )
+            TabsRenderer(runtime, window, tabContainer)
             return@Column
         }
 
@@ -233,10 +412,10 @@ fun ContainerRenderer(
                             .fillMaxWidth()
                             .weight(1f, fill = true)
                     ) {
-                        TableRenderer(runtime, dsContext, container.table, selectionModeOverride = selectionModeOverride)
+                        TableRenderer(runtime, dsContext, responsiveTable(container.table, container, runtime.targetContext.formFactor.orEmpty()), selectionModeOverride = selectionModeOverride)
                     }
                 } else {
-                    TableRenderer(runtime, dsContext, container.table, selectionModeOverride = selectionModeOverride)
+                    TableRenderer(runtime, dsContext, responsiveTable(container.table, container, runtime.targetContext.formFactor.orEmpty()), selectionModeOverride = selectionModeOverride)
                 }
             }
         }
@@ -430,6 +609,18 @@ private fun resolveContainerVisibilityContext(
     container: ContainerDef,
     chartDataSourceRef: String?
 ): DataSourceContext? {
+    container.dataStateBoundary?.dataSourceRefs?.firstOrNull { it.isNotBlank() }?.let {
+        return window.contextOrNull(it)
+    }
+    container.metricSummary?.dataSourceRef?.trim().orEmpty().takeIf { it.isNotEmpty() }?.let {
+        return window.contextOrNull(it)
+    }
+    container.detailView?.dataSourceRef?.trim().orEmpty().takeIf { it.isNotEmpty() }?.let {
+        return window.contextOrNull(it)
+    }
+    container.relationDrill?.dataSourceRef?.trim().orEmpty().takeIf { it.isNotEmpty() }?.let {
+        return window.contextOrNull(it)
+    }
     val explicit = container.visibleWhen?.dataSourceRef?.trim().orEmpty().takeIf { it.isNotEmpty() }
     explicit?.let { return window.contextOrNull(it) }
 
@@ -438,6 +629,35 @@ private fun resolveContainerVisibilityContext(
     }
 
     return resolveContainerItemsContext(window, container, chartDataSourceRef)
+}
+
+private fun effectiveBoundaryRows(
+    collection: List<Map<String, Any?>>,
+    form: Map<String, Any?>,
+    metrics: Map<String, Any?>
+): List<Map<String, Any?>> = when {
+    collection.isNotEmpty() -> collection
+    form.isNotEmpty() -> listOf(form)
+    metrics.isNotEmpty() -> listOf(metrics)
+    else -> emptyList()
+}
+
+private fun responsiveTable(
+    table: com.viant.forgeandroid.runtime.TableDef,
+    container: ContainerDef,
+    formFactor: String
+): com.viant.forgeandroid.runtime.TableDef {
+    val spec = container.responsiveDataGrid ?: return table
+    val target = formFactor.trim().lowercase().ifBlank { "phone" }
+    val state = WorkflowPrimitiveRuntime.responsiveDataGridState(spec, target) ?: return table
+    val requested = state.columns.toSet()
+    val columns = if (requested.isEmpty()) table.columns else table.columns.filter { column ->
+        listOfNotNull(column.id, column.key, column.name).any(requested::contains)
+    }
+    return table.copy(
+        columns = columns,
+        presentation = if (state.rowLayout.equals("table", true)) "tabular" else table.presentation
+    )
 }
 
 @Composable

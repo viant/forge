@@ -40,6 +40,7 @@ class ForgeRuntime(
     private val dataSourceRuntime = DataSourceRuntime(signals, restClient, scope)
     private val windowRuntime = WindowRuntime(signals, dataSourceRuntime)
     private val parameterResolver = ParameterResolver()
+    val mutationCommands = MutationCommandRuntime()
 
     private val handlers = HandlerRegistry()
     private val execEngine = ExecutionEngine(this, handlers, parameterResolver, scope)
