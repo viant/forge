@@ -238,7 +238,7 @@ Each editable operation may override the collection-level `selection` contract. 
 
 ## Read composition and presentation
 
-- `derivedDataSource`: typed `projections`, joins, filters, unions, sorting, and grouped `measures` (`count|sum|min|max|first|list`) over named source datasources.
+- `derivedDataSource`: typed `projections`, joins, filters, unions, sorting, and grouped `measures` (`count|sum|min|max|first|list`) over named source datasources. Declare non-critical enrichment inputs in `optionalSources`; a terminal optional error settles as an empty input plus one warning without replacing the primary datasource's loaded/error state.
 - `permissionBoundary`: fail-closed resource/capability visibility with an explicit denied message.
 - `responsiveDataGrid`: breakpoint-specific visible/sticky columns, density, and table/card row layout.
 - `historyDiff`: before/after selectors, ignored fields, and semantic field labels.

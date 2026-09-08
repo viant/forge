@@ -33,6 +33,8 @@ const defaultCellProperties = (item) => {
     return properties;
 };
 
+export const shouldShowFullContentButton = (column, overflowing) => overflowing && column?.showFullContent !== false;
+
 const TableCell = ({
                        context,
                        cell,
@@ -278,7 +280,7 @@ const TableCell = ({
                         <span ref={textRef} className="cell-content" style={{ width: "100%"}}>
                             {displayedText}
                         </span>
-                        {showMoreButton && (
+                        {shouldShowFullContentButton(col, showMoreButton) && (
                             <button
                                 type="button"
                                 className="forge-table-cell-expand"

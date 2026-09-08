@@ -9,7 +9,7 @@ import TreeEditor from './TreeEditor.jsx';
 import UploadCollection from './UploadCollection.jsx';
 import Wizard from './Wizard.jsx';
 import {ResponsiveCardRows, responsiveCardsSupported, responsiveTarget} from './ResponsiveDataGrid.jsx';
-import {derivedSourceState} from './DerivedDataSource.jsx';
+import {derivedSourceState, nextDerivedControl} from './DerivedDataSource.jsx';
 
 const signal = (value) => ({value, peek: () => value});
 const data = {
@@ -59,6 +59,8 @@ if (!permissionBoundaryAllows({mode: 'resource', capability: 'write'}, root)) th
 if (responsiveTarget(390) !== 'phone' || responsiveTarget(900) !== 'narrow' || responsiveTarget(1200) !== 'desktop') throw new Error('responsive targets are not stable');
 const cards = renderToStaticMarkup(<ResponsiveCardRows rows={[{id: 1, name: 'Example'}]} columns={[{id: 'name', name: 'Name'}]}/>);
 includes(cards, '<dt>Name</dt><dd>Example</dd>');
+const utcCards = renderToStaticMarkup(<ResponsiveCardRows rows={[{id: 1, created: '2026-09-08T18:58:00Z'}]} columns={[{id: 'created', name: 'Time (GMT)', format: 'dateTime24', timeZone: 'UTC'}]}/>);
+includes(utcCards, '<dt>Time (GMT)</dt><dd>Sep 8, 2026, 18:58</dd>');
 const handler = (value) => ({isDefined: () => true, execute: () => value});
 const actionCards = renderToStaticMarkup(<ResponsiveCardRows
   rows={[{id: 1, watching: false}]}
@@ -72,7 +74,16 @@ includes(actionCards, 'aria-pressed="true"');
 includes(actionCards, 'disabled=""');
 if (!responsiveCardsSupported({selectionEnabled: false, toolbar: {items: []}, pagination: {pageSize: 20}}, {selectionMode: 'none'})) throw new Error('read-only cards rejected toolbar or pagination');
 if (responsiveCardsSupported({}, {selectionMode: 'multi'})) throw new Error('editable multi-selection table was unsafely rendered as read-only cards');
-if (derivedSourceState([{loaded: false}, {loaded: true}]).ready) throw new Error('derived source published before all inputs loaded');
-if (!derivedSourceState([{loaded: true}, {loaded: true}]).ready) throw new Error('derived source did not publish completed inputs');
+if (derivedSourceState([{ref: 'rows', state: {loaded: false}}, {ref: 'metrics', state: {loaded: true}}]).ready) throw new Error('derived source published before all inputs loaded');
+if (!derivedSourceState([{ref: 'rows', state: {loaded: true}}, {ref: 'metrics', state: {loaded: true}}]).ready) throw new Error('derived source did not publish completed inputs');
+const optionalFailure = derivedSourceState([
+  {ref: 'rows', state: {loaded: true, loading: false}},
+  {ref: 'metrics', state: {loaded: false, loading: false, error: new Error('metrics unavailable')}},
+], ['metrics']);
+if (!optionalFailure.ready || optionalFailure.error || optionalFailure.warnings[0]?.message !== 'metrics unavailable') throw new Error('terminal optional source failure did not settle as a warning');
+const primaryControl = {loaded: true, loading: false, error: null};
+const warnedControl = nextDerivedControl(primaryControl, {ready: true, warnings: optionalFailure.warnings, preservePrimary: true});
+if (warnedControl.loaded !== true || warnedControl.error !== null || warnedControl.derivedWarnings.length !== 1) throw new Error('optional source failure corrupted primary control state');
+if (nextDerivedControl(warnedControl, {ready: true, warnings: optionalFailure.warnings, preservePrimary: true}) !== warnedControl) throw new Error('terminal optional source state was not idempotent');
 
 console.log('workflow primitive render contracts passed');

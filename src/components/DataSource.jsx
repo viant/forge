@@ -3,7 +3,7 @@ import React, {useEffect, useState} from "react";
 import {getLogger} from "../utils/logger.js";
 import {useSignals} from '@preact/signals-react/runtime';
 import { extractData, isDeferredCacheHitEnvelope } from "./dataSourceExtract.js";
-import { resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, withFetchedPageInfo } from "./dataSourceFetchState.js";
+import { recoverInterruptedFetchOnMount, resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, withFetchedPageInfo } from "./dataSourceFetchState.js";
 import {reconcileMultiSelection, reconcileSingleSelection} from "./dataSourceSelection.js";
 import {applyFetchTransform} from "./dataSourceTransform.js";
 import {hasResolvedDependencies} from "./dataSourceDependencies.js";
@@ -72,10 +72,6 @@ export default function DataSource({context}) {
     const mountedRef = useRef(true);
     const initialFetchObservationRef = useRef(true);
 
-    useEffect(() => () => {
-        mountedRef.current = false;
-    }, []);
-
     const {dataSource, signals, connector, handlers, identity} = context
     const {paging, selectors} = dataSource;
     const pagingEnabled = !!paging?.enabled;
@@ -84,6 +80,12 @@ export default function DataSource({context}) {
     const events = dataSourceEvents(context, dataSource);
     const resourceModelRef = resourceModelRefForDataSource(context, dataSource.resourceModelRef);
     const selectionMode = dataSource.selectionMode || 'single';
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []);
     // Ensure the upstream selection signal is always initialised with an
     // object so that downstream code can safely access `.selected` without
     // additional null-checks.
@@ -175,6 +177,13 @@ export default function DataSource({context}) {
         const initialFetchObservation = initialFetchObservationRef.current;
         initialFetchObservationRef.current = false;
         try { log.debug('[watch] flags', { ds: context?.identity?.dataSourceRef, fetch, refresh, loading: loadingNow, input: inputVal }); } catch(_) {}
+        const recovered = recoverInterruptedFetchOnMount(dataSource, inputVal, controlValue, initialFetchObservation);
+        if (recovered) {
+            input.value = recovered.input;
+            control.value = recovered.control;
+            try { log.debug('[watch] recovered interrupted mount fetch', { ds: context?.identity?.dataSourceRef, replay: recovered.input.fetch }); } catch(_) {}
+            return;
+        }
         if (!fetch && !refresh) {
             try { log.debug('[watch] skip (no flags)', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
             return;
@@ -311,6 +320,7 @@ export default function DataSource({context}) {
                 flagReadDone()
                 setInactive(true);
             }
+            setLoading(false);
             return;
         } else {
             setInactive(false);
@@ -443,6 +453,7 @@ export default function DataSource({context}) {
                 flagReadDone();
                 setInactive(true);
             }
+            setLoading(false);
             return;
         }
         setInactive(false);

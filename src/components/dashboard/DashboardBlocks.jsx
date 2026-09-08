@@ -18,6 +18,7 @@ import { withFrozenIdentifierColumn } from "./tableFrozenIdentifier.js";
 import LookupSelectionInput from "../lookup/LookupSelectionInput.jsx";
 import { dashboardStatusTone, isDashboardStatusValue, titleizeDashboardKey, toneColors } from "./dashboardVisualUtils.jsx";
 import { DashboardErrorBoundary } from "./dashboardErrorBoundary.js";
+import {editableNumberValue} from './editableTableValue.js';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import "./Dashboard.css";
 
@@ -1368,11 +1369,16 @@ export function DashboardTable({container, context}) {
 export function DashboardEditableTable({container, context, embedded = false}) {
     useSignals();
     const dataSourceRef = String(container?.dataSourceRef || '').trim();
-    const dataSource = dataSourceRef ? context?.Context?.(dataSourceRef)?.handlers?.dataSource : null;
+    const dataSourceContext = dataSourceRef ? context?.Context?.(dataSourceRef) : null;
+    const dataSource = dataSourceContext?.handlers?.dataSource;
     const [revision, setRevision] = useState(0);
+    const [draftRows, setDraftRows] = useState(null);
     const [filterText, setFilterText] = useState('');
     const [page, setPage] = useState(1);
-    const currentRows = () => dataSource?.peekFullCollection?.() || dataSource?.peekCollection?.() || [];
+    const sourceRows = dataSource?.peekFullCollection?.() || dataSource?.peekCollection?.() || [];
+    const sourceSignature = JSON.stringify(sourceRows);
+    useEffect(() => setDraftRows(null), [dataSourceRef, sourceSignature]);
+    const currentRows = () => draftRows || sourceRows;
     const rows = currentRows();
     const columns = Array.isArray(container?.columns) ? container.columns : [];
     const authorization = context?.signals?.authorization?.value || context?.authorization || {};
@@ -1389,8 +1395,14 @@ export function DashboardEditableTable({container, context, embedded = false}) {
     const pageCount = Math.max(1, Math.ceil(filteredEntries.length / pageSize));
     const currentPage = Math.min(page, pageCount);
     const visibleEntries = filteredEntries.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    const mobileCards = container?.mobileCards?.enabled === true ? container.mobileCards : null;
+    const mobileFieldKeys = Array.isArray(mobileCards?.fields) ? mobileCards.fields : [];
+    const mobileRequiredFields = new Set(Array.isArray(mobileCards?.requiredFields) ? mobileCards.requiredFields : []);
     const commit = (nextRows) => {
-        dataSource?.replaceCollection?.({rows: nextRows, selectAll: true});
+        setDraftRows(nextRows);
+        if (typeof dataSource?.replaceCollection === 'function') dataSource.replaceCollection({rows: nextRows, selectAll: true});
+        else if (typeof dataSource?.setCollection === 'function') dataSource.setCollection(nextRows);
+        if (dataSourceContext?.signals?.collection) dataSourceContext.signals.collection.value = nextRows;
         setRevision((value) => value + 1);
     };
     const updateCell = (rowIndex, key, value) => commit(currentRows().map((row, index) => (
@@ -1434,9 +1446,36 @@ export function DashboardEditableTable({container, context, embedded = false}) {
         const color = visual.palette?.[0] || 'rgba(56, 87, 214, .16)';
         return {backgroundImage: `linear-gradient(90deg, ${color} 0%, ${color} ${pct}%, #fff ${pct}%, #fff 100%)`};
     };
+    const mobileCardControl = (row, rowIndex, column) => {
+        const editor = column?.editor === false ? null : (column?.editor || {type: 'text'});
+        const editorDisabled = !!(editor?.disabledWhen && evaluatePlainVisibleWhen(editor.disabledWhen, context, row));
+        const value = row?.[column?.key] ?? '';
+        if (!editor) return <span>{formatDashboardValue(value, column?.format, getDashboardLocale(context))}</span>;
+        if (editor.type === 'select') return (
+            <select aria-label={`${column.cardLabel || column.label || column.key} row ${rowIndex + 1}`} value={value} disabled={editorDisabled}
+                onChange={(event) => updateCell(rowIndex, column.key, event.target.value)}>
+                {(editor.options || []).map((option) => {
+                    const normalized = option && typeof option === 'object' ? option : {label: option, value: option};
+                    return <option key={normalized.value} value={normalized.value}>{normalized.label}</option>;
+                })}
+            </select>
+        );
+        return (
+            <input aria-label={`${column.cardLabel || column.label || column.key} row ${rowIndex + 1}`}
+                type={editor.type === 'number' ? 'number' : editor.type === 'time' ? 'time' : editor.type === 'date' ? 'date' : editor.type === 'datetime-local' ? 'datetime-local' : 'text'}
+                min={editor.min} max={editor.max} step={editor.step} disabled={editorDisabled}
+                required={column.required === true || mobileRequiredFields.has(column.key)}
+                value={editor.type === 'tags' && Array.isArray(value) ? value.join(', ') : value}
+                placeholder={editor.placeholder || ''}
+                onInput={(event) => updateCell(rowIndex, column.key,
+                    editor.type === 'number' ? editableNumberValue(event.target.value)
+                        : editor.type === 'tags' ? event.target.value.split(',').map((entry) => entry.trim()).filter(Boolean)
+                            : event.target.value)}/>
+        );
+    };
 
     const content = (
-            <div className="forge-editable-collection" data-revision={revision}>
+            <div className={`forge-editable-collection${mobileCards ? ' forge-editable-collection--mobile-cards' : ''}`} data-revision={revision}>
                 <div className="forge-editable-collection__toolbar">
                     {container?.quickFilter !== false ? <input className="forge-editable-collection__filter" type="search" value={filterText} placeholder={embedded ? `Filter selected ${String(container?.selectedFilterLabel || container?.title || 'rows').toLowerCase()}…` : `Filter ${String(container?.title || 'collection').toLowerCase()} rows…`} aria-label={embedded ? `Filter selected ${container?.selectedFilterLabel || container?.title || 'rows'}` : `Filter ${container?.title || 'collection'} rows`} onChange={(event) => { setFilterText(event.target.value); setPage(1); }}/> : null}
                     <span>{filteredEntries.length} of {rows.length} {rows.length === 1 ? 'row' : 'rows'}</span>
@@ -1446,7 +1485,7 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                 </div>
                 <div className="forge-editable-collection__table-wrap">
                     <table className="forge-editable-collection__table forge-editable-collection__table--frozen-identifier">
-                        <thead><tr>{tableColumns.map((column) => <th key={column.key} className={column.frozen ? 'forge-table-frozen-identifier' : undefined} style={column.frozen ? {'--forge-frozen-column-width': `${column.resolvedCompactWidth}px`} : undefined}>{column.label || column.key}</th>)}<th aria-label="Row actions"/></tr></thead>
+                        <thead><tr>{tableColumns.map((column) => <th key={column.key} title={column.tooltip || column.cardLabel || undefined} className={column.frozen ? 'forge-table-frozen-identifier' : undefined} style={column.frozen ? {'--forge-frozen-column-width': `${column.resolvedCompactWidth}px`} : undefined}>{column.label || column.key}</th>)}<th aria-label="Row actions"/></tr></thead>
                         <tbody>
                             {visibleEntries.map(({row, index: rowIndex}) => (
                                 <tr key={rowIndex}>
@@ -1455,7 +1494,7 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                                         const editorDisabled = !!(editor?.disabledWhen && evaluatePlainVisibleWhen(editor.disabledWhen, context, row));
                                         const value = row?.[column.key] ?? '';
                                         return (
-                                            <td key={column.key} className={column.frozen ? 'forge-table-frozen-identifier' : undefined} style={column.frozen ? {'--forge-frozen-column-width': `${column.resolvedCompactWidth}px`} : undefined}>
+                                            <td key={column.key} className={[column.frozen ? 'forge-table-frozen-identifier' : '', column.required === true ? 'is-required' : ''].filter(Boolean).join(' ') || undefined} style={column.frozen ? {'--forge-frozen-column-width': `${column.resolvedCompactWidth}px`} : undefined}>
                                                 {!editor ? <span>{formatDashboardValue(value, column.format, getDashboardLocale(context))}</span>
                                                     : editor.type === 'frequency' ? (() => {
                                                         const parts = frequencyParts(value);
@@ -1497,11 +1536,12 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                                                             min={editor.min}
                                                             max={editor.max}
                                                             step={editor.step}
+                                                            required={column.required === true}
                                                             disabled={editorDisabled}
                                                             style={editableCellStyle(row, column)}
                                                             value={editor.type === 'tags' && Array.isArray(value) ? value.join(', ') : value} placeholder={editor.placeholder || ''}
-                                                            onChange={(event) => updateCell(rowIndex, column.key,
-                                                                editor.type === 'number' ? Number(event.target.value)
+                                                            onInput={(event) => updateCell(rowIndex, column.key,
+                                                                editor.type === 'number' ? editableNumberValue(event.target.value)
                                                                     : editor.type === 'tags' ? event.target.value.split(',').map((entry) => entry.trim()).filter(Boolean)
                                                                         : event.target.value)}/>
                                                     )}
@@ -1519,6 +1559,30 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                         </tbody>
                     </table>
                 </div>
+                {mobileCards ? <div className="forge-editable-collection__cards">
+                    {visibleEntries.map(({row, index: rowIndex}) => {
+                        const titleColumn = columns.find((column) => column.key === mobileCards.titleField);
+                        const metaColumn = columns.find((column) => column.key === mobileCards.metaField);
+                        const cardColumns = mobileFieldKeys.map((key) => visibleRuntimeColumns.find((column) => column.key === key)).filter(Boolean);
+                        return <section className="forge-editable-collection__card" key={`mobile-${rowIndex}`}>
+                            <header className="forge-editable-collection__card-header">
+                                <strong>{formatDashboardValue(row?.[mobileCards.titleField], titleColumn?.format, getDashboardLocale(context))}</strong>
+                                <span>{mobileCards.metaLabel ? `${mobileCards.metaLabel}: ` : ''}{formatDashboardValue(row?.[mobileCards.metaField], mobileCards.metaFormat || metaColumn?.format, getDashboardLocale(context))}</span>
+                            </header>
+                            <div className="forge-editable-collection__card-fields">
+                                {cardColumns.map((column) => {
+                                    const required = mobileRequiredFields.has(column.key) || column.required === true;
+                                    return <label className={required ? 'forge-editable-collection__card-field is-required' : 'forge-editable-collection__card-field'} key={column.key}>
+                                    <span>{column.cardLabel || column.label || column.key}{required ? ' *' : ''}</span>
+                                    {mobileCardControl(row, rowIndex, column)}
+                                </label>})}
+                            </div>
+                            {container?.allowRemove !== false ? <button type="button" className="forge-editable-collection__card-remove"
+                                disabled={rows.length <= Math.max(0, Number(container?.minRows || 0))}
+                                onClick={() => removeRow(rowIndex)}>{container?.removeRowLabel || 'Remove row'}</button> : null}
+                        </section>;
+                    })}
+                </div> : null}
                 {pageCount > 1 ? <div className="forge-editable-collection__pager">
                     <button type="button" disabled={currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
                     <span>Page {currentPage} of {pageCount}</span>

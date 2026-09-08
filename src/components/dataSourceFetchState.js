@@ -48,6 +48,15 @@ export function shouldReplayPendingFetchOnMount(dataSource = {}, fetch = false) 
     return !fetch || dataSource?.replayPendingFetchOnRestore !== false;
 }
 
+export function recoverInterruptedFetchOnMount(dataSource = {}, input = {}, control = {}, initialObservation = false) {
+    if (!initialObservation || control?.loading !== true || control?.loaded === true) return null;
+    const replay = dataSource?.replayPendingFetchOnRestore !== false;
+    return {
+        input: {...(input || {}), fetch: replay, refresh: false},
+        control: {...(control || {}), loading: false, stale: replay},
+    };
+}
+
 export function resolveFetchPage({
     page = 1,
     filter = {},

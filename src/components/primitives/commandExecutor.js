@@ -3,9 +3,12 @@ import {resolveSelector} from '../../utils/selector.js';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import {applyPrimitiveState, mutationCommandTargetParameters, reconcileEditableCollection} from './editableCollectionModel.js';
 import {prepareResourcePayload} from './resourceModel.js';
+import {formatDataSourceError} from '../../utils/dataSourceError.js';
 
 const commandStates = new WeakMap();
 const transportStates = new WeakMap();
+
+const commandErrorMessage = (error) => formatDataSourceError(error) || 'The request could not be completed.';
 
 function stableContextOwner(context) {
   return context?.signals?.control || context?.signals?.input || context;
@@ -65,23 +68,28 @@ function awaitWriter(target, invoke, timeoutMs) {
   return new Promise((resolve) => {
     let settled = false;
     let loadingSeen = false;
+    let invocationStarted = false;
+    let timer = null;
     let dispose = () => {};
     const settle = (outcome) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      if (timer !== null) clearTimeout(timer);
       dispose();
       resolve(outcome);
     };
     const control = target?.signals?.control;
     const observed = typeof control?.subscribe === 'function';
     if (observed) dispose = control.subscribe((value = {}) => {
+      if (!invocationStarted) return;
       if (value.loading) { loadingSeen = true; return; }
       if (value.error) { settle({status: 'failed', error: value.error}); return; }
       if (loadingSeen) settle(value.error ? {status: 'failed', error: value.error} : {status: 'succeeded'});
     });
-    const timer = setTimeout(() => settle({status: 'indeterminate', error: new Error('The writer outcome is unknown because the client stopped waiting.')}), timeoutMs);
+    if (settled) return;
+    timer = setTimeout(() => settle({status: 'indeterminate', error: new Error('The writer outcome is unknown because the client stopped waiting.')}), timeoutMs);
     try {
+      invocationStarted = true;
       const result = invoke();
       if (result === false) settle({status: 'failed', error: new Error('The datasource rejected the command before invocation.')});
       else if (result?.then) result.then(() => {
@@ -214,7 +222,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       releaseTransport(target, key);
       transportAcquired = false;
       applyPrimitiveState(context, command.errorState);
-      publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error: writer.error, message: String(writer.error?.message || writer.error), writerStatus: 'failed', syncStatus: 'not_started'});
+      publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error: writer.error, message: commandErrorMessage(writer.error), writerStatus: 'failed', syncStatus: 'not_started'});
       notifyLifecycle(lifecycle, 'onSettled', {status: 'failed', error: writer.error, invocationId: id});
       return {accepted: true, status: 'failed', error: writer.error, invocationId: id};
     }
@@ -240,6 +248,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     notifyLifecycle(lifecycle, 'onSettled', {status: 'succeeded', warnings, invocationId: id});
     return {accepted: true, status: 'succeeded', warnings, invocationId: id};
   } catch (error) {
+    console.error(`Forge mutation command failed commandId=${key} dataSourceRef=${targetRef} writerInvoked=${writerInvoked}: ${error?.stack || error}`);
     if (transportAcquired && target) releaseTransport(target, key);
     if (writerSucceeded) {
       const warnings = [{stage: 'post_write', error}];
@@ -248,7 +257,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       return {accepted: true, status: 'succeeded', warnings, invocationId: id};
     }
     try { applyPrimitiveState(context, command.errorState); } catch (_) {}
-    publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error, message: String(error?.message || error), writerStatus: writerInvoked ? 'failed' : 'not_invoked', syncStatus: 'not_started'});
+    publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error, message: commandErrorMessage(error), writerStatus: writerInvoked ? 'failed' : 'not_invoked', syncStatus: 'not_started'});
     notifyLifecycle(lifecycle, 'onSettled', {status: 'failed', error, invocationId: id});
     return {accepted: writerInvoked, status: 'failed', error, invocationId: id};
   }

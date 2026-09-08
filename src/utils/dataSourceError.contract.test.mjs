@@ -10,4 +10,5 @@ assert.match(internal.message, /parameter.*Auth/, 'raw diagnostics remain availa
 assert.equal(formatDataSourceError('seed "AudienceParse": {"status":"error","message":"Internal Server Error"}'), 'This data is temporarily unavailable. Retry in a moment.');
 assert.equal(formatDataSourceError({status: 504, message: 'upstream timeout'}), 'The request timed out. Retry in a moment.');
 assert.equal(formatDataSourceError({status: 403, message: 'forbidden'}), 'Access denied. You do not have permission to load this data.');
+assert.equal(formatDataSourceError({status: 500, message: 'GET error: 500 Internal Server Error: {"data":[{"name":"private draft"}],"violations":[{"Message":"Order must have at least one channel"}]}'}), 'Order must have at least one channel');
 console.log('datasource errors ✓ user-safe 5xx/timeout/auth messages with raw diagnostics retained');

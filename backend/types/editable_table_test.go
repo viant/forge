@@ -20,6 +20,14 @@ addRow:
   label: Add Row
   deriveHandler: Workspace.nextRow
   defaults: {effectiveAt: '', threshold: null}
+mobileCards:
+  enabled: true
+  titleField: effectiveAt
+  metaField: threshold
+  metaLabel: Threshold
+  metaFormat: currency
+  fields: [quantity]
+  requiredFields: [quantity]
 columns:
   - key: effectiveAt
     label: Effective At
@@ -27,6 +35,9 @@ columns:
     editor: {type: date}
   - key: quantity
     label: Quantity
+    cardLabel: Required Quantity
+    tooltip: Quantity to allocate
+    required: true
     visibleWhen: {source: authorization, field: principal.features, contains: QUANTITY}
     editor: {type: number, disabledWhen: {source: row, field: enabled, equals: false}}
 `)
@@ -45,6 +56,12 @@ columns:
 	}
 	if len(container.Columns) != 2 || container.AddRow == nil || container.AddRow.DeriveHandler != "Workspace.nextRow" {
 		t.Fatalf("editable-table contract was truncated: %#v", container)
+	}
+	if container.MobileCards == nil || !container.MobileCards.Enabled || container.MobileCards.MetaFormat != "currency" || len(container.MobileCards.RequiredFields) != 1 {
+		t.Fatalf("editable-table mobile cards were truncated: %#v", container.MobileCards)
+	}
+	if column := container.Columns[1]; column.CardLabel != "Required Quantity" || column.Tooltip != "Quantity to allocate" || !column.Required {
+		t.Fatalf("editable-table column presentation was truncated: %#v", column)
 	}
 	encoded, err := json.Marshal(container)
 	if err != nil {

@@ -13,6 +13,17 @@
     z-index: -1;
 }
 
+/* Blueprint Core 6.0 alpha also omits the radio input class expected by the
+   6.10 host stylesheet. Keep the native input accessible while preventing it
+   from rendering beside the Blueprint indicator. */
+.forge-blueprint-radio-compat > input[type="radio"] {
+    left: 0;
+    opacity: 0;
+    position: absolute;
+    top: 0;
+    z-index: -1;
+}
+
 .form-panel,
 .forge-form-panel-tabs.bp4-tabs,
 .forge-form-panel-tabs.bp5-tabs,
@@ -183,8 +194,17 @@
 .forge-required-input
     :where(:is(.bp4-input:not(:disabled), .bp5-input:not(:disabled), .bp6-input:not(:disabled),
         .bp4-button:not(:disabled), .bp5-button:not(:disabled), .bp6-button:not(:disabled),
-        .bp4-file-input, .bp5-file-input, .bp6-file-input)
-        :not(.bp4-intent-danger):not(.bp5-intent-danger):not(.bp6-intent-danger)) {
+        .bp4-file-input, .bp5-file-input, .bp6-file-input):not(.bp4-intent-danger):not(.bp5-intent-danger):not(.bp6-intent-danger)) {
+    border-color: #d58f98;
+    background-color: #fff3f4;
+}
+
+/* Text/date inputs may receive the required class on the Blueprint input itself
+   instead of on a wrapping control cell. Keep that direct-root form consistent
+   with wrapped numeric, select, lookup, and file controls. */
+:is(.forge-required-input.bp4-input:not(:disabled),
+    .forge-required-input.bp5-input:not(:disabled),
+    .forge-required-input.bp6-input:not(:disabled)):not(.bp4-intent-danger):not(.bp5-intent-danger):not(.bp6-intent-danger) {
     border-color: #d58f98;
     background-color: #fff3f4;
 }
@@ -195,6 +215,13 @@
 .forge-required-input .bp4-numeric-input .bp4-input:not(:disabled),
 .forge-required-input .bp5-numeric-input .bp5-input:not(:disabled),
 .forge-required-input .bp6-numeric-input .bp6-input:not(:disabled) {
+    border-color: #d58f98;
+    background-color: #fff3f4;
+}
+
+.forge-required-input .bp4-input:not(:disabled),
+.forge-required-input .bp5-input:not(:disabled),
+.forge-required-input .bp6-input:not(:disabled) {
     border-color: #d58f98;
     background-color: #fff3f4;
 }
@@ -281,6 +308,13 @@
 }
 
 @media (max-width: 600px) {
+    .forge-view-dialog {
+        margin: 56px 8px 8px !important;
+        width: calc(100vw - 16px) !important;
+        max-width: calc(100vw - 16px) !important;
+        max-height: calc(100vh - 64px) !important;
+    }
+
     .forge-grid-collapse-phone {
         grid-template-columns: minmax(0, 1fr) !important;
         grid-template-rows: none !important;

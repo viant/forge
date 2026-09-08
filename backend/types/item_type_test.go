@@ -75,14 +75,20 @@ func TestItemPreservesDatasourceBackedOptions(t *testing.T) {
 id: category
 type: select
 optionsDataSourceRef: advertiser_categories
+optionsDataSelector: catalog.groups
+fallbackOptionsDataSourceRef: advertiser_categories_fallback
+fallbackOptionsDataSelector: groups
 optionLabelField: caption
 optionValueField: caption
 optionSecondaryField: id
+optionDisabledField: disabled
 `)
 	if err := yaml.Unmarshal(input, &item); err != nil {
 		t.Fatal(err)
 	}
-	if item.OptionsDataSourceRef != "advertiser_categories" || item.OptionLabelField != "caption" || item.OptionValueField != "caption" || item.OptionSecondaryField != "id" {
+	if item.OptionsDataSourceRef != "advertiser_categories" || item.OptionsDataSelector != "catalog.groups" ||
+		item.FallbackOptionsDataSourceRef != "advertiser_categories_fallback" || item.FallbackOptionsDataSelector != "groups" ||
+		item.OptionLabelField != "caption" || item.OptionValueField != "caption" || item.OptionSecondaryField != "id" || item.OptionDisabledField != "disabled" {
 		t.Fatalf("datasource-backed options were not preserved: %#v", item)
 	}
 }

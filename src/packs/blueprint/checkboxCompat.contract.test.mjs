@@ -6,5 +6,7 @@ const css = readFileSync(new URL('../../components/Container.css', import.meta.u
 
 assert.match(widgetSource, /Checkbox[\s\S]*forge-blueprint-checkbox-compat/);
 assert.match(css, /\.forge-blueprint-checkbox-compat\s*>\s*input\[type="checkbox"\][\s\S]*opacity:\s*0[\s\S]*position:\s*absolute/);
+assert.match(widgetSource, /Radio[\s\S]*forge-blueprint-radio-compat/);
+assert.match(css, /\.forge-blueprint-radio-compat\s*>\s*input\[type="radio"\][\s\S]*opacity:\s*0[\s\S]*position:\s*absolute/);
 
-console.log('checkboxCompat ✓ hides the unclassed native Blueprint checkbox input');
+console.log('controlCompat ✓ hides unclassed native Blueprint checkbox and radio inputs');

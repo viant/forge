@@ -40,6 +40,14 @@ const catalogContext = {
 };
 assert.deepEqual(resolveDataSourceOptionRows({optionsDataSourceRef: 'server_catalog', optionsDataSelector: 'catalog', fallbackOptionsDataSourceRef: 'fallback_catalog'}, catalogContext), [{field: 'AGE'}]);
 assert.deepEqual(resolveDataSourceOptionRows({optionsDataSourceRef: 'missing', optionsDataSelector: 'catalog', fallbackOptionsDataSourceRef: 'fallback_catalog'}, catalogContext), [{field: 'POSTAL_CODE'}]);
+const legacyCatalogContext = {
+	Context(ref) {
+		if (ref === 'server_catalog') return {signals: {collection: {value: [{fields: ['DISABLED']}]}, control: {value: {loading: false, error: null}}}};
+		if (ref === 'fallback_catalog') return {signals: {collection: {value: [{field: 'POSTAL_CODE'}]}}};
+		return null;
+	},
+};
+assert.deepEqual(resolveDataSourceOptionRows({optionsDataSourceRef: 'server_catalog', optionsDataSelector: 'catalog', fallbackOptionsDataSourceRef: 'fallback_catalog'}, legacyCatalogContext), [{field: 'POSTAL_CODE'}], 'a legacy primary envelope without the selected collection must use the fallback');
 console.log('option rows ✓ nested server catalog with curated outage fallback');
 const loadingCatalogContext = {
 	Context(ref) {

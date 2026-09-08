@@ -104,6 +104,13 @@ const preflight = await executeCommand(preflightContext, {dataSourceRef: 'prefli
 assert.equal(preflight.status, 'failed', 'a datasource error before loading must settle immediately');
 assert.equal(preflight.error, preflightError);
 assert.equal(getCommandState(preflightContext, {dataSourceRef: 'preflight'}).guarded, false);
+let replayedErrorWriterCalls = 0;
+const replayedError = new Error('previous writer error');
+const replayedErrorControl = mutableSignal({loading: false, error: replayedError});
+const replayedErrorContext = {Context: () => ({signals: {control: replayedErrorControl}, handlers: {dataSource: {setInputParameters() {}, fetchCollection() { replayedErrorWriterCalls += 1; replayedErrorControl.value = {loading: true, error: null}; queueMicrotask(() => { replayedErrorControl.value = {loading: false, error: null}; }); }}}})};
+const replayedErrorOutcome = await executeCommand(replayedErrorContext, {dataSourceRef: 'replayed-error', timeoutMs: 30000});
+assert.equal(replayedErrorOutcome.status, 'succeeded', 'a synchronously replayed prior error must not block a new writer invocation');
+assert.equal(replayedErrorWriterCalls, 1, 'retry must invoke the writer exactly once after ignoring the replayed error');
 const resolvedBeforeControl = mutableSignal({loading: false, error: null});
 const delayedControlError = new Error('writer control rejected resolved transport');
 const resolvedBeforeControlContext = {Context: () => ({signals: {control: resolvedBeforeControl}, handlers: {dataSource: {setInputParameters() {}, fetchCollection() { queueMicrotask(() => { resolvedBeforeControl.value = {loading: false, error: delayedControlError}; }); return Promise.resolve(); }}}})};

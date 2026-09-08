@@ -24,6 +24,7 @@ import {useSignals} from '@preact/signals-react/runtime';
 import {applyClientFilters} from './clientFilters.js';
 import {resetPaginationScroll} from './paginationScroll.js';
 import PaginationBar from './basic/PaginationBar.jsx';
+import {shouldInitializeEmptyTable} from './tableInitialization.js';
 
 const defaultCellWidth = 30; // Adjust as needed
 
@@ -271,7 +272,8 @@ const Basic = ({ context, container, columns, pagination, children, renderRows }
 
     useEffect(() => {
         const data = handlers.dataSource.getCollection();
-        if (!data?.length && collection?.length === 0) {
+        const control = context?.signals?.control?.peek?.() || context?.signals?.control?.value || {};
+        if (shouldInitializeEmptyTable(data, collection, control)) {
             events.onInit.execute({});
         }
     }, []);

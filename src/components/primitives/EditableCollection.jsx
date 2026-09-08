@@ -6,6 +6,7 @@ import ResponsiveDataGrid from './ResponsiveDataGrid.jsx';
 import {resolveParameters} from '../../hooks/parameters.js';
 import {
   editableCollectionOperationState,
+  editableCollectionRows,
   mutationCommandTargetParameters,
 } from './editableCollectionModel.js';
 import MutationCommand from './MutationCommand.jsx';
@@ -19,6 +20,7 @@ export default function EditableCollection({container, context, isActive}) {
   const dataContext = ref && context?.identity?.dataSourceRef !== ref ? context?.Context?.(ref) : context;
   const selection = dataContext?.signals?.selection?.value || {};
   const operations = Array.isArray(spec.operations) ? spec.operations : [];
+  const selectedRows = editableCollectionRows(selection);
 
   const invoke = (operation) => {
     const state = editableCollectionOperationState({...operation, selection: operation.selection || spec.selection}, dataContext, selection);
@@ -74,6 +76,13 @@ export default function EditableCollection({container, context, isActive}) {
             );
           })}
         </ButtonGroup>
+      ) : null}
+      {spec.selectionStatus === true ? (
+        <div className="forge-editable-collection__selection-status" role="status" aria-live="polite">
+          {selectedRows.length > 0
+            ? `${selectedRows.length} ${selectedRows.length === 1 ? 'row' : 'rows'} selected`
+            : (spec.selectionPrompt || 'Select a row to enable row actions.')}
+        </div>
       ) : null}
       {container.responsiveDataGrid
         ? <ResponsiveDataGrid container={{...container, dataSourceRef: ref}} context={dataContext} isActive={isActive}/>

@@ -4,6 +4,7 @@
 import { useEffect } from "react";
 import { useSignalEffect } from "@preact/signals-react";
 import { getLogger } from "../utils/logger.js";
+import {shouldFetchDataSourceOnMount} from './dataSourceFetcherState.js';
 
 /**
  * Props:
@@ -22,8 +23,8 @@ export default function DataSourceFetcher({
     const dataSourceId = context?.identity?.dataSourceId || context?.identity?.dataSourceRef || '';
     // 1. trigger collection fetch when component mounts (optional)
     useEffect(() => {
-        const alreadyLoaded = context?.signals?.control?.peek?.()?.loaded === true;
-        if (fetchData && !(fetchOnce && alreadyLoaded)) {
+        const control = context?.signals?.control?.peek?.() || {};
+        if (shouldFetchDataSourceOnMount({fetchData, fetchOnce, control})) {
             try { log.debug('[fetcher] fetch on mount', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
             context?.handlers?.dataSource?.fetchCollection?.();
         } else {

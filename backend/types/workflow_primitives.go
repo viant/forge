@@ -41,11 +41,13 @@ type RefreshSpec struct {
 }
 
 type EditableCollection struct {
-	DataSourceRef  string                        `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
-	IdentityFields []string                      `json:"identityFields,omitempty" yaml:"identityFields,omitempty"`
-	Selection      *PrimitiveSelection           `json:"selection,omitempty" yaml:"selection,omitempty"`
-	Operations     []EditableCollectionOperation `json:"operations,omitempty" yaml:"operations,omitempty"`
-	Mutation       *MutationCommand              `json:"mutation,omitempty" yaml:"mutation,omitempty"`
+	DataSourceRef   string                        `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	IdentityFields  []string                      `json:"identityFields,omitempty" yaml:"identityFields,omitempty"`
+	Selection       *PrimitiveSelection           `json:"selection,omitempty" yaml:"selection,omitempty"`
+	SelectionStatus bool                          `json:"selectionStatus,omitempty" yaml:"selectionStatus,omitempty"`
+	SelectionPrompt string                        `json:"selectionPrompt,omitempty" yaml:"selectionPrompt,omitempty"`
+	Operations      []EditableCollectionOperation `json:"operations,omitempty" yaml:"operations,omitempty"`
+	Mutation        *MutationCommand              `json:"mutation,omitempty" yaml:"mutation,omitempty"`
 }
 
 type PrimitiveSelection struct {
@@ -140,10 +142,11 @@ type UploadCollectionSpec struct {
 }
 
 type DerivedDataSourceSpec struct {
-	Version  string            `json:"version,omitempty" yaml:"version,omitempty"`
-	MaxRows  int               `json:"maxRows,omitempty" yaml:"maxRows,omitempty"`
-	Sources  []string          `json:"sources" yaml:"sources"`
-	Pipeline []DerivedDataStep `json:"pipeline" yaml:"pipeline"`
+	Version         string            `json:"version,omitempty" yaml:"version,omitempty"`
+	MaxRows         int               `json:"maxRows,omitempty" yaml:"maxRows,omitempty"`
+	Sources         []string          `json:"sources" yaml:"sources"`
+	OptionalSources []string          `json:"optionalSources,omitempty" yaml:"optionalSources,omitempty"`
+	Pipeline        []DerivedDataStep `json:"pipeline" yaml:"pipeline"`
 }
 
 type DerivedDataStep struct {

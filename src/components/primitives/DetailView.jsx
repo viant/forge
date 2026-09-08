@@ -36,7 +36,8 @@ function DetailField({field, record, context, emptyText, columns}) {
   const [copyStatus, setCopyStatus] = React.useState('');
   const value = resolveSelector(record, field.field);
   const currency = field.currencyField ? resolveSelector(record, field.currencyField) : context?.resource?.currency;
-  const display = value == null || value === '' ? field.emptyText || emptyText || '—' : formatDisplayValue(value, field.format || 'raw', 'en-US', {currency, timeZone: context?.resource?.timeZone});
+  const timeZone = field.timeZoneSelector ? resolveSelector(record, field.timeZoneSelector) || field.timeZone : field.timeZone;
+  const display = value == null || value === '' ? field.emptyText || emptyText || '—' : formatDisplayValue(value, field.format || 'raw', 'en-US', {currency, timeZone: timeZone || context?.resource?.timeZone});
   const target = field.link ? resolveLinkTarget({linkConfig: field.link, row: record, value, context}) : null;
   const copy = async () => {
     setCopyStatus(await copyDetailValue(typeof navigator !== 'undefined' ? navigator.clipboard : null, field.label, value));

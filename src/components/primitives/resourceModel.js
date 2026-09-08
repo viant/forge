@@ -334,7 +334,10 @@ export function marshalResource(draft, context, modelRef, baseline = null, modeO
 
 function resolveValueSource(context, source = {}, extras = {}) {
   const scope = String(source.scope || 'extras').trim().toLowerCase();
-  const dataContext = source.dataSourceRef ? context?.Context?.(source.dataSourceRef) : context;
+  const dataSourceRef = String(source.dataSourceRef || '').trim();
+  const dataContext = dataSourceRef
+    ? (String(context?.identity?.dataSourceRef || '').trim() === dataSourceRef ? context : context?.Context?.(dataSourceRef))
+    : context;
   let value;
   switch (scope) {
     case 'constant': value = source.value; break;
