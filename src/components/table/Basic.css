@@ -694,6 +694,19 @@
     max-width: 100%;
 }
 
+.forge-table-cell-badges {
+    display: inline-flex;
+    min-width: 0;
+    max-width: 100%;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.forge-table-cell-badges > * {
+    flex: 0 0 auto;
+}
+
 .forge-table-stacked-summary {
     display: grid;
     min-width: 0;
@@ -770,6 +783,12 @@
 .forge-table-cell-badge.is-warning {
     background: #fff2d8;
     color: #7a4b00;
+}
+
+.forge-table-cell-badge.is-danger,
+.forge-table-cell-badge.is-error {
+    background: #fde8e7;
+    color: #b42318;
 }
 
 .forge-table-cell-badge > span:last-child {

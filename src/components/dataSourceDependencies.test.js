@@ -19,6 +19,8 @@ const filter = {};
 assert.equal(hasResolvedDependencies([{name: 'filters.period', from: 'const', location: 'month'}], {}, filter), true);
 assert.equal(filter.filters.period, 'month');
 assert.equal(hasResolvedDependencies([{name: 'filters.optional', required: false}], {filters: {}}), true);
+assert.equal(hasResolvedDependencies([{name: 'From'}, {name: 'To'}], {From: null, To: null}), false);
+assert.equal(hasResolvedDependencies([{name: 'From'}, {name: 'To'}], {From: '', To: '2026-09-07'}), false);
 
 const scopedParameters = [
     {name: 'AdvertiserId', required: false},
