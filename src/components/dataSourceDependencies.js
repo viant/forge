@@ -47,7 +47,7 @@ export function hasResolvedDependencies(parameters = [], values = {}, filter = {
             assignPath(filter, paramDef.name, paramDef.location);
             continue;
         }
-        if (hasDefinedPath(values, paramDef.name)) continue;
+        if (hasDefinedPath(values, paramDef.name) && isMeaningfulDependencyValue(resolvedPathValue(values, paramDef.name))) continue;
         if ('default' in paramDef) {
             assignPath(values, paramDef.name, paramDef.default);
             continue;
