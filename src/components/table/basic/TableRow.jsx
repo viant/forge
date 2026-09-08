@@ -62,7 +62,7 @@ const TableRow = ({
             onClick={handleRowClick}
             className={[selected ? "selected-row" : "row", rowClassName].filter(Boolean).join(" ")}
             style={rowStyle}
-            aria-disabled={rowSelectionDisabled || undefined}
+            data-selection-disabled={rowSelectionDisabled || undefined}
         >
             {cells}
         </tr>
