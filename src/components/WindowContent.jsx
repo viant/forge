@@ -236,6 +236,7 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}) {
         for (const item of node.items) {
             addRef(item?.dataSourceRef);
             addRef(item?.optionsDataSourceRef);
+            addRef(item?.fallbackOptionsDataSourceRef);
             addRef(resolveMappedRef(item));
         }
     }
@@ -313,6 +314,7 @@ export function resolveFetcherOwnedDataSourceRefs(metadata) {
 }
 
 export function shouldPrimeDataSourceFetch(dataSource = {}, prevInput = {}, collection = [], paramsChanged = false, control = {}) {
+    if (control?.loading === true) return false;
     const autoFetchEnabled = dataSource?.autoFetch !== false;
     const hasCollection = Array.isArray(collection) && collection.length > 0;
     const hasCompletedLoad = control?.loaded === true;
@@ -820,7 +822,7 @@ function WindowContentInner({window, metadata, services}) {
                 }),
             };
         }
-    }, [windowFormSignal, metadata, defaultDataSourceRef, initialWindowFormSeed, context, parameters, windowId, log, fetcherOwnedDataSourceRefs, requiredDataSourceRefs]);
+    }, [windowFormSignal, windowFormSnapshot, metadata, defaultDataSourceRef, initialWindowFormSeed, context, parameters, windowId, log, fetcherOwnedDataSourceRefs, requiredDataSourceRefs]);
 
     const renderDataSources = () => {
         if (!context) return null;

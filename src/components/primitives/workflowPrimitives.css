@@ -37,6 +37,14 @@
   white-space: nowrap;
 }
 
+.forge-editable-collection__selection-status {
+  flex: 0 0 auto;
+  margin: -2px 0 8px;
+  color: #607086;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .forge-assignment-picker {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -147,10 +155,9 @@
   .forge-detail-view dl { grid-template-columns: 1fr; }
   .forge-master-detail.is-split { grid-template-columns: 1fr; }
   .forge-editable-collection__operation-bar {
-    flex-wrap: nowrap;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    overflow-x: visible;
     padding-bottom: 2px;
-    scrollbar-width: thin;
   }
   .forge-editable-collection__operation-bar > .forge-mutation-command,
   .forge-editable-collection__operation-bar > .bp6-button,

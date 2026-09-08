@@ -123,16 +123,18 @@ type DetailViewSection struct {
 }
 
 type DetailViewField struct {
-	ID            string                 `json:"id" yaml:"id"`
-	Label         string                 `json:"label" yaml:"label"`
-	Field         string                 `json:"field" yaml:"field"`
-	Format        string                 `json:"format,omitempty" yaml:"format,omitempty"`
-	CurrencyField string                 `json:"currencyField,omitempty" yaml:"currencyField,omitempty"`
-	EmptyText     string                 `json:"emptyText,omitempty" yaml:"emptyText,omitempty"`
-	Span          int                    `json:"span,omitempty" yaml:"span,omitempty"`
-	Copyable      bool                   `json:"copyable,omitempty" yaml:"copyable,omitempty"`
-	VisibleWhen   map[string]interface{} `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
-	Link          *TableLink             `json:"link,omitempty" yaml:"link,omitempty"`
+	ID               string                 `json:"id" yaml:"id"`
+	Label            string                 `json:"label" yaml:"label"`
+	Field            string                 `json:"field" yaml:"field"`
+	Format           string                 `json:"format,omitempty" yaml:"format,omitempty"`
+	TimeZone         string                 `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
+	TimeZoneSelector string                 `json:"timeZoneSelector,omitempty" yaml:"timeZoneSelector,omitempty"`
+	CurrencyField    string                 `json:"currencyField,omitempty" yaml:"currencyField,omitempty"`
+	EmptyText        string                 `json:"emptyText,omitempty" yaml:"emptyText,omitempty"`
+	Span             int                    `json:"span,omitempty" yaml:"span,omitempty"`
+	Copyable         bool                   `json:"copyable,omitempty" yaml:"copyable,omitempty"`
+	VisibleWhen      map[string]interface{} `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+	Link             *TableLink             `json:"link,omitempty" yaml:"link,omitempty"`
 }
 
 type MasterDetailSpec struct {

@@ -59,8 +59,29 @@ function resolveDisplayMessage(status, message) {
     if (status === 408 || status === 504 || /(?:timed?\s*out|timeout)/i.test(message)) {
         return 'The request timed out. Retry in a moment.';
     }
+    const validationMessage = extractValidationMessage(message);
+    if (validationMessage) {
+        return validationMessage;
+    }
     if ((status && status >= 500) || /(?:internal server error|parameter\s+"?(?:auth|sysconfig)"?|seed\s+"?[a-z0-9_]+"?\s*:)/i.test(message)) {
         return 'This data is temporarily unavailable. Retry in a moment.';
     }
     return message;
+}
+
+function extractValidationMessage(message) {
+    const match = String(message || '').match(/(\{[\s\S]*\})\s*$/);
+    if (!match) {
+        return '';
+    }
+    try {
+        const payload = JSON.parse(match[1]);
+        const violations = Array.isArray(payload?.violations) ? payload.violations : [];
+        const messages = [...new Set(violations
+            .map((violation) => String(violation?.Message || violation?.message || '').trim())
+            .filter(Boolean))];
+        return messages.join(' ');
+    } catch (_) {
+        return '';
+    }
 }

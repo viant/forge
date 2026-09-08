@@ -50,7 +50,7 @@ function ResponsiveCardField({row, rowIndex, column, colIndex, context, columnHa
   const computed = readCardState(stateEvents, 'onValue', undefined);
   if (computed !== undefined) value = computed;
   const currency = column.currencyField ? resolveSelector(row, column.currencyField) : undefined;
-  const timeZone = context?.resource?.timeZone;
+  const timeZone = (column.timeZoneSelector ? resolveSelector(row, column.timeZoneSelector) || column.timeZone : column.timeZone) || context?.resource?.timeZone;
   const display = value == null || value === '' ? column.emptyText || '—' : formatDisplayValue(value, column.format || 'raw', 'en-US', {currency, timeZone});
   const label = column.name || column.label || column.cellProperties?.['aria-label'] || field;
   if (column.type === 'button') {

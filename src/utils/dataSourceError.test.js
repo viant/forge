@@ -32,4 +32,13 @@ describe('dataSourceError', () => {
         });
         expect(message).toBe('Authentication required. Please sign in to continue.');
     });
+
+    it('extracts validation messages without exposing backend JSON', () => {
+        const message = formatDataSourceError({
+            status: 500,
+            message: 'GET error: 500 Internal Server Error: {"status":"error","data":[{"name":"secret draft"}],"violations":[{"Field":"ChannelsV2","Message":"Order must have at least one channel"}]}',
+        });
+        expect(message).toBe('Order must have at least one channel');
+        expect(message).not.toContain('{');
+    });
 });

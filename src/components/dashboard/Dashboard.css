@@ -7033,12 +7033,14 @@ button.forge-report-builder__dialog-source-card:focus-visible {
 .forge-editable-collection__table-wrap { overflow-x: auto; border: 1px solid #dce5ee; border-radius: 12px; }
 .forge-editable-collection__table-wrap { container-type: inline-size; }
 .forge-editable-collection__table { width: 100%; border-collapse: collapse; background: #fff; }
-.forge-editable-collection__table th { background: #f3f6fa; color: #4e6075; padding: 9px 10px; text-align: left; font-size: 11px; letter-spacing: .025em; text-transform: uppercase; }
+.forge-editable-collection__table th { background: #f3f6fa; color: #4e6075; padding: 4px 8px; min-height: 22px; line-height: 14px; text-align: left; font-size: 11px; letter-spacing: .025em; text-transform: uppercase; }
 .forge-editable-collection__table td { border-top: 1px solid #e3eaf1; padding: 7px; vertical-align: top; }
 .forge-editable-collection__table input,
 .forge-editable-collection__table select,
 .forge-editable-collection__table textarea { width: 100%; min-width: 110px; min-height: 34px; box-sizing: border-box; border: 1px solid #cdd9e5; border-radius: 8px; background: #fff; color: #23364b; padding: 6px 8px; font: inherit; font-size: 12px; }
 .forge-editable-collection__table textarea { min-height: 42px; line-height: 1.35; resize: none; overflow: hidden; field-sizing: content; }
+.forge-editable-collection__table td.is-required > input,
+.forge-editable-collection__table td.is-required > select { border-color: #e6b9c0; background: #fff3f4; }
 .forge-editable-collection__table input:focus,
 .forge-editable-collection__table select:focus { border-color: #4b78cf; outline: 2px solid rgba(47, 109, 225, .14); }
 .forge-editable-collection__table textarea:focus { border-color: #4b78cf; outline: 2px solid rgba(47, 109, 225, .14); }
@@ -7059,6 +7061,20 @@ button.forge-report-builder__dialog-source-card:focus-visible {
 .forge-editable-collection__actions { width: 42px; text-align: center; }
 .forge-editable-collection__actions button { width: 30px; height: 30px; border: 0; border-radius: 8px; background: #fff0f0; color: #a82a2a; cursor: pointer; }
 .forge-editable-collection__empty { color: #718096; padding: 18px !important; text-align: center; }
+.forge-editable-collection__cards { display: none; }
+.forge-editable-collection__card { border: 1px solid #dce5ee; border-radius: 12px; background: #fff; overflow: hidden; }
+.forge-editable-collection__card-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 38px; padding: 8px 10px; background: #f3f6fa; color: #334a62; }
+.forge-editable-collection__card-header strong { font-size: 13px; }
+.forge-editable-collection__card-header span { color: #607188; font-size: 12px; font-weight: 700; }
+.forge-editable-collection__card-fields { display: grid; gap: 10px; padding: 10px; }
+.forge-editable-collection__card-field { display: grid; gap: 5px; color: #40536a; font-size: 12px; font-weight: 700; }
+.forge-editable-collection__card-field > input,
+.forge-editable-collection__card-field > select { width: 100%; min-height: 38px; box-sizing: border-box; border: 1px solid #cdd9e5; border-radius: 8px; background: #fff; color: #23364b; padding: 7px 9px; font: inherit; font-weight: 500; }
+.forge-editable-collection__card-field.is-required > input,
+.forge-editable-collection__card-field.is-required > select { border-color: #e6b9c0; background: #fff3f4; }
+.forge-editable-collection__card-field > input:focus,
+.forge-editable-collection__card-field > select:focus { border-color: #4b78cf; outline: 2px solid rgba(47, 109, 225, .14); }
+.forge-editable-collection__card-remove { margin: 0 10px 10px; min-height: 34px; border: 1px solid #efc2c2; border-radius: 8px; background: #fff4f4; color: #9b2f2f; font-weight: 700; }
 .forge-frequency-editor { display: grid; grid-template-columns: minmax(62px, .8fr) auto minmax(58px, .7fr) minmax(84px, 1fr); align-items: center; gap: 6px; }
 .forge-frequency-editor > span { color: #657487; font-size: 12px; font-weight: 700; }
 .forge-frequency-editor input,
@@ -7066,6 +7082,12 @@ button.forge-report-builder__dialog-source-card:focus-visible {
 .forge-editable-collection__pager { display: flex; align-items: center; justify-content: flex-end; gap: 10px; color: #657487; font-size: 12px; font-weight: 700; }
 .forge-editable-collection__pager button { min-height: 30px; border: 1px solid #ccd8e5; border-radius: 8px; background: #fff; color: #34516e; padding: 4px 9px; cursor: pointer; }
 .forge-editable-collection__pager button:disabled { opacity: .45; cursor: default; }
+
+@media (max-width: 600px) {
+    .forge-editable-collection--mobile-cards > .forge-editable-collection__table-wrap { display: none; }
+    .forge-editable-collection--mobile-cards > .forge-editable-collection__cards { display: grid; gap: 10px; }
+    .forge-editable-collection__toolbar { align-items: flex-start; }
+}
 
 @media print {
     .forge-dashboard-lookup-chips { display: none; }

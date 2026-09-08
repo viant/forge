@@ -551,6 +551,7 @@ export function registerPack() {
                         <MenuItem
                             key={item.value}
                             text={item.label}
+                            htmlTitle={item.tooltip || undefined}
                             active={modifiers.active}
                             disabled={isSelectOptionDisabled(item)}
                             onClick={isSelectOptionDisabled(item) ? undefined : handleClick}
@@ -1000,7 +1001,12 @@ export function registerPack() {
                 onChange={(e) => onChange?.(e)}
             >
                 {options.map((opt) => (
-                    <Radio key={opt.value} label={opt.label} value={opt.value} />
+                    <Radio
+                        key={opt.value}
+                        className="forge-blueprint-radio-compat"
+                        label={opt.label}
+                        value={opt.value}
+                    />
                 ))}
             </RadioGroup>
         );

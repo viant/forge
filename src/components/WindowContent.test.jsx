@@ -129,11 +129,16 @@ describe('resolveRequiredDataSourceRefs', () => {
 
   it('includes an options datasource used by a form select', () => {
     const metadata = {
-      dataSource: { product: {}, product_categories: {} },
+      dataSource: { product: {}, product_categories: {}, fallback_categories: {} },
       view: {
         content: {
           dataSourceRef: 'product',
-          items: [{ id: 'category', type: 'select', optionsDataSourceRef: 'product_categories' }],
+          items: [{
+            id: 'category',
+            type: 'select',
+            optionsDataSourceRef: 'product_categories',
+            fallbackOptionsDataSourceRef: 'fallback_categories',
+          }],
         },
       },
     };
@@ -141,6 +146,7 @@ describe('resolveRequiredDataSourceRefs', () => {
     expect(resolveRequiredDataSourceRefs(metadata, 'product', {})).toEqual([
       'product',
       'product_categories',
+      'fallback_categories',
     ]);
   });
 
@@ -398,6 +404,9 @@ describe('resolveFetcherOwnedDataSourceRefs', () => {
 });
 
 describe('shouldPrimeDataSourceFetch', () => {
+    it('does not re-prime an in-flight empty datasource', () => {
+      expect(shouldPrimeDataSourceFetch({}, {fetch: false}, [], false, {loaded: false, loading: true})).toBe(false);
+    });
   it('does not auto-fetch empty user-driven datasources', () => {
     expect(
       shouldPrimeDataSourceFetch({ autoFetch: false }, { parameters: {} }, [], true),

@@ -35,6 +35,8 @@ has(renderToStaticMarkup(<RelationDrill context={context} container={{relationDr
 has(renderToStaticMarkup(<NotificationRules context={context} container={{notificationRules: {rules: [{id: 'notice', message: 'Review input', intent: 'warning'}]}}}/>), 'Review input');
 has(renderToStaticMarkup(<MetricSummary context={context} container={{metricSummary: {dataSourceRef: 'summary', metrics: [{id: 'total', label: 'Total', field: 'total', format: 'currency2'}]}}}/>), '$12.50');
 has(renderToStaticMarkup(<DetailView context={context} container={{detailView: {dataSourceRef: 'record', sections: [{id: 'general', label: 'General', fields: [{id: 'name', label: 'Name', field: 'name'}]}]}}}/>), 'data-detail-field-id="name"');
+const utcDetailContext = {...dataContext, signals: {...dataContext.signals, form: signal({created: '2026-09-08T18:58:00Z'})}};
+has(renderToStaticMarkup(<DetailView context={{...context, Context: () => utcDetailContext}} container={{detailView: {dataSourceRef: 'record', fields: [{id: 'created', label: 'Time (GMT)', field: 'created', format: 'dateTime24', timeZone: 'UTC'}]}}}/>), 'Sep 8, 2026, 18:58');
 const collectionDetailContext = {...dataContext, signals: {...dataContext.signals, form: signal({name: 'Seed'}), collection: signal([{name: 'Fetched'}])}};
 assert.equal(resolveDetailRecord(collectionDetailContext, 'collection').name, 'Fetched');
 has(renderToStaticMarkup(<DetailView context={{...context, Context: () => collectionDetailContext}} container={{detailView: {dataSourceRef: 'record', source: 'collection', fields: [{id: 'name', label: 'Name', field: 'name'}]}}}/>), 'Fetched');

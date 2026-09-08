@@ -52,7 +52,7 @@ detailView:
   sections:
     - id: general
       label: General
-      fields: [{id: id, label: ID, field: id, format: id, copyable: true}]
+      fields: [{id: id, label: ID, field: id, format: id, timeZone: UTC, timeZoneSelector: eventTimeZone, copyable: true}]
 masterDetail:
   stateKey: selectedRecord
   identityFields: [id]
@@ -86,6 +86,9 @@ masterDetail:
 	}
 	if container.DetailView == nil || len(container.DetailView.Sections) != 1 || !container.DetailView.Sections[0].Fields[0].Copyable {
 		t.Fatal("detailView truncated")
+	}
+	if field := container.DetailView.Sections[0].Fields[0]; field.TimeZone != "UTC" || field.TimeZoneSelector != "eventTimeZone" {
+		t.Fatalf("detailView time-zone metadata truncated: %#v", field)
 	}
 	if container.MasterDetail == nil || len(container.MasterDetail.IdentityFields) != 1 || container.MasterDetail.Detail.Parameters["RecordId"] == nil {
 		t.Fatal("masterDetail truncated")

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+    recoverInterruptedFetchOnMount,
     resolveFetchPage,
     shouldReplayPendingFetchOnMount,
     snapshotFilter,
@@ -10,6 +11,23 @@ import {
 assert.equal(shouldReplayPendingFetchOnMount({}, true), true);
 assert.equal(shouldReplayPendingFetchOnMount({replayPendingFetchOnRestore: false}, true), false);
 assert.equal(shouldReplayPendingFetchOnMount({replayPendingFetchOnRestore: false}, false), true);
+
+assert.deepEqual(
+    recoverInterruptedFetchOnMount({}, {fetch: false, page: 1}, {loading: true, loaded: false}, true),
+    {input: {fetch: true, page: 1, refresh: false}, control: {loading: false, loaded: false, stale: true}},
+    "an interrupted reader clears stale loading and replays after remount",
+);
+assert.deepEqual(
+    recoverInterruptedFetchOnMount({replayPendingFetchOnRestore: false}, {fetch: true}, {loading: true}, true),
+    {input: {fetch: false, refresh: false}, control: {loading: false, stale: false}},
+    "an interrupted mutation clears stale loading without replaying a write",
+);
+assert.equal(recoverInterruptedFetchOnMount({}, {fetch: true}, {loading: false}, true), null);
+assert.equal(
+    recoverInterruptedFetchOnMount({}, {fetch: false}, {loading: true, loaded: true}, true),
+    null,
+    "a completed empty response must not be replayed during the loading-to-settled render",
+);
 
 assert.deepEqual(snapshotFilter({
     b: 2,

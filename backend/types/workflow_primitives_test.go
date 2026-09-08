@@ -28,6 +28,8 @@ editableCollection:
   dataSourceRef: records
   identityFields: [id]
   selection: {mode: multi, min: 1, max: 20}
+  selectionStatus: true
+  selectionPrompt: Select one row to continue.
   operations:
     - id: edit
       label: Edit
@@ -77,6 +79,7 @@ derivedDataSource:
   version: v1
   maxRows: 5000
   sources: [records, metrics]
+  optionalSources: [metrics]
   pipeline:
     - operation: join
       source: metrics
@@ -170,6 +173,9 @@ scheduleEditor:
 	if container.DerivedDataSource.Version != "v1" || container.DerivedDataSource.MaxRows != 5000 || container.DerivedDataSource.Pipeline[0].JoinCardinality != "one" {
 		t.Fatal("derived pipeline governance metadata missing")
 	}
+	if len(container.DerivedDataSource.OptionalSources) != 1 || container.DerivedDataSource.OptionalSources[0] != "metrics" {
+		t.Fatal("derived optional sources were truncated")
+	}
 	if container.ResponsiveDataGrid == nil || container.HistoryDiff == nil || container.ScheduleEditor == nil {
 		t.Fatal("grid/history/schedule primitive missing")
 	}
@@ -192,5 +198,9 @@ scheduleEditor:
 	}
 	if output["editableCollection"] == nil || output["scheduleEditor"] == nil {
 		t.Fatalf("workflow primitives were not serialized: %s", encoded)
+	}
+	editable := output["editableCollection"].(map[string]interface{})
+	if editable["selectionStatus"] != true || editable["selectionPrompt"] != "Select one row to continue." {
+		t.Fatalf("editableCollection selection status metadata was not retained: %#v", editable)
 	}
 }

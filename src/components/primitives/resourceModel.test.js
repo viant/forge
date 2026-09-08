@@ -76,7 +76,24 @@ const payload = prepareResourcePayload(context, {
   modelRef: 'record', source: {scope: 'form', dataSourceRef: 'record_read'}, baseline: {scope: 'collection', dataSourceRef: 'record_read', selector: '0'},
 }, {});
 assert.deepEqual(payload, {Records: [{Id: 7, Name: 'Changed', Threshold: null, Enabled: false, Children: [{Id: 11, Value: 40, Label: 'one'}, {Id: 12, Value: 30, Label: 'two'}], Source: 'forge'}]});
-assert.deepEqual(hooks.map(([name]) => name), ['beforeRead', 'afterRead', 'beforeRead', 'afterRead', 'beforeWrite', 'afterWrite', 'beforeWrite', 'afterWrite']);
+const localReadContext = {
+  ...context,
+  identity: {dataSourceRef: 'record_read'},
+  signals: {collection: {peek: () => collections.record_read}},
+  handlers: {dataSource: {getFormData: () => ({id: 7, name: 'Local change', cap: 2, enabled: true, children: collections.record_read[0].children})}},
+  Context: () => ({
+    signals: {collection: {peek: () => [{id: 999, name: 'Foreign baseline'}]}},
+    handlers: {dataSource: {getFormData: () => ({id: 999, name: 'Foreign draft'})}},
+  }),
+};
+assert.deepEqual(prepareResourcePayload(localReadContext, {
+  modelRef: 'record', source: {scope: 'form', dataSourceRef: 'record_read'}, baseline: {scope: 'collection', dataSourceRef: 'record_read', selector: '0'}, mode: 'changed',
+}), {Records: [{Id: 7, Name: 'Local change', Source: 'forge'}]}, 'resource payloads must prefer their window-local datasource over a same-name global context');
+assert.deepEqual(hooks.map(([name]) => name), [
+  'beforeRead', 'afterRead', 'beforeRead', 'afterRead',
+  'beforeWrite', 'afterWrite', 'beforeWrite', 'afterWrite',
+  'beforeWrite', 'beforeWrite', 'afterWrite',
+]);
 assert.ok(hooks.every(([, immutable]) => immutable), 'hooks receive immutable value snapshots');
 
 const changed = marshalResource({children: [{id: 11, value: 50}]}, context, 'record', read, 'changed');

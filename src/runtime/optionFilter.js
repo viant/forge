@@ -71,21 +71,27 @@ export function filterDataSourceOptions(rows, optionFilter, context) {
     }));
 }
 
-function rowsFromDataSource(context, dataSourceRef, selector = '') {
-	if (!dataSourceRef || typeof context?.Context !== 'function') return [];
+function optionRowsSnapshot(context, dataSourceRef, selector = '') {
+	if (!dataSourceRef || typeof context?.Context !== 'function') return {rows: [], selectorPresent: false};
 	const target = context.Context(dataSourceRef);
 	const collection = target?.signals?.collection?.value || target?.signals?.collection?.peek?.() || [];
 	const form = target?.signals?.form?.value || target?.signals?.form?.peek?.() || {};
-	if (!selector) return Array.isArray(collection) ? collection : [];
+	if (!selector) return {rows: Array.isArray(collection) ? collection : [], selectorPresent: true};
 	const root = Array.isArray(collection) && collection.length === 1 ? collection[0] : (form && Object.keys(form).length ? form : collection);
 	const selected = resolveSelector(root, selector);
-	return Array.isArray(selected) ? selected : [];
+	return {rows: Array.isArray(selected) ? selected : [], selectorPresent: selected !== undefined};
+}
+
+function rowsFromDataSource(context, dataSourceRef, selector = '') {
+	return optionRowsSnapshot(context, dataSourceRef, selector).rows;
 }
 
 export function resolveDataSourceOptionRows(item = {}, context = {}) {
 	const primaryRef = String(item?.optionsDataSourceRef || '').trim();
 	const primaryTarget = primaryRef && typeof context?.Context === 'function' ? context.Context(primaryRef) : null;
-	const primary = rowsFromDataSource(context, primaryRef, item?.optionsDataSelector || item?.optionsSelector || '');
+	const primarySelector = item?.optionsDataSelector || item?.optionsSelector || '';
+	const primarySnapshot = optionRowsSnapshot(context, primaryRef, primarySelector);
+	const primary = primarySnapshot.rows;
 	if (primary.length > 0) return primary;
 	const primaryControl = primaryTarget?.signals?.control?.value || primaryTarget?.signals?.control?.peek?.() || {};
 	if (primaryControl.loading === true) return [];
@@ -93,6 +99,16 @@ export function resolveDataSourceOptionRows(item = {}, context = {}) {
 	const primaryForm = primaryTarget?.signals?.form?.value || primaryTarget?.signals?.form?.peek?.() || {};
 	const hasPrimaryPayload = (Array.isArray(primaryCollection) && primaryCollection.length > 0)
 		|| (primaryForm && typeof primaryForm === 'object' && Object.keys(primaryForm).length > 0);
+	// Older compatible servers may return the primary envelope without a newly
+	// introduced nested collection. Only a present-but-empty selector is an
+	// authoritative true-empty response; an absent selector uses the fallback.
+	if (hasPrimaryPayload && primarySelector && !primarySnapshot.selectorPresent) {
+		return rowsFromDataSource(
+			context,
+			String(item?.fallbackOptionsDataSourceRef || '').trim(),
+			item?.fallbackOptionsDataSelector || item?.fallbackOptionsSelector || '',
+		);
+	}
 	if (hasPrimaryPayload && !primaryControl.error) return [];
 	return rowsFromDataSource(
 		context,
