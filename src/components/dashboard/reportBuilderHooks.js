@@ -161,8 +161,11 @@ export function resolveHostedExecuteOnOpenHostAction({
     if (executeOnOpen !== true) {
         return "skip";
     }
+    if (!windowState || typeof windowState !== "object" || Array.isArray(windowState)) {
+        return "skip";
+    }
     const hostOpenState = String(windowState?.hostOpenState || "").trim().toLowerCase();
-    if (hostOpenState === "fresh") {
+    if (hostOpenState === "fresh" || hostOpenState === "") {
         return "execute";
     }
     if (hostOpenState === "historical_replay") {

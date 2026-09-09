@@ -67,7 +67,35 @@ import { resolveSelector } from "../utils/selector.js";
 import { getLogger } from "../utils/logger.js";
 import { normalizeServiceErrorText } from "../utils/errorText.js";
 import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "../reporting/reportChartAnnotations.js";
+import { buildChartCategoryTickLabel, normalizeChartCategoryLabelConfig } from "./chartCategoryLabel.js";
 import "./Chart.css";
+
+function ClampedCategoryTick({ x = 0, y = 0, payload = {}, config = null, valueFormatter = null, orientation = "x", style = {} }) {
+    const rawValue = payload?.value;
+    const formattedValue = typeof valueFormatter === "function" ? valueFormatter(rawValue) : rawValue;
+    const label = buildChartCategoryTickLabel(formattedValue, config);
+    if (!label) return null;
+    const isYAxis = orientation === "y";
+    const lineHeight = Math.max(11, Number(style?.fontSize || 12) + 2);
+    return (
+        <g transform={`translate(${x},${y})`}>
+            <title>{label.fullText}</title>
+            <text
+                x={isYAxis ? -6 : 0}
+                y={isYAxis ? -((label.lines.length - 1) * lineHeight) / 2 : 8}
+                textAnchor={isYAxis ? "end" : "middle"}
+                dominantBaseline={isYAxis ? "middle" : "hanging"}
+                {...style}
+            >
+                {label.lines.map((line, index) => (
+                    <tspan key={`${line}-${index}`} x={isYAxis ? -6 : 0} dy={index === 0 ? 0 : lineHeight}>
+                        {line}
+                    </tspan>
+                ))}
+            </text>
+        </g>
+    );
+}
 
 function ChartActionButton({
     children,
@@ -651,9 +679,11 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         setSelectedValueKey(newValueKey); // Just update the state
     };
 
+    const categoryLabelConfig = normalizeChartCategoryLabelConfig(xAxis?.categoryLabel);
+    const categoryLabelBottomOffset = categoryLabelConfig?.lines === 2 ? 14 : 0;
     const chartMargin = embedded
-        ? {top: 24, right: 12, left: 6, bottom: 34}
-        : {top: 10, right: 60, left: 14, bottom: 42};
+        ? {top: 24, right: 12, left: 6, bottom: 34 + categoryLabelBottomOffset}
+        : {top: 10, right: 60, left: 14, bottom: 42 + categoryLabelBottomOffset};
     const legendProps = embedded
         ? {verticalAlign: "top", align: "center", wrapperStyle: {fontSize: "10px", lineHeight: 1.1, paddingBottom: "6px", color: "#5f6b7c"}}
         : {};
@@ -663,6 +693,12 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const axisLabelStyle = embedded
         ? undefined
         : {fontSize: 12, fill: "#667085", fontWeight: 500};
+    const renderXAxisCategoryTick = categoryLabelConfig
+        ? ((props) => <ClampedCategoryTick {...props} config={categoryLabelConfig} valueFormatter={(value) => formatChartXAxisValue(value, resolvedTickFormat, resolvedTickValueMode)} style={axisTickStyle} />)
+        : axisTickStyle;
+    const renderYAxisCategoryTick = categoryLabelConfig
+        ? ((props) => <ClampedCategoryTick {...props} config={categoryLabelConfig} orientation="y" style={axisTickStyle} />)
+        : (embedded ? {fontSize: 11, fill: "#5f6b7c"} : undefined);
     const gridStroke = embedded ? "rgba(95,107,124,0.18)" : "rgba(152,162,179,0.22)";
     const showEmbeddedSeriesSelector = embedded && !isPieChart && availableDataKeys.length > 1;
     const showChartLegend = !showEmbeddedSeriesSelector && (embedded || !controlsVisible);
@@ -899,7 +935,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             <XAxis
                 dataKey={xAxis?.dataKey || "name"}
                 tickFormatter={(val) => formatChartXAxisValue(val, resolvedTickFormat, resolvedTickValueMode)}
-                tick={axisTickStyle}
+                tick={renderXAxisCategoryTick}
                 axisLine={false}
                 tickLine={false}
                 minTickGap={embedded ? 24 : 5}
@@ -985,7 +1021,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             220,
             Math.max(
                 110,
-                ...normalizedChartData.map((row) => String(readChartDataValue(row, categoryKey) ?? "").length * 6 + 20)
+				...normalizedChartData.map((row) => String(readChartDataValue(row, categoryKey) ?? "").length * 6 + 20)
             )
         );
         const barSize = embedded ? 10 : 12;
@@ -998,7 +1034,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 <XAxis
                     type="number"
                     tickFormatter={createAxisTickFormatter(primarySeries.format || leftAxis.format)}
-                    tick={embedded ? {fontSize: 11, fill: "#5f6b7c"} : undefined}
+                    tick={renderYAxisCategoryTick}
                     label={{
                         value: embedded ? "" : (leftAxis.label || primarySeries.label || ""),
                         position: "insideBottomRight",

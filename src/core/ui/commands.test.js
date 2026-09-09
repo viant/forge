@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { addWindow, activeWindows, selectedTabId, selectedWindowId, getBusSignal, getCollectionSignal, getDashboardFilterSignal, getDashboardSelectionSignal, getFormSignal, getMetricsSignal, getViewSignal } from '../store/signals.js';
+import { addWindow, activeWindows, selectedTabId, selectedWindowId, getBusSignal, getCollectionSignal, getDashboardFilterSignal, getDashboardSelectionSignal, getFormSignal, getMetadataSignal, getMetricsSignal, getSelectionSignal, getViewSignal } from '../store/signals.js';
 import { runUICommand } from './commands.js';
 import { registerControlTarget, unregisterControlTarget } from './registry.js';
 
@@ -710,6 +710,76 @@ const clearAllDashboardFilters = await runUICommand({
 });
 assert.equal(clearAllDashboardFilters.ok, true);
 assert.deepEqual(getDashboardFilterSignal(`${openedDemo.windowId}:demoDashboard`).peek(), {});
+
+const selectionWindow = activeWindows.peek().find((win) => win.windowId === openedDemo.windowId);
+assert.ok(selectionWindow);
+getMetadataSignal(openedDemo.windowId).value = {
+  ...(selectionWindow.inlineMetadata || {}),
+  ...(getMetadataSignal(openedDemo.windowId).peek() || {}),
+  dataSource: {
+    ...(selectionWindow.inlineMetadata?.dataSource || {}),
+    ...(getMetadataSignal(openedDemo.windowId).peek()?.dataSource || {}),
+    selectableRows: {
+      selectionMode: 'multi',
+      uniqueKey: [{ field: 'advertiser.id' }, { field: 'reportId' }],
+    },
+  },
+};
+const selectableRowsId = `${openedDemo.windowId}DSselectableRows`;
+getCollectionSignal(selectableRowsId).value = [
+  { advertiser: { id: 17 }, reportId: 'reach', title: 'Reach' },
+  { advertiser: { id: 17 }, reportId: 'spend', title: 'Spend' },
+  { advertiser: { id: 31 }, reportId: 'reach', title: 'Reach 31' },
+];
+const selectedRows = await runUICommand({
+  method: 'ui.datasource.setSelection',
+  params: {
+    windowId: openedDemo.windowId,
+    dataSourceRef: 'selectableRows',
+    identities: [
+      { 'advertiser.id': '17', reportId: 'spend' },
+      { advertiser: { id: 31 }, reportId: 'reach' },
+    ],
+  },
+});
+assert.equal(selectedRows.ok, true);
+assert.deepEqual(selectedRows.identityFields, ['advertiser.id', 'reportId']);
+assert.deepEqual(selectedRows.selectedIdentities, [
+  { 'advertiser.id': 17, reportId: 'spend' },
+  { 'advertiser.id': 31, reportId: 'reach' },
+]);
+assert.deepEqual(selectedRows.rowIndexes, [1, 2]);
+assert.deepEqual(
+  getSelectionSignal(selectableRowsId).peek().selection.map((row) => row.title),
+  ['Spend', 'Reach 31'],
+);
+
+const selectionBeforeFailure = getSelectionSignal(selectableRowsId).peek();
+await assert.rejects(
+  runUICommand({
+    method: 'ui.datasource.setSelection',
+    params: {
+      windowId: openedDemo.windowId,
+      dataSourceRef: 'selectableRows',
+      identityFields: ['advertiser.id'],
+      identities: [{ advertiser: { id: 17 } }],
+    },
+  }),
+  /ambiguous row identity/,
+);
+assert.deepEqual(getSelectionSignal(selectableRowsId).peek(), selectionBeforeFailure);
+await assert.rejects(
+  runUICommand({
+    method: 'ui.datasource.setSelection',
+    params: {
+      windowId: openedDemo.windowId,
+      dataSourceRef: 'selectableRows',
+      identities: [{ advertiser: { id: 999 }, reportId: 'missing' }],
+    },
+  }),
+  /no row found for identity/,
+);
+assert.deepEqual(getSelectionSignal(selectableRowsId).peek(), selectionBeforeFailure);
 
 const setDashboardSelection = await runUICommand({
   method: 'ui.dashboard.selection.set',

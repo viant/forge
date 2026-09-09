@@ -158,6 +158,29 @@ assert.deepEqual(normalizeReportTableBlockColumn({
   },
 });
 
+assert.deepEqual(normalizeReportTableBlockColumn({
+  key: "creativeName",
+  label: "Creative",
+  link: { kind: "external", urlField: "creativeUrl", hrefTemplate: "javascript:ignored" },
+}), {
+  key: "creativeName",
+  label: "Creative",
+  link: { kind: "external", urlField: "creativeUrl" },
+});
+
+assert.deepEqual(normalizeReportTableBlockColumn({
+  key: "entityName",
+  link: { kind: "entityDetail", handler: "entity", idField: "entityId" },
+}), {
+  key: "entityName",
+  link: { kind: "entityDetail", handler: "entity", idField: "entityId" },
+});
+
+assert.equal("link" in normalizeReportTableBlockColumn({
+  key: "unsafe",
+  link: { kind: "external", hrefTemplate: "javascript:alert(1)" },
+}), false);
+
 assert.deepEqual(normalizeReportDocumentTableBlock({
   id: "comparisonTable",
   title: "Comparison Table",

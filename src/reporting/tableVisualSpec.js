@@ -1,3 +1,5 @@
+import { normalizeReportTableLink } from "./reportTableLink.js";
+
 function normalizeString(value = "") {
   return String(value || "").trim();
 }
@@ -98,6 +100,7 @@ export function normalizeReportTableBlockColumn(column = {}) {
     return null;
   }
   const cellVisual = normalizeReportTableCellVisual(column.cellVisual);
+  const link = normalizeReportTableLink(column.link);
   return {
     key,
     ...(normalizeString(column.sourceKey) ? { sourceKey: normalizeString(column.sourceKey) } : {}),
@@ -113,6 +116,7 @@ export function normalizeReportTableBlockColumn(column = {}) {
     ...(normalizeString(column.format) ? { format: normalizeString(column.format) } : {}),
     ...(normalizeString(column.align) ? { align: normalizeString(column.align) } : {}),
     ...(column?.runtimeFilterable === true ? { runtimeFilterable: true } : {}),
+    ...(link ? { link } : {}),
     ...(cellVisual ? { cellVisual } : {}),
   };
 }
@@ -140,11 +144,13 @@ export function normalizeReportDocumentTableBlock(block = {}) {
   ) {
     return null;
   }
+  const accentTone = normalizeString(block?.accentTone).toLowerCase();
   return {
     id,
     kind: "tableBlock",
     title,
     datasetRef,
     columns,
+    ...(["blue", "green", "amber", "rose", "slate"].includes(accentTone) ? { accentTone } : {}),
   };
 }

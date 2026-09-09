@@ -113,6 +113,13 @@ const hostedExecutionIdentityCases = [
         expected: "inline-source-1",
     },
     {
+        name: "runtime field catalog identity",
+        container: {
+            parameters: { reportDefinition: { fieldCatalog: { id: "runtime-report:catalog-entry" } } },
+        },
+        expected: "runtime-report:catalog-entry",
+    },
+    {
         name: "legacy state template fallback",
         container: { parameters: { executeOnOpen: true } },
         expected: "stale-template",
@@ -145,7 +152,10 @@ assert.deepEqual([
     resolveHostedReportActivationIdentity({
         parameters: { sourceKind: "report", artifactId: "artifact-only" },
     }),
-], ["artifact-123", "saved-report", "inline-report", "artifact-only"], "activation identity must match the exact effect request identity");
+    resolveHostedReportActivationIdentity({
+        parameters: { reportDefinition: { fieldCatalog: { id: "runtime-report:catalog-entry" } } },
+    }),
+], ["artifact-123", "saved-report", "inline-report", "artifact-only", ""], "activation identity must match the exact effect request identity and exclude field-catalog-only runtime definitions");
 assert.deepEqual([
     matchesHostedReportActivationCurrent({
         activationRequired: true,

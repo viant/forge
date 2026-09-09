@@ -6,6 +6,7 @@ import { resolveTableLink } from "../../utils/tableLink.js";
 import { formatDashboardValue } from "./dashboardUtils.js";
 import { resolveDashboardTableColumnValue } from "./dashboardTableValue.js";
 import { resolveTableCellVisualState } from "./tableCellVisuals.js";
+import { normalizeReportTableLink, resolveReportTableLink } from "../../reporting/reportTableLink.js";
 
 export const toneColors = {
     info: {background: '#ebf1f5', border: '#ced9e0', text: '#30404d'},
@@ -337,8 +338,32 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale) {
 }
 
 export function renderDashboardTableCell(cell, row, column, locale, context) {
-    const link = resolveTableLink({row, column, value: cell});
+    const reportLink = resolveReportTableLink({
+        row,
+        column,
+        value: cell,
+        entityDetailHandlers: context?.handlers?.entityDetail,
+    });
+    const hasReportLink = !!normalizeReportTableLink(column?.link);
+    const link = reportLink || (hasReportLink ? null : resolveTableLink({row, column, value: cell}));
     if (link) {
+        if (link.kind === 'entityDetail') {
+            return (
+                <button
+                    type="button"
+                    title={link.title || link.text}
+                    className="forge-dashboard-table-link"
+                    style={{background: 'none', border: 'none', padding: 0, margin: 0, cursor: 'pointer'}}
+                    onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        link.handler({ entityId: link.entityId, row, column, context });
+                    }}
+                >
+                    {link.text}
+                </button>
+            );
+        }
         if (link.kind === 'window') {
             return (
                 <button

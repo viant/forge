@@ -247,6 +247,11 @@ function buildAuthoredTableBlock(block = {}, fieldCatalog = {}) {
     if (!normalizedColumn) {
       return column;
     }
+    const linkField = normalizeString(normalizedColumn?.link?.urlField || normalizedColumn?.link?.idField);
+    const hasValidLinkField = !linkField || !!resolveReportBuilderCatalogEntry(fieldCatalog, linkField);
+    if (!hasValidLinkField) {
+      delete normalizedColumn.link;
+    }
     const catalogEntry = resolveReportBuilderCatalogEntry(fieldCatalog, normalizedColumn?.key);
     const fieldId = resolveReportBuilderFieldId(catalogEntry?.entry);
     if (!catalogEntry || !fieldId) {
@@ -591,6 +596,8 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
         (Array.isArray(normalizedBlock?.columns) ? normalizedBlock.columns : []).forEach((column) => {
           enableField(column?.key, normalizedDatasetRef, request);
           enableField(column?.cellVisual?.valueField, normalizedDatasetRef, request);
+          enableField(column?.link?.urlField, normalizedDatasetRef, request);
+          enableField(column?.link?.idField, normalizedDatasetRef, request);
         });
         break;
       case "geoMapBlock":
@@ -1539,6 +1546,7 @@ export function buildReportDocumentKpiBlock(block = {}) {
         secondaryField,
         secondaryLabel: normalizeString(block?.secondaryLabel || secondaryField),
         ...(normalizeString(block?.secondaryFormat) ? { secondaryFormat: normalizeString(block.secondaryFormat) } : {}),
+        ...(block?.secondaryTrend === true ? { secondaryTrend: true } : {}),
         ...(normalizeString(block?.secondaryDisplayKey)
           ? { secondaryDisplayKey: normalizeString(block.secondaryDisplayKey) }
           : {}),
