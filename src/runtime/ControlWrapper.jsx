@@ -97,7 +97,7 @@ export default function ControlWrapper({ item, container, context, framework = '
         return (
             <div
                 style={style}
-                className={["forge-control-wrapper", item?.className].filter(Boolean).join(" ")}
+                className={["forge-control-wrapper", readOnly ? "is-readonly" : "", disabled ? "is-disabled" : "", item?.className].filter(Boolean).join(" ")}
                 ref={wrapperRef}
                 data-forge-control-id={item?.id || undefined}
                 {...accessibilityProps}
@@ -110,7 +110,7 @@ export default function ControlWrapper({ item, container, context, framework = '
     return (
         <div
             style={style}
-            className={["forge-control-wrapper", item?.className].filter(Boolean).join(" ")}
+            className={["forge-control-wrapper", readOnly ? "is-readonly" : "", disabled ? "is-disabled" : "", item?.className].filter(Boolean).join(" ")}
             ref={wrapperRef}
             data-forge-control-id={item?.id || undefined}
             {...accessibilityProps}

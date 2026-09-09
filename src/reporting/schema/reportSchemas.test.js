@@ -337,6 +337,7 @@ const tabGroupSpec = {
       kind: "tabGroupBlock",
       title: "Sections",
       sectionIds: ["overviewSection"],
+      includeUnlistedSections: false,
       defaultSectionId: "overviewSection",
     },
     {
@@ -354,6 +355,14 @@ assert.deepEqual(validateReportSpec(tabGroupSpec), {
   valid: true,
   errors: [],
 });
+const invalidTabGroupReference = validateReportSpec({
+  ...tabGroupSpec,
+  blocks: tabGroupSpec.blocks.map((block) => (
+    block.kind === "tabGroupBlock" ? { ...block, sectionIds: ["missingSection"] } : block
+  )),
+});
+assert.equal(invalidTabGroupReference.valid, false);
+assert.equal(invalidTabGroupReference.errors.some((error) => error.code === "unknownSectionRef"), true);
 assert.deepEqual(validateReportFill(buildReportFillFromReportSpec(tabGroupSpec, {
   primary: {
     rows: [
@@ -387,6 +396,7 @@ const compositeSpec = {
       kind: "compositeBlock",
       title: "Summary panel",
       description: "Groups the narrative and KPI into one panel.",
+      layout: "responsiveGrid",
       childBlockIds: ["summaryMarkdown", "headlineKpi"],
     },
   ],
@@ -395,6 +405,14 @@ assert.deepEqual(validateReportSpec(compositeSpec), {
   valid: true,
   errors: [],
 });
+const invalidCompositeReference = validateReportSpec({
+  ...compositeSpec,
+  blocks: compositeSpec.blocks.map((block) => (
+    block.kind === "compositeBlock" ? { ...block, childBlockIds: ["missingKpi"] } : block
+  )),
+});
+assert.equal(invalidCompositeReference.valid, false);
+assert.equal(invalidCompositeReference.errors.some((error) => error.code === "unknownBlockRef"), true);
 assert.deepEqual(validateReportFill(buildReportFillFromReportSpec(compositeSpec, {
   primary: {
     rows: [

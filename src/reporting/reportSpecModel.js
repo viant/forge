@@ -256,6 +256,7 @@ export function buildReportBuilderPublishedDatasetConfig(baseConfig = {}, source
         ? { displayValueMap: cloneValue(column.displayValueMap) }
         : {}),
       ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
+      ...(normalizeString(column?.tickFormat) ? { tickFormat: normalizeString(column.tickFormat) } : {}),
     }))
     .filter((entry) => entry.id && entry.key && entry.label);
   const measures = fieldOptions
@@ -390,16 +391,19 @@ export function buildReportBuilderPublishedDatasetDeclarations(
         : null;
       const sameDataSource = normalizeString(source?.dataSourceRef)
         && normalizeString(source?.dataSourceRef) === normalizeString(primaryRequestContext?.dataSourceRef);
-      const inheritedRequestContext = sameDataSource
-        ? {
+      const inheritedRequestContext = {
+          ...(isPlainObject(primaryRequestContext?.request?.options)
+            ? { options: cloneValue(primaryRequestContext.request.options) }
+            : {}),
+          ...(sameDataSource ? {
             ...(isPlainObject(primaryRequestContext?.request?.filters)
               ? { filters: cloneValue(primaryRequestContext.request.filters) }
               : {}),
             ...(Array.isArray(primaryRequestContext?.request?.refinements)
               ? { refinements: cloneValue(primaryRequestContext.request.refinements) }
               : {}),
-          }
-        : null;
+          } : {}),
+        };
       const request = buildReportBuilderPublishedDatasetRequest(
         source,
         state,

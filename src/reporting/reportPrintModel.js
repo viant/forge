@@ -590,7 +590,33 @@ function buildOrderedReportFillBlocks(reportSpec = {}, reportFill = {}) {
     }
     ordered.push(block);
   });
-  return ordered;
+  const strictTabGroup = (Array.isArray(reportFill?.blocks) ? reportFill.blocks : [])
+    .find((block) => (
+      normalizeString(block?.kind) === "tabGroupBlock"
+      && (block?.content?.includeUnlistedSections ?? block?.includeUnlistedSections) === false
+    )) || null;
+  if (!strictTabGroup) {
+    return ordered;
+  }
+  const authoredSectionIds = new Set(
+    (Array.isArray(strictTabGroup?.content?.sectionIds)
+      ? strictTabGroup.content.sectionIds
+      : (Array.isArray(strictTabGroup?.sectionIds) ? strictTabGroup.sectionIds : []))
+      .map((sectionId) => normalizeString(sectionId))
+      .filter(Boolean),
+  );
+  let includeCurrentSection = false;
+  return ordered.filter((block) => {
+    const kind = normalizeString(block?.kind);
+    if (kind === "tabGroupBlock") {
+      return true;
+    }
+    if (kind === "sectionBlock") {
+      includeCurrentSection = authoredSectionIds.has(normalizeString(block?.id));
+      return includeCurrentSection;
+    }
+    return includeCurrentSection;
+  });
 }
 
 function buildLayoutSpanByBlockId(reportSpec = {}) {
@@ -1409,6 +1435,13 @@ function renderReportPrintCompositeBlock(state = {}, block = {}, {
     finishReportPrintBlock(state);
     return;
   }
+  const authoredLayout = normalizeString(block?.content?.layout || block?.layout);
+  const layout = authoredLayout === "responsiveGrid" ? "responsiveGrid" : "stack";
+  if (authoredLayout === "stack") {
+    childBlocks.forEach((childBlock) => renderReportPrintBlock(state, childBlock, {}));
+    finishReportPrintBlock(state);
+    return;
+  }
   let pendingRow = [];
   let pendingSpan = 0;
   const flushPendingRow = () => {
@@ -1421,11 +1454,13 @@ function renderReportPrintCompositeBlock(state = {}, block = {}, {
   };
   childBlocks.forEach((childBlock) => {
     const blockId = normalizeString(childBlock?.id);
-    const span = resolveResponsiveReportPrintSpan(
-      state,
-      childBlock,
-      resolveReportLayoutSpan(state.layoutSpanByBlockId.get(blockId)),
-    );
+    const span = layout === "responsiveGrid"
+      ? REPORT_LAYOUT_GRID_COLUMNS / 3
+      : resolveResponsiveReportPrintSpan(
+        state,
+        childBlock,
+        resolveReportLayoutSpan(state.layoutSpanByBlockId.get(blockId)),
+      );
     if (span >= REPORT_LAYOUT_GRID_COLUMNS) {
       flushPendingRow();
       renderReportPrintBlock(state, childBlock, {});

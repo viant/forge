@@ -12,21 +12,27 @@ import {evaluatePlainVisibleWhen, trackVisibleWhen} from './visibleWhen.js';
 import {dialogCloseDisabledWhen, isDialogCloseDisabled} from './dialogClose.js';
 import {consumeDialogFocusRevision, dialogFreshFormSeed, shouldRefreshDialogDataSourceForMount} from './viewDialogFreshState.js';
 import MutationCommand from './primitives/MutationCommand.jsx';
+import DisabledActionShell from './DisabledActionShell.jsx';
 
 export function ViewDialogFooterAction({action, context, disabled = false, onClose, onInvoke}) {
     if (action?.mutationCommand) {
         return <MutationCommand
-            command={{...action.mutationCommand, commandId: action.mutationCommand.commandId || action.id, label: action.label || action.id, icon: action.icon || action.mutationCommand.icon, hideLabel: action.hideLabel === true, intent: action.intent || action.mutationCommand.intent}}
+            command={{...action.mutationCommand, commandId: action.mutationCommand.commandId || action.id, label: action.label || action.id, icon: action.icon || action.mutationCommand.icon, hideLabel: action.hideLabel === true, intent: action.intent || action.mutationCommand.intent, tooltip: action.tooltip || action.mutationCommand.tooltip}}
             context={context}
             disabled={disabled}
         />;
     }
-    return <Button
+    const button = <Button
         intent={action?.intent}
         disabled={disabled}
         title={action?.tooltip || action?.label || action?.id}
         onClick={(event) => action?.close === true ? onClose?.() : onInvoke?.(event)}
     >{action?.label}</Button>;
+    return disabled && action?.tooltip ? (
+        <DisabledActionShell reason={action.tooltip} label={action?.label || action?.id || 'Action'}>
+            {button}
+        </DisabledActionShell>
+    ) : button;
 }
 
 function normalizeQuickFilterSpecs(dialog) {

@@ -11,6 +11,7 @@ import {
 } from './editableCollectionModel.js';
 import MutationCommand from './MutationCommand.jsx';
 import {permissionBoundaryAllows, permissionBoundaryAllowsRows} from './PermissionBoundary.jsx';
+import DisabledActionShell from '../DisabledActionShell.jsx';
 import './workflowPrimitives.css';
 
 export default function EditableCollection({container, context, isActive}) {
@@ -76,9 +77,9 @@ export default function EditableCollection({container, context, isActive}) {
               </Button>
             );
             return disabled && operation.tooltip ? (
-              <span key={operation.id} className="forge-disabled-action-shell" title={operation.tooltip} tabIndex={0} aria-label={`${operation.label || operation.id}. ${operation.tooltip}`}>
+              <DisabledActionShell key={operation.id} reason={operation.tooltip} label={operation.label || operation.id}>
                 {button}
-              </span>
+              </DisabledActionShell>
             ) : React.cloneElement(button, {key: operation.id});
           })}
         </ButtonGroup>

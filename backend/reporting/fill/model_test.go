@@ -228,23 +228,27 @@ func TestDecodeJSON_ReportFillFixtureWithExtendedDashboardBlocks(t *testing.T) {
 			"kind":          "compositeBlock",
 			"title":         "Summary panel",
 			"description":   "Groups the opening narrative and KPI.",
+			"layout":        "responsiveGrid",
 			"childBlockIds": []any{"directIntro", "integrationFlow"},
 			"content": map[string]any{
 				"title":         "Summary panel",
 				"description":   "Groups the opening narrative and KPI.",
+				"layout":        "responsiveGrid",
 				"childBlockIds": []any{"directIntro", "integrationFlow"},
 			},
 		},
 		map[string]any{
-			"id":               "sectionTabs",
-			"kind":             "tabGroupBlock",
-			"title":            "Forecast views",
-			"sectionIds":       []any{"overviewSection"},
-			"defaultSectionId": "overviewSection",
+			"id":                      "sectionTabs",
+			"kind":                    "tabGroupBlock",
+			"title":                   "Forecast views",
+			"sectionIds":              []any{"overviewSection"},
+			"defaultSectionId":        "overviewSection",
+			"includeUnlistedSections": false,
 			"content": map[string]any{
-				"title":            "Forecast views",
-				"sectionIds":       []any{"overviewSection"},
-				"defaultSectionId": "overviewSection",
+				"title":                   "Forecast views",
+				"sectionIds":              []any{"overviewSection"},
+				"defaultSectionId":        "overviewSection",
+				"includeUnlistedSections": false,
 				"tabs": []any{
 					map[string]any{"id": "overviewSection", "title": "Overview", "navigationLabel": "Overview"},
 				},
@@ -366,11 +370,17 @@ func TestDecodeJSON_ReportFillFixtureWithExtendedDashboardBlocks(t *testing.T) {
 			require.NotNil(t, block.CompositeContent)
 			require.Equal(t, []string{"directIntro", "integrationFlow"}, block.ChildBlockIDs)
 			require.Equal(t, []string{"directIntro", "integrationFlow"}, block.CompositeContent.ChildBlockIDs)
+			require.Equal(t, "responsiveGrid", block.Layout)
+			require.Equal(t, "responsiveGrid", block.CompositeContent.Layout)
 		case "tabGroupBlock":
 			foundTabGroup = true
 			require.NotNil(t, block.TabGroupContent)
 			require.Equal(t, []string{"overviewSection"}, block.SectionIDs)
 			require.Equal(t, "overviewSection", block.DefaultSectionID)
+			require.NotNil(t, block.IncludeUnlistedSections)
+			require.False(t, *block.IncludeUnlistedSections)
+			require.NotNil(t, block.TabGroupContent.IncludeUnlistedSections)
+			require.False(t, *block.TabGroupContent.IncludeUnlistedSections)
 			require.Len(t, block.TabGroupContent.Tabs, 1)
 		case "stepperBlock":
 			foundStepper = true

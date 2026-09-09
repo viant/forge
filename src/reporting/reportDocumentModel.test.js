@@ -9,6 +9,7 @@ import {
   buildReportDocumentCollectionBlock,
   buildReportDocumentSectionBlock,
   buildReportDocumentCompositeBlock,
+  buildReportDocumentTabGroupBlock,
   buildReportDocumentStepperBlock,
   buildReportDocumentInfoPanelBlock,
   buildReportDocumentCalloutBlock,
@@ -269,6 +270,20 @@ assert.deepEqual(buildReportDocumentSectionBlock({
   description: "Starts with the high-level executive view.",
   navigationLabel: "Overview",
 });
+assert.deepEqual(buildReportDocumentTabGroupBlock({
+  id: "sectionTabs",
+  title: "Sections",
+  sectionIds: ["summary", "details", "summary"],
+  defaultSectionId: "summary",
+  includeUnlistedSections: false,
+}), {
+  id: "sectionTabs",
+  kind: "tabGroupBlock",
+  title: "Sections",
+  sectionIds: ["summary", "details"],
+  includeUnlistedSections: false,
+  defaultSectionId: "summary",
+});
 assert.deepEqual(buildReportDocumentCompositeBlock({
   id: "summaryPanel",
   title: "Summary panel",
@@ -280,6 +295,18 @@ assert.deepEqual(buildReportDocumentCompositeBlock({
   title: "Summary panel",
   description: "Groups the opening narrative and KPI.",
   childBlockIds: ["narrativeIntro", "headlineKpi"],
+});
+assert.deepEqual(buildReportDocumentCompositeBlock({
+  id: "kpiGrid",
+  title: "KPI grid",
+  layout: "responsiveGrid",
+  childBlockIds: ["kpiA", "kpiB", "kpiC"],
+}), {
+  id: "kpiGrid",
+  kind: "compositeBlock",
+  title: "KPI grid",
+  layout: "responsiveGrid",
+  childBlockIds: ["kpiA", "kpiB", "kpiC"],
 });
 assert.deepEqual(buildReportDocumentStepperBlock({
   id: "integrationFlow",

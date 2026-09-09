@@ -74,6 +74,7 @@ type PrimitiveSelection struct {
 type EditableCollectionOperation struct {
 	ID                string                 `json:"id" yaml:"id"`
 	Label             string                 `json:"label" yaml:"label"`
+	Tooltip           string                 `json:"tooltip,omitempty" yaml:"tooltip,omitempty"`
 	Intent            string                 `json:"intent,omitempty" yaml:"intent,omitempty"`
 	DialogID          string                 `json:"dialogId,omitempty" yaml:"dialogId,omitempty"`
 	Handler           string                 `json:"handler,omitempty" yaml:"handler,omitempty"`

@@ -200,12 +200,80 @@ function validateReportSpecCalculatedFields(value = null) {
   });
 }
 
+function validateCompositeBlockReferences(value = null, { useContent = false } = {}) {
+  const blocks = Array.isArray(value?.blocks) ? value.blocks : [];
+  const blockIds = new Set(blocks.map((block) => normalizeString(block?.id)).filter(Boolean));
+  return blocks.flatMap((block, blockIndex) => {
+    if (normalizeString(block?.kind) !== "compositeBlock") {
+      return [];
+    }
+    const contentChildBlockIds = useContent && Array.isArray(block?.content?.childBlockIds)
+      ? block.content.childBlockIds
+      : null;
+    const childBlockIds = contentChildBlockIds || (Array.isArray(block?.childBlockIds) ? block.childBlockIds : []);
+    const pathPrefix = contentChildBlockIds
+      ? `$.blocks[${blockIndex}].content.childBlockIds`
+      : `$.blocks[${blockIndex}].childBlockIds`;
+    return childBlockIds.flatMap((childBlockId, childIndex) => {
+      const normalizedChildBlockId = normalizeString(childBlockId);
+      if (normalizedChildBlockId === normalizeString(block?.id)) {
+        return [{
+          path: `${pathPrefix}[${childIndex}]`,
+          code: "selfReference",
+          message: "A compositeBlock cannot contain itself.",
+        }];
+      }
+      if (normalizedChildBlockId && !blockIds.has(normalizedChildBlockId)) {
+        return [{
+          path: `${pathPrefix}[${childIndex}]`,
+          code: "unknownBlockRef",
+          message: `Unknown child block reference '${normalizedChildBlockId}'.`,
+        }];
+      }
+      return [];
+    });
+  });
+}
+
+function validateTabGroupSectionReferences(value = null, { useContent = false } = {}) {
+  const blocks = Array.isArray(value?.blocks) ? value.blocks : [];
+  const sectionIds = new Set(
+    blocks
+      .filter((block) => normalizeString(block?.kind) === "sectionBlock")
+      .map((block) => normalizeString(block?.id))
+      .filter(Boolean),
+  );
+  return blocks.flatMap((block, blockIndex) => {
+    if (normalizeString(block?.kind) !== "tabGroupBlock") {
+      return [];
+    }
+    const contentSectionIds = useContent && Array.isArray(block?.content?.sectionIds)
+      ? block.content.sectionIds
+      : null;
+    const referencedSectionIds = contentSectionIds || (Array.isArray(block?.sectionIds) ? block.sectionIds : []);
+    const pathPrefix = contentSectionIds
+      ? `$.blocks[${blockIndex}].content.sectionIds`
+      : `$.blocks[${blockIndex}].sectionIds`;
+    return referencedSectionIds.flatMap((sectionId, sectionIndex) => {
+      const normalizedSectionId = normalizeString(sectionId);
+      return normalizedSectionId && !sectionIds.has(normalizedSectionId) ? [{
+        path: `${pathPrefix}[${sectionIndex}]`,
+        code: "unknownSectionRef",
+        message: `Unknown section block reference '${normalizedSectionId}'.`,
+      }] : [];
+    });
+  });
+}
+
 export function validateReportSpec(value = null) {
   const topLevel = validateReportSchema(reportSpecSchema, value);
   const calculatedFieldErrors = validateReportSpecCalculatedFields(value);
+  const compositeReferenceErrors = validateCompositeBlockReferences(value);
   const errors = [
     ...filterRedundantCalculatedFieldSchemaErrors(topLevel.errors, calculatedFieldErrors),
     ...calculatedFieldErrors,
+    ...compositeReferenceErrors,
+    ...validateTabGroupSectionReferences(value),
   ];
   return {
     valid: errors.length === 0,
@@ -214,7 +282,16 @@ export function validateReportSpec(value = null) {
 }
 
 export function validateReportFill(value = null) {
-  return validateReportSchema(reportFillSchema, value);
+  const topLevel = validateReportSchema(reportFillSchema, value);
+  const errors = [
+    ...topLevel.errors,
+    ...validateCompositeBlockReferences(value, { useContent: true }),
+    ...validateTabGroupSectionReferences(value, { useContent: true }),
+  ];
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
 }
 
 export function validateReportPrint(value = null) {

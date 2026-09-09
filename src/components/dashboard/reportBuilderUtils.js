@@ -37,6 +37,10 @@ import {
     supportsStackIdForSeries,
 } from "./reportBuilderChartRules.js";
 import {
+    normalizeReportBuilderOptionDefinitions,
+    resolveEffectiveReportBuilderOptions,
+} from "./reportBuilderOptions.js";
+import {
     REPORT_DOCUMENT_RUNTIME_PREVIEW_INTERACTION_KEY,
     resolveReportBuilderPersistedRuntimePreviewInteraction,
 } from "./reportBuilderRuntimePreviewInteractionPersistence.js";
@@ -886,6 +890,9 @@ export function buildReportBuilderSettingsHash(state = {}) {
         ...(binding ? { binding } : {}),
         dimensions: normalizeStringArray(state?.selectedDimensions),
         measures: normalizeStringArray(state?.selectedMeasures),
+        reportOptions: state?.reportOptions && typeof state.reportOptions === "object" && !Array.isArray(state.reportOptions)
+            ? state.reportOptions
+            : {},
         localCalculatedFields: normalizeReportBuilderLocalCalculatedFields(state?.localCalculatedFields),
         localTableCalculations: normalizeReportBuilderLocalTableCalculations(state?.localTableCalculations),
         ...(drillMetadata
@@ -1761,6 +1768,7 @@ export function buildReportBuilderDefaultState(config = {}) {
     const dimensions = getVisibleReportBuilderDimensions(config);
     const staticFilters = resolveReportBuilderScopeParamFilters(config);
     const dynamicFilterGroups = resolveReportBuilderDynamicFilterGroups(config);
+    const reportOptionDefinitions = normalizeReportBuilderOptionDefinitions(config?.reportOptions);
 
     const semanticSelections = resolveReportBuilderSemanticSelections(config, config?.binding);
     const selectedMeasures = semanticSelections?.hasExplicitMeasures
@@ -1819,6 +1827,9 @@ export function buildReportBuilderDefaultState(config = {}) {
         orderDir: String(defaultOrder?.defaultDirection || "desc").trim().toLowerCase() || "desc",
         ...scopeParamStateSlice(defaultScopeParamValues),
         dynamicGroups: defaultDynamicGroups,
+        ...(reportOptionDefinitions.length > 0
+            ? { reportOptions: resolveEffectiveReportBuilderOptions(reportOptionDefinitions, {}) }
+            : {}),
     };
     const normalizedOrder = normalizeReportBuilderOrderState(config, baseState, baseState);
     return {
@@ -1831,6 +1842,7 @@ export function buildReportBuilderDefaultState(config = {}) {
 export function mergeReportBuilderState(config = {}, persisted = {}) {
     const defaults = buildReportBuilderDefaultState(config);
     const dynamicFilterGroups = resolveReportBuilderDynamicFilterGroups(config);
+    const reportOptionDefinitions = normalizeReportBuilderOptionDefinitions(config?.reportOptions);
     const next = {
         ...mergeScopeParamValues({
             ...defaults,
@@ -1852,6 +1864,11 @@ export function mergeReportBuilderState(config = {}, persisted = {}) {
     });
 
     next.localCalculatedFields = normalizeReportBuilderLocalCalculatedFields(next.localCalculatedFields);
+    if (reportOptionDefinitions.length > 0) {
+        next.reportOptions = resolveEffectiveReportBuilderOptions(reportOptionDefinitions, next.reportOptions);
+    } else {
+        delete next.reportOptions;
+    }
     next.localTableCalculations = normalizeReportBuilderLocalTableCalculations(next.localTableCalculations);
     next.drillMetadata = normalizeReportBuilderDrillMetadataState(next.drillMetadata);
     const normalizedExplorationState = normalizeReportBuilderExplorationState(next);
@@ -1898,6 +1915,12 @@ export function sanitizeReportBuilderState(config = {}, state = {}) {
     });
     next.dynamicGroups = dynamicGroups;
     next.localCalculatedFields = normalizeReportBuilderLocalCalculatedFields(next.localCalculatedFields);
+    const reportOptionDefinitions = normalizeReportBuilderOptionDefinitions(config?.reportOptions);
+    if (reportOptionDefinitions.length > 0) {
+        next.reportOptions = resolveEffectiveReportBuilderOptions(reportOptionDefinitions, next.reportOptions);
+    } else {
+        delete next.reportOptions;
+    }
     next.localTableCalculations = normalizeReportBuilderLocalTableCalculations(next.localTableCalculations);
     next.drillMetadata = normalizeReportBuilderDrillMetadataState(next.drillMetadata);
     const normalizedExplorationState = normalizeReportBuilderExplorationState(next);
@@ -1968,6 +1991,10 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
     });
 
     let request = clone(requestConfig.baseParameters || {});
+    const effectiveReportOptions = resolveEffectiveReportBuilderOptions(config?.reportOptions, state?.reportOptions);
+    if (Object.keys(effectiveReportOptions).length > 0) {
+        request.options = effectiveReportOptions;
+    }
 
     const selectedDimensionIds = new Set(
         normalizeFieldIdArray(state.selectedDimensions),

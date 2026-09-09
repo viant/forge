@@ -653,10 +653,12 @@ Authoring fields:
 - `title`
 - `sectionIds[]`
 - optional `defaultSectionId`
+- optional `includeUnlistedSections`; defaults to `true`
 
 Runtime behavior:
 
 - tabs are metadata-driven over existing `sectionBlock`s
+- `includeUnlistedSections: false` makes `sectionIds` authoritative and excludes the implicit overview and other unlisted sections
 - the block is presentation/navigation only; it does not own child content
 - print/export flattens sections in authored order and does not render a tab UI
 
@@ -670,13 +672,17 @@ Authoring fields:
 
 - `title`
 - optional `description`
+- optional `layout`: `stack` or `responsiveGrid`
 - `childBlockIds[]`
 
 Runtime behavior:
 
 - child blocks render inside the grouped panel once
 - grouped child blocks are suppressed from the top-level document flow
+- omitted `layout` preserves the legacy child-span behavior (which stacks children without authored spans); explicit `stack` forces one full-width child per row
+- `responsiveGrid` renders three columns above 960px, two columns from 641px through 960px, and one column at 640px or below
 - print/export lowers the grouped children inside the composite panel in order
+- print/export lowers `responsiveGrid` deterministically as three equal columns; it does not depend on a browser viewport
 
 ## `collectionBlock`
 
@@ -1005,6 +1011,22 @@ Published datasets can reuse one datasource with independent local scope. The
 supported modes are `inherit`, `append`, `override`, and `exclude`. An
 `override` still carries inherited entity and categorical values, then replaces
 the configured local request paths.
+
+Published date dimensions may own their chart tick formatting. Forge preserves
+the optional `tickFormat` while deriving column and chart field catalogs and
+copies it to the generated chart `xAxis`:
+
+```yaml
+dataSources:
+  - id: daily_delivery
+    dataSourceRef: dailyDeliverySource
+    dimensions:
+      - id: eventDate
+        key: eventDate
+        label: Date
+        chartAxis: true
+        tickFormat: MMM d
+```
 
 Use `relativeDateRange` for reusable calendar windows:
 

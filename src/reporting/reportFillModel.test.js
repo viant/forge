@@ -12,6 +12,7 @@ import {
   buildReportDocumentCollectionBlock,
   buildReportDocumentSectionBlock,
   buildReportDocumentCompositeBlock,
+  buildReportDocumentTabGroupBlock,
   buildReportDocumentStepperBlock,
   buildReportDocumentInfoPanelBlock,
   buildReportDocumentCalloutBlock,
@@ -428,6 +429,7 @@ const compositeFill = buildReportFillFromReportSpec({
       id: "summaryPanel",
       title: "Summary panel",
       description: "Groups the opening narrative and KPI.",
+      layout: "responsiveGrid",
       childBlockIds: ["narrativeIntro", "headlineKpi"],
     }),
   ],
@@ -437,6 +439,26 @@ const compositeFill = buildReportFillFromReportSpec({
 assert.equal(compositeFill.blocks[0].kind, "compositeBlock");
 assert.deepEqual(compositeFill.blocks[0].content.childBlockIds, ["narrativeIntro", "headlineKpi"]);
 assert.equal(compositeFill.blocks[0].content.description, "Groups the opening narrative and KPI.");
+assert.equal(compositeFill.blocks[0].layout, "responsiveGrid");
+assert.equal(compositeFill.blocks[0].content.layout, "responsiveGrid");
+
+const strictTabGroupFill = buildReportFillFromReportSpec({
+  title: "Strict sections",
+  datasets: [{ id: "primary", request: {} }],
+  blocks: [
+    buildReportDocumentTabGroupBlock({
+      id: "sectionTabs",
+      title: "Sections",
+      sectionIds: ["detailsSection"],
+      includeUnlistedSections: false,
+    }),
+    buildReportDocumentSectionBlock({ id: "overviewSection", title: "Overview" }),
+    buildReportDocumentSectionBlock({ id: "detailsSection", title: "Details" }),
+  ],
+}, { primary: { rows: [] } });
+assert.deepEqual(strictTabGroupFill.blocks[0].content.sectionIds, ["detailsSection"]);
+assert.equal(strictTabGroupFill.blocks[0].content.includeUnlistedSections, false);
+assert.deepEqual(strictTabGroupFill.blocks[0].content.tabs.map((tab) => tab.id), ["detailsSection"]);
 
 const stepperFill = buildReportFillFromReportSpec({
   title: "Stepper Runtime",

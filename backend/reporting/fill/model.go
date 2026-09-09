@@ -100,6 +100,7 @@ type Block struct {
 	ChildBlockIDs            []string              `json:"childBlockIds,omitempty"`
 	SectionIDs               []string              `json:"sectionIds,omitempty"`
 	DefaultSectionID         string                `json:"defaultSectionId,omitempty"`
+	IncludeUnlistedSections  *bool                 `json:"includeUnlistedSections,omitempty"`
 	ItemTitleField           string                `json:"itemTitleField,omitempty"`
 	ItemTitleLabel           string                `json:"itemTitleLabel,omitempty"`
 	ToneField                string                `json:"toneField,omitempty"`
@@ -334,6 +335,7 @@ type SectionContent struct {
 type CompositeContent struct {
 	Title         string   `json:"title"`
 	Description   string   `json:"description,omitempty"`
+	Layout        string   `json:"layout,omitempty"`
 	ChildBlockIDs []string `json:"childBlockIds"`
 }
 
@@ -344,10 +346,11 @@ type TabGroupTab struct {
 }
 
 type TabGroupContent struct {
-	Title            string        `json:"title"`
-	SectionIDs       []string      `json:"sectionIds"`
-	DefaultSectionID string        `json:"defaultSectionId,omitempty"`
-	Tabs             []TabGroupTab `json:"tabs"`
+	Title                   string        `json:"title"`
+	SectionIDs              []string      `json:"sectionIds"`
+	DefaultSectionID        string        `json:"defaultSectionId,omitempty"`
+	IncludeUnlistedSections *bool         `json:"includeUnlistedSections,omitempty"`
+	Tabs                    []TabGroupTab `json:"tabs"`
 }
 
 type StepperContent struct {
@@ -591,17 +594,19 @@ type rawCompositeBlock struct {
 	Kind          string           `json:"kind"`
 	Title         string           `json:"title"`
 	Description   string           `json:"description,omitempty"`
+	Layout        string           `json:"layout,omitempty"`
 	ChildBlockIDs []string         `json:"childBlockIds"`
 	Content       CompositeContent `json:"content"`
 }
 
 type rawTabGroupBlock struct {
-	ID               string          `json:"id"`
-	Kind             string          `json:"kind"`
-	Title            string          `json:"title,omitempty"`
-	SectionIDs       []string        `json:"sectionIds"`
-	DefaultSectionID string          `json:"defaultSectionId,omitempty"`
-	Content          TabGroupContent `json:"content"`
+	ID                      string          `json:"id"`
+	Kind                    string          `json:"kind"`
+	Title                   string          `json:"title,omitempty"`
+	SectionIDs              []string        `json:"sectionIds"`
+	DefaultSectionID        string          `json:"defaultSectionId,omitempty"`
+	IncludeUnlistedSections *bool           `json:"includeUnlistedSections,omitempty"`
+	Content                 TabGroupContent `json:"content"`
 }
 
 type rawStepperBlock struct {
@@ -840,6 +845,7 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				Kind:             compositeBlock.Kind,
 				Title:            compositeBlock.Title,
 				Description:      compositeBlock.Description,
+				Layout:           compositeBlock.Layout,
 				ChildBlockIDs:    compositeBlock.ChildBlockIDs,
 				CompositeContent: &compositeBlock.Content,
 			})
@@ -851,12 +857,13 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				return nil, fmt.Errorf("decode reportFill.blocks[%d] tabGroupBlock: %w", index, err)
 			}
 			fill.Blocks = append(fill.Blocks, Block{
-				ID:               tabGroupBlock.ID,
-				Kind:             tabGroupBlock.Kind,
-				Title:            tabGroupBlock.Title,
-				SectionIDs:       tabGroupBlock.SectionIDs,
-				DefaultSectionID: tabGroupBlock.DefaultSectionID,
-				TabGroupContent:  &tabGroupBlock.Content,
+				ID:                      tabGroupBlock.ID,
+				Kind:                    tabGroupBlock.Kind,
+				Title:                   tabGroupBlock.Title,
+				SectionIDs:              tabGroupBlock.SectionIDs,
+				DefaultSectionID:        tabGroupBlock.DefaultSectionID,
+				IncludeUnlistedSections: tabGroupBlock.IncludeUnlistedSections,
+				TabGroupContent:         &tabGroupBlock.Content,
 			})
 		case "stepperBlock":
 			stepperBlock := rawStepperBlock{}
@@ -1055,6 +1062,16 @@ func (r *ReportFill) Validate() error {
 	}
 	if len(r.Datasets) == 0 {
 		return fmt.Errorf("reportFill.datasets must not be empty")
+	}
+	blockIDs := make(map[string]struct{}, len(r.Blocks))
+	sectionIDs := make(map[string]struct{}, len(r.Blocks))
+	for _, block := range r.Blocks {
+		if blockID := strings.TrimSpace(block.ID); blockID != "" {
+			blockIDs[blockID] = struct{}{}
+		}
+		if strings.TrimSpace(block.Kind) == "sectionBlock" {
+			sectionIDs[strings.TrimSpace(block.ID)] = struct{}{}
+		}
 	}
 	for index, dataset := range r.Datasets {
 		if strings.TrimSpace(dataset.ID) == "" {
@@ -1426,6 +1443,21 @@ func (r *ReportFill) Validate() error {
 			if block.CompositeContent.ChildBlockIDs == nil || len(block.CompositeContent.ChildBlockIDs) == 0 {
 				return fmt.Errorf("reportFill.blocks[%d].content.childBlockIds must not be empty for compositeBlock", index)
 			}
+			if block.Layout != "" && block.Layout != "stack" && block.Layout != "responsiveGrid" {
+				return fmt.Errorf("reportFill.blocks[%d].layout %q is not supported for compositeBlock", index, block.Layout)
+			}
+			if block.CompositeContent.Layout != "" && block.CompositeContent.Layout != "stack" && block.CompositeContent.Layout != "responsiveGrid" {
+				return fmt.Errorf("reportFill.blocks[%d].content.layout %q is not supported for compositeBlock", index, block.CompositeContent.Layout)
+			}
+			for childIndex, childBlockID := range block.CompositeContent.ChildBlockIDs {
+				normalizedChildBlockID := strings.TrimSpace(childBlockID)
+				if normalizedChildBlockID == strings.TrimSpace(block.ID) {
+					return fmt.Errorf("reportFill.blocks[%d].content.childBlockIds[%d] must not reference the compositeBlock itself", index, childIndex)
+				}
+				if _, ok := blockIDs[normalizedChildBlockID]; !ok {
+					return fmt.Errorf("reportFill.blocks[%d].content.childBlockIds[%d] references unknown block %q", index, childIndex, childBlockID)
+				}
+			}
 		}
 		if strings.TrimSpace(block.Kind) == "tabGroupBlock" {
 			if len(block.SectionIDs) == 0 {
@@ -1439,6 +1471,11 @@ func (r *ReportFill) Validate() error {
 			}
 			if block.TabGroupContent.SectionIDs == nil || len(block.TabGroupContent.SectionIDs) == 0 {
 				return fmt.Errorf("reportFill.blocks[%d].content.sectionIds must not be empty for tabGroupBlock", index)
+			}
+			for sectionIndex, sectionID := range block.TabGroupContent.SectionIDs {
+				if _, ok := sectionIDs[strings.TrimSpace(sectionID)]; !ok {
+					return fmt.Errorf("reportFill.blocks[%d].content.sectionIds[%d] references unknown section block %q", index, sectionIndex, sectionID)
+				}
 			}
 			if block.TabGroupContent.Tabs == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content.tabs is required for tabGroupBlock", index)

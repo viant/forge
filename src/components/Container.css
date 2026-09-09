@@ -414,6 +414,8 @@
 
 /* Read-only values must not look editable. Dictionary/lookup controls retain
    their resolved pastel because that color communicates a different state. */
+.forge-control-wrapper.is-readonly :is(.bp6-input, .bp5-input, .bp4-input):not(.forge-dictionary-input),
+.forge-widget-readonly:not(.forge-dictionary-input) :is(.bp6-input, .bp5-input, .bp4-input),
 :is(.bp6-input.forge-widget-readonly, .bp5-input.forge-widget-readonly, .bp4-input.forge-widget-readonly):not(.forge-dictionary-input) {
     background: #f1f4f8;
     color: #66768a;

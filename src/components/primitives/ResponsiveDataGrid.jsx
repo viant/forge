@@ -10,6 +10,7 @@ import {useCellEvents} from '../../hooks/event.js';
 import {applyDynamicCellProperties} from '../table/basic/cellProperties.js';
 import {isolateButtonCellProps} from '../table/basic/buttonCellEvents.js';
 import {resolveButtonIcon, resolveButtonPressed} from '../table/basic/buttonIcon.js';
+import {resolveTableCellBadge} from '../table/basic/tableCellBadge.js';
 
 function openCardTarget(target, context) {
   if (target?.kind === 'dialog') return context?.handlers?.window?.openDialog?.({context, execution: {args: [target.dialogId, {awaitResult: target.awaitResult === true}]}, parameters: target.parameters});
@@ -99,7 +100,10 @@ function ResponsiveCardField({row, rowIndex, column, colIndex, context, columnHa
     /></dd></div>;
   }
   const target = column.link ? resolveLinkTarget({linkConfig: column.link, row, value, context}) : null;
-  return <div className="forge-responsive-grid__field" key={field}><dt>{label}</dt><dd>{target ? <button type="button" className="forge-responsive-grid__link" onClick={() => openCardTarget(target, context)}>{display}</button> : display}</dd></div>;
+  const badge = resolveTableCellBadge(row, column.badge, context);
+  const badgeNode = badge ? <span className={`forge-table-cell-badge is-${badge.tone}${badge.className ? ` ${badge.className}` : ''}`} title={badge.tooltip || undefined}>{badge.icon ? <span aria-hidden="true">{badge.icon}</span> : null}{badge.hideLabel ? null : <span>{badge.label}</span>}</span> : null;
+  const content = badge?.replaceValue ? badgeNode : badgeNode ? <span className="forge-table-cell-badges"><span className="forge-table-cell-badges__primary">{display}</span>{badgeNode}</span> : display;
+  return <div className="forge-responsive-grid__field" key={field}><dt>{label}</dt><dd>{target ? <button type="button" className="forge-responsive-grid__link" onClick={() => openCardTarget(target, context)}>{content}</button> : content}</dd></div>;
 }
 
 export function ResponsiveCardRows({rows, columns, context, identityColumns = ['id'], columnHandlers, onRowClick}) {

@@ -60,6 +60,7 @@ describe('resolveInitialWindowFormValues', () => {
             handler: 'dataSource.setWindowFormData',
             parameters: [
               { in: 'const', name: 'seedOnly', location: 'keep-me' },
+              { in: 'const', name: 'booleanSeed', location: 'true', codec: {name: 'boolean'} },
             ],
           },
         ],
@@ -83,6 +84,7 @@ describe('resolveInitialWindowFormValues', () => {
 
     expect(resolveInitialWindowFormValues(metadata)).toEqual({
       seedOnly: 'keep-me',
+      booleanSeed: true,
       periodView: 'today',
       granularity: 'day',
     });

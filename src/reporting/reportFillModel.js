@@ -618,9 +618,11 @@ function normalizeReportFillCompositeChildBlockIds(childBlockIds = []) {
 }
 
 function buildReportFillCompositeContent(block = {}) {
+  const layout = normalizeString(block?.layout);
   return {
     title: normalizeString(block?.title || "Grouped Panel") || "Grouped Panel",
     ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    ...(["stack", "responsiveGrid"].includes(layout) ? { layout } : {}),
     childBlockIds: normalizeReportFillCompositeChildBlockIds(block?.childBlockIds),
   };
 }
@@ -651,12 +653,16 @@ function buildReportFillTabGroupContent(block = {}, reportSpec = {}) {
   const orderedTabs = requestedSectionIds
     .map((sectionId) => sectionById.get(sectionId) || null)
     .filter(Boolean);
-  const trailingTabs = availableSections.filter((section) => !requestedSectionIds.includes(section.id));
+  const includeUnlistedSections = block?.includeUnlistedSections !== false;
+  const trailingTabs = includeUnlistedSections
+    ? availableSections.filter((section) => !requestedSectionIds.includes(section.id))
+    : [];
   const tabs = [...orderedTabs, ...trailingTabs];
   const defaultSectionId = normalizeString(block?.defaultSectionId);
   return {
     title: normalizeString(block?.title || "Sections") || "Sections",
     sectionIds: tabs.map((tab) => tab.id),
+    ...(typeof block?.includeUnlistedSections === "boolean" ? { includeUnlistedSections: block.includeUnlistedSections } : {}),
     ...(defaultSectionId && tabs.some((tab) => tab.id === defaultSectionId) ? { defaultSectionId } : {}),
     tabs,
   };

@@ -517,6 +517,10 @@ export const reportSpecSchema = {
           type: "object",
           additionalProperties: { $ref: "#/$defs/requestValue" },
         },
+        options: {
+          type: "object",
+          additionalProperties: { $ref: "#/$defs/requestValue" },
+        },
         semanticSelection: { $ref: "#/$defs/semanticSelectionRequest" },
         refinements: {
           type: "array",
@@ -1127,6 +1131,7 @@ export const reportSpecSchema = {
         runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         description: { type: "string" },
+        layout: { enum: ["stack", "responsiveGrid"] },
         childBlockIds: {
           type: "array",
           minItems: 1,
@@ -1143,6 +1148,7 @@ export const reportSpecSchema = {
         kind: { const: "tabGroupBlock" },
         runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
+        includeUnlistedSections: { type: "boolean" },
         sectionIds: {
           type: "array",
           minItems: 1,

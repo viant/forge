@@ -1677,6 +1677,7 @@ export function buildReportDocumentTabGroupBlock(block = {}) {
     kind: "tabGroupBlock",
     title: normalizeString(block?.title || "Sections") || "Sections",
     sectionIds,
+    ...(typeof block?.includeUnlistedSections === "boolean" ? { includeUnlistedSections: block.includeUnlistedSections } : {}),
     ...(defaultSectionId && sectionIds.includes(defaultSectionId) ? { defaultSectionId } : {}),
   };
 }
@@ -1696,11 +1697,13 @@ function normalizeReportDocumentCompositeChildBlockIds(childBlockIds = []) {
 
 export function buildReportDocumentCompositeBlock(block = {}) {
   const childBlockIds = normalizeReportDocumentCompositeChildBlockIds(block?.childBlockIds);
+  const layout = normalizeString(block?.layout);
   return {
     id: normalizeString(block?.id || "compositeBlock"),
     kind: "compositeBlock",
     title: normalizeString(block?.title || "Grouped Panel") || "Grouped Panel",
     ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
+    ...(["stack", "responsiveGrid"].includes(layout) ? { layout } : {}),
     childBlockIds,
   };
 }

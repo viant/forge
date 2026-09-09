@@ -730,6 +730,12 @@ import {
     resolveReportBuilderVariantStateKey,
 } from "./reportBuilderVariantModel.js";
 import { applyReportBuilderRuntimeFieldCatalog } from "./reportBuilderRuntimeFieldCatalog.js";
+import ReportBuilderOptionControls from "./ReportBuilderOptionControls.jsx";
+import {
+    normalizeReportBuilderOptionDefinitions,
+    resolveEffectiveReportBuilderOptions,
+    updateReportBuilderOptionValue,
+} from "./reportBuilderOptions.js";
 
 function getBuilderConfig(container = {}) {
     return container.dashboard?.reportBuilder || container.reportBuilder || container.builder || {};
@@ -4106,6 +4112,14 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         ? semanticDiagnosticTargets.groupByDiagnostics
         : [];
     const staticFilters = useMemo(() => resolveReportBuilderScopeParamFilters(displayConfig), [displayConfig]);
+    const reportOptionDefinitions = useMemo(
+        () => normalizeReportBuilderOptionDefinitions(config?.reportOptions),
+        [config?.reportOptions],
+    );
+    const effectiveReportOptions = useMemo(
+        () => resolveEffectiveReportBuilderOptions(reportOptionDefinitions, state?.reportOptions),
+        [reportOptionDefinitions, state?.reportOptions],
+    );
     const dynamicFilterGroups = useMemo(() => resolveReportBuilderDynamicFilterGroups(config), [config]);
     const dynamicFilterFamilies = useMemo(() => resolveDynamicFilterFamilies(config), [config]);
     const familyMode = dynamicFilterFamilies.length > 0;
@@ -4718,7 +4732,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     );
     const hasValidChartSpec = !!state.chartSpec && chartSpecValidation.valid;
     const hasStaleChartSpec = !!state.chartSpec && isReportBuilderChartSpecStale(config, state.chartSpec, chartFields);
-    const settingsHash = useMemo(() => buildReportBuilderSettingsHash(state), [state.binding, state.drillMetadata, state.localCalculatedFields, state.localTableCalculations, state.selectedDimensions, state.selectedMeasures]);
+    const settingsHash = useMemo(() => buildReportBuilderSettingsHash(state), [state.binding, state.drillMetadata, state.localCalculatedFields, state.localTableCalculations, state.reportOptions, state.selectedDimensions, state.selectedMeasures]);
     const chartRenderCollection = useMemo(
         () => resolveReportBuilderChartCollection({
             computedCollection,
@@ -5003,6 +5017,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         return orderedIds.map((groupId) => byId.get(groupId)).filter(Boolean);
     }, [authoredPrimaryFilterBarGroupOrder, authoredPrimaryFilterBarMode, authoredPrimaryFilterBarVisibleGroups, compactRequiredStaticFilters, dynamicFilterFamilies, dynamicFilterGroups, familyMode, hiddenDynamicGroupIds]);
     const hasFilterDrawerContent = notices.length > 0
+        || reportOptionDefinitions.length > 0
         || requiredStaticFilters.length > 0
         || optionalStaticFilters.length > 0
         || dynamicFilterGroups.length > 0
@@ -5402,6 +5417,12 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             inlineReportMode ? "forge-report-builder__bottom--inline-report" : "",
             useFilterDrawer ? "forge-report-builder__bottom--drawer" : "",
         ].filter(Boolean).join(" ")} aria-label={useFilterDrawer ? "Filters drawer" : "Filters"}>
+            <ReportBuilderOptionControls
+                definitions={reportOptionDefinitions}
+                values={effectiveReportOptions}
+                onChange={setReportOptionValue}
+                headingId={inlineReportMode ? "report-builder-options-inline-heading" : "report-builder-options-heading"}
+            />
             <section
                 className={[
                     "forge-report-builder__bottom-group",
@@ -7448,6 +7469,12 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                     <div className="forge-report-builder__compact-sheet-body">
                         {compactSheetTab === "scope" ? (
                             <div className="forge-report-builder__compact-panel-stack">
+                                <ReportBuilderOptionControls
+                                    definitions={reportOptionDefinitions}
+                                    values={effectiveReportOptions}
+                                    onChange={setReportOptionValue}
+                                    headingId="report-builder-options-compact-heading"
+                                />
                                 {compactRequiredStaticFilters.map((filter) => renderStaticFilterSection(filter))}
                                 <section className="forge-report-builder__panel forge-report-builder__panel--bottom">
                                     <div className="forge-report-builder__panel-headerline">
@@ -11713,6 +11740,19 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                 ...previous,
                 [edge]: value || "",
             }),
+            page: 1,
+        });
+    };
+    const setReportOptionValue = (name, value) => {
+        const currentState = currentBuilderStateRef.current || state;
+        persistExplorationMutation({
+            ...currentState,
+            reportOptions: updateReportBuilderOptionValue(
+                reportOptionDefinitions,
+                currentState?.reportOptions,
+                name,
+                value,
+            ),
             page: 1,
         });
     };
