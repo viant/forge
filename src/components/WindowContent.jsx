@@ -241,6 +241,9 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}) {
     };
 
     addRef(node.dataSourceRef);
+    addRef(node.definitionDataSourceRef);
+    addRef(node.runtime?.definitionDataSourceRef);
+    addRef(node.dashboard?.reportBuilder?.definitionDataSourceRef);
     addRef(resolveMappedRef(node));
 
     if (node.chart) {

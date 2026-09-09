@@ -234,7 +234,16 @@ export function resolveParameters(parameterDefinitions = [], context) {
         }
 
         const {name, in: inWhere, location} = param;
-        const value = applyParameterCodec(resolveParameter(context, inWhere, location), param.codec);
+        const hasDefault = Object.prototype.hasOwnProperty.call(param, 'default');
+        const resolvedValue = inWhere === undefined && hasDefault
+            ? param.default
+            : resolveParameter(context, inWhere, location);
+        const value = applyParameterCodec(
+            resolvedValue === undefined && hasDefault
+                ? param.default
+                : resolvedValue,
+            param.codec,
+        );
         if(name === "...") {
             if (toDataSource) {
                 resolved[toDataSource] = {...value};

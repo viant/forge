@@ -56,6 +56,14 @@ assert.deepEqual(resolved, {
 });
 
 assert.deepEqual(resolveParameters([
+  {name: 'Action', default: 'describe'},
+  {name: 'Limit', default: '50', codec: {name: 'int'}},
+], baseContext), {
+  Action: 'describe',
+  Limit: 50,
+});
+
+assert.deepEqual(resolveParameters([
   {name: '...', in: 'windowForm', location: 'lineForecastRequest'},
 ], baseContext), {
   From: '2026-09-08T00:00:00Z',
