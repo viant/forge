@@ -155,15 +155,16 @@ type SemanticSelectionItems struct {
 }
 
 type TableColumn struct {
-	Key               string `json:"key"`
-	SourceKey         string `json:"sourceKey,omitempty"`
-	DisplayKey        string `json:"displayKey,omitempty"`
-	Label             string `json:"label"`
-	Kind              string `json:"kind,omitempty"`
-	Format            string `json:"format,omitempty"`
-	Align             string `json:"align,omitempty"`
-	CellVisual        any    `json:"cellVisual,omitempty"`
-	RuntimeFilterable bool   `json:"runtimeFilterable,omitempty"`
+	Key               string         `json:"key"`
+	SourceKey         string         `json:"sourceKey,omitempty"`
+	DisplayKey        string         `json:"displayKey,omitempty"`
+	Label             string         `json:"label"`
+	Kind              string         `json:"kind,omitempty"`
+	Format            string         `json:"format,omitempty"`
+	Align             string         `json:"align,omitempty"`
+	CellVisual        any            `json:"cellVisual,omitempty"`
+	Link              map[string]any `json:"link,omitempty"`
+	RuntimeFilterable bool           `json:"runtimeFilterable,omitempty"`
 }
 
 type StepperStep struct {
@@ -220,6 +221,7 @@ type Block struct {
 	ID                       string           `json:"id"`
 	Kind                     string           `json:"kind"`
 	Title                    string           `json:"title,omitempty"`
+	AccentTone               string           `json:"accentTone,omitempty"`
 	DatasetRef               string           `json:"datasetRef,omitempty"`
 	Columns                  []TableColumn    `json:"columns,omitempty"`
 	ChartSpec                map[string]any   `json:"chartSpec,omitempty"`
@@ -231,6 +233,7 @@ type Block struct {
 	SecondaryField           string           `json:"secondaryField,omitempty"`
 	SecondaryLabel           string           `json:"secondaryLabel,omitempty"`
 	SecondaryFormat          string           `json:"secondaryFormat,omitempty"`
+	SecondaryTrend           bool             `json:"secondaryTrend,omitempty"`
 	SecondaryDisplayKey      string           `json:"secondaryDisplayKey,omitempty"`
 	SecondaryDisplayValueMap map[string]any   `json:"secondaryDisplayValueMap,omitempty"`
 	Description              string           `json:"description,omitempty"`
@@ -306,6 +309,7 @@ type rawTableBlock struct {
 	ID         string        `json:"id"`
 	Kind       string        `json:"kind"`
 	Title      string        `json:"title,omitempty"`
+	AccentTone string        `json:"accentTone,omitempty"`
 	DatasetRef string        `json:"datasetRef"`
 	Columns    []TableColumn `json:"columns"`
 }
@@ -331,6 +335,7 @@ type rawKPIBlock struct {
 	SecondaryField           string         `json:"secondaryField,omitempty"`
 	SecondaryLabel           string         `json:"secondaryLabel,omitempty"`
 	SecondaryFormat          string         `json:"secondaryFormat,omitempty"`
+	SecondaryTrend           bool           `json:"secondaryTrend,omitempty"`
 	SecondaryDisplayKey      string         `json:"secondaryDisplayKey,omitempty"`
 	SecondaryDisplayValueMap map[string]any `json:"secondaryDisplayValueMap,omitempty"`
 	Description              string         `json:"description,omitempty"`
@@ -925,6 +930,7 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			ID:         block.ID,
 			Kind:       block.Kind,
 			Title:      block.Title,
+			AccentTone: block.AccentTone,
 			DatasetRef: block.DatasetRef,
 			Columns:    block.Columns,
 		}, nil
@@ -958,6 +964,7 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			SecondaryField:           block.SecondaryField,
 			SecondaryLabel:           block.SecondaryLabel,
 			SecondaryFormat:          block.SecondaryFormat,
+			SecondaryTrend:           block.SecondaryTrend,
 			SecondaryDisplayKey:      block.SecondaryDisplayKey,
 			SecondaryDisplayValueMap: block.SecondaryDisplayValueMap,
 			Description:              block.Description,

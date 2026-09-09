@@ -65,6 +65,7 @@ type Block struct {
 	ID                       string                `json:"id"`
 	Kind                     string                `json:"kind"`
 	Title                    string                `json:"title,omitempty"`
+	AccentTone               string                `json:"accentTone,omitempty"`
 	DatasetRef               string                `json:"datasetRef,omitempty"`
 	Columns                  []TableColumn         `json:"columns,omitempty"`
 	Content                  *TableContent         `json:"content,omitempty"`
@@ -77,6 +78,7 @@ type Block struct {
 	SecondaryField           string                `json:"secondaryField,omitempty"`
 	SecondaryLabel           string                `json:"secondaryLabel,omitempty"`
 	SecondaryFormat          string                `json:"secondaryFormat,omitempty"`
+	SecondaryTrend           bool                  `json:"secondaryTrend,omitempty"`
 	SecondaryDisplayKey      string                `json:"secondaryDisplayKey,omitempty"`
 	SecondaryDisplayValueMap map[string]any        `json:"secondaryDisplayValueMap,omitempty"`
 	Description              string                `json:"description,omitempty"`
@@ -129,15 +131,16 @@ type Block struct {
 }
 
 type TableColumn struct {
-	Key               string `json:"key"`
-	SourceKey         string `json:"sourceKey,omitempty"`
-	DisplayKey        string `json:"displayKey,omitempty"`
-	Label             string `json:"label"`
-	Kind              string `json:"kind,omitempty"`
-	Format            string `json:"format,omitempty"`
-	Align             string `json:"align,omitempty"`
-	CellVisual        any    `json:"cellVisual,omitempty"`
-	RuntimeFilterable bool   `json:"runtimeFilterable,omitempty"`
+	Key               string         `json:"key"`
+	SourceKey         string         `json:"sourceKey,omitempty"`
+	DisplayKey        string         `json:"displayKey,omitempty"`
+	Label             string         `json:"label"`
+	Kind              string         `json:"kind,omitempty"`
+	Format            string         `json:"format,omitempty"`
+	Align             string         `json:"align,omitempty"`
+	CellVisual        any            `json:"cellVisual,omitempty"`
+	Link              map[string]any `json:"link,omitempty"`
+	RuntimeFilterable bool           `json:"runtimeFilterable,omitempty"`
 }
 
 type TableContent struct {
@@ -260,6 +263,7 @@ type KPIContent struct {
 	SecondaryField           string         `json:"secondaryField,omitempty"`
 	SecondaryLabel           string         `json:"secondaryLabel,omitempty"`
 	SecondaryFormat          string         `json:"secondaryFormat,omitempty"`
+	SecondaryTrend           bool           `json:"secondaryTrend,omitempty"`
 	SecondaryDisplayKey      string         `json:"secondaryDisplayKey,omitempty"`
 	SecondaryDisplayValueMap map[string]any `json:"secondaryDisplayValueMap,omitempty"`
 	SecondaryValue           any            `json:"secondaryValue,omitempty"`
@@ -466,6 +470,7 @@ type rawTableBlock struct {
 	ID         string        `json:"id"`
 	Kind       string        `json:"kind"`
 	Title      string        `json:"title,omitempty"`
+	AccentTone string        `json:"accentTone,omitempty"`
 	DatasetRef string        `json:"datasetRef"`
 	Columns    []TableColumn `json:"columns"`
 	Content    TableContent  `json:"content"`
@@ -725,6 +730,7 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				ID:         tableBlock.ID,
 				Kind:       tableBlock.Kind,
 				Title:      tableBlock.Title,
+				AccentTone: tableBlock.AccentTone,
 				DatasetRef: tableBlock.DatasetRef,
 				Columns:    tableBlock.Columns,
 				Content:    &tableBlock.Content,
@@ -764,6 +770,7 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				SecondaryField:           kpiBlock.SecondaryField,
 				SecondaryLabel:           kpiBlock.SecondaryLabel,
 				SecondaryFormat:          kpiBlock.SecondaryFormat,
+				SecondaryTrend:           kpiBlock.SecondaryTrend,
 				SecondaryDisplayKey:      kpiBlock.SecondaryDisplayKey,
 				SecondaryDisplayValueMap: kpiBlock.SecondaryDisplayValueMap,
 				Description:              kpiBlock.Description,

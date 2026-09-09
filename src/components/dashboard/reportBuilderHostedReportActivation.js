@@ -40,17 +40,18 @@ export function resolveHostedReportSource(container = null) {
         && !Array.isArray(parameters.reportDefinition)
         ? parameters.reportDefinition
         : null;
-    const inlineDefinitionId = normalizeString(
+    const explicitInlineDefinitionId = normalizeString(
         inlineDefinition?.id
         || inlineDefinition?.source?.id,
     );
+    const runtimeFieldCatalogId = normalizeString(inlineDefinition?.fieldCatalog?.id);
     const canonicalKindValue = normalizeString(parameters.sourceKind);
     const canonicalKind = normalizeHostedReportSourceKind(parameters.sourceKind);
     const canonicalId = normalizeString(parameters.sourceId);
     if (canonicalKind) {
         return {
             kind: canonicalKind,
-            id: canonicalId || (canonicalKind === "inline" ? inlineDefinitionId : ""),
+            id: canonicalId || (canonicalKind === "inline" ? (explicitInlineDefinitionId || runtimeFieldCatalogId) : ""),
         };
     }
     if (canonicalKindValue) {
@@ -65,10 +66,10 @@ export function resolveHostedReportSource(container = null) {
     if (reportStarterId) {
         return { kind: "preset", id: reportStarterId };
     }
-    if (inlineDefinition) {
+    if (inlineDefinition && explicitInlineDefinitionId) {
         return {
             kind: "inline",
-            id: inlineDefinitionId,
+            id: explicitInlineDefinitionId,
         };
     }
     return { kind: "", id: "" };
@@ -80,6 +81,13 @@ export function resolveHostedReportExecutionIdentity(container = null, state = n
         return sourceId;
     }
     const parameters = container?.parameters || {};
+    const runtimeFieldCatalogId = normalizeString(
+        parameters?.reportDefinition?.fieldCatalog?.id
+        || parameters?.FieldCatalog?.id,
+    );
+    if (runtimeFieldCatalogId) {
+        return runtimeFieldCatalogId;
+    }
     const hasDeclaredSource = !!normalizeString(parameters.sourceKind)
         || !!normalizeString(parameters.reportId)
         || !!normalizeString(parameters.reportStarterId)

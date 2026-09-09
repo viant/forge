@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Icon } from "@blueprintjs/core";
 
 import Chart from "../Chart.jsx";
 import SectionTabRail from "../SectionTabRail.jsx";
@@ -64,6 +65,7 @@ import {
   resolveReportRuntimeHostActions,
   resolveReportRuntimeSelectionActions,
 } from "../../reporting/reportBlockRuntimeModel.js";
+import { buildReportRuntimeFilterToolbarModel } from "./reportRuntimeFilterToolbarModel.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -1385,6 +1387,17 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
   const hasSecondaryValue = !!content?.secondaryField
     && content?.secondaryValue !== undefined
     && content?.secondaryValue !== null;
+  const secondaryTrend = content?.secondaryTrend === true || block?.secondaryTrend === true;
+  const secondaryNumeric = Number(content?.secondaryValue);
+  const secondaryArrow = secondaryTrend && Number.isFinite(secondaryNumeric)
+    ? (secondaryNumeric > 0 ? "↑" : (secondaryNumeric < 0 ? "↓" : "→"))
+    : "";
+  const formattedSecondaryValue = hasSecondaryValue
+    ? formatKpiValue(content?.secondaryValue, normalizeString(content?.secondaryFormat), locale)
+    : "";
+  const signedSecondaryValue = secondaryTrend && Number.isFinite(secondaryNumeric) && secondaryNumeric > 0 && !String(formattedSecondaryValue).startsWith("+")
+    ? `+${formattedSecondaryValue}`
+    : formattedSecondaryValue;
   const toneStyles = resolveRuntimeKpiToneStyles(content?.tone, theme);
   const blockTitle = normalizeString(block?.title || content?.title || "KPI");
   const valueLabel = normalizeString(content?.valueLabel || content?.valueField || "Value");
@@ -1449,7 +1462,7 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
                   <strong style={{ color: "#182026" }}>
                     {normalizeString(content?.secondaryLabel || content?.secondaryField)}
                   </strong>
-                  <span>{formatKpiValue(content?.secondaryValue, normalizeString(content?.secondaryFormat), locale)}</span>
+                  <span>{secondaryArrow ? `${secondaryArrow} ` : ""}{signedSecondaryValue}</span>
                 </div>
               ) : null}
             </>
@@ -2019,6 +2032,11 @@ function resolveRuntimeCompositeConfig(blocks = []) {
 }
 
 function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null }) {
+  const tableAccentTone = normalizeString(block?.content?.accentTone || block?.accentTone).toLowerCase();
+  const tableAccent = ["blue", "green", "amber", "rose", "slate"].includes(tableAccentTone)
+    ? resolveRuntimeAccentPalette(tableAccentTone).accent
+    : "";
+  const tablePanelStyle = tableAccent ? { borderLeft: `4px solid ${tableAccent}` } : {};
   const invalidDiagnostic = (Array.isArray(diagnostics) ? diagnostics : [])
     .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
     || null;
@@ -2030,6 +2048,7 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
       <RuntimePanel
         className="forge-report-runtime-table-panel"
         title={normalizeString(block?.title || "Table")}
+        style={tablePanelStyle}
       >
         <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
         <BlockErrorCallout diagnostic={invalidDiagnostic} />
@@ -2079,6 +2098,7 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
     <RuntimePanel
       className="forge-report-runtime-table-panel"
       title={normalizeString(block?.title || "Table")}
+      style={tablePanelStyle}
     >
       <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
       {columns.length === 0 ? (
@@ -2156,10 +2176,27 @@ function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummar
           const canEditOptions = Array.isArray(interactiveFilter?.options)
             && interactiveFilter.options.length > 0
             && typeof runtimeHandlers?.toggleScopeParamOption === "function";
+          const canToggleEnabled = typeof runtimeHandlers?.setScopeParamEnabled === "function";
+          const filterEnabled = interactiveFilter?.enabled !== false;
+          const wrapFilterControl = (control) => (
+            <div key={param?.id} className="forge-report-runtime-filter-control" style={{ display: "inline-flex", alignItems: "flex-start", gap: 6 }}>
+              <div style={{ opacity: filterEnabled ? 1 : 0.52, pointerEvents: filterEnabled ? "auto" : "none" }}>{control}</div>
+              {canToggleEnabled ? (
+                <button
+                  type="button"
+                  aria-label={`${filterEnabled ? "Disable" : "Enable"} ${label} filter`}
+                  aria-pressed={filterEnabled}
+                  onClick={() => runtimeHandlers.setScopeParamEnabled(interactiveFilter, !filterEnabled)}
+                  style={{ border: "1px solid #d8e1e8", background: filterEnabled ? "#eef4fb" : "#fff", borderRadius: 999, padding: "4px 8px", cursor: "pointer", fontSize: 10 }}
+                >
+                  {filterEnabled ? "On" : "Off"}
+                </button>
+              ) : null}
+            </div>
+          );
           if (canEditDateRange || canEditOptions) {
-            return (
+            return wrapFilterControl(
               <InlineStaticFilterControl
-                key={param?.id}
                 filter={interactiveFilter}
                 value={param?.value}
                 onToggle={(optionValue) => runtimeHandlers.toggleScopeParamOption(interactiveFilter, optionValue)}
@@ -2167,9 +2204,8 @@ function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummar
               />
             );
           }
-          return (
+          return wrapFilterControl(
             <span
-              key={param?.id}
               style={{
                 display: "inline-flex",
                 alignItems: "flex-start",
@@ -2645,6 +2681,7 @@ export default function ReportRuntime({
 }) {
   const reportPresentation = normalizeString(presentationMode).toLowerCase() === "report";
   const [selectedChartSelectionsByBlock, setSelectedChartSelectionsByBlock] = useState({});
+  const [filterPanelOpen, setFilterPanelOpen] = useState(true);
   const [runtimeSelection, setRuntimeSelection] = useState({});
   const [runtimeViewportWidth, setRuntimeViewportWidth] = useState(() => (
     typeof window !== "undefined" ? Number(window.innerWidth || 0) || 0 : 0
@@ -2739,6 +2776,10 @@ export default function ReportRuntime({
         })
       : [],
     [allRuntimeBlocks, availableDatasetRefs, reportPresentation, suppressedFilterBarDatasetRefs],
+  );
+  const filterToolbarModel = useMemo(
+    () => buildReportRuntimeFilterToolbarModel(topFilterBarBlocks),
+    [topFilterBarBlocks],
   );
   const hasTopLevelRefinementBarBlock = useMemo(
     () => allRuntimeBlocks.some((block) => normalizeString(block?.kind) === "refinementBarBlock"),
@@ -3191,7 +3232,25 @@ export default function ReportRuntime({
         </RuntimePanel>
       ) : null}
       {!showContextSummary && !reportPresentation ? <CompactBindingChips bindingSummary={bindingSummary} /> : null}
-      {topFilterBarBlocks.length > 0 ? (
+      {reportPresentation && filterToolbarModel.visible ? (
+        <div className="forge-report-runtime-filter-toolbar" style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            aria-label="Toggle report filters"
+            aria-pressed={filterPanelOpen}
+            onClick={() => setFilterPanelOpen((open) => !open)}
+            style={{ border: "1px solid #d8e1e8", background: filterPanelOpen ? "#eef4fb" : "#fff", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}
+          >
+            <Icon icon="filter" size={13} aria-hidden="true" /> Filters{filterToolbarModel.activeCount > 0 ? ` (${filterToolbarModel.activeCount})` : ""}
+          </button>
+          {filterToolbarModel.activeCount > 0 && typeof runtimeHandlers?.clearScopeParams === "function" ? (
+            <button type="button" aria-label="Clear all report filters" onClick={() => runtimeHandlers.clearScopeParams(filterToolbarModel.filters)} style={{ border: 0, background: "transparent", cursor: "pointer", color: "#21538f", fontSize: 11 }}>
+              Clear all
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {topFilterBarBlocks.length > 0 && (!reportPresentation || filterPanelOpen) ? (
         <div
           style={{
             display: "grid",

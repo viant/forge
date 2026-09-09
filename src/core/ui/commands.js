@@ -170,6 +170,65 @@ function computeUniqueKeyValue(record, uniqueKey = []) {
     .join('_');
 }
 
+function getIdentityFields(dataSource, requestedFields) {
+  const rawFields = Array.isArray(requestedFields) && requestedFields.length > 0
+    ? requestedFields
+    : (Array.isArray(dataSource?.uniqueKey) ? dataSource.uniqueKey : []);
+  const fields = rawFields
+    .map((item) => String(typeof item === 'string' ? item : (item?.field || '')).trim())
+    .filter(Boolean);
+  if (fields.length === 0) {
+    throw new Error('identityFields are required when the datasource has no uniqueKey');
+  }
+  if (new Set(fields).size !== fields.length) {
+    throw new Error('identityFields must be unique');
+  }
+  return fields;
+}
+
+function resolveIdentityField(holder, field) {
+  if (holder != null && typeof holder === 'object' && Object.prototype.hasOwnProperty.call(holder, field)) {
+    return holder[field];
+  }
+  return resolveSelector(holder, field);
+}
+
+function normalizeIdentity(identity, fields) {
+  if (identity == null) throw new Error('identity values cannot be null');
+  if (typeof identity !== 'object' || Array.isArray(identity)) {
+    if (fields.length !== 1) {
+      throw new Error('composite identities must be objects keyed by identityFields');
+    }
+    return { [fields[0]]: identity };
+  }
+  const normalized = {};
+  for (const field of fields) {
+    const value = resolveIdentityField(identity, field);
+    if (value === undefined || value === null || (typeof value === 'string' && value.trim() === '')) {
+      throw new Error(`identity field is required: ${field}`);
+    }
+    normalized[field] = value;
+  }
+  return normalized;
+}
+
+function identityValueEquals(actual, requested) {
+  if (actual === requested) return true;
+  if (actual == null || requested == null) return false;
+  if (typeof actual === 'object' || typeof requested === 'object') {
+    return JSON.stringify(actual) === JSON.stringify(requested);
+  }
+  return String(actual) === String(requested);
+}
+
+function rowMatchesIdentity(row, identity, fields) {
+  return fields.every((field) => identityValueEquals(resolveIdentityField(row, field), identity[field]));
+}
+
+function observeIdentity(row, fields) {
+  return Object.fromEntries(fields.map((field) => [field, resolveIdentityField(row, field)]));
+}
+
 function findNodePathByUri(nodes, uri, path = []) {
   if (!Array.isArray(nodes)) return null;
   for (let i = 0; i < nodes.length; i++) {
@@ -693,6 +752,74 @@ export async function runUICommand(cmd = {}) {
       const input = getInputSignal(dataSourceId);
       input.value = { ...(input.peek() || {}), fetch: true };
       return { ok: true };
+    }
+
+    // ------------------------------------------------------------------
+    // Datasource selection (stable identity)
+    // ------------------------------------------------------------------
+    case 'ui.datasource.setSelection': {
+      const windowId = requireString('windowId', params.windowId);
+      if (!getWindowById(windowId)) throw new Error(`window not found: ${windowId}`);
+      const dataSourceRef = requireString('dataSourceRef', params.dataSourceRef);
+      const meta = getMetadataSignal(windowId).peek();
+      const dsCfg = meta?.dataSource?.[dataSourceRef];
+      if (!dsCfg) throw new Error(`datasource not found: ${dataSourceRef}`);
+
+      const identities = Array.isArray(params.identities) ? params.identities : [];
+      if (identities.length === 0) throw new Error('identities are required');
+      const identityFields = getIdentityFields(dsCfg, params.identityFields);
+      const normalizedIdentities = identities.map((identity) => normalizeIdentity(identity, identityFields));
+      const selectionMode = String(dsCfg.selectionMode || 'single').trim().toLowerCase();
+      if (selectionMode === 'none') throw new Error(`datasource does not support selection: ${dataSourceRef}`);
+      if (selectionMode !== 'multi' && normalizedIdentities.length !== 1) {
+        throw new Error('single-selection datasource requires exactly one identity');
+      }
+
+      const { dataSourceId } = getDataSourceId(windowId, dataSourceRef);
+      const items = getCollectionSignal(dataSourceId).peek();
+      if (!Array.isArray(items)) throw new Error(`datasource collection is not a row list: ${dataSourceRef}`);
+
+      // Resolve every requested identity before mutating any signal. Missing,
+      // ambiguous, and duplicate targets therefore leave the prior selection intact.
+      const matches = normalizedIdentities.map((identity) => {
+        const rowIndexes = [];
+        for (let index = 0; index < items.length; index++) {
+          if (rowMatchesIdentity(items[index], identity, identityFields)) rowIndexes.push(index);
+        }
+        const printable = JSON.stringify(identity);
+        if (rowIndexes.length === 0) throw new Error(`no row found for identity: ${printable}`);
+        if (rowIndexes.length > 1) throw new Error(`ambiguous row identity: ${printable}`);
+        return { rowIndex: rowIndexes[0], row: items[rowIndexes[0]] };
+      });
+      if (new Set(matches.map(({ rowIndex }) => rowIndex)).size !== matches.length) {
+        throw new Error('identities resolve to the same row');
+      }
+
+      const selectedIdentities = matches.map(({ row }) => observeIdentity(row, identityFields));
+      const rowIndexes = matches.map(({ rowIndex }) => rowIndex);
+      const selection = getSelectionSignal(
+        dataSourceId,
+        selectionMode === 'multi' ? { selection: [] } : { selected: null, rowIndex: -1 }
+      );
+      if (selectionMode === 'multi') {
+        selection.value = { selection: matches.map(({ row }) => row) };
+      } else {
+        const [{ row, rowIndex }] = matches;
+        selection.value = { selected: row, rowIndex };
+        const form = getFormSignal(dataSourceId);
+        const status = getFormStatusSignal(dataSourceId);
+        form.value = { ...(row || {}) };
+        status.value = { ...(status.peek() || {}), dirty: false, version: (status.peek()?.version || 0) + 1 };
+      }
+      return {
+        ok: true,
+        windowId,
+        dataSourceRef,
+        selectionMode,
+        identityFields,
+        selectedIdentities,
+        rowIndexes,
+      };
     }
 
     // ------------------------------------------------------------------

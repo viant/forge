@@ -219,6 +219,14 @@ assert.equal(
     "skip",
     "ambiguous hosted provenance must fail closed",
 );
+assert.equal(
+    reportBuilderHooksModule.resolveHostedExecuteOnOpenHostAction({
+        executeOnOpen: true,
+        windowState: { windowId: "reportBuilder__live", conversationId: "conversation-live" },
+    }),
+    "execute",
+    "a live hosted window object without replay provenance executes once; only explicit historical replay restores",
+);
 
 let gateCFreshBeginCount = 0;
 let gateCFreshDispatchCount = 0;

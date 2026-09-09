@@ -535,6 +535,29 @@ export const reportSpecSchema = {
         },
       },
     },
+    tableLink: {
+      oneOf: [
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["kind", "urlField"],
+          properties: {
+            kind: { const: "external" },
+            urlField: { type: "string", minLength: 1 },
+          },
+        },
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["kind", "handler", "idField"],
+          properties: {
+            kind: { const: "entityDetail" },
+            handler: { type: "string", minLength: 1 },
+            idField: { type: "string", minLength: 1 },
+          },
+        },
+      ],
+    },
     tableColumn: {
       type: "object",
       additionalProperties: false,
@@ -556,6 +579,7 @@ export const reportSpecSchema = {
         format: { type: "string" },
         align: { type: "string" },
         runtimeFilterable: { type: "boolean" },
+        link: { $ref: "#/$defs/tableLink" },
         cellVisual: { $ref: "#/$defs/tableCellVisual" },
       },
     },
@@ -966,6 +990,7 @@ export const reportSpecSchema = {
         kind: { const: "tableBlock" },
         runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
+        accentTone: { enum: ["blue", "green", "amber", "rose", "slate"] },
         datasetRef: { type: "string" },
         columns: {
           type: "array",
@@ -990,6 +1015,7 @@ export const reportSpecSchema = {
         secondaryField: { type: "string" },
         secondaryLabel: { type: "string" },
         secondaryFormat: { enum: ["currency", "number", "number5", "percent", "percentFraction", "compact", "compactNumber"] },
+        secondaryTrend: { type: "boolean" },
         secondaryDisplayKey: { type: "string" },
         secondaryDisplayValueMap: {
           type: "object",

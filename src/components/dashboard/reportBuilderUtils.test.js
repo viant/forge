@@ -1654,6 +1654,7 @@ const normalizedChartSpec = normalizeReportBuilderChartSpec({
     xField: "eventDate",
     yFields: ["totalSpend"],
     seriesField: "siteType",
+    categoryLabel: { lines: 2, maxCharacters: 24 },
 });
 assert.deepEqual(normalizedChartSpec, {
     title: "Spend by Date",
@@ -1661,6 +1662,7 @@ assert.deepEqual(normalizedChartSpec, {
     xField: "eventDate",
     yFields: ["totalSpend"],
     seriesField: "siteType",
+    categoryLabel: { lines: 2, maxCharacters: 24 },
 });
 
 const validChartSpec = validateReportBuilderChartSpec(config, normalizedChartSpec, chartFields);
@@ -1943,10 +1945,12 @@ const explicitContainer = buildExplicitReportBuilderChartContainer(
         xField: "eventDate",
         yFields: ["totalSpend"],
         seriesField: "siteType",
+        categoryLabel: { lines: 2, maxCharacters: 20 },
     },
 );
 assert.equal(explicitContainer.chart.type, "bar");
 assert.equal(explicitContainer.chart.xAxis.dataKey, "eventDate");
+assert.deepEqual(explicitContainer.chart.xAxis.categoryLabel, { lines: 2, maxCharacters: 20 });
 assert.equal(explicitContainer.chart.series.nameKey, "siteType");
 assert.equal(explicitContainer.chart.series.valueKey, "totalSpend");
 

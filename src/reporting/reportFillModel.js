@@ -476,6 +476,7 @@ function buildReportFillKpiContent(block = {}, dataset = {}, {
         secondaryField,
         secondaryLabel: normalizeString(block?.secondaryLabel || secondaryField),
         ...(normalizeString(block?.secondaryFormat) ? { secondaryFormat: normalizeString(block.secondaryFormat) } : {}),
+        ...(block?.secondaryTrend === true ? { secondaryTrend: true } : {}),
         secondaryValue: selectedRow
           ? resolveReportFillFieldDisplayValue(selectedRow, {
             sourceField: secondaryField,

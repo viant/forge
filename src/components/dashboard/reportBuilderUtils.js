@@ -458,6 +458,16 @@ function normalizeChartSeriesOptions(input) {
     return Object.keys(result).length > 0 ? result : null;
 }
 
+function normalizeChartCategoryLabel(value = null) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const lines = Number(value.lines);
+    if (lines !== 1 && lines !== 2) return null;
+    return {
+        lines,
+        maxCharacters: Math.max(4, Math.min(120, Number(value.maxCharacters) || 28)),
+    };
+}
+
 export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     if (!chartSpec || typeof chartSpec !== "object" || Array.isArray(chartSpec)) {
         return null;
@@ -471,6 +481,7 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     const yFields = normalizeStringArray(chartSpec.yFields || chartSpec.yField).filter(Boolean);
     const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
+    const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
     return {
         ...(title ? { title } : {}),
         ...(eyebrow ? { eyebrow } : {}),
@@ -481,6 +492,7 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         yFields: Array.from(new Set(yFields)),
         ...(seriesField ? { seriesField } : {}),
         ...(seriesOptions ? { seriesOptions } : {}),
+        ...(categoryLabel ? { categoryLabel } : {}),
     };
 }
 
@@ -2319,6 +2331,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
                 ? { displayValueMap: clone(xField.displayValueMap) }
                 : {}),
             tickFormat: xField?.tickFormat,
+            ...(normalized.categoryLabel ? { categoryLabel: clone(normalized.categoryLabel) } : {}),
         },
         yAxis: {
             format: yMeasures[0]?.format,
