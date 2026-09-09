@@ -23,6 +23,37 @@ func TestDecodeJSON_ReportFillTableBlock(t *testing.T) {
 	require.Len(t, report.Blocks[0].Content.ResolvedRows, 2)
 }
 
+func TestDecodeJSON_ReportFillPreservesCollapsibleTablePresentation(t *testing.T) {
+	fixture := loadReportFillFromExportRequestFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	blocks := fixture["blocks"].([]any)
+	var table map[string]any
+	for _, item := range blocks {
+		candidate := item.(map[string]any)
+		if candidate["kind"] == "tableBlock" {
+			table = candidate
+			break
+		}
+	}
+	require.NotNil(t, table)
+	table["collapsible"] = true
+	table["defaultCollapsed"] = true
+	table["labelClamp"] = map[string]any{"lines": float64(1), "maxCharacters": float64(28)}
+	syncReportFillFixtureProvenance(fixture)
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+	fill, err := DecodeJSON(data)
+	require.NoError(t, err)
+	for _, block := range fill.Blocks {
+		if block.Kind == "tableBlock" {
+			require.True(t, block.Collapsible)
+			require.True(t, block.DefaultCollapsed)
+			require.Equal(t, &TextClamp{Lines: 1, MaxCharacters: 28}, block.LabelClamp)
+			return
+		}
+	}
+	t.Fatal("table block was not decoded")
+}
+
 func TestDecodeJSON_ReportFillPreservesBlockRuntimeContract(t *testing.T) {
 	fixture := loadReportFillFromExportRequestFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
 	blocks := fixture["blocks"].([]any)

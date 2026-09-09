@@ -114,6 +114,28 @@ export function updateReportBuilderOptionValue(definitions = [], selected = {}, 
   });
 }
 
+export function countModifiedReportBuilderOptions(definitions = [], selected = {}) {
+  const normalizedDefinitions = normalizeReportBuilderOptionDefinitions(definitions);
+  const effective = resolveEffectiveReportBuilderOptions(normalizedDefinitions, selected);
+  return normalizedDefinitions.filter((definition) => (
+    JSON.stringify(effective[definition.name]) !== JSON.stringify(definition.default)
+  )).length;
+}
+
+export function buildReportBuilderFilterToolbarModel({
+  allowedFilterCount = 0,
+  optionDefinitions = [],
+  optionValues = {},
+  modifiedFilterCount = 0,
+} = {}) {
+  const normalizedDefinitions = normalizeReportBuilderOptionDefinitions(optionDefinitions);
+  return {
+    visible: Math.max(0, Number(allowedFilterCount) || 0) > 0 || normalizedDefinitions.length > 0,
+    activeNonDefaultCount: Math.max(0, Number(modifiedFilterCount) || 0)
+      + countModifiedReportBuilderOptions(normalizedDefinitions, optionValues),
+  };
+}
+
 export function isDemandSideReportOptionName(name = "") {
   return isEntityOptionName(name);
 }

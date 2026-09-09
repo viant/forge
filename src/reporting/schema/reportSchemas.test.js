@@ -161,6 +161,15 @@ assert.deepEqual(validateReportSpec(reportSpec), {
   valid: true,
   errors: [],
 });
+const collapsibleSchemaSpec = JSON.parse(JSON.stringify(reportSpec));
+const collapsibleSchemaTable = collapsibleSchemaSpec.blocks.find((block) => block.kind === "tableBlock");
+collapsibleSchemaTable.collapsible = true;
+collapsibleSchemaTable.defaultCollapsed = true;
+collapsibleSchemaTable.labelClamp = { lines: 2, maxCharacters: 36 };
+assert.deepEqual(validateReportSpec(collapsibleSchemaSpec), { valid: true, errors: [] });
+assert.deepEqual(validateReportFill(buildReportFillFromReportSpec(collapsibleSchemaSpec, {
+  primary: { rows: [{ eventDate: "2026-05-01", channelId: "Display", totalSpend: 25, impressions: 100 }] },
+})), { valid: true, errors: [] });
 assert.deepEqual(validateReportSpec({
   ...reportSpec,
   scope: {

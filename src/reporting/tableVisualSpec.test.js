@@ -372,4 +372,34 @@ assert.equal(normalizeReportDocumentTableBlock({
   columnKeys: ["[MaxDepth]"],
 }), null);
 
+assert.equal(normalizeReportDocumentTableBlock({
+  id: "accentedTable",
+  datasetRef: "primary",
+  accentTone: "blue",
+  columns: [{ key: "campaign" }],
+}).accentTone, "blue");
+assert.equal(normalizeReportDocumentTableBlock({
+  id: "unsupportedAccent",
+  datasetRef: "primary",
+  accentTone: "brand-specific-purple",
+  columns: [{ key: "campaign" }],
+}).accentTone, undefined);
+assert.deepEqual(normalizeReportDocumentTableBlock({
+  id: "collapsibleTable",
+  datasetRef: "primary",
+  collapsible: true,
+  defaultCollapsed: true,
+  labelClamp: { lines: 2, maxCharacters: 36 },
+  columns: [{ key: "creative", labelClamp: { lines: 1, maxCharacters: 20 } }],
+}), {
+  id: "collapsibleTable",
+  kind: "tableBlock",
+  title: "Table",
+  datasetRef: "primary",
+  columns: [{ key: "creative", labelClamp: { lines: 1, maxCharacters: 20 } }],
+  collapsible: true,
+  defaultCollapsed: true,
+  labelClamp: { lines: 2, maxCharacters: 36 },
+});
+
 console.log("tableVisualSpec ✓ normalizes authored table visual contracts");

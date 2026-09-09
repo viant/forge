@@ -2,6 +2,7 @@ import { buildReportSpecHash, buildReportFillHash } from "./reportFillModel.js";
 import { buildReportPrintChartSvg } from "./reportPrintChartSvg.js";
 import { buildReportPrintGeoSvg } from "./reportPrintGeoSvg.js";
 import { formatExportValue } from "./reportExportValueFormatter.js";
+import { normalizePresentationText } from "../utils/presentationText.js";
 import { getIconPaths } from "@blueprintjs/icons";
 import {
   REPORT_LAYOUT_GRID_COLUMNS,
@@ -647,7 +648,7 @@ function normalizeMarkdownToPlainText(markdown = "") {
 }
 
 function formatReportPrintValue(value, format = "") {
-  return formatExportValue(value, format);
+  return normalizePresentationText(formatExportValue(value, format));
 }
 
 function formatReportPrintFilterParamValue(param = {}) {

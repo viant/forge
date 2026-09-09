@@ -22,6 +22,7 @@ const config = applyReportBuilderRuntimeFieldCatalog({
       allowedFilters: ["from", "to", "campaignIds"],
       allowedSorts: ["advertiserDate", "totalSpend"],
       defaultDatePreset: "last7Days",
+      tablePresentation: { collapsible: true, labelClamp: { lines: 2, maxCharacters: 36 } },
     },
   },
 });
@@ -35,6 +36,7 @@ assert.deepEqual(config.result.orderFields.map((entry) => entry.value), ["advert
 assert.deepEqual(config.predicates.map((entry) => entry.id), ["dateRange", "campaignIds"]);
 assert.deepEqual(config.predicates[0].default, { preset: "last7Days" });
 assert.deepEqual(config.result.viewModes, ["table", "chart"]);
+assert.deepEqual(config.tablePresentation, { collapsible: true, labelClamp: { lines: 2, maxCharacters: 36 } });
 
 console.log("reportBuilderRuntimeFieldCatalog ✓ derives authorized report controls from a runtime definition");
 
@@ -127,3 +129,11 @@ assert.ok(runtimePreview?.reportSpec);
 assert.ok(runtimePreview?.reportFill);
 assert.ok(runtimePreview?.reportPrint);
 assert.ok(runtimePreview?.exportRequest, "a populated runtime-catalog report must produce an export request");
+assert.deepEqual(
+  runtimePreview.reportSpec.blocks.find((block) => block.id === "advancedReportingTable"),
+  {
+    ...runtimePreview.reportSpec.blocks.find((block) => block.id === "advancedReportingTable"),
+    collapsible: true,
+    labelClamp: { lines: 2, maxCharacters: 36 },
+  },
+);

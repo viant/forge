@@ -4,6 +4,10 @@ import { useSignals } from "@preact/signals-react/runtime";
 
 import Chart from "../Chart.jsx";
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
+import {
+    resolveReportBuilderDefinitionDataSourceRef,
+    resolveReportBuilderDefinitionInitialization,
+} from "./reportBuilderDefinitionInitialization.js";
 import { resolveKey } from "../../utils/selector.js";
 import { resolveDashboardTableColumnValue } from "./dashboardTableValue.js";
 import { formatDashboardValue } from "./dashboardUtils.js";
@@ -732,6 +736,8 @@ import {
 import { applyReportBuilderRuntimeFieldCatalog } from "./reportBuilderRuntimeFieldCatalog.js";
 import ReportBuilderOptionControls from "./ReportBuilderOptionControls.jsx";
 import {
+    buildReportBuilderFilterToolbarModel,
+    countModifiedReportBuilderOptions,
     normalizeReportBuilderOptionDefinitions,
     resolveEffectiveReportBuilderOptions,
     updateReportBuilderOptionValue,
@@ -1836,7 +1842,85 @@ function resolveDynamicFilterFamilies(config = {}) {
       .sort((left, right) => left.order - right.order);
 }
 
+function ReportBuilderDefinitionStatus({ status = "loading", message = "" }) {
+    const failed = status === "error";
+    return (
+        <section
+            className="forge-report-builder-definition-status"
+            role={failed ? "alert" : "status"}
+            style={{
+                margin: 16,
+                padding: 20,
+                border: `1px solid ${failed ? "#f5c2c0" : "#dbe5ec"}`,
+                borderRadius: 14,
+                background: failed ? "#fff5f4" : "#fbfdff",
+                color: "#30404d",
+            }}
+        >
+            <h4 style={{ margin: "0 0 8px", color: "#182026" }}>
+                {failed ? "Report definition unavailable" : "Preparing report"}
+            </h4>
+            <p style={{ margin: 0 }}>{message || (failed ? "The report cannot be initialized." : "Loading report definition…")}</p>
+        </section>
+    );
+}
+
 export default function ReportBuilder({ container: sourceContainer, context }) {
+    useSignals();
+    const rootWindowFormValue = context?.signals?.windowForm?.value || {};
+    const definitionConfig = getBuilderConfig(sourceContainer);
+    const definitionDataSourceRef = resolveReportBuilderDefinitionDataSourceRef(sourceContainer, definitionConfig);
+    const definitionContext = definitionDataSourceRef && typeof context?.Context === "function"
+        ? context.Context(definitionDataSourceRef)
+        : null;
+    const definitionRows = definitionContext?.signals?.collection?.value || [];
+    const definitionControl = definitionContext?.signals?.control?.value || {};
+    const definitionFetch = definitionContext?.handlers?.dataSource?.fetchCollection;
+    const [definitionFetchFailure, setDefinitionFetchFailure] = useState(null);
+    const definitionFetchKeyRef = useRef("");
+    const definitionIdentityKey = useMemo(() => JSON.stringify({
+        dataSourceRef: definitionDataSourceRef,
+        parameters: context?.windowState?.parameters || {},
+    }), [context?.windowState?.parameters, definitionDataSourceRef]);
+    const definitionReady = !!(
+        rootWindowFormValue?.reportDefinition
+        && typeof rootWindowFormValue.reportDefinition === "object"
+        && !Array.isArray(rootWindowFormValue.reportDefinition)
+        && rootWindowFormValue.reportDefinition?.fieldCatalog
+    );
+    const definitionInitialization = resolveReportBuilderDefinitionInitialization({
+        dataSourceRef: definitionDataSourceRef,
+        contextAvailable: !!definitionContext && typeof definitionFetch === "function",
+        fetchRequested: definitionControl?.fetchRequested === true,
+        refreshRequested: definitionControl?.refreshRequested === true,
+        loading: definitionControl?.loading === true,
+        error: definitionFetchFailure || definitionControl?.error || null,
+        rowCount: Array.isArray(definitionRows) ? definitionRows.length : 0,
+        definitionReady,
+        definitionError: rootWindowFormValue?.advancedReportingDefinitionError || "",
+    });
+
+    useEffect(() => {
+        if (!definitionInitialization.shouldFetch || definitionFetchKeyRef.current === definitionIdentityKey) {
+            return;
+        }
+        definitionFetchKeyRef.current = definitionIdentityKey;
+        setDefinitionFetchFailure(null);
+        try {
+            Promise.resolve(definitionFetch())
+                .catch((error) => setDefinitionFetchFailure(error || new Error("definition fetch failed")));
+        } catch (error) {
+            setDefinitionFetchFailure(error || new Error("definition fetch failed"));
+        }
+    }, [definitionFetch, definitionIdentityKey, definitionInitialization.shouldFetch]);
+
+    if (!definitionInitialization.ready) {
+        return <ReportBuilderDefinitionStatus status={definitionInitialization.status} message={definitionInitialization.message} />;
+    }
+    return <ReportBuilderReady container={sourceContainer} context={context} />;
+}
+
+function ReportBuilderReady({ container: sourceContainer, context }) {
     useSignals();
     const rootWindowFormSignal = context?.signals?.windowForm;
     const rootWindowFormValue = rootWindowFormSignal?.value || {};
@@ -2386,6 +2470,7 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     }, [chartApplyFeedback]);
     const [exportHistoryNowMs, setExportHistoryNowMs] = useState(() => Date.now());
     const [filtersDrawerOpen, setFiltersDrawerOpen] = useState(false);
+    const [reportFilterRailOpen, setReportFilterRailOpen] = useState(false);
     const [manualRunSequence, setManualRunSequence] = useState(0);
     const [pendingScrollRowId, setPendingScrollRowId] = useState("");
     const builderRootRef = useRef(null);
@@ -5024,8 +5109,29 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
         || dynamicFilterFamilies.length > 0;
     const showUnifiedRuntimeFilterSurface = false;
     const showRuntimeFilterRail = false;
-    const showLeftRail = !compactMode && designWorkspaceMode && designRailHasVisiblePanels;
     const totalActiveFilterCount = activeStaticFilterCount + activeDynamicFilterCount;
+    const modifiedReportOptionCount = countModifiedReportBuilderOptions(reportOptionDefinitions, effectiveReportOptions);
+    const defaultFilterControlState = buildReportBuilderDefaultState(config);
+    const modifiedStaticFilterCount = staticFilters.filter((filter) => {
+        const key = resolveScopeParamId(filter);
+        return key && JSON.stringify(getScopeParamValue(state, key)) !== JSON.stringify(getScopeParamValue(defaultFilterControlState, key));
+    }).length;
+    const modifiedDynamicFilterCount = [...dynamicFilterGroups, ...dynamicFilterFamilies].filter((entry) => {
+        const key = normalizeString(entry?.id);
+        return key && JSON.stringify(state?.dynamicGroups?.[key]) !== JSON.stringify(defaultFilterControlState?.dynamicGroups?.[key]);
+    }).length;
+    const reportFilterToolbarModel = buildReportBuilderFilterToolbarModel({
+        allowedFilterCount: staticFilters.length + dynamicFilterGroups.length + dynamicFilterFamilies.length,
+        optionDefinitions: reportOptionDefinitions,
+        optionValues: effectiveReportOptions,
+        modifiedFilterCount: modifiedStaticFilterCount + modifiedDynamicFilterCount,
+    });
+    const showReportFilterToolbar = !compactMode && !designWorkspaceMode && reportFilterToolbarModel.visible;
+    const totalActiveControlCount = reportFilterToolbarModel.activeNonDefaultCount;
+    const showLeftRail = !compactMode && (
+        (designWorkspaceMode && designRailHasVisiblePanels)
+        || (!designWorkspaceMode && reportFilterRailOpen && hasFilterDrawerContent)
+    );
     const designWorkspaceFlowState = useMemo(() => {
         const measureLabels = selectedMeasureDefs.map((measure) => measure?.label || measure?.id);
         const breakdownLabels = selectedDimensionDefs.map((dimension) => dimension?.label || dimension?.id);
@@ -5417,10 +5523,19 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
             inlineReportMode ? "forge-report-builder__bottom--inline-report" : "",
             useFilterDrawer ? "forge-report-builder__bottom--drawer" : "",
         ].filter(Boolean).join(" ")} aria-label={useFilterDrawer ? "Filters drawer" : "Filters"}>
+            {totalActiveControlCount > 0 ? (
+                <div className="forge-report-builder__bottom-header-actions">
+                    <button type="button" className="forge-report-builder__bottom-toggle" aria-label="Reset report filters and options to defaults" onClick={resetReportFiltersAndOptions}>
+                        Clear all / reset to defaults
+                    </button>
+                </div>
+            ) : null}
             <ReportBuilderOptionControls
                 definitions={reportOptionDefinitions}
                 values={effectiveReportOptions}
                 onChange={setReportOptionValue}
+                onReset={resetReportFiltersAndOptions}
+                activeCount={modifiedReportOptionCount}
                 headingId={inlineReportMode ? "report-builder-options-inline-heading" : "report-builder-options-heading"}
             />
             <section
@@ -11753,6 +11868,21 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                 name,
                 value,
             ),
+            page: 1,
+        });
+    };
+    const resetReportFiltersAndOptions = () => {
+        const currentState = currentBuilderStateRef.current || state;
+        const defaults = buildReportBuilderDefaultState(config);
+        let nextState = currentState;
+        staticFilters.forEach((filter) => {
+            const key = resolveScopeParamId(filter);
+            if (key) nextState = setScopeParamValue(nextState, key, getScopeParamValue(defaults, key));
+        });
+        persistExplorationMutation({
+            ...nextState,
+            dynamicGroups: defaults.dynamicGroups,
+            ...(reportOptionDefinitions.length > 0 ? { reportOptions: defaults.reportOptions } : {}),
             page: 1,
         });
     };
@@ -20296,6 +20426,23 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
                                         </Popover>
                                     ) : null}
                                     {renderDesignModeControl()}
+                                    {showReportFilterToolbar ? (
+                                        <button
+                                            type="button"
+                                            className="forge-report-builder__toolbar-button forge-report-builder__toolbar-button--icon"
+                                            aria-label={reportFilterRailOpen ? "Close report filters and options" : "Open report filters and options"}
+                                            title={reportFilterRailOpen ? "Close filters and options" : "Filters and options"}
+                                            aria-expanded={reportFilterRailOpen}
+                                            onClick={() => setReportFilterRailOpen((open) => !open)}
+                                        >
+                                            <Icon icon="filter" size={14} />
+                                            {totalActiveControlCount > 0 ? (
+                                                <span className="forge-report-builder__toolbar-count" aria-label={`${totalActiveControlCount} active non-default filters and options`}>
+                                                    {totalActiveControlCount}
+                                                </span>
+                                            ) : null}
+                                        </button>
+                                    ) : null}
                                 </div>
                                 {showInlineToolbarFilters ? (
                                     <div className="forge-report-builder__toolbar-divider" aria-hidden="true" />

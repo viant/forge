@@ -166,6 +166,43 @@ All sources normalize to the same execution contract:
 Execution and export should accept a source kind plus source identity and
 runtime filters instead of exposing separate preset-specific operations.
 
+  ### Workspace report groups
+
+A workspace may organize any number of report families with
+`forge.reporting.group` assets under its configured reporting root. Groups are
+presentation and routing metadata only; they do not grant data access or let a
+client select a server implementation.
+
+```yaml
+kind: forge.reporting.group
+id: deliveryReports
+label: Delivery reports # `title` is accepted as an authoring alias
+description: Optional catalog copy
+icon: chart
+order: 20
+visibility: visible
+builderRef: deliveryBuilder
+catalogRef: ./definitions.json
+definitionRef: deliveryCatalog
+catalogDataSourceRef: delivery_catalog
+definitionDataSourceRef: delivery_definition
+presetRefs: [delivery_overview]
+definitionRefs: [overview, detail]
+```
+
+`id`, `label` (or `title`), and `builderRef` are required. `description`,
+`icon`, `order`, `visibility`, `catalogRef`, `definitionRef`,
+`catalogDataSourceRef`, `definitionDataSourceRef`, `presetRefs`, and
+`definitionRefs` are optional. The data-source refs name workspace sources that
+list authorized rows and resolve one authorized definition respectively; Forge
+does not interpret their domain payloads. Builder and preset references are validated
+against the same immutable registry snapshot. Definition references remain
+opaque because the owning workspace server authorizes and resolves its own
+definition catalog. `catalogRef` is resolved relative to the group asset and
+must remain inside the configured workspace after symlink evaluation. Inline
+`catalog`, `reports`, `definition`, `definitions`, and `fieldCatalog` payloads
+are rejected; authorized rows must cross the workspace data-source boundary.
+
 ### Inline reports
 
 Inline reports are one-off, progressively assembled reports. The compiler

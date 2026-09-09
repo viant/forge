@@ -66,6 +66,50 @@ func pathWithin(parent, candidate string) bool {
 	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
 }
 
+// ResolveAssetReference resolves a group-relative file reference while
+// retaining the workspace as the authorization boundary.
+func ResolveAssetReference(workspaceRoot, assetFilename, reference string) (string, string, error) {
+	reference = strings.TrimSpace(reference)
+	if reference == "" {
+		return "", "", nil
+	}
+	if strings.Contains(reference, "://") || filepath.IsAbs(filepath.FromSlash(reference)) {
+		return "", "", fmt.Errorf("catalog reference %q must be a relative workspace path", reference)
+	}
+	workspaceAbs, err := filepath.Abs(workspaceRoot)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve workspace root: %w", err)
+	}
+	assetAbs, err := filepath.Abs(assetFilename)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve group asset: %w", err)
+	}
+	normalized := filepath.ToSlash(filepath.Clean(filepath.FromSlash(reference)))
+	resolved := filepath.Clean(filepath.Join(filepath.Dir(assetAbs), filepath.FromSlash(normalized)))
+	if !pathWithin(workspaceAbs, resolved) {
+		return "", "", fmt.Errorf("catalog reference %q resolves outside workspace root", reference)
+	}
+	workspaceEvaluated := workspaceAbs
+	if value, evalErr := filepath.EvalSymlinks(workspaceAbs); evalErr == nil {
+		workspaceEvaluated = value
+	}
+	resolvedEvaluated, err := filepath.EvalSymlinks(resolved)
+	if err != nil {
+		return "", "", fmt.Errorf("resolve catalog reference %q: %w", reference, err)
+	}
+	if !pathWithin(workspaceEvaluated, resolvedEvaluated) {
+		return "", "", fmt.Errorf("catalog reference %q resolves outside workspace root", reference)
+	}
+	info, err := os.Stat(resolvedEvaluated)
+	if err != nil {
+		return "", "", fmt.Errorf("stat catalog reference %q: %w", reference, err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", "", fmt.Errorf("catalog reference %q is not a regular file", reference)
+	}
+	return normalized, resolvedEvaluated, nil
+}
+
 func Discover(ctx context.Context, options Options) (*Registry, error) {
 	root, err := ResolveRoot(options.WorkspaceRoot, options.ReportingRoot)
 	if err != nil {
@@ -126,6 +170,7 @@ func newRegistry(root string) *Registry {
 		buildersByID:  map[string]*Asset{},
 		presetsByID:   map[string]*Asset{},
 		fragmentsByID: map[string]*Asset{},
+		groupsByID:    map[string]*Asset{},
 	}
 }
 
@@ -148,7 +193,7 @@ func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
 		return nil, []Diagnostic{{Code: "assetDecodeFailed", Message: err.Error(), SourcePath: relativePath}}
 	}
 	kind := stringValue(raw["kind"])
-	if kind != KindBuilder && kind != KindPreset && kind != KindFragment && kind != legacyBuilderKind {
+	if kind != KindBuilder && kind != KindPreset && kind != KindFragment && kind != KindGroup && kind != legacyBuilderKind {
 		return nil, nil
 	}
 	id := stringValue(raw["id"])
@@ -157,21 +202,46 @@ func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
 		return nil, []Diagnostic{diagnosticAt("assetIDRequired", "reporting asset id is required", relativePath, "$.id", idNode)}
 	}
 	asset := &Asset{
-		Kind:        kind,
-		ID:          id,
-		BuilderRef:  stringValue(raw["builderRef"]),
-		Label:       firstString(raw, "label", "title"),
-		Description: stringValue(raw["description"]),
-		SourcePath:  relativePath,
-		YAMLPath:    "$",
-		Raw:         raw,
+		Kind:                    kind,
+		ID:                      id,
+		BuilderRef:              stringValue(raw["builderRef"]),
+		Label:                   firstString(raw, "label", "title"),
+		Description:             stringValue(raw["description"]),
+		Icon:                    stringValue(raw["icon"]),
+		Order:                   intPointer(raw["order"]),
+		Visibility:              stringValue(raw["visibility"]),
+		DefinitionRef:           stringValue(raw["definitionRef"]),
+		CatalogRef:              stringValue(raw["catalogRef"]),
+		CatalogDataSourceRef:    stringValue(raw["catalogDataSourceRef"]),
+		DefinitionDataSourceRef: stringValue(raw["definitionDataSourceRef"]),
+		PresetRefs:              stringListValue(raw["presetRefs"]),
+		DefinitionRefs:          stringListValue(raw["definitionRefs"]),
+		SourcePath:              relativePath,
+		YAMLPath:                "$",
+		Raw:                     raw,
+	}
+	catalogDiagnostics := make([]Diagnostic, 0)
+	if asset.Kind == KindGroup && asset.CatalogRef != "" {
+		normalizedRef, catalogPath, resolveErr := ResolveAssetReference(workspaceRoot, filename, asset.CatalogRef)
+		if resolveErr != nil {
+			catalogDiagnostics = append(catalogDiagnostics, diagnosticAt(
+				"groupCatalogRefInvalid",
+				resolveErr.Error(),
+				relativePath,
+				"$.catalogRef",
+				mappingValue(documentContent(&node), "catalogRef"),
+			))
+		} else {
+			asset.CatalogRef = normalizedRef
+			asset.CatalogPath = catalogPath
+		}
 	}
 	if kind == legacyBuilderKind {
 		asset.Kind = KindBuilder
 		asset.Legacy = true
 	}
 	assets := []*Asset{asset}
-	diagnostics := validateAsset(asset, documentContent(&node))
+	diagnostics := append(catalogDiagnostics, validateAsset(asset, documentContent(&node))...)
 	if asset.Kind == KindBuilder {
 		embedded := embeddedLegacyPresets(asset)
 		assets = append(assets, embedded...)
@@ -255,6 +325,52 @@ func validateAsset(asset *Asset, rootNode *yaml.Node) []Diagnostic {
 			"block",
 		)...)
 	}
+	if asset.Kind == KindGroup {
+		if strings.TrimSpace(asset.Label) == "" {
+			diagnostics = append(diagnostics, diagnosticAt(
+				"groupLabelRequired",
+				fmt.Sprintf("report group %q must declare label or title", asset.ID),
+				asset.SourcePath,
+				asset.YAMLPath+".label",
+				mappingValue(rootNode, "label"),
+			))
+		}
+		if strings.TrimSpace(asset.BuilderRef) == "" {
+			diagnostics = append(diagnostics, diagnosticAt(
+				"groupBuilderRefRequired",
+				fmt.Sprintf("report group %q must reference a builder", asset.ID),
+				asset.SourcePath,
+				asset.YAMLPath+".builderRef",
+				mappingValue(rootNode, "builderRef"),
+			))
+		}
+		for _, key := range []string{"catalog", "definitions", "definition", "reports", "fieldCatalog"} {
+			if _, ok := asset.Raw[key]; !ok {
+				continue
+			}
+			diagnostics = append(diagnostics, diagnosticAt(
+				"groupInlineDefinitionUnsupported",
+				fmt.Sprintf("report group %q must reference authorized data sources instead of embedding %q", asset.ID, key),
+				asset.SourcePath,
+				asset.YAMLPath+"."+key,
+				mappingValue(rootNode, key),
+			))
+		}
+		diagnostics = append(diagnostics, duplicateStringRefs(
+			asset.PresetRefs,
+			asset.SourcePath,
+			asset.YAMLPath+".presetRefs",
+			"groupPresetRefDuplicate",
+			"preset",
+		)...)
+		diagnostics = append(diagnostics, duplicateStringRefs(
+			asset.DefinitionRefs,
+			asset.SourcePath,
+			asset.YAMLPath+".definitionRefs",
+			"groupDefinitionRefDuplicate",
+			"definition",
+		)...)
+	}
 	return diagnostics
 }
 
@@ -282,6 +398,28 @@ func duplicateIDs(items []any, sourcePath, yamlPath, code, noun string) []Diagno
 	return result
 }
 
+func duplicateStringRefs(items []string, sourcePath, yamlPath, code, noun string) []Diagnostic {
+	seen := map[string]int{}
+	result := make([]Diagnostic, 0)
+	for index, item := range items {
+		key := normalizeID(item)
+		if key == "" {
+			continue
+		}
+		if first, ok := seen[key]; ok {
+			result = append(result, Diagnostic{
+				Code:       code,
+				Message:    fmt.Sprintf("duplicate %s reference %q (first declared at index %d)", noun, item, first),
+				SourcePath: sourcePath,
+				YAMLPath:   fmt.Sprintf("%s[%d]", yamlPath, index),
+			})
+			continue
+		}
+		seen[key] = index
+	}
+	return result
+}
+
 func (r *Registry) add(asset *Asset) []Diagnostic {
 	if asset == nil {
 		return nil
@@ -295,6 +433,8 @@ func (r *Registry) add(asset *Asset) []Diagnostic {
 		index = r.presetsByID
 	case KindFragment:
 		index = r.fragmentsByID
+	case KindGroup:
+		index = r.groupsByID
 	default:
 		return nil
 	}
@@ -314,6 +454,8 @@ func (r *Registry) add(asset *Asset) []Diagnostic {
 		r.Presets = append(r.Presets, asset)
 	case KindFragment:
 		r.Fragments = append(r.Fragments, asset)
+	case KindGroup:
+		r.Groups = append(r.Groups, asset)
 	}
 	return nil
 }
@@ -330,6 +472,36 @@ func (r *Registry) validateReferences() []Diagnostic {
 			SourcePath: preset.SourcePath,
 			YAMLPath:   preset.YAMLPath + ".builderRef",
 		})
+	}
+	for _, group := range r.Groups {
+		if normalizeID(group.BuilderRef) != "" && r.Builder(group.BuilderRef) == nil {
+			result = append(result, Diagnostic{
+				Code:       "groupBuilderUnavailable",
+				Message:    fmt.Sprintf("report group %q references unavailable builder %q", group.ID, group.BuilderRef),
+				SourcePath: group.SourcePath,
+				YAMLPath:   group.YAMLPath + ".builderRef",
+			})
+		}
+		for index, presetRef := range group.PresetRefs {
+			preset := r.Preset(presetRef)
+			if preset == nil {
+				result = append(result, Diagnostic{
+					Code:       "groupPresetUnavailable",
+					Message:    fmt.Sprintf("report group %q references unavailable preset %q", group.ID, presetRef),
+					SourcePath: group.SourcePath,
+					YAMLPath:   fmt.Sprintf("%s.presetRefs[%d]", group.YAMLPath, index),
+				})
+				continue
+			}
+			if normalizeID(group.BuilderRef) != "" && normalizeID(preset.BuilderRef) != normalizeID(group.BuilderRef) {
+				result = append(result, Diagnostic{
+					Code:       "groupPresetBuilderMismatch",
+					Message:    fmt.Sprintf("report group %q references preset %q owned by builder %q, not %q", group.ID, presetRef, preset.BuilderRef, group.BuilderRef),
+					SourcePath: group.SourcePath,
+					YAMLPath:   fmt.Sprintf("%s.presetRefs[%d]", group.YAMLPath, index),
+				})
+			}
+		}
 	}
 	return result
 }
@@ -398,6 +570,33 @@ func mapValue(value any) map[string]any {
 func listValue(value any) []any {
 	result, _ := value.([]any)
 	return result
+}
+
+func stringListValue(value any) []string {
+	items := listValue(value)
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		if normalized := stringValue(item); normalized != "" {
+			result = append(result, normalized)
+		}
+	}
+	return result
+}
+
+func intPointer(value any) *int {
+	switch typed := value.(type) {
+	case int:
+		result := typed
+		return &result
+	case int64:
+		result := int(typed)
+		return &result
+	case uint64:
+		result := int(typed)
+		return &result
+	default:
+		return nil
+	}
 }
 
 // Loader retains the prior valid registry when a development reload contains

@@ -174,6 +174,26 @@ describe('resolveRequiredDataSourceRefs', () => {
     ]);
   });
 
+  it('mounts report-builder definition datasources before compile', () => {
+    const metadata = {
+      dataSource: {
+        report_rows: {},
+        report_definition: {},
+      },
+      view: {
+        content: {
+          dataSourceRef: 'report_rows',
+          definitionDataSourceRef: 'report_definition',
+        },
+      },
+    };
+
+    expect(resolveRequiredDataSourceRefs(metadata, '', {})).toEqual([
+      'report_rows',
+      'report_definition',
+    ]);
+  });
+
   it('mounts datasource refs only for the selected tab', () => {
     const metadata = {
       dataSource: { advertiser_properties: {}, advertiser_campaigns: {}, advertiser_orders: {} },
