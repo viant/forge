@@ -1367,4 +1367,25 @@ assert.equal(authoredKpiCards.length, 2);
 assert.equal(authoredKpiCards[0].box.y, authoredKpiCards[1].box.y);
 assert.notEqual(authoredKpiCards[0].box.x, authoredKpiCards[1].box.x);
 
+const collapsiblePrintSpec = {
+  ...authoredKpiGridSpec,
+  title: "Collapsible print table",
+  layoutIntent: { ...authoredKpiGridSpec.layoutIntent, blockOrder: ["creativeTable"], items: [{ blockId: "creativeTable", size: "full" }] },
+  blocks: [buildReportDocumentTableBlock({
+    id: "creativeTable",
+    title: "Creatives",
+    datasetRef: "metrics",
+    collapsible: true,
+    defaultCollapsed: true,
+    labelClamp: { lines: 1, maxCharacters: 8 },
+    columns: [{ key: "creativeName", label: "Creative" }],
+  })],
+};
+const collapsiblePrintFill = buildReportFillFromReportSpec(collapsiblePrintSpec, {
+  metrics: { rows: [{ creativeName: "Kroil\uFFFD\uFFFD creative full value" }] },
+});
+const collapsibleTablePrint = buildReportPrintFromReportFill({ reportSpec: collapsiblePrintSpec, reportFill: collapsiblePrintFill });
+const collapsiblePrintText = collapsibleTablePrint.pages.flatMap((page) => page.elements).map((element) => element.text).filter(Boolean);
+assert.ok(collapsiblePrintText.includes("Kroil? creative full value"), "print keeps the full normalized value even when the runtime table defaults collapsed");
+
 console.log("reportPrintModel ✓ builds the canonical ReportPrint contract and lowers authored ReportFill blocks into paginated print output");

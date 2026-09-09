@@ -1,4 +1,5 @@
 import { normalizeReportBuilderOptionDefinitions } from "./reportBuilderOptions.js";
+import { normalizePresentationClampConfig } from "../../utils/presentationText.js";
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -36,6 +37,17 @@ function normalizeFormat(column = {}) {
   return "";
 }
 
+function normalizeTablePresentation(value = null) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const labelClamp = normalizePresentationClampConfig(value?.labelClamp || value?.LabelClamp);
+  const collapsible = value?.collapsible === true || value?.Collapsible === true;
+  return {
+    ...(collapsible ? { collapsible: true } : {}),
+    ...(collapsible && (value?.defaultCollapsed === true || value?.DefaultCollapsed === true) ? { defaultCollapsed: true } : {}),
+    ...(labelClamp ? { labelClamp } : {}),
+  };
+}
+
 export function applyReportBuilderRuntimeFieldCatalog(config = {}, windowForm = {}) {
   const next = clone(config) || {};
   if (next?.runtimeFieldCatalog?.enabled !== true) {
@@ -54,8 +66,18 @@ export function applyReportBuilderRuntimeFieldCatalog(config = {}, windowForm = 
       defaultDatePreset: windowForm?.DefaultDatePreset,
       maxRows: windowForm?.MaxRows,
       options: windowForm?.Options,
+      tablePresentation: windowForm?.TablePresentation,
     };
   next.reportOptions = normalizeReportBuilderOptionDefinitions(catalog?.options);
+  const tablePresentation = normalizeTablePresentation(
+    catalog?.tablePresentation
+    || catalog?.TablePresentation
+    || definition?.tablePresentation
+    || definition?.TablePresentation,
+  );
+  if (tablePresentation && Object.keys(tablePresentation).length > 0) {
+    next.tablePresentation = tablePresentation;
+  }
   const columns = (Array.isArray(catalog?.columns) ? catalog.columns : [])
     .map((column) => ({
       name: normalizeString(column?.name),

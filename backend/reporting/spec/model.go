@@ -165,6 +165,7 @@ type TableColumn struct {
 	CellVisual        any            `json:"cellVisual,omitempty"`
 	Link              map[string]any `json:"link,omitempty"`
 	RuntimeFilterable bool           `json:"runtimeFilterable,omitempty"`
+	LabelClamp        *TextClamp     `json:"labelClamp,omitempty"`
 }
 
 type StepperStep struct {
@@ -222,6 +223,9 @@ type Block struct {
 	Kind                     string           `json:"kind"`
 	Title                    string           `json:"title,omitempty"`
 	AccentTone               string           `json:"accentTone,omitempty"`
+	Collapsible              bool             `json:"collapsible,omitempty"`
+	DefaultCollapsed         bool             `json:"defaultCollapsed,omitempty"`
+	LabelClamp               *TextClamp       `json:"labelClamp,omitempty"`
 	DatasetRef               string           `json:"datasetRef,omitempty"`
 	Columns                  []TableColumn    `json:"columns,omitempty"`
 	ChartSpec                map[string]any   `json:"chartSpec,omitempty"`
@@ -279,6 +283,11 @@ type Block struct {
 	Runtime                  map[string]any   `json:"runtime,omitempty"`
 }
 
+type TextClamp struct {
+	Lines         int `json:"lines"`
+	MaxCharacters int `json:"maxCharacters,omitempty"`
+}
+
 type rawReportSpec struct {
 	Version          int               `json:"version"`
 	Kind             string            `json:"kind"`
@@ -306,12 +315,15 @@ type rawBlockHeader struct {
 }
 
 type rawTableBlock struct {
-	ID         string        `json:"id"`
-	Kind       string        `json:"kind"`
-	Title      string        `json:"title,omitempty"`
-	AccentTone string        `json:"accentTone,omitempty"`
-	DatasetRef string        `json:"datasetRef"`
-	Columns    []TableColumn `json:"columns"`
+	ID               string        `json:"id"`
+	Kind             string        `json:"kind"`
+	Title            string        `json:"title,omitempty"`
+	AccentTone       string        `json:"accentTone,omitempty"`
+	Collapsible      bool          `json:"collapsible,omitempty"`
+	DefaultCollapsed bool          `json:"defaultCollapsed,omitempty"`
+	LabelClamp       *TextClamp    `json:"labelClamp,omitempty"`
+	DatasetRef       string        `json:"datasetRef"`
+	Columns          []TableColumn `json:"columns"`
 }
 
 type rawChartBlock struct {
@@ -670,12 +682,21 @@ func (r *ReportSpec) Validate() error {
 			if len(block.Columns) == 0 {
 				return fmt.Errorf("reportSpec.blocks[%d].columns must not be empty for tableBlock", index)
 			}
+			if block.DefaultCollapsed && !block.Collapsible {
+				return fmt.Errorf("reportSpec.blocks[%d].defaultCollapsed requires collapsible for tableBlock", index)
+			}
+			if block.LabelClamp != nil && block.LabelClamp.Lines != 1 && block.LabelClamp.Lines != 2 {
+				return fmt.Errorf("reportSpec.blocks[%d].labelClamp.lines must be 1 or 2 for tableBlock", index)
+			}
 			for columnIndex, column := range block.Columns {
 				if strings.TrimSpace(column.Key) == "" {
 					return fmt.Errorf("reportSpec.blocks[%d].columns[%d].key is required", index, columnIndex)
 				}
 				if strings.TrimSpace(column.Label) == "" {
 					return fmt.Errorf("reportSpec.blocks[%d].columns[%d].label is required", index, columnIndex)
+				}
+				if column.LabelClamp != nil && column.LabelClamp.Lines != 1 && column.LabelClamp.Lines != 2 {
+					return fmt.Errorf("reportSpec.blocks[%d].columns[%d].labelClamp.lines must be 1 or 2", index, columnIndex)
 				}
 			}
 		case "chartBlock":
@@ -927,12 +948,15 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			return Block{}, err
 		}
 		return Block{
-			ID:         block.ID,
-			Kind:       block.Kind,
-			Title:      block.Title,
-			AccentTone: block.AccentTone,
-			DatasetRef: block.DatasetRef,
-			Columns:    block.Columns,
+			ID:               block.ID,
+			Kind:             block.Kind,
+			Title:            block.Title,
+			AccentTone:       block.AccentTone,
+			Collapsible:      block.Collapsible,
+			DefaultCollapsed: block.DefaultCollapsed,
+			LabelClamp:       block.LabelClamp,
+			DatasetRef:       block.DatasetRef,
+			Columns:          block.Columns,
 		}, nil
 	case "chartBlock":
 		block := rawChartBlock{}

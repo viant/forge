@@ -14,6 +14,16 @@ export function normalizePresentationText(value = "", { replacement = "?" } = {}
     return text.replace(/\s+/g, " ").trim();
 }
 
+export function normalizePresentationClampConfig(value = null) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const lines = Number(value.lines);
+    if (lines !== 1 && lines !== 2) return null;
+    return {
+        lines,
+        maxCharacters: Math.max(4, Math.min(120, Number(value.maxCharacters) || 28)),
+    };
+}
+
 function presentationGraphemes(value = "") {
     const text = normalizePresentationText(value);
     if (!text) return [];

@@ -23,6 +23,7 @@ import { normalizeReportRefinements } from "./reportRefinementModel.js";
 import { normalizeReportCalculatedFields } from "./calculatedFieldModel.js";
 import { resolveReportBuilderDrillMetadata } from "./reportBuilderDrillMetadata.js";
 import { normalizeReportTableCellVisual } from "./tableVisualSpec.js";
+import { normalizePresentationClampConfig } from "../utils/presentationText.js";
 import { shouldKeepPrimaryDataset } from "./reportPrimaryDatasetModel.js";
 import { isReportDatasetBackedBlockKind } from "./reportBlockKindModel.js";
 import { resolveReportScopeContextPresetFromState } from "./reportContextPresetModel.js";
@@ -144,6 +145,7 @@ function buildReportSpecColumns(columns = []) {
     ...(normalizeString(column?.align) ? { align: normalizeString(column.align) } : {}),
     ...(column?.runtimeFilterable === true ? { runtimeFilterable: true } : {}),
     ...(normalizeReportTableCellVisual(column?.cellVisual) ? { cellVisual: normalizeReportTableCellVisual(column.cellVisual) } : {}),
+    ...(normalizePresentationClampConfig(column?.labelClamp) ? { labelClamp: normalizePresentationClampConfig(column.labelClamp) } : {}),
   })).filter((column) => column.key);
 }
 
@@ -688,6 +690,7 @@ export function buildReportBuilderReportSpec({
         kind: "tableBlock",
         datasetRef: "primary",
         columns: tableColumns,
+        ...(config?.tablePresentation && typeof config.tablePresentation === "object" ? cloneValue(config.tablePresentation) : {}),
       },
       ...(chartBlock ? [chartBlock] : []),
     ]

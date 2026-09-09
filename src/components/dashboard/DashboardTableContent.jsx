@@ -18,6 +18,7 @@ import { resolveDashboardTableColumnValue } from "./dashboardTableValue.js";
 import { buildTableRuntimeColumns } from "./tableCellVisuals.js";
 import { withFrozenIdentifierColumn } from "./tableFrozenIdentifier.js";
 import { renderDashboardTableCell, titleizeDashboardKey } from "./dashboardVisualUtils.jsx";
+import { clampPresentationText, normalizePresentationClampConfig, normalizePresentationText } from "../../utils/presentationText.js";
 
 const DEFAULT_SUBTITLE_STYLE = {
     fontSize: '12px',
@@ -40,6 +41,7 @@ export default function DashboardTableContent({
     context,
     locale = 'en-US',
     subtitleStyle = DEFAULT_SUBTITLE_STYLE,
+    onPresentationStateChange = null,
 }) {
     const {collection, loading, error, selection} = useDataSourceState(context);
     const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
@@ -92,6 +94,7 @@ export default function DashboardTableContent({
             cellVisual: col?.cellVisual,
             frozen: col?.frozen === true,
             width: col?.width,
+            labelClamp: normalizePresentationClampConfig(col?.labelClamp || container.dashboard?.table?.labelClamp || container.labelClamp),
         };
     }).filter((col) => !!col.key), [rawColumns]);
 
@@ -142,10 +145,22 @@ export default function DashboardTableContent({
     }, [quickFilteredCollection, limit, runtimeColumns, sortKey, sortDir]);
     const pageCount = pagingEnabled ? Math.max(1, Math.ceil(allSortedRows.length / pageSize)) : 1;
     const currentPage = Math.min(page, pageCount);
+    const sortLabel = sortKey ? (displayColumns.find((column) => column.key === sortKey)?.label || sortKey) : "";
     const sortedRows = pagingEnabled
         ? allSortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
         : allSortedRows;
     useEffect(() => { setPage(1); }, [quickFilter, sortKey, sortDir, pageSize]);
+    useEffect(() => {
+        onPresentationStateChange?.({
+            rowCount: allSortedRows.length,
+            filter: quickFilter.trim(),
+            sort: sortKey ? {
+                key: sortKey,
+                label: sortLabel,
+                direction: sortDir,
+            } : null,
+        });
+    }, [allSortedRows.length, onPresentationStateChange, quickFilter, sortDir, sortKey, sortLabel]);
     const allSelected = multiSelect && sortedRows.length > 0 && sortedRows.every(rowSelected);
     const selectionLabelField = String(container?.selectionLabelField || displayColumns[0]?.key || '').trim();
 
@@ -266,9 +281,33 @@ export default function DashboardTableContent({
                                         const cellStyle = {...rowStyle, ...mergeStyles(cellRules), textAlign: col.align || 'left'};
                                         const cellClassName = [rowClassName, mergeClassNames(cellRules)].filter(Boolean).join(" ");
                                         const value = resolveDashboardTableColumnValue(row, col, { preferDisplay: true });
+                                        const presentationValue = typeof value === 'string' ? normalizePresentationText(value) : value;
+                                        const clampedText = typeof presentationValue === 'string' && col.labelClamp
+                                            ? clampPresentationText(presentationValue, col.labelClamp)
+                                            : null;
+                                        const renderedCell = renderDashboardTableCell(
+                                            clampedText?.truncated ? clampedText.lines.join(' ') : presentationValue,
+                                            row,
+                                            col,
+                                            locale,
+                                            context,
+                                        );
                                         return (
                                             <td key={`${index}-${ci}`} className={[cellClassName, col.frozen ? 'forge-table-frozen-identifier' : ''].filter(Boolean).join(' ')} style={{...cellStyle, ...(col.frozen ? {'--forge-frozen-column-width': `${col.resolvedCompactWidth}px`, '--forge-frozen-left': multiSelect ? '42px' : '0px'} : {})}}>
-                                                {renderDashboardTableCell(value, row, col, locale, context)}
+                                                {clampedText ? (
+                                                    <span
+                                                        className="forge-dashboard-table-cell-label-clamp"
+                                                        title={clampedText.fullText}
+                                                        style={{
+                                                            display: '-webkit-box',
+                                                            WebkitBoxOrient: 'vertical',
+                                                            WebkitLineClamp: clampedText.lines.length,
+                                                            overflow: 'hidden',
+                                                        }}
+                                                    >
+                                                        {renderedCell}
+                                                    </span>
+                                                ) : renderedCell}
                                             </td>
                                         );
                                     })}

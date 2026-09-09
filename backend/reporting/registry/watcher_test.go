@@ -44,6 +44,30 @@ document: {blocks: []}
 		t.Fatalf("expected valid asset reload, got %#v", valid)
 	}
 
+	catalogPath := writeAsset(t, workspace, "extension/forge/reporting/groups/definitions.json", `{"version":"one"}`)
+	writeAsset(t, workspace, "extension/forge/reporting/groups/delivery.yaml", `
+kind: forge.reporting.group
+id: delivery_reports
+label: Delivery reports
+builderRef: performance
+catalogRef: ./definitions.json
+presetRefs: [delivery]
+`)
+	awaitWatchEvent(t, events, false)
+	valid = loader.Current()
+	if group := valid.Group("delivery_reports"); group == nil || len(group.PresetRefs) != 1 {
+		t.Fatalf("expected report group hot reload, got %#v", group)
+	}
+	beforeCatalogReload := valid
+	if err = os.WriteFile(catalogPath, []byte(`{"version":"two"}`), 0o644); err != nil {
+		t.Fatalf("update referenced catalog: %v", err)
+	}
+	awaitWatchEvent(t, events, false)
+	valid = loader.Current()
+	if valid == beforeCatalogReload || valid.Group("delivery_reports") == nil {
+		t.Fatalf("expected referenced catalog JSON to trigger registry reload")
+	}
+
 	if err = os.WriteFile(builderPath, []byte("kind: [invalid"), 0o644); err != nil {
 		t.Fatalf("write invalid builder: %v", err)
 	}

@@ -2200,7 +2200,11 @@ export function buildReportBuilderReportDocument({
   const documentBlocks = mergeReportBuilderDocumentBlocks(
     normalizeReportBuilderDocumentBlocks(state?.reportDocumentBlocks),
     additionalBlocks,
-  );
+  ).map((block) => (
+    normalizeString(block?.kind) === "tableBlock" && config?.tablePresentation && typeof config.tablePresentation === "object"
+      ? normalizeReportDocumentTableBlock({ ...cloneValue(config.tablePresentation), ...block })
+      : block
+  )).filter(Boolean);
   const source = {
     kind: "dashboard.reportBuilder",
     containerId: resolveContainerIdentity(container),

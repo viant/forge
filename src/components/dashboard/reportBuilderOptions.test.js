@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 
 import {
+  buildReportBuilderFilterToolbarModel,
+  countModifiedReportBuilderOptions,
   isDemandSideReportOptionName,
   normalizeReportBuilderOptionDefinitions,
   resolveEffectiveReportBuilderOptions,
@@ -59,6 +61,13 @@ const defaultRequest = buildReportBuilderRequest(config, defaults);
 assert.deepEqual(defaultRequest.options, defaults.reportOptions);
 
 const changedOptions = updateReportBuilderOptionValue(config.reportOptions, defaults.reportOptions, "attributionModel", "last_touch");
+assert.equal(countModifiedReportBuilderOptions(config.reportOptions, defaults.reportOptions), 0);
+assert.equal(countModifiedReportBuilderOptions(config.reportOptions, changedOptions), 1);
+assert.deepEqual(buildReportBuilderFilterToolbarModel({
+  optionDefinitions: config.reportOptions,
+  optionValues: changedOptions,
+}), { visible: true, activeNonDefaultCount: 1 });
+assert.deepEqual(buildReportBuilderFilterToolbarModel({ allowedFilterCount: 2 }), { visible: true, activeNonDefaultCount: 0 });
 const changedState = mergeReportBuilderState(config, { ...defaults, reportOptions: changedOptions });
 const changedRequest = buildReportBuilderRequest(config, changedState);
 assert.equal(changedRequest.options.attributionModel, "last_touch");
