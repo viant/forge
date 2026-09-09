@@ -32,4 +32,32 @@ assert.match(html, /bp6-intent-primary/);
 assert.match(html, /bp6-button-text">Save Record<\/span>/);
 assert.match(html, /aria-live="polite"/);
 
+const disabledButton = renderToStaticMarkup(<WidgetRenderer
+    context={context}
+    item={{
+        id: 'unsafeSave',
+        label: 'Save',
+        type: 'button',
+        tooltip: 'Disabled until sparse updates are safe.',
+        disabledWhen: {source: 'windowForm', field: 'sparseSafe', notEquals: true},
+    }}
+/>);
+assert.match(disabledButton, /title="Disabled until sparse updates are safe\."/);
+assert.match(disabledButton, /tabindex="0"/);
+assert.match(disabledButton, /<button[^>]*disabled=""/);
+
+const readOnlyInput = renderToStaticMarkup(<WidgetRenderer
+    context={context}
+    item={{
+        id: 'unsafeName',
+        label: 'Name',
+        type: 'text',
+        scope: 'form',
+        dataField: 'name',
+        readOnlyWhen: {source: 'windowForm', field: 'sparseSafe', notEquals: true},
+    }}
+/>);
+assert.match(readOnlyInput, /forge-widget-readonly/);
+assert.match(readOnlyInput, /readonly=""/);
+
 console.log('widgetMutationCommand ✓ item actions use the generic mutation lifecycle');

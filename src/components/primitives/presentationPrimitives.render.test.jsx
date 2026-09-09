@@ -11,6 +11,7 @@ import NotificationRules from './NotificationRules.jsx';
 import MetricSummary from './MetricSummary.jsx';
 import DetailView, {resolveDetailRecord} from './DetailView.jsx';
 import MasterDetail from './MasterDetail.jsx';
+import EditableCollection from './EditableCollection.jsx';
 
 const signal = (value) => ({value, peek: () => value});
 let form = {id: 1, name: 'Alpha', childCount: 0};
@@ -48,5 +49,9 @@ const detailContext = {...dataContext, identity: {dataSourceRef: 'detail'}, sign
 const coordinatedContext = {...context, Context: (ref) => ref === 'detail' ? detailContext : dataContext};
 has(renderToStaticMarkup(<MasterDetail context={coordinatedContext} container={{containers: [{id: 'master', dataSourceRef: 'record'}, {id: 'detail', dataSourceRef: 'detail'}], masterDetail: {identityFields: ['id'], master: {containerId: 'master'}, detail: {containerId: 'detail'}, responsive: {wide: 'split'}}}} renderRegion={(entry) => <div>{entry.id}</div>}/>), 'forge-master-detail');
 has(renderToStaticMarkup(<MasterDetail context={context} container={{containers: [{id: 'master', dataSourceRef: 'record'}, {id: 'detail', dataSourceRef: 'record'}], masterDetail: {identityFields: ['id'], master: {containerId: 'master'}, detail: {containerId: 'detail'}}}}/>), 'Master and detail must use distinct datasource contexts');
+const gatedCollection = renderToStaticMarkup(<EditableCollection context={context} isActive container={{editableCollection: {dataSourceRef: 'record', operations: [{id: 'edit', label: 'Edit', handler: 'Host.edit', tooltip: 'Disabled until sparse updates are safe.', disabledWhen: {source: 'windowForm', field: 'sparseSafe', notEquals: true}}]}}/>);
+has(gatedCollection, 'forge-disabled-action-shell');
+has(gatedCollection, 'title="Disabled until sparse updates are safe."');
+has(gatedCollection, 'tabindex="0"');
 
 console.log('presentation primitive render contracts passed');
