@@ -3,7 +3,7 @@ import React, {useEffect, useState} from "react";
 import {getLogger} from "../utils/logger.js";
 import {useSignals} from '@preact/signals-react/runtime';
 import { extractData, isDeferredCacheHitEnvelope } from "./dataSourceExtract.js";
-import { recoverInterruptedFetchOnMount, resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, withFetchedPageInfo } from "./dataSourceFetchState.js";
+import { beginDataSourceFetch, reconcileRestoredPendingFetch, recoverInterruptedFetchOnMount, resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, withFetchedPageInfo } from "./dataSourceFetchState.js";
 import {reconcileMultiSelection, reconcileSingleSelection} from "./dataSourceSelection.js";
 import {applyFetchTransform} from "./dataSourceTransform.js";
 import {hasResolvedDependencies} from "./dataSourceDependencies.js";
@@ -11,6 +11,7 @@ import {bindingFinalizationAction, isCurrentBindingGeneration} from "./primitive
 import {resourceModelRefForDataSource, unmarshalResourceCollection} from "./primitives/resourceModel.js";
 import {settleDataSourceRequest} from './dataSourceRequestLifecycle.js';
 import {shouldDispatchSelectionEvent} from './selectionEventModel.js';
+import {reconcileFetchForMetadataReadiness} from './dataSourceMetadataReadiness.js';
 import {
     findSelectionSignal,
 
@@ -177,6 +178,20 @@ export default function DataSource({context}) {
         const initialFetchObservation = initialFetchObservationRef.current;
         initialFetchObservationRef.current = false;
         try { log.debug('[watch] flags', { ds: context?.identity?.dataSourceRef, fetch, refresh, loading: loadingNow, input: inputVal }); } catch(_) {}
+        const deferredForMetadata = reconcileFetchForMetadataReadiness(context, inputVal, controlValue);
+        if (deferredForMetadata) {
+            input.value = deferredForMetadata.input;
+            if (deferredForMetadata.control !== controlValue) control.value = deferredForMetadata.control;
+            try { log.debug('[watch] suppress fetch until current target metadata is ready', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
+            return;
+        }
+        const restored = reconcileRestoredPendingFetch(dataSource, inputVal, controlValue);
+        if (restored) {
+            input.value = restored.input;
+            if (restored.control !== controlValue) control.value = restored.control;
+            try { log.debug('[watch] reconcile restored pending fetch', { ds: context?.identity?.dataSourceRef, replay: restored.input.fetch }); } catch(_) {}
+            return;
+        }
         const recovered = recoverInterruptedFetchOnMount(dataSource, inputVal, controlValue, initialFetchObservation);
         if (recovered) {
             input.value = recovered.input;
@@ -329,6 +344,7 @@ export default function DataSource({context}) {
 
 
         const finalFilter = {...refreshFilter};
+        control.value = beginDataSourceFetch(control.peek());
         setLoading(true);
         try {
             const payload = await connector.get({
@@ -478,8 +494,8 @@ export default function DataSource({context}) {
             page = page || 1;
         }
 
+        control.value = beginDataSourceFetch(control.peek());
         setLoading(true);
-        control.value = { ...control.peek(), error: null, stale: false };
         try {
             page = resolveFetchPage({
                 page,

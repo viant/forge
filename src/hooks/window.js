@@ -761,6 +761,7 @@ export function useWindowHandlers(windowId) {
             sig.value = {
                 ...prev,
                 open: true,
+                focusRequest: Number(prev?.focusRequest || 0) + 1,
                 selectionMode,
                 props: {
                     ...props,

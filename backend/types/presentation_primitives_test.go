@@ -34,6 +34,7 @@ dataStateBoundary:
   allowPartial: true
   renderEmptyContent: true
   suppressErrorWhen: {source: windowForm, field: sharedError, notEmpty: true}
+  errorAction: {label: Retry records, icon: refresh, dataSourceRef: records, bypassCache: true}
 relationDrill:
   dataSourceRef: record
   countField: childCount
@@ -81,6 +82,9 @@ masterDetail:
 	}
 	if container.DataStateBoundary == nil || !container.DataStateBoundary.AllowPartial || !container.DataStateBoundary.RenderEmptyContent || container.DataStateBoundary.SuppressErrorWhen["field"] != "sharedError" || container.RelationDrill == nil {
 		t.Fatal("data state/relation truncated")
+	}
+	if action := container.DataStateBoundary.ErrorAction; action == nil || action.Label != "Retry records" || action.DataSourceRef != "records" || !action.BypassCache {
+		t.Fatalf("data-state error action truncated: %#v", action)
 	}
 	if container.NotificationRules == nil || len(container.NotificationRules.Rules) != 1 || container.MetricSummary == nil || len(container.MetricSummary.Metrics) != 1 {
 		t.Fatal("notification/metric truncated")

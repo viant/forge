@@ -62,6 +62,14 @@ type DataStateBoundarySpec struct {
 	ErrorMessage       string                 `json:"errorMessage,omitempty" yaml:"errorMessage,omitempty"`
 	StaleMessage       string                 `json:"staleMessage,omitempty" yaml:"staleMessage,omitempty"`
 	SuppressErrorWhen  map[string]interface{} `json:"suppressErrorWhen,omitempty" yaml:"suppressErrorWhen,omitempty"`
+	ErrorAction        *DataStateErrorAction  `json:"errorAction,omitempty" yaml:"errorAction,omitempty"`
+}
+
+type DataStateErrorAction struct {
+	Label         string `json:"label,omitempty" yaml:"label,omitempty"`
+	Icon          string `json:"icon,omitempty" yaml:"icon,omitempty"`
+	DataSourceRef string `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	BypassCache   bool   `json:"bypassCache,omitempty" yaml:"bypassCache,omitempty"`
 }
 
 type RelationDrillSpec struct {

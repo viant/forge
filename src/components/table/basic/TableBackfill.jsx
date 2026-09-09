@@ -16,23 +16,23 @@ const TableBackfill = ({context, rowCount, colSpan, collection}) => {
 
     const errorMessage = formatDataSourceError(error);
     const rows = [];
+    const stateClassName = error ? " is-error" : loading ? " is-loading" : " is-empty";
     for (let i = 0; i < rowCount; i++) {
         if (i === 0) {
-            // First row includes the cell with rowspan and the first column without span
-            rows.push(<tr key={`backfill-${i}`}>
-                <td></td>
-                <td rowSpan={rowCount - 1} colSpan={colSpan - 1} className="empty-row">
+            rows.push(<tr key={`backfill-${i}`} className={`table-state-row${stateClassName}`}>
+                <td colSpan={Math.max(1, colSpan)} className="empty-row table-state-cell">
+                    <div className="table-state-message" role={error ? "alert" : "status"}>
                     {loading && !error ? (<SoftSkeleton lines={1} height={10} />) : null}
-                    {noData && !disabled && !loading ? (
+                    {noData && !disabled && !loading && !error ? (
                         <span style={{color: Colors.BLUE3}}><Icon icon="info-sign"></Icon> No data. </span>) : null}
                     {error ?
                         <span style={{color: Colors.RED3}}><Icon icon="error"></Icon> {errorMessage} </span> : null}
+                    </div>
                 </td>
             </tr>);
         } else {
-            // Remaining rows only include the first column
-            rows.push(<tr key={`backfill-${i}`}>
-                <td><span className="truncate-content">&nbsp;</span></td>
+            rows.push(<tr key={`backfill-${i}`} className="table-state-spacer-row" aria-hidden="true">
+                <td colSpan={Math.max(1, colSpan)}><span className="truncate-content">&nbsp;</span></td>
             </tr>);
         }
     }

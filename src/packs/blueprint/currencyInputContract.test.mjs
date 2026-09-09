@@ -6,6 +6,12 @@ const currency = source.match(/registerWidget\(\s*'currency',[\s\S]*?registerEve
 
 assert.ok(currency, 'currency widget contract should exist');
 assert.match(currency, /\(\{ value = '', onValueChange, readOnly/);
+assert.match(currency, /stepSize, minorStepSize, majorStepSize, \.\.\.rest/);
+assert.match(currency, /resolveNumericInputMinorStepSize\(stepSize, minorStepSize\)/);
+assert.match(currency, /stepSize=\{stepSize\}/);
+assert.match(currency, /minorStepSize=\{resolvedMinorStepSize\}/);
+assert.match(currency, /majorStepSize=\{majorStepSize\}/);
+assert.doesNotMatch(currency, /minorStepSize=\{0\.1\}/);
 assert.match(currency, /min=\{nullable \? undefined : min\}/, 'nullable currency must allow clearing before configured-value validation');
 assert.match(currency, /String\(valueAsString \|\| ''\)\.trim\(\) === '' \? null : valueAsNumber/);
 assert.match(currency, /registerEventAdapter\('currency',[\s\S]*onValueChange:[\s\S]*adapter\.set\(v\)/);

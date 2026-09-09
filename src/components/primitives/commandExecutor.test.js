@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {dispatchMutationCommand, executeCommand, getCommandState, mergeCommandParameters, resolveCommandConfirmation, resolveIndeterminateCommand} from './commandExecutor.js';
+import {dispatchMutationCommand, executeCommand, getCommandState, mergeCommandParameters, resetCommandState, resolveCommandConfirmation, resolveIndeterminateCommand} from './commandExecutor.js';
 
 const mutableSignal = (initial) => {
   let value = initial;
@@ -52,6 +52,9 @@ assert.equal(getCommandState(context, command).writerStatus, 'succeeded');
 assert.equal(getCommandState(context, command).syncStatus, 'partial_failure');
 assert.match(getCommandState(context, command).message, /Some related data/);
 assert.deepEqual(order, ['confirm']);
+assert.equal(resetCommandState(context, command), true, 'a newly mounted command may clear a prior terminal presentation state');
+assert.equal(getCommandState(context, command).phase, 'idle');
+assert.equal(getCommandState(context, command).message, '');
 
 let cancelledWriterCalls = 0;
 const cancelContext = {Context: () => ({handlers: {dataSource: {setInputParameters() {}, fetchCollection() { cancelledWriterCalls += 1; }}}})};
@@ -72,6 +75,7 @@ assert.equal((await executeCommand(timeoutContext, {dataSourceRef: 'hang', timeo
 assert.equal((await executeCommand(timeoutContext, {commandId: 'other', dataSourceRef: 'hang'})).status, 'transport_busy');
 const timeoutCallerB = {Context: () => hanging};
 assert.equal((await executeCommand(timeoutCallerB, {commandId: 'caller-b', dataSourceRef: 'hang'})).status, 'transport_busy');
+assert.equal(resetCommandState(timeoutContext, {dataSourceRef: 'hang'}), false, 'a remount must not clear an indeterminate writer guard');
 assert.equal(resolveIndeterminateCommand(timeoutContext, {dataSourceRef: 'hang'}, 'Authoritative recovery completed.'), true);
 assert.equal(getCommandState(timeoutContext, {dataSourceRef: 'hang'}).phase, 'idle');
 
@@ -156,6 +160,50 @@ let distinctCalls = 0;
 const distinctContext = {Context: () => ({handlers: {dataSource: {setInputParameters() {}, fetchCollection() { distinctCalls += 1; return Promise.resolve(); }}}})};
 await Promise.all([executeCommand(distinctContext, {commandId: 'edit', dataSourceRef: 'left'}), executeCommand(distinctContext, {commandId: 'archive', dataSourceRef: 'right'})]);
 assert.equal(distinctCalls, 2);
+
+let sameWriterCalls = 0;
+let sameWriterSyncCalls = 0;
+let finishSameWriterSync;
+let finishSecondWriter;
+const sameWriterTarget = {signals: {collection: mutableSignal([{id: 1, value: 'first'}])}, handlers: {dataSource: {
+  setInputParameters() {},
+  fetchCollection() {
+    sameWriterCalls += 1;
+    if (sameWriterCalls === 2) return new Promise((resolve) => { finishSecondWriter = resolve; });
+    return Promise.resolve();
+  },
+}}};
+const sameWriterRows = {handlers: {dataSource: {fetchCollection() {
+  sameWriterSyncCalls += 1;
+  return new Promise((resolve) => { finishSameWriterSync = resolve; });
+}}}};
+const sharedWriterWindowForm = mutableSignal({writerBusy: false});
+const sameWriterContext = {signals: {windowForm: sharedWriterWindowForm}, Context: (ref) => ref === 'shared-writer' ? sameWriterTarget : sameWriterRows};
+const syncingEdit = executeCommand(sameWriterContext, {
+  commandId: 'edit-shared-writer',
+  dataSourceRef: 'shared-writer',
+  refresh: [{dataSourceRef: 'rows'}],
+  pendingState: {writerBusy: true},
+  successState: {writerBusy: false},
+});
+for (let attempt = 0; attempt < 10 && sameWriterSyncCalls === 0; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(sameWriterSyncCalls, 1, 'first command must be awaiting post-write synchronization');
+assert.equal(getCommandState(sameWriterContext, {commandId: 'edit-shared-writer'}).phase, 'synchronizing');
+assert.equal((await executeCommand(sameWriterContext, {commandId: 'edit-shared-writer', dataSourceRef: 'shared-writer'})).status, 'suppressed', 'the same command remains guarded through synchronization');
+const removingAfterWriterAck = executeCommand(sameWriterContext, {
+  commandId: 'remove-shared-writer',
+  dataSourceRef: 'shared-writer',
+  pendingState: {writerBusy: true},
+  successState: {writerBusy: false},
+});
+for (let attempt = 0; attempt < 10 && sameWriterCalls < 2; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(sharedWriterWindowForm.value.writerBusy, true, 'older synchronization must not clear the newer writer pending state');
+finishSecondWriter();
+const removeAfterWriterAck = await removingAfterWriterAck;
+assert.equal(removeAfterWriterAck.status, 'succeeded', 'a different command may reuse the writer after its acknowledgement');
+assert.equal(sameWriterCalls, 2, 'both writer commands must execute exactly once');
+finishSameWriterSync();
+assert.equal((await syncingEdit).status, 'succeeded');
 
 let unstableFinish;
 let unstableCalls = 0;

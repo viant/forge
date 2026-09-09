@@ -115,10 +115,13 @@
         gap: 6px 10px;
     }
 
+    .basic-table-filterbar.is-compact .toolbar-container:not(.is-responsive) .toolbar-left,
+    .basic-table-filterbar.is-compact .toolbar-container:not(.is-responsive) .toolbar-right,
     .basic-table-filterbar.is-compact .toolbar-left,
     .basic-table-filterbar.is-compact .toolbar-right {
         flex: 1 1 100%;
         min-width: 0;
+        flex-wrap: wrap;
     }
 
     .basic-table-filterbar.is-compact .toolbar-left {
@@ -246,6 +249,38 @@
     flex: 0 0 auto;
 }
 
+.pagination-status-compact {
+    display: none;
+}
+
+@media (max-width: 480px) {
+    .basic-table-filterbar.is-compact .toolbar-container .toolbar-right {
+        width: 100%;
+        max-width: 100%;
+        flex: 1 1 100%;
+        justify-content: flex-start;
+    }
+
+    .basic-table-filterbar.is-compact .toolbar-container .toolbar-right > span,
+    .basic-table-filterbar.is-compact .forge-toolbar-table-export {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
+    .basic-table-paginationbar {
+        padding-left: 2px !important;
+        padding-right: 2px !important;
+    }
+
+    .pagination-status-full {
+        display: none;
+    }
+
+    .pagination-status-compact {
+        display: inline;
+    }
+}
+
 /* Footer pagination is an essential table control. Responsive primary
    toolbars may hide their center lane, but a footer must keep its centered
    pager visible at every viewport. */
@@ -271,7 +306,6 @@
     padding: 2px 8px !important;
 }
 
-.basic-table-wrapper.is-compact-density table th,
 .basic-table-wrapper.is-compact-density table td {
     height: 22px !important;
     max-height: 22px;
@@ -496,14 +530,18 @@
     position: sticky;
     top: 0;
     z-index: 2;
-    padding: 10px 14px;
+    height: 22px;
+    padding: 1px 6px;
     background: #eaf2ff;
     border-bottom: 1px solid #d7e0ec;
     color: #1849a9;
     font-size: 13px;
     font-weight: 700;
+    line-height: 18px;
     letter-spacing: 0;
+    overflow-wrap: anywhere;
     text-transform: none;
+    white-space: normal;
 }
 
 .basic-table-wrapper tfoot td {
@@ -515,44 +553,23 @@
     backdrop-filter: blur(10px);
 }
 
-.basic-table-wrapper.is-loading tbody {
-    opacity: 0.68;
-}
-
-.table-loading-overlay {
+.table-refresh-indicator {
     position: absolute;
-    inset: 68px 12px 56px 12px;
-    z-index: 3;
+    top: 8px;
+    right: 10px;
+    z-index: 7;
     pointer-events: none;
     display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 96px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.58));
-}
-
-.table-loading-card {
-    display: flex;
     align-items: center;
-    gap: 12px;
-    width: min(380px, 80%);
-    padding: 14px 16px;
+    gap: 6px;
+    padding: 5px 8px;
     border: 1px solid #c8d9fb;
-    border-radius: 8px;
+    border-radius: 999px;
     background: rgba(255, 255, 255, 0.96);
-    box-shadow: 0 18px 50px rgba(18, 44, 87, 0.18);
-}
-
-.table-loading-title {
-    color: #172033;
-    font-weight: 700;
-    line-height: 1.2;
-}
-
-.table-loading-text {
-    margin-top: 2px;
-    color: #5f6b7c;
-    font-size: 12px;
+    box-shadow: 0 4px 14px rgba(18, 44, 87, 0.12);
+    color: #40506a;
+    font-size: 11px;
+    font-weight: 650;
 }
 
 .forge-table-tone-info {
@@ -656,6 +673,30 @@
 .empty-row:hover td {
     background-color: transparent !important;
     cursor: default !important;
+}
+
+.basic-table-wrapper .table-state-cell {
+    padding: 12px 14px !important;
+    white-space: normal !important;
+}
+
+.table-state-message {
+    position: sticky;
+    left: 14px;
+    display: block;
+    width: min(560px, calc(100vw - 64px));
+    max-width: calc(100vw - 64px);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.table-state-message > span {
+    white-space: normal;
+}
+
+.table-state-spacer-row td {
+    height: 22px;
 }
 
 .row td {

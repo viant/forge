@@ -1,4 +1,5 @@
 import React from 'react';
+import assert from 'node:assert/strict';
 import {renderToStaticMarkup} from 'react-dom/server';
 import AssignmentPicker from './AssignmentPicker.jsx';
 import HistoryDiff from './HistoryDiff.jsx';
@@ -8,7 +9,7 @@ import StatusWorkflow from './StatusWorkflow.jsx';
 import TreeEditor from './TreeEditor.jsx';
 import UploadCollection from './UploadCollection.jsx';
 import Wizard from './Wizard.jsx';
-import {projectResponsiveColumns, ResponsiveCardRows, responsiveCardsSupported, responsiveGridStyle, responsiveTarget} from './ResponsiveDataGrid.jsx';
+import {applyResponsiveColumnState, projectResponsiveColumns, ResponsiveCardRows, responsiveCardsSupported, responsiveGridStyle, responsiveTarget} from './ResponsiveDataGrid.jsx';
 import {derivedSourceState, nextDerivedControl} from './DerivedDataSource.jsx';
 
 const signal = (value) => ({value, peek: () => value});
@@ -59,6 +60,11 @@ if (!permissionBoundaryAllows({mode: 'resource', capability: 'write'}, root)) th
 if (responsiveTarget(390) !== 'phone' || responsiveTarget(900) !== 'narrow' || responsiveTarget(1200) !== 'desktop') throw new Error('responsive targets are not stable');
 if (responsiveGridStyle({style: {height: '300px'}}).flexShrink !== 0) throw new Error('explicit responsive height may not be silently flex-shrunk');
 if (projectResponsiveColumns([{id: 'status'}, {id: 'name'}, {id: 'id'}], ['__select__', 'name', 'id', 'status']).map((column) => column.id).join(',') !== 'name,id,status') throw new Error('responsive breakpoint column order is not authoritative');
+assert.deepEqual(
+  applyResponsiveColumnState([{id: 'name', width: 300, sticky: true}, {id: 'status', width: 120, sticky: true}], {stickyColumns: ['name'], columnOverrides: {name: {width: 180}}}),
+  [{id: 'name', width: 180, sticky: 'left'}, {id: 'status', width: 120, sticky: false}],
+  'responsive column state must resize the phone identity column and explicitly clear desktop stickiness elsewhere',
+);
 const cards = renderToStaticMarkup(<ResponsiveCardRows rows={[{id: 1, name: 'Example'}]} columns={[{id: 'name', name: 'Name'}]}/>);
 includes(cards, '<dt>Name</dt><dd>Example</dd>');
 const utcCards = renderToStaticMarkup(<ResponsiveCardRows rows={[{id: 1, created: '2026-09-08T18:58:00Z'}]} columns={[{id: 'created', name: 'Time (GMT)', format: 'dateTime24', timeZone: 'UTC'}]}/>);

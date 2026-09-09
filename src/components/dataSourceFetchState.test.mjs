@@ -1,32 +1,91 @@
 import assert from "node:assert/strict";
 
 import {
+    beginDataSourceFetch,
+    reconcileRestoredPendingFetch,
     recoverInterruptedFetchOnMount,
     resolveFetchPage,
+    resolveRestoredPendingFetch,
     shouldReplayPendingFetchOnMount,
     snapshotFilter,
     withFetchedPageInfo,
 } from "./dataSourceFetchState.js";
+
+const begunRefresh = beginDataSourceFetch({loading: false, loaded: true, error: new Error('old'), stale: true});
+assert.deepEqual(begunRefresh, {loading: true, loaded: false, error: null, stale: false});
+assert.deepEqual(
+    recoverInterruptedFetchOnMount({}, {fetch: false}, begunRefresh, true),
+    {input: {fetch: true, refresh: false}, control: {loading: false, loaded: false, error: null, stale: true}},
+    "an interrupted refresh must be replayable after a responsive target remount",
+);
 
 assert.equal(shouldReplayPendingFetchOnMount({}, true), true);
 assert.equal(shouldReplayPendingFetchOnMount({replayPendingFetchOnRestore: false}, true), false);
 assert.equal(shouldReplayPendingFetchOnMount({replayPendingFetchOnRestore: false}, false), true);
 
 assert.deepEqual(
+    resolveRestoredPendingFetch(
+        {replayPendingFetchOnRestore: false},
+        {fetch: true, parameters: {AudienceId: 7396187}, __forgeRestoredPendingFetch: true},
+    ),
+    {fetch: false, refresh: false, parameters: {AudienceId: 7396187}},
+    "a responsive datasource instance must suppress a restored stale request even when it did not remount",
+);
+assert.deepEqual(
+    resolveRestoredPendingFetch(
+        {},
+        {fetch: true, parameters: {Id: 7396187}, __forgeRestoredPendingFetch: true},
+    ),
+    {fetch: true, refresh: false, parameters: {Id: 7396187}},
+    "ordinary readers must still replay restored requests after the restore marker is consumed",
+);
+assert.equal(resolveRestoredPendingFetch({}, {fetch: true}), null);
+
+assert.deepEqual(
+    reconcileRestoredPendingFetch(
+        {replayPendingFetchOnRestore: false},
+        {fetch: true, parameters: {AudienceId: 7396187}, __forgeRestoredPendingFetch: true},
+        {loading: true, loaded: false},
+    ),
+    {
+        input: {fetch: false, refresh: false, parameters: {AudienceId: 7396187}},
+        control: {loading: false, loaded: false, stale: false},
+    },
+    "suppressing a restored request must also settle its orphaned loading state",
+);
+assert.deepEqual(
     recoverInterruptedFetchOnMount({}, {fetch: false, page: 1}, {loading: true, loaded: false}, true),
     {input: {fetch: true, page: 1, refresh: false}, control: {loading: false, loaded: false, stale: true}},
     "an interrupted reader clears stale loading and replays after remount",
 );
 assert.deepEqual(
-    recoverInterruptedFetchOnMount({replayPendingFetchOnRestore: false}, {fetch: true}, {loading: true}, true),
+    recoverInterruptedFetchOnMount(
+        {replayPendingFetchOnRestore: false},
+        {fetch: true, __forgeRestoredPendingFetch: true},
+        {loading: true},
+        true,
+    ),
     {input: {fetch: false, refresh: false}, control: {loading: false, stale: false}},
     "an interrupted mutation clears stale loading without replaying a write",
 );
+assert.deepEqual(
+    recoverInterruptedFetchOnMount(
+        {replayPendingFetchOnRestore: false},
+        {fetch: true, parameters: {Id: 7396187}},
+        {loading: true},
+        true,
+    ),
+    {
+        input: {fetch: true, refresh: false, parameters: {Id: 7396187}},
+        control: {loading: false, stale: true},
+    },
+    "orphaned loading recovery must preserve one fresh required-parameter rebound fetch",
+);
 assert.equal(recoverInterruptedFetchOnMount({}, {fetch: true}, {loading: false}, true), null);
-assert.equal(
+assert.deepEqual(
     recoverInterruptedFetchOnMount({}, {fetch: false}, {loading: true, loaded: true}, true),
-    null,
-    "a completed empty response must not be replayed during the loading-to-settled render",
+    {input: {fetch: true, refresh: false}, control: {loading: false, loaded: true, stale: true}},
+    "a remounted reader with prior rows must clear and replay an orphaned loading state",
 );
 
 assert.deepEqual(snapshotFilter({

@@ -48,11 +48,46 @@ export function shouldReplayPendingFetchOnMount(dataSource = {}, fetch = false) 
     return !fetch || dataSource?.replayPendingFetchOnRestore !== false;
 }
 
-export function recoverInterruptedFetchOnMount(dataSource = {}, input = {}, control = {}, initialObservation = false) {
-    if (!initialObservation || control?.loading !== true || control?.loaded === true) return null;
-    const replay = dataSource?.replayPendingFetchOnRestore !== false;
+export const RESTORED_PENDING_FETCH = "__forgeRestoredPendingFetch";
+
+export function resolveRestoredPendingFetch(dataSource = {}, input = {}) {
+    if (input?.[RESTORED_PENDING_FETCH] !== true) return null;
+    const {[RESTORED_PENDING_FETCH]: _restored, ...nextInput} = input || {};
     return {
-        input: {...(input || {}), fetch: replay, refresh: false},
+        ...nextInput,
+        fetch: dataSource?.replayPendingFetchOnRestore !== false && nextInput.fetch === true,
+        refresh: false,
+    };
+}
+
+export function reconcileRestoredPendingFetch(dataSource = {}, input = {}, control = {}) {
+    const nextInput = resolveRestoredPendingFetch(dataSource, input);
+    if (!nextInput) return null;
+    return {
+        input: nextInput,
+        control: control?.loading === true
+            ? {...(control || {}), loading: false, stale: nextInput.fetch === true}
+            : control,
+    };
+}
+
+export function beginDataSourceFetch(control = {}) {
+    return {...(control || {}), loading: true, loaded: false, error: null, stale: false};
+}
+
+export function recoverInterruptedFetchOnMount(dataSource = {}, input = {}, control = {}, initialObservation = false) {
+    // A loading flag is owned by the DataSource instance that started the
+    // request. If a new instance observes it on mount, the owner was
+    // unmounted and can no longer settle the flag (even when older rows had
+    // already set `loaded`). Clear and optionally replay the read.
+    if (!initialObservation || control?.loading !== true) return null;
+    const restoredPendingFetch = input?.[RESTORED_PENDING_FETCH] === true;
+    const replay = restoredPendingFetch
+        ? dataSource?.replayPendingFetchOnRestore !== false
+        : input?.fetch === true || dataSource?.replayPendingFetchOnRestore !== false;
+    const {[RESTORED_PENDING_FETCH]: _restored, ...nextInput} = input || {};
+    return {
+        input: {...nextInput, fetch: replay, refresh: false},
         control: {...(control || {}), loading: false, stale: replay},
     };
 }

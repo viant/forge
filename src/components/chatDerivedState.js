@@ -6,6 +6,15 @@ import {
     effectiveShowAbortWhileRunning,
 } from './chatLegacySubmitState.js';
 
+const terminalConversationStatuses = new Set(['completed', 'done', 'succeeded', 'success', 'failed', 'error', 'canceled', 'cancelled']);
+
+export function effectiveBackendConversationRunning(snapshot = {}) {
+    if (snapshot?.running !== true) return false;
+    const status = String(snapshot?.status || snapshot?.Status || '').trim().toLowerCase();
+    const stage = String(snapshot?.stage || snapshot?.Stage || '').trim().toLowerCase();
+    return !terminalConversationStatuses.has(status) && !terminalConversationStatuses.has(stage);
+}
+
 export function computeEffectiveQueuedTurns({
     usesExternalFeedState = false,
     queuedTurns = [],

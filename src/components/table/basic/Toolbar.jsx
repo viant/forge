@@ -91,6 +91,15 @@ export function toolbarItemShouldRender(item = {}, context, dynamicVisible = tru
     return true;
 }
 
+export function toolbarItemShouldDisable(item = {}, context, dynamicReadonly = false) {
+    const ctx = item.dataSourceRef ? context?.Context?.(item.dataSourceRef) || context : context;
+    return item.disabled === true
+        || item.enabled === false
+        || dynamicReadonly === true
+        || (item.disabledWhen ? evaluatePlainVisibleWhen(item.disabledWhen, ctx) : false)
+        || (item.readOnlyWhen ? evaluatePlainVisibleWhen(item.readOnlyWhen, ctx) : false);
+}
+
 export function toolbarHasSelection(selectionState = {}) {
     const selectedRows = Array.isArray(selectionState?.selection) ? selectionState.selection : [];
     return selectedRows.length > 0 || !!selectionState?.selected;
@@ -257,10 +266,9 @@ const Toolbar = ({
         }
         if ((item.type === 'menu' || item.widget === 'menu' || item.type === 'dropdown') && Array.isArray(item.menuItems)) {
             const menuEvents = useToolbarControlEvents(context, item.menuItems);
-            const menuDisabled = item.disabled === true
+            const menuDisabled = toolbarItemShouldDisable(item, context, isReadonly)
                 || (item.enableWhenSelection === true && !hasSelection)
-                || disabled
-                || isReadonly;
+                || disabled;
             const spanStyle = align === 'center'
                 ? {margin: '0 10px'}
                 : (align === 'right' ? {marginLeft: '10px'} : {marginRight: '10px'});
@@ -422,7 +430,7 @@ const Toolbar = ({
                         <Button
                             type="button"
                             rightIcon="caret-down"
-                            disabled={item.disabled === true || disabled || isReadonly}
+                            disabled={toolbarItemShouldDisable(item, context, isReadonly) || disabled}
                             aria-label={`${item.label || item.id || 'Select'}: ${toolbarSelectLabel(item.options, value)}`}
                             title={item.tooltip || item.label || item.id}
                             className={`forge-toolbar-select-trigger${item.className ? ` ${item.className}` : ''}`}
@@ -450,13 +458,11 @@ const Toolbar = ({
                 return false;
             }
         });
-        const effectiveDisabled = item.disabled === true
-            || item.enabled === false
+        const effectiveDisabled = toolbarItemShouldDisable(item, context, isReadonly)
             || (item.enableWhenSelection === true && !hasSelection)
             || !hasDirtyRef
             || hasBlockingDirtyRef
-            || (item.enabled !== true && disabled)
-            || isReadonly;
+            || (item.enabled !== true && disabled);
         const testID = toolbarItemTestID(item);
         const spanStyle = align === 'center'
             ? { margin: "0 10px" }

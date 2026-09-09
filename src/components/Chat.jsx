@@ -83,7 +83,7 @@ import {
 } from './chatLegacySubmitState.js';
 import useChatLegacyState from './useChatLegacyState.js';
 import useChatLegacyLifecycle from './useChatLegacyLifecycle.js';
-import { computeChatDerivedState } from './chatDerivedState.js';
+import { computeChatDerivedState, effectiveBackendConversationRunning } from './chatDerivedState.js';
 import { computeAbortVisibility, renderChatToolbar } from './chatViewHelpers.js';
 import {
     buildUsageSummary,
@@ -683,7 +683,7 @@ export default function Chat({
         : internalHandleAutoSelectToolsChange;
 
     const conversationID = normalizeString(conversationSnapshot?.id);
-    const backendConversationRunning = !!conversationSnapshot?.running;
+    const backendConversationRunning = effectiveBackendConversationRunning(conversationSnapshot);
     const queuedTurns = Array.isArray(conversationSnapshot?.queuedTurns) ? conversationSnapshot.queuedTurns : [];
     const queuedCountValue = conversationSnapshot?.queuedCount;
 

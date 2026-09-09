@@ -53,6 +53,7 @@ import {formatPercentFraction2Input, parsePercentFraction2Input} from './percent
 import {resolveSelector} from '../../utils/selector.js';
 import {normalizeLifetimeStart, resolveDateRangePreset, resolveDateRangePresetSyncPatch} from './dateRangePreset.js';
 import {commitSelectOption, isSelectOptionDisabled} from './selectOptionModel.js';
+import {resolveNumericInputMinorStepSize} from './numericInputSteps.js';
 
 /* ------------------------ Widget implementation ----------------------- */
 
@@ -379,15 +380,17 @@ export function registerPack() {
     /* -------------------- Number / Numeric input ------------------- */
     registerWidget(
         'number',
-        ({ value = '', onValueChange, readOnly, stepSize, minorStepSize, ...rest }) => {
-            const resolvedMinorStepSize = minorStepSize ?? (
-                Number.isFinite(stepSize) ? Math.min(0.1, stepSize) : undefined
-            );
+        ({ value = '', onValueChange, readOnly, nullable = false, min, stepSize, minorStepSize, ...rest }) => {
+            const empty = nullable && (value === '' || value === null || value === undefined);
+            const resolvedMinorStepSize = resolveNumericInputMinorStepSize(stepSize, minorStepSize);
             return (
                 <NumericInput
                     {...rest}
-                    value={value ?? ''}
-                    onValueChange={(v) => onValueChange?.(v)}
+                    value={empty ? '' : (value ?? '')}
+                    min={nullable ? undefined : min}
+                    onValueChange={(valueAsNumber, valueAsString) => {
+                        onValueChange?.(nullable && String(valueAsString || '').trim() === '' ? null : valueAsNumber);
+                    }}
                     readOnly={readOnly}
                     stepSize={stepSize}
                     minorStepSize={resolvedMinorStepSize}
@@ -830,8 +833,9 @@ export function registerPack() {
     /* -------------------- Currency ---------------------------------- */
     registerWidget(
         'currency',
-        ({ value = '', onValueChange, readOnly, currency = 'USD', nullable = false, min, ...rest }) => {
+        ({ value = '', onValueChange, readOnly, currency = 'USD', nullable = false, min, stepSize, minorStepSize, majorStepSize, ...rest }) => {
             const empty = nullable && (value === '' || value === null || value === undefined);
+            const resolvedMinorStepSize = resolveNumericInputMinorStepSize(stepSize, minorStepSize);
             return (
                 <NumericInput
                     {...rest}
@@ -844,8 +848,9 @@ export function registerPack() {
                     leftIcon={currencyInputIcon(currency)}
                     title={rest.title || String(currency).toUpperCase()}
                     aria-label={`${rest['aria-label'] || 'Amount'} (${String(currency).toUpperCase()})`}
-                    majorStepSize={10}
-                    minorStepSize={0.1}
+                    stepSize={stepSize}
+                    minorStepSize={resolvedMinorStepSize}
+                    majorStepSize={majorStepSize}
                 />
             );
         },

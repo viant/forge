@@ -1016,6 +1016,17 @@ assert.deepEqual(request.orderBy, ["totalSpend desc"]);
 assert.equal(canAutoFetchReportBuilder(config, merged), true);
 assert.deepEqual(resolveReportBuilderReadiness(config, merged), { canRun: true, reason: "" });
 
+const parameterizedFieldRequest = buildReportBuilderRequest(config, {
+    ...merged,
+    selectedDimensions: "eventDate channelId",
+    selectedMeasures: "totalSpend,impressions",
+});
+assert.equal(parameterizedFieldRequest.dimensions.eventDate, true);
+assert.equal(parameterizedFieldRequest.dimensions.channelId, true);
+assert.equal(parameterizedFieldRequest.measures.totalSpend, true);
+assert.equal(parameterizedFieldRequest.measures.impressions, true);
+assert.equal(parameterizedFieldRequest.dimensions["eventDate channelId"], undefined);
+
 const semanticRequestState = mergeReportBuilderState(semanticMappedConfig, {
     selectedMeasures: ["totalSpend", "impressions"],
     selectedDimensions: ["eventDate"],
