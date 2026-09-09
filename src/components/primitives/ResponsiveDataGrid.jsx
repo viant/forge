@@ -42,6 +42,21 @@ export function projectResponsiveColumns(authoredColumns = [], columnIDs = []) {
   return requested.map((id) => byID.get(id)).filter(Boolean);
 }
 
+export function applyResponsiveColumnState(columns = [], state = {}) {
+  const stickyOverride = Array.isArray(state?.stickyColumns);
+  const sticky = new Set(state?.stickyColumns || []);
+  const overrides = state?.columnOverrides && typeof state.columnOverrides === 'object' ? state.columnOverrides : {};
+  return (columns || []).map((column) => {
+    const id = column.id || column.dataField || column.field;
+    const override = overrides[id] && typeof overrides[id] === 'object' ? overrides[id] : {};
+    return {
+      ...column,
+      ...override,
+      ...(stickyOverride ? {sticky: sticky.has(id) ? 'left' : false} : {}),
+    };
+  });
+}
+
 function readCardState(stateEvents, name, fallback) {
   try {
     return typeof stateEvents?.[name] === 'function' ? stateEvents[name]() : fallback;
@@ -107,9 +122,8 @@ export default function ResponsiveDataGrid({container, context, isActive}) {
   const responsiveStyle = responsiveGridStyle(state);
   const dataContext = container.dataSourceRef && context?.identity?.dataSourceRef !== container.dataSourceRef ? context.Context?.(container.dataSourceRef) || context : context;
   const authoredColumns = container.table?.columns || [];
-  const sticky = new Set(state.stickyColumns || []);
   const projected = projectResponsiveColumns(authoredColumns, state.columns);
-  const columns = projected.map((column) => sticky.has(column.id || column.dataField || column.field) ? {...column, sticky: 'left'} : column);
+  const columns = applyResponsiveColumnState(projected, state);
   const table = {...container.table, columns, density: state.density || container.table?.density};
   if (target === 'phone' && state.rowLayout === 'cards' && state.readOnlyCards === true && responsiveCardsSupported(container.table, dataContext?.dataSource)) {
     return <div ref={host} className="forge-responsive-grid forge-responsive-grid--phone" data-forge-primitive="responsiveDataGrid" data-row-layout="cards" style={responsiveStyle}>

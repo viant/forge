@@ -62,6 +62,14 @@ export function subscribeCommand(context, command = {}, listener) {
   return () => entry.listeners.delete(listener);
 }
 
+export function resetCommandState(context, command = {}) {
+  const key = commandGuardKey(command);
+  const current = getCommandState(context, command);
+  if (!key || current.guarded || !['succeeded', 'failed'].includes(current.phase)) return false;
+  publish(context, key, {phase: 'idle', guarded: false, pending: false, retryAllowed: true, error: null, message: '', invocationId: '', writerStatus: 'idle', syncStatus: 'not_started', warnings: []});
+  return true;
+}
+
 const invocationID = () => globalThis.crypto?.randomUUID?.() || `cmd-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 function awaitWriter(target, invoke, timeoutMs) {
@@ -109,7 +117,7 @@ function awaitWriter(target, invoke, timeoutMs) {
   });
 }
 
-async function synchronizeUI(context, target, command) {
+async function synchronizeUI(context, target, command, writerResponse = null) {
   const warnings = [];
   if (command.reconcile) {
     const spec = command.reconcile;
@@ -120,7 +128,7 @@ async function synchronizeUI(context, target, command) {
         if (result?.then) await result;
       } else {
         const current = destination?.signals?.collection?.peek?.() || destination?.signals?.collection?.value || [];
-        const response = target?.signals?.collection?.peek?.() || target?.signals?.collection?.value || [];
+        const response = writerResponse ?? target?.signals?.collection?.peek?.() ?? target?.signals?.collection?.value ?? [];
         const path = spec.resultPath || spec.rowsPath;
         const selected = path ? resolveSelector(response, path) : response;
         if (destination?.signals?.collection) destination.signals.collection.value = reconcileEditableCollection(current, selected, spec);
@@ -263,10 +271,17 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     }
     writerSucceeded = true;
     let warnings = [];
-    try { warnings = await synchronizeUI(context, target, command); } catch (error) { warnings.push({stage: 'synchronize', error}); }
     try { applyPrimitiveState(context, command.successState); } catch (error) { warnings.push({stage: 'successState', error}); }
+    const writerResponse = parameterSnapshot(target?.signals?.collection?.peek?.() || target?.signals?.collection?.value || []);
+    // The writer transport is no longer in use once its terminal success is
+    // acknowledged. Release it before potentially slow UI reconciliation so a
+    // different command may use the same datasource. Keep this command's own
+    // guard until synchronization settles, and reconcile against the immutable
+    // writer response snapshot so a later writer cannot replace its result.
     releaseTransport(target, key);
     transportAcquired = false;
+    publish(context, key, {phase: 'synchronizing', guarded: true, pending: false, retryAllowed: false, error: null, message: 'Refreshing…', writerStatus: 'succeeded', syncStatus: 'pending'});
+    try { warnings.push(...await synchronizeUI(context, target, command, writerResponse)); } catch (error) { warnings.push({stage: 'synchronize', error}); }
     const syncStatus = warnings.length ? 'partial_failure' : 'succeeded';
     const message = warnings.length ? 'Saved. Some related data could not be refreshed.' : 'Completed';
     publish(context, key, {phase: 'succeeded', guarded: false, pending: false, retryAllowed: true, error: null, message, writerStatus: 'succeeded', syncStatus, warnings});

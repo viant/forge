@@ -53,6 +53,34 @@ assert.equal(flatConfig.dimensions[0].default, true);
 assert.equal(flatConfig.measures[0].default, true);
 assert.equal(flatConfig.primaryMeasure, "impressions");
 
+const parameterizedConfig = applyReportBuilderRuntimeFieldCatalog({
+  runtimeFieldCatalog: { enabled: true },
+}, {
+  FieldCatalog: {
+    columns: [
+      { name: "conversionDate", type: "date", role: "dimension" },
+      { name: "campaignId", type: "integer", role: "dimension" },
+      { name: "channel", type: "string", role: "dimension" },
+      { name: "eventType", type: "string", role: "dimension" },
+      { name: "conversions", type: "number", role: "measure" },
+      { name: "lastTouchConversions", type: "number", role: "measure" },
+    ],
+    defaultDimensions: "campaignId channel conversionDate eventType",
+    defaultMeasures: "conversions,lastTouchConversions",
+    allowedFilters: "from to campaignIds",
+    allowedSorts: "conversionDate conversions",
+  },
+});
+assert.deepEqual(
+  parameterizedConfig.dimensions.map(({ id, default: selected }) => [id, !!selected]),
+  [["conversionDate", true], ["campaignId", true], ["channel", true], ["eventType", true]],
+);
+assert.deepEqual(
+  parameterizedConfig.measures.map(({ id, default: selected }) => [id, !!selected]),
+  [["conversions", true], ["lastTouchConversions", true]],
+);
+assert.deepEqual(parameterizedConfig.predicates.map((entry) => entry.id), ["dateRange", "campaignIds"]);
+
 const runtimeState = {
   selectedDimensions: ["advertiserDate"],
   selectedMeasures: ["totalSpend"],

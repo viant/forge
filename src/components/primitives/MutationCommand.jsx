@@ -1,12 +1,20 @@
 import React from 'react';
 import {Alert, Button} from '@blueprintjs/core';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
-import {executeCommand, getMutationCommandState, subscribeMutationCommand} from './primitiveMutation.js';
+import {executeCommand, getMutationCommandState, resetMutationCommandState, subscribeMutationCommand} from './primitiveMutation.js';
 import {usePredicateSignals} from './usePredicateSignals.js';
 
 export function useMutationCommandState(context, command) {
-  const [state, setState] = React.useState(() => getMutationCommandState(context, command));
-  React.useEffect(() => subscribeMutationCommand(context, command, setState), [context, command?.commandId, command?.dataSourceRef]);
+  const [state, setState] = React.useState(() => {
+    const current = getMutationCommandState(context, command);
+    return !current.guarded && ['succeeded', 'failed'].includes(current.phase)
+      ? {...current, phase: 'idle', message: '', error: null, writerStatus: 'idle', syncStatus: 'not_started', warnings: []}
+      : current;
+  });
+  React.useEffect(() => {
+    resetMutationCommandState(context, command);
+    return subscribeMutationCommand(context, command, setState);
+  }, [context, command?.commandId, command?.dataSourceRef]);
   return state;
 }
 

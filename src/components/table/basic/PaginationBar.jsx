@@ -3,7 +3,7 @@
 import React, {useState} from "react";
 import {Button} from "@blueprintjs/core";
 import {useSignalEffect} from "@preact/signals-react";
-import {canNavigateNext, resolvePaginationState} from "./PaginationState.js";
+import {canNavigateNext, compactPaginationStatusLabel, paginationStatusLabel, resolvePaginationState} from "./PaginationState.js";
 
 const buttonProperties = {
     'pagination.first': {label: "First Page", icon: "double-chevron-left"},
@@ -20,23 +20,29 @@ const PaginationBar = ({
     const [recordCount, setRecordCount] = useState(null);
     const [hasMore, setHasMore] = useState(null);
     const [inactive, setInactive] = useState(false);
+    const [initialLoading, setInitialLoading] = useState(false);
     const handlers = context.handlers;
 
     useSignalEffect(() => {
         const info = handlers.dataSource.getCollectionInfo();
         const inputPage = handlers.dataSource.getPage?.();
         const isInactive = handlers.dataSource.isInactive();
+        const control = context?.signals?.control?.value || {};
+        const collection = context?.signals?.collection?.value || [];
         const nextState = resolvePaginationState({
             info,
             inputPage,
             fallbackPage: currentPage,
             inactive: isInactive,
+            loading: control.loading === true,
+            loadedRowCount: Array.isArray(collection) ? collection.length : 0,
         });
         setInactive(isInactive);
         setTotalPages(nextState.totalPages);
         setRecordCount(nextState.recordCount);
         setHasMore(nextState.hasMore);
         setCurrentPage(nextState.currentPage);
+        setInitialLoading(nextState.initialLoading);
     });
 
     const onFirstPage = () => {
@@ -84,22 +90,21 @@ const PaginationBar = ({
     };
 
     const canGoPrevious = !inactive && currentPage > 1;
-    const canGoNext = canNavigateNext({inactive, currentPage, totalPages, recordCount, hasMore});
+    const canGoNext = canNavigateNext({inactive, initialLoading, currentPage, totalPages, recordCount, hasMore});
     const canGoLast = !inactive && totalPages != null && currentPage < totalPages;
-    const pageLabel = totalPages != null ? `Page ${currentPage} of ${totalPages}` : `Page ${currentPage}`;
-    const countLabel = recordCount != null
-        ? ` (${recordCount} ${recordCount === 1 ? 'record' : 'records'})`
-        : '';
+    const statusLabel = paginationStatusLabel({initialLoading, currentPage, totalPages, recordCount});
+    const compactStatusLabel = compactPaginationStatusLabel({initialLoading, currentPage, totalPages, recordCount});
 
     return (
-        <div className="pagination-bar">
+        <div className="pagination-bar" aria-busy={initialLoading || undefined}>
             <div>
                 {renderActionButton("pagination.first", onFirstPage, !canGoPrevious)}
                 {renderActionButton("pagination.previous", onPreviousPage, !canGoPrevious)}
 
 
-                    <span>
-                        {pageLabel}{countLabel}
+                    <span role="status" aria-live="polite">
+                        <span className="pagination-status-full">{statusLabel}</span>
+                        <span className="pagination-status-compact" aria-hidden="true">{compactStatusLabel}</span>
                     </span>
 
 

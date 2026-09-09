@@ -14,7 +14,12 @@ function humanize(value = "") {
 }
 
 function normalizeList(values = []) {
-  return (Array.isArray(values) ? values : []).map(normalizeString).filter(Boolean);
+  const source = Array.isArray(values)
+    ? values
+    : (typeof values === "string" ? values.split(/[\s,]+/) : []);
+  return source.flatMap((value) => (
+    typeof value === "string" ? value.split(/[\s,]+/) : [value]
+  )).map(normalizeString).filter(Boolean);
 }
 
 function normalizeFormat(column = {}) {

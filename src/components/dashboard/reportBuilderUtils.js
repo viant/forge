@@ -102,6 +102,13 @@ function normalizeArray(values = []) {
     return isPresent(values) ? [values] : [];
 }
 
+function normalizeFieldIdArray(values = []) {
+    return normalizeArray(values)
+        .flatMap((entry) => (typeof entry === "string" ? entry.split(/[\s,]+/) : [entry]))
+        .map((entry) => String(entry ?? "").trim())
+        .filter(Boolean);
+}
+
 export function shouldAutoCollapseReportBuilderFilters({
     canShowResults = false,
     hasCompletedCurrentRun = false,
@@ -1963,7 +1970,7 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
     let request = clone(requestConfig.baseParameters || {});
 
     const selectedDimensionIds = new Set(
-        normalizeArray(state.selectedDimensions).map((entry) => String(entry).trim()).filter(Boolean),
+        normalizeFieldIdArray(state.selectedDimensions),
     );
     const resolvedDependencyIds = new Set();
     const enableFieldDependency = (fieldKey = "") => {
@@ -1991,7 +1998,7 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
         }
     };
 
-    normalizeArray(state.selectedMeasures).forEach((id) => {
+    normalizeFieldIdArray(state.selectedMeasures).forEach((id) => {
         const match = measures.find((item) => String(item?.id || "").trim() === String(id).trim());
         if (match) {
             setNestedValue(request, match.paramPath || `measures.${match.id}`, true);
@@ -2007,7 +2014,7 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
     });
 
     getNormalizedTableCalculationMeasures(effectiveConfig)
-        .filter((definition) => normalizeArray(state.selectedMeasures).map((entry) => String(entry).trim()).includes(String(definition?.id || "").trim()))
+        .filter((definition) => normalizeFieldIdArray(state.selectedMeasures).includes(String(definition?.id || "").trim()))
         .forEach((definition) => {
             const compute = definition.compute || {};
             [

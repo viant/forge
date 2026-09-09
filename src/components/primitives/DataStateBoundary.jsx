@@ -1,5 +1,5 @@
 import React from 'react';
-import {Callout, NonIdealState, Spinner} from '@blueprintjs/core';
+import {Button, Callout, NonIdealState, Spinner} from '@blueprintjs/core';
 import {useSignals} from '@preact/signals-react/runtime';
 import {dataBoundaryState} from './presentationModels.js';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
@@ -21,9 +21,15 @@ export default function DataStateBoundary({container, context, children}) {
     return Array.isArray(rows) ? rows : [];
   });
   const state = dataBoundaryState(states, collections, spec.allowPartial);
+  const errorAction = spec.errorAction && typeof spec.errorAction === 'object' ? spec.errorAction : null;
+  const retryError = () => {
+    const ref = errorAction?.dataSourceRef || spec.dataSourceRefs?.[0] || container.dataSourceRef;
+    const target = ref ? (context.Context?.(ref) || context) : context;
+    return target?.handlers?.dataSource?.fetchCollection?.({cache: {bypassCache: errorAction?.bypassCache !== false}});
+  };
   if (state.kind === 'loading') return <div className="forge-data-state" data-forge-primitive="dataStateBoundary"><Spinner size={24}/><span>{spec.loadingMessage || 'Loading…'}</span></div>;
   if (state.kind === 'error' && spec.suppressErrorWhen && evaluatePlainVisibleWhen(spec.suppressErrorWhen, context)) return null;
-  if (state.kind === 'error') return <Callout intent="danger" data-forge-primitive="dataStateBoundary">{spec.errorMessage || String(state.errors[0]?.message || state.errors[0] || 'Unable to load data.')}</Callout>;
+  if (state.kind === 'error') return <Callout intent="danger" data-forge-primitive="dataStateBoundary"><div>{spec.errorMessage || String(state.errors[0]?.message || state.errors[0] || 'Unable to load data.')}</div>{errorAction ? <Button icon={errorAction.icon || 'refresh'} onClick={retryError} style={{marginTop: 10}}>{errorAction.label || 'Retry'}</Button> : null}</Callout>;
   if (state.kind === 'empty' && !renderEmptyContent) return <NonIdealState icon="search" title={spec.emptyMessage || 'No data'}/>;
   if (state.kind === 'stale_empty' && !renderEmptyContent) return <div data-forge-primitive="dataStateBoundary"><Callout intent="warning">{spec.staleMessage || 'Cached data may be stale.'}</Callout><NonIdealState icon="search" title={spec.emptyMessage || 'No data'}/></div>;
   return <div data-forge-primitive="dataStateBoundary">{(state.kind === 'partial' || state.kind === 'stale' || state.kind === 'stale_empty') ? <Callout intent="warning">{(state.kind === 'stale' || state.kind === 'stale_empty') ? spec.staleMessage || 'Showing cached data.' : 'Some data is unavailable.'}</Callout> : null}{children}</div>;

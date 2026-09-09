@@ -1,7 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import Toolbar, { clearToolbarStatusValue, collectionCountValue, toolbarDisabledWrapperProps, toolbarHasSelection, toolbarItemIcon, toolbarItemLabel, toolbarItemShouldRender, toolbarStatusAppearance, toolbarStatusShouldRender, toolbarStatusValue } from './Toolbar.jsx';
+import Toolbar, { clearToolbarStatusValue, collectionCountValue, toolbarDisabledWrapperProps, toolbarHasSelection, toolbarItemIcon, toolbarItemLabel, toolbarItemShouldDisable, toolbarItemShouldRender, toolbarStatusAppearance, toolbarStatusShouldRender, toolbarStatusValue } from './Toolbar.jsx';
 import {toolbarBooleanValue, updateToolbarBoolean} from './toolbarBoolean.js';
 
 describe('toolbarItemIcon', () => {
@@ -88,6 +88,26 @@ describe('toolbarItemShouldRender', () => {
 
     it('retains dynamic onVisible denial as authoritative', () => {
         expect(toolbarItemShouldRender({}, context, false)).toBe(false);
+    });
+});
+
+describe('toolbarItemShouldDisable', () => {
+    const signal = (value) => ({value, peek() { return this.value; }});
+    const context = {
+        signals: {windowForm: signal({sparsePatchSafe: false})},
+        Context() { return this; },
+    };
+
+    it('honors declarative disabledWhen for ordinary toolbar actions', () => {
+        const item = {disabledWhen: {source: 'windowForm', field: 'sparsePatchSafe', notEquals: true}};
+        expect(toolbarItemShouldDisable(item, context)).toBe(true);
+    });
+
+    it('leaves the action enabled when its safety predicate passes', () => {
+        const item = {disabledWhen: {source: 'windowForm', field: 'sparsePatchSafe', notEquals: true}};
+        context.signals.windowForm.value = {sparsePatchSafe: true};
+        expect(toolbarItemShouldDisable(item, context)).toBe(false);
+        context.signals.windowForm.value = {sparsePatchSafe: false};
     });
 });
 

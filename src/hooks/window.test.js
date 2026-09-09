@@ -97,6 +97,7 @@ assert.equal(typeof dialogPromise?.then, 'function');
 const dialogSignal = getDialogSignal(`${windowId}DialogadOrderPicker`).peek();
 const dialogHandlers = useDialogHandlers(windowId, 'adOrderPicker');
 assert.equal(dialogSignal.open, true);
+assert.equal(dialogSignal.focusRequest, 1);
 assert.deepEqual(dialogSignal.args, {
   'filters.adOrderId': '1232',
 });
@@ -118,7 +119,7 @@ assert.deepEqual(busyResult, {
   canceled: true,
   reason: 'dialog_already_open',
 });
-assert.equal(getDialogSignal(`${windowId}DialogadOrderPicker`).peek().focusRequest, 1);
+assert.equal(getDialogSignal(`${windowId}DialogadOrderPicker`).peek().focusRequest, 2);
 
 dialogHandlers.commit({ payload: { id: 'order-1' } });
 assert.deepEqual(await dialogPromise, { id: 'order-1' });

@@ -582,6 +582,17 @@ function restoreWindowSignalsFromSnapshot(win) {
                 stale: false,
             };
         }
+        if (nextInput?.fetch === true) {
+            // Runtime-only provenance: consumers can distinguish a fetch
+            // promoted by restore from a new metadata/input binding. Keeping
+            // it non-enumerable also means a parameter-rebinding object spread
+            // consumes it before the fresh request is observed.
+            Object.defineProperty(nextInput, '__forgeRestoredPendingFetch', {
+                value: true,
+                enumerable: false,
+                configurable: true,
+            });
+        }
         if (nextInput && typeof nextInput === 'object') {
             getInputSignal(dataSourceId).value = nextInput;
         }

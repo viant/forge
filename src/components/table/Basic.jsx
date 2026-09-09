@@ -25,6 +25,7 @@ import {applyClientFilters} from './clientFilters.js';
 import {resetPaginationScroll} from './paginationScroll.js';
 import PaginationBar from './basic/PaginationBar.jsx';
 import {shouldInitializeEmptyTable} from './tableInitialization.js';
+import {tableLoadingMode} from './tableLoadingState.js';
 
 const defaultCellWidth = 30; // Adjust as needed
 
@@ -510,6 +511,7 @@ const Basic = ({ context, container, columns, pagination, children, renderRows }
         showEmptyState,
     );
     const hasFooterToolbar = footerToolbarItems.length > 0;
+    const loadingMode = tableLoadingMode({loading, error, rowCount: sortedCollection.length});
 
     useEffect(() => {
         const scroller = scrollRef.current;
@@ -554,7 +556,7 @@ const Basic = ({ context, container, columns, pagination, children, renderRows }
 
     return (
         <div
-            className={`basic-table-wrapper${String(container?.table?.density || '').toLowerCase() === 'compact' ? " is-compact-density" : ""}${loading && sortedCollection.length > 0 ? " is-loading" : ""}${showEmptyState ? " has-metadata-empty-state" : ""}${horizontalOverflow.left ? " has-table-overflow-left" : ""}${horizontalOverflow.right ? " has-table-overflow-right" : ""}`}
+            className={`basic-table-wrapper${String(container?.table?.density || '').toLowerCase() === 'compact' ? " is-compact-density" : ""}${loadingMode === 'refresh' ? " is-refreshing" : ""}${showEmptyState ? " has-metadata-empty-state" : ""}${horizontalOverflow.left ? " has-table-overflow-left" : ""}${horizontalOverflow.right ? " has-table-overflow-right" : ""}`}
             style={{
                 height: "100%",
                 width: tableDisplayWidth,
@@ -660,15 +662,10 @@ const Basic = ({ context, container, columns, pagination, children, renderRows }
                 </div>
             ) : null}
 
-            {loading && sortedCollection.length > 0 ? (
-                <div className="table-loading-overlay" role="status" aria-live="polite">
-                    <div className="table-loading-card">
-                        <Spinner size={18} />
-                        <div>
-                            <div className="table-loading-title">Loading data</div>
-                            <div className="table-loading-text">Waiting for the latest rows.</div>
-                        </div>
-                    </div>
+            {loadingMode === 'refresh' ? (
+                <div className="table-refresh-indicator" role="status" aria-live="polite">
+                    <Spinner size={14} />
+                    <span>Refreshing rows…</span>
                 </div>
             ) : null}
 

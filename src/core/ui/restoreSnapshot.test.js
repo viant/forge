@@ -101,6 +101,21 @@ assert.deepEqual(getDialogSignal('orderPerformance_1DialogworkItemPicker').peek(
   props: { multiple: true, awaitResult: true },
 });
 assert.deepEqual(getInputSignal('orderPerformance_1DSprofile').peek(), { fetch: true, refresh: false, parameters: { AdOrderId: [2667545] } });
+assert.equal(
+  getInputSignal('orderPerformance_1DSprofile').peek().__forgeRestoredPendingFetch,
+  true,
+  'restore-promoted reads must carry runtime provenance for already-mounted responsive consumers',
+);
+assert.equal(
+  Object.keys(getInputSignal('orderPerformance_1DSprofile').peek()).includes('__forgeRestoredPendingFetch'),
+  false,
+  'restore provenance must not leak into request input or subsequent snapshots',
+);
+assert.equal(
+  ({...getInputSignal('orderPerformance_1DSprofile').peek(), parameters: {Id: 2667545}}).__forgeRestoredPendingFetch,
+  undefined,
+  'a fresh metadata parameter binding must consume restore provenance before fetching',
+);
 assert.deepEqual(getControlSignal('orderPerformance_1DSprofile').peek(), { loading: false, error: null, stale: false });
 assert.deepEqual(getCollectionSignal('orderPerformance_1DSprofile').peek(), [{ date: '2026-05-15', spend: 120 }]);
 assert.deepEqual(getMetricsSignal('orderPerformance_1DSprofile').peek(), { spend: 120 });

@@ -10,7 +10,7 @@ import { getLogger } from '../utils/logger.js';
 import { buildQuickFilterSeed, mergeQuickFilterValue } from './viewDialogQuickFilters.js';
 import {evaluatePlainVisibleWhen, trackVisibleWhen} from './visibleWhen.js';
 import {dialogCloseDisabledWhen, isDialogCloseDisabled} from './dialogClose.js';
-import {dialogFreshFormSeed, shouldRefreshDialogDataSourceOnOpen} from './viewDialogFreshState.js';
+import {consumeDialogFocusRevision, dialogFreshFormSeed, shouldRefreshDialogDataSourceForMount} from './viewDialogFreshState.js';
 import MutationCommand from './primitives/MutationCommand.jsx';
 
 export function ViewDialogFooterAction({action, context, disabled = false, onClose, onInvoke}) {
@@ -242,7 +242,13 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                 }
             })();
             const dialogDataSourceHandlers = dialogContext?.handlers?.dataSource;
-            const refreshOnOpen = shouldRefreshDialogDataSourceOnOpen(dialogContext?.dataSource);
+            const focusOwner = context?.signals?.windowControl || context?.windowState || context;
+            const lastHandledFocusRequest = consumeDialogFocusRevision(focusOwner, dialog?.id, focusRequest);
+            const refreshOnOpen = shouldRefreshDialogDataSourceForMount(
+                dialogContext?.dataSource,
+                focusRequest,
+                lastHandledFocusRequest,
+            );
             try {
                 const args = handlers.dialog.callerArgs();
                 const callerProps = handlers.dialog.callerProps?.() || {};
@@ -270,7 +276,12 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                 const nextFilterStr = JSON.stringify(nextFilter || {});
                 const prevFilterStr = JSON.stringify((current.filter || {}));
                 const inputChanged = nextArgsStr !== prevArgsStr || nextParamsStr !== prevParamsStr || nextFilterStr !== prevFilterStr;
-                if ((inputChanged || refreshOnOpen) && fetchOnOpen) {
+                // Responsive metadata can remount an already-open dialog and make
+                // caller input look newly bound. A datasource that explicitly
+                // preserves dialog state must not lose its live form merely
+                // because that remount changed the input identity; its owning
+                // open action remains responsible for any intentional reset.
+                if (refreshOnOpen && fetchOnOpen) {
                     try {
                         const formSeed = dialogFreshFormSeed(
                             dialogContext?.dataSource,
@@ -359,7 +370,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
             }
         }
         previousOpenRef.current = isDialogOpen;
-    }, [dialogOpen, handlers, resolvedDataSourceRef, selectionModeOverride, context, dialog, events, quickFilterSpecs, fetchOnOpen, log]);
+    }, [dialogOpen, handlers, resolvedDataSourceRef, selectionModeOverride, context, dialog, events, quickFilterSpecs, fetchOnOpen, focusRequest, log]);
 
     const handleClose = () => {
         if (isDialogCloseDisabled(dialog, dsCtx)) return false;

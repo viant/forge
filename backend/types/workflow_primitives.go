@@ -201,12 +201,13 @@ type ResponsiveDataGridSpec struct {
 }
 
 type ResponsiveDataGridState struct {
-	Columns       []string               `json:"columns,omitempty" yaml:"columns,omitempty"`
-	StickyColumns []string               `json:"stickyColumns,omitempty" yaml:"stickyColumns,omitempty"`
-	Density       string                 `json:"density,omitempty" yaml:"density,omitempty"`
-	RowLayout     string                 `json:"rowLayout,omitempty" yaml:"rowLayout,omitempty"`
-	ReadOnlyCards bool                   `json:"readOnlyCards,omitempty" yaml:"readOnlyCards,omitempty"`
-	Style         map[string]interface{} `json:"style,omitempty" yaml:"style,omitempty"`
+	Columns         []string                          `json:"columns,omitempty" yaml:"columns,omitempty"`
+	StickyColumns   []string                          `json:"stickyColumns,omitempty" yaml:"stickyColumns,omitempty"`
+	ColumnOverrides map[string]map[string]interface{} `json:"columnOverrides,omitempty" yaml:"columnOverrides,omitempty"`
+	Density         string                            `json:"density,omitempty" yaml:"density,omitempty"`
+	RowLayout       string                            `json:"rowLayout,omitempty" yaml:"rowLayout,omitempty"`
+	ReadOnlyCards   bool                              `json:"readOnlyCards,omitempty" yaml:"readOnlyCards,omitempty"`
+	Style           map[string]interface{}            `json:"style,omitempty" yaml:"style,omitempty"`
 }
 
 type HistoryDiffSpec struct {
