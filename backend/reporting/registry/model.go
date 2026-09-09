@@ -11,6 +11,7 @@ const (
 	KindBuilder  = "forge.reporting.builder"
 	KindPreset   = "forge.reporting.preset"
 	KindFragment = "forge.reporting.fragment"
+	KindGroup    = "forge.reporting.group"
 
 	legacyBuilderKind = "dashboard.reportBuilder"
 )
@@ -19,15 +20,27 @@ const (
 // configured reporting root. Raw remains generic so workspace metadata can
 // evolve without introducing a backend release gate for every UI property.
 type Asset struct {
-	Kind        string         `json:"kind"`
-	ID          string         `json:"id"`
-	BuilderRef  string         `json:"builderRef,omitempty"`
-	Label       string         `json:"label,omitempty"`
-	Description string         `json:"description,omitempty"`
-	SourcePath  string         `json:"sourcePath"`
-	YAMLPath    string         `json:"yamlPath"`
-	Legacy      bool           `json:"legacy,omitempty"`
-	Raw         map[string]any `json:"raw,omitempty"`
+	Kind        string `json:"kind"`
+	ID          string `json:"id"`
+	BuilderRef  string `json:"builderRef,omitempty"`
+	Label       string `json:"label,omitempty"`
+	Description string `json:"description,omitempty"`
+	Icon        string `json:"icon,omitempty"`
+	Order       *int   `json:"order,omitempty"`
+	Visibility  string `json:"visibility,omitempty"`
+	// DefinitionRef is an opaque server-owned identity. CatalogRef is a
+	// workspace-relative file reference resolved securely during discovery.
+	DefinitionRef           string         `json:"definitionRef,omitempty"`
+	CatalogRef              string         `json:"catalogRef,omitempty"`
+	CatalogPath             string         `json:"-"`
+	CatalogDataSourceRef    string         `json:"catalogDataSourceRef,omitempty"`
+	DefinitionDataSourceRef string         `json:"definitionDataSourceRef,omitempty"`
+	PresetRefs              []string       `json:"presetRefs,omitempty"`
+	DefinitionRefs          []string       `json:"definitionRefs,omitempty"`
+	SourcePath              string         `json:"sourcePath"`
+	YAMLPath                string         `json:"yamlPath"`
+	Legacy                  bool           `json:"legacy,omitempty"`
+	Raw                     map[string]any `json:"raw,omitempty"`
 }
 
 // Registry is the immutable result of one successful discovery pass.
@@ -36,10 +49,12 @@ type Registry struct {
 	Builders  []*Asset
 	Presets   []*Asset
 	Fragments []*Asset
+	Groups    []*Asset
 
 	buildersByID  map[string]*Asset
 	presetsByID   map[string]*Asset
 	fragmentsByID map[string]*Asset
+	groupsByID    map[string]*Asset
 }
 
 func (r *Registry) Builder(id string) *Asset {
@@ -61,6 +76,13 @@ func (r *Registry) Fragment(id string) *Asset {
 		return nil
 	}
 	return r.fragmentsByID[normalizeID(id)]
+}
+
+func (r *Registry) Group(id string) *Asset {
+	if r == nil {
+		return nil
+	}
+	return r.groupsByID[normalizeID(id)]
 }
 
 func (r *Registry) PresetsForBuilder(builderRef string) []*Asset {

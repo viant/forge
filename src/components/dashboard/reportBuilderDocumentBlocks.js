@@ -2561,8 +2561,11 @@ export function buildReportBuilderDocumentBlockDiagnostics(blocks = [], {
             ? new Set((datasetOption.valueFieldOptions || []).map((option) => option.value))
             : valueOptionIds;
         const effectiveSecondaryOptionIds = datasetOption
-            ? new Set((datasetOption.secondaryFieldOptions || []).map((option) => option.value))
-            : secondaryOptionIds;
+            ? new Set([
+                ...(datasetOption.secondaryFieldOptions || []).map((option) => option.value),
+                ...(datasetOption.valueFieldOptions || []).map((option) => option.value),
+            ])
+            : new Set([...secondaryOptionIds, ...valueOptionIds]);
         const effectiveTableColumnOptions = datasetOption?.tableColumnOptions?.length > 0
             ? datasetOption.tableColumnOptions
             : normalizedTableColumnOptions;

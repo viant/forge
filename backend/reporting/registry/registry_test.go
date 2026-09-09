@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -33,6 +34,23 @@ id: standard_filters
 label: Standard Filters
 blocks: []
 `)
+	writeAsset(t, workspace, "extension/forge/reporting/groups/delivery.json", `{"version":"test"}`)
+	writeAsset(t, workspace, "extension/forge/reporting/groups/delivery.yaml", `
+kind: forge.reporting.group
+id: delivery
+title: Delivery reports
+description: Delivery-focused report starters
+icon: chart
+order: 20
+visibility: visible
+builderRef: performance
+catalogRef: ./delivery.json
+definitionRef: deliveryCatalog
+catalogDataSourceRef: delivery_catalog
+definitionDataSourceRef: delivery_definition
+presetRefs: [delivery_brief]
+definitionRefs: [delivery_overview, delivery_detail]
+`)
 
 	got, err := Discover(context.Background(), Options{WorkspaceRoot: workspace})
 	if err != nil {
@@ -49,6 +67,32 @@ blocks: []
 	}
 	if len(got.Fragments) != 1 || got.Fragments[0].ID != "standard_filters" {
 		t.Fatalf("unexpected fragments %#v", got.Fragments)
+	}
+	if len(got.Groups) != 1 || got.Groups[0].ID != "delivery" {
+		t.Fatalf("unexpected report groups %#v", got.Groups)
+	}
+	group := got.Group("DELIVERY")
+	if group == nil || group.Label != "Delivery reports" || group.BuilderRef != "performance" || group.Icon != "chart" {
+		t.Fatalf("unexpected report group %#v", group)
+	}
+	if group.Order == nil || *group.Order != 20 || group.Visibility != "visible" {
+		t.Fatalf("unexpected report group presentation %#v", group)
+	}
+	if group.CatalogRef != "delivery.json" || group.DefinitionRef != "deliveryCatalog" {
+		t.Fatalf("unexpected report group catalog references %#v", group)
+	}
+	evaluatedWorkspace, err := filepath.EvalSymlinks(workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if group.CatalogPath != filepath.Join(evaluatedWorkspace, "extension", "forge", "reporting", "groups", "delivery.json") {
+		t.Fatalf("unexpected resolved report group catalog path %q", group.CatalogPath)
+	}
+	if group.CatalogDataSourceRef != "delivery_catalog" || group.DefinitionDataSourceRef != "delivery_definition" {
+		t.Fatalf("unexpected report group data source references %#v", group)
+	}
+	if len(group.PresetRefs) != 1 || group.PresetRefs[0] != "delivery_brief" || len(group.DefinitionRefs) != 2 {
+		t.Fatalf("unexpected report group member references %#v", group)
 	}
 	if got.Preset("DELIVERY_BRIEF") == nil || got.Builder("Performance") == nil {
 		t.Fatalf("expected case-insensitive registry lookup")
@@ -71,6 +115,68 @@ reportBuilder: {}
 	}
 	if _, err = ResolveRoot(workspace, "../outside"); err == nil {
 		t.Fatalf("expected root escape to be rejected")
+	}
+}
+
+func TestGroupCatalogReferenceRelocatesWithWorkspace(t *testing.T) {
+	parent := t.TempDir()
+	original := filepath.Join(parent, "workspace-a")
+	writeAsset(t, original, "extension/forge/reporting/family/builder.yaml", `
+kind: forge.reporting.builder
+id: family
+reportBuilder: {}
+`)
+	writeAsset(t, original, "extension/forge/reporting/family/definitions.json", `{"version":"one"}`)
+	writeAsset(t, original, "extension/forge/reporting/family/group.yaml", `
+kind: forge.reporting.group
+id: family
+label: Family
+builderRef: family
+catalogRef: ./definitions.json
+`)
+
+	before, err := Discover(context.Background(), Options{WorkspaceRoot: original})
+	if err != nil {
+		t.Fatalf("discover original workspace: %v", err)
+	}
+	relocated := filepath.Join(parent, "workspace-b")
+	if err = os.Rename(original, relocated); err != nil {
+		t.Fatalf("relocate workspace: %v", err)
+	}
+	after, err := Discover(context.Background(), Options{WorkspaceRoot: relocated})
+	if err != nil {
+		t.Fatalf("discover relocated workspace: %v", err)
+	}
+	if before.Group("family").CatalogRef != after.Group("family").CatalogRef || after.Group("family").CatalogRef != "definitions.json" {
+		t.Fatalf("catalog reference changed across relocation: before=%#v after=%#v", before.Group("family"), after.Group("family"))
+	}
+	evaluatedRelocated, err := filepath.EvalSymlinks(relocated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(after.Group("family").CatalogPath, evaluatedRelocated+string(filepath.Separator)) {
+		t.Fatalf("relocated catalog path did not follow workspace: %q", after.Group("family").CatalogPath)
+	}
+}
+
+func TestResolveAssetReferenceRejectsAbsoluteTraversalAndSymlinkEscape(t *testing.T) {
+	workspace := t.TempDir()
+	asset := writeAsset(t, workspace, "extension/forge/reporting/family/group.yaml", "kind: ignored\n")
+	outside := filepath.Join(t.TempDir(), "definitions.json")
+	if err := os.WriteFile(outside, []byte(`{"version":"outside"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, reference := range []string{outside, "../../../../../definitions.json", "env://REPORT_DEFINITIONS"} {
+		if _, _, err := ResolveAssetReference(workspace, asset, reference); err == nil {
+			t.Fatalf("expected unsafe catalog reference %q to fail", reference)
+		}
+	}
+	link := filepath.Join(filepath.Dir(asset), "linked.json")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := ResolveAssetReference(workspace, asset, "./linked.json"); err == nil {
+		t.Fatal("expected catalog symlink escape to fail")
 	}
 }
 
@@ -145,6 +251,58 @@ document:
 		}
 	}
 	for _, code := range []string{"builderDataSourceDuplicate", "assetIDDuplicate", "presetBlockDuplicate", "presetBuilderUnavailable"} {
+		if !codes[code] {
+			t.Fatalf("missing diagnostic %q in %#v", code, validationErr.Diagnostics)
+		}
+	}
+}
+
+func TestDiscoverValidatesReportGroupReferences(t *testing.T) {
+	workspace := t.TempDir()
+	writeAsset(t, workspace, "extension/forge/reporting/alpha.yaml", `
+kind: forge.reporting.builder
+id: alpha
+reportBuilder: {}
+`)
+	writeAsset(t, workspace, "extension/forge/reporting/beta.yaml", `
+kind: forge.reporting.builder
+id: beta
+reportBuilder: {}
+`)
+	writeAsset(t, workspace, "extension/forge/reporting/beta-preset.yaml", `
+kind: forge.reporting.preset
+id: beta_brief
+builderRef: beta
+document: {blocks: []}
+`)
+	writeAsset(t, workspace, "extension/forge/reporting/group.yaml", `
+kind: forge.reporting.group
+id: alpha_reports
+builderRef: alpha
+catalogRef: env://1INVALID
+catalog: {rows: [{id: leaked}]}
+presetRefs: [missing, beta_brief, beta_brief]
+definitionRefs: [overview, overview]
+`)
+
+	_, err := Discover(context.Background(), Options{WorkspaceRoot: workspace})
+	var validationErr *ValidationError
+	if !errors.As(err, &validationErr) {
+		t.Fatalf("expected ValidationError, got %T %v", err, err)
+	}
+	codes := map[string]bool{}
+	for _, diagnostic := range validationErr.Diagnostics {
+		codes[diagnostic.Code] = true
+	}
+	for _, code := range []string{
+		"groupLabelRequired",
+		"groupPresetUnavailable",
+		"groupPresetBuilderMismatch",
+		"groupPresetRefDuplicate",
+		"groupDefinitionRefDuplicate",
+		"groupCatalogRefInvalid",
+		"groupInlineDefinitionUnsupported",
+	} {
 		if !codes[code] {
 			t.Fatalf("missing diagnostic %q in %#v", code, validationErr.Diagnostics)
 		}

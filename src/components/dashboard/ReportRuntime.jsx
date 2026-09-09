@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@blueprintjs/core";
 
 import Chart from "../Chart.jsx";
@@ -180,7 +180,7 @@ function buildRuntimeTableRows(block = {}, dataset = {}) {
   });
 }
 
-function RuntimePanel({ title = "", subtitle = "", children, className = "", style = {} }) {
+function RuntimePanel({ title = "", subtitle = "", children, className = "", style = {}, headerAction = null }) {
   return (
     <section
       className={className || undefined}
@@ -197,9 +197,12 @@ function RuntimePanel({ title = "", subtitle = "", children, className = "", sty
       }}
     >
       {title || subtitle ? (
-        <header style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {title ? <h3 style={{ margin: 0, fontSize: 15, color: "#182026" }}>{title}</h3> : null}
-          {subtitle ? <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: "#5f6b7c" }}>{subtitle}</p> : null}
+        <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {title ? <h3 style={{ margin: 0, fontSize: 15, color: "#182026" }}>{title}</h3> : null}
+            {subtitle ? <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: "#5f6b7c" }}>{subtitle}</p> : null}
+          </span>
+          {headerAction}
         </header>
       ) : null}
       {children}
@@ -2043,6 +2046,28 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
   const columns = Array.isArray(block?.content?.columns)
     ? block.content.columns
     : (Array.isArray(block?.columns) ? block.columns : []);
+  const collapsible = block?.content?.collapsible === true || block?.collapsible === true;
+  const [collapsed, setCollapsed] = useState(() => collapsible && (block?.content?.defaultCollapsed === true || block?.defaultCollapsed === true));
+  const [tablePresentation, setTablePresentation] = useState(() => ({
+    rowCount: Number(block?.content?.rowCount ?? dataset?.provenance?.rowCount ?? 0) || 0,
+    filter: "",
+    sort: null,
+  }));
+  const handleTablePresentationChange = useCallback((next = {}) => {
+    setTablePresentation((current) => {
+      const nextRowCount = Math.max(0, Number(next?.rowCount) || 0);
+      const nextFilter = normalizeString(next?.filter);
+      const nextSort = next?.sort || null;
+      if (
+        current.rowCount === nextRowCount
+        && current.filter === nextFilter
+        && JSON.stringify(current.sort) === JSON.stringify(nextSort)
+      ) {
+        return current;
+      }
+      return { rowCount: nextRowCount, filter: nextFilter, sort: nextSort };
+    });
+  }, []);
   if (invalidDiagnostic) {
     return (
       <RuntimePanel
@@ -2099,13 +2124,39 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
       className="forge-report-runtime-table-panel"
       title={normalizeString(block?.title || "Table")}
       style={tablePanelStyle}
+      headerAction={collapsible ? (
+        <button
+          type="button"
+          className="forge-report-runtime-table-toggle"
+          aria-label={`${collapsed ? "Expand" : "Collapse"} ${normalizeString(block?.title || "Table")}`}
+          aria-expanded={!collapsed}
+          aria-controls={`${normalizeString(block?.id || "tableBlock")}__table_content`}
+          onClick={() => setCollapsed((value) => !value)}
+          style={{ border: "1px solid #d4dee8", background: "#fff", borderRadius: 8, padding: "5px 9px", cursor: "pointer", color: "#30404d", display: "inline-flex", alignItems: "center", gap: 6 }}
+        >
+          <Icon icon={collapsed ? "chevron-down" : "chevron-up"} size={14} aria-hidden="true" />
+          <span>{collapsed ? "Expand" : "Collapse"}</span>
+        </button>
+      ) : null}
     >
       <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
+      {collapsible && collapsed ? (
+        <div className="forge-report-runtime-table-collapsed-summary" aria-live="polite" style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 12, color: "#5f6b7c" }}>
+          <span>{tablePresentation.rowCount} {tablePresentation.rowCount === 1 ? "row" : "rows"}</span>
+          {tablePresentation.sort ? <span>Sorted by {tablePresentation.sort.label} ({tablePresentation.sort.direction})</span> : null}
+          {tablePresentation.filter ? <span>Filter: {tablePresentation.filter}</span> : null}
+        </div>
+      ) : null}
       {columns.length === 0 ? (
         <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
           No table fields selected. Edit this table block in Design to choose at least one field.
         </div>
       ) : (
+      <div
+        id={`${normalizeString(block?.id || "tableBlock")}__table_content`}
+        aria-hidden={collapsible && collapsed ? true : undefined}
+        style={collapsible && collapsed ? { display: "none" } : undefined}
+      >
       <DashboardTableContent
         container={{
           id: block.id,
@@ -2119,6 +2170,7 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
               limit: Math.max(1, Number(dataset?.provenance?.rowCount || reportSpec?.parameters?.pageSize || 50) || 50),
               rowActionDisplay: "compact",
               rowActions,
+              labelClamp: block?.content?.labelClamp || block?.labelClamp,
             },
           },
         }}
@@ -2127,7 +2179,9 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
           rows: runtimeTableRows,
         }, locale)}
         locale={locale}
+        onPresentationStateChange={handleTablePresentationChange}
       />
+      </div>
       )}
     </RuntimePanel>
   );

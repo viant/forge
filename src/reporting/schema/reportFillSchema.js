@@ -433,6 +433,15 @@ export const reportFillSchema = {
         },
       ],
     },
+    presentationTextClamp: {
+      type: "object",
+      additionalProperties: false,
+      required: ["lines"],
+      properties: {
+        lines: { enum: [1, 2] },
+        maxCharacters: { type: "integer", minimum: 4, maximum: 120 },
+      },
+    },
     tableColumn: {
       type: "object",
       additionalProperties: false,
@@ -456,6 +465,7 @@ export const reportFillSchema = {
         runtimeFilterable: { type: "boolean" },
         link: { $ref: "#/$defs/tableLink" },
         cellVisual: { $ref: "#/$defs/tableCellVisual" },
+        labelClamp: { $ref: "#/$defs/presentationTextClamp" },
       },
     },
     cellVisualRange: {
@@ -836,6 +846,9 @@ export const reportFillSchema = {
         runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         accentTone: { enum: ["blue", "green", "amber", "rose", "slate"] },
+        collapsible: { type: "boolean" },
+        defaultCollapsed: { type: "boolean" },
+        labelClamp: { $ref: "#/$defs/presentationTextClamp" },
         datasetRef: { type: "string" },
         columns: {
           type: "array",

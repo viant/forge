@@ -58,6 +58,23 @@ func TestDecodeJSON_PreservesBlockRuntimeContract(t *testing.T) {
 	require.Equal(t, "region", spec.Blocks[0].Runtime["filterBindings"].(map[string]any)["region"])
 }
 
+func TestDecodeJSON_PreservesCollapsibleTablePresentation(t *testing.T) {
+	fixture := loadReportSpecFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	blocks := fixture["blocks"].([]any)
+	table := blocks[len(blocks)-1].(map[string]any)
+	table["collapsible"] = true
+	table["defaultCollapsed"] = true
+	table["labelClamp"] = map[string]any{"lines": float64(2), "maxCharacters": float64(36)}
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+	spec, err := DecodeJSON(data)
+	require.NoError(t, err)
+	decoded := spec.Blocks[len(spec.Blocks)-1]
+	require.True(t, decoded.Collapsible)
+	require.True(t, decoded.DefaultCollapsed)
+	require.Equal(t, &TextClamp{Lines: 2, MaxCharacters: 36}, decoded.LabelClamp)
+}
+
 func TestDecodeJSON_CapacityAudienceReportSpecPreservesCellVisualColumns(t *testing.T) {
 	spec := loadReportSpecFixture(t, "capacity-audience-export-request-fixture.v1.json")
 

@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function ReportBuilderOptionControls({ definitions = [], values = {}, onChange = null, headingId = "report-builder-options-heading" }) {
+export default function ReportBuilderOptionControls({ definitions = [], values = {}, onChange = null, onReset = null, activeCount = 0, headingId = "report-builder-options-heading" }) {
   if (!Array.isArray(definitions) || definitions.length === 0) return null;
   return (
     <section className="forge-report-builder__report-options" aria-labelledby={headingId}>
@@ -9,6 +9,11 @@ export default function ReportBuilderOptionControls({ definitions = [], values =
           <h3 id={headingId} className="forge-report-builder__bottom-label forge-report-builder__bottom-label--featured">Report options</h3>
           <div className="forge-report-builder__bottom-description">Adjust server-published report semantics.</div>
         </div>
+        {activeCount > 0 && typeof onReset === "function" ? (
+          <button type="button" className="forge-report-builder__bottom-toggle" aria-label="Reset report options to defaults" onClick={onReset}>
+            Reset to defaults
+          </button>
+        ) : null}
       </div>
       <div className="forge-report-builder__report-options-grid">
         {definitions.map((definition) => {

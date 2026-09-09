@@ -18,6 +18,8 @@ assert.match(html, /aria-describedby="report-builder-option-model-description"/)
 assert.match(html, /<select id="report-builder-option-model"/);
 assert.match(html, /type="number" step="1"/);
 assert.match(html, /type="checkbox"[^>]*checked=""/);
+const modifiedHtml = renderToStaticMarkup(<ReportBuilderOptionControls definitions={definitions} values={{ model: "linear" }} activeCount={1} onReset={() => {}} />);
+assert.match(modifiedHtml, /aria-label="Reset report options to defaults"/);
 
 const css = fs.readFileSync(new URL("./Dashboard.css", import.meta.url), "utf8");
 assert.match(css, /report-options-grid[\s\S]*repeat\(auto-fit, minmax\(180px, 1fr\)\)/, "desktop uses a fluid multi-column grid");
