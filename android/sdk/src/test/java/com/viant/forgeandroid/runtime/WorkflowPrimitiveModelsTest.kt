@@ -15,7 +15,7 @@ class WorkflowPrimitiveModelsTest {
             {
               "id":"record",
               "dataSourceRef":"record",
-              "dataStateBoundary":{"dataSourceRefs":["record","summary"],"allowPartial":true,"emptyMessage":"No record"},
+              "dataStateBoundary":{"dataSourceRefs":["record","summary"],"allowPartial":true,"emptyMessage":"No record","suppressErrorWhen":{"source":"windowForm","field":"sharedError","notEmpty":true},"errorAction":{"label":"Retry records","icon":"refresh","dataSourceRef":"record","bypassCache":true}},
               "relationDrill":{"countField":"childCount","singularLabel":"child","pluralLabel":"children","link":{"windowKey":"children"}},
               "notificationRules":{"rules":[{"id":"missing","intent":"warning","message":"Missing input","visibleWhen":{"source":"form","field":"name","empty":true}}]},
               "metricSummary":{"columns":3,"metrics":[{"id":"spend","label":"Spend","field":"spend","format":"currency2","comparisonField":"delta","betterWhen":"lower"}]},
@@ -26,6 +26,8 @@ class WorkflowPrimitiveModelsTest {
 
         val decoded = json.decodeFromString<ContainerDef>(source)
         assertEquals(listOf("record", "summary"), decoded.dataStateBoundary?.dataSourceRefs)
+        assertEquals("Retry records", decoded.dataStateBoundary?.errorAction?.label)
+        assertTrue(decoded.dataStateBoundary?.errorAction?.bypassCache == true)
         assertEquals("children", decoded.relationDrill?.pluralLabel)
         assertEquals("missing", decoded.notificationRules?.rules?.first()?.id)
         assertEquals("lower", decoded.metricSummary?.metrics?.first()?.betterWhen)
@@ -63,7 +65,7 @@ class WorkflowPrimitiveModelsTest {
             {
               "id":"catalog",
               "mutationCommand":{"commandId":"save","dataSourceRef":"writer"},
-              "editableCollection":{"identityFields":["id"],"operations":[{"id":"edit","label":"Edit","requiresSelection":true}]},
+              "editableCollection":{"identityFields":["id"],"operations":[{"id":"edit","label":"Edit","tooltip":"Requires one row","requiresSelection":true}]},
               "assignmentPicker":{"availableDataSourceRef":"available","assignedDataSourceRef":"assigned"},
               "statusWorkflow":{"stateField":"status","transitions":[{"id":"approve","to":"approved","label":"Approve","command":{"dataSourceRef":"writer"}}]},
               "treeEditor":{"dataSourceRef":"tree","childrenField":"children"},
@@ -71,7 +73,7 @@ class WorkflowPrimitiveModelsTest {
               "uploadCollection":{"accept":["image/*"],"upload":{"dataSourceRef":"upload"}},
               "derivedDataSource":{"sources":["left"],"pipeline":[{"operation":"select","source":"left"}]},
               "permissionBoundary":{"mode":"resource","capability":"read"},
-              "responsiveDataGrid":{"identityColumns":["id"],"breakpoints":{"phone":{"columns":["name"],"rowLayout":"cards","readOnlyCards":true}}},
+              "responsiveDataGrid":{"identityColumns":["id"],"breakpoints":{"phone":{"columns":["name"],"stickyColumns":[],"columnOverrides":{"name":{"label":"Compact name","width":180}},"rowLayout":"cards","readOnlyCards":true}}},
               "historyDiff":{"beforeField":"before","afterField":"after","redactFields":["secret"]},
               "scheduleEditor":{"startField":"start","endField":"end","timeZoneField":"timeZone"},
               "draftForm":{"dataSourceRef":"draft","submit":{"dataSourceRef":"writer"}},
@@ -83,8 +85,10 @@ class WorkflowPrimitiveModelsTest {
         val decoded = json.decodeFromString<ContainerDef>(source)
         assertEquals("save", decoded.mutationCommand?.commandId)
         assertEquals("edit", decoded.editableCollection?.operations?.first()?.id)
+        assertEquals("Requires one row", decoded.editableCollection?.operations?.first()?.tooltip)
         assertEquals("approve", decoded.statusWorkflow?.transitions?.first()?.id)
         assertEquals("cards", decoded.responsiveDataGrid?.breakpoints?.get("phone")?.rowLayout)
+        assertEquals("Compact name", (decoded.responsiveDataGrid?.breakpoints?.get("phone")?.columnOverrides?.get("name")?.get("label") as? kotlinx.serialization.json.JsonPrimitive)?.content)
         assertEquals("watch", decoded.resourceHeader?.actions?.first()?.id)
         val roundTrip = json.decodeFromString<ContainerDef>(json.encodeToString(ContainerDef.serializer(), decoded))
         assertTrue(roundTrip.responsiveDataGrid?.breakpoints?.get("phone")?.readOnlyCards == true)

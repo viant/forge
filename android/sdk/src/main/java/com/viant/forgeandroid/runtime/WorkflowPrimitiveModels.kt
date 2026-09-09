@@ -61,7 +61,7 @@ data class RefreshSpec(
 
 @Serializable data class PrimitiveSelectionSpec(val mode: String? = null, val min: Int? = null, val max: Int? = null, val disabledWhen: DashboardConditionDef? = null, val every: DashboardConditionDef? = null, val any: DashboardConditionDef? = null, val none: DashboardConditionDef? = null)
 @Serializable data class EditableCollectionSpec(val dataSourceRef: String? = null, val identityFields: List<String> = emptyList(), val selection: PrimitiveSelectionSpec? = null, val selectionStatus: Boolean = false, val selectionPrompt: String? = null, val operations: List<EditableCollectionOperationSpec> = emptyList(), val mutation: MutationCommandDef? = null)
-@Serializable data class EditableCollectionOperationSpec(val id: String, val label: String, val intent: String? = null, val dialogId: String? = null, val handler: String? = null, val requiresSelection: Boolean = false, val selection: PrimitiveSelectionSpec? = null, val visibleWhen: DashboardConditionDef? = null, val disabledWhen: DashboardConditionDef? = null, val parameters: List<ParameterDef> = emptyList(), val mutation: MutationCommandDef? = null)
+@Serializable data class EditableCollectionOperationSpec(val id: String, val label: String, val tooltip: String? = null, val intent: String? = null, val dialogId: String? = null, val handler: String? = null, val requiresSelection: Boolean = false, val selection: PrimitiveSelectionSpec? = null, val visibleWhen: DashboardConditionDef? = null, val disabledWhen: DashboardConditionDef? = null, val parameters: List<ParameterDef> = emptyList(), val mutation: MutationCommandDef? = null)
 @Serializable data class AssignmentPickerSpec(val availableDataSourceRef: String, val assignedDataSourceRef: String, val identityFields: List<String> = emptyList(), val labelField: String? = null, val assign: MutationCommandDef? = null, val unassign: MutationCommandDef? = null, val allowMultiple: Boolean? = null)
 @Serializable data class StatusWorkflowSpec(val stateField: String, val transitions: List<StatusWorkflowTransitionSpec>)
 @Serializable data class StatusWorkflowTransitionSpec(val id: String, val from: List<JsonElement> = emptyList(), val to: JsonElement, val label: String, val confirm: String? = null, val availableWhen: DashboardConditionDef? = null, val command: MutationCommandDef)
@@ -75,7 +75,7 @@ data class RefreshSpec(
 @Serializable data class DerivedMeasureSpec(val target: String, val source: String? = null, val operation: String)
 @Serializable data class PermissionBoundarySpec(val mode: String? = null, val dataSourceRef: String? = null, val identityField: String? = null, val capability: String? = null, val visibleWhen: DashboardConditionDef? = null, val deniedMessage: String? = null)
 @Serializable data class ResponsiveDataGridSpec(val identityColumns: List<String> = emptyList(), val breakpoints: Map<String, ResponsiveDataGridStateSpec> = emptyMap())
-@Serializable data class ResponsiveDataGridStateSpec(val columns: List<String> = emptyList(), val stickyColumns: List<String> = emptyList(), val density: String? = null, val rowLayout: String? = null, val readOnlyCards: Boolean = false, val style: Map<String, JsonElement> = emptyMap())
+@Serializable data class ResponsiveDataGridStateSpec(val columns: List<String> = emptyList(), val stickyColumns: List<String>? = null, val columnOverrides: Map<String, Map<String, JsonElement>> = emptyMap(), val density: String? = null, val rowLayout: String? = null, val readOnlyCards: Boolean = false, val style: Map<String, JsonElement> = emptyMap())
 @Serializable data class HistoryDiffSpec(val dataSourceRef: String? = null, val identityField: String? = null, val beforeField: String? = null, val afterField: String? = null, val ignoreFields: List<String> = emptyList(), val fieldLabels: Map<String, String> = emptyMap(), val redactFields: List<String> = emptyList(), val arrayStrategy: String? = null, val recordLabelField: String? = null)
 @Serializable data class ScheduleEditorSpec(val dataSourceRef: String? = null, val startField: String? = null, val endField: String? = null, val timeZoneField: String? = null, val allowOverlap: Boolean? = null, val minDuration: String? = null, val allowAdd: Boolean? = null, val allowRemove: Boolean? = null, val ambiguousTimePolicy: String? = null, val mutation: MutationCommandDef? = null)
 @Serializable data class DraftFormSpec(val dataSourceRef: String? = null, val saveLabel: String? = null, val resetLabel: String? = null, val validWhen: DashboardConditionDef? = null, val dirtyWhen: DashboardConditionDef? = null, val confirmDiscard: String? = null, val onReset: String? = null, val submit: MutationCommandDef? = null)
@@ -93,7 +93,17 @@ data class DataStateBoundarySpec(
     val loadingMessage: String? = null,
     val emptyMessage: String? = null,
     val errorMessage: String? = null,
-    val staleMessage: String? = null
+    val staleMessage: String? = null,
+    val suppressErrorWhen: DashboardConditionDef? = null,
+    val errorAction: DataStateErrorActionSpec? = null
+)
+
+@Serializable
+data class DataStateErrorActionSpec(
+    val label: String? = null,
+    val icon: String? = null,
+    val dataSourceRef: String? = null,
+    val bypassCache: Boolean = false
 )
 
 @Serializable

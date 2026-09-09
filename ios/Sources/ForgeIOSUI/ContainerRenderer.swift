@@ -109,9 +109,20 @@ public struct ContainerRenderer: View {
             ProgressView(boundary?.loadingMessage ?? "Loading…")
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else if boundary != nil && boundaryKind == .error {
-            Label(boundary?.errorMessage ?? visibilityControl.error ?? "Unable to load data.", systemImage: "exclamationmark.octagon.fill")
-                .foregroundStyle(.red)
+            if boundaryErrorSuppressed {
+                EmptyView()
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label(boundary?.errorMessage ?? visibilityControl.error ?? "Unable to load data.", systemImage: "exclamationmark.octagon.fill")
+                        .foregroundStyle(.red)
+                    if let action = boundary?.errorAction {
+                        Button(action.label ?? "Retry") { retryBoundaryError(action) }
+                            .accessibilityIdentifier("forge-data-state-retry")
+                    }
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("forge-data-state-error")
+            }
         } else if boundary != nil && boundaryKind == .empty && boundary?.renderEmptyContent != true {
             ContentUnavailableView(boundary?.emptyMessage ?? "No data", systemImage: "tray")
         } else {
@@ -292,6 +303,27 @@ public struct ContainerRenderer: View {
                 "rowIndex": visibilitySelection.rowIndex
             ]
         )
+    }
+
+    private var boundaryErrorSuppressed: Bool {
+        guard let condition = container.dataStateBoundary?.suppressErrorWhen else { return false }
+        return DashboardRuntime.evaluateDashboardCondition(
+            condition,
+            metrics: visibilityMetrics.mapValues(containerVisibilityAnyValue),
+            filters: visibilityInput.filter.mapValues(containerVisibilityAnyValue),
+            form: visibilityForm.mapValues(containerVisibilityAnyValue),
+            windowForm: visibilityWindowForm.mapValues(containerVisibilityAnyValue),
+            collection: visibilityCollection.map { $0.mapValues(containerVisibilityAnyValue) }
+        )
+    }
+
+    private func retryBoundaryError(_ action: DataStateErrorActionSpec) {
+        guard let runtime, let window else { return }
+        let ref = action.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            ? action.dataSourceRef!
+            : (container.dataStateBoundary?.dataSourceRefs.first ?? container.dataSourceRef ?? inheritedDataSourceRef ?? "")
+        guard !ref.isEmpty else { return }
+        Task { await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref) }
     }
 
     @MainActor
@@ -698,9 +730,22 @@ public struct ContainerRenderer: View {
         guard let spec = container.responsiveDataGrid else { return table }
         let target = horizontalSizeClass == .compact ? "phone" : "desktop"
         guard let state = WorkflowPrimitiveRuntime.responsiveDataGridState(spec: spec, target: target) else { return table }
-        let requested = Set(state.columns ?? [])
-        let columns = requested.isEmpty ? table.columns : table.columns.filter { column in
-            [column.id, column.key, column.name].compactMap { $0 }.contains(where: requested.contains)
+        let requested = state.columns ?? []
+        let projected = requested.isEmpty ? table.columns : requested.compactMap { requestedID in
+            table.columns.first { [ $0.id, $0.key, $0.name ].compactMap { $0 }.contains(requestedID) }
+        }
+        let sticky = Set(state.stickyColumns ?? [])
+        let columns = projected.map { column in
+            let id = column.id ?? column.key ?? column.name ?? ""
+            var override = state.columnOverrides?[id] ?? [:]
+            if state.stickyColumns != nil { override["frozen"] = .bool(sticky.contains(id)) }
+            guard !override.isEmpty,
+                  let baseData = try? JSONEncoder().encode(column),
+                  var base = try? JSONDecoder().decode([String: JSONValue].self, from: baseData) else { return column }
+            override.forEach { base[$0.key] = $0.value }
+            guard let mergedData = try? JSONEncoder().encode(base),
+                  let merged = try? JSONDecoder().decode(ColumnDef.self, from: mergedData) else { return column }
+            return merged
         }
         let presentation = state.rowLayout?.lowercased() == "table" ? "tabular" : table.presentation
         return TableDef(
