@@ -236,7 +236,11 @@ export function resolveParameters(parameterDefinitions = [], context) {
         const {name, in: inWhere, location} = param;
         const value = applyParameterCodec(resolveParameter(context, inWhere, location), param.codec);
         if(name === "...") {
-            resolved[toDataSource] = {...value}
+            if (toDataSource) {
+                resolved[toDataSource] = {...value};
+            } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+                Object.assign(resolved, value);
+            }
         } else if(name.startsWith("[]")) {
             const key = name.substring(2);
             resolved[toDataSource][key] = [value];

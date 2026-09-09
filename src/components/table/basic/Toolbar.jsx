@@ -13,6 +13,7 @@ import {resolveSelector, setSelector} from '../../../utils/selector.js';
 import {evaluatePlainVisibleWhen} from '../../visibleWhen.js';
 import {toolbarBooleanField, toolbarBooleanValue, updateToolbarBoolean} from './toolbarBoolean.js';
 import {downloadTableExport, tableExportColumns, tableExportFormats, tableExportRows} from './tableExport.js';
+import DisabledActionShell from '../../DisabledActionShell.jsx';
 
 function sanitizeTestID(value) {
     return String(value || '')
@@ -468,12 +469,7 @@ const Toolbar = ({
             ? { margin: "0 10px" }
             : (align === 'right' ? { marginLeft: "10px" } : { marginRight: "10px" });
 
-        return (
-            <span
-                key={item.id}
-                style={spanStyle}
-                {...toolbarDisabledWrapperProps(item, effectiveDisabled)}
-            >
+        const button = (
                 <Button
                     key={item.id}
                     icon={toolbarItemIcon(item.icon)}
@@ -490,8 +486,12 @@ const Toolbar = ({
                 >
                     {toolbarItemLabel(item)}
                 </Button>
-            </span>
         );
+        return effectiveDisabled && item.tooltip ? (
+            <DisabledActionShell key={item.id} reason={item.tooltip} label={item.label || item.id} style={spanStyle}>
+                {button}
+            </DisabledActionShell>
+        ) : <span key={item.id} style={spanStyle}>{button}</span>;
     };
 
     const renderAlignedItems = (align) => {

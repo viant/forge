@@ -4,6 +4,37 @@ import {
   buildReportBuilderRuntimePreviewArtifacts,
   buildReportBuilderRuntimePreviewModel,
 } from "./reportBuilderRuntimePreview.js";
+import { buildExplicitReportBuilderChartContainer } from "./reportBuilderUtils.js";
+import {
+  buildReportBuilderPublishedDatasetConfig,
+  normalizeReportBuilderPublishedDataSources,
+} from "../../reporting/reportSpecModel.js";
+
+const [dailyPublishedSource] = normalizeReportBuilderPublishedDataSources({
+  dataSources: [{
+    id: "daily_delivery",
+    dataSourceRef: "dailyDeliverySource",
+    dimensions: [{
+      id: "eventDate",
+      key: "eventDate",
+      label: "Date",
+      chartAxis: true,
+      tickFormat: "MMM d",
+    }],
+    measures: [{ id: "total", key: "total", label: "Total" }],
+  }],
+});
+assert.equal(dailyPublishedSource.columnOptions[0].tickFormat, "MMM d");
+assert.equal(dailyPublishedSource.chartFieldOptions[0].tickFormat, "MMM d");
+const dailyPublishedConfig = buildReportBuilderPublishedDatasetConfig({}, dailyPublishedSource);
+assert.equal(dailyPublishedConfig.dimensions[0].tickFormat, "MMM d");
+const dailyPublishedChart = buildExplicitReportBuilderChartContainer(
+  { dataSourceRef: "dailyDeliverySource", collection: [] },
+  dailyPublishedConfig,
+  { selectedDimensions: ["eventDate"], selectedMeasures: ["total"] },
+  { type: "line", xField: "eventDate", yFields: ["total"] },
+);
+assert.equal(dailyPublishedChart.chart.xAxis.tickFormat, "MMM d");
 
 const container = {
   id: "publishedDatasetBuilder",

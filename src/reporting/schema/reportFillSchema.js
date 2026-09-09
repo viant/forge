@@ -392,6 +392,10 @@ export const reportFillSchema = {
           type: "object",
           additionalProperties: { $ref: "#/$defs/requestValue" },
         },
+        options: {
+          type: "object",
+          additionalProperties: { $ref: "#/$defs/requestValue" },
+        },
         semanticSelection: { $ref: "#/$defs/semanticSelectionRequest" },
         refinements: {
           type: "array",
@@ -1341,6 +1345,7 @@ export const reportFillSchema = {
         runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         description: { type: "string" },
+        layout: { enum: ["stack", "responsiveGrid"] },
         childBlockIds: {
           type: "array",
           minItems: 1,
@@ -1353,6 +1358,7 @@ export const reportFillSchema = {
           properties: {
             title: { type: "string" },
             description: { type: "string" },
+            layout: { enum: ["stack", "responsiveGrid"] },
             childBlockIds: {
               type: "array",
               minItems: 1,
@@ -1381,6 +1387,7 @@ export const reportFillSchema = {
         kind: { const: "tabGroupBlock" },
         runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
+        includeUnlistedSections: { type: "boolean" },
         sectionIds: {
           type: "array",
           minItems: 1,
@@ -1393,6 +1400,7 @@ export const reportFillSchema = {
           required: ["title", "sectionIds", "tabs"],
           properties: {
             title: { type: "string" },
+            includeUnlistedSections: { type: "boolean" },
             sectionIds: {
               type: "array",
               items: { type: "string" },

@@ -756,6 +756,52 @@ assert.equal(
   true,
 );
 
+const responsiveCompositeDocument = buildReportBuilderReportDocument({
+  container,
+  config,
+  state: {
+    ...state,
+    reportDocumentBlocks: [
+      buildReportDocumentCompositeBlock({
+        id: "kpiGrid",
+        title: "KPI grid",
+        layout: "responsiveGrid",
+        childBlockIds: ["kpiA", "kpiB", "kpiC"],
+      }),
+      buildReportDocumentKpiBlock({ id: "kpiA", title: "KPI A", valueField: "a", valueLabel: "A" }),
+      buildReportDocumentKpiBlock({ id: "kpiB", title: "KPI B", valueField: "b", valueLabel: "B" }),
+      buildReportDocumentKpiBlock({ id: "kpiC", title: "KPI C", valueField: "c", valueLabel: "C" }),
+    ],
+    reportDocumentLayout: {
+      type: "stack",
+      items: [
+        { blockId: "kpiGrid" },
+        { blockId: "kpiA" },
+        { blockId: "kpiB" },
+        { blockId: "kpiC" },
+      ],
+    },
+  },
+});
+const responsiveCompositeSpec = lowerReportDocumentToReportSpec(responsiveCompositeDocument);
+const responsiveCompositeFill = buildReportFillFromReportSpec(responsiveCompositeSpec, {
+  primary: { rows: [{ a: 1, b: 2, c: 3 }] },
+});
+const responsiveCompositePrint = buildReportPrintFromReportFill({
+  reportSpec: responsiveCompositeSpec,
+  reportFill: responsiveCompositeFill,
+});
+assert.deepEqual(
+  responsiveCompositePrint,
+  buildReportPrintFromReportFill({ reportSpec: responsiveCompositeSpec, reportFill: responsiveCompositeFill }),
+);
+const responsiveKpiTitles = responsiveCompositePrint.pages
+  .flatMap((page) => page.elements)
+  .filter((element) => ["kpiA__title_0", "kpiB__title_0", "kpiC__title_0"].includes(element.id));
+assert.equal(responsiveKpiTitles.length, 3);
+assert.equal(new Set(responsiveKpiTitles.map((element) => element.box.y)).size, 1);
+assert.equal(new Set(responsiveKpiTitles.map((element) => element.box.x)).size, 3);
+
 const tabGroupDocument = buildReportBuilderReportDocument({
   container,
   config,
@@ -780,6 +826,12 @@ const tabGroupDocument = buildReportBuilderReportDocument({
         navigationLabel: "Execution",
         description: "Execution section.",
       }),
+      buildReportDocumentSectionBlock({
+        id: "appendixSection",
+        title: "Appendix",
+        navigationLabel: "Appendix",
+        description: "Unlisted appendix section.",
+      }),
     ],
     reportDocumentLayout: {
       type: "stack",
@@ -787,6 +839,7 @@ const tabGroupDocument = buildReportBuilderReportDocument({
         { blockId: "sectionTabs" },
         { blockId: "overviewSection" },
         { blockId: "executionSection" },
+        { blockId: "appendixSection" },
       ],
     },
   },
@@ -814,6 +867,26 @@ assert.equal(
 assert.equal(
   tabGroupPrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "text" && element.text === "Opening summary section."),
   true,
+);
+assert.equal(
+  tabGroupPrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "text" && element.text === "Unlisted appendix section."),
+  true,
+);
+const strictTabGroupDocument = {
+  ...tabGroupDocument,
+  blocks: tabGroupDocument.blocks.map((block) => (
+    block.id === "sectionTabs" ? { ...block, includeUnlistedSections: false } : block
+  )),
+};
+const strictTabGroupSpec = lowerReportDocumentToReportSpec(strictTabGroupDocument);
+const strictTabGroupFill = buildReportFillFromReportSpec(strictTabGroupSpec, { primary: { rows: [] } });
+const strictTabGroupPrint = buildReportPrintFromReportFill({
+  reportSpec: strictTabGroupSpec,
+  reportFill: strictTabGroupFill,
+});
+assert.equal(
+  strictTabGroupPrint.pages.flatMap((page) => page.elements).some((element) => element.kind === "text" && element.text === "Unlisted appendix section."),
+  false,
 );
 
 const calloutDocument = buildReportBuilderReportDocument({

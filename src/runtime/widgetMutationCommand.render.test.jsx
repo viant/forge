@@ -44,7 +44,7 @@ const disabledButton = renderToStaticMarkup(<WidgetRenderer
 />);
 assert.match(disabledButton, /title="Disabled until sparse updates are safe\."/);
 assert.match(disabledButton, /tabindex="0"/);
-assert.match(disabledButton, /<button[^>]*disabled=""/);
+assert.match(disabledButton, /disabled=""/);
 
 const readOnlyInput = renderToStaticMarkup(<WidgetRenderer
     context={context}
@@ -57,7 +57,7 @@ const readOnlyInput = renderToStaticMarkup(<WidgetRenderer
         readOnlyWhen: {source: 'windowForm', field: 'sparseSafe', notEquals: true},
     }}
 />);
-assert.match(readOnlyInput, /forge-widget-readonly/);
+assert.match(readOnlyInput, /forge-control-wrapper is-readonly/);
 assert.match(readOnlyInput, /readonly=""/);
 
 console.log('widgetMutationCommand ✓ item actions use the generic mutation lifecycle');

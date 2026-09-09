@@ -3,6 +3,7 @@ import {Alert, Button} from '@blueprintjs/core';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import {executeCommand, getMutationCommandState, resetMutationCommandState, subscribeMutationCommand} from './primitiveMutation.js';
 import {usePredicateSignals} from './usePredicateSignals.js';
+import DisabledActionShell from '../DisabledActionShell.jsx';
 
 export function useMutationCommandState(context, command) {
   const [state, setState] = React.useState(() => {
@@ -47,10 +48,10 @@ export default function MutationCommand({command, context, extras = {}, disabled
   };
   React.useEffect(() => () => confirmResolver.current?.(false), []);
   return (
-    <span className="forge-mutation-command" title={blockedExplanation || undefined} tabIndex={blockedExplanation ? 0 : undefined} aria-label={blockedExplanation ? `${command?.label || 'Action'}. ${blockedExplanation}` : undefined}>
+    <DisabledActionShell reason={blockedExplanation} label={command?.label || 'Action'} className="forge-mutation-command">
       <Button icon={command?.icon || undefined} aria-label={command?.label || 'Save'} title={!valid ? command.invalidMessage || 'This action is not currently valid.' : command?.label || undefined} intent={command?.intent || undefined} loading={state.phase === 'pending'} disabled={blocked || busy} onClick={invoke}>{command?.hideLabel ? null : children || command?.label || 'Save'}</Button>
       <span className="forge-mutation-command__status" data-command-phase={state.phase || 'idle'} aria-live="polite">{statusMessage}</span>
       <Alert isOpen={confirmOpen} intent={command?.intent === 'danger' ? 'danger' : 'primary'} confirmButtonText={children || command?.label || 'Confirm'} cancelButtonText="Cancel" onCancel={() => settleConfirmation(false)} onConfirm={() => settleConfirmation(true)}>{confirmMessage}</Alert>
-    </span>
+    </DisabledActionShell>
   );
 }

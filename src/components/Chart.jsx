@@ -1139,7 +1139,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
 
     const downloadCsv = () => {
         const cols = visibleColumns.length ? visibleColumns : allTableColumns;
-        const lines = [cols.map(escapeCsvCell).join(",")];
+        const lines = [cols.map((key) => escapeCsvCell(chartTableColumnMeta(key, xAxis, seriesDefinitions).label)).join(",")];
         chartData.forEach((row) => {
             lines.push(cols.map((c) => escapeCsvCell(readChartDataValue(row, c))).join(","));
         });
@@ -1508,7 +1508,9 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
 
             <Dialog isOpen={!embedded && showColumnDialog} onClose={() => setShowColumnDialog(false)} title="Column customization">
                 <div style={{padding: 12, display: "flex", flexDirection: "column", gap: 10}}>
-                    {allTableColumns.map((key) => (
+                    {allTableColumns.map((key) => {
+                        const meta = chartTableColumnMeta(key, xAxis, seriesDefinitions);
+                        return (
                         <div key={key} style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12}}>
                             <label className="bp4-control bp4-checkbox" style={{marginBottom: 0}}>
                                 <input
@@ -1517,7 +1519,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                                     onChange={() => toggleColumnVisibility(key)}
                                 />
                                 <span className="bp4-control-indicator"/>
-                                {key}
+                                {meta.label}
                             </label>
                             <input
                                 className="bp4-input bp4-small"
@@ -1534,7 +1536,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                                 style={{width: 90}}
                             />
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </Dialog>
 

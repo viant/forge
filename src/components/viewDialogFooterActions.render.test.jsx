@@ -14,6 +14,11 @@ const html = renderToStaticMarkup(<div className="dialog-footer-proof">
         context={context}
     />
     <ViewDialogFooterAction
+        action={{id: 'unsafe', label: 'Unsafe Save', tooltip: 'Disabled until sparse updates are safe.'}}
+        context={context}
+        disabled={true}
+    />
+    <ViewDialogFooterAction
         action={{
             id: 'save',
             label: 'Save Record',
@@ -27,6 +32,8 @@ const html = renderToStaticMarkup(<div className="dialog-footer-proof">
 
 assert.match(html, /dialog-footer-proof/);
 assert.match(html, /bp6-button-text">Close<\/span>/);
+assert.match(html, /forge-disabled-action-shell/);
+assert.match(html, /title="Disabled until sparse updates are safe\." tabindex="0"/);
 assert.match(html, /forge-mutation-command/);
 assert.match(html, /bp6-intent-primary/);
 assert.match(html, /title="Save Record"[^>]*disabled=""[^>]*bp6-intent-primary/);

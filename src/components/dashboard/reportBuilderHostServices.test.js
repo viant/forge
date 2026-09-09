@@ -64,6 +64,8 @@ assert.equal(typeof synthesized.reportStore?.listReports, "function");
 assert.equal(typeof synthesized.reportStore?.deleteReport, "function");
 assert.equal(typeof synthesized.reportLifecycle?.shareArtifact, "function");
 assert.equal(typeof synthesized.reportSharedArtifacts?.listArtifacts, "function");
+assert.equal(typeof synthesized.reportRuns?.begin, "function");
+assert.equal(typeof synthesized.reportRuns?.getContext, "function");
 
 const queued = await synthesized.reportExport.submitRequest({
   request: {
@@ -173,6 +175,14 @@ const completeExplicitServices = {
   reportSharedArtifacts: {
     listArtifacts: async () => ({ artifacts: [] }),
     getArtifact: async () => ({ artifactId: "shared-1" }),
+  },
+  reportRuns: {
+    begin: async () => ({ enabled: false }),
+    complete: async () => ({ ok: true }),
+    fail: async () => ({ ok: true }),
+    activate: async () => ({ ok: true }),
+    getContext: async () => ({ enabled: false, context: null }),
+    adopt: async () => ({ enabled: false }),
   },
 };
 

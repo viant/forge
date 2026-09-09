@@ -3,7 +3,29 @@ import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import ReportRuntime, { RefinementBarBlock } from "./ReportRuntime.jsx";
+import ReportRuntime, {
+  buildRuntimeSections,
+  RefinementBarBlock,
+  resolveReportRuntimeCompositeColumns,
+  resolveReportRuntimeCompositeLayout,
+} from "./ReportRuntime.jsx";
+
+const sectionContractBlocks = [
+  { id: "sectionTabs", kind: "tabGroupBlock", sectionIds: ["detailsSection"] },
+  { id: "baseKpi", kind: "kpiBlock" },
+  { id: "detailsSection", kind: "sectionBlock", title: "Details" },
+  { id: "detailsBody", kind: "markdownBlock" },
+  { id: "appendixSection", kind: "sectionBlock", title: "Appendix" },
+];
+assert.deepEqual(buildRuntimeSections(sectionContractBlocks).map((section) => section.id), [
+  "detailsSection",
+  "overview",
+  "appendixSection",
+]);
+assert.deepEqual(buildRuntimeSections([
+  { ...sectionContractBlocks[0], includeUnlistedSections: false },
+  ...sectionContractBlocks.slice(1),
+]).map((section) => section.id), ["detailsSection"]);
 
 const reportSpec = {
   title: "Semantic Runtime Report",
@@ -3067,8 +3089,8 @@ const compositeRuntimeHtml = renderToStaticMarkup(
         blockOrder: ["summaryPanel", "summaryMarkdown", "headlineKpi"],
         items: [
           { blockId: "summaryPanel" },
-          { blockId: "summaryMarkdown", span: 6 },
-          { blockId: "headlineKpi", span: 6 },
+          { blockId: "summaryMarkdown" },
+          { blockId: "headlineKpi" },
         ],
       },
       blocks: [],
@@ -3122,11 +3144,19 @@ const compositeRuntimeHtml = renderToStaticMarkup(
     presentationMode: "report",
   }),
 );
+assert.equal(resolveReportRuntimeCompositeLayout({}), "stack");
+assert.equal(resolveReportRuntimeCompositeColumns({}, 1200), 1);
+const responsiveComposite = { layout: "responsiveGrid" };
+assert.equal(resolveReportRuntimeCompositeColumns(responsiveComposite, 1200), 3);
+assert.equal(resolveReportRuntimeCompositeColumns(responsiveComposite, 800), 2);
+assert.equal(resolveReportRuntimeCompositeColumns(responsiveComposite, 500), 1);
 assert.ok(compositeRuntimeHtml.includes("Summary panel"));
 assert.ok(compositeRuntimeHtml.includes("Summary child"));
 assert.ok(compositeRuntimeHtml.includes("Headline child KPI"));
 assert.equal((compositeRuntimeHtml.match(/Summary child/g) || []).length, 1);
 assert.equal((compositeRuntimeHtml.match(/Headline child KPI/g) || []).length, 1);
+assert.ok(compositeRuntimeHtml.includes('data-report-runtime-block-id="summaryMarkdown" data-report-runtime-layout-span="12"'));
+assert.ok(compositeRuntimeHtml.includes('data-report-runtime-block-id="headlineKpi" data-report-runtime-layout-span="12"'));
 assert.ok(!compositeRuntimeHtml.includes("Unsupported Block"));
 
 const calloutRuntimeHtml = renderToStaticMarkup(

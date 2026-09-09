@@ -32,6 +32,7 @@ import DataSourceContainer from './WindowContentDataSourceContainer.jsx';
 
 import useDataConnector from '../hooks/dataconnector.js';
 import { mergeWindowFormValues } from '../hooks/dataSource.js';
+import {applyParameterCodec} from '../hooks/parameters.js';
 import {injectActions} from '../actions';
 import { resolveMetadataForTarget } from '../runtime/metadataResolver.js';
 import {compilePermittedView, normalizeAuthorizationSnapshot} from '../runtime/permittedView.js';
@@ -135,7 +136,7 @@ export function resolveInitialWindowFormValues(metadata) {
             if (parameter?.in !== 'const') continue;
             const name = String(parameter?.name || '').trim();
             if (!name) continue;
-            initial[name] = parameter?.location;
+            initial[name] = applyParameterCodec(parameter?.location, parameter?.codec);
         }
     }
     collectInitialWindowFormItemValues(metadata?.view?.content || null, initial);

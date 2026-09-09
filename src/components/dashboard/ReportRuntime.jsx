@@ -244,6 +244,25 @@ function resolveResponsiveRuntimeLayoutGridColumn(block = {}, gridColumns = REPO
   return span >= gridColumns ? "1 / -1" : `span ${Math.max(1, Math.min(gridColumns, span))}`;
 }
 
+export function resolveReportRuntimeCompositeLayout(block = {}) {
+  const layout = normalizeString(block?.content?.layout || block?.layout);
+  return layout === "responsiveGrid" ? "responsiveGrid" : "stack";
+}
+
+export function resolveReportRuntimeCompositeColumns(block = {}, viewportWidth = 0) {
+  if (resolveReportRuntimeCompositeLayout(block) !== "responsiveGrid") {
+    return 1;
+  }
+  const normalizedWidth = Number(viewportWidth) || 0;
+  if (normalizedWidth > 0 && normalizedWidth <= 640) {
+    return 1;
+  }
+  if (normalizedWidth > 0 && normalizedWidth <= 960) {
+    return 2;
+  }
+  return 3;
+}
+
 function formatKpiValue(value, format = "", locale = "en-US") {
   if (value == null) {
     return "—";
@@ -1905,12 +1924,15 @@ function TimelineBlock({ block = {} }) {
   );
 }
 
-function buildRuntimeSections(blocks = [], hiddenBlockIds = new Set()) {
+export function buildRuntimeSections(blocks = [], hiddenBlockIds = new Set()) {
   const normalizedBlocks = Array.isArray(blocks) ? blocks : [];
   const explicitTabGroup = normalizedBlocks.find((block) => normalizeString(block?.kind) === "tabGroupBlock") || null;
   const explicitSectionIds = Array.isArray(explicitTabGroup?.content?.sectionIds)
     ? explicitTabGroup.content.sectionIds.map((sectionId) => normalizeString(sectionId)).filter(Boolean)
     : (Array.isArray(explicitTabGroup?.sectionIds) ? explicitTabGroup.sectionIds.map((sectionId) => normalizeString(sectionId)).filter(Boolean) : []);
+  const includeUnlistedSections = explicitTabGroup?.content?.includeUnlistedSections
+    ?? explicitTabGroup?.includeUnlistedSections
+    ?? true;
   const sections = [];
   let current = null;
   normalizedBlocks.forEach((block, index) => {
@@ -1953,7 +1975,7 @@ function buildRuntimeSections(blocks = [], hiddenBlockIds = new Set()) {
     .map((sectionId) => sectionById.get(sectionId) || null)
     .filter(Boolean);
   const trailingSections = filteredSections.filter((section) => !explicitSectionIds.includes(normalizeString(section?.id)));
-  return [...orderedSections, ...trailingSections];
+  return includeUnlistedSections === false ? orderedSections : [...orderedSections, ...trailingSections];
 }
 
 function resolveRuntimeTabGroupConfig(blocks = []) {
@@ -1970,6 +1992,9 @@ function resolveRuntimeTabGroupConfig(blocks = []) {
     id: normalizeString(tabGroupBlock?.id || "tabGroupBlock") || "tabGroupBlock",
     title: normalizeString(tabGroupBlock?.content?.title || tabGroupBlock?.title || "Sections") || "Sections",
     sectionIds,
+    includeUnlistedSections: tabGroupBlock?.content?.includeUnlistedSections
+      ?? tabGroupBlock?.includeUnlistedSections
+      ?? true,
     defaultSectionId: normalizeString(tabGroupBlock?.content?.defaultSectionId || tabGroupBlock?.defaultSectionId),
   };
 }
@@ -3039,6 +3064,9 @@ export default function ReportRuntime({
       const childBlocks = childBlockIds
         .map((blockId) => runtimeBlockIndex.get(normalizeString(blockId)) || null)
         .filter(Boolean);
+      const compositeLayout = resolveReportRuntimeCompositeLayout(block);
+      const compositeColumns = resolveReportRuntimeCompositeColumns(block, runtimeViewportWidth);
+      const hasAuthoredCompositeLayout = !!normalizeString(block?.content?.layout || block?.layout);
       return (
         <RuntimePanel
           key={block.id}
@@ -3046,7 +3074,25 @@ export default function ReportRuntime({
           subtitle={normalizeString(block?.content?.description || block?.description)}
         >
           {childBlocks.length > 0 ? (
-            renderLayoutBlockGrid(childBlocks, `runtime:${normalizeString(block?.id || "composite")}`)
+            hasAuthoredCompositeLayout ? <div
+              data-report-runtime-composite-layout={compositeLayout}
+              data-report-runtime-composite-columns={compositeColumns}
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${compositeColumns}, minmax(0, 1fr))`,
+                gap: 16,
+              }}
+            >
+              {childBlocks.map((childBlock) => (
+                <div
+                  key={`runtime:${normalizeString(block?.id || "composite")}:${childBlock?.id || "block"}`}
+                  data-report-runtime-block-id={normalizeString(childBlock?.id)}
+                  style={{ minWidth: 0 }}
+                >
+                  {renderBlock(childBlock)}
+                </div>
+              ))}
+            </div> : renderLayoutBlockGrid(childBlocks, `runtime:${normalizeString(block?.id || "composite")}`)
           ) : (
             <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
               Add one or more child blocks to this grouped panel.
@@ -3160,7 +3206,7 @@ export default function ReportRuntime({
       <DiagnosticsPanel diagnostics={[
         ...runtimeDiagnostics,
       ]} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />
-      {runtimeSections.length > 1 ? (
+      {runtimeSections.length > 1 || (runtimeTabGroup?.includeUnlistedSections === false && runtimeSections.length > 0) ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {runtimeTabGroup?.title ? (
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "#486579" }}>

@@ -1,3 +1,5 @@
+import { normalizeReportBuilderOptionDefinitions } from "./reportBuilderOptions.js";
+
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
 }
@@ -51,7 +53,9 @@ export function applyReportBuilderRuntimeFieldCatalog(config = {}, windowForm = 
       allowedSorts: windowForm?.AllowedSorts,
       defaultDatePreset: windowForm?.DefaultDatePreset,
       maxRows: windowForm?.MaxRows,
+      options: windowForm?.Options,
     };
+  next.reportOptions = normalizeReportBuilderOptionDefinitions(catalog?.options);
   const columns = (Array.isArray(catalog?.columns) ? catalog.columns : [])
     .map((column) => ({
       name: normalizeString(column?.name),

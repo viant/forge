@@ -19,7 +19,7 @@ const dataContext = {
   identity: {dataSourceRef: 'record'},
   resource: {timeZone: 'UTC'},
   signals: {form: signal(form), collection: signal([form]), selection: signal({selected: form, rowIndex: 0}), windowForm: signal({}), metrics: signal({total: 12.5, delta: 1}), control: signal({loaded: true})},
-  handlers: {dataSource: {getFormData: () => form, setFormData: ({values}) => { form = values; }}},
+  handlers: {dataSource: {getFormData: () => form, setFormData: ({values}) => { form = values; }, peekFilter: () => null}},
 };
 const context = {...dataContext, Context: () => dataContext, lookupHandler: () => () => true};
 const has = (markup, value) => { if (!markup.includes(value)) throw new Error(`missing ${value}: ${markup}`); };
@@ -49,7 +49,7 @@ const detailContext = {...dataContext, identity: {dataSourceRef: 'detail'}, sign
 const coordinatedContext = {...context, Context: (ref) => ref === 'detail' ? detailContext : dataContext};
 has(renderToStaticMarkup(<MasterDetail context={coordinatedContext} container={{containers: [{id: 'master', dataSourceRef: 'record'}, {id: 'detail', dataSourceRef: 'detail'}], masterDetail: {identityFields: ['id'], master: {containerId: 'master'}, detail: {containerId: 'detail'}, responsive: {wide: 'split'}}}} renderRegion={(entry) => <div>{entry.id}</div>}/>), 'forge-master-detail');
 has(renderToStaticMarkup(<MasterDetail context={context} container={{containers: [{id: 'master', dataSourceRef: 'record'}, {id: 'detail', dataSourceRef: 'record'}], masterDetail: {identityFields: ['id'], master: {containerId: 'master'}, detail: {containerId: 'detail'}}}}/>), 'Master and detail must use distinct datasource contexts');
-const gatedCollection = renderToStaticMarkup(<EditableCollection context={context} isActive container={{editableCollection: {dataSourceRef: 'record', operations: [{id: 'edit', label: 'Edit', handler: 'Host.edit', tooltip: 'Disabled until sparse updates are safe.', disabledWhen: {source: 'windowForm', field: 'sparseSafe', notEquals: true}}]}}/>);
+const gatedCollection = renderToStaticMarkup(<EditableCollection context={context} isActive container={{table: {columns: []}, editableCollection: {dataSourceRef: 'record', operations: [{id: 'edit', label: 'Edit', handler: 'Host.edit', tooltip: 'Disabled until sparse updates are safe.', disabledWhen: {source: 'windowForm', field: 'sparseSafe', notEquals: true}}]}}}/>);
 has(gatedCollection, 'forge-disabled-action-shell');
 has(gatedCollection, 'title="Disabled until sparse updates are safe."');
 has(gatedCollection, 'tabindex="0"');

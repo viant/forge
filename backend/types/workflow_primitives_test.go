@@ -34,6 +34,7 @@ editableCollection:
   operations:
     - id: edit
       label: Edit
+      tooltip: Disabled until the writer is safe.
       dialogId: recordDraft
       handler: Host.openRecord
       requiresSelection: true
@@ -131,6 +132,9 @@ scheduleEditor:
 	}
 	if container.EditableCollection.Operations[0].Handler != "Host.openRecord" {
 		t.Fatalf("editable collection operation handler missing: %#v", container.EditableCollection.Operations[0])
+	}
+	if container.EditableCollection.Operations[0].Tooltip != "Disabled until the writer is safe." {
+		t.Fatalf("editable collection operation tooltip missing: %#v", container.EditableCollection.Operations[0])
 	}
 	if container.EditableCollection.Operations[0].Selection == nil || container.EditableCollection.Operations[0].Selection.Max != 1 {
 		t.Fatalf("per-operation selection override missing: %#v", container.EditableCollection.Operations[0])

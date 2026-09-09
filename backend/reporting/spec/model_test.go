@@ -198,6 +198,21 @@ func TestDecodeJSON_RejectsSemanticSelectionWithoutParameters(t *testing.T) {
 	require.Contains(t, err.Error(), "reportSpec.datasets[0].request.semanticSelection.parameters is required")
 }
 
+func TestDecodeJSON_PreservesDatasetRequestOptions(t *testing.T) {
+	fixture := loadReportSpecFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	dataset := fixture["datasets"].([]any)[0].(map[string]any)
+	dataset["request"].(map[string]any)["options"] = map[string]any{
+		"attributionModel": "linear",
+		"lookbackDays":     30,
+	}
+	raw, err := json.Marshal(fixture)
+	require.NoError(t, err)
+	decoded, err := DecodeJSON(raw)
+	require.NoError(t, err)
+	require.Equal(t, "linear", decoded.Datasets[0].Request.Options["attributionModel"])
+	require.Equal(t, float64(30), decoded.Datasets[0].Request.Options["lookbackDays"])
+}
+
 func TestDecodeJSON_RejectsBlankOrderByEntry(t *testing.T) {
 	fixture := loadReportSpecFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
 	datasets := fixture["datasets"].([]any)
@@ -253,14 +268,16 @@ func TestDecodeJSON_AcceptsExtendedDashboardBlocks(t *testing.T) {
 			"kind":          "compositeBlock",
 			"title":         "Summary panel",
 			"description":   "Groups the opening narrative and KPI.",
-			"childBlockIds": []any{"narrativeIntro", "headlineKpi"},
+			"layout":        "responsiveGrid",
+			"childBlockIds": []any{"directIntro", "integrationFlow"},
 		},
 		map[string]any{
-			"id":               "sectionTabs",
-			"kind":             "tabGroupBlock",
-			"title":            "Forecast views",
-			"sectionIds":       []any{"overviewSection"},
-			"defaultSectionId": "overviewSection",
+			"id":                      "sectionTabs",
+			"kind":                    "tabGroupBlock",
+			"title":                   "Forecast views",
+			"sectionIds":              []any{"overviewSection"},
+			"defaultSectionId":        "overviewSection",
+			"includeUnlistedSections": false,
 		},
 		map[string]any{
 			"id":          "integrationFlow",
@@ -348,9 +365,12 @@ func TestDecodeJSON_AcceptsExtendedDashboardBlocks(t *testing.T) {
 	require.Equal(t, "kanbanBlock", spec.Blocks[13].Kind)
 	require.Equal(t, "timelineBlock", spec.Blocks[14].Kind)
 	require.Equal(t, "Overview", spec.Blocks[6].NavigationLabel)
-	require.Equal(t, []string{"narrativeIntro", "headlineKpi"}, spec.Blocks[7].ChildBlockIDs)
+	require.Equal(t, []string{"directIntro", "integrationFlow"}, spec.Blocks[7].ChildBlockIDs)
+	require.Equal(t, "responsiveGrid", spec.Blocks[7].Layout)
 	require.Equal(t, []string{"overviewSection"}, spec.Blocks[8].SectionIDs)
 	require.Equal(t, "overviewSection", spec.Blocks[8].DefaultSectionID)
+	require.NotNil(t, spec.Blocks[8].IncludeUnlistedSections)
+	require.False(t, *spec.Blocks[8].IncludeUnlistedSections)
 	require.Equal(t, "warning-sign", spec.Blocks[11].Icon)
 	require.Equal(t, []string{"Executive", "Launch Ready"}, spec.Blocks[11].Badges)
 	require.Equal(t, "green", spec.Theme["accentTone"])

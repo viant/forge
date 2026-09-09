@@ -5398,6 +5398,71 @@ button.forge-report-builder__dialog-source-card:focus-visible {
     max-height: min(46vh, 520px);
 }
 
+.forge-report-builder__report-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid #d8e2eb;
+    border-radius: 20px;
+    background: #fff;
+}
+
+.forge-report-builder__report-options-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.forge-report-builder__report-option {
+    display: grid;
+    align-content: start;
+    gap: 6px;
+    min-width: 0;
+}
+
+.forge-report-builder__report-option > label {
+    color: #183247;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.forge-report-builder__report-option > select,
+.forge-report-builder__report-option > input:not([type="checkbox"]) {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 36px;
+    padding: 7px 9px;
+    border: 1px solid #b9c8d5;
+    border-radius: 8px;
+    background: #fff;
+    color: #183247;
+}
+
+.forge-report-builder__report-option > input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    margin: 4px 0;
+}
+
+.forge-report-builder__report-option-description {
+    color: #5f6b7c;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+    .forge-report-builder__report-options-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    .forge-report-builder__report-options-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .forge-report-builder__bottom-body {
     display: flex;
     flex: 1 1 auto;

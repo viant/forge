@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import {useSignals} from '@preact/signals-react/runtime';
 import ControlRenderer from './ControlRenderer.jsx';
 import {evaluatePlainVisibleWhen, trackVisibleWhen} from './visibleWhen.js';
 
@@ -180,6 +181,7 @@ export default function GridLayoutRenderer({
     baseDataSourceRef,
     style: styleOverride = {},
 }) {
+    useSignals();
     const layout = container?.layout || {};
     const columns = layout?.columns || 1;
     const labels = layout?.labels || {};

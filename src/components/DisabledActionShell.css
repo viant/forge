@@ -1,0 +1,27 @@
+.forge-disabled-action-shell {
+  display: inline-flex;
+  position: relative;
+  max-width: 100%;
+}
+
+.forge-disabled-action-shell > :is(button, .bp4-button, .bp5-button, .bp6-button):disabled {
+  pointer-events: none;
+}
+
+.forge-disabled-action-shell:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid #2f6fdd;
+  outline-offset: 2px;
+}
+
+.forge-disabled-reason-popover {
+  max-width: min(360px, calc(100vw - 32px));
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.forge-disabled-reason-popover .bp4-button,
+.forge-disabled-reason-popover .bp5-button,
+.forge-disabled-reason-popover .bp6-button {
+  margin-top: 8px;
+}

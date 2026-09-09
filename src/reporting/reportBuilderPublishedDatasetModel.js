@@ -62,6 +62,7 @@ function buildDerivedDimensionOptions(entry = {}) {
       ? { displayValueMap: cloneValue(entry.displayValueMap) }
       : {}),
     ...(normalizeString(entry?.format) ? { format: normalizeString(entry.format) } : {}),
+    ...(normalizeString(entry?.tickFormat) ? { tickFormat: normalizeString(entry.tickFormat) } : {}),
     ...(entry?.default === true ? { default: true } : {}),
     ...(entry?.chartAxis === true ? { chartAxis: true } : {}),
     ...(entry?.runtimeFilter && typeof entry.runtimeFilter === "object" && !Array.isArray(entry.runtimeFilter)
@@ -152,6 +153,7 @@ function deriveChartFieldOptions(entry = {}) {
     label: normalizeString(item?.label || item?.key),
     kind: normalizeString(item?.kind),
     ...(normalizeString(item?.format) ? { format: normalizeString(item.format) } : {}),
+    ...(normalizeString(item?.tickFormat) ? { tickFormat: normalizeString(item.tickFormat) } : {}),
     ...(item?.default === true ? { default: true } : {}),
     ...(item?.chartAxis === true ? { chartAxis: true } : {}),
     ...(normalizeString(item?.rawId) ? { rawId: normalizeString(item.rawId) } : {}),

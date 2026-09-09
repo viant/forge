@@ -24,6 +24,7 @@ const baseContext = {
         granularity: 'hour',
         periodView: 'today',
         publisherId: '8',
+        lineForecastRequest: {From: '2026-09-08T00:00:00Z', IncludeChannelv2: [6], ExcludeZip: ['56788']},
       }),
     },
   },
@@ -52,6 +53,14 @@ assert.deepEqual(resolved, {
   order_id: 2637048,
   granularity: 'hour',
   publisherId: 8,
+});
+
+assert.deepEqual(resolveParameters([
+  {name: '...', in: 'windowForm', location: 'lineForecastRequest'},
+], baseContext), {
+  From: '2026-09-08T00:00:00Z',
+  IncludeChannelv2: [6],
+  ExcludeZip: ['56788'],
 });
 
 const filterContext = {
