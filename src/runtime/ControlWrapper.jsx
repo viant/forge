@@ -19,7 +19,7 @@ const findFocusable = (root) => {
     return node;
 };
 
-export default function ControlWrapper({ item, container, context, framework = 'core', children }) {
+export default function ControlWrapper({ item, container, context, framework = 'core', disabled = false, readOnly = false, children }) {
     // Allow per-item override to skip wrapper
     if (item?.wrapper === 'none') {
         if (item?.validationError) {
@@ -50,6 +50,13 @@ export default function ControlWrapper({ item, container, context, framework = '
     };
 
     const inline = (item.labelPosition || container?.layout?.labelPosition) === 'left';
+    const unavailable = disabled === true || readOnly === true;
+    const unavailableTooltip = unavailable ? (item?.tooltip || item?.title || '') : '';
+    const accessibilityProps = unavailableTooltip ? {
+        title: unavailableTooltip,
+        tabIndex: 0,
+        'aria-label': `${item?.label || item?.id || 'Control'}. ${unavailableTooltip}`,
+    } : {};
 
     const isLabelWidget =
         (item?.type && String(item.type).toLowerCase() === 'label') ||
@@ -93,6 +100,7 @@ export default function ControlWrapper({ item, container, context, framework = '
                 className={["forge-control-wrapper", item?.className].filter(Boolean).join(" ")}
                 ref={wrapperRef}
                 data-forge-control-id={item?.id || undefined}
+                {...accessibilityProps}
             >
                 {custom(item, container, children, context)}
             </div>
@@ -105,6 +113,7 @@ export default function ControlWrapper({ item, container, context, framework = '
             className={["forge-control-wrapper", item?.className].filter(Boolean).join(" ")}
             ref={wrapperRef}
             data-forge-control-id={item?.id || undefined}
+            {...accessibilityProps}
         >
             {item?.label && !item.hideLabel && !isLabelWidget && (
                 <label

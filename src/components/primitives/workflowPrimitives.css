@@ -141,6 +141,7 @@
 .forge-detail-view__link { padding: 0; border: 0; background: none; color: #175fa3; text-align: left; cursor: pointer; }
 .forge-detail-view__copy-status:empty { display: none; }
 .forge-detail-view__copy-status { color: #617184; font-size: 11px; }
+.forge-disabled-action-shell { display: inline-flex; }
 .forge-master-detail { display: grid; min-width: 0; min-height: 0; gap: 12px; }
 .forge-master-detail.is-split { grid-template-columns: minmax(240px,.8fr) minmax(0,1.2fr); }
 .forge-master-detail.is-drill { grid-template-columns: minmax(0,1fr); }

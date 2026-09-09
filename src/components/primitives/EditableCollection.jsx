@@ -62,18 +62,24 @@ export default function EditableCollection({container, context, isActive}) {
             if (!state.visible) return null;
             const command = operation.mutation || spec.mutation;
             if (command && !operation.handler && !operation.dialogId) {
-              return <MutationCommand key={operation.id} command={{...command, commandId: command.commandId || operation.id, label: operation.label || operation.id, intent: operation.intent || command.intent}} context={dataContext} extras={{selectedRows: state.rows, operationId: operation.id}} disabled={state.disabled || !selectionPermitted}/>;
+              return <MutationCommand key={operation.id} command={{...command, commandId: command.commandId || operation.id, label: operation.label || operation.id, intent: operation.intent || command.intent, tooltip: operation.tooltip || command.tooltip}} context={dataContext} extras={{selectedRows: state.rows, operationId: operation.id}} disabled={state.disabled || !selectionPermitted}/>;
             }
-            return (
+            const disabled = state.disabled || !selectionPermitted;
+            const button = (
               <Button
-                key={operation.id}
                 intent={operation.intent || undefined}
-                disabled={state.disabled || !selectionPermitted}
+                disabled={disabled}
+                title={operation.tooltip || undefined}
                 onClick={() => invoke(operation)}
               >
                 {operation.label || operation.id}
               </Button>
             );
+            return disabled && operation.tooltip ? (
+              <span key={operation.id} className="forge-disabled-action-shell" title={operation.tooltip} tabIndex={0} aria-label={`${operation.label || operation.id}. ${operation.tooltip}`}>
+                {button}
+              </span>
+            ) : React.cloneElement(button, {key: operation.id});
           })}
         </ButtonGroup>
       ) : null}

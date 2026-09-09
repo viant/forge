@@ -295,7 +295,7 @@ export default function WidgetRenderer({
             intent: item.intent || item.mutationCommand.intent,
         };
         return (
-            <ControlWrapper item={item} container={container} context={resolvedContext} framework={framework}>
+            <ControlWrapper item={item} container={container} context={resolvedContext} framework={framework} disabled={widgetProps.disabled === true} readOnly={widgetProps.readOnly === true}>
                 <MutationCommand command={command} context={resolvedContext} disabled={widgetProps.disabled === true}/>
             </ControlWrapper>
         );
@@ -324,8 +324,11 @@ export default function WidgetRenderer({
     if (validationMsg) {
         widgetProps.intent = 'danger';
     }
+    if (widgetProps.readOnly === true && widgetProps.disabled !== true) {
+        widgetProps.className = [widgetProps.className, 'forge-widget-readonly'].filter(Boolean).join(' ');
+    }
     return (
-        <ControlWrapper item={itemWithError} container={container} context={resolvedContext} framework={framework} >
+        <ControlWrapper item={itemWithError} container={container} context={resolvedContext} framework={framework} disabled={widgetProps.disabled === true} readOnly={widgetProps.readOnly === true}>
             <Widget { ...widgetProps} />
         </ControlWrapper>
     );

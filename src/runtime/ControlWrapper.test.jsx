@@ -20,4 +20,21 @@ describe('ControlWrapper', () => {
         expect(html).toContain('role="alert"');
         expect(html).toContain('Enter a valid domain.');
     });
+
+    it('keeps a disabled control explanation keyboard-accessible', () => {
+        const html = renderToStaticMarkup(
+            <ControlWrapper
+                item={{id: 'save', label: 'Save', tooltip: 'Disabled until sparse updates are safe.'}}
+                container={{}}
+                context={{}}
+                disabled
+            >
+                <button disabled>Save</button>
+            </ControlWrapper>,
+        );
+
+        expect(html).toContain('title="Disabled until sparse updates are safe."');
+        expect(html).toContain('tabindex="0"');
+        expect(html).toContain('aria-label="Save. Disabled until sparse updates are safe."');
+    });
 });
