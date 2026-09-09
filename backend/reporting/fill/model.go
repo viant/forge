@@ -498,6 +498,7 @@ type rawKPIBlock struct {
 	SecondaryField           string         `json:"secondaryField,omitempty"`
 	SecondaryLabel           string         `json:"secondaryLabel,omitempty"`
 	SecondaryFormat          string         `json:"secondaryFormat,omitempty"`
+	SecondaryTrend           bool           `json:"secondaryTrend,omitempty"`
 	SecondaryDisplayKey      string         `json:"secondaryDisplayKey,omitempty"`
 	SecondaryDisplayValueMap map[string]any `json:"secondaryDisplayValueMap,omitempty"`
 	Description              string         `json:"description,omitempty"`
