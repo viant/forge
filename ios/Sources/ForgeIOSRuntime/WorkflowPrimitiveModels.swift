@@ -212,6 +212,7 @@ public final class EditableCollectionSpec: Codable, @unchecked Sendable {
 public struct EditableCollectionOperationSpec: Codable, Sendable, Identifiable {
     public let id: String
     public let label: String
+    public let tooltip: String?
     public let intent: String?
     public let dialogId: String?
     public let handler: String?
@@ -222,9 +223,10 @@ public struct EditableCollectionOperationSpec: Codable, Sendable, Identifiable {
     public let parameters: [ParameterDef]?
     public let mutation: MutationCommandDef?
 
-    public init(id: String, label: String, intent: String? = nil, dialogId: String? = nil, handler: String? = nil, requiresSelection: Bool? = nil, selection: PrimitiveSelectionSpec? = nil, visibleWhen: DashboardConditionDef? = nil, disabledWhen: DashboardConditionDef? = nil, parameters: [ParameterDef]? = nil, mutation: MutationCommandDef? = nil) {
+    public init(id: String, label: String, tooltip: String? = nil, intent: String? = nil, dialogId: String? = nil, handler: String? = nil, requiresSelection: Bool? = nil, selection: PrimitiveSelectionSpec? = nil, visibleWhen: DashboardConditionDef? = nil, disabledWhen: DashboardConditionDef? = nil, parameters: [ParameterDef]? = nil, mutation: MutationCommandDef? = nil) {
         self.id = id
         self.label = label
+        self.tooltip = tooltip
         self.intent = intent
         self.dialogId = dialogId
         self.handler = handler
@@ -392,6 +394,7 @@ public final class ResponsiveDataGridSpec: Codable, @unchecked Sendable {
 public struct ResponsiveDataGridStateSpec: Codable, Sendable {
     public let columns: [String]?
     public let stickyColumns: [String]?
+    public let columnOverrides: [String: [String: JSONValue]]?
     public let density: String?
     public let rowLayout: String?
     public let readOnlyCards: Bool?
@@ -509,6 +512,8 @@ public final class DataStateBoundarySpec: Codable, @unchecked Sendable {
     public let emptyMessage: String?
     public let errorMessage: String?
     public let staleMessage: String?
+    public let suppressErrorWhen: DashboardConditionDef?
+    public let errorAction: DataStateErrorActionSpec?
 
     public init(
         dataSourceRefs: [String] = [],
@@ -517,7 +522,9 @@ public final class DataStateBoundarySpec: Codable, @unchecked Sendable {
         loadingMessage: String? = nil,
         emptyMessage: String? = nil,
         errorMessage: String? = nil,
-        staleMessage: String? = nil
+        staleMessage: String? = nil,
+        suppressErrorWhen: DashboardConditionDef? = nil,
+        errorAction: DataStateErrorActionSpec? = nil
     ) {
         self.dataSourceRefs = dataSourceRefs
         self.allowPartial = allowPartial
@@ -526,9 +533,11 @@ public final class DataStateBoundarySpec: Codable, @unchecked Sendable {
         self.emptyMessage = emptyMessage
         self.errorMessage = errorMessage
         self.staleMessage = staleMessage
+        self.suppressErrorWhen = suppressErrorWhen
+        self.errorAction = errorAction
     }
 
-    private enum CodingKeys: String, CodingKey { case dataSourceRefs, allowPartial, renderEmptyContent, loadingMessage, emptyMessage, errorMessage, staleMessage }
+    private enum CodingKeys: String, CodingKey { case dataSourceRefs, allowPartial, renderEmptyContent, loadingMessage, emptyMessage, errorMessage, staleMessage, suppressErrorWhen, errorAction }
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         dataSourceRefs = try values.decodeIfPresent([String].self, forKey: .dataSourceRefs) ?? []
@@ -538,6 +547,22 @@ public final class DataStateBoundarySpec: Codable, @unchecked Sendable {
         emptyMessage = try values.decodeIfPresent(String.self, forKey: .emptyMessage)
         errorMessage = try values.decodeIfPresent(String.self, forKey: .errorMessage)
         staleMessage = try values.decodeIfPresent(String.self, forKey: .staleMessage)
+        suppressErrorWhen = try values.decodeIfPresent(DashboardConditionDef.self, forKey: .suppressErrorWhen)
+        errorAction = try values.decodeIfPresent(DataStateErrorActionSpec.self, forKey: .errorAction)
+    }
+}
+
+public struct DataStateErrorActionSpec: Codable, Sendable {
+    public let label: String?
+    public let icon: String?
+    public let dataSourceRef: String?
+    public let bypassCache: Bool?
+
+    public init(label: String? = nil, icon: String? = nil, dataSourceRef: String? = nil, bypassCache: Bool? = nil) {
+        self.label = label
+        self.icon = icon
+        self.dataSourceRef = dataSourceRef
+        self.bypassCache = bypassCache
     }
 }
 

@@ -185,9 +185,11 @@ struct WorkflowPresentationPrimitives: View {
                             ],
                             externallyDisabled: disabled
                         )
+                        .accessibilityHint(operation.tooltip ?? "")
                     } else {
                         Button(operation.label) { invokeEditableOperation(operation, spec: spec) }
                             .disabled(disabled)
+                            .accessibilityHint(operation.tooltip ?? "")
                     }
                 }
             }

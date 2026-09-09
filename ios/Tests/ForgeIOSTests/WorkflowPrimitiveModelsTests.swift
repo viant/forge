@@ -7,7 +7,7 @@ final class WorkflowPrimitiveModelsTests: XCTestCase {
         {
           "id": "record",
           "dataSourceRef": "record",
-          "dataStateBoundary": {"dataSourceRefs":["record","summary"],"allowPartial":true,"emptyMessage":"No record"},
+          "dataStateBoundary": {"dataSourceRefs":["record","summary"],"allowPartial":true,"emptyMessage":"No record","suppressErrorWhen":{"source":"windowForm","field":"sharedError","notEmpty":true},"errorAction":{"label":"Retry records","icon":"refresh","dataSourceRef":"record","bypassCache":true}},
           "relationDrill": {"countField":"childCount","singularLabel":"child","pluralLabel":"children","link":{"windowKey":"children"}},
           "notificationRules": {"rules":[{"id":"missing","intent":"warning","message":"Missing input","visibleWhen":{"source":"form","field":"name","empty":true}}]},
           "metricSummary": {"columns":3,"metrics":[{"id":"spend","label":"Spend","field":"spend","format":"currency2","comparisonField":"delta","betterWhen":"lower"}]},
@@ -18,6 +18,8 @@ final class WorkflowPrimitiveModelsTests: XCTestCase {
 
         let decoded = try JSONDecoder().decode(ContainerDef.self, from: source)
         XCTAssertEqual(decoded.dataStateBoundary?.dataSourceRefs, ["record", "summary"])
+        XCTAssertEqual(decoded.dataStateBoundary?.errorAction?.label, "Retry records")
+        XCTAssertEqual(decoded.dataStateBoundary?.errorAction?.bypassCache, true)
         XCTAssertEqual(decoded.relationDrill?.pluralLabel, "children")
         XCTAssertEqual(decoded.notificationRules?.rules.first?.id, "missing")
         XCTAssertEqual(decoded.metricSummary?.metrics.first?.betterWhen, "lower")
@@ -44,7 +46,7 @@ final class WorkflowPrimitiveModelsTests: XCTestCase {
         {
           "id":"catalog",
           "mutationCommand":{"commandId":"save","dataSourceRef":"writer"},
-          "editableCollection":{"identityFields":["id"],"operations":[{"id":"edit","label":"Edit","requiresSelection":true}]},
+          "editableCollection":{"identityFields":["id"],"operations":[{"id":"edit","label":"Edit","tooltip":"Requires one row","requiresSelection":true}]},
           "assignmentPicker":{"availableDataSourceRef":"available","assignedDataSourceRef":"assigned"},
           "statusWorkflow":{"stateField":"status","transitions":[{"id":"approve","to":"approved","label":"Approve","command":{"dataSourceRef":"writer"}}]},
           "treeEditor":{"dataSourceRef":"tree","childrenField":"children"},
@@ -52,7 +54,7 @@ final class WorkflowPrimitiveModelsTests: XCTestCase {
           "uploadCollection":{"accept":["image/*"],"upload":{"dataSourceRef":"upload"}},
           "derivedDataSource":{"sources":["left"],"pipeline":[{"operation":"select","source":"left"}]},
           "permissionBoundary":{"mode":"resource","capability":"read"},
-          "responsiveDataGrid":{"identityColumns":["id"],"breakpoints":{"phone":{"columns":["name"],"rowLayout":"cards","readOnlyCards":true}}},
+          "responsiveDataGrid":{"identityColumns":["id"],"breakpoints":{"phone":{"columns":["name"],"stickyColumns":[],"columnOverrides":{"name":{"label":"Compact name","width":180}},"rowLayout":"cards","readOnlyCards":true}}},
           "historyDiff":{"beforeField":"before","afterField":"after","redactFields":["secret"]},
           "scheduleEditor":{"startField":"start","endField":"end","timeZoneField":"timeZone"},
           "draftForm":{"dataSourceRef":"draft","submit":{"dataSourceRef":"writer"}},
@@ -65,6 +67,7 @@ final class WorkflowPrimitiveModelsTests: XCTestCase {
         let decoded = try JSONDecoder().decode(ContainerDef.self, from: source)
         XCTAssertEqual(decoded.mutationCommand?.commandId, "save")
         XCTAssertEqual(decoded.editableCollection?.operations?.first?.id, "edit")
+        XCTAssertEqual(decoded.editableCollection?.operations?.first?.tooltip, "Requires one row")
         XCTAssertEqual(decoded.assignmentPicker?.assignedDataSourceRef, "assigned")
         XCTAssertEqual(decoded.statusWorkflow?.transitions.first?.id, "approve")
         XCTAssertEqual(decoded.treeEditor?.childrenField, "children")
@@ -73,6 +76,7 @@ final class WorkflowPrimitiveModelsTests: XCTestCase {
         XCTAssertEqual(decoded.derivedDataSource?.pipeline.first?.operation, "select")
         XCTAssertEqual(decoded.permissionBoundary?.capability, "read")
         XCTAssertEqual(decoded.responsiveDataGrid?.breakpoints?["phone"]?.rowLayout, "cards")
+        XCTAssertEqual(decoded.responsiveDataGrid?.breakpoints?["phone"]?.columnOverrides?["name"]?["label"], .string("Compact name"))
         XCTAssertEqual(decoded.historyDiff?.redactFields, ["secret"])
         XCTAssertEqual(decoded.scheduleEditor?.timeZoneField, "timeZone")
         XCTAssertEqual(decoded.draftForm?.submit?.dataSourceRef, "writer")
