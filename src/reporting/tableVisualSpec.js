@@ -1,4 +1,5 @@
 import { normalizeReportTableLink } from "./reportTableLink.js";
+import { normalizePresentationClampConfig } from "../utils/presentationText.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -101,6 +102,7 @@ export function normalizeReportTableBlockColumn(column = {}) {
   }
   const cellVisual = normalizeReportTableCellVisual(column.cellVisual);
   const link = normalizeReportTableLink(column.link);
+  const labelClamp = normalizePresentationClampConfig(column.labelClamp);
   return {
     key,
     ...(normalizeString(column.sourceKey) ? { sourceKey: normalizeString(column.sourceKey) } : {}),
@@ -118,6 +120,7 @@ export function normalizeReportTableBlockColumn(column = {}) {
     ...(column?.runtimeFilterable === true ? { runtimeFilterable: true } : {}),
     ...(link ? { link } : {}),
     ...(cellVisual ? { cellVisual } : {}),
+    ...(labelClamp ? { labelClamp } : {}),
   };
 }
 
@@ -145,6 +148,7 @@ export function normalizeReportDocumentTableBlock(block = {}) {
     return null;
   }
   const accentTone = normalizeString(block?.accentTone).toLowerCase();
+  const labelClamp = normalizePresentationClampConfig(block?.labelClamp);
   return {
     id,
     kind: "tableBlock",
@@ -152,5 +156,8 @@ export function normalizeReportDocumentTableBlock(block = {}) {
     datasetRef,
     columns,
     ...(["blue", "green", "amber", "rose", "slate"].includes(accentTone) ? { accentTone } : {}),
+    ...(block?.collapsible === true ? { collapsible: true } : {}),
+    ...(block?.collapsible === true && block?.defaultCollapsed === true ? { defaultCollapsed: true } : {}),
+    ...(labelClamp ? { labelClamp } : {}),
   };
 }

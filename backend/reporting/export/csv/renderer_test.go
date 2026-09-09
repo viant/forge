@@ -16,6 +16,18 @@ func TestRender_TableBlockToCSV(t *testing.T) {
 	require.Equal(t, "Channel,Spend\nDisplay,$42.50\nCTV,$30.00\n", string(data))
 }
 
+func TestRender_CollapsedPresentationDoesNotAlterRawExportText(t *testing.T) {
+	report, err := reportfill.DecodeJSON([]byte(validTestReportFillJSON()))
+	require.NoError(t, err)
+	report.Blocks[0].Collapsible = true
+	report.Blocks[0].DefaultCollapsed = true
+	report.Blocks[0].LabelClamp = &reportfill.TextClamp{Lines: 1, MaxCharacters: 8}
+	report.Blocks[0].Content.ResolvedRows[0].Cells[0].DisplayValue = "Kroil\uFFFD\uFFFD creative full value"
+	data, err := Render(report)
+	require.NoError(t, err)
+	require.Contains(t, string(data), "Kroil\uFFFD\uFFFD creative full value")
+}
+
 func TestRender_RejectsMissingOrMultipleTableBlocks(t *testing.T) {
 	report, err := reportfill.DecodeJSON([]byte(validTestReportFillJSON()))
 	require.NoError(t, err)

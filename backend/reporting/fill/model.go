@@ -66,6 +66,9 @@ type Block struct {
 	Kind                     string                `json:"kind"`
 	Title                    string                `json:"title,omitempty"`
 	AccentTone               string                `json:"accentTone,omitempty"`
+	Collapsible              bool                  `json:"collapsible,omitempty"`
+	DefaultCollapsed         bool                  `json:"defaultCollapsed,omitempty"`
+	LabelClamp               *TextClamp            `json:"labelClamp,omitempty"`
 	DatasetRef               string                `json:"datasetRef,omitempty"`
 	Columns                  []TableColumn         `json:"columns,omitempty"`
 	Content                  *TableContent         `json:"content,omitempty"`
@@ -130,6 +133,11 @@ type Block struct {
 	Runtime                  map[string]any        `json:"runtime,omitempty"`
 }
 
+type TextClamp struct {
+	Lines         int `json:"lines"`
+	MaxCharacters int `json:"maxCharacters,omitempty"`
+}
+
 type TableColumn struct {
 	Key               string         `json:"key"`
 	SourceKey         string         `json:"sourceKey,omitempty"`
@@ -141,6 +149,7 @@ type TableColumn struct {
 	CellVisual        any            `json:"cellVisual,omitempty"`
 	Link              map[string]any `json:"link,omitempty"`
 	RuntimeFilterable bool           `json:"runtimeFilterable,omitempty"`
+	LabelClamp        *TextClamp     `json:"labelClamp,omitempty"`
 }
 
 type TableContent struct {
@@ -467,13 +476,16 @@ type rawBlockHeader struct {
 }
 
 type rawTableBlock struct {
-	ID         string        `json:"id"`
-	Kind       string        `json:"kind"`
-	Title      string        `json:"title,omitempty"`
-	AccentTone string        `json:"accentTone,omitempty"`
-	DatasetRef string        `json:"datasetRef"`
-	Columns    []TableColumn `json:"columns"`
-	Content    TableContent  `json:"content"`
+	ID               string        `json:"id"`
+	Kind             string        `json:"kind"`
+	Title            string        `json:"title,omitempty"`
+	AccentTone       string        `json:"accentTone,omitempty"`
+	Collapsible      bool          `json:"collapsible,omitempty"`
+	DefaultCollapsed bool          `json:"defaultCollapsed,omitempty"`
+	LabelClamp       *TextClamp    `json:"labelClamp,omitempty"`
+	DatasetRef       string        `json:"datasetRef"`
+	Columns          []TableColumn `json:"columns"`
+	Content          TableContent  `json:"content"`
 }
 
 type rawChartBlock struct {
@@ -728,13 +740,16 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				return nil, fmt.Errorf("decode reportFill.blocks[%d] tableBlock: %w", index, err)
 			}
 			fill.Blocks = append(fill.Blocks, Block{
-				ID:         tableBlock.ID,
-				Kind:       tableBlock.Kind,
-				Title:      tableBlock.Title,
-				AccentTone: tableBlock.AccentTone,
-				DatasetRef: tableBlock.DatasetRef,
-				Columns:    tableBlock.Columns,
-				Content:    &tableBlock.Content,
+				ID:               tableBlock.ID,
+				Kind:             tableBlock.Kind,
+				Title:            tableBlock.Title,
+				AccentTone:       tableBlock.AccentTone,
+				Collapsible:      tableBlock.Collapsible,
+				DefaultCollapsed: tableBlock.DefaultCollapsed,
+				LabelClamp:       tableBlock.LabelClamp,
+				DatasetRef:       tableBlock.DatasetRef,
+				Columns:          tableBlock.Columns,
+				Content:          &tableBlock.Content,
 			})
 		case "chartBlock":
 			chartBlock := rawChartBlock{}
@@ -1166,6 +1181,17 @@ func (r *ReportFill) Validate() error {
 			}
 			if len(block.Columns) == 0 {
 				return fmt.Errorf("reportFill.blocks[%d].columns must not be empty for tableBlock", index)
+			}
+			if block.DefaultCollapsed && !block.Collapsible {
+				return fmt.Errorf("reportFill.blocks[%d].defaultCollapsed requires collapsible for tableBlock", index)
+			}
+			if block.LabelClamp != nil && block.LabelClamp.Lines != 1 && block.LabelClamp.Lines != 2 {
+				return fmt.Errorf("reportFill.blocks[%d].labelClamp.lines must be 1 or 2 for tableBlock", index)
+			}
+			for columnIndex, column := range block.Columns {
+				if column.LabelClamp != nil && column.LabelClamp.Lines != 1 && column.LabelClamp.Lines != 2 {
+					return fmt.Errorf("reportFill.blocks[%d].columns[%d].labelClamp.lines must be 1 or 2", index, columnIndex)
+				}
 			}
 			if block.Content == nil {
 				return fmt.Errorf("reportFill.blocks[%d].content is required for tableBlock", index)

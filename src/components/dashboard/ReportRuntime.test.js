@@ -3277,4 +3277,22 @@ assert.ok(documentBackedRuntimeHtml.includes("Parameters Reporting Window"));
 assert.ok(documentBackedRuntimeHtml.includes("Recovered from the embedded runtime document."));
 assert.ok(documentBackedRuntimeHtml.includes("2026-06-01 to 2026-06-07"));
 
+const collapsedTableHtml = renderToStaticMarkup(React.createElement(ReportRuntime, {
+  reportSpec: {
+    title: "Collapsible report",
+    parameters: { pageSize: 25 },
+    datasets: [{ id: "primary", dataSourceRef: "advanced.reporting", request: {} }],
+    blocks: [{ id: "creativeTable", kind: "tableBlock", title: "Creatives", datasetRef: "primary", collapsible: true, defaultCollapsed: true, labelClamp: { lines: 2, maxCharacters: 12 }, columns: [{ key: "creative", label: "Creative" }] }],
+  },
+  reportFill: {
+    diagnostics: [],
+    datasets: [{ id: "primary", dataSourceRef: "advanced.reporting", provenance: { rowCount: 1 }, rows: [{ creative: "Kroil\uFFFD\uFFFD creative name that is long" }] }],
+    blocks: [{ id: "creativeTable", kind: "tableBlock", title: "Creatives", datasetRef: "primary", collapsible: true, defaultCollapsed: true, labelClamp: { lines: 2, maxCharacters: 12 }, columns: [{ key: "creative", label: "Creative" }], content: { rowCount: 1, columns: [{ key: "creative", label: "Creative" }], resolvedRows: [] } }],
+  },
+}));
+assert.ok(collapsedTableHtml.includes('aria-label="Expand Creatives"'));
+assert.ok(collapsedTableHtml.includes('aria-expanded="false"'));
+assert.ok(collapsedTableHtml.includes("1 row"));
+assert.ok(collapsedTableHtml.includes('aria-hidden="true"'));
+
 console.log("ReportRuntime ✓ renders semantic binding chips and actionable runtime diagnostics");

@@ -25,7 +25,7 @@ func WithWatchDebounce(delay time.Duration) WatchOption {
 	}
 }
 
-// Watcher reloads a Loader after reporting YAML changes. Loader retains the
+// Watcher reloads a Loader after reporting YAML or JSON asset changes. Loader retains the
 // last valid registry, so a partially written or invalid asset never replaces
 // the report definitions currently being served.
 type Watcher struct {
@@ -143,7 +143,7 @@ func (w *Watcher) loop(ctx context.Context, root string, fileWatcher *fsnotify.W
 					continue
 				}
 			}
-			if isReportingYAML(root, event.Name) && event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) != 0 {
+			if isReportingAsset(root, event.Name) && event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) != 0 {
 				schedule()
 			}
 		case <-timer.C:
@@ -181,10 +181,10 @@ func addRecursiveReportingWatch(watcher *fsnotify.Watcher, root string) error {
 	})
 }
 
-func isReportingYAML(root, filename string) bool {
+func isReportingAsset(root, filename string) bool {
 	if !pathWithin(root, filename) {
 		return false
 	}
 	extension := strings.ToLower(filepath.Ext(filename))
-	return extension == ".yaml" || extension == ".yml"
+	return extension == ".yaml" || extension == ".yml" || extension == ".json"
 }
