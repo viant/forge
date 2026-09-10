@@ -1479,7 +1479,7 @@ export function buildReportDocumentFilterBarBlock({
   })();
   const normalizedPlacement = (() => {
     const candidate = normalizeString(placement).toLowerCase();
-    return ["inherit", "inline", "rail-left", "hidden"].includes(candidate) ? candidate : "";
+    return ["inherit", "left", "right", "top", "inline", "rail-left", "hidden"].includes(candidate) ? candidate : "";
   })();
   const normalizeIdList = (values = []) => (Array.isArray(values) ? values : [])
     .map((entry) => normalizeString(entry))

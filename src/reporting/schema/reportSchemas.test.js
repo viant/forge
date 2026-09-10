@@ -162,6 +162,19 @@ assert.deepEqual(validateReportSpec(reportSpec), {
   valid: true,
   errors: [],
 });
+for (const placement of ["left", "right", "top", "inline", "rail-left"]) {
+  const placementSpec = JSON.parse(JSON.stringify(reportSpec));
+  placementSpec.blocks.push({
+    id: `filters_${placement.replace(/[^a-z]/g, "_")}`,
+    kind: "filterBarBlock",
+    title: "Filters",
+    datasetRef: "primary",
+    paramIds: ["dateRange"],
+    mode: "unified",
+    placement,
+  });
+  assert.deepEqual(validateReportSpec(placementSpec), { valid: true, errors: [] }, `schema should accept '${placement}' filter placement`);
+}
 const summaryProjectionSpec = JSON.parse(JSON.stringify(reportSpec));
 summaryProjectionSpec.datasets.push({
   id: "summary",

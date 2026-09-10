@@ -1353,7 +1353,7 @@ export const reportSpecSchema = {
         title: { type: "string" },
         datasetRef: { type: "string" },
         mode: { enum: ["baseline", "unified"] },
-        placement: { enum: ["inherit", "inline", "rail-left", "hidden"] },
+        placement: { enum: ["inherit", "left", "right", "top", "inline", "rail-left", "hidden"] },
         paramIds: {
           type: "array",
           items: { type: "string" },
