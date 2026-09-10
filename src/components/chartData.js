@@ -94,6 +94,12 @@ export function resolveHorizontalBarLayout({
     };
 }
 
+export function applyChartRowLimit(rows = [], rowLimit = 0) {
+    const source = Array.isArray(rows) ? rows : [];
+    const limit = Math.trunc(Number(rowLimit) || 0);
+    return Number.isInteger(limit) && limit > 0 ? source.slice(0, limit) : source;
+}
+
 export function hasNonZeroChartSeriesValue(rows = [], seriesKeys = []) {
     const keys = Array.isArray(seriesKeys) ? seriesKeys : [];
     return (Array.isArray(rows) ? rows : []).some((row) => keys.some((key) => {
