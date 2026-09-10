@@ -5543,13 +5543,6 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         data-report-filter-surface={!designWorkspaceMode ? "true" : undefined}
         data-report-filter-surface-placement={!designWorkspaceMode ? reportFilterSurfaceModel?.placement : undefined}
         >
-            {totalActiveControlCount > 0 ? (
-                <div className="forge-report-builder__bottom-header-actions">
-                    <button type="button" className="forge-report-builder__bottom-toggle" aria-label="Reset report filters and options to defaults" onClick={resetReportFiltersAndOptions}>
-                        Clear all / reset to defaults
-                    </button>
-                </div>
-            ) : null}
             <ReportBuilderOptionControls
                 definitions={reportOptionDefinitions}
                 values={effectiveReportOptions}
@@ -5579,6 +5572,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                         </div>
                     </div>
                     <div className="forge-report-builder__bottom-header-actions">
+                        {totalActiveControlCount > 0 ? (
+                            <button type="button" className="forge-report-builder__bottom-toggle" aria-label="Reset report filters and options to defaults" onClick={resetReportFiltersAndOptions}>
+                                Reset
+                            </button>
+                        ) : null}
                         <button
                             type="button"
                             className="forge-report-builder__bottom-toggle"
@@ -20626,75 +20624,69 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                         )}
                         </div>
                         <div className="forge-report-builder__left-resizer-shell">
-                            {leftRailCanScrollDown ? (
+                            {!designWorkspaceMode ? (
                                 <button
                                     type="button"
-                                    className="forge-report-builder__left-jump"
-                                    onClick={scrollLeftRailToBottom}
-                                    aria-label="Scroll setup panel to bottom"
-                                    title="Scroll to the last setup section"
+                                    className="forge-report-builder__filter-rail-close"
+                                    onClick={() => setReportFilterRailOpen(false)}
+                                    aria-label="Close report filters and options"
+                                    title="Close filters and restore the full report width"
                                 >
-                                    <Icon icon="double-chevron-down" size={12} />
+                                    <Icon icon={reportFilterSurfaceModel.renderRight ? "chevron-right" : "chevron-left"} size={12} />
                                 </button>
-                            ) : null}
-                            <button
-                                type="button"
-                                className="forge-report-builder__left-resizer-dock"
-                                onClick={toggleResultPanePosition}
-                                aria-label={resultPanePositionActionLabel}
-                                title={`${resultPanePositionLabel}. ${resultPanePositionActionLabel}.`}
-                                data-result-pane-position={resultPanePosition}
-                            >
-                                <Icon icon={resultPanePosition === "left" ? "double-chevron-right" : "double-chevron-left"} size={10} />
-                            </button>
-                            <div
-                                className={leftRailResizing ? "forge-report-builder__left-resizer is-active" : "forge-report-builder__left-resizer"}
-                                role="separator"
-                                aria-orientation="vertical"
-                                aria-label="Resize setup panel"
-                                aria-valuemin={MIN_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT}
-                                aria-valuemax={MAX_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT}
-                                aria-valuenow={Math.round(resolvedLeftRailWidthPercent)}
-                                aria-valuetext={resolveReportBuilderLeftRailWidthAriaValueText(resolvedLeftRailWidthPercent)}
-                                tabIndex={0}
-                                title="Drag to resize the setup panel. Use arrow keys to adjust or double-click to reset."
-                                onPointerDown={startLeftRailResize}
-                                onKeyDown={handleLeftRailResizeKeyDown}
-                                onDoubleClick={resetLeftRailWidth}
-                                data-left-rail-width={Math.round(resolvedLeftRailWidthPercent)}
-                            >
-                                <span className="forge-report-builder__left-resizer-thumb">
-                                    <span className="forge-report-builder__left-resizer-controls">
+                            ) : (
+                                <>
+                                    {leftRailCanScrollDown ? (
                                         <button
                                             type="button"
-                                            className="forge-report-builder__left-resizer-step"
-                                            aria-label={moveDividerLeftLabel}
-                                            title={moveDividerLeftLabel}
-                                            disabled={!canMoveDividerLeft}
-                                            onPointerDown={stopLeftRailControlPointerDown}
-                                            onClick={() => nudgeLeftRailWidth("left")}
+                                            className="forge-report-builder__left-jump"
+                                            onClick={scrollLeftRailToBottom}
+                                            aria-label="Scroll setup panel to bottom"
+                                            title="Scroll to the last setup section"
                                         >
-                                            <Icon icon="chevron-left" size={10} />
+                                            <Icon icon="double-chevron-down" size={12} />
                                         </button>
-                                        <span className="forge-report-builder__left-resizer-grip" aria-hidden="true">
-                                            <span />
-                                            <span />
-                                            <span />
+                                    ) : null}
+                                    <button
+                                        type="button"
+                                        className="forge-report-builder__left-resizer-dock"
+                                        onClick={toggleResultPanePosition}
+                                        aria-label={resultPanePositionActionLabel}
+                                        title={`${resultPanePositionLabel}. ${resultPanePositionActionLabel}.`}
+                                        data-result-pane-position={resultPanePosition}
+                                    >
+                                        <Icon icon={resultPanePosition === "left" ? "double-chevron-right" : "double-chevron-left"} size={10} />
+                                    </button>
+                                    <div
+                                        className={leftRailResizing ? "forge-report-builder__left-resizer is-active" : "forge-report-builder__left-resizer"}
+                                        role="separator"
+                                        aria-orientation="vertical"
+                                        aria-label="Resize setup panel"
+                                        aria-valuemin={MIN_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT}
+                                        aria-valuemax={MAX_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT}
+                                        aria-valuenow={Math.round(resolvedLeftRailWidthPercent)}
+                                        aria-valuetext={resolveReportBuilderLeftRailWidthAriaValueText(resolvedLeftRailWidthPercent)}
+                                        tabIndex={0}
+                                        title="Drag to resize the setup panel. Use arrow keys to adjust or double-click to reset."
+                                        onPointerDown={startLeftRailResize}
+                                        onKeyDown={handleLeftRailResizeKeyDown}
+                                        onDoubleClick={resetLeftRailWidth}
+                                        data-left-rail-width={Math.round(resolvedLeftRailWidthPercent)}
+                                    >
+                                        <span className="forge-report-builder__left-resizer-thumb">
+                                            <span className="forge-report-builder__left-resizer-controls">
+                                                <button type="button" className="forge-report-builder__left-resizer-step" aria-label={moveDividerLeftLabel} title={moveDividerLeftLabel} disabled={!canMoveDividerLeft} onPointerDown={stopLeftRailControlPointerDown} onClick={() => nudgeLeftRailWidth("left")}>
+                                                    <Icon icon="chevron-left" size={10} />
+                                                </button>
+                                                <span className="forge-report-builder__left-resizer-grip" aria-hidden="true"><span /><span /><span /></span>
+                                                <button type="button" className="forge-report-builder__left-resizer-step" aria-label={moveDividerRightLabel} title={moveDividerRightLabel} disabled={!canMoveDividerRight} onPointerDown={stopLeftRailControlPointerDown} onClick={() => nudgeLeftRailWidth("right")}>
+                                                    <Icon icon="chevron-right" size={10} />
+                                                </button>
+                                            </span>
                                         </span>
-                                        <button
-                                            type="button"
-                                            className="forge-report-builder__left-resizer-step"
-                                            aria-label={moveDividerRightLabel}
-                                            title={moveDividerRightLabel}
-                                            disabled={!canMoveDividerRight}
-                                            onPointerDown={stopLeftRailControlPointerDown}
-                                            onClick={() => nudgeLeftRailWidth("right")}
-                                        >
-                                            <Icon icon="chevron-right" size={10} />
-                                        </button>
-                                    </span>
-                                </span>
-                            </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </aside>
                 ) : null}

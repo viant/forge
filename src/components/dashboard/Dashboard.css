@@ -1327,14 +1327,14 @@
 }
 
 .forge-report-builder--filters-left {
-    grid-template-columns: var(--forge-report-builder-left-width, clamp(192px, 24%, 420px)) minmax(0, 1fr);
+    grid-template-columns: clamp(240px, 20vw, 320px) minmax(0, 1fr);
     grid-template-areas:
         "top top"
         "left center";
 }
 
 .forge-report-builder--filters-right {
-    grid-template-columns: minmax(0, 1fr) var(--forge-report-builder-left-width, clamp(192px, 24%, 420px));
+    grid-template-columns: minmax(0, 1fr) clamp(240px, 20vw, 320px);
     grid-template-areas:
         "top top"
         "center left";
@@ -2874,6 +2874,93 @@
     width: 44px;
     pointer-events: none;
     z-index: 6;
+}
+
+.forge-report-builder--filters-right .forge-report-builder__left-resizer-shell {
+    right: auto;
+    left: -22px;
+}
+
+.forge-report-builder__filter-rail-close {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid #cfdcf0;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #23446d;
+    box-shadow: 0 8px 18px rgba(15, 30, 50, 0.1);
+    pointer-events: auto;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.forge-report-builder__filter-rail-close:hover,
+.forge-report-builder__filter-rail-close:focus-visible {
+    border-color: #98b7ea;
+    color: #17345d;
+    outline: none;
+}
+
+.forge-report-builder__left [data-report-filter-surface="true"] {
+    gap: 10px;
+    overflow: hidden;
+}
+
+.forge-report-builder__left [data-report-filter-surface="true"] .forge-report-builder__bottom-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.forge-report-builder__left [data-report-filter-surface="true"] .forge-report-builder__bottom-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+}
+
+.forge-report-builder__left [data-report-filter-surface="true"] .forge-report-builder__bottom-toggle {
+    white-space: normal;
+    text-align: left;
+}
+
+.forge-report-builder__left [data-report-filter-surface="true"] .forge-report-builder__date-range {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+}
+
+.forge-report-builder__left [data-report-filter-surface="true"] .forge-report-builder__date-range input {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 6px;
+}
+
+.forge-report-builder__left [data-report-filter-surface="true"] .forge-report-builder-dynamic-row {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.forge-report-builder__left [data-report-filter-surface="true"] .forge-report-builder-dynamic-row__controls,
+.forge-report-builder__left [data-report-filter-surface="true"] .forge-lookup-selection-input {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.forge-report-builder__left [data-report-filter-surface="true"] .forge-report-builder-dynamic-row__controls .forge-report-builder-select {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+}
+
+.forge-report-builder__left [data-report-filter-surface="true"] .forge-report-builder-dynamic-row__actions {
+    justify-content: flex-start;
 }
 
 /* Visual layer only: the full-height strip overlaps the rail's scrollbar, so it
