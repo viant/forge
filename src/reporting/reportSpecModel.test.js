@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+  buildReportBuilderPublishedDatasetConfig,
   buildReportBuilderPublishedDatasetDeclarations,
   buildReportBuilderReportSpec,
   normalizeReportBuilderPublishedDataSources,
@@ -63,6 +64,17 @@ const rawConfig = {
     timeoutMs: 120000,
   },
 };
+
+const inheritedPublishedRuntimeConfig = buildReportBuilderPublishedDatasetConfig(rawConfig, {
+  id: "summary",
+  dataSourceRef: "summarySource",
+  capabilities: { inheritRuntimeFieldCatalog: true },
+  columnOptions: [],
+  chartFieldOptions: [],
+});
+assert.deepEqual(inheritedPublishedRuntimeConfig.dimensions, rawConfig.dimensions);
+assert.deepEqual(inheritedPublishedRuntimeConfig.measures, rawConfig.measures);
+assert.equal(inheritedPublishedRuntimeConfig.dataSourceRef, "summarySource");
 
 const rawState = {
   selectedMeasures: ["totalSpend", "impressions"],

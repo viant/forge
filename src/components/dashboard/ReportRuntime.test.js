@@ -8,7 +8,38 @@ import ReportRuntime, {
   RefinementBarBlock,
   resolveReportRuntimeCompositeColumns,
   resolveReportRuntimeCompositeLayout,
+  resolveReportRuntimeChartRowLimit,
+  shouldApplyTableDefaultCollapsed,
+  sanitizeReportRuntimeDiagnostics,
 } from "./ReportRuntime.jsx";
+
+assert.deepEqual(sanitizeReportRuntimeDiagnostics([{severity: "error", code: "secretCode", message: "backend detail", suggestedFix: "internal"}], true), [{
+  severity: "error",
+  code: "reportSectionUnavailable",
+  message: "This report section could not be refreshed for the current authorized scope.",
+  suggestedFix: "",
+}]);
+
+assert.equal(resolveReportRuntimeChartRowLimit({ rowLimit: 2, chartSpec: { type: "horizontal_bar" } }), 2);
+assert.equal(resolveReportRuntimeChartRowLimit({ chartSpec: { type: "horizontal_bar" } }), 10);
+assert.equal(resolveReportRuntimeChartRowLimit({ chartSpec: { type: "line" } }), 0);
+assert.equal(shouldApplyTableDefaultCollapsed(false, true, true), true);
+assert.equal(shouldApplyTableDefaultCollapsed(true, true, true), false);
+
+const legacyCollapsibleTableHtml = renderToStaticMarkup(React.createElement(ReportRuntime, {
+  reportSpec: {
+    title: "Legacy collapsible report",
+    parameters: { pageSize: 25 },
+    datasets: [{ id: "primary", dataSourceRef: "advanced.reporting", request: {} }],
+    blocks: [{ id: "legacyTable", kind: "tableBlock", title: "Legacy Evidence", datasetRef: "primary", collapsible: true, columns: [{ key: "value", label: "Value" }] }],
+  },
+  reportFill: {
+    diagnostics: [],
+    datasets: [{ id: "primary", dataSourceRef: "advanced.reporting", provenance: { rowCount: 1 }, rows: [{ value: 42 }] }],
+    blocks: [{ id: "legacyTable", kind: "tableBlock", title: "Legacy Evidence", datasetRef: "primary", collapsible: true, columns: [{ key: "value", label: "Value" }], content: { rowCount: 1, columns: [{ key: "value", label: "Value" }], resolvedRows: [] } }],
+  },
+}));
+assert.ok(legacyCollapsibleTableHtml.includes('aria-label="Expand Legacy Evidence"'));
 
 const sectionContractBlocks = [
   { id: "sectionTabs", kind: "tabGroupBlock", sectionIds: ["detailsSection"] },
@@ -173,6 +204,25 @@ assert.ok(html.includes("semanticProviderDiagnostics"));
 assert.ok(html.includes("Block primaryChart"));
 assert.ok(html.includes("reportDocument.blocks.primaryChart.targetRef"));
 
+const publicReportErrorHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec,
+    reportFill: {
+      ...reportFill,
+      diagnostics: [{
+        code: "runtimePreviewDatasetFetchFailed",
+        severity: "error",
+        message: "failed to resolve subscription campaign scope",
+      }],
+    },
+    presentationMode: "report",
+  }),
+);
+assert.ok(publicReportErrorHtml.includes("Report refresh unavailable"));
+assert.ok(publicReportErrorHtml.includes("The saved result remains unchanged"));
+assert.ok(!publicReportErrorHtml.includes("failed to resolve subscription campaign scope"));
+assert.ok(!publicReportErrorHtml.includes("runtimePreviewDatasetFetchFailed"));
+
 const hiddenContextSummaryHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
     reportSpec,
@@ -322,6 +372,42 @@ const kpiToneHtml = renderToStaticMarkup(
 );
 assert.ok(kpiToneHtml.includes('data-report-runtime-kpi-tone="danger"'));
 assert.ok(kpiToneHtml.includes("supply"));
+
+const trendKpiHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Trend KPI Runtime",
+      layoutIntent: {
+        blockOrder: ["positiveKpi", "negativeKpi"],
+        items: [{ blockId: "positiveKpi" }, { blockId: "negativeKpi" }],
+      },
+      blocks: [],
+      datasets: [],
+    },
+    reportFill: {
+      diagnostics: [],
+      datasets: [],
+      blocks: [
+        {
+          id: "positiveKpi", kind: "kpiBlock", title: "Positive",
+          content: { value: 10, valueField: "value", rowCount: 1, secondaryField: "change", secondaryValue: 0.17, secondaryTrend: true, secondaryFormat: "percentFraction" },
+        },
+        {
+          id: "negativeKpi", kind: "kpiBlock", title: "Negative",
+          content: { value: 10, valueField: "value", rowCount: 1, secondaryField: "change", secondaryValue: -0.069, secondaryTrend: true, secondaryFormat: "percentFraction" },
+        },
+      ],
+    },
+  }),
+);
+assert.ok(trendKpiHtml.includes('data-report-runtime-kpi-trend="positive"'));
+assert.ok(trendKpiHtml.includes('data-report-runtime-kpi-trend-row="positive"'));
+assert.ok(trendKpiHtml.includes('data-report-runtime-kpi-accent="positive"'));
+assert.ok(trendKpiHtml.includes("#18794e"));
+assert.ok(trendKpiHtml.includes('data-report-runtime-kpi-trend="negative"'));
+assert.ok(trendKpiHtml.includes('data-report-runtime-kpi-trend-row="negative"'));
+assert.ok(trendKpiHtml.includes('data-report-runtime-kpi-accent="negative"'));
+assert.ok(trendKpiHtml.includes("#c23030"));
 
 const badgesBlockHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
@@ -3292,7 +3378,7 @@ const collapsedTableHtml = renderToStaticMarkup(React.createElement(ReportRuntim
 }));
 assert.ok(collapsedTableHtml.includes('aria-label="Expand Creatives"'));
 assert.ok(collapsedTableHtml.includes('aria-expanded="false"'));
-assert.ok(collapsedTableHtml.includes("1 row"));
-assert.ok(collapsedTableHtml.includes('aria-hidden="true"'));
+assert.ok(collapsedTableHtml.includes("Showing 1 of 1 row"));
+assert.ok(collapsedTableHtml.includes("Kroil"));
 
 console.log("ReportRuntime ✓ renders semantic binding chips and actionable runtime diagnostics");

@@ -375,7 +375,9 @@ export function buildReportBuilderAuthoredRuntimePreviewState({
                 icon: "warning-sign",
                 eyebrow: reportPresentation ? "Report" : "Runtime preview",
                 title: reportPresentation ? "We couldn't prepare this report" : "We couldn't compile these runtime results",
-                description: String(runtimePreviewErrorDescription || "").trim(),
+                description: reportPresentation
+                    ? "The latest report data could not be prepared for the current authorized scope. Review the report filters and try again."
+                    : String(runtimePreviewErrorDescription || "").trim(),
                 ...(
                     String(readinessAction || "").trim() === "retrySemanticModelLoad"
                         ? {
@@ -395,7 +397,7 @@ export function buildReportBuilderAuthoredRuntimePreviewState({
                             }
                             : {}
                 ),
-                ...(runtimePreviewErrorDiagnostics || {}),
+                ...(!reportPresentation ? (runtimePreviewErrorDiagnostics || {}) : {}),
             }
             : null,
         canRenderRuntime: !!runtimeConfig

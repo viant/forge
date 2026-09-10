@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -220,6 +221,7 @@ func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
 		YAMLPath:                "$",
 		Raw:                     raw,
 	}
+	profileDiagnostics := loadPresentationProfiles(workspaceRoot, filename, asset, documentContent(&node))
 	catalogDiagnostics := make([]Diagnostic, 0)
 	if asset.Kind == KindGroup && asset.CatalogRef != "" {
 		normalizedRef, catalogPath, resolveErr := ResolveAssetReference(workspaceRoot, filename, asset.CatalogRef)
@@ -241,7 +243,8 @@ func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
 		asset.Legacy = true
 	}
 	assets := []*Asset{asset}
-	diagnostics := append(catalogDiagnostics, validateAsset(asset, documentContent(&node))...)
+	diagnostics := append(catalogDiagnostics, profileDiagnostics...)
+	diagnostics = append(diagnostics, validateAsset(asset, documentContent(&node))...)
 	if asset.Kind == KindBuilder {
 		embedded := embeddedLegacyPresets(asset)
 		assets = append(assets, embedded...)
@@ -250,6 +253,98 @@ func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
 		}
 	}
 	return assets, diagnostics
+}
+
+func loadPresentationProfiles(workspaceRoot, assetFilename string, asset *Asset, rootNode *yaml.Node) []Diagnostic {
+	if asset == nil || asset.Kind != KindBuilder {
+		return nil
+	}
+	reportBuilder, _ := asset.Raw["reportBuilder"].(map[string]any)
+	refOwner := asset.Raw
+	yamlPath := "$.presentationProfileRefs"
+	if reportBuilder != nil {
+		refOwner = reportBuilder
+		yamlPath = "$.reportBuilder.presentationProfileRefs"
+	}
+	refs := stringListValue(refOwner["presentationProfileRefs"])
+	if len(refs) == 0 {
+		return nil
+	}
+	profiles := make([]map[string]any, 0, len(refs))
+	normalizedRefs := make([]string, 0, len(refs))
+	diagnostics := make([]Diagnostic, 0)
+	seenViews := map[string]string{}
+	for index, reference := range refs {
+		normalizedRef, resolvedPath, err := ResolveAssetReference(workspaceRoot, assetFilename, reference)
+		entryPath := fmt.Sprintf("%s[%d]", yamlPath, index)
+		if err != nil {
+			diagnostics = append(diagnostics, diagnosticAt("presentationProfileRefInvalid", err.Error(), asset.SourcePath, entryPath, mappingValue(rootNode, "presentationProfileRefs")))
+			continue
+		}
+		data, readErr := os.ReadFile(resolvedPath)
+		if readErr != nil {
+			diagnostics = append(diagnostics, Diagnostic{Code: "presentationProfileReadFailed", Message: readErr.Error(), SourcePath: asset.SourcePath, YAMLPath: entryPath})
+			continue
+		}
+		var profile map[string]any
+		if decodeErr := yaml.Unmarshal(data, &profile); decodeErr != nil {
+			diagnostics = append(diagnostics, Diagnostic{Code: "presentationProfileInvalid", Message: decodeErr.Error(), SourcePath: asset.SourcePath, YAMLPath: entryPath})
+			continue
+		}
+		if stringValue(profile["kind"]) != "forge.reporting.presentationProfileCatalog" || stringValue(profile["schemaVersion"]) != "1" || len(listValue(profile["views"])) == 0 {
+			diagnostics = append(diagnostics, Diagnostic{Code: "presentationProfileContractInvalid", Message: fmt.Sprintf("presentation profile %q must declare kind forge.reporting.presentationProfileCatalog, schemaVersion 1, and non-empty views", normalizedRef), SourcePath: asset.SourcePath, YAMLPath: entryPath})
+			continue
+		}
+		profileValid := stringValue(profile["familyId"]) != ""
+		if !profileValid {
+			diagnostics = append(diagnostics, Diagnostic{Code: "presentationProfileFamilyRequired", Message: fmt.Sprintf("presentation profile %q must declare familyId", normalizedRef), SourcePath: asset.SourcePath, YAMLPath: entryPath})
+		}
+		for viewIndex, rawView := range listValue(profile["views"]) {
+			view := mapValue(rawView)
+			viewID, parseErr := strconv.Atoi(stringValue(view["viewId"]))
+			visualProfile := stringValue(view["visualProfile"])
+			viewPath := fmt.Sprintf("%s.views[%d]", entryPath, viewIndex)
+			if parseErr != nil || viewID <= 0 || visualProfile == "" || stringValue(view["revision"]) == "" || len(listValue(view["tabs"])) == 0 || len(listValue(view["blocks"])) == 0 {
+				diagnostics = append(diagnostics, Diagnostic{Code: "presentationProfileViewInvalid", Message: fmt.Sprintf("presentation profile %q view %d must declare positive viewId, visualProfile, revision, tabs, and blocks", normalizedRef, viewIndex), SourcePath: asset.SourcePath, YAMLPath: viewPath})
+				profileValid = false
+				continue
+			}
+			identity := fmt.Sprintf("%d:%s", viewID, strings.ToLower(visualProfile))
+			if previousRef, ok := seenViews[identity]; ok {
+				diagnostics = append(diagnostics, Diagnostic{Code: "presentationProfileViewDuplicate", Message: fmt.Sprintf("presentation view %s is declared by both %q and %q", identity, previousRef, normalizedRef), SourcePath: asset.SourcePath, YAMLPath: viewPath})
+				profileValid = false
+				continue
+			}
+			seenViews[identity] = normalizedRef
+		}
+		if !profileValid {
+			continue
+		}
+		profile["sourceRef"] = normalizedRef
+		profiles = append(profiles, profile)
+		normalizedRefs = append(normalizedRefs, normalizedRef)
+	}
+	asset.PresentationProfileRefs = normalizedRefs
+	asset.PresentationProfiles = profiles
+	refOwner["presentationProfileRefs"] = stringSliceAny(normalizedRefs)
+	refOwner["presentationProfiles"] = mapSliceAny(profiles)
+	return diagnostics
+}
+
+func stringSliceAny(values []string) []any {
+	result := make([]any, len(values))
+	for index, value := range values {
+		result[index] = value
+	}
+	return result
+}
+
+func mapSliceAny(values []map[string]any) []any {
+	result := make([]any, len(values))
+	for index, value := range values {
+		result[index] = value
+	}
+	return result
 }
 
 func embeddedLegacyPresets(builder *Asset) []*Asset {

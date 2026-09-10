@@ -17,7 +17,7 @@ const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
 const testsDir = path.join(repoRoot, "tests");
 const defaultOutputRoot = path.join(repoRoot, "output", "playwright", "report-builder-preview-suite");
-const browserProofRunner = path.resolve(repoRoot, "../agently/ui/scripts/browser-proof-runner.mjs");
+const browserProofRunner = path.resolve(repoRoot, "scripts/browser-proof-runner.mjs");
 
 async function listScenarioFiles() {
   const entries = await fs.readdir(testsDir, { withFileTypes: true });

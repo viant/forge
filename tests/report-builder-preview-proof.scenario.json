@@ -69,15 +69,15 @@
     },
     {
       "type": "assertText",
-      "text": "Setup"
+      "text": "Filters"
     },
     {
       "type": "assertText",
-      "text": "Chart"
+      "text": "Data model"
     },
     {
       "type": "assertText",
-      "text": "Run"
+      "text": "Load report file"
     },
     {
       "type": "waitForDomContains",
@@ -85,15 +85,10 @@
       "timeoutMs": 60000
     },
     {
-      "type": "clickSelectorContains",
-      "selector": ".forge-report-builder__compact-action",
-      "text": "Setup",
-      "index": 0
-    },
-    {
-      "type": "waitForDomContains",
-      "text": "BREAK DOWN BY",
-      "timeoutMs": 60000
+      "type": "clickRole",
+      "role": "button",
+      "name": "Filters",
+      "exact": true
     },
     {
       "type": "assertText",
@@ -113,31 +108,8 @@
       "name": "Close"
     },
     {
-      "type": "clickSelectorContains",
-      "selector": ".forge-report-builder__compact-action",
-      "text": "Chart",
-      "index": 0
-    },
-    {
-      "type": "waitForDomContains",
-      "text": "Create or apply a chart",
-      "timeoutMs": 60000
-    },
-    {
-      "type": "assertText",
-      "text": "Create Chart"
-    },
-    {
-      "type": "assertText",
-      "text": "Quick view"
-    },
-    {
-      "type": "assertText",
-      "text": "Export"
-    },
-    {
       "type": "screenshot",
-      "file": "report-builder-preview-compact-chart-sheet-proof.png",
+      "file": "report-builder-preview-compact-proof.png",
       "fullPage": true
     }
   ]

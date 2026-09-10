@@ -5,11 +5,24 @@ import path from "node:path";
 const repoRoot = process.cwd();
 const authoredRuntimeRunnerPath = path.join(repoRoot, "scripts", "run-authored-runtime-unit-tests.mjs");
 const phase1VerifierPath = path.join(repoRoot, "scripts", "verify-semantic-preview-phase1.mjs");
+const scenarioRunnerPath = path.join(repoRoot, "scripts", "run-report-builder-preview-scenarios.mjs");
+const browserProofRunnerPath = path.join(repoRoot, "scripts", "browser-proof-runner.mjs");
 const packageJsonPath = path.join(repoRoot, "package.json");
 
 const authoredRuntimeRunner = fs.readFileSync(authoredRuntimeRunnerPath, "utf8");
 const phase1Verifier = fs.readFileSync(phase1VerifierPath, "utf8");
+const scenarioRunner = fs.readFileSync(scenarioRunnerPath, "utf8");
+const browserProofRunner = fs.readFileSync(browserProofRunnerPath, "utf8");
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+
+assert.equal(
+  scenarioRunner.includes('path.resolve(repoRoot, "scripts/browser-proof-runner.mjs")'),
+  true,
+  "preview scenarios should use the Forge-owned browser-proof runner",
+);
+assert.equal(scenarioRunner.includes("../agently"), false, "preview scenarios should not depend on a sibling checkout");
+assert.equal(browserProofRunner.includes('from "playwright"'), true, "browser proof should use the declared Playwright dependency");
+assert.equal(packageJson.devDependencies?.playwright, "^1.60.0", "Playwright should be declared for browser proof runs");
 
 const requiredRuntimeProofFiles = [
   "scripts/report-builder-preview-semantic-left-rail-resize-handle-scenario-assets.test.mjs",

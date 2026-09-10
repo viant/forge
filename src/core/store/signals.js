@@ -523,7 +523,7 @@ function restoreWindowSignalsFromSnapshot(win) {
     const windowId = String(win?.windowId || '').trim();
     if (!windowId) return;
 
-    const inlineMetadata = win?.inlineMetadata;
+    const inlineMetadata = win?.inlineMetadataExplicit === true ? win?.inlineMetadata : null;
     if (inlineMetadata && typeof inlineMetadata === 'object' && !containsSnapshotSerializationMarker(inlineMetadata)) {
         try {
             injectActions(inlineMetadata);
@@ -676,7 +676,8 @@ export const restoreWindowsFromSnapshot = (snapshot) => {
         x: win?.position?.x ?? win?.x ?? undefined,
         y: win?.position?.y ?? win?.y ?? undefined,
         size: win?.size && !containsSnapshotSerializationMarker(win.size) ? win.size : undefined,
-        inlineMetadata: win?.inlineMetadata && typeof win.inlineMetadata === 'object' && !containsSnapshotSerializationMarker(win.inlineMetadata) ? win.inlineMetadata : undefined,
+        inlineMetadata: win?.inlineMetadataExplicit === true && win?.inlineMetadata && typeof win.inlineMetadata === 'object' && !containsSnapshotSerializationMarker(win.inlineMetadata) ? win.inlineMetadata : undefined,
+        inlineMetadataExplicit: win?.inlineMetadataExplicit === true,
     }));
     for (const win of windows) {
         restoreWindowSignalsFromSnapshot(win);
@@ -831,6 +832,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
         };
         if (options.inlineMetadata) {
             newWindow.inlineMetadata = options.inlineMetadata;
+            newWindow.inlineMetadataExplicit = true;
         }
         if (options.size) {
             newWindow.size = options.size;
@@ -893,6 +895,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
         };
         if (options.inlineMetadata !== undefined) {
             nextWindow.inlineMetadata = options.inlineMetadata;
+            nextWindow.inlineMetadataExplicit = true;
         }
         if (options.size !== undefined) {
             nextWindow.size = options.size;

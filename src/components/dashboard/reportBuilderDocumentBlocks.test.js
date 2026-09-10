@@ -483,6 +483,38 @@ assert.deepEqual(
     "dataset options must retain independently scoped aliases of the primary datasource",
 );
 
+const inheritedRuntimeCatalogOptions = buildReportBuilderDatasetOptions({
+    currentSourceRef: "advancedReportingRun",
+    configuredSources: [
+        { id: "primary", dataSourceRef: "advancedReportingRun" },
+        {
+            id: "advanced_summary",
+            dataSourceRef: "advancedReportingRun",
+            capabilities: { fieldCatalog: true, inheritRuntimeFieldCatalog: true },
+            request: { summary: true, dimensions: {}, measures: {}, limit: 1 },
+        },
+    ],
+    tableColumnOptions: [
+        { key: "deviceChannelMix", label: "Device Channel Mix", kind: "dimension" },
+        { key: "impressions", label: "Impressions", kind: "measure" },
+    ],
+    valueFieldOptions: [{ value: "impressions", label: "Impressions" }],
+    secondaryFieldOptions: [{ value: "deviceChannelMix", label: "Device Channel Mix" }],
+    chartFieldOptions: [
+        { key: "deviceChannelMix", label: "Device Channel Mix", kind: "dimension" },
+        { key: "impressions", label: "Impressions", kind: "measure" },
+    ],
+});
+const inheritedSummaryOption = inheritedRuntimeCatalogOptions.find((entry) => entry.value === "advanced_summary");
+assert.deepEqual(inheritedSummaryOption.valueFieldOptions, [{ value: "impressions", label: "Impressions" }]);
+assert.deepEqual(inheritedSummaryOption.secondaryFieldOptions, [{ value: "deviceChannelMix", label: "Device Channel Mix" }]);
+assert.equal(buildReportBuilderDocumentBlockDiagnostics([
+    { id: "summaryImpressions", kind: "kpiBlock", datasetRef: "advanced_summary", valueField: "impressions" },
+], {
+    valueFieldOptions: [{ value: "impressions", label: "Impressions" }],
+    datasetOptions: inheritedRuntimeCatalogOptions,
+}).length, 0);
+
 const reopenedSameSourceScopedOptions = buildReportBuilderDatasetOptions({
     currentSourceRef: "forecastSource",
     configuredDatasets: [

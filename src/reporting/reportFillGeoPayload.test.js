@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
 import { buildReportFillGeoPayload } from "./reportFillGeoPayload.js";
+import { resolveGeoTextColor } from "../components/dashboard/geoMapUtils.js";
+
+assert.equal(resolveGeoTextColor("#0c4d52"), "#ffffff");
+assert.equal(resolveGeoTextColor("#d9f0ea"), "#102a43");
 
 const payload = buildReportFillGeoPayload({
   geo: {
@@ -101,5 +105,20 @@ assert.deepEqual(payload, {
     ],
   },
 });
+
+const fullNamePayload = buildReportFillGeoPayload({
+  geo: {
+    key: "stateName",
+    metric: { key: "visits", label: "Visits", format: "number" },
+    aggregate: "sum",
+  },
+}, [
+  { stateName: "Florida", visits: 142.7 },
+  { stateName: "Virginia", visits: 55.1 },
+]);
+assert.deepEqual(fullNamePayload.regions.map(({ key, label, rawValue }) => ({ key, label, rawValue })), [
+  { key: "FL", label: "Florida", rawValue: 142.7 },
+  { key: "VA", label: "Virginia", rawValue: 55.1 },
+]);
 
 console.log("reportFillGeoPayload ✓ builds deterministic resolved geo payloads for ReportFill");

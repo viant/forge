@@ -34,6 +34,7 @@ activeWindows.value = [
     workspaceCollapsed: true,
     parentKey: 'root',
     inTab: true,
+    inlineMetadataExplicit: true,
   },
 ];
 selectedTabId.value = 'W1';
@@ -131,6 +132,7 @@ assert.equal(snap.windows[0].workspaceMinHeight, 500);
 assert.deepEqual(snap.windows[0].navigation, { label: 'Reports', icon: 'chart' });
 assert.equal(snap.windows[0].workspaceCollapsed, true);
 assert.equal(snap.windows[0].parentKey, 'root');
+assert.equal(snap.windows[0].inlineMetadataExplicit, true);
 assert.equal(snap.windows[0].inlineMetadata.namespace, 'Demo');
 assert.equal(snap.windows[0].inlineMetadata.actions.code, '(() => ({ ping: () => true }))()');
 assert.equal('import' in snap.windows[0].inlineMetadata.actions, false);
@@ -199,5 +201,14 @@ assert.deepEqual(snap.windows[0].metadata.reportBuilder.dataSources, [
     ],
   },
 ]);
+
+activeWindows.value = [{windowId: 'W2', windowKey: 'advertiser', windowTitle: 'Advertiser', inTab: true}];
+getMetadataSignal('W2').value = {
+  authorizationSnapshot: {resources: {'95420': {id: 95420}}},
+  view: {content: {id: 'protected'}},
+};
+const registeredSnapshot = buildUISnapshot({includeInlineMetadata: true});
+assert.equal(registeredSnapshot.windows[0].inlineMetadata, undefined, 'registered windows must refetch metadata and authorization after restore');
+assert.equal(registeredSnapshot.windows[0].inlineMetadataExplicit, false);
 
 resetSignals();

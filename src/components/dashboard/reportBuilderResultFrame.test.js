@@ -1114,6 +1114,30 @@ assert.deepEqual(buildReportBuilderAuthoredRuntimePreviewState({
     canRenderRuntime: true,
 });
 
+const publicReportFailureState = buildReportBuilderAuthoredRuntimePreviewState({
+    runtimePreviewEnabled: true,
+    runtimePreviewArtifact: {
+        runtimeBlock: {
+            dashboard: {
+                reportRuntime: {
+                    reportFill: { datasets: [{ id: "primary", rows: [] }] },
+                },
+            },
+        },
+    },
+    runtimePreviewRowsSource: { loading: false, error: new Error("unsupported report option") },
+    runtimePreviewErrorDescription: '{"status":"error","message":"unsupported report option"}',
+    runtimePreviewArtifactDiagnostics: [{
+        code: "runtimePreviewDatasetFetchFailed",
+        severity: "error",
+        message: "unsupported report option attributionModel",
+    }],
+    presentationMode: "report",
+});
+assert.equal(publicReportFailureState.errorState?.description, "The latest report data could not be prepared for the current authorized scope. Review the report filters and try again.");
+assert.equal(publicReportFailureState.errorState?.diagnostics, undefined);
+assert.doesNotMatch(JSON.stringify(publicReportFailureState.errorState), /unsupported report option|runtimePreviewDatasetFetchFailed/);
+
 assert.deepEqual(buildReportBuilderAuthoredRuntimePreviewState({
     runtimePreviewEnabled: true,
     runtimePreviewArtifact: {

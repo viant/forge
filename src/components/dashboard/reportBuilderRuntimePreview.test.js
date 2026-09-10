@@ -1235,6 +1235,7 @@ const authoredChartModel = buildReportBuilderRuntimePreviewModel({
           type: "line",
           xField: "channelV2",
           yFields: ["avails"],
+          categoryLabel: { lines: 2, maxCharacters: 24 },
         },
       },
     ],
@@ -1261,6 +1262,7 @@ const authoredChartPreview = buildReportBuilderRuntimePreview({
 });
 assert.equal(authoredChartPreview.reportFill.blocks.some((block) => block.kind === "chartBlock" && block.id === "trendChart" && block.content?.chartSpec?.title === "Trend Chart" && block.content?.chartModel?.type === "line"), true);
 assert.equal(authoredChartPreview.reportPrint.pages[0].elements.some((element) => element.kind === "svg" && element.id.includes("trendChart")), true);
+assert.deepEqual(validateReportExportRequest(authoredChartPreview.exportRequest), { valid: true, errors: [] });
 
 const authoredEnhancedBlocksModel = buildReportBuilderRuntimePreviewModel({
   container,

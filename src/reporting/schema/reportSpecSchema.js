@@ -521,6 +521,8 @@ export const reportSpecSchema = {
           type: "object",
           additionalProperties: { $ref: "#/$defs/requestValue" },
         },
+        summary: { type: "boolean" },
+        resultSet: { type: "string", minLength: 1 },
         semanticSelection: { $ref: "#/$defs/semanticSelectionRequest" },
         refinements: {
           type: "array",
@@ -743,6 +745,7 @@ export const reportSpecSchema = {
         runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         datasetRef: { type: "string" },
+        rowLimit: { type: "integer", minimum: 1 },
         chartSpec: { $ref: "#/$defs/chartSpec" },
         chartModel: { $ref: "#/$defs/chartModel" },
       },
@@ -780,6 +783,7 @@ export const reportSpecSchema = {
           items: { type: "string" },
         },
         seriesField: { type: "string" },
+        categoryLabel: { $ref: "#/$defs/presentationTextClamp" },
         seriesOptions: {
           type: "object",
           additionalProperties: {
@@ -808,7 +812,9 @@ export const reportSpecSchema = {
           type: "object",
           additionalProperties: { $ref: "#/$defs/jsonValue" },
         },
+        categoryLabel: { $ref: "#/$defs/presentationTextClamp" },
         tickFormat: { type: "string" },
+        valueMode: { enum: ["civil", "instant"] },
       },
     },
     chartYAxis: {

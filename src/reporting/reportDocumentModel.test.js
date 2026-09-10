@@ -23,6 +23,7 @@ import {
   buildReportDocumentMarkdownBlock,
   buildReportDocumentRefinementBarBlock,
   buildReportDocumentTableBlock,
+  buildStaticDatasetReportBuilderConfig,
   lowerReportDocumentToReportSpec,
   normalizeReportDocumentBuilderConfig,
   resolveReportDocumentBinding,
@@ -77,6 +78,23 @@ const config = {
     pageSize: 50,
   },
 };
+
+const inheritedRuntimeDatasetConfig = buildStaticDatasetReportBuilderConfig(config, {
+  id: "summary",
+  dataSourceRef: "summarySource",
+  columnOptions: [],
+  capabilities: { inheritRuntimeFieldCatalog: true },
+});
+assert.deepEqual(inheritedRuntimeDatasetConfig.dimensions, config.dimensions);
+assert.deepEqual(inheritedRuntimeDatasetConfig.measures, config.measures);
+assert.equal(inheritedRuntimeDatasetConfig.dataSourceRef, "summarySource");
+const isolatedEmptyDatasetConfig = buildStaticDatasetReportBuilderConfig(config, {
+  id: "empty",
+  dataSourceRef: "emptySource",
+  columnOptions: [],
+});
+assert.deepEqual(isolatedEmptyDatasetConfig.dimensions, []);
+assert.deepEqual(isolatedEmptyDatasetConfig.measures, []);
 
 const state = {
   selectedMeasures: ["totalSpend", "impressions"],
@@ -444,6 +462,7 @@ const authoredChartBlock = buildReportDocumentChartBlock({
   id: "channelTrend",
   title: "Channel Trend",
   datasetRef: "primary",
+  rowLimit: 8,
   chartSpec: {
     type: "line",
     xField: "eventDate",
@@ -456,6 +475,7 @@ assert.deepEqual(authoredChartBlock, {
   kind: "chartBlock",
   title: "Channel Trend",
   datasetRef: "primary",
+  rowLimit: 8,
   chartSpec: {
     title: "Channel Trend",
     type: "line",

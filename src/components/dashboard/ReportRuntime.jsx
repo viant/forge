@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@blueprintjs/core";
 
 import Chart from "../Chart.jsx";
@@ -21,6 +21,7 @@ import {
   resolveReportRuntimeRefinementFields,
   resolveReportRuntimeScopeSummary,
 } from "./reportRuntimeModel.js";
+import { resolveRuntimeKpiTrend } from "./reportRuntimeKpiTrend.js";
 import {
   buildIdleReportRuntimeProviderActionsState,
   buildPendingReportRuntimeProviderActionsState,
@@ -49,7 +50,7 @@ import {
   setReportRuntimeChartSelection,
 } from "./reportRuntimeChartSelectionState.js";
 import { resolveReportRuntimeDrillMetadataProvider } from "./reportRuntimeDrillProvider.js";
-import { DEFAULT_GEO_PALETTE, US_STATE_TILES, normalizeGeoKey } from "./geoMapUtils.js";
+import { DEFAULT_GEO_PALETTE, US_STATE_TILES, normalizeGeoKey, resolveGeoTextColor } from "./geoMapUtils.js";
 import { buildSemanticFieldGovernanceChipViewModels } from "./semanticFieldGovernanceView.js";
 import { formatDashboardValue } from "./dashboardUtils.js";
 import { resolveDashboardRowActionIdentity } from "./dashboardRowActionPresentation.js";
@@ -157,6 +158,18 @@ function createRuntimeContext(dataset = {}, locale = "en-US") {
       },
     },
   };
+}
+
+export function resolveReportRuntimeChartRowLimit(block = {}) {
+  const explicitRowLimit = Math.trunc(Number(block?.content?.rowLimit ?? block?.rowLimit ?? 0));
+  const chartType = normalizeString(block?.content?.chartSpec?.type || block?.chartSpec?.type).toLowerCase();
+  return Number.isInteger(explicitRowLimit) && explicitRowLimit > 0
+    ? explicitRowLimit
+    : (chartType === "horizontal_bar" || chartType === "funnel_bar" ? 10 : 0);
+}
+
+export function shouldApplyTableDefaultCollapsed(previousDefaultCollapsed, nextDefaultCollapsed, collapsible) {
+  return collapsible === true && nextDefaultCollapsed === true && previousDefaultCollapsed !== true;
 }
 
 function buildRuntimeTableRows(block = {}, dataset = {}) {
@@ -879,10 +892,25 @@ function ScopeDetailsPanel({ scopeSummary = null, activeScopeSummary = null, pre
   );
 }
 
-function DiagnosticsPanel({ diagnostics = [], onRetryProviderActions = null, providerActionsLoading = false }) {
+function DiagnosticsPanel({ diagnostics = [], developerMode = false, onRetryProviderActions = null, providerActionsLoading = false }) {
   const viewModel = buildReportRuntimeDiagnosticsViewModel(diagnostics);
   if (!viewModel.hasDiagnostics) {
     return null;
+  }
+  if (!developerMode) {
+    const hasError = viewModel.diagnostics.some((diagnostic) => normalizeString(diagnostic?.severity).toLowerCase() === "error");
+    return (
+      <RuntimePanel
+        className="forge-report-runtime-diagnostics forge-report-runtime-diagnostics--public"
+        title={hasError ? "Report refresh unavailable" : "Report notice"}
+      >
+        <div style={{ fontSize: 12, lineHeight: 1.6, color: "#30404d" }}>
+          {hasError
+            ? "The latest report data could not be refreshed for the current authorized scope. The saved result remains unchanged. Review the report filters and try again."
+            : "Some report details are temporarily unavailable. The saved result remains unchanged."}
+        </div>
+      </RuntimePanel>
+    );
   }
   return (
     <RuntimePanel className="forge-report-runtime-diagnostics" title="Runtime Diagnostics">
@@ -1002,6 +1030,23 @@ function DiagnosticsPanel({ diagnostics = [], onRetryProviderActions = null, pro
       </div>
     </RuntimePanel>
   );
+}
+
+export function sanitizeReportRuntimeDiagnostics(diagnostics = [], publicMode = false) {
+  const source = Array.isArray(diagnostics) ? diagnostics : [];
+  if (!publicMode) return source;
+  return source.map((diagnostic) => {
+    if (!diagnostic || typeof diagnostic !== "object" || Array.isArray(diagnostic)) return diagnostic;
+    const severity = normalizeString(diagnostic?.severity || "info").toLowerCase();
+    return {
+      ...diagnostic,
+      code: severity === "error" ? "reportSectionUnavailable" : "reportSectionNotice",
+      message: severity === "error"
+        ? "This report section could not be refreshed for the current authorized scope."
+        : "Some report details are temporarily unavailable.",
+      suggestedFix: "",
+    };
+  });
 }
 
 function BlockDiagnosticsCallout({ diagnostics = [], onRetryProviderActions = null, providerActionsLoading = false }) {
@@ -1392,9 +1437,8 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
     && content?.secondaryValue !== null;
   const secondaryTrend = content?.secondaryTrend === true || block?.secondaryTrend === true;
   const secondaryNumeric = Number(content?.secondaryValue);
-  const secondaryArrow = secondaryTrend && Number.isFinite(secondaryNumeric)
-    ? (secondaryNumeric > 0 ? "↑" : (secondaryNumeric < 0 ? "↓" : "→"))
-    : "";
+  const secondaryTrendStyle = resolveRuntimeKpiTrend(content?.secondaryValue, secondaryTrend);
+  const secondaryArrow = secondaryTrendStyle.arrow;
   const formattedSecondaryValue = hasSecondaryValue
     ? formatKpiValue(content?.secondaryValue, normalizeString(content?.secondaryFormat), locale)
     : "";
@@ -1431,11 +1475,12 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
     >
       <div
         data-report-runtime-kpi-tone={normalizeString(content?.tone).toLowerCase() || "neutral"}
+        data-report-runtime-kpi-accent={secondaryTrend ? secondaryTrendStyle.kind : "neutral"}
         style={{
           height: 4,
           width: 32,
           borderRadius: 999,
-          background: toneStyles.accent,
+          background: secondaryTrend ? secondaryTrendStyle.color : toneStyles.accent,
           marginBottom: 2,
         }}
       />
@@ -1461,11 +1506,19 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
                 </span>
               </div>
               {hasSecondaryValue ? (
-                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: "#30404d" }}>
-                  <strong style={{ color: "#182026" }}>
+                <div
+                  data-report-runtime-kpi-trend-row={secondaryTrendStyle.kind}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: secondaryTrendStyle.color }}
+                >
+                  <strong style={{ color: "inherit" }}>
                     {normalizeString(content?.secondaryLabel || content?.secondaryField)}
                   </strong>
-                  <span>{secondaryArrow ? `${secondaryArrow} ` : ""}{signedSecondaryValue}</span>
+                  <span
+                    data-report-runtime-kpi-trend={secondaryTrendStyle.kind}
+                    style={{ color: secondaryTrendStyle.color, fontWeight: secondaryTrend ? 700 : 400 }}
+                  >
+                    {secondaryArrow ? `${secondaryArrow} ` : ""}{signedSecondaryValue}
+                  </span>
                 </div>
               ) : null}
             </>
@@ -2047,7 +2100,16 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
     ? block.content.columns
     : (Array.isArray(block?.columns) ? block.columns : []);
   const collapsible = block?.content?.collapsible === true || block?.collapsible === true;
-  const [collapsed, setCollapsed] = useState(() => collapsible && (block?.content?.defaultCollapsed === true || block?.defaultCollapsed === true));
+  const authoredDefaultCollapsed = block?.content?.defaultCollapsed ?? block?.defaultCollapsed;
+  const defaultCollapsed = collapsible && authoredDefaultCollapsed !== false;
+  const [collapsed, setCollapsed] = useState(() => collapsible && defaultCollapsed);
+  const previousDefaultCollapsedRef = useRef(defaultCollapsed);
+  useEffect(() => {
+    if (shouldApplyTableDefaultCollapsed(previousDefaultCollapsedRef.current, defaultCollapsed, collapsible)) {
+      setCollapsed(true);
+    }
+    previousDefaultCollapsedRef.current = defaultCollapsed;
+  }, [collapsible, defaultCollapsed]);
   const [tablePresentation, setTablePresentation] = useState(() => ({
     rowCount: Number(block?.content?.rowCount ?? dataset?.provenance?.rowCount ?? 0) || 0,
     filter: "",
@@ -2087,6 +2149,7 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
     providerActionsByField,
   });
   const runtimeTableRows = buildRuntimeTableRows(block, dataset);
+  const collapsedPreviewLimit = Math.min(5, runtimeTableRows.length);
   const rowActions = tableInteractionState.actions
     .filter((action) => supportsReportRuntimeExecution(action, runtimeHandlers))
     .map((action) => ({
@@ -2142,7 +2205,7 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
       <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
       {collapsible && collapsed ? (
         <div className="forge-report-runtime-table-collapsed-summary" aria-live="polite" style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 12, color: "#5f6b7c" }}>
-          <span>{tablePresentation.rowCount} {tablePresentation.rowCount === 1 ? "row" : "rows"}</span>
+          <span>Showing {collapsedPreviewLimit} of {runtimeTableRows.length} {runtimeTableRows.length === 1 ? "row" : "rows"}</span>
           {tablePresentation.sort ? <span>Sorted by {tablePresentation.sort.label} ({tablePresentation.sort.direction})</span> : null}
           {tablePresentation.filter ? <span>Filter: {tablePresentation.filter}</span> : null}
         </div>
@@ -2154,8 +2217,6 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
       ) : (
       <div
         id={`${normalizeString(block?.id || "tableBlock")}__table_content`}
-        aria-hidden={collapsible && collapsed ? true : undefined}
-        style={collapsible && collapsed ? { display: "none" } : undefined}
       >
       <DashboardTableContent
         container={{
@@ -2167,7 +2228,9 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
             table: {
               columns,
               density: "compact",
-              limit: Math.max(1, Number(dataset?.provenance?.rowCount || reportSpec?.parameters?.pageSize || 50) || 50),
+              limit: collapsed
+                ? Math.max(1, collapsedPreviewLimit)
+                : Math.max(1, Number(dataset?.provenance?.rowCount || reportSpec?.parameters?.pageSize || 50) || 50),
               rowActionDisplay: "compact",
               rowActions,
               labelClamp: block?.content?.labelClamp || block?.labelClamp,
@@ -2606,7 +2669,7 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
                       borderRadius: 10,
                       border: region ? "1px solid rgba(24,32,38,0.14)" : "1px dashed rgba(95,107,124,0.22)",
                       background: region?.color || "#eef3f8",
-                      color: region ? "#102a43" : "#5f6b7c",
+                      color: region ? resolveGeoTextColor(region.color) : "#5f6b7c",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -2732,8 +2795,10 @@ export default function ReportRuntime({
   showContextSummary = true,
   suppressFilterBarBlocks = false,
   suppressFilterBarBlockDatasetRefs = [],
+  showDeveloperDiagnostics = false,
 }) {
   const reportPresentation = normalizeString(presentationMode).toLowerCase() === "report";
+  const publicDiagnosticsMode = reportPresentation && !showDeveloperDiagnostics;
   const [selectedChartSelectionsByBlock, setSelectedChartSelectionsByBlock] = useState({});
   const [filterPanelOpen, setFilterPanelOpen] = useState(true);
   const [runtimeSelection, setRuntimeSelection] = useState({});
@@ -2779,9 +2844,17 @@ export default function ReportRuntime({
   }, [reportFill, reportSpec, runtimeSelection]);
   const datasetIndex = useMemo(() => new Map(
     (Array.isArray(effectiveReportFill?.datasets) ? effectiveReportFill.datasets : [])
-      .map((dataset) => [normalizeString(dataset?.id), dataset])
+      .map((dataset) => [normalizeString(dataset?.id), publicDiagnosticsMode
+        ? {
+          ...dataset,
+          provenance: {
+            ...(dataset?.provenance || {}),
+            diagnostics: sanitizeReportRuntimeDiagnostics(dataset?.provenance?.diagnostics, true),
+          },
+        }
+        : dataset])
       .filter(([id]) => !!id),
-  ), [effectiveReportFill]);
+  ), [effectiveReportFill, publicDiagnosticsMode]);
   const availableDatasetRefs = useMemo(
     () => Array.from(datasetIndex.keys()),
     [datasetIndex],
@@ -2923,8 +2996,8 @@ export default function ReportRuntime({
     ...providerDiagnostics,
   ]), [providerDiagnostics, reportFill?.diagnostics]);
   const blockDiagnosticsIndex = useMemo(
-    () => buildBlockDiagnosticsIndex(runtimeDiagnostics),
-    [runtimeDiagnostics],
+    () => buildBlockDiagnosticsIndex(sanitizeReportRuntimeDiagnostics(runtimeDiagnostics, publicDiagnosticsMode)),
+    [publicDiagnosticsMode, runtimeDiagnostics],
   );
 
   const setSelectedChartSelection = (blockId, selection) => {
@@ -3121,7 +3194,10 @@ export default function ReportRuntime({
                 kind: "dashboard.chart",
                 title: normalizeString(block?.title || block?.content?.chartSpec?.title || block?.chartSpec?.title || "Chart"),
                 dataSourceRef: normalizeString(dataset?.dataSourceRef || block?.datasetRef),
-                chart: chartModel,
+                chart: {
+                  ...chartModel,
+                  rowLimit: resolveReportRuntimeChartRowLimit(block),
+                },
               }}
               context={createRuntimeContext(dataset, locale)}
               isActive
@@ -3318,7 +3394,7 @@ export default function ReportRuntime({
       <HostIntentPanel hostIntent={hostIntent} runtimeHandlers={runtimeHandlers} />
       <DiagnosticsPanel diagnostics={[
         ...runtimeDiagnostics,
-      ]} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />
+      ]} developerMode={!reportPresentation || showDeveloperDiagnostics} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />
       {runtimeSections.length > 1 || (runtimeTabGroup?.includeUnlistedSections === false && runtimeSections.length > 0) ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {runtimeTabGroup?.title ? (

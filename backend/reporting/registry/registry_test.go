@@ -118,6 +118,77 @@ reportBuilder: {}
 	}
 }
 
+func TestDiscoverLoadsBuilderPresentationProfilesFromWorkspaceRelativeRefs(t *testing.T) {
+	workspace := t.TempDir()
+	writeAsset(t, workspace, "extension/forge/reporting/family/profiles/performance.json", `{
+  "kind":"forge.reporting.presentationProfileCatalog",
+  "schemaVersion":1,
+  "familyId":"performance",
+  "views":[{"viewId":1294,"visualProfile":"performance_overview","revision":"1","tabs":[{"id":"overview","title":"Overview","blockIds":["trend"]}],"blocks":[{"id":"trend","kind":"chartBlock"}]}]
+}`)
+	writeAsset(t, workspace, "extension/forge/reporting/family/builder.yaml", `
+kind: forge.reporting.builder
+id: family
+reportBuilder:
+  presentationProfileRefs:
+    - ./profiles/performance.json
+`)
+
+	got, err := Discover(context.Background(), Options{WorkspaceRoot: workspace})
+	if err != nil {
+		t.Fatalf("Discover() error = %v", err)
+	}
+	builder := got.Builder("family")
+	if builder == nil || len(builder.PresentationProfiles) != 1 || len(builder.PresentationProfileRefs) != 1 {
+		t.Fatalf("unexpected presentation profiles %#v", builder)
+	}
+	if builder.PresentationProfileRefs[0] != "profiles/performance.json" {
+		t.Fatalf("unexpected normalized profile ref %q", builder.PresentationProfileRefs[0])
+	}
+	if builder.PresentationProfiles[0]["sourceRef"] != "profiles/performance.json" {
+		t.Fatalf("profile source identity was not retained: %#v", builder.PresentationProfiles[0])
+	}
+	reportBuilder := mapValue(builder.Raw["reportBuilder"])
+	if len(listValue(reportBuilder["presentationProfiles"])) != 1 {
+		t.Fatalf("resolved profiles were not published in builder config: %#v", reportBuilder)
+	}
+}
+
+func TestDiscoverRejectsPresentationProfileOutsideWorkspace(t *testing.T) {
+	parent := t.TempDir()
+	workspace := filepath.Join(parent, "workspace")
+	writeAsset(t, parent, "outside.json", `{"kind":"forge.reporting.presentationProfileCatalog","schemaVersion":1,"views":[{}]}`)
+	writeAsset(t, workspace, "extension/forge/reporting/family/builder.yaml", `
+kind: forge.reporting.builder
+id: family
+reportBuilder:
+  presentationProfileRefs: [../../../../../outside.json]
+`)
+
+	_, err := Discover(context.Background(), Options{WorkspaceRoot: workspace})
+	if err == nil || !strings.Contains(err.Error(), "outside workspace") {
+		t.Fatalf("expected workspace escape rejection, got %v", err)
+	}
+}
+
+func TestDiscoverRejectsDuplicatePresentationViewIdentity(t *testing.T) {
+	workspace := t.TempDir()
+	profile := `{"kind":"forge.reporting.presentationProfileCatalog","schemaVersion":1,"familyId":"performance","views":[{"viewId":1294,"visualProfile":"performance_overview","revision":"1","tabs":[{"id":"overview","title":"Overview","blockIds":["trend"]}],"blocks":[{"id":"trend","kind":"chartBlock"}]}]}`
+	writeAsset(t, workspace, "extension/forge/reporting/family/profiles/one.json", profile)
+	writeAsset(t, workspace, "extension/forge/reporting/family/profiles/two.json", profile)
+	writeAsset(t, workspace, "extension/forge/reporting/family/builder.yaml", `
+kind: forge.reporting.builder
+id: family
+reportBuilder:
+  presentationProfileRefs: [./profiles/one.json, ./profiles/two.json]
+`)
+
+	_, err := Discover(context.Background(), Options{WorkspaceRoot: workspace})
+	if err == nil || !strings.Contains(err.Error(), "declared by both") {
+		t.Fatalf("expected duplicate presentation identity rejection, got %v", err)
+	}
+}
+
 func TestGroupCatalogReferenceRelocatesWithWorkspace(t *testing.T) {
 	parent := t.TempDir()
 	original := filepath.Join(parent, "workspace-a")
