@@ -15,6 +15,8 @@ const runtimeUnitTests = [
   "scripts/report-builder-preview-proof-integration.test.mjs",
   "scripts/report-builder-preview-scenario-assets.test.mjs",
   "scripts/report-builder-preview-multi-dataset-runtime-proof-scenario-assets.test.mjs",
+  "scripts/report-builder-preview-horizontal-bar-mobile-proof-scenario-assets.test.mjs",
+  "scripts/report-builder-preview-filter-surface-placements-scenario-assets.test.mjs",
   "scripts/report-builder-preview-import-scenario-assets.test.mjs",
   "scripts/report-builder-preview-import-catalog-document-scenario-assets.test.mjs",
   "scripts/report-builder-preview-import-document-api-scenario-assets.test.mjs",

@@ -43,6 +43,7 @@ import {
     resolveChartBodyState,
     resolveChartLoadingState,
     resolveHorizontalBarDataLabelLayout,
+    resolveHorizontalBarLayout,
     resolveChartValueAxisDomain,
     resolveVisibleChartState,
     transformData,
@@ -697,21 +698,20 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     };
 
     const authoredCategoryLabelConfig = normalizeChartCategoryLabelConfig(xAxis?.categoryLabel);
-    const estimatedCategoryGutter = Math.max(110, Math.min(420, Number(chartSize.width || 0) * 0.42 || 220));
-    const responsiveCategoryMaxCharacters = Math.max(
-        24,
-        Math.min(120, Math.floor(Math.max(84, estimatedCategoryGutter - 24) / 7) * 2),
-    );
+    const horizontalBarLayout = resolveHorizontalBarLayout({
+        containerWidth: chartSize.width,
+        embedded,
+        categoryLabel: authoredCategoryLabelConfig,
+    });
     const categoryLabelConfig = isHorizontalBar
-        ? {
-            lines: authoredCategoryLabelConfig?.lines || 2,
-            maxCharacters: Math.max(authoredCategoryLabelConfig?.maxCharacters || 0, responsiveCategoryMaxCharacters),
-        }
+        ? horizontalBarLayout.categoryLabel
         : authoredCategoryLabelConfig;
     const categoryLabelBottomOffset = categoryLabelConfig?.lines === 2 ? 14 : 0;
-    const chartMargin = embedded
-        ? {top: 24, right: 12, left: 6, bottom: 34 + categoryLabelBottomOffset}
-        : {top: 10, right: 60, left: 14, bottom: 42 + categoryLabelBottomOffset};
+    const chartMargin = isHorizontalBar
+        ? horizontalBarLayout.margin
+        : (embedded
+            ? {top: 24, right: 12, left: 6, bottom: 34 + categoryLabelBottomOffset}
+            : {top: 10, right: 60, left: 14, bottom: 42 + categoryLabelBottomOffset});
     const legendProps = embedded
         ? {verticalAlign: "top", align: "center", wrapperStyle: {fontSize: "10px", lineHeight: 1.1, paddingBottom: "6px", color: "#5f6b7c"}}
         : {};
@@ -1049,16 +1049,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         if (!categoryKey || !primarySeries) return null;
 
         const activePalette = (palette && palette.length > 0) ? palette : defaultCategoricalPalette();
-        const estimatedCategoryCharacters = categoryLabelConfig
-            ? Math.ceil(categoryLabelConfig.maxCharacters / categoryLabelConfig.lines)
-            : Math.max(1, ...normalizedChartData.map((row) => String(readChartDataValue(row, categoryKey) ?? "").length));
-        const categoryWidth = Math.min(
-            estimatedCategoryGutter,
-            Math.max(
-                110,
-                estimatedCategoryCharacters * 7 + 24,
-            )
-        );
+        const categoryWidth = horizontalBarLayout.categoryWidth;
         const barSize = embedded ? 10 : 12;
         const showHorizontalDataLabels = shouldRenderSeriesDataLabels(primarySeries, type, normalizedChartData.length, embedded);
         const primaryDataLabelFormatter = buildDataLabelFormatter(primarySeries.format || leftAxis.format);
@@ -1077,6 +1068,9 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         offset: 0,
                     }}
                     domain={resolveChartValueAxisDomain(type, leftAxis.domain)}
+                    tickCount={horizontalBarLayout.numericTickCount}
+                    minTickGap={horizontalBarLayout.numericMinTickGap}
+                    interval="preserveStartEnd"
                 />
                 <YAxis
                     type="category"
@@ -1330,7 +1324,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     );
 
     const resolvedWidth = isHorizontalBar
-        ? normalizeChartExtent(width, embedded ? "82%" : "85%")
+        ? normalizeChartExtent(width, horizontalBarLayout.width)
         : normalizeChartExtent(width, "100%");
     const estimatedHorizontalRowHeight = categoryLabelConfig?.lines === 2
         ? (embedded ? 34 : 40)

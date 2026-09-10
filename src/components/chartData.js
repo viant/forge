@@ -57,6 +57,43 @@ export function resolveHorizontalBarDataLabelLayout({ x = 0, width = 0, value = 
     };
 }
 
+export function resolveHorizontalBarLayout({
+    containerWidth = 0,
+    embedded = false,
+    categoryLabel = null,
+} = {}) {
+    const width = Math.max(0, Number(containerWidth) || 0);
+    const compact = width > 0 && width <= 520;
+    const lines = Math.max(1, Math.min(2, Number(categoryLabel?.lines) || 2));
+    const categoryShare = compact ? 0.34 : 0.42;
+    const categoryWidth = Math.round(Math.max(
+        compact ? 76 : 110,
+        Math.min(compact ? 104 : 420, width * categoryShare || (compact ? 96 : 220)),
+    ));
+    const charactersPerLine = Math.max(compact ? 10 : 12, Math.floor(Math.max(64, categoryWidth - 16) / 6.5));
+    const responsiveMaxCharacters = charactersPerLine;
+    const authoredMaxCharacters = Math.max(0, Number(categoryLabel?.maxCharacters) || 0);
+    const maxCharacters = authoredMaxCharacters > 0
+        ? Math.min(authoredMaxCharacters, responsiveMaxCharacters)
+        : responsiveMaxCharacters;
+    const bottomOffset = lines === 2 ? 14 : 0;
+    const margin = compact
+        ? { top: embedded ? 20 : 10, right: 36, left: 0, bottom: (embedded ? 32 : 40) + bottomOffset }
+        : (embedded
+            ? { top: 24, right: 12, left: 6, bottom: 34 + bottomOffset }
+            : { top: 10, right: 60, left: 14, bottom: 42 + bottomOffset });
+    return {
+        compact,
+        width: compact ? "100%" : (embedded ? "82%" : "85%"),
+        categoryWidth,
+        categoryLabel: { lines, maxCharacters },
+        margin,
+        numericTickCount: compact ? 3 : undefined,
+        numericMinTickGap: compact ? 18 : 5,
+        estimatedPlotWidth: width > 0 ? Math.max(0, width - categoryWidth - margin.left - margin.right) : 0,
+    };
+}
+
 export function hasNonZeroChartSeriesValue(rows = [], seriesKeys = []) {
     const keys = Array.isArray(seriesKeys) ? seriesKeys : [];
     return (Array.isArray(rows) ? rows : []).some((row) => keys.some((key) => {
