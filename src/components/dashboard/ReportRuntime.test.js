@@ -229,6 +229,10 @@ assert.ok(!publicReportErrorHtml.includes("runtimePreviewDatasetFetchFailed"));
 assert.equal(isReportRuntimeRefreshDiagnostic({ code: "runtimePreviewDatasetFetchFailed" }), true);
 assert.equal(isReportRuntimeRefreshDiagnostic({ code: "documentBlockColumnUnavailable" }), false);
 assert.equal(hasUsableReportRuntimeData({ datasets: [{ id: "saved", rows: [{ value: 42 }] }] }), true);
+assert.equal(hasUsableReportRuntimeData({
+  datasets: [{ id: "saved", rows: [] }],
+  blocks: [{ id: "savedKpi", kind: "kpiBlock", content: { value: 42, rowCount: 1 } }],
+}), true);
 assert.deepEqual(resolvePublicReportRuntimeDiagnostics([
   { code: "runtimePreviewDatasetFetchFailed", severity: "error" },
   { code: "documentBlockColumnUnavailable", severity: "error" },
@@ -3288,6 +3292,8 @@ const responsiveComposite = { layout: "responsiveGrid" };
 assert.equal(resolveReportRuntimeCompositeColumns(responsiveComposite, 1200), 3);
 assert.equal(resolveReportRuntimeCompositeColumns(responsiveComposite, 800), 2);
 assert.equal(resolveReportRuntimeCompositeColumns(responsiveComposite, 500), 1);
+assert.equal(resolveReportRuntimeCompositeColumns({...responsiveComposite, runtime: {mobileColumns: 2}}, 500), 2);
+assert.equal(resolveReportRuntimeCompositeColumns({...responsiveComposite, runtime: {mobileColumns: 9}}, 500), 3);
 assert.ok(compositeRuntimeHtml.includes("Summary panel"));
 assert.ok(compositeRuntimeHtml.includes("Summary child"));
 assert.ok(compositeRuntimeHtml.includes("Headline child KPI"));

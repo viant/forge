@@ -440,6 +440,22 @@
 }
 
 @media (max-width: 700px) {
+    .forge-report-runtime-geo-layout {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    .forge-report-runtime-geo-tiles {
+        grid-template-columns: repeat(12, minmax(20px, 1fr)) !important;
+        grid-template-rows: repeat(8, minmax(28px, 1fr)) !important;
+        gap: 4px !important;
+    }
+
+    .forge-report-runtime-geo-details {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+    }
+
     .forge-dashboard-table-scroll-hint {
         display: flex;
         align-items: center;

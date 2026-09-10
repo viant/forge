@@ -100,6 +100,23 @@ export function applyChartRowLimit(rows = [], rowLimit = 0) {
     return Number.isInteger(limit) && limit > 0 ? source.slice(0, limit) : source;
 }
 
+export function resolveResponsiveChartType(chartType = "", containerWidth = 0, {
+    xAxis = null,
+    rows = [],
+} = {}) {
+    const normalizedType = String(chartType || "").trim().toLowerCase();
+    const width = Math.max(0, Number(containerWidth) || 0);
+    if (normalizedType !== "bar" || width <= 0 || width > 520) {
+        return normalizedType;
+    }
+    const key = String(xAxis?.dataKey || "").trim();
+    const values = key ? (Array.isArray(rows) ? rows : []).slice(0, 8).map((row) => readChartDataValue(row, key)) : [];
+    const temporal = values.length > 0 && values.every((value) => (
+        value instanceof Date || /^\d{4}-\d{2}-\d{2}(?:[T\s]|$)/.test(String(value ?? "").trim())
+    ));
+    return temporal ? normalizedType : "horizontal_bar";
+}
+
 export function hasNonZeroChartSeriesValue(rows = [], seriesKeys = []) {
     const keys = Array.isArray(seriesKeys) ? seriesKeys : [];
     return (Array.isArray(rows) ? rows : []).some((row) => keys.some((key) => {

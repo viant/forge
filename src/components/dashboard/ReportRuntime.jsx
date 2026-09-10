@@ -124,11 +124,12 @@ function supportsReportRuntimeExecution(execution = null, runtimeHandlers = null
   return false;
 }
 
-function createRuntimeContext(dataset = {}, locale = "en-US") {
+function createRuntimeContext(dataset = {}, locale = "en-US", { publicMode = false } = {}) {
   const rows = Array.isArray(dataset?.rows) ? dataset.rows : [];
   const diagnostics = Array.isArray(dataset?.provenance?.diagnostics) ? dataset.provenance.diagnostics : [];
-  const controlValue = diagnostics.find((entry) => normalizeString(entry?.severity).toLowerCase() === "error")
-    ? { loading: false, error: diagnostics.find((entry) => normalizeString(entry?.severity).toLowerCase() === "error")?.message || "Dataset failed to load." }
+  const errorDiagnostic = diagnostics.find((entry) => normalizeString(entry?.severity).toLowerCase() === "error") || null;
+  const controlValue = errorDiagnostic && !(publicMode && rows.length > 0)
+    ? { loading: false, error: errorDiagnostic?.message || "Dataset failed to load." }
     : { loading: false, error: null };
   return {
     locale,
@@ -273,7 +274,10 @@ export function resolveReportRuntimeCompositeColumns(block = {}, viewportWidth =
   }
   const normalizedWidth = Number(viewportWidth) || 0;
   if (normalizedWidth > 0 && normalizedWidth <= 640) {
-    return 1;
+    const requestedMobileColumns = Number(block?.content?.runtime?.mobileColumns ?? block?.runtime?.mobileColumns);
+    return Number.isFinite(requestedMobileColumns)
+      ? Math.max(1, Math.min(3, Math.floor(requestedMobileColumns)))
+      : 1;
   }
   if (normalizedWidth > 0 && normalizedWidth <= 960) {
     return 2;
@@ -1041,8 +1045,21 @@ export function isReportRuntimeRefreshDiagnostic(diagnostic = null) {
 }
 
 export function hasUsableReportRuntimeData(reportFill = null) {
-  return (Array.isArray(reportFill?.datasets) ? reportFill.datasets : [])
+  const hasDatasetRows = (Array.isArray(reportFill?.datasets) ? reportFill.datasets : [])
     .some((dataset) => Array.isArray(dataset?.rows) && dataset.rows.length > 0);
+  if (hasDatasetRows) {
+    return true;
+  }
+  return (Array.isArray(reportFill?.blocks) ? reportFill.blocks : []).some((block) => {
+    const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
+      ? block.content
+      : {};
+    return Number(content?.rowCount || 0) > 0
+      || (Array.isArray(content?.resolvedRows) && content.resolvedRows.length > 0)
+      || (Array.isArray(content?.items) && content.items.length > 0)
+      || (Array.isArray(content?.resolvedChart?.rows) && content.resolvedChart.rows.length > 0)
+      || (content?.value !== undefined && content?.value !== null);
+  });
 }
 
 export function resolvePublicReportRuntimeDiagnostics(diagnostics = [], reportFill = null) {
@@ -1172,7 +1189,13 @@ function resolveRuntimeBlockDatasetRef(block = {}, {
 }
 
 function resolveDatasetBackedBlockDiagnostics(block = {}, diagnostics = [], dataset = null, publicMode = false) {
-  const datasetHasUsableRows = Array.isArray(dataset?.rows) && dataset.rows.length > 0;
+  const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content) ? block.content : {};
+  const datasetHasUsableRows = (Array.isArray(dataset?.rows) && dataset.rows.length > 0)
+    || Number(content?.rowCount || 0) > 0
+    || (content?.value !== undefined && content?.value !== null)
+    || (Array.isArray(content?.resolvedRows) && content.resolvedRows.length > 0)
+    || (Array.isArray(content?.items) && content.items.length > 0)
+    || (Array.isArray(content?.resolvedChart?.rows) && content.resolvedChart.rows.length > 0);
   const resolvedDiagnostics = (Array.isArray(diagnostics) ? diagnostics : [])
     .filter((diagnostic) => !(publicMode && datasetHasUsableRows && isReportRuntimeRefreshDiagnostic(diagnostic)));
   const datasetDiagnostics = Array.isArray(dataset?.provenance?.diagnostics)
@@ -2110,7 +2133,7 @@ function resolveRuntimeCompositeConfig(blocks = []) {
   };
 }
 
-function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null }) {
+function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false }) {
   const tableAccentTone = normalizeString(block?.content?.accentTone || block?.accentTone).toLowerCase();
   const tableAccent = ["blue", "green", "amber", "rose", "slate"].includes(tableAccentTone)
     ? resolveRuntimeAccentPalette(tableAccentTone).accent
@@ -2263,7 +2286,7 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
         context={createRuntimeContext({
           ...dataset,
           rows: runtimeTableRows,
-        }, locale)}
+        }, locale, { publicMode })}
         locale={locale}
         onPresentationStateChange={handleTablePresentationChange}
       />
@@ -2660,7 +2683,7 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
           No geo data.
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 1fr) minmax(220px, 320px)", gap: 16 }}>
+        <div className="forge-report-runtime-geo-layout" style={{ display: "grid", gridTemplateColumns: "minmax(320px, 1fr) minmax(220px, 320px)", gap: 16 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 12, color: "#30404d" }}>
               <span><strong>{Number(resolvedGeo?.summary?.regionCount || 0)}</strong> Regions</span>
@@ -2669,6 +2692,7 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
             </div>
             <div
               role="list"
+              className="forge-report-runtime-geo-tiles"
               aria-label={normalizeString(block?.title || "Geo map")}
               style={{
                 display: "grid",
@@ -2731,7 +2755,7 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
               )
             ) : null}
           </div>
-          <aside style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <aside className="forge-report-runtime-geo-details" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div
               style={{
                 border: "1px solid #d8e1e8",
@@ -3147,6 +3171,7 @@ export default function ReportRuntime({
           onRetryProviderActions={retryProviderActions}
           providerActionsLoading={providerActionsLoading}
           onRuntimeSelection={setRuntimeSelection}
+          publicMode={publicDiagnosticsMode}
         />
       );
     }
@@ -3228,7 +3253,7 @@ export default function ReportRuntime({
                   rowLimit: resolveReportRuntimeChartRowLimit(block),
                 },
               }}
-              context={createRuntimeContext(dataset, locale)}
+              context={createRuntimeContext(dataset, locale, { publicMode: publicDiagnosticsMode })}
               isActive
               embedded={false}
               showControls={!reportPresentation}

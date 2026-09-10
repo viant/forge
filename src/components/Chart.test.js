@@ -14,6 +14,7 @@ import {
     resolveChartLoadingState,
     resolveHorizontalBarDataLabelLayout,
     resolveHorizontalBarLayout,
+    resolveResponsiveChartType,
     resolveChartValueAxisDomain,
     resolveChartTableMinWidth,
     resolveVisibleChartState,
@@ -33,6 +34,18 @@ assert.equal(resolveChartTableMinWidth([160, 240, 320]), 720);
 const fullChartRows = Array.from({ length: 8 }, (_, index) => ({ id: index + 1 }));
 assert.deepEqual(applyChartRowLimit(fullChartRows, 4).map((row) => row.id), [1, 2, 3, 4]);
 assert.equal(applyChartRowLimit(fullChartRows, 0), fullChartRows);
+assert.equal(resolveResponsiveChartType("bar", 390, {
+    xAxis: { dataKey: "device" },
+    rows: [{ device: "Mobile" }, { device: "Connected TV" }],
+}), "horizontal_bar");
+assert.equal(resolveResponsiveChartType("bar", 390, {
+    xAxis: { dataKey: "date" },
+    rows: [{ date: "2026-08-20" }, { date: "2026-08-21" }],
+}), "bar");
+assert.equal(resolveResponsiveChartType("bar", 1024, {
+    xAxis: { dataKey: "device" },
+    rows: [{ device: "Mobile" }],
+}), "bar");
 
 const signedBarDomain = resolveChartValueAxisDomain('horizontal_bar');
 assert.equal(signedBarDomain[0](-31385), -31385);
