@@ -12,6 +12,7 @@ import {
     resolveChartBodyState,
     resolveChartLoadingState,
     resolveHorizontalBarDataLabelLayout,
+    resolveHorizontalBarLayout,
     resolveChartValueAxisDomain,
     resolveChartTableMinWidth,
     resolveVisibleChartState,
@@ -280,6 +281,33 @@ assert.deepEqual(resolveHorizontalBarDataLabelLayout({ x: 100, width: 12, value:
     x: 118,
     textAnchor: "start",
     fill: "#5f6b7c",
+});
+assert.deepEqual(resolveHorizontalBarLayout({
+    containerWidth: 280,
+    categoryLabel: { lines: 2, maxCharacters: 48 },
+}), {
+    compact: true,
+    width: "100%",
+    categoryWidth: 95,
+    categoryLabel: { lines: 2, maxCharacters: 12 },
+    margin: { top: 10, right: 36, left: 0, bottom: 54 },
+    numericTickCount: 3,
+    numericMinTickGap: 18,
+    estimatedPlotWidth: 149,
+});
+assert.deepEqual(resolveHorizontalBarLayout({
+    containerWidth: 900,
+    embedded: true,
+    categoryLabel: { lines: 2, maxCharacters: 36 },
+}), {
+    compact: false,
+    width: "82%",
+    categoryWidth: 378,
+    categoryLabel: { lines: 2, maxCharacters: 36 },
+    margin: { top: 24, right: 12, left: 6, bottom: 48 },
+    numericTickCount: undefined,
+    numericMinTickGap: 5,
+    estimatedPlotWidth: 504,
 });
 assert.equal(hasNonZeroChartSeriesValue([{ conversions: 0 }, { conversions: 0 }], ["conversions"]), false);
 assert.equal(hasNonZeroChartSeriesValue([{ conversions: 0 }, { conversions: 1 }], ["conversions"]), true);

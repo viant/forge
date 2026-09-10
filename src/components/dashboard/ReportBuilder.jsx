@@ -5538,7 +5538,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             "forge-report-builder__bottom",
             inlineReportMode ? "forge-report-builder__bottom--inline-report" : "",
             useFilterDrawer ? "forge-report-builder__bottom--drawer" : "",
-        ].filter(Boolean).join(" ")} aria-label={useFilterDrawer ? "Filters drawer" : "Filters"}>
+        ].filter(Boolean).join(" ")}
+        aria-label={useFilterDrawer ? "Filters drawer" : "Filters"}
+        data-report-filter-surface={!designWorkspaceMode ? "true" : undefined}
+        data-report-filter-surface-placement={!designWorkspaceMode ? reportFilterSurfaceModel?.placement : undefined}
+        >
             {totalActiveControlCount > 0 ? (
                 <div className="forge-report-builder__bottom-header-actions">
                     <button type="button" className="forge-report-builder__bottom-toggle" aria-label="Reset report filters and options to defaults" onClick={resetReportFiltersAndOptions}>
@@ -7581,6 +7585,8 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                     role="dialog"
                     aria-modal="true"
                     aria-label="Report builder setup"
+                    data-report-filter-surface={compactSheetTab === "filters" ? "true" : undefined}
+                    data-report-filter-surface-placement={compactSheetTab === "filters" ? "top" : undefined}
                     onClick={(event) => event.stopPropagation()}
                 >
                     <div className="forge-report-builder__compact-sheet-header">
@@ -19983,7 +19989,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                             presentationMode={reportWorkspaceMode ? "report" : "preview"}
                             showContextSummary={false}
                             suppressFilterBarBlocks={showUnifiedRuntimeFilterSurface}
-                            suppressFilterBarBlockDatasetRefs={(showInlineReportBaselineControls || authoredPrimaryFilterBarPlacement === "hidden") ? ["primary"] : []}
+                            suppressFilterBarBlockDatasetRefs={(
+                                reportFilterSurfaceModel.available
+                                || (compactMode && authoredPrimaryFilterBarPlacement !== "hidden" && hasFilterDrawerContent)
+                                || authoredPrimaryFilterBarPlacement === "hidden"
+                            ) ? ["primary"] : []}
                         />
                     );
                     return runtimeContent;
