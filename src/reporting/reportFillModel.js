@@ -906,7 +906,7 @@ function normalizeFilterBarBlockMode(value = "") {
 
 function normalizeFilterBarBlockPlacement(value = "") {
   const normalized = normalizeString(value).toLowerCase();
-  return ["inherit", "inline", "rail-left", "hidden"].includes(normalized) ? normalized : "inherit";
+  return ["inherit", "left", "right", "top", "inline", "rail-left", "hidden"].includes(normalized) ? normalized : "inherit";
 }
 
 function buildFilterBarGroupOrdering(block = {}) {

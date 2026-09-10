@@ -190,7 +190,7 @@ function normalizeFilterBarBlockMode(value = "") {
 
 function normalizeFilterBarBlockPlacement(value = "") {
     const normalized = String(value || "").trim().toLowerCase();
-    return ["inherit", "inline", "rail-left", "hidden"].includes(normalized) ? normalized : "inherit";
+    return ["inherit", "left", "right", "top", "inline", "rail-left", "hidden"].includes(normalized) ? normalized : "inherit";
 }
 
 function parseReportBuilderTableDragPayload(event = null) {
@@ -2928,8 +2928,9 @@ export function ReportBuilderDocumentBlockDialog({
                                     onChange={(event) => setDraftPatch({ placement: normalizeFilterBarBlockPlacement(event.target.value) })}
                                 >
                                     <option value="inherit">Inherit workspace</option>
-                                    <option value="inline">Inline</option>
-                                    <option value="rail-left">Left rail</option>
+                                    <option value="left">Left</option>
+                                    <option value="right">Right</option>
+                                    <option value="top">Top</option>
                                     <option value="hidden">Hidden</option>
                                 </select>
                             </label>

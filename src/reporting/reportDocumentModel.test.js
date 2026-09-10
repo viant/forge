@@ -142,6 +142,13 @@ const filterBarBlock = buildReportDocumentFilterBarBlock({
   title: "Shared Filters",
   paramIds: ["dateRange"],
 });
+for (const placement of ["left", "right", "top", "inline", "rail-left"]) {
+  assert.equal(buildReportDocumentFilterBarBlock({
+    id: `filters_${placement.replace(/[^a-z]/g, "_")}`,
+    paramIds: ["dateRange"],
+    placement,
+  })?.placement, placement, `filter placement '${placement}' should survive the document contract`);
+}
 assert.deepEqual(buildReportDocumentFilterBarBlock({
   id: "legacyScopeFilters",
   title: "Scope",

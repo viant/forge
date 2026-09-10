@@ -142,7 +142,10 @@ import {
     invalidateHostedReportRestoredRuntime,
     resolveHostedReportRestoreRehydration,
 } from "./reportBuilderRestoreRehydration.js";
-import { shouldRenderInlineReportFilterSurface } from "./reportBuilderFilterSurface.js";
+import {
+    buildReportBuilderFilterSurfaceModel,
+    normalizeReportBuilderFilterSurfacePlacement,
+} from "./reportBuilderFilterSurface.js";
 import {
     buildHostedReportActivationRequest,
     buildHostedReportActivationResponse,
@@ -2106,7 +2109,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         || config?.layout?.filterPresentation
         || ""
     ).trim().toLowerCase();
-    const useFilterRail = filterPresentation === "rail-left";
+    const useFilterRail = filterPresentation === "rail-left" || filterPresentation === "left";
     const useFilterDrawer = filterPresentation === "drawer-left";
     const currentPrefillSignature = prefillSignature(windowFormValue);
     const currentReportDefinitionSignature = reportDefinitionSignature(windowFormValue);
@@ -5045,13 +5048,10 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     }, [authoredPrimaryFilterBarBlock, unifiedReportSurfaceFiltersEnabled]);
     const authoredPrimaryFilterBarPlacement = useMemo(() => {
         const explicit = normalizeString(authoredPrimaryFilterBarBlock?.placement).toLowerCase();
-        if (["inline", "rail-left", "hidden"].includes(explicit)) {
-            return explicit;
-        }
         if (explicit === "inherit") {
-            return normalizeString(config?.filterPresentation).toLowerCase() === "rail-left" ? "rail-left" : "inline";
+            return normalizeReportBuilderFilterSurfacePlacement(config?.filterPresentation);
         }
-        return "inline";
+        return normalizeReportBuilderFilterSurfacePlacement(explicit || config?.filterPresentation);
     }, [authoredPrimaryFilterBarBlock, config?.filterPresentation]);
     const authoredPrimaryFilterBarVisibleGroups = useMemo(
         () => (Array.isArray(authoredPrimaryFilterBarBlock?.visibleGroups) ? authoredPrimaryFilterBarBlock.visibleGroups : []).map((entry) => normalizeString(entry)).filter(Boolean),
@@ -5133,11 +5133,20 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         optionValues: effectiveReportOptions,
         modifiedFilterCount: modifiedStaticFilterCount + modifiedDynamicFilterCount,
     });
-    const showReportFilterToolbar = !compactMode && !designWorkspaceMode && reportFilterToolbarModel.visible;
+    const showReportFilterToolbar = !compactMode
+        && !designWorkspaceMode
+        && authoredPrimaryFilterBarPlacement !== "hidden"
+        && reportFilterToolbarModel.visible;
     const totalActiveControlCount = reportFilterToolbarModel.activeNonDefaultCount;
+    const reportFilterSurfaceModel = buildReportBuilderFilterSurfaceModel({
+        available: !designWorkspaceMode && authoredPrimaryFilterBarPlacement !== "hidden" && reportFilterToolbarModel.visible,
+        open: reportFilterRailOpen,
+        placement: authoredPrimaryFilterBarPlacement,
+        compact: compactMode,
+    });
     const showLeftRail = !compactMode && (
         (designWorkspaceMode && designRailHasVisiblePanels)
-        || (!designWorkspaceMode && reportFilterRailOpen && hasFilterDrawerContent)
+        || (!designWorkspaceMode && hasFilterDrawerContent && (reportFilterSurfaceModel.renderLeft || reportFilterSurfaceModel.renderRight))
     );
     const designWorkspaceFlowState = useMemo(() => {
         const measureLabels = selectedMeasureDefs.map((measure) => measure?.label || measure?.id);
@@ -7520,7 +7529,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 </div>
             ) : null}
             <div className="forge-report-builder__compact-summary-actions">
-                {hasFilterDrawerContent ? (
+                {hasFilterDrawerContent && authoredPrimaryFilterBarPlacement !== "hidden" ? (
                     <Button
                         small
                         outlined
@@ -9753,7 +9762,6 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         && showAuthoredReportSurface
         && authoredPrimaryFilterBarPlacement !== "hidden"
         && hasFilterDrawerContent;
-    const showRailLeftUnifiedReportFilters = showInlineReportBaselineControls && authoredPrimaryFilterBarPlacement === "rail-left";
     const authoredPreviewAutoFetchKey = useMemo(
         () => [
             buildReportBuilderSurfaceAutoRunKey({
@@ -19962,11 +19970,6 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                     if (!authoredRuntimePreviewState.canRenderRuntime) {
                         return null;
                     }
-                    const unifiedFilterPanel = shouldRenderInlineReportFilterSurface({
-                        showInlineReportBaselineControls,
-                        showLeftRail,
-                        hasDedicatedFilterControl: showReportFilterToolbar || compactMode,
-                    }) ? renderFiltersPanel({ inlineReportMode: true }) : null;
                     const runtimeContent = (
                         <ReportRuntime
                             reportSpec={authoredRuntimePreviewState.runtimeConfig.reportSpec}
@@ -19983,20 +19986,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                             suppressFilterBarBlockDatasetRefs={(showInlineReportBaselineControls || authoredPrimaryFilterBarPlacement === "hidden") ? ["primary"] : []}
                         />
                     );
-                    if (showRailLeftUnifiedReportFilters && unifiedFilterPanel) {
-                        return (
-                            <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 360px) minmax(0, 1fr)", gap: 16, alignItems: "start", marginBottom: 12 }}>
-                                <div>{unifiedFilterPanel}</div>
-                                <div>{runtimeContent}</div>
-                            </div>
-                        );
-                    }
-                    return (
-                        <>
-                            {unifiedFilterPanel}
-                            {runtimeContent}
-                        </>
-                    );
+                    return runtimeContent;
                 })()}
                 {authoredRuntimePreviewState.canRenderRuntime && desktopResultHeaderState.quickActions.enabled ? (
                     <div className="forge-report-builder__result-header-actions" style={{ marginBottom: 12 }}>
@@ -20383,9 +20373,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             compactMode ? "forge-report-builder--compact" : "",
             compactSheetOpen || compactChartSheetOpen ? "forge-report-builder--compact-overlay-open" : "",
             useFilterDrawer ? "forge-report-builder--filters-drawer" : "",
+            reportFilterSurfaceModel.renderLeft ? "forge-report-builder--filters-left" : "",
+            reportFilterSurfaceModel.renderRight ? "forge-report-builder--filters-right" : "",
             resultPanePosition === "left" ? "forge-report-builder--result-left" : "",
             (!compactMode && designWorkspaceMode && !designRailHasVisiblePanels) ? "forge-report-builder--designer-canvas" : "",
-            (workspaceMode === "report" && !showLeftRail) ? "forge-report-builder--workspace-report" : "",
+            ((workspaceMode === "report" || showAuthoredReportSurface) && !showLeftRail) ? "forge-report-builder--workspace-report" : "",
         ].filter(Boolean).join(" ")}
         ref={builderRootRef}
         style={builderRootStyle}
@@ -20585,7 +20577,10 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             {!designWorkspaceMode ? renderCompileDiagnosticsNotice(dashboardAdapterDiagnosticsNotice) : null}
             <div className="forge-report-builder__body">
                 {showLeftRail ? (
-                    <aside className="forge-report-builder__left">
+                    <aside
+                        className="forge-report-builder__left"
+                        data-report-filter-placement={!designWorkspaceMode ? reportFilterSurfaceModel.placement : undefined}
+                    >
                         <div className="forge-report-builder__left-scroll" ref={leftRailRef}>
                         <div className="forge-report-builder__left-rail-header">
                             <div className="forge-report-builder__left-rail-header-copy">
@@ -20695,6 +20690,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 ) : null}
 
                 <main className="forge-report-builder__center">
+                    {reportFilterSurfaceModel.renderTop ? (
+                        <div className="forge-report-builder__filter-surface forge-report-builder__filter-surface--top" data-report-filter-placement="top">
+                            {renderFiltersPanel({ inlineReportMode: true })}
+                        </div>
+                    ) : null}
                     {renderDesignWorkspaceOverview()}
                     {semanticResultSurfaceState && designWorkspaceMode ? (
                         <ReportBuilderSummaryNotice

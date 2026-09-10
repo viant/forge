@@ -1326,6 +1326,26 @@
         "center left";
 }
 
+.forge-report-builder--filters-left {
+    grid-template-columns: var(--forge-report-builder-left-width, clamp(192px, 24%, 420px)) minmax(0, 1fr);
+    grid-template-areas:
+        "top top"
+        "left center";
+}
+
+.forge-report-builder--filters-right {
+    grid-template-columns: minmax(0, 1fr) var(--forge-report-builder-left-width, clamp(192px, 24%, 420px));
+    grid-template-areas:
+        "top top"
+        "center left";
+}
+
+.forge-report-builder__filter-surface--top {
+    width: 100%;
+    min-width: 0;
+    margin-bottom: 12px;
+}
+
 .forge-report-builder--workspace-report {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
