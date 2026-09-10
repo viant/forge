@@ -5,12 +5,15 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 import ReportRuntime, {
   buildRuntimeSections,
+  hasUsableReportRuntimeData,
+  isReportRuntimeRefreshDiagnostic,
   RefinementBarBlock,
   resolveReportRuntimeCompositeColumns,
   resolveReportRuntimeCompositeLayout,
   resolveReportRuntimeChartRowLimit,
   shouldApplyTableDefaultCollapsed,
   sanitizeReportRuntimeDiagnostics,
+  resolvePublicReportRuntimeDiagnostics,
 } from "./ReportRuntime.jsx";
 
 assert.deepEqual(sanitizeReportRuntimeDiagnostics([{severity: "error", code: "secretCode", message: "backend detail", suggestedFix: "internal"}], true), [{
@@ -222,6 +225,55 @@ assert.ok(publicReportErrorHtml.includes("Report refresh unavailable"));
 assert.ok(publicReportErrorHtml.includes("The saved result remains unchanged"));
 assert.ok(!publicReportErrorHtml.includes("failed to resolve subscription campaign scope"));
 assert.ok(!publicReportErrorHtml.includes("runtimePreviewDatasetFetchFailed"));
+
+assert.equal(isReportRuntimeRefreshDiagnostic({ code: "runtimePreviewDatasetFetchFailed" }), true);
+assert.equal(isReportRuntimeRefreshDiagnostic({ code: "documentBlockColumnUnavailable" }), false);
+assert.equal(hasUsableReportRuntimeData({ datasets: [{ id: "saved", rows: [{ value: 42 }] }] }), true);
+assert.deepEqual(resolvePublicReportRuntimeDiagnostics([
+  { code: "runtimePreviewDatasetFetchFailed", severity: "error" },
+  { code: "documentBlockColumnUnavailable", severity: "error" },
+], { datasets: [{ id: "saved", rows: [{ value: 42 }] }] }), [
+  { code: "documentBlockColumnUnavailable", severity: "error" },
+]);
+
+const populatedSavedDatasetHtml = renderToStaticMarkup(
+  React.createElement(ReportRuntime, {
+    reportSpec: {
+      title: "Saved data runtime",
+      layoutIntent: { blockOrder: ["savedKpi"], items: [{ blockId: "savedKpi" }] },
+      datasets: [{ id: "saved", request: {} }],
+      blocks: [{ id: "savedKpi", kind: "kpiBlock", title: "Saved KPI", datasetRef: "saved", valueField: "value" }],
+    },
+    reportFill: {
+      diagnostics: [{
+        code: "runtimePreviewDatasetFetchFailed",
+        severity: "error",
+        blockId: "savedKpi",
+        message: "internal refresh failed",
+      }],
+      datasets: [{
+        id: "saved",
+        rows: [{ value: 42 }],
+        provenance: {
+          rowCount: 1,
+          diagnostics: [{ code: "runtimePreviewDatasetFetchFailed", severity: "error", message: "internal refresh failed" }],
+        },
+      }],
+      blocks: [{
+        id: "savedKpi",
+        kind: "kpiBlock",
+        title: "Saved KPI",
+        datasetRef: "saved",
+        content: { title: "Saved KPI", valueField: "value", valueLabel: "Value", value: 42, rowCount: 1 },
+      }],
+    },
+    presentationMode: "report",
+  }),
+);
+assert.ok(populatedSavedDatasetHtml.includes("42"));
+assert.ok(!populatedSavedDatasetHtml.includes("Report refresh unavailable"));
+assert.ok(!populatedSavedDatasetHtml.includes("could not be refreshed"));
+assert.ok(!populatedSavedDatasetHtml.includes("internal refresh failed"));
 
 const hiddenContextSummaryHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
