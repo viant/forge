@@ -1032,6 +1032,27 @@ function DiagnosticsPanel({ diagnostics = [], developerMode = false, onRetryProv
   );
 }
 
+export function isReportRuntimeRefreshDiagnostic(diagnostic = null) {
+  const code = normalizeString(diagnostic?.code).toLowerCase();
+  return code.startsWith("runtimepreviewdataset")
+    || code.startsWith("runtimepreviewfreshness")
+    || code === "reportsectionunavailable"
+    || code === "reportsectionnotice";
+}
+
+export function hasUsableReportRuntimeData(reportFill = null) {
+  return (Array.isArray(reportFill?.datasets) ? reportFill.datasets : [])
+    .some((dataset) => Array.isArray(dataset?.rows) && dataset.rows.length > 0);
+}
+
+export function resolvePublicReportRuntimeDiagnostics(diagnostics = [], reportFill = null) {
+  const source = Array.isArray(diagnostics) ? diagnostics : [];
+  if (!hasUsableReportRuntimeData(reportFill)) {
+    return source;
+  }
+  return source.filter((diagnostic) => !isReportRuntimeRefreshDiagnostic(diagnostic));
+}
+
 export function sanitizeReportRuntimeDiagnostics(diagnostics = [], publicMode = false) {
   const source = Array.isArray(diagnostics) ? diagnostics : [];
   if (!publicMode) return source;
@@ -1150,12 +1171,14 @@ function resolveRuntimeBlockDatasetRef(block = {}, {
   });
 }
 
-function resolveDatasetBackedBlockDiagnostics(block = {}, diagnostics = [], dataset = null) {
-  const resolvedDiagnostics = Array.isArray(diagnostics) ? diagnostics : [];
+function resolveDatasetBackedBlockDiagnostics(block = {}, diagnostics = [], dataset = null, publicMode = false) {
+  const datasetHasUsableRows = Array.isArray(dataset?.rows) && dataset.rows.length > 0;
+  const resolvedDiagnostics = (Array.isArray(diagnostics) ? diagnostics : [])
+    .filter((diagnostic) => !(publicMode && datasetHasUsableRows && isReportRuntimeRefreshDiagnostic(diagnostic)));
   const datasetDiagnostics = Array.isArray(dataset?.provenance?.diagnostics)
     ? dataset.provenance.diagnostics
     : [];
-  if (datasetDiagnostics.length === 0) {
+  if (datasetDiagnostics.length === 0 || (publicMode && datasetHasUsableRows)) {
     return resolvedDiagnostics;
   }
   const normalizedBlockId = normalizeString(block?.id);
@@ -2995,9 +3018,15 @@ export default function ReportRuntime({
     ...(Array.isArray(reportFill?.diagnostics) ? reportFill.diagnostics : []),
     ...providerDiagnostics,
   ]), [providerDiagnostics, reportFill?.diagnostics]);
+  const visibleRuntimeDiagnostics = useMemo(
+    () => (publicDiagnosticsMode
+      ? resolvePublicReportRuntimeDiagnostics(runtimeDiagnostics, effectiveReportFill)
+      : runtimeDiagnostics),
+    [effectiveReportFill, publicDiagnosticsMode, runtimeDiagnostics],
+  );
   const blockDiagnosticsIndex = useMemo(
-    () => buildBlockDiagnosticsIndex(sanitizeReportRuntimeDiagnostics(runtimeDiagnostics, publicDiagnosticsMode)),
-    [publicDiagnosticsMode, runtimeDiagnostics],
+    () => buildBlockDiagnosticsIndex(sanitizeReportRuntimeDiagnostics(visibleRuntimeDiagnostics, publicDiagnosticsMode)),
+    [publicDiagnosticsMode, visibleRuntimeDiagnostics],
   );
 
   const setSelectedChartSelection = (blockId, selection) => {
@@ -3084,11 +3113,11 @@ export default function ReportRuntime({
     }
     if (kind === "kpiBlock") {
       const dataset = datasetIndex.get(resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef) || null;
-      return <KpiBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)} locale={locale} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} theme={runtimeTheme} />;
+      return <KpiBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset, publicDiagnosticsMode)} locale={locale} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} theme={runtimeTheme} />;
     }
     if (kind === "collectionBlock") {
       const dataset = datasetIndex.get(resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef) || null;
-      return <CollectionBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)} locale={locale} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} theme={runtimeTheme} />;
+      return <CollectionBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset, publicDiagnosticsMode)} locale={locale} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} theme={runtimeTheme} />;
     }
     if (kind === "filterBarBlock") {
       const normalizedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;
@@ -3109,7 +3138,7 @@ export default function ReportRuntime({
         <TableBlock
           key={block.id}
           block={block}
-          diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)}
+          diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset, publicDiagnosticsMode)}
           dataset={dataset}
           reportSpec={reportSpec}
           providerActionsByField={providerActionsByField}
@@ -3123,7 +3152,7 @@ export default function ReportRuntime({
     }
     if (kind === "chartBlock") {
       const dataset = resolveRuntimeDataset(block);
-      const diagnostics = resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset);
+      const diagnostics = resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset, publicDiagnosticsMode);
       const invalidDiagnostic = diagnostics
         .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
         || null;
@@ -3226,7 +3255,7 @@ export default function ReportRuntime({
     }
     if (kind === "geoMapBlock") {
       const dataset = datasetIndex.get(resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef) || null;
-      return <GeoMapBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset)} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
+      return <GeoMapBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset, publicDiagnosticsMode)} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
     }
     if (kind === "compositeBlock") {
       const childBlockIds = Array.isArray(block?.content?.childBlockIds)
@@ -3392,9 +3421,7 @@ export default function ReportRuntime({
         </div>
       ) : null}
       <HostIntentPanel hostIntent={hostIntent} runtimeHandlers={runtimeHandlers} />
-      <DiagnosticsPanel diagnostics={[
-        ...runtimeDiagnostics,
-      ]} developerMode={!reportPresentation || showDeveloperDiagnostics} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />
+      <DiagnosticsPanel diagnostics={visibleRuntimeDiagnostics} developerMode={!reportPresentation || showDeveloperDiagnostics} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />
       {runtimeSections.length > 1 || (runtimeTabGroup?.includeUnlistedSections === false && runtimeSections.length > 0) ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {runtimeTabGroup?.title ? (

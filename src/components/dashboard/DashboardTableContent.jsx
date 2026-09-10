@@ -19,6 +19,7 @@ import { buildTableRuntimeColumns } from "./tableCellVisuals.js";
 import { withFrozenIdentifierColumn } from "./tableFrozenIdentifier.js";
 import { renderDashboardTableCell, titleizeDashboardKey } from "./dashboardVisualUtils.jsx";
 import { clampPresentationText, normalizePresentationClampConfig, normalizePresentationText } from "../../utils/presentationText.js";
+import { buildDashboardTableLayout } from "./dashboardTableLayout.js";
 
 const DEFAULT_SUBTITLE_STYLE = {
     fontSize: '12px',
@@ -118,6 +119,10 @@ export default function DashboardTableContent({
         [normalizedColumns, quickFilteredCollection],
     );
     const displayColumns = useMemo(() => withFrozenIdentifierColumn(runtimeColumns), [runtimeColumns]);
+    const tableLayout = useMemo(() => buildDashboardTableLayout(displayColumns, {
+        multiSelect,
+        hasRowActions: rowActions.length > 0,
+    }), [displayColumns, multiSelect, rowActions.length]);
 
     const [sortKey, setSortKey] = useState(null);
     const [sortDir, setSortDir] = useState('asc');
@@ -212,13 +217,28 @@ export default function DashboardTableContent({
                 </div>
             ) : null}
             {sortedRows.length > 0 ? (
-                <div className="forge-dashboard-table-wrap">
+                <>
+                {tableLayout.horizontallyScrollable ? (
+                    <div className="forge-dashboard-table-scroll-hint">Scroll horizontally to view all columns</div>
+                ) : null}
+                <div
+                    className="forge-dashboard-table-wrap"
+                    role={tableLayout.horizontallyScrollable ? "region" : undefined}
+                    aria-label={tableLayout.horizontallyScrollable ? "Scrollable data table" : undefined}
+                    tabIndex={tableLayout.horizontallyScrollable ? 0 : undefined}
+                    data-horizontal-scroll={tableLayout.horizontallyScrollable ? "true" : "false"}
+                >
                     <table className={[
                         "forge-dashboard-table",
                         "forge-dashboard-table--frozen-identifier",
                         density === "compact" ? "forge-dashboard-table--compact" : "",
                         rowActions.length > 0 ? "forge-dashboard-table--has-actions" : "",
-                    ].filter(Boolean).join(" ")}>
+                    ].filter(Boolean).join(" ")} style={{minWidth: `${tableLayout.minWidth}px`}}>
+                        <colgroup>
+                            {multiSelect ? <col style={{width: `${tableLayout.selectionWidth}px`}} /> : null}
+                            {tableLayout.columnWidths.map((columnWidth, index) => <col key={`column-width-${displayColumns[index]?.key || index}`} style={{width: `${columnWidth}px`}} />)}
+                            {rowActions.length > 0 ? <col style={{width: `${tableLayout.actionsWidth}px`}} /> : null}
+                        </colgroup>
                         <thead>
                         <tr>
                             {multiSelect ? (
@@ -371,6 +391,7 @@ export default function DashboardTableContent({
                         </tbody>
                     </table>
                 </div>
+                </>
             ) : null}
             {pagingEnabled && pageCount > 1 ? (
                 <div className="forge-dashboard-table-pager">

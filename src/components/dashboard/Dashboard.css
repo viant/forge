@@ -305,8 +305,25 @@
 }
 
 .forge-dashboard-table-wrap {
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: visible;
+    overscroll-behavior-inline: contain;
+    scrollbar-gutter: stable;
     container-type: inline-size;
+}
+
+.forge-dashboard-table-wrap:focus-visible {
+    outline: 2px solid #2f6de1;
+    outline-offset: 3px;
+    border-radius: 6px;
+}
+
+.forge-dashboard-table-scroll-hint {
+    display: none;
+    margin-bottom: 8px;
+    color: #5f6b7c;
+    font-size: 11px;
+    line-height: 1.4;
 }
 
 .forge-dashboard-table {
@@ -386,6 +403,12 @@
 .forge-dashboard-table th.forge-table-frozen-identifier { z-index: 3; background: #f7fafc; }
 .forge-dashboard-table tbody tr:nth-child(even) td.forge-table-frozen-identifier { background: #fbfdff; }
 
+.forge-dashboard-table-wrap[data-horizontal-scroll="true"] .forge-table-frozen-identifier {
+    width: var(--forge-frozen-column-width, 148px);
+    min-width: var(--forge-frozen-column-width, 148px);
+    max-width: var(--forge-frozen-column-width, 148px);
+}
+
 .forge-dashboard-table--compact td {
     padding: 8px 10px;
 }
@@ -417,6 +440,21 @@
 }
 
 @media (max-width: 700px) {
+    .forge-dashboard-table-scroll-hint {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .forge-dashboard-table {
+        width: max-content;
+    }
+
+    .forge-dashboard-table th,
+    .forge-dashboard-table td {
+        overflow: hidden;
+    }
+
     .forge-dashboard-table--has-actions {
         width: max-content;
         min-width: 760px;
