@@ -31,6 +31,7 @@ import {
 import { useDataSourceState } from "../hooks/useDataSourceState.js";
 import {
     aggregateDirectSeriesData,
+    applyChartRowLimit,
     buildPieSliceCellKey,
     buildPieChartData,
     fillMissingTemporalBuckets,
@@ -565,7 +566,10 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const isPieChart = type === "pie" || type === "donut";
     const isHorizontalBar = isHorizontalBarType(type);
     const prepared = useMemo(() => {
-        const chartRows = materializeChartDisplayRows(chart, effectiveCollection || []);
+        const chartRows = applyChartRowLimit(
+            materializeChartDisplayRows(chart, effectiveCollection || []),
+            chart?.rowLimit,
+        );
         if (isPieChart) {
             const nameKey = series.nameKey || "name";
             const valueKey = series.valueKey || selectedValueKey || "value";
@@ -876,10 +880,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         __seriesFormats: Object.fromEntries(renderableSeriesDefinitions.map((entry) => [entry.value, entry.format || leftAxis.format])),
         __seriesAxes: Object.fromEntries(renderableSeriesDefinitions.map((entry) => [entry.value, entry.axis === "right" ? rightAxis?.format : leftAxis.format])),
     }));
-    const chartRowLimit = Math.trunc(Number(chart?.rowLimit || 0));
-    const normalizedChartData = Number.isInteger(chartRowLimit) && chartRowLimit > 0
-        ? normalizedAllChartData.slice(0, chartRowLimit)
-        : normalizedAllChartData;
+    const normalizedChartData = normalizedAllChartData;
 
     const resolvedChartAnnotations = React.useMemo(() => (
         buildRuntimeChartAnnotationElements(normalizeChartAnnotations(chart), { embedded })

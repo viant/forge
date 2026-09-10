@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import {
     aggregateDirectSeriesData,
+    applyChartRowLimit,
     buildPieChartData,
     buildPieSliceCellKey,
     formatChartNumber,
@@ -29,6 +30,9 @@ assert.equal(formatChartXAxisValue('2026-05-14T12:00:00Z', 'MM/dd'), '05/14');
 assert.equal(formatChartXAxisValue('2026-05-14T00:00:00Z', 'MM/dd', 'civil'), '05/14');
 assert.equal(resolveChartTableMinWidth([110, 110, 110]), 330);
 assert.equal(resolveChartTableMinWidth([160, 240, 320]), 720);
+const fullChartRows = Array.from({ length: 8 }, (_, index) => ({ id: index + 1 }));
+assert.deepEqual(applyChartRowLimit(fullChartRows, 4).map((row) => row.id), [1, 2, 3, 4]);
+assert.equal(applyChartRowLimit(fullChartRows, 0), fullChartRows);
 
 const signedBarDomain = resolveChartValueAxisDomain('horizontal_bar');
 assert.equal(signedBarDomain[0](-31385), -31385);
