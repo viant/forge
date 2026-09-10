@@ -1,7 +1,9 @@
 .forge-section-tab-rail-frame {
     position: relative;
     width: 100%;
+    max-width: 100%;
     min-width: 0;
+    box-sizing: border-box;
 }
 
 .forge-section-tab-rail {
@@ -64,6 +66,7 @@
     background: linear-gradient(270deg, #fff 32%, rgba(255,255,255,0));
 }
 .forge-section-tab {
+    --forge-section-tab-font-weight: 700;
     position: relative;
     display: inline-flex;
     flex: 0 0 auto;
@@ -80,7 +83,8 @@
     color: #486579;
     font: inherit;
     font-size: 13px;
-    font-weight: 700;
+    font-synthesis: none;
+    font-weight: var(--forge-section-tab-font-weight);
     line-height: 20px;
     cursor: pointer;
     white-space: nowrap;
@@ -95,6 +99,7 @@
     border-bottom-color: #2f6de1;
     background: rgba(47, 109, 225, 0.055);
     color: #1d4ed8;
+    font-weight: var(--forge-section-tab-font-weight);
     box-shadow: none;
     scroll-margin-inline: 44px;
 }
