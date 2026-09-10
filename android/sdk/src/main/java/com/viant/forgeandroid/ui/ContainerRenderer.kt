@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -38,8 +39,13 @@ import com.viant.forgeandroid.runtime.DataStateBoundaryKind
 import com.viant.forgeandroid.runtime.WorkflowPrimitiveRuntime
 import com.viant.forgeandroid.runtime.JsonUtil
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 
 @Composable
 fun ContainerRenderer(
@@ -199,11 +205,32 @@ fun ContainerRenderer(
                 return
             }
             DataStateBoundaryKind.Error -> {
-                Text(
-                    boundary.errorMessage ?: visibilityContext?.control?.peek()?.error ?: "Unable to load data.",
-                    color = Color(0xFFB42318),
-                    modifier = modifier.fillMaxWidth().padding(12.dp)
-                )
+                val suppressed = boundary.suppressErrorWhen?.let { condition ->
+                    evaluateDashboardCondition(
+                        condition = condition,
+                        metrics = visibilityMetrics,
+                        filters = visibilityInput.filter,
+                        form = visibilityForm,
+                        windowForm = windowForm,
+                        collection = visibilityCollection
+                    )
+                } == true
+                if (!suppressed) {
+                    Column(modifier = modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(boundary.errorMessage ?: visibilityContext?.control?.peek()?.error ?: "Unable to load data.", color = Color(0xFFB42318))
+                        boundary.errorAction?.let { action ->
+                            Button(
+                                onClick = {
+                                    val ref = action.dataSourceRef?.trim().orEmpty().ifBlank {
+                                        boundary.dataSourceRefs.firstOrNull().orEmpty().ifBlank { container.dataSourceRef ?: inheritedDataSourceRef.orEmpty() }
+                                    }
+                                    if (ref.isNotBlank()) runtime.refreshDataSourceCollection(window.windowId, ref)
+                                },
+                                modifier = Modifier.semantics { contentDescription = action.label ?: "Retry" }
+                            ) { Text(action.label ?: "Retry") }
+                        }
+                    }
+                }
                 return
             }
             DataStateBoundaryKind.Empty -> if (!boundary.renderEmptyContent) {
@@ -650,9 +677,20 @@ private fun responsiveTable(
     val spec = container.responsiveDataGrid ?: return table
     val target = formFactor.trim().lowercase().ifBlank { "phone" }
     val state = WorkflowPrimitiveRuntime.responsiveDataGridState(spec, target) ?: return table
-    val requested = state.columns.toSet()
-    val columns = if (requested.isEmpty()) table.columns else table.columns.filter { column ->
-        listOfNotNull(column.id, column.key, column.name).any(requested::contains)
+    val projected = if (state.columns.isEmpty()) table.columns else state.columns.mapNotNull { requestedID ->
+        table.columns.firstOrNull { column -> listOfNotNull(column.id, column.key, column.name).contains(requestedID) }
+    }
+    val sticky = state.stickyColumns.orEmpty().toSet()
+    val columnJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
+    val columns = projected.map { column ->
+        val id = column.id ?: column.key ?: column.name.orEmpty()
+        val override = state.columnOverrides[id].orEmpty().toMutableMap()
+        if (state.stickyColumns != null) override["frozen"] = JsonPrimitive(id in sticky)
+        if (override.isEmpty()) column else runCatching {
+            val base = columnJson.encodeToJsonElement(com.viant.forgeandroid.runtime.ColumnDef.serializer(), column).jsonObject.toMutableMap()
+            base.putAll(override)
+            columnJson.decodeFromJsonElement(com.viant.forgeandroid.runtime.ColumnDef.serializer(), JsonObject(base))
+        }.getOrDefault(column)
     }
     return table.copy(
         columns = columns,

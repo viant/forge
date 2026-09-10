@@ -155,10 +155,11 @@ internal fun WorkflowPresentationPrimitives(
                             runtime, window, context, mutation,
                             labelOverride = operation.label,
                             extras = mapOf("operationId" to operation.id, "selectedRows" to selectedRows),
-                            externallyDisabled = disabled
+                            externallyDisabled = disabled,
+                            accessibilityDescriptionOverride = listOfNotNull(operation.label, operation.tooltip).joinToString(". ")
                         )
                     } else {
-                        Button(enabled = !disabled, onClick = {
+                        Button(enabled = !disabled, modifier = Modifier.semantics { contentDescription = listOfNotNull(operation.label, operation.tooltip).joinToString(". ") }, onClick = {
                             if (context != null) invokeEditableOperation(runtime, context, operation, selectedRows)
                         }) { Text(operation.label) }
                     }
@@ -321,7 +322,8 @@ internal fun MutationCommandButton(
     confirmationOverride: String? = null,
     extras: Map<String, Any?> = emptyMap(),
     externallyDisabled: Boolean = false,
-    onSettled: ((MutationCommandResult) -> Unit)? = null
+    onSettled: ((MutationCommandResult) -> Unit)? = null,
+    accessibilityDescriptionOverride: String? = null
 ) {
     val scope = rememberCoroutineScope()
     var state by remember(command.commandId, command.dataSourceRef) { mutableStateOf(MutationCommandState()) }
@@ -352,7 +354,7 @@ internal fun MutationCommandButton(
                 if (!(confirmationOverride ?: runtime.mutationCommands.resolveConfirmation(command, extras)).isBlank()) confirmationVisible = true else execute(false)
             },
             modifier = Modifier.semantics {
-                contentDescription = command.label ?: "Save"
+                contentDescription = accessibilityDescriptionOverride ?: command.label ?: "Save"
             }
         ) {
             Text(if (state.pending) "Saving…" else labelOverride ?: command.label ?: "Save")
