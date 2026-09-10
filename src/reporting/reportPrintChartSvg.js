@@ -1,6 +1,6 @@
 import { formatExportNumericValue } from "./reportExportValueFormatter.js";
 import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "./reportChartAnnotations.js";
-import { readChartDataValue } from "../components/chartData.js";
+import { formatChartXAxisValue, readChartDataValue } from "../components/chartData.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -18,6 +18,37 @@ function escapeXml(value = "") {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
+}
+
+function buildPrintLabelLines(value = "", clamp = null, fallbackCharacters = 18) {
+  const normalized = normalizeString(value);
+  if (!normalized) return [];
+  const lineLimit = clamp?.lines === 2 ? 2 : 1;
+  const configuredLimit = Math.trunc(Number(clamp?.maxCharacters));
+  const characterLimit = Number.isInteger(configuredLimit) && configuredLimit >= 4
+    ? configuredLimit
+    : fallbackCharacters;
+  const clipped = normalized.length > characterLimit
+    ? `${normalized.slice(0, Math.max(1, characterLimit - 1)).trimEnd()}…`
+    : normalized;
+  if (lineLimit === 1 || clipped.length <= Math.ceil(characterLimit / 2)) {
+    return [clipped];
+  }
+  const target = Math.ceil(clipped.length / 2);
+  let splitAt = clipped.lastIndexOf(" ", target);
+  if (splitAt < Math.floor(target * 0.55)) {
+    const nextSpace = clipped.indexOf(" ", target);
+    splitAt = nextSpace > 0 ? nextSpace : target;
+  }
+  return [clipped.slice(0, splitAt).trim(), clipped.slice(splitAt).trim()].filter(Boolean);
+}
+
+function renderPrintLabelLines(lines = [], { x = 0, y = 0, anchor = "middle", fill = "#667085" } = {}) {
+  if (!Array.isArray(lines) || lines.length === 0) return "";
+  const startY = y - ((lines.length - 1) * 6);
+  return `<text x="${x}" y="${startY}" text-anchor="${anchor}" font-size="10" fill="${fill}">${lines
+    .map((line, index) => `<tspan x="${x}" dy="${index === 0 ? 0 : 12}">${escapeXml(line)}</tspan>`)
+    .join("")}</text>`;
 }
 
 const DEFAULT_REPORT_PRINT_CHART_PALETTE = [
@@ -842,10 +873,15 @@ function renderCartesianChartSvg({
     if (index % labelStep !== 0 && index !== rows.length - 1) {
       return "";
     }
-    const label = normalizeString(readChartDataValue(row, xAxisKey)).slice(0, 14);
-    return `
-      <text x="${xPositions[index]}" y="${topPad + plotHeight + 18}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(label)}</text>
-    `;
+    const label = formatChartXAxisValue(
+      readChartDataValue(row, xAxisKey),
+      normalizeString(chartModel?.xAxis?.tickFormat),
+      normalizeString(chartModel?.xAxis?.valueMode),
+    );
+    return renderPrintLabelLines(
+      buildPrintLabelLines(label, chartModel?.xAxis?.categoryLabel, 14),
+      { x: xPositions[index], y: topPad + plotHeight + 18 },
+    );
   }).join("\n");
   const xAxisTitle = xAxisLabel
     ? `<text x="${leftPad + (plotWidth / 2)}" y="${topPad + plotHeight + 36}" text-anchor="middle" font-size="11" font-weight="600" fill="#475467">${escapeXml(xAxisLabel)}</text>`
@@ -969,12 +1005,22 @@ function renderHorizontalBarChartSvg({
     };
   }
 
-  const leftPad = 116;
+  const xAxisKey = normalizeString(resolvedChart?.xAxisKey);
+  const categoryClamp = chartModel?.xAxis?.categoryLabel || null;
+  const categoryLabelLines = rows.map((row) => buildPrintLabelLines(
+    readChartDataValue(row, xAxisKey),
+    categoryClamp,
+    18,
+  ));
+  const longestCategoryLine = categoryLabelLines.reduce((longest, lines) => Math.max(
+    longest,
+    ...lines.map((line) => line.length),
+  ), 0);
+  const leftPad = Math.min(Math.floor(width * 0.38), Math.max(116, 20 + (longestCategoryLine * 6)));
   const rightPad = 20;
   const topPad = 16;
   const bottomPad = 34;
   const plotWidth = Math.max(200, width - leftPad - rightPad);
-  const xAxisKey = normalizeString(resolvedChart?.xAxisKey);
   const valueRange = bounds.maxValue - bounds.minValue || 1;
   const baselineX = leftPad + (((0 - bounds.minValue) / valueRange) * plotWidth);
   const groupGap = 10;
@@ -1013,10 +1059,12 @@ function renderHorizontalBarChartSvg({
 
   const categoryLabels = rows.map((row, rowIndex) => {
     const groupTop = topPad + (rowIndex * (rowHeight + groupGap));
-    const label = normalizeString(readChartDataValue(row, xAxisKey)).slice(0, 18);
-    return `
-      <text x="${leftPad - 8}" y="${groupTop + (rowHeight / 2) + 4}" text-anchor="end" font-size="10" fill="#344054">${escapeXml(label)}</text>
-    `;
+    return renderPrintLabelLines(categoryLabelLines[rowIndex], {
+      x: leftPad - 8,
+      y: groupTop + (rowHeight / 2) + 4,
+      anchor: "end",
+      fill: "#344054",
+    });
   }).join("\n");
 
   const renderedSeries = seriesDescriptors.map((series, seriesIndex) => (

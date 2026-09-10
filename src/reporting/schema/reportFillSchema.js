@@ -396,6 +396,8 @@ export const reportFillSchema = {
           type: "object",
           additionalProperties: { $ref: "#/$defs/requestValue" },
         },
+        summary: { type: "boolean" },
+        resultSet: { type: "string", minLength: 1 },
         semanticSelection: { $ref: "#/$defs/semanticSelectionRequest" },
         refinements: {
           type: "array",
@@ -882,6 +884,7 @@ export const reportFillSchema = {
         runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         datasetRef: { type: "string" },
+        rowLimit: { type: "integer", minimum: 1 },
         chartSpec: { $ref: "#/$defs/chartSpec" },
         chartModel: { $ref: "#/$defs/chartModel" },
         content: {
@@ -917,6 +920,7 @@ export const reportFillSchema = {
           items: { type: "string" },
         },
         seriesField: { type: "string" },
+        categoryLabel: { $ref: "#/$defs/presentationTextClamp" },
         seriesOptions: {
           type: "object",
           additionalProperties: {
@@ -945,7 +949,9 @@ export const reportFillSchema = {
           type: "object",
           additionalProperties: { $ref: "#/$defs/jsonValue" },
         },
+        categoryLabel: { $ref: "#/$defs/presentationTextClamp" },
         tickFormat: { type: "string" },
+        valueMode: { enum: ["civil", "instant"] },
       },
     },
     chartYAxis: {
@@ -1198,6 +1204,7 @@ export const reportFillSchema = {
             secondaryField: { type: "string" },
             secondaryLabel: { type: "string" },
             secondaryFormat: { enum: ["currency", "number", "number5", "percent", "percentFraction", "compact", "compactNumber"] },
+            secondaryTrend: { type: "boolean" },
             secondaryDisplayKey: { type: "string" },
             secondaryDisplayValueMap: {
               type: "object",

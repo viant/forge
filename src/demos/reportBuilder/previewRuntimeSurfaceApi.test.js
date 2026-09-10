@@ -140,6 +140,7 @@ let currentBuilderConfig = {
 let currentCollectionRows = [{ country: "US", avails: 153100 }];
 let currentCollectionInfo = { hasMore: false };
 let currentControl = { loading: false, error: null };
+let currentRuntimeDatasetPayloads = {};
 let currentSavedReportPayloads = [
   {
     savedReportPayload: {
@@ -196,6 +197,12 @@ attachPreviewRuntimeSurfaceApi(metrics, {
   },
   setControl(nextControl) {
     currentControl = nextControl;
+  },
+  getRuntimeDatasetPayloads() {
+    return currentRuntimeDatasetPayloads;
+  },
+  setRuntimeDatasetPayloads(nextPayloads) {
+    currentRuntimeDatasetPayloads = nextPayloads;
   },
   getSavedReportPayloads() {
     return currentSavedReportPayloads;
@@ -346,6 +353,42 @@ assert.deepEqual(metrics.replaceCollectionRows([{ country: "CA", avails: 200 }],
 assert.deepEqual(currentCollectionInfo, { hasMore: true });
 assert.equal(currentControl.loading, false);
 assert.match(String(currentControl.error?.message || ""), /Preview failed/);
+
+const runtimeDatasetSeed = {
+  primary: { rows: [{ country: "US", avails: 10 }], hasMore: true },
+  detail: { rows: [{ country: "CA", avails: 20 }] },
+  totals: { rows: [], error: new Error("Totals unavailable") },
+};
+assert.deepEqual(metrics.replaceRuntimeDatasetPayloads(runtimeDatasetSeed), {
+  primary: { rows: [{ country: "US", avails: 10 }], hasMore: true, diagnostics: [] },
+  detail: { rows: [{ country: "CA", avails: 20 }], hasMore: false, diagnostics: [] },
+  totals: {
+    rows: [],
+    hasMore: false,
+    diagnostics: [{
+      code: "runtimePreviewDatasetSeedError",
+      severity: "error",
+      message: "Totals unavailable",
+    }],
+    error: {
+      message: "Totals unavailable",
+      diagnostics: [{
+        code: "runtimePreviewDatasetSeedError",
+        severity: "error",
+        message: "Totals unavailable",
+      }],
+    },
+  },
+});
+runtimeDatasetSeed.primary.rows[0].avails = 999;
+assert.equal(metrics.getRuntimeDatasetPayloads().primary.rows[0].avails, 10);
+const runtimeDatasetRead = metrics.getRuntimeDatasetPayloads();
+runtimeDatasetRead.detail.rows[0].avails = 999;
+assert.equal(metrics.getRuntimeDatasetPayloads().detail.rows[0].avails, 20);
+assert.deepEqual(metrics.replaceRuntimeDatasetPayloads({ primary: { rows: [] } }), {
+  primary: { rows: [], hasMore: false, diagnostics: [] },
+});
+assert.equal(metrics.getRuntimeDatasetPayloads().detail, undefined);
 
 assert.deepEqual(metrics.getSeededSavedReportPayloads(), currentSavedReportPayloads);
 assert.deepEqual(
@@ -748,6 +791,8 @@ assert.equal(metrics.getBuilderState, undefined);
 assert.equal(metrics.patchBuilderState, undefined);
 assert.equal(metrics.getCollectionRows, undefined);
 assert.equal(metrics.replaceCollectionRows, undefined);
+assert.equal(metrics.getRuntimeDatasetPayloads, undefined);
+assert.equal(metrics.replaceRuntimeDatasetPayloads, undefined);
 assert.equal(metrics.applyStandaloneRuntimeRefinement, undefined);
 assert.equal(metrics.getSeededSavedReportPayloads, undefined);
 assert.equal(metrics.replaceSeededSavedReportPayloads, undefined);

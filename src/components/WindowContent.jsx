@@ -78,8 +78,14 @@ export function compileWindowAuthorizationMetadata(metadata, parameters = {}) {
     return {...result.metadata, authorizationSnapshot: authorization};
 }
 
+export function isProtectedWindowMetadata(metadata) {
+    return !!metadata && (!!metadata.authorization || !!metadata.authorizationSnapshot);
+}
+
 export function canUseInlineMetadataFallback(inlineMetadata) {
-    return !!inlineMetadata && (!inlineMetadata.authorization || !!inlineMetadata.authorizationSnapshot);
+    // Protected metadata must always complete a fresh permission preflight.
+    // A carried snapshot may be expired or belong to a different resource.
+    return !!inlineMetadata && !isProtectedWindowMetadata(inlineMetadata);
 }
 
 export function formatWindowMetadataError(error) {
@@ -1064,20 +1070,19 @@ export default function WindowContent({window, isInTab = false}) {
             return () => { cancelled = true; };
         }
         const existingMetadata = metadataSignalHandle.peek?.();
-        const existingWindowKey = String(existingMetadata?.__windowKey || '').trim();
         const targetKey = normalizeTargetKey(targetContext);
-        const existingTargetKey = String(existingMetadata?.__targetKey || '').trim();
-        const existingIsProvisional = existingMetadata?.__provisionalInline === true;
-        if (existingMetadata && !existingIsProvisional && existingWindowKey === baseKey && existingTargetKey === targetKey) {
-            setFetchError(null);
-            setLoading(false);
-            return () => { cancelled = true; };
-        }
+        // Registered windows always fetch fresh metadata and authorization.
+        // A compiled protected tree may no longer retain enough markers to be
+        // distinguished safely from public metadata.
         setSignalsReady(false);
         setLoading(true);
         setFetchError(null);
+        if (isProtectedWindowMetadata(existingMetadata)) {
+            metadataSignalHandle.value = null;
+        }
 
         let hasInlineFallback = false;
+        let fetchedProtectedMetadata = false;
         if (window && canUseInlineMetadataFallback(window.inlineMetadata)) {
             try {
                 const resolvedMetadata = resolveWindowMetadataForTarget(window.inlineMetadata, targetContext);
@@ -1099,6 +1104,7 @@ export default function WindowContent({window, isInTab = false}) {
                 if (cancelled) return;
                 setFetchError(null);
                 const completeMetadata = resolveWindowMetadataForTarget(resp.data, targetContext);
+                fetchedProtectedMetadata = isProtectedWindowMetadata(completeMetadata);
                 const permissionAppliedMetadata = await applyWindowPermissionMetadata(completeMetadata, {
                     services,
                     windowKey: baseKey,
@@ -1122,7 +1128,8 @@ export default function WindowContent({window, isInTab = false}) {
             })
             .catch((err) => {
                 if (!cancelled) {
-                    if (!hasInlineFallback) {
+                    const protectedRequest = fetchedProtectedMetadata || isProtectedWindowMetadata(existingMetadata) || isProtectedWindowMetadata(window?.inlineMetadata);
+                    if (!hasInlineFallback || protectedRequest || Number(err?.status) === 401 || Number(err?.status) === 403) {
                         console.error('Error fetching metadata', err);
                         setFetchError(err);
                     }
@@ -1136,7 +1143,7 @@ export default function WindowContent({window, isInTab = false}) {
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [windowId, baseKey, metadataSignalHandle, targetContext]);
+    }, [windowId, baseKey, metadataSignalHandle, targetContext, window?.parameters, window?.resource, window?.conversationId]);
 
     useEffect(() => {
         const metadata = metadataSignalHandle?.value;

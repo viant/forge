@@ -387,6 +387,19 @@ export function buildReportBuilderDatasetOptions({
             if (!dataSourceRef || !value || value === configuredPrimaryId) {
                 return null;
             }
+            const inheritRuntimeFieldCatalog = entry?.capabilities?.inheritRuntimeFieldCatalog === true;
+            const columnOptions = Array.isArray(entry?.columnOptions) && entry.columnOptions.length > 0
+                ? entry.columnOptions
+                : (inheritRuntimeFieldCatalog ? tableColumnOptions : []);
+            const inheritedValueFieldOptions = Array.isArray(entry?.valueFieldOptions) && entry.valueFieldOptions.length > 0
+                ? entry.valueFieldOptions
+                : (inheritRuntimeFieldCatalog ? valueFieldOptions : []);
+            const inheritedSecondaryFieldOptions = Array.isArray(entry?.secondaryFieldOptions) && entry.secondaryFieldOptions.length > 0
+                ? entry.secondaryFieldOptions
+                : (inheritRuntimeFieldCatalog ? secondaryFieldOptions : []);
+            const inheritedChartFieldOptions = Array.isArray(entry?.chartFieldOptions) && entry.chartFieldOptions.length > 0
+                ? entry.chartFieldOptions
+                : (inheritRuntimeFieldCatalog ? chartFieldOptions : []);
             return {
                 value,
                 dataSourceRef,
@@ -408,10 +421,10 @@ export function buildReportBuilderDatasetOptions({
                 ...(entry?.capabilities && typeof entry.capabilities === "object" && !Array.isArray(entry.capabilities)
                     ? { capabilities: cloneValue(entry.capabilities) }
                     : {}),
-                columnOptions: Array.isArray(entry?.columnOptions) ? entry.columnOptions : [],
-                valueFieldOptions: Array.isArray(entry?.valueFieldOptions) ? entry.valueFieldOptions : [],
-                secondaryFieldOptions: Array.isArray(entry?.secondaryFieldOptions) ? entry.secondaryFieldOptions : [],
-                chartFieldOptions: Array.isArray(entry?.chartFieldOptions) ? entry.chartFieldOptions : [],
+                columnOptions,
+                valueFieldOptions: inheritedValueFieldOptions,
+                secondaryFieldOptions: inheritedSecondaryFieldOptions,
+                chartFieldOptions: inheritedChartFieldOptions,
                 scopeParamOptions: Array.isArray(entry?.scopeParamOptions) ? entry.scopeParamOptions : [],
                 filterBarGroupOptions: Array.isArray(entry?.filterBarGroupOptions) ? entry.filterBarGroupOptions : [],
             };

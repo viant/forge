@@ -450,7 +450,7 @@ function buildAuthoredBadgesBlock(block = {}, fieldCatalog = {}) {
   return normalizedBlock;
 }
 
-function buildStaticDatasetReportBuilderConfig(baseConfig = {}, dataset = null) {
+export function buildStaticDatasetReportBuilderConfig(baseConfig = {}, dataset = null) {
   const normalizedDataset = dataset && typeof dataset === "object" && !Array.isArray(dataset)
     ? dataset
     : null;
@@ -460,7 +460,9 @@ function buildStaticDatasetReportBuilderConfig(baseConfig = {}, dataset = null) 
   const columnOptions = Array.isArray(normalizedDataset?.columnOptions)
     ? normalizedDataset.columnOptions
     : [];
-  const dimensions = columnOptions
+  const inheritRuntimeFieldCatalog = normalizedDataset?.capabilities?.inheritRuntimeFieldCatalog === true
+    && columnOptions.length === 0;
+  const dimensions = inheritRuntimeFieldCatalog ? cloneValue(baseConfig?.dimensions || []) : columnOptions
     .filter((column) => normalizeString(column?.kind) === "dimension")
     .map((column) => ({
       id: normalizeString(column?.key),
@@ -469,7 +471,7 @@ function buildStaticDatasetReportBuilderConfig(baseConfig = {}, dataset = null) 
       ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
     }))
     .filter((entry) => entry.id && entry.key && entry.label);
-  const measures = columnOptions
+  const measures = inheritRuntimeFieldCatalog ? cloneValue(baseConfig?.measures || []) : columnOptions
     .filter((column) => normalizeString(column?.kind) === "measure")
     .map((column) => ({
       id: normalizeString(column?.key),
@@ -1972,12 +1974,14 @@ export function buildReportDocumentChartBlock(block = {}) {
       : {}),
     title: normalizedTitle,
   });
+  const rowLimit = Math.trunc(Number(block?.rowLimit));
   return {
     id: normalizeString(block?.id || "chartBlock"),
     kind: "chartBlock",
     title: normalizedTitle,
     datasetRef: normalizeString(block?.datasetRef || "primary"),
     chartSpec: normalizedChartSpec,
+    ...(Number.isInteger(rowLimit) && rowLimit > 0 ? { rowLimit } : {}),
   };
 }
 

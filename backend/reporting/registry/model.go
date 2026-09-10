@@ -30,17 +30,19 @@ type Asset struct {
 	Visibility  string `json:"visibility,omitempty"`
 	// DefinitionRef is an opaque server-owned identity. CatalogRef is a
 	// workspace-relative file reference resolved securely during discovery.
-	DefinitionRef           string         `json:"definitionRef,omitempty"`
-	CatalogRef              string         `json:"catalogRef,omitempty"`
-	CatalogPath             string         `json:"-"`
-	CatalogDataSourceRef    string         `json:"catalogDataSourceRef,omitempty"`
-	DefinitionDataSourceRef string         `json:"definitionDataSourceRef,omitempty"`
-	PresetRefs              []string       `json:"presetRefs,omitempty"`
-	DefinitionRefs          []string       `json:"definitionRefs,omitempty"`
-	SourcePath              string         `json:"sourcePath"`
-	YAMLPath                string         `json:"yamlPath"`
-	Legacy                  bool           `json:"legacy,omitempty"`
-	Raw                     map[string]any `json:"raw,omitempty"`
+	DefinitionRef           string           `json:"definitionRef,omitempty"`
+	CatalogRef              string           `json:"catalogRef,omitempty"`
+	CatalogPath             string           `json:"-"`
+	CatalogDataSourceRef    string           `json:"catalogDataSourceRef,omitempty"`
+	DefinitionDataSourceRef string           `json:"definitionDataSourceRef,omitempty"`
+	PresetRefs              []string         `json:"presetRefs,omitempty"`
+	DefinitionRefs          []string         `json:"definitionRefs,omitempty"`
+	PresentationProfileRefs []string         `json:"presentationProfileRefs,omitempty"`
+	PresentationProfiles    []map[string]any `json:"presentationProfiles,omitempty"`
+	SourcePath              string           `json:"sourcePath"`
+	YAMLPath                string           `json:"yamlPath"`
+	Legacy                  bool             `json:"legacy,omitempty"`
+	Raw                     map[string]any   `json:"raw,omitempty"`
 }
 
 // Registry is the immutable result of one successful discovery pass.

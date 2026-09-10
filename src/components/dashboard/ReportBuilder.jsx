@@ -139,6 +139,11 @@ import {
     resolveReportBuilderSurfaceAutoRunAction,
 } from "./reportBuilderSurfaceAutoRun.js";
 import {
+    invalidateHostedReportRestoredRuntime,
+    resolveHostedReportRestoreRehydration,
+} from "./reportBuilderRestoreRehydration.js";
+import { shouldRenderInlineReportFilterSurface } from "./reportBuilderFilterSurface.js";
+import {
     buildHostedReportActivationRequest,
     buildHostedReportActivationResponse,
     buildHostedInlineReportActivation,
@@ -2643,6 +2648,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     const reportBuilderMountedRef = useRef(true);
     const appliedReportStarterIdRef = useRef("");
     const executeOnOpenRunKeyRef = useRef("");
+    const restoredReportRehydrationKeyRef = useRef("");
     const hostedRunInitializationTransitionKeyRef = useRef("");
     const hostedRunInitializationAttemptRef = useRef(null);
     const hostedRunInitializationAttemptSequenceRef = useRef(0);
@@ -2664,6 +2670,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         hostedReportLifecycleContextKeyRef.current = hostedReportLifecycleContextKey;
         hostedReportLifecycleContextChangedRef.current = true;
         executeOnOpenRunKeyRef.current = "";
+        restoredReportRehydrationKeyRef.current = "";
         hostedRunInitializationTransitionKeyRef.current = "";
         hostedRunInitializationAttemptRef.current = null;
         hostedRunInitializationAttemptSequenceRef.current = 0;
@@ -19955,7 +19962,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                     if (!authoredRuntimePreviewState.canRenderRuntime) {
                         return null;
                     }
-                    const unifiedFilterPanel = showInlineReportBaselineControls ? renderFiltersPanel({ inlineReportMode: true }) : null;
+                    const unifiedFilterPanel = shouldRenderInlineReportFilterSurface({
+                        showInlineReportBaselineControls,
+                        showLeftRail,
+                        hasDedicatedFilterControl: showReportFilterToolbar || compactMode,
+                    }) ? renderFiltersPanel({ inlineReportMode: true }) : null;
                     const runtimeContent = (
                         <ReportRuntime
                             reportSpec={authoredRuntimePreviewState.runtimeConfig.reportSpec}
@@ -20012,6 +20023,68 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             </section>
         );
     };
+
+    useEffect(() => {
+        if (designWorkspaceMode
+            || shouldDeferReportBuilderRequestForPrefill({
+                currentPrefillSignature,
+                appliedPrefillSignature: appliedPrefillSignatureRef.current,
+            })
+            || shouldDeferReportBuilderExecutionForDefinition({
+                currentSignature: currentReportDefinitionSignature,
+                committedSignature: committedReportDefinitionSignature,
+            })
+            || !showAuthoredReportSurface) {
+            return;
+        }
+        const authoredBlockCount = Array.isArray(state?.reportDocumentBlocks)
+            ? state.reportDocumentBlocks.length
+            : 0;
+        const decision = resolveHostedReportRestoreRehydration({
+            hostAction: hostedExecuteOnOpenHostAction,
+            activationReady: hostedReportActivationCurrent,
+            canRunReport,
+            reportIdentity: hostedReportExecutionIdentity,
+            lifecycleContextKey: hostedReportLifecycleContextKey,
+            requestFingerprint: currentRequestFingerprint,
+            authoredBlockCount,
+            consumedKey: restoredReportRehydrationKeyRef.current,
+        });
+        if (decision.type !== "rehydrate") {
+            return;
+        }
+        restoredReportRehydrationKeyRef.current = decision.key;
+        requestFingerprintRef.current = "";
+        lastManualRunFingerprintRef.current = "";
+        authoredPreviewAutoFetchKeyRef.current = "";
+        invalidateHostedReportRestoredRuntime(builderContext);
+        setManualRunSequence((current) => current + 1);
+        const invocationSnapshot = captureRunDispatchSnapshot(
+            currentBuilderStateRef.current || state,
+            { origin: "restore" },
+        );
+        dispatchReportRequestSnapshot(invocationSnapshot, {
+            forceFetch: true,
+            markManual: false,
+        });
+    }, [
+        builderContext,
+        canRunReport,
+        captureRunDispatchSnapshot,
+        committedReportDefinitionSignature,
+        currentPrefillSignature,
+        currentReportDefinitionSignature,
+        currentRequestFingerprint,
+        designWorkspaceMode,
+        dispatchReportRequestSnapshot,
+        hostedExecuteOnOpenHostAction,
+        hostedReportActivationCurrent,
+        hostedReportExecutionIdentity,
+        hostedReportLifecycleContextKey,
+        showAuthoredReportSurface,
+        state,
+        state?.reportDocumentBlocks,
+    ]);
 
     useEffect(() => {
         if (pendingReportWorkspaceRunRef.current) {

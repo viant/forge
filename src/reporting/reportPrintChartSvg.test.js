@@ -5,6 +5,7 @@ import { buildReportPrintChartSvg } from "./reportPrintChartSvg.js";
 const groupedLine = buildReportPrintChartSvg({
   chartModel: {
     type: "line",
+    xAxis: { dataKey: "eventDate", tickFormat: "MMM d", valueMode: "civil" },
     series: {
       palette: ["#137cbd", "#0f9960"],
     },
@@ -33,6 +34,8 @@ assert.doesNotMatch(groupedLine.svg, /stroke-dasharray=/);
 assert.match(groupedLine.svg, /Display/);
 assert.match(groupedLine.svg, /CTV/);
 assert.match(groupedLine.svg, />eventDate</);
+assert.match(groupedLine.svg, /May 1/);
+assert.doesNotMatch(groupedLine.svg, /2026-05-01/);
 
 const lineWithEmptySeries = buildReportPrintChartSvg({
   chartModel: {
@@ -150,6 +153,7 @@ assert.match(signColoredDirectBar.svg, /fill="#0f9960"/);
 const horizontalBar = buildReportPrintChartSvg({
   chartModel: {
     type: "horizontal_bar",
+    xAxis: { dataKey: "channelV2", categoryLabel: { lines: 2, maxCharacters: 36 } },
     series: {
       values: [
         { value: "avails", label: "Available Impressions", color: "#137cbd", type: "horizontal_bar", format: "compactNumber", dataLabels: "always" },
@@ -164,6 +168,7 @@ const horizontalBar = buildReportPrintChartSvg({
     rows: [
       { channelV2: "Display", avails: 158400 },
       { channelV2: "CTV", avails: 138200 },
+      { channelV2: "Delivery - Leave Checked", avails: 121000 },
     ],
   },
   width: 640,
@@ -174,6 +179,9 @@ assert.ok(horizontalBar.height > 120);
 assert.match(horizontalBar.svg, /<rect/);
 assert.match(horizontalBar.svg, /Display/);
 assert.match(horizontalBar.svg, /CTV/);
+assert.match(horizontalBar.svg, /Delivery -/);
+assert.match(horizontalBar.svg, /Leave Checked/);
+assert.match(horizontalBar.svg, /<tspan/);
 assert.match(horizontalBar.svg, /158.4K/);
 assert.match(horizontalBar.svg, />158K</);
 assert.match(horizontalBar.svg, /Available Impressions/);

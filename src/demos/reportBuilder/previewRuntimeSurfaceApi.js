@@ -2,6 +2,7 @@ import {
   attachPreviewRuntimeInteractionApi,
   detachPreviewRuntimeInteractionApi,
 } from "./previewRuntimeInteractionApi.js";
+import { normalizePreviewRuntimeDatasetPayloads } from "./previewRuntimeDatasetPayloads.js";
 
 function cloneValue(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -88,6 +89,8 @@ export function attachPreviewRuntimeSurfaceApi(metrics = {}, {
   setCollectionRows = null,
   setCollectionInfo = null,
   setControl = null,
+  getRuntimeDatasetPayloads = null,
+  setRuntimeDatasetPayloads = null,
   getSavedReportPayloads = null,
   setSavedReportPayloads = null,
   buildSavedReportPayloadRecord = null,
@@ -185,6 +188,22 @@ export function attachPreviewRuntimeSurfaceApi(metrics = {}, {
       });
     }
     return metrics.getCollectionRows();
+  };
+
+  metrics.getRuntimeDatasetPayloads = function getRuntimeDatasetPayloadsSnapshot() {
+    const currentPayloads = typeof getRuntimeDatasetPayloads === "function"
+      ? getRuntimeDatasetPayloads()
+      : {};
+    return normalizePreviewRuntimeDatasetPayloads(currentPayloads);
+  };
+
+  metrics.replaceRuntimeDatasetPayloads = function replaceRuntimeDatasetPayloads(payloads = {}) {
+    if (typeof setRuntimeDatasetPayloads !== "function") {
+      return null;
+    }
+    const nextPayloads = normalizePreviewRuntimeDatasetPayloads(payloads);
+    setRuntimeDatasetPayloads(nextPayloads);
+    return normalizePreviewRuntimeDatasetPayloads(nextPayloads);
   };
 
   metrics.applyStandaloneRuntimeRefinement = function applyStandaloneRuntimeRefinement(refinement = null) {
@@ -291,6 +310,8 @@ export function detachPreviewRuntimeSurfaceApi(metrics = {}) {
   delete metrics.patchBuilderState;
   delete metrics.getCollectionRows;
   delete metrics.replaceCollectionRows;
+  delete metrics.getRuntimeDatasetPayloads;
+  delete metrics.replaceRuntimeDatasetPayloads;
   delete metrics.applyStandaloneRuntimeRefinement;
   delete metrics.getSeededSavedReportPayloads;
   delete metrics.replaceSeededSavedReportPayloads;

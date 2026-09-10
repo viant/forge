@@ -46,6 +46,7 @@ restoreWindowsFromSnapshot({
     zIndex: 12,
     position: { x: 10, y: 20 },
     size: { width: 800, height: 500 },
+    inlineMetadataExplicit: true,
     inlineMetadata: {
       namespace: 'order',
       actions: { code: '(() => ({}))()' },
@@ -83,6 +84,7 @@ restoreWindowsFromSnapshot({
 assert.equal(activeWindows.value.length, 1);
 assert.equal(activeWindows.value[0].windowId, 'orderPerformance_1');
 assert.equal(activeWindows.value[0].windowKey, 'orderPerformance');
+assert.equal(activeWindows.value[0].inlineMetadataExplicit, true);
 assert.equal(
   activeWindows.value[0].hostOpenState,
   'historical_replay',

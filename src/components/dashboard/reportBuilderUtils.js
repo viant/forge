@@ -2331,6 +2331,9 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
                 ? { displayValueMap: clone(xField.displayValueMap) }
                 : {}),
             tickFormat: xField?.tickFormat,
+            ...(["civil", "instant"].includes(String(xField?.valueMode || "").trim())
+                ? { valueMode: String(xField.valueMode).trim() }
+                : {}),
             ...(normalized.categoryLabel ? { categoryLabel: clone(normalized.categoryLabel) } : {}),
         },
         yAxis: {

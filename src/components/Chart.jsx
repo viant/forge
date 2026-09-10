@@ -34,12 +34,16 @@ import {
     buildPieSliceCellKey,
     buildPieChartData,
     fillMissingTemporalBuckets,
+    formatChartNumber,
     formatChartXAxisValue,
+    hasNonZeroChartSeriesValue,
     materializeChartDisplayRows,
     normalizeChartKey,
     readChartDataValue,
     resolveChartBodyState,
     resolveChartLoadingState,
+    resolveHorizontalBarDataLabelLayout,
+    resolveChartValueAxisDomain,
     resolveVisibleChartState,
     transformData,
     resolveChartTableMinWidth,
@@ -94,6 +98,24 @@ function ClampedCategoryTick({ x = 0, y = 0, payload = {}, config = null, valueF
                 ))}
             </text>
         </g>
+    );
+}
+
+function HorizontalBarValueLabel({ x = 0, y = 0, width = 0, height = 0, value = 0, formatter = null }) {
+    const layout = resolveHorizontalBarDataLabelLayout({ x, width, value });
+    const label = typeof formatter === "function" ? formatter(value) : value;
+    return (
+        <text
+            x={layout.x}
+            y={(Number(y) || 0) + (Number(height) || 0) / 2}
+            textAnchor={layout.textAnchor}
+            dominantBaseline="middle"
+            fill={layout.fill}
+            fontSize={11}
+            fontWeight={600}
+        >
+            {label}
+        </text>
     );
 }
 
@@ -243,7 +265,7 @@ function shouldRenderSeriesDataLabels(series = {}, chartType = "", rowCount = 0,
     if (mode === "always") {
         return true;
     }
-    if (mode !== "auto") {
+    if (mode && mode !== "auto") {
         return false;
     }
     if (chartType === "horizontal_bar" || chartType === "funnel_bar") {
@@ -251,6 +273,9 @@ function shouldRenderSeriesDataLabels(series = {}, chartType = "", rowCount = 0,
     }
     if (chartType === "bar") {
         return rowCount <= 10;
+    }
+    if (!mode) {
+        return false;
     }
     if (chartType === "line" || chartType === "area") {
         return rowCount <= 8;
@@ -408,15 +433,7 @@ function buildRuntimeChartAnnotationElements(annotations = [], { embedded = fals
 
 // Function to format large numbers with commas
 function formatLargeNumber(value) {
-    if (value >= 1e9) {
-        return `${(value / 1e9).toFixed(1)}B`;
-    } else if (value >= 1e6) {
-        return `${(value / 1e6).toFixed(1)}M`;
-    } else if (value >= 1e3) {
-        return `${(value / 1e3).toFixed(1)}K`;
-    } else {
-        return value;
-    }
+    return formatChartNumber(value);
 }
 
 function escapeCsvCell(value) {
@@ -679,7 +696,18 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         setSelectedValueKey(newValueKey); // Just update the state
     };
 
-    const categoryLabelConfig = normalizeChartCategoryLabelConfig(xAxis?.categoryLabel);
+    const authoredCategoryLabelConfig = normalizeChartCategoryLabelConfig(xAxis?.categoryLabel);
+    const estimatedCategoryGutter = Math.max(110, Math.min(420, Number(chartSize.width || 0) * 0.42 || 220));
+    const responsiveCategoryMaxCharacters = Math.max(
+        24,
+        Math.min(120, Math.floor(Math.max(84, estimatedCategoryGutter - 24) / 7) * 2),
+    );
+    const categoryLabelConfig = isHorizontalBar
+        ? {
+            lines: authoredCategoryLabelConfig?.lines || 2,
+            maxCharacters: Math.max(authoredCategoryLabelConfig?.maxCharacters || 0, responsiveCategoryMaxCharacters),
+        }
+        : authoredCategoryLabelConfig;
     const categoryLabelBottomOffset = categoryLabelConfig?.lines === 2 ? 14 : 0;
     const chartMargin = embedded
         ? {top: 24, right: 12, left: 6, bottom: 34 + categoryLabelBottomOffset}
@@ -837,7 +865,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         chart?.fillMissingTemporalBuckets,
     );
 
-    const normalizedChartData = (isHorizontalBar
+    const normalizedAllChartData = (isHorizontalBar
         ? [...denseChartData].sort((a, b) => {
             const primaryKey = renderableSeriesDefinitions[0]?.value;
             return Number(b?.[primaryKey] || 0) - Number(a?.[primaryKey] || 0);
@@ -848,6 +876,10 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         __seriesFormats: Object.fromEntries(renderableSeriesDefinitions.map((entry) => [entry.value, entry.format || leftAxis.format])),
         __seriesAxes: Object.fromEntries(renderableSeriesDefinitions.map((entry) => [entry.value, entry.axis === "right" ? rightAxis?.format : leftAxis.format])),
     }));
+    const chartRowLimit = Math.trunc(Number(chart?.rowLimit || 0));
+    const normalizedChartData = Number.isInteger(chartRowLimit) && chartRowLimit > 0
+        ? normalizedAllChartData.slice(0, chartRowLimit)
+        : normalizedAllChartData;
 
     const resolvedChartAnnotations = React.useMemo(() => (
         buildRuntimeChartAnnotationElements(normalizeChartAnnotations(chart), { embedded })
@@ -959,7 +991,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     position: "insideLeft",
                     ...axisLabelStyle,
                 }}
-                domain={leftAxis.domain}
+                domain={resolveChartValueAxisDomain(type, leftAxis.domain)}
             />
             {hasRightAxis ? (
                 <YAxis
@@ -1017,15 +1049,19 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         if (!categoryKey || !primarySeries) return null;
 
         const activePalette = (palette && palette.length > 0) ? palette : defaultCategoricalPalette();
+        const estimatedCategoryCharacters = categoryLabelConfig
+            ? Math.ceil(categoryLabelConfig.maxCharacters / categoryLabelConfig.lines)
+            : Math.max(1, ...normalizedChartData.map((row) => String(readChartDataValue(row, categoryKey) ?? "").length));
         const categoryWidth = Math.min(
-            220,
+            estimatedCategoryGutter,
             Math.max(
                 110,
-				...normalizedChartData.map((row) => String(readChartDataValue(row, categoryKey) ?? "").length * 6 + 20)
+                estimatedCategoryCharacters * 7 + 24,
             )
         );
         const barSize = embedded ? 10 : 12;
         const showHorizontalDataLabels = shouldRenderSeriesDataLabels(primarySeries, type, normalizedChartData.length, embedded);
+        const primaryDataLabelFormatter = buildDataLabelFormatter(primarySeries.format || leftAxis.format);
 
         return (
             <BarChart data={normalizedChartData} margin={chartMargin} layout="vertical">
@@ -1034,19 +1070,19 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 <XAxis
                     type="number"
                     tickFormatter={createAxisTickFormatter(primarySeries.format || leftAxis.format)}
-                    tick={renderYAxisCategoryTick}
+                    tick={axisTickStyle}
                     label={{
                         value: embedded ? "" : (leftAxis.label || primarySeries.label || ""),
                         position: "insideBottomRight",
                         offset: 0,
                     }}
-                    domain={leftAxis.domain}
+                    domain={resolveChartValueAxisDomain(type, leftAxis.domain)}
                 />
                 <YAxis
                     type="category"
                     dataKey={categoryKey}
                     width={categoryWidth}
-                    tick={embedded ? {fontSize: 11, fill: "#5f6b7c"} : undefined}
+                    tick={renderYAxisCategoryTick}
                 />
                 <Tooltip
                     formatter={(value) => tooltipFormatterForFormat(primarySeries.format || leftAxis.format)(value)}
@@ -1062,7 +1098,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(primarySeries.value, payload) } : {})}
                     >
                         {showHorizontalDataLabels ? (
-                            <LabelList dataKey={primarySeries.value} position="right" formatter={buildDataLabelFormatter(primarySeries.format || leftAxis.format)} fill="#5f6b7c" fontSize={11} />
+                            <LabelList dataKey={primarySeries.value} content={(props) => <HorizontalBarValueLabel {...props} formatter={primaryDataLabelFormatter} />} />
                         ) : null}
                         {normalizedChartData.map((row, index) => (
                             <Cell
@@ -1090,7 +1126,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                                 ))
                                 : null}
                             {shouldRenderSeriesDataLabels(entry, type, normalizedChartData.length, embedded) ? (
-                                <LabelList dataKey={entry.value} position="right" formatter={buildDataLabelFormatter(entry.format || leftAxis.format)} fill="#5f6b7c" fontSize={11} />
+                                <LabelList dataKey={entry.value} content={(props) => <HorizontalBarValueLabel {...props} formatter={buildDataLabelFormatter(entry.format || leftAxis.format)} />} />
                             ) : null}
                         </Bar>
                     ))
@@ -1203,6 +1239,14 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const hasRenderableSeriesValues = isPieChart
         ? pieFilteredData.some((entry) => Number.isFinite(Number(entry?.value)))
         : normalizedChartData.some((row) => selectedSeriesDefinitions.some((entry) => Number.isFinite(Number(row?.[entry.value]))));
+    const hasNonZeroRenderableSeriesValues = isPieChart
+        ? pieFilteredData.some((entry) => Number.isFinite(Number(entry?.value)) && Number(entry.value) !== 0)
+        : hasNonZeroChartSeriesValue(normalizedChartData, selectedSeriesDefinitions.map((entry) => entry.value));
+    const showZeroDataMessage = !effectiveLoading
+        && !error
+        && hasChartRows
+        && hasRenderableSeriesValues
+        && !hasNonZeroRenderableSeriesValues;
     const hasResolvedMetricsPayload = chartMetrics && typeof chartMetrics === 'object' && Object.keys(chartMetrics).length > 0;
     const showResolvedEmptyStateWhileLoading =
         effectiveLoading
@@ -1288,8 +1332,15 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const resolvedWidth = isHorizontalBar
         ? normalizeChartExtent(width, embedded ? "82%" : "85%")
         : normalizeChartExtent(width, "100%");
+    const estimatedHorizontalRowHeight = categoryLabelConfig?.lines === 2
+        ? (embedded ? 34 : 40)
+        : (embedded ? 28 : 32);
+    const horizontalBarDefaultHeight = Math.max(
+        embedded ? 150 : 160,
+        Math.min(embedded ? 380 : 440, 96 + normalizedChartData.length * estimatedHorizontalRowHeight),
+    );
     const resolvedHeight = isHorizontalBar
-        ? normalizeChartExtent(height, embedded ? 320 : 260)
+        ? normalizeChartExtent(height, horizontalBarDefaultHeight)
         : normalizeChartExtent(height, embedded ? 380 : 240);
     const effectiveViewportHeight = showEmptyDataMessage
         ? normalizeChartExtent(chart?.emptyHeight, resolvedHeight)
@@ -1443,6 +1494,24 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                             >
                                 Loading chart…
                             </div>
+                        </div>
+                    ) : showZeroDataMessage ? (
+                        <div
+                            style={{
+                                height: "100%",
+                                minHeight: embedded ? 110 : 180,
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 6,
+                                textAlign: "center",
+                                color: "#5f6b7c",
+                                fontSize: 12,
+                            }}
+                        >
+                            <strong style={{ color: "#30404d" }}>All values are zero for the selected period.</strong>
+                            <span>Adjust the report filters or choose a wider date interval.</span>
                         </div>
                     ) : showEmptyDataMessage ? (
                         <div

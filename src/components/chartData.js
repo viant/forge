@@ -23,6 +23,48 @@ export function resolveChartLoadingState({
     return overrideRows.length === 0;
 }
 
+export function formatChartNumber(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return value;
+    const magnitude = Math.abs(numeric);
+    const formatValue = (scaled, suffix = "") => `${new Intl.NumberFormat("en-US", {
+        maximumFractionDigits: 2,
+    }).format(scaled)}${suffix}`;
+    if (magnitude >= 1e9) return formatValue(numeric / 1e9, "B");
+    if (magnitude >= 1e6) return formatValue(numeric / 1e6, "M");
+    if (magnitude >= 1e3) return formatValue(numeric / 1e3, "K");
+    return formatValue(numeric);
+}
+
+export function resolveHorizontalBarDataLabelLayout({ x = 0, width = 0, value = 0 } = {}) {
+    const numericX = Number(x) || 0;
+    const numericWidth = Number(width) || 0;
+    const barLeft = Math.min(numericX, numericX + numericWidth);
+    const barRight = Math.max(numericX, numericX + numericWidth);
+    const negative = Number(value) < 0;
+    const renderInside = Math.abs(numericWidth) >= 56;
+    if (renderInside) {
+        return {
+            x: negative ? barLeft + 6 : barRight - 6,
+            textAnchor: negative ? "start" : "end",
+            fill: "#ffffff",
+        };
+    }
+    return {
+        x: negative ? barLeft - 6 : barRight + 6,
+        textAnchor: negative ? "end" : "start",
+        fill: "#5f6b7c",
+    };
+}
+
+export function hasNonZeroChartSeriesValue(rows = [], seriesKeys = []) {
+    const keys = Array.isArray(seriesKeys) ? seriesKeys : [];
+    return (Array.isArray(rows) ? rows : []).some((row) => keys.some((key) => {
+        const value = Number(readChartDataValue(row, key));
+        return Number.isFinite(value) && value !== 0;
+    }));
+}
+
 function attachChartSelectionRowsMetadata(target, initialValue) {
     if (!target || typeof target !== "object") {
         return target;
@@ -381,4 +423,21 @@ export function resolveChartBodyState({
         showSelectionMessage,
         showEmptyDataMessage,
     };
+}
+
+// Bar lengths encode magnitude, so an auto-zoomed value axis can materially
+// misrepresent a small range (especially a single negative business delta).
+// Preserve an authored domain, but make every default bar domain include zero.
+export function resolveChartValueAxisDomain(chartType = "", explicitDomain = undefined) {
+    if (explicitDomain !== undefined && explicitDomain !== null) {
+        return explicitDomain;
+    }
+    const normalized = String(chartType || "").trim().toLowerCase();
+    if (!['bar', 'horizontal_bar', 'funnel_bar'].includes(normalized)) {
+        return undefined;
+    }
+    return [
+        (dataMin) => Math.min(0, Number.isFinite(Number(dataMin)) ? Number(dataMin) : 0),
+        (dataMax) => Math.max(0, Number.isFinite(Number(dataMax)) ? Number(dataMax) : 0),
+    ];
 }

@@ -49,6 +49,7 @@ const config = {
         type: "line",
         xField: "eventDate",
         yFields: ["totalSpend"],
+        categoryLabel: { lines: 2, maxCharacters: 24 },
       },
     ],
     orderFields: [
@@ -161,6 +162,30 @@ assert.deepEqual(validateReportSpec(reportSpec), {
   valid: true,
   errors: [],
 });
+const summaryProjectionSpec = JSON.parse(JSON.stringify(reportSpec));
+summaryProjectionSpec.datasets.push({
+  id: "summary",
+  dataSourceRef: "demoReportSource",
+  request: { resultSet: "summary", summary: true, dimensions: {}, measures: {}, filters: {}, limit: 1, offset: 0 },
+});
+const summaryProjectionFill = buildReportFillFromReportSpec(summaryProjectionSpec, {
+  primary: { rows: [] },
+  summary: { rows: [{ totalSpend: 25, impressions: 100 }] },
+});
+const summaryProjectionPrint = buildReportPrintFromReportFill({
+  reportSpec: summaryProjectionSpec,
+  reportFill: summaryProjectionFill,
+});
+const summaryProjectionExport = buildDraftReportExportRequest({
+  reportDocument: { id: "performanceBuilder", title: "Performance Report" },
+  reportSpec: summaryProjectionSpec,
+  reportFill: summaryProjectionFill,
+  reportPrint: summaryProjectionPrint,
+  format: "pdf",
+});
+assert.deepEqual(validateReportSpec(summaryProjectionSpec), { valid: true, errors: [] });
+assert.deepEqual(validateReportFill(summaryProjectionFill), { valid: true, errors: [] });
+assert.deepEqual(validateReportExportRequest(summaryProjectionExport), { valid: true, errors: [] });
 const collapsibleSchemaSpec = JSON.parse(JSON.stringify(reportSpec));
 const collapsibleSchemaTable = collapsibleSchemaSpec.blocks.find((block) => block.kind === "tableBlock");
 collapsibleSchemaTable.collapsible = true;
@@ -399,6 +424,9 @@ const compositeSpec = {
       datasetRef: "primary",
       valueField: "totalSpend",
       valueLabel: "Spend",
+      secondaryField: "totalSpend",
+      secondaryLabel: "Change",
+      secondaryTrend: true,
     },
     {
       id: "summaryPanel",
@@ -478,7 +506,7 @@ const annotatedChartSpec = {
       },
       chartModel: {
         type: "line",
-        xAxis: { dataKey: "eventDate", label: "Event Date" },
+        xAxis: { dataKey: "eventDate", label: "Event Date", categoryLabel: { lines: 2, maxCharacters: 24 } },
         yAxis: { format: "currency" },
         annotations: {
           verticalMarkers: [

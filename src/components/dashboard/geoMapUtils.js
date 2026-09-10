@@ -56,8 +56,24 @@ export const US_STATE_TILES = [
 
 export const DEFAULT_GEO_PALETTE = ['#d9f0ea', '#9fd8ce', '#55b9aa', '#187f78', '#0c4d52'];
 
+const US_STATE_CODE_BY_NAME = new Map(
+    US_STATE_TILES.map((state) => [state.label.toUpperCase(), state.key]),
+);
+
 export function normalizeGeoKey(value) {
-    return String(value ?? '').trim().toUpperCase();
+    const normalized = String(value ?? '').trim().toUpperCase();
+    return US_STATE_CODE_BY_NAME.get(normalized) || normalized;
+}
+
+export function resolveGeoTextColor(background = "") {
+    const matched = String(background || "").trim().match(/^#([0-9a-f]{6})$/i);
+    if (!matched) return "#102a43";
+    const value = Number.parseInt(matched[1], 16);
+    const red = (value >> 16) & 0xff;
+    const green = (value >> 8) & 0xff;
+    const blue = value & 0xff;
+    const luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
+    return luminance < 0.48 ? "#ffffff" : "#102a43";
 }
 
 export function pickPaletteColor(value, minValue, maxValue, palette = DEFAULT_GEO_PALETTE) {

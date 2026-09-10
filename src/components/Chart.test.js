@@ -4,11 +4,15 @@ import {
     aggregateDirectSeriesData,
     buildPieChartData,
     buildPieSliceCellKey,
+    formatChartNumber,
     formatChartXAxisValue,
+    hasNonZeroChartSeriesValue,
     formatTimestamp,
     materializeChartDisplayRows,
     resolveChartBodyState,
     resolveChartLoadingState,
+    resolveHorizontalBarDataLabelLayout,
+    resolveChartValueAxisDomain,
     resolveChartTableMinWidth,
     resolveVisibleChartState,
     transformData,
@@ -24,6 +28,15 @@ assert.equal(formatChartXAxisValue('2026-05-14T12:00:00Z', 'MM/dd'), '05/14');
 assert.equal(formatChartXAxisValue('2026-05-14T00:00:00Z', 'MM/dd', 'civil'), '05/14');
 assert.equal(resolveChartTableMinWidth([110, 110, 110]), 330);
 assert.equal(resolveChartTableMinWidth([160, 240, 320]), 720);
+
+const signedBarDomain = resolveChartValueAxisDomain('horizontal_bar');
+assert.equal(signedBarDomain[0](-31385), -31385);
+assert.equal(signedBarDomain[1](-31381), 0);
+const positiveBarDomain = resolveChartValueAxisDomain('bar');
+assert.equal(positiveBarDomain[0](42), 0);
+assert.equal(positiveBarDomain[1](84), 84);
+assert.equal(resolveChartValueAxisDomain('line'), undefined);
+assert.deepEqual(resolveChartValueAxisDomain('bar', [-100, 100]), [-100, 100]);
 
 assert.deepEqual(resolveVisibleChartState({
     chartData: [],
@@ -254,5 +267,21 @@ assert.deepEqual(resolveChartBodyState({
     showSelectionMessage: true,
     showEmptyDataMessage: false,
 });
+
+assert.equal(formatChartNumber(-31382.314905724586), "-31.38K");
+assert.equal(formatChartNumber(315.8579386163547), "315.86");
+assert.equal(formatChartNumber(0), "0");
+assert.deepEqual(resolveHorizontalBarDataLabelLayout({ x: 300, width: -200, value: -12 }), {
+    x: 106,
+    textAnchor: "start",
+    fill: "#ffffff",
+});
+assert.deepEqual(resolveHorizontalBarDataLabelLayout({ x: 100, width: 12, value: 8 }), {
+    x: 118,
+    textAnchor: "start",
+    fill: "#5f6b7c",
+});
+assert.equal(hasNonZeroChartSeriesValue([{ conversions: 0 }, { conversions: 0 }], ["conversions"]), false);
+assert.equal(hasNonZeroChartSeriesValue([{ conversions: 0 }, { conversions: 1 }], ["conversions"]), true);
 
 console.log('Chart ✓ transform, aggregation, and state helpers');

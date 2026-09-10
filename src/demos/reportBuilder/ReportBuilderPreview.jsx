@@ -36,6 +36,7 @@ import {
   attachPreviewRuntimeSurfaceApi,
   detachPreviewRuntimeSurfaceApi,
 } from './previewRuntimeSurfaceApi.js';
+import { resolvePreviewRuntimeDatasetInputs } from './previewRuntimeDatasetPayloads.js';
 import {
   buildPreviewHydratedRuntimeInteractionSnapshot,
   buildPreviewRuntimeInteractionFingerprint,
@@ -1469,6 +1470,8 @@ export default function ReportBuilderPreview() {
   const lastObservedWindowFormJSONRef = useRef(undefined);
   const lastObservedInputJSONRef = useRef(undefined);
   const [previewRuntimeRunSequence, setPreviewRuntimeRunSequence] = useState(0);
+  const [previewSeededRuntimeDatasetPayloads, setPreviewSeededRuntimeDatasetPayloads] = useState({});
+  const previewSeededRuntimeDatasetPayloadsRef = useRef(previewSeededRuntimeDatasetPayloads);
   const [, setPreviewConfigRevision] = useState(0);
   const [, setPreviewSeededReportPayloadRevision] = useState(0);
 
@@ -1709,6 +1712,13 @@ export default function ReportBuilderPreview() {
           context.signals.control.value = nextControl;
         }
       },
+      getRuntimeDatasetPayloads() {
+        return previewSeededRuntimeDatasetPayloadsRef.current;
+      },
+      setRuntimeDatasetPayloads(nextPayloads) {
+        previewSeededRuntimeDatasetPayloadsRef.current = clonePreviewValue(nextPayloads || {});
+        setPreviewSeededRuntimeDatasetPayloads(previewSeededRuntimeDatasetPayloadsRef.current);
+      },
       getSavedReportPayloads() {
         return container?.dashboard?.reportBuilder?.reportDocumentSavedPayloads || [];
       },
@@ -1797,15 +1807,28 @@ export default function ReportBuilderPreview() {
   const previewRuntimeError = previewRuntimeUsesResolvedCollection
     ? (context?.signals?.control?.value?.error || null)
     : (previewRuntimeRowsState.error || null);
+  const previewRuntimeDatasetInputs = useMemo(() => resolvePreviewRuntimeDatasetInputs({
+    rows: previewRuntimeRows,
+    hasMore: previewRuntimeHasMore,
+    error: previewRuntimeError,
+    fetchedPayloads: previewRuntimeDatasetPayloadState.payloads,
+    seededPayloads: previewSeededRuntimeDatasetPayloads,
+  }), [
+    previewRuntimeError,
+    previewRuntimeHasMore,
+    previewRuntimeRows,
+    previewRuntimeDatasetPayloadState.payloads,
+    previewSeededRuntimeDatasetPayloads,
+  ]);
   const previewRuntime = useMemo(() => buildPreviewAuthoredReport({
     container,
     config: previewDisplayConfig,
     state: previewBuilderState,
-    rows: previewRuntimeRows,
+    rows: previewRuntimeDatasetInputs.rows,
     rowsResolved: true,
-    hasMore: previewRuntimeHasMore,
-    datasetPayloads: previewRuntimeDatasetPayloadState.payloads,
-    error: previewRuntimeError,
+    hasMore: previewRuntimeDatasetInputs.hasMore,
+    datasetPayloads: previewRuntimeDatasetInputs.datasetPayloads,
+    error: previewRuntimeDatasetInputs.error,
     refinements: runtimeRefinements,
     drillTransitions: runtimeDrillTransitions,
     hostIntent: runtimeHostIntent,
@@ -1819,11 +1842,8 @@ export default function ReportBuilderPreview() {
     previewBuilderState,
     previewDisplayConfig,
     previewHydratedReportDocumentSession?.reopenedCompileState?.diagnostics,
-    previewRuntimeError,
-    previewRuntimeHasMore,
-    previewRuntimeDatasetPayloadState.payloads,
+    previewRuntimeDatasetInputs,
     previewRuntimeModel,
-    previewRuntimeRows,
     previewResolvedSemanticSummary,
     runtimeRefinements,
     runtimeDrillTransitions,

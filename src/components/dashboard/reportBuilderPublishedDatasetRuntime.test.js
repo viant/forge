@@ -20,14 +20,18 @@ const [dailyPublishedSource] = normalizeReportBuilderPublishedDataSources({
       label: "Date",
       chartAxis: true,
       tickFormat: "MMM d",
+      valueMode: "civil",
     }],
     measures: [{ id: "total", key: "total", label: "Total" }],
   }],
 });
 assert.equal(dailyPublishedSource.columnOptions[0].tickFormat, "MMM d");
 assert.equal(dailyPublishedSource.chartFieldOptions[0].tickFormat, "MMM d");
+assert.equal(dailyPublishedSource.columnOptions[0].valueMode, "civil");
+assert.equal(dailyPublishedSource.chartFieldOptions[0].valueMode, "civil");
 const dailyPublishedConfig = buildReportBuilderPublishedDatasetConfig({}, dailyPublishedSource);
 assert.equal(dailyPublishedConfig.dimensions[0].tickFormat, "MMM d");
+assert.equal(dailyPublishedConfig.dimensions[0].valueMode, "civil");
 const dailyPublishedChart = buildExplicitReportBuilderChartContainer(
   { dataSourceRef: "dailyDeliverySource", collection: [] },
   dailyPublishedConfig,
@@ -35,6 +39,7 @@ const dailyPublishedChart = buildExplicitReportBuilderChartContainer(
   { type: "line", xField: "eventDate", yFields: ["total"] },
 );
 assert.equal(dailyPublishedChart.chart.xAxis.tickFormat, "MMM d");
+assert.equal(dailyPublishedChart.chart.xAxis.valueMode, "civil");
 
 const container = {
   id: "publishedDatasetBuilder",
