@@ -66,7 +66,12 @@
 .form-panel.forge-form-panel-section-tabs {
     flex: 0 0 auto;
     height: auto;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
     overflow: visible;
+    scrollbar-gutter: stable;
     gap: 14px;
 }
 
@@ -74,9 +79,20 @@
 
 .forge-form-panel-section-tabs__panel {
     flex: 0 0 auto;
+    width: 100%;
+    max-width: 100%;
     min-width: 0;
     min-height: 0;
+    box-sizing: border-box;
+    contain: inline-size;
     overflow: visible;
+}
+
+.forge-form-panel-section-tabs__panel > * {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .form-panel.forge-form-panel-section-tabs.is-fill {
