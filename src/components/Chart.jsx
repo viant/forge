@@ -45,6 +45,7 @@ import {
     resolveChartLoadingState,
     resolveHorizontalBarDataLabelLayout,
     resolveHorizontalBarLayout,
+    resolveResponsiveChartType,
     resolveChartValueAxisDomain,
     resolveVisibleChartState,
     transformData,
@@ -563,8 +564,12 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         return JSON.stringify({ dataSourceId, params, filter });
     }, [chartContext, chartContext?.signals?.input?.value]);
 
-    const isPieChart = type === "pie" || type === "donut";
-    const isHorizontalBar = isHorizontalBarType(type);
+    const responsiveChartType = resolveResponsiveChartType(type, chartSize.width, {
+        xAxis,
+        rows: effectiveCollection,
+    });
+    const isPieChart = responsiveChartType === "pie" || responsiveChartType === "donut";
+    const isHorizontalBar = isHorizontalBarType(responsiveChartType);
     const prepared = useMemo(() => {
         const chartRows = applyChartRowLimit(
             materializeChartDisplayRows(chart, effectiveCollection || []),
@@ -715,7 +720,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         ? horizontalBarLayout.margin
         : (embedded
             ? {top: 24, right: 12, left: 6, bottom: 34 + categoryLabelBottomOffset}
-            : {top: 10, right: 60, left: 14, bottom: 42 + categoryLabelBottomOffset});
+            : {top: 24, right: 60, left: 14, bottom: 42 + categoryLabelBottomOffset});
     const legendProps = embedded
         ? {verticalAlign: "top", align: "center", wrapperStyle: {fontSize: "10px", lineHeight: 1.1, paddingBottom: "6px", color: "#5f6b7c"}}
         : {};
@@ -1052,7 +1057,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         const activePalette = (palette && palette.length > 0) ? palette : defaultCategoricalPalette();
         const categoryWidth = horizontalBarLayout.categoryWidth;
         const barSize = embedded ? 10 : 12;
-        const showHorizontalDataLabels = shouldRenderSeriesDataLabels(primarySeries, type, normalizedChartData.length, embedded);
+        const showHorizontalDataLabels = shouldRenderSeriesDataLabels(primarySeries, responsiveChartType, normalizedChartData.length, embedded);
         const primaryDataLabelFormatter = buildDataLabelFormatter(primarySeries.format || leftAxis.format);
 
         return (
@@ -1068,7 +1073,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         position: "insideBottomRight",
                         offset: 0,
                     }}
-                    domain={resolveChartValueAxisDomain(type, leftAxis.domain)}
+                    domain={resolveChartValueAxisDomain(responsiveChartType, leftAxis.domain)}
                     tickCount={horizontalBarLayout.numericTickCount}
                     minTickGap={horizontalBarLayout.numericMinTickGap}
                     interval="preserveStartEnd"
@@ -1112,7 +1117,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                             name={entry.name || entry.label}
                             fill={entry.color}
                             barSize={barSize}
-                            stackId={type === "funnel_bar" ? undefined : entry.stackId}
+                            stackId={responsiveChartType === "funnel_bar" ? undefined : entry.stackId}
                             {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}
                         >
                             {entry.pointColorMode === "bySign"
@@ -1120,7 +1125,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                                     <Cell key={`${entry.value}-cell-${index}`} fill={resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color)} />
                                 ))
                                 : null}
-                            {shouldRenderSeriesDataLabels(entry, type, normalizedChartData.length, embedded) ? (
+                            {shouldRenderSeriesDataLabels(entry, responsiveChartType, normalizedChartData.length, embedded) ? (
                                 <LabelList dataKey={entry.value} content={(props) => <HorizontalBarValueLabel {...props} formatter={buildDataLabelFormatter(entry.format || leftAxis.format)} />} />
                             ) : null}
                         </Bar>
