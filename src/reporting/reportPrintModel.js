@@ -1,5 +1,9 @@
+import { resolveReportDatasetRefResolution } from "./reportDatasetRefModel.js";
+import { compactReportPrintSequence } from "./reportPrintLabels.js";
+import { normalizeReportSpecScopeParams } from "./reportSpecModel.js";
+import { isReportRuntimeBlockVisible, resolveReportRuntimeFilterValues, resolveReportRuntimeBlockRows } from "./reportBlockRuntimeModel.js";
 import { buildReportSpecHash, buildReportFillHash } from "./reportFillModel.js";
-import { buildReportPrintChartSvg } from "./reportPrintChartSvg.js";
+import { buildReportPrintChartPages } from "./reportPrintChartSvg.js";
 import { buildReportPrintGeoSvg } from "./reportPrintGeoSvg.js";
 import { formatExportValue } from "./reportExportValueFormatter.js";
 import { normalizePresentationText } from "../utils/presentationText.js";
@@ -551,7 +555,22 @@ const REPORT_PRINT_THEME = Object.freeze({
   cardPadding: 10,
 });
 
-function buildOrderedReportFillBlocks(reportSpec = {}, reportFill = {}) {
+function buildReportPrintVisibleBlockIds(reportSpec, reportFill) {
+  const filters = resolveReportRuntimeFilterValues(normalizeReportSpecScopeParams(reportSpec));
+  // Materialized filter-bar values override the stored spec, including false/0.
+  for (const block of reportFill.blocks || []) {
+    for (const param of block?.content?.params || []) filters[param.id] = cloneValue(param.value);
+  }
+  const datasets = new Map((reportFill.datasets || []).map((dataset) => [dataset.id, dataset]));
+  return new Set((reportFill.blocks || []).filter((block) => {
+    const { datasetRef } = resolveReportDatasetRefResolution({ preferredDatasetRef: block.datasetRef, availableDatasetRefs: [...datasets.keys()], fallbackDatasetRef: "primary" });
+    const dataset = datasets.get(datasetRef);
+    const rows = resolveReportRuntimeBlockRows(block, dataset?.rows || [], { filters });
+    return isReportRuntimeBlockVisible(block, { filters, metrics: rows[0] || {} });
+  }).map((block) => block.id));
+}
+
+function buildOrderedReportFillBlocks(reportSpec = {}, reportFill = {}, visibleBlockIds = new Set((reportFill.blocks || []).map((block) => block.id))) {
   const blocksById = new Map(
     (Array.isArray(reportFill?.blocks) ? reportFill.blocks : [])
       .map((block) => [normalizeString(block?.id), block])
@@ -579,7 +598,7 @@ function buildOrderedReportFillBlocks(reportSpec = {}, reportFill = {}) {
         return;
       }
       seen.add(blockId);
-      ordered.push(block);
+      if (visibleBlockIds.has(blockId)) ordered.push(block);
     });
   (Array.isArray(reportFill?.blocks) ? reportFill.blocks : []).forEach((block) => {
     const blockId = normalizeString(block?.id);
@@ -589,7 +608,7 @@ function buildOrderedReportFillBlocks(reportSpec = {}, reportFill = {}) {
     if (blockId) {
       seen.add(blockId);
     }
-    ordered.push(block);
+    if (visibleBlockIds.has(blockId)) ordered.push(block);
   });
   const strictTabGroup = (Array.isArray(reportFill?.blocks) ? reportFill.blocks : [])
     .find((block) => (
@@ -855,6 +874,7 @@ function buildReportPrintLayoutState(reportSpec = {}, reportFill = {}, geometry 
     reportFill,
     reportTheme: resolveReportPrintTheme(reportSpec),
     blocksById,
+    visibleBlockIds: buildReportPrintVisibleBlockIds(reportSpec, reportFill),
     layoutSpanByBlockId: buildLayoutSpanByBlockId(reportSpec),
     geometry: normalizedGeometry,
     contentLeft,
@@ -978,6 +998,11 @@ function renderReportPrintTextLines(state = {}, {
     });
   });
   return firstElement;
+}
+
+function reportPrintTitleHeight(state, block, layoutNote = "") {
+  return wrapReportPrintText(resolveReportPrintBlockTitle(block), state.contentWidth, REPORT_PRINT_THEME.titleFontSize).length * REPORT_PRINT_THEME.titleLineHeight
+    + (layoutNote ? wrapReportPrintText(layoutNote, state.contentWidth, REPORT_PRINT_THEME.warningFontSize).length * REPORT_PRINT_THEME.warningLineHeight : 0) + 4;
 }
 
 function renderReportPrintSectionTitle(state = {}, block = {}, {
@@ -1120,8 +1145,12 @@ function renderReportPrintGridRow(state = {}, entries = []) {
   syncReportPrintStateFromChildren(state, childStates);
 }
 
-function buildFilterBarLines(block = {}) {
-  const params = Array.isArray(block?.content?.params) ? block.content.params : [];
+function buildFilterBarLines(block = {}, reportSpec = {}) {
+  const scopeParams = new Map(normalizeReportSpecScopeParams(reportSpec).map((param) => [param.id, param]));
+  const params = (Array.isArray(block?.content?.params) ? block.content.params : []).filter((param) => {
+    const definition = { ...scopeParams.get(param.id), ...param };
+    return definition.hidden !== true && definition.visible !== false && definition.presentation !== "hidden";
+  });
   const criteria = Array.isArray(block?.content?.criteria) ? block.content.criteria : [];
   if (params.length === 0 && criteria.length === 0) {
     return ["No active filter parameters."];
@@ -1188,7 +1217,7 @@ function renderReportPrintTextSectionBlock(state = {}, block = {}, lines = [], {
 } = {}) {
   ensureReportPrintSpace(
     state,
-    120,
+    reportPrintTitleHeight(state, block, layoutNote) + REPORT_PRINT_THEME.bodyLineHeight,
   );
   renderReportPrintSectionTitle(state, block, { layoutNote });
   renderReportPrintTextLines(state, {
@@ -1205,7 +1234,8 @@ function renderReportPrintMarkdownBlock(state = {}, block = {}, options = {}) {
 }
 
 function renderReportPrintFilterBarBlock(state = {}, block = {}, options = {}) {
-  renderReportPrintTextSectionBlock(state, block, buildFilterBarLines(block), options);
+  if ((block?.content?.placement || block?.placement) === "hidden") return;
+  renderReportPrintTextSectionBlock(state, block, buildFilterBarLines(block, state.reportSpec), options);
 }
 
 function renderReportPrintRefinementBarBlock(state = {}, block = {}, options = {}) {
@@ -1392,7 +1422,7 @@ function renderReportPrintSectionBlock(state = {}, block = {}, {
 } = {}) {
   ensureReportPrintSpace(
     state,
-    220,
+    reportPrintTitleHeight(state, block, layoutNote),
   );
   renderReportPrintSectionTitle(state, block, { layoutNote });
   const lines = [
@@ -1425,6 +1455,7 @@ function renderReportPrintCompositeBlock(state = {}, block = {}, {
     ? block.content.childBlockIds
     : (Array.isArray(block?.childBlockIds) ? block.childBlockIds : []);
   const childBlocks = childBlockIds
+    .filter((blockId) => state.visibleBlockIds.has(normalizeString(blockId)))
     .map((blockId) => state.blocksById.get(normalizeString(blockId)) || null)
     .filter(Boolean);
   if (childBlocks.length === 0) {
@@ -1831,12 +1862,12 @@ function resolveReportPrintTonePalette(tone = "", theme = {}) {
 }
 
 function resolveReportPrintTableCellText(column = {}, cell = {}) {
-  return formatReportPrintValue(
+  return compactReportPrintSequence(formatReportPrintValue(
     cell?.displayValue !== undefined && cell?.displayValue !== null && cell?.displayValue !== ""
       ? cell.displayValue
       : cell?.value,
     normalizeString(column?.format),
-  );
+  ));
 }
 
 function buildReportPrintTableColumnLayout(state = {}, block = {}, columns = []) {
@@ -2130,12 +2161,7 @@ function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {
       },
       rowKey,
       columnKey,
-      text: formatReportPrintValue(
-        cell?.displayValue !== undefined && cell?.displayValue !== null && cell?.displayValue !== ""
-          ? cell.displayValue
-          : cell?.value,
-        normalizeString(column?.format),
-      ),
+      text: resolveReportPrintTableCellText(column, cell),
       ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
       align: resolveReportPrintTableColumnAlign(column, cell),
       fontSize: 9,
@@ -2148,7 +2174,36 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
   const columns = Array.isArray(block?.content?.columns) ? block.content.columns : [];
-  const rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
+  let rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
+  const maxColumns = Math.max(3, Math.floor(state.contentWidth / 85));
+  if (columns.length > maxColumns) {
+    const groupSize = maxColumns - 1;
+    const groupCount = Math.ceil((columns.length - 1) / groupSize);
+    for (let start = 1; start < columns.length; start += groupSize) {
+      const group = Math.floor((start - 1) / groupSize) + 1;
+      const title = `${resolveReportPrintBlockTitle(block)} (${group}/${groupCount})`;
+      renderReportPrintTableBlock(state, {
+        ...block,
+        id: `${block.id}__columns_${group}`,
+        title,
+        content: { ...block.content, title, columns: [columns[0], ...columns.slice(start, start + groupSize)] },
+      }, { layoutNote });
+    }
+    return;
+  }
+  const pathwayDetails = [];
+  rows = rows.map((row, rowIndex) => ({
+    ...row,
+    cells: (row.cells || []).map((cell) => {
+      const column = columns.find((entry) => entry.key === cell.key);
+      if (!column) return cell;
+      const text = resolveReportPrintTableCellText(column, cell);
+      if (!text.includes(" -> ") || text.length <= 110) return cell;
+      const key = `Pathway ${rowIndex + 1}`;
+      pathwayDetails.push(`${key}: ${text}`);
+      return { ...cell, displayValue: `${key} (${String(cell.displayValue || cell.value).split(/->|→|â†’/).length} touchpoints; see details)` };
+    }),
+  }));
   if (columns.length === 0) {
     renderReportPrintSectionTitle(state, block, { layoutNote });
     renderReportPrintTextLines(state, {
@@ -2172,9 +2227,7 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
   const columnLayout = buildReportPrintTableColumnLayout(state, block, columns);
   const dataBarRanges = buildReportPrintDataBarRanges(block);
   const firstRowHeight = resolveReportPrintTableRowHeight(columns, rows[0], columnLayout.widths);
-  const headingHeight = REPORT_PRINT_THEME.titleLineHeight
-    + (layoutNote ? REPORT_PRINT_THEME.warningLineHeight : 0)
-    + 4;
+  const headingHeight = reportPrintTitleHeight(state, block, layoutNote);
   ensureReportPrintSpace(state, headingHeight + columnLayout.headerHeight + firstRowHeight);
   renderReportPrintSectionTitle(state, block, { layoutNote });
   let rowIndex = 0;
@@ -2189,6 +2242,7 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
       const rowHeight = resolveReportPrintTableRowHeight(columns, rows[rowIndex], columnLayout.widths);
       if (state.cursorY + rowHeight > state.contentBottom && state.cursorY > state.contentTop) {
         startNextReportPrintPage(state);
+        renderReportPrintSectionTitle(state, { ...block, title: `${resolveReportPrintBlockTitle(block)} (continued)`, content: { ...block.content, title: `${resolveReportPrintBlockTitle(block)} (continued)` } });
         break;
       }
       renderReportPrintTableRow(
@@ -2206,58 +2260,71 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
       rowIndex += 1;
     }
   }
+  if (pathwayDetails.length) {
+    renderReportPrintTextSectionBlock(state, { id: `${block.id}__pathway_details`, title: `${resolveReportPrintBlockTitle(block)} - pathway details` }, pathwayDetails);
+  }
   finishReportPrintBlock(state);
 }
 
 function renderReportPrintChartBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
-  const svgResult = buildReportPrintChartSvg({
+  const titleHeight = reportPrintTitleHeight(state, block, layoutNote);
+  const chartPages = buildReportPrintChartPages({
     chartModel: block?.content?.chartModel || block?.chartModel || {},
     resolvedChart: block?.content?.resolvedChart || null,
     width: state.contentWidth,
+    maxHeight: state.contentBottom - state.contentTop - titleHeight,
+    firstMaxHeight: state.contentBottom - state.cursorY - titleHeight >= 180
+      ? state.contentBottom - state.cursorY - titleHeight
+      : state.contentBottom - state.contentTop - titleHeight - (state.sectionHeadingHeight || 0),
   });
-  const titleHeight = REPORT_PRINT_THEME.titleLineHeight + (layoutNote ? REPORT_PRINT_THEME.warningLineHeight : 0) + 8;
-  const chartHeight = svgResult?.svg ? Math.max(120, Number(svgResult.height) || 0) : REPORT_PRINT_THEME.bodyLineHeight;
-  ensureReportPrintSpace(state, titleHeight + chartHeight);
-  renderReportPrintSectionTitle(state, block, { layoutNote });
-  if (!svgResult?.svg) {
-    const placeholder = renderReportPrintTextLines(state, {
-      idPrefix: `${normalizeString(block?.id || "chart")}__unsupported`,
-      lines: ["Chart output is not available for this ReportPrint block."],
-      color: REPORT_PRINT_THEME.warningColor,
-    });
+  for (const [pageIndex, svgResult] of chartPages.entries()) {
+    const pageBlock = pageIndex === 0 ? block : { ...block, title: `${resolveReportPrintBlockTitle(block)} (continued)`, content: { ...block.content, title: `${resolveReportPrintBlockTitle(block)} (continued)` } };
+    const chartHeight = svgResult?.svg ? Math.max(120, Number(svgResult.height) || 0) : REPORT_PRINT_THEME.bodyLineHeight;
+    ensureReportPrintSpace(state, titleHeight + chartHeight);
+    renderReportPrintSectionTitle(state, pageBlock, { layoutNote });
+    if (!svgResult?.svg) {
+      const placeholder = renderReportPrintTextLines(state, {
+        idPrefix: `${normalizeString(block?.id || "chart")}__unsupported`,
+        lines: ["Chart output is not available for this ReportPrint block."],
+        color: REPORT_PRINT_THEME.warningColor,
+      });
+      (Array.isArray(svgResult?.diagnostics) ? svgResult.diagnostics : []).forEach((diagnostic) => {
+        pushReportPrintDiagnostic(state, {
+          ...diagnostic,
+          pageNumber: state.currentPage?.number,
+          elementId: placeholder?.id,
+        });
+      });
+      finishReportPrintBlock(state);
+      return;
+    }
+    ensureReportPrintSpace(state, chartHeight);
+    const svgElement = pushReportPrintElement(state, buildReportPrintSvgElement({
+      id: `${normalizeString(block?.id || "chart")}__svg_page_${state.currentPage?.number}`,
+      kind: "svg",
+      box: {
+        x: state.contentLeft,
+        y: state.cursorY,
+        width: state.contentWidth,
+        height: chartHeight,
+      },
+      svg: svgResult.svg,
+    }));
+    state.cursorY += chartHeight;
     (Array.isArray(svgResult?.diagnostics) ? svgResult.diagnostics : []).forEach((diagnostic) => {
       pushReportPrintDiagnostic(state, {
         ...diagnostic,
         pageNumber: state.currentPage?.number,
-        elementId: placeholder?.id,
+        elementId: svgElement?.id,
       });
     });
+    if (svgResult.labelDetails?.length) {
+      renderReportPrintTextLines(state, { idPrefix: `${block.id}__labels_${pageIndex}`, lines: svgResult.labelDetails, fontSize: 9, lineHeight: 12 });
+    }
     finishReportPrintBlock(state);
-    return;
   }
-  ensureReportPrintSpace(state, chartHeight);
-  const svgElement = pushReportPrintElement(state, buildReportPrintSvgElement({
-    id: `${normalizeString(block?.id || "chart")}__svg_page_${state.currentPage?.number}`,
-    kind: "svg",
-    box: {
-      x: state.contentLeft,
-      y: state.cursorY,
-      width: state.contentWidth,
-      height: chartHeight,
-    },
-    svg: svgResult.svg,
-  }));
-  state.cursorY += chartHeight;
-  (Array.isArray(svgResult?.diagnostics) ? svgResult.diagnostics : []).forEach((diagnostic) => {
-    pushReportPrintDiagnostic(state, {
-      ...diagnostic,
-      pageNumber: state.currentPage?.number,
-      elementId: svgElement?.id,
-    });
-  });
-  finishReportPrintBlock(state);
 }
 
 function renderReportPrintGeoBlock(state = {}, block = {}, {
@@ -2389,6 +2456,28 @@ function renderReportPrintBlock(state = {}, block = {}, options = {}) {
   }
 }
 
+function keepReportPrintSectionWithNext(state, blocks, index) {
+  if (blocks[index]?.kind !== "sectionBlock") return;
+  const probe = { ...state, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null, cursorY: state.contentTop };
+  let next = index;
+  while (blocks[next]?.kind === "sectionBlock") {
+    renderReportPrintBlock(probe, blocks[next], {});
+    next += 1;
+  }
+  const headingHeight = probe.cursorY - probe.contentTop;
+  state.sectionHeadingHeight = Math.max(state.sectionHeadingHeight || 0, headingHeight);
+  if (!blocks[next]) return;
+  const contentProbe = { ...probe, sectionHeadingHeight: headingHeight, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null, cursorY: state.contentTop };
+  renderReportPrintBlock(contentProbe, blocks[next], {});
+  const firstPageElements = contentProbe.pages[0]?.elements || [];
+  const contentHeight = blocks[next].kind === "tableBlock"
+    ? (firstPageElements.find((element) => element.id.includes("__row_rule_0"))?.box.y || state.contentTop) - state.contentTop
+    : blocks[next].kind === "chartBlock"
+      ? Math.min(reportPrintTitleHeight(state, blocks[next]) + 180, Math.max(0, ...firstPageElements.map((element) => element.box.y + element.box.height - state.contentTop)))
+      : Math.max(0, ...firstPageElements.map((element) => element.box.y + element.box.height - state.contentTop));
+  ensureReportPrintSpace(state, Math.min(state.contentBottom - state.contentTop, headingHeight + contentHeight));
+}
+
 export function buildReportPrintFromReportFill({
   reportSpec = null,
   reportFill = null,
@@ -2406,7 +2495,7 @@ export function buildReportPrintFromReportFill({
   if (!state) {
     return null;
   }
-  const orderedBlocks = buildOrderedReportFillBlocks(reportSpec, reportFill);
+  const orderedBlocks = buildOrderedReportFillBlocks(reportSpec, reportFill, state.visibleBlockIds);
   let pendingRow = [];
   let pendingSpan = 0;
   const flushPendingRow = () => {
@@ -2427,7 +2516,9 @@ export function buildReportPrintFromReportFill({
     );
     if (span >= REPORT_LAYOUT_GRID_COLUMNS) {
       flushPendingRow();
+      keepReportPrintSectionWithNext(state, orderedBlocks, index);
       renderReportPrintBlock(state, block, {});
+      if (block.kind !== "sectionBlock") state.sectionHeadingHeight = 0;
       continue;
     }
     if (pendingRow.length > 0 && (pendingSpan + span) > REPORT_LAYOUT_GRID_COLUMNS) {

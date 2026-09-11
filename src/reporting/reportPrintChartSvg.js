@@ -1,3 +1,4 @@
+import { compactReportPrintSequence, wrapReportPrintLabel } from "./reportPrintLabels.js";
 import { formatExportNumericValue } from "./reportExportValueFormatter.js";
 import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "./reportChartAnnotations.js";
 import { formatChartXAxisValue, readChartDataValue } from "../components/chartData.js";
@@ -46,9 +47,9 @@ function buildPrintLabelLines(value = "", clamp = null, fallbackCharacters = 18)
 function renderPrintLabelLines(lines = [], { x = 0, y = 0, anchor = "middle", fill = "#667085" } = {}) {
   if (!Array.isArray(lines) || lines.length === 0) return "";
   const startY = y - ((lines.length - 1) * 6);
-  return `<text x="${x}" y="${startY}" text-anchor="${anchor}" font-size="10" fill="${fill}">${lines
-    .map((line, index) => `<tspan x="${x}" dy="${index === 0 ? 0 : 12}">${escapeXml(line)}</tspan>`)
-    .join("")}</text>`;
+  // Separate text nodes keep each line positioned in both browser SVG and the
+  // PDF SVG interpreter, which does not implement relative tspan offsets.
+  return lines.map((line, index) => `<text x="${x}" y="${startY + index * 12}" text-anchor="${anchor}" font-size="10" fill="${fill}"><tspan>${escapeXml(line)}</tspan></text>`).join("");
 }
 
 const DEFAULT_REPORT_PRINT_CHART_PALETTE = [
@@ -969,6 +970,8 @@ function renderHorizontalBarChartSvg({
   chartModel = {},
   resolvedChart = {},
   width = 680,
+  valueBounds = null,
+  categoryOffset = 0,
 } = {}) {
   const rows = resolveCartesianRows(resolvedChart);
   const seriesDescriptors = resolveCartesianSeriesDescriptors(chartModel, resolvedChart);
@@ -994,7 +997,7 @@ function renderHorizontalBarChartSvg({
       ],
     };
   }
-  const bounds = computeCartesianValueBounds(rows, seriesDescriptors);
+  const bounds = valueBounds || computeCartesianValueBounds(rows, seriesDescriptors);
   if (!bounds) {
     return {
       svg: "",
@@ -1006,25 +1009,31 @@ function renderHorizontalBarChartSvg({
   }
 
   const xAxisKey = normalizeString(resolvedChart?.xAxisKey);
-  const categoryClamp = chartModel?.xAxis?.categoryLabel || null;
-  const categoryLabelLines = rows.map((row) => buildPrintLabelLines(
-    readChartDataValue(row, xAxisKey),
-    categoryClamp,
-    18,
-  ));
+  // Web tooltip clamps are unsuitable for paper. Wrap complete compact labels,
+  // and use numbered keys with printable details when two lines cannot hold them.
+  const labelDetails = [];
+  const labelCharacters = Math.max(12, Math.floor((width * 0.38 - 28) / 6));
+  const categoryLabelLines = rows.map((row, index) => {
+    const label = compactReportPrintSequence(readChartDataValue(row, xAxisKey));
+    const lines = wrapReportPrintLabel(label, labelCharacters);
+    if (lines.length <= 2) return lines;
+    const key = `Category ${categoryOffset + index + 1}`;
+    labelDetails.push(`${key}: ${label}`);
+    return [key];
+  });
   const longestCategoryLine = categoryLabelLines.reduce((longest, lines) => Math.max(
     longest,
     ...lines.map((line) => line.length),
   ), 0);
   const leftPad = Math.min(Math.floor(width * 0.38), Math.max(116, 20 + (longestCategoryLine * 6)));
-  const rightPad = 20;
+  const rightPad = 66;
   const topPad = 16;
   const bottomPad = 34;
-  const plotWidth = Math.max(200, width - leftPad - rightPad);
+  const plotWidth = Math.max(40, width - leftPad - rightPad);
   const valueRange = bounds.maxValue - bounds.minValue || 1;
   const baselineX = leftPad + (((0 - bounds.minValue) / valueRange) * plotWidth);
-  const groupGap = 10;
-  const rowHeight = seriesDescriptors.length > 1 ? 42 : 28;
+  const groupGap = 8;
+  const rowHeight = Math.max(24, seriesDescriptors.length * 18);
   const perSeriesHeight = Math.max(10, Math.floor((rowHeight - (Math.max(0, seriesDescriptors.length - 1) * 4)) / Math.max(seriesDescriptors.length, 1)));
   const plotHeight = Math.max(80, (rows.length * rowHeight) + (Math.max(0, rows.length - 1) * groupGap));
   const legend = buildLegendSvg(seriesDescriptors, width, topPad + plotHeight + bottomPad + 4);
@@ -1103,6 +1112,7 @@ function renderHorizontalBarChartSvg({
     </svg>`,
     height,
     diagnostics: [],
+    labelDetails,
   };
 }
 
@@ -1132,4 +1142,29 @@ export function buildReportPrintChartSvg({
       ),
     ].filter(Boolean),
   };
+}
+
+export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}, width = 680, maxHeight = 620, firstMaxHeight = maxHeight } = {}) {
+  const type = normalizeString(chartModel?.type || resolvedChart?.type).toLowerCase();
+  if (!["horizontal_bar", "funnel_bar"].includes(type) || !["directSeries", "groupedSeries"].includes(resolvedChart?.kind)) {
+    return [buildReportPrintChartSvg({ chartModel, resolvedChart, width })];
+  }
+  const rows = resolveCartesianRows(resolvedChart);
+  if (!rows.length) return [buildReportPrintChartSvg({ chartModel, resolvedChart, width })];
+  const descriptors = resolveCartesianSeriesDescriptors(chartModel, resolvedChart);
+  const valueBounds = computeCartesianValueBounds(rows, descriptors);
+  const pages = [];
+  let offset = 0;
+  while (offset < rows.length) {
+    let count = rows.length - offset;
+    let page;
+    do {
+      page = renderHorizontalBarChartSvg({ chartModel, resolvedChart: { ...resolvedChart, rows: rows.slice(offset, offset + count) }, width, valueBounds, categoryOffset: offset });
+      if (page.height <= (offset === 0 ? firstMaxHeight : maxHeight) || count === 1) break;
+      count -= 1;
+    } while (count > 0);
+    pages.push(page);
+    offset += count;
+  }
+  return pages;
 }

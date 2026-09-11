@@ -52,3 +52,12 @@ func TestReportOptionsPaginateAndDoNotInventDefaults(t *testing.T) {
 	require.Greater(t, len(prepared.Pages), len(report.Pages))
 	require.NoError(t, prepared.Validate())
 }
+
+func TestReportOptionsExcludeCompatibilityAndHiddenControls(t *testing.T) {
+	options := Options{
+		Metadata: json.RawMessage(`{"reportOptions":[{"name":"metric","label":"Ranking Metric"},{"name":"hidden","hidden":true},{"name":"invisible","visible":false},{"name":"legacy","presentation":{"placement":"hidden"}}],"options":{"metric":"ROAS","compatibility":"Device","hidden":true,"invisible":1,"legacy":"Channel"}}`),
+	}
+	require.Equal(t, []string{"Ranking Metric: ROAS"}, reportOptionLines(options))
+	options.ReportSpec = json.RawMessage(`{"datasets":[{"request":{"options":{"metric":"ROAS","compatibility":"Device","hidden":true,"invisible":1,"legacy":"Channel"}}}]}`)
+	require.Equal(t, []string{"Ranking Metric: ROAS"}, reportOptionLines(options))
+}
