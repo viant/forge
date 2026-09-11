@@ -20121,6 +20121,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                             locale={locale}
                             hostIntent={runtimePreviewHostIntent}
                             runtimeHandlers={runtimePreviewHandlers}
+                            conditionValues={Object.keys(effectiveReportOptions || {}).length > 0 ? effectiveReportOptions : state?.reportOptions}
                             presentationMode={reportWorkspaceMode ? "report" : "preview"}
                             showContextSummary={false}
                             suppressFilterBarBlocks={showUnifiedRuntimeFilterSurface}

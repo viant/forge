@@ -1726,6 +1726,18 @@ function SectionHeaderBlock({ block = {}, headerAction = null }) {
   );
 }
 
+function hasSectionHeaderDetail(block = {}, headerAction = null, navigationLabel = "") {
+  const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
+    ? block.content
+    : {};
+  return Boolean(
+    headerAction
+    || distinctWorkspaceTitle(normalizeString(block?.title || content?.title), navigationLabel)
+    || normalizeString(content?.subtitle || block?.subtitle)
+    || normalizeString(content?.description || block?.description),
+  );
+}
+
 function StepperBlock({ block = {} }) {
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
@@ -2861,12 +2873,15 @@ export default function ReportRuntime({
   suppressFilterBarBlocks = false,
   suppressFilterBarBlockDatasetRefs = [],
   showDeveloperDiagnostics = false,
+  conditionValues = {},
+  defaultContextSummaryOpen = false,
 }) {
   const workspacePresentation = useWorkspacePresentation();
   const reportPresentation = normalizeString(presentationMode).toLowerCase() === "report";
   const publicDiagnosticsMode = reportPresentation && !showDeveloperDiagnostics;
   const [selectedChartSelectionsByBlock, setSelectedChartSelectionsByBlock] = useState({});
   const [filterPanelOpen, setFilterPanelOpen] = useState(true);
+  const [contextSummaryOpen, setContextSummaryOpen] = useState(() => defaultContextSummaryOpen === true);
   const [runtimeSelection, setRuntimeSelection] = useState({});
   const [runtimeViewportWidth, setRuntimeViewportWidth] = useState(() => (
     typeof window !== "undefined" ? Number(window.innerWidth || 0) || 0 : 0
@@ -2989,8 +3004,13 @@ export default function ReportRuntime({
     setProviderReloadSequence((current) => current + 1);
   };
   const runtimeFilterValues = useMemo(
-    () => resolveReportRuntimeFilterValues(scopeParamIndex),
-    [scopeParamIndex],
+    () => ({
+      ...(conditionValues && typeof conditionValues === "object" && !Array.isArray(conditionValues)
+        ? conditionValues
+        : {}),
+      ...resolveReportRuntimeFilterValues(scopeParamIndex),
+    }),
+    [conditionValues, scopeParamIndex],
   );
   const resolveRuntimeDataset = (block = {}) => {
     const resolvedDatasetRef = resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef;
@@ -3411,21 +3431,49 @@ export default function ReportRuntime({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {showContextSummary ? (
-        <RuntimePanel
-          title={distinctWorkspaceTitle(normalizeString(title || reportDocument?.title || reportSpec?.title || (reportPresentation ? "Report" : "Report Runtime Preview")), workspacePresentation?.label)}
-          subtitle={normalizeString(subtitle)}
-        >
-          {!reportPresentation ? <BindingChips bindingSummary={bindingSummary} /> : null}
-          <BindingDetailsPanel bindingSummary={bindingSummary} presentationMode={presentationMode} />
-          {!hasTopLevelFilterBarBlock ? (
-            <ScopeDetailsPanel
-              scopeSummary={scopeSummary}
-              activeScopeSummary={hasTopLevelRefinementBarBlock ? null : activeScopeSummary}
-              presentationMode={presentationMode}
-            />
+      {showContextSummary && !reportPresentation ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <button
+            type="button"
+            aria-label={contextSummaryOpen ? "Hide report metadata" : "Show report metadata"}
+            aria-expanded={contextSummaryOpen}
+            onClick={() => setContextSummaryOpen((open) => !open)}
+            style={{
+              alignSelf: "flex-start",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 7,
+              minHeight: 32,
+              padding: "6px 10px",
+              border: "1px solid #d8e1e8",
+              borderRadius: 9,
+              background: "#fff",
+              color: "#30404d",
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            <Icon icon={contextSummaryOpen ? "chevron-up" : "chevron-down"} size={13} aria-hidden="true" />
+            Report metadata
+          </button>
+          {contextSummaryOpen ? (
+            <RuntimePanel
+              title={distinctWorkspaceTitle(normalizeString(title || reportDocument?.title || reportSpec?.title || "Report Runtime Preview"), workspacePresentation?.label)}
+              subtitle={normalizeString(subtitle)}
+            >
+              {!reportPresentation ? <BindingChips bindingSummary={bindingSummary} /> : null}
+              <BindingDetailsPanel bindingSummary={bindingSummary} presentationMode={presentationMode} />
+              {!hasTopLevelFilterBarBlock ? (
+                <ScopeDetailsPanel
+                  scopeSummary={scopeSummary}
+                  activeScopeSummary={hasTopLevelRefinementBarBlock ? null : activeScopeSummary}
+                  presentationMode={presentationMode}
+                />
+              ) : null}
+            </RuntimePanel>
           ) : null}
-        </RuntimePanel>
+        </div>
       ) : null}
       {!showContextSummary && !reportPresentation ? <CompactBindingChips bindingSummary={bindingSummary} /> : null}
       {reportPresentation && filterToolbarModel.visible ? (
@@ -3476,11 +3524,19 @@ export default function ReportRuntime({
             if (normalizeString(section?.id) !== resolvedActiveSectionId) {
               return null;
             }
+            const sectionHeaderAction = headerActions?.get(normalizeString(section?.block?.id));
             return (
-              <WorkspacePresentationProvider key={section.id} value={{...workspacePresentation, sectionLabel: section.navigationLabel}}><div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                {section.block ? renderBlock(section.block) : null}
-                {renderLayoutBlockGrid(section.items, `runtime:${section.id}`)}
-              </div></WorkspacePresentationProvider>
+              <WorkspacePresentationProvider
+                key={section.id}
+                value={{ ...workspacePresentation, sectionLabel: section.navigationLabel }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  {section.block && hasSectionHeaderDetail(section.block, sectionHeaderAction, section.navigationLabel)
+                    ? renderBlock(section.block)
+                    : null}
+                  {renderLayoutBlockGrid(section.items, `runtime:${section.id}`)}
+                </div>
+              </WorkspacePresentationProvider>
             );
           })}
         </div>
