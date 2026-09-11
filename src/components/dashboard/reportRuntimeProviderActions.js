@@ -94,6 +94,21 @@ export function buildIdleReportRuntimeProviderActionsState() {
   };
 }
 
+export function settleMissingReportRuntimeProviderActionsState(currentState = {}) {
+  const actions = currentState?.providerActionsByField;
+  const diagnostics = currentState?.providerDiagnostics;
+  if (
+    actions instanceof Map
+    && actions.size === 0
+    && Array.isArray(diagnostics)
+    && diagnostics.length === 0
+    && currentState?.loading === false
+  ) {
+    return currentState;
+  }
+  return buildIdleReportRuntimeProviderActionsState();
+}
+
 export function buildPendingReportRuntimeProviderActionsState(currentState = {}) {
   return {
     providerActionsByField: cloneProviderActionsByField(currentState?.providerActionsByField),

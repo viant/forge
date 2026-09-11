@@ -4,7 +4,7 @@ export default {
   baseUrl: "http://127.0.0.1:5175",
   viewport: { width: 1400, height: 1000 },
   steps: [
-    ...buildPreviewBootstrapSteps(),
+    ...buildPreviewBootstrapSteps({ captureDownloads: true }),
     { type: "clickRole", role: "button", name: "Design" },
     {
       type: "eval",
@@ -71,7 +71,9 @@ export default {
     { type: "clickRole", role: "button", name: "Export", exact: true },
     { type: "waitForDomContains", text: "PDF", timeoutMs: 60000 },
     { type: "waitForDomContains", text: "XLSX", timeoutMs: 60000 },
-    { type: "clickRole", role: "button", name: "Export", exact: true },
+    { type: "waitForDomContains", text: "CSV", timeoutMs: 60000 },
+    { type: "clickRole", role: "menuitem", name: "CSV", exact: true },
+    { type: "waitForEval", expression: "window.__artifactDownloadCapture?.filename?.endsWith('.csv') && window.__artifactDownloadCapture?.mimeType?.includes('text/csv') && window.__artifactDownloadCapture?.payloadReady === true", timeoutMs: 60000 },
     { type: "setViewport", width: 1024, height: 900 },
     { type: "wait", ms: 300 },
     { type: "setViewport", width: 768, height: 1024 },

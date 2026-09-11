@@ -11,9 +11,11 @@ import {
     formatTimestamp,
     materializeChartDisplayRows,
     resolveChartBodyState,
+    resolveChartAnimationActive,
     resolveChartLoadingState,
     resolveHorizontalBarDataLabelLayout,
     resolveHorizontalBarLayout,
+    resolveResponsiveCivilDateAxis,
     resolveResponsiveChartType,
     resolveChartValueAxisDomain,
     resolveChartTableMinWidth,
@@ -46,6 +48,16 @@ assert.equal(resolveResponsiveChartType("bar", 1024, {
     xAxis: { dataKey: "device" },
     rows: [{ device: "Mobile" }],
 }), "bar");
+const civilDateRows = Array.from({ length: 8 }, (_, index) => ({ date: `2026-08-${String(20 + index).padStart(2, "0")}`, value: index + 1 }));
+assert.deepEqual(resolveResponsiveCivilDateAxis(civilDateRows, "date", 320), {
+    compact: true,
+    ticks: ["2026-08-20", "2026-08-27"],
+    tickFormat: "MM/dd",
+    bottomMargin: 72,
+    labelPosition: "bottom",
+    labelOffset: 18,
+});
+assert.equal(resolveResponsiveCivilDateAxis(civilDateRows, "date", 900).ticks, undefined);
 
 const signedBarDomain = resolveChartValueAxisDomain('horizontal_bar');
 assert.equal(signedBarDomain[0](-31385), -31385);
@@ -55,6 +67,9 @@ assert.equal(positiveBarDomain[0](42), 0);
 assert.equal(positiveBarDomain[1](84), 84);
 assert.equal(resolveChartValueAxisDomain('line'), undefined);
 assert.deepEqual(resolveChartValueAxisDomain('bar', [-100, 100]), [-100, 100]);
+assert.equal(resolveChartAnimationActive({}), false);
+assert.equal(resolveChartAnimationActive({ animate: true }), true);
+assert.equal(resolveChartAnimationActive({ animation: true }), true);
 
 assert.deepEqual(resolveVisibleChartState({
     chartData: [],
@@ -305,12 +320,12 @@ assert.deepEqual(resolveHorizontalBarLayout({
 }), {
     compact: true,
     width: "100%",
-    categoryWidth: 95,
-    categoryLabel: { lines: 2, maxCharacters: 12 },
-    margin: { top: 10, right: 36, left: 0, bottom: 54 },
+    categoryWidth: 112,
+    categoryLabel: { lines: 2, maxCharacters: 14 },
+    margin: { top: 10, right: 36, left: 8, bottom: 54 },
     numericTickCount: 3,
     numericMinTickGap: 18,
-    estimatedPlotWidth: 149,
+    estimatedPlotWidth: 124,
 });
 assert.deepEqual(resolveHorizontalBarLayout({
     containerWidth: 900,

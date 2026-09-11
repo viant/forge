@@ -1656,6 +1656,7 @@ export function buildReportDocumentCollectionBlock(block = {}) {
 
 export function buildReportDocumentSectionBlock(block = {}) {
   const navigationLabel = normalizeString(block?.navigationLabel || block?.title || "Section") || "Section";
+  const blockIds = Array.from(new Set((Array.isArray(block?.blockIds) ? block.blockIds : []).map((blockId) => normalizeString(blockId)).filter(Boolean)));
   return {
     id: normalizeString(block?.id || "sectionBlock"),
     kind: "sectionBlock",
@@ -1663,6 +1664,7 @@ export function buildReportDocumentSectionBlock(block = {}) {
     ...(normalizeString(block?.subtitle) ? { subtitle: normalizeString(block.subtitle) } : {}),
     ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
     navigationLabel,
+    ...(blockIds.length > 0 ? { blockIds } : {}),
   };
 }
 
@@ -1714,6 +1716,7 @@ export function buildReportDocumentCompositeBlock(block = {}) {
     title: normalizeString(block?.title || "Grouped Panel") || "Grouped Panel",
     ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
     ...(["stack", "responsiveGrid"].includes(layout) ? { layout } : {}),
+    ...(block?.runtime && typeof block.runtime === "object" && !Array.isArray(block.runtime) ? { runtime: cloneValue(block.runtime) } : {}),
     childBlockIds,
   };
 }
@@ -2378,11 +2381,61 @@ function orderLoweredBlocksByDocumentLayout(document = {}, baseSpec = {}, allBlo
   };
 }
 
+export function buildExclusiveReportSectionOwnership(blocks = []) {
+  const source = Array.isArray(blocks) ? blocks : [];
+  const tabGroup = source.find((block) => normalizeString(block?.kind) === "tabGroupBlock") || null;
+  if (!tabGroup || tabGroup?.includeUnlistedSections !== false) {
+    return new Map();
+  }
+  const declaredSectionIds = new Set((Array.isArray(tabGroup?.sectionIds) ? tabGroup.sectionIds : []).map((sectionId) => normalizeString(sectionId)).filter(Boolean));
+  const ownership = new Map(Array.from(declaredSectionIds, (sectionId) => [sectionId, []]));
+  let activeSectionId = "";
+  let inferActiveSectionOwnership = false;
+  source.forEach((block) => {
+    const blockId = normalizeString(block?.id);
+    const kind = normalizeString(block?.kind);
+    if (kind === "sectionBlock") {
+      activeSectionId = declaredSectionIds.has(blockId) ? blockId : "";
+      const explicitBlockIds = (Array.isArray(block?.blockIds) ? block.blockIds : []).map((ownedBlockId) => normalizeString(ownedBlockId)).filter(Boolean);
+      if (activeSectionId && explicitBlockIds.length > 0) {
+        ownership.set(activeSectionId, Array.from(new Set(explicitBlockIds)));
+        inferActiveSectionOwnership = false;
+      } else {
+        inferActiveSectionOwnership = !!activeSectionId;
+      }
+      return;
+    }
+    if (!activeSectionId || !inferActiveSectionOwnership || !blockId || kind === "tabGroupBlock" || kind === "reportBuilderBlock") {
+      return;
+    }
+    ownership.get(activeSectionId).push(blockId);
+  });
+  return ownership;
+}
+
+export function filterExclusiveReportRuntimeBlocks(documentBlocks = [], runtimeBlocks = [], ownership = new Map()) {
+  if (!(ownership instanceof Map) || ownership.size === 0) {
+    return Array.isArray(runtimeBlocks) ? runtimeBlocks : [];
+  }
+  const allowedBlockIds = new Set(
+    (Array.isArray(documentBlocks) ? documentBlocks : [])
+      .map((block) => normalizeString(block?.id))
+      .filter(Boolean),
+  );
+  ownership.forEach((blockIds, sectionId) => {
+    if (normalizeString(sectionId)) allowedBlockIds.add(normalizeString(sectionId));
+    (Array.isArray(blockIds) ? blockIds : []).map((blockId) => normalizeString(blockId)).filter(Boolean).forEach((blockId) => allowedBlockIds.add(blockId));
+  });
+  return (Array.isArray(runtimeBlocks) ? runtimeBlocks : [])
+    .filter((block) => allowedBlockIds.has(normalizeString(block?.id)));
+}
+
 export function lowerReportDocumentToReportSpec(document = {}, {
   includePrimaryBlocks = true,
   runtimeDatasetScopeParams = null,
 } = {}) {
   const blocks = Array.isArray(document?.blocks) ? document.blocks : [];
+  const exclusiveSectionOwnership = buildExclusiveReportSectionOwnership(blocks);
   const reportBuilderBlock = resolveReportBuilderBlock(document);
   if (!reportBuilderBlock) {
     throw new Error("ReportDocument must contain at least one reportBuilderBlock.");
@@ -2486,6 +2539,12 @@ export function lowerReportDocumentToReportSpec(document = {}, {
     .filter((block) => normalizeString(block?.kind) !== "reportBuilderBlock")
     .map((block) => {
       const normalizedBlock = normalizeReportBuilderDocumentBlock(block);
+      if (normalizeString(normalizedBlock?.kind) === "sectionBlock" && exclusiveSectionOwnership.has(normalizeString(normalizedBlock?.id))) {
+        return {
+          ...normalizedBlock,
+          blockIds: cloneValue(exclusiveSectionOwnership.get(normalizeString(normalizedBlock.id))),
+        };
+      }
       const datasetContext = resolveDatasetSpecificRuntimeContext(normalizedBlock?.datasetRef);
       if (normalizeString(normalizedBlock?.kind) === "chartBlock") {
         const chartState = buildAuthoredChartBlockState({
@@ -2503,6 +2562,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
           blockId: normalizedBlock?.id,
           datasetRef: normalizedBlock?.datasetRef,
           title: normalizedBlock?.title,
+          rowLimit: normalizedBlock?.rowLimit,
         }), normalizedBlock);
       }
       if (normalizeString(normalizedBlock?.kind) === "tableBlock") {
@@ -2528,7 +2588,8 @@ export function lowerReportDocumentToReportSpec(document = {}, {
     baseSpec,
     [...(Array.isArray(baseSpec?.blocks) ? baseSpec.blocks : []), ...additionalBlocks],
   );
-  const nextBlocks = loweredLayout.blocks;
+  const nextBlocks = filterExclusiveReportRuntimeBlocks(blocks, loweredLayout.blocks, exclusiveSectionOwnership);
+  const nextBlockIds = new Set(nextBlocks.map((block) => normalizeString(block?.id)).filter(Boolean));
   const referencedDatasetRefs = new Set(
     nextBlocks
       .map((block) => normalizeString(block?.datasetRef))
@@ -2588,7 +2649,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
     layoutIntent: {
       ...(baseSpec?.layoutIntent || {}),
       blockOrder: nextBlocks.map((block) => normalizeString(block?.id)).filter(Boolean),
-      items: loweredLayout.items,
+      items: (Array.isArray(loweredLayout.items) ? loweredLayout.items : []).filter((item) => nextBlockIds.has(normalizeString(item?.blockId))),
     },
     datasets: nextDatasets,
     calculatedFields: nextCalculatedFields,

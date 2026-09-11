@@ -455,6 +455,7 @@ export function buildReportSpecChartBlock({
   blockId = "primaryChart",
   datasetRef = "primary",
   title = "",
+  rowLimit = 0,
 } = {}) {
   const normalizedChartSpec = normalizeReportBuilderChartSpec({
     ...(chartSpec && typeof chartSpec === "object" && !Array.isArray(chartSpec) ? chartSpec : {}),
@@ -470,12 +471,14 @@ export function buildReportSpecChartBlock({
     dataSourceRef,
     collection: [],
   }, config, state, normalizedChartSpec);
+  const normalizedRowLimit = Math.trunc(Number(rowLimit) || 0);
   return {
     id: normalizeString(blockId || "primaryChart"),
     kind: "chartBlock",
     datasetRef: normalizeString(datasetRef || "primary"),
     chartSpec: normalizedChartSpec,
     chartModel: validation.valid ? cloneValue(chartContainer?.chart || null) : null,
+    ...(Number.isInteger(normalizedRowLimit) && normalizedRowLimit > 0 ? { rowLimit: normalizedRowLimit } : {}),
   };
 }
 

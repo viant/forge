@@ -42,9 +42,11 @@ import {
     normalizeChartKey,
     readChartDataValue,
     resolveChartBodyState,
+    resolveChartAnimationActive,
     resolveChartLoadingState,
     resolveHorizontalBarDataLabelLayout,
     resolveHorizontalBarLayout,
+    resolveResponsiveCivilDateAxis,
     resolveResponsiveChartType,
     resolveChartValueAxisDomain,
     resolveVisibleChartState,
@@ -74,15 +76,30 @@ import { resolveSelector } from "../utils/selector.js";
 import { getLogger } from "../utils/logger.js";
 import { normalizeServiceErrorText } from "../utils/errorText.js";
 import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "../reporting/reportChartAnnotations.js";
-import { buildChartCategoryTickLabel, normalizeChartCategoryLabelConfig } from "./chartCategoryLabel.js";
+import { buildChartCategoryTickLabel, buildMeasuredChartCategoryTickLabel, normalizeChartCategoryLabelConfig } from "./chartCategoryLabel.js";
 import "./Chart.css";
 
-function ClampedCategoryTick({ x = 0, y = 0, payload = {}, config = null, valueFormatter = null, orientation = "x", style = {} }) {
+let categoryTickMeasureCanvas = null;
+
+function measureCategoryTickText(value, style = {}) {
+    if (typeof document === "undefined") return String(value || "").length * 6.5;
+    categoryTickMeasureCanvas ||= document.createElement("canvas");
+    const context = categoryTickMeasureCanvas.getContext("2d");
+    if (!context) return String(value || "").length * 6.5;
+    const fontSize = Math.max(8, Number(style?.fontSize || 12));
+    const fontWeight = style?.fontWeight || 400;
+    context.font = `${fontWeight} ${fontSize}px ${style?.fontFamily || "Arial, sans-serif"}`;
+    return context.measureText(String(value || "")).width;
+}
+
+function ClampedCategoryTick({ x = 0, y = 0, payload = {}, config = null, valueFormatter = null, orientation = "x", style = {}, availableWidth = 0 }) {
     const rawValue = payload?.value;
     const formattedValue = typeof valueFormatter === "function" ? valueFormatter(rawValue) : rawValue;
-    const label = buildChartCategoryTickLabel(formattedValue, config);
-    if (!label) return null;
     const isYAxis = orientation === "y";
+    const label = isYAxis
+        ? buildMeasuredChartCategoryTickLabel(formattedValue, config, availableWidth, (text) => measureCategoryTickText(text, style))
+        : buildChartCategoryTickLabel(formattedValue, config);
+    if (!label) return null;
     const lineHeight = Math.max(11, Number(style?.fontSize || 12) + 2);
     return (
         <g transform={`translate(${x},${y})`}>
@@ -568,6 +585,11 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         xAxis,
         rows: effectiveCollection,
     });
+    const responsiveCivilDateAxis = resolveResponsiveCivilDateAxis(
+        effectiveCollection,
+        xAxis?.dataKey,
+        chartSize.width,
+    );
     const isPieChart = responsiveChartType === "pie" || responsiveChartType === "donut";
     const isHorizontalBar = isHorizontalBarType(responsiveChartType);
     const prepared = useMemo(() => {
@@ -716,14 +738,20 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         ? horizontalBarLayout.categoryLabel
         : authoredCategoryLabelConfig;
     const categoryLabelBottomOffset = categoryLabelConfig?.lines === 2 ? 14 : 0;
+    const cartesianAxisTitleBottomMargin = !embedded && String(xAxis?.label || "").trim() ? 64 : 0;
     const chartMargin = isHorizontalBar
         ? horizontalBarLayout.margin
         : (embedded
             ? {top: 24, right: 12, left: 6, bottom: 34 + categoryLabelBottomOffset}
-            : {top: 24, right: 60, left: 14, bottom: 42 + categoryLabelBottomOffset});
+            : {top: 24, right: 60, left: 14, bottom: Math.max(42 + categoryLabelBottomOffset, cartesianAxisTitleBottomMargin, responsiveCivilDateAxis.bottomMargin)});
+    const horizontalLegendSeriesCount = directSeriesChart
+        ? seriesDefinitions.length
+        : availableDataKeys.length;
     const legendProps = embedded
         ? {verticalAlign: "top", align: "center", wrapperStyle: {fontSize: "10px", lineHeight: 1.1, paddingBottom: "6px", color: "#5f6b7c"}}
-        : {};
+        : (isHorizontalBar && horizontalLegendSeriesCount > 1
+            ? {verticalAlign: "top", align: "center", wrapperStyle: {fontSize: "12px", lineHeight: 1.2, paddingBottom: "8px", color: "#5f6b7c"}}
+            : {});
     const axisTickStyle = embedded
         ? {fontSize: 11, fill: "#5f6b7c"}
         : {fontSize: 12, fill: "#667085"};
@@ -734,7 +762,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         ? ((props) => <ClampedCategoryTick {...props} config={categoryLabelConfig} valueFormatter={(value) => formatChartXAxisValue(value, resolvedTickFormat, resolvedTickValueMode)} style={axisTickStyle} />)
         : axisTickStyle;
     const renderYAxisCategoryTick = categoryLabelConfig
-        ? ((props) => <ClampedCategoryTick {...props} config={categoryLabelConfig} orientation="y" style={axisTickStyle} />)
+        ? ((props) => <ClampedCategoryTick {...props} config={categoryLabelConfig} orientation="y" style={axisTickStyle} availableWidth={Math.max(0, horizontalBarLayout.categoryWidth - 10)} />)
         : (embedded ? {fontSize: 11, fill: "#5f6b7c"} : undefined);
     const gridStroke = embedded ? "rgba(95,107,124,0.18)" : "rgba(152,162,179,0.22)";
     const showEmbeddedSeriesSelector = embedded && !isPieChart && availableDataKeys.length > 1;
@@ -905,7 +933,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             strokeDasharray: entry.strokeDasharray || defaultLineDash,
             fillOpacity: entry.fillOpacity ?? (entry.type === "area" ? 0.22 : 1),
             opacity: entry.opacity,
-            isAnimationActive: chart?.animate === true || chart?.animation === true,
+            isAnimationActive: resolveChartAnimationActive(chart),
         };
         const showSeriesDataLabels = shouldRenderSeriesDataLabels(entry, type, normalizedChartData.length, embedded);
         const dataLabelFormatter = buildDataLabelFormatter(entry.format || leftAxis.format);
@@ -972,15 +1000,20 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             {resolvedChartAnnotations.background}
             <XAxis
                 dataKey={xAxis?.dataKey || "name"}
-                tickFormatter={(val) => formatChartXAxisValue(val, resolvedTickFormat, resolvedTickValueMode)}
+                ticks={responsiveCivilDateAxis.ticks}
+                tickFormatter={(val) => formatChartXAxisValue(
+                    val,
+                    responsiveCivilDateAxis.tickFormat || resolvedTickFormat,
+                    responsiveCivilDateAxis.compact ? "civil" : resolvedTickValueMode,
+                )}
                 tick={renderXAxisCategoryTick}
                 axisLine={false}
                 tickLine={false}
-                minTickGap={embedded ? 24 : 5}
+                minTickGap={responsiveCivilDateAxis.compact ? 18 : (embedded ? 24 : 5)}
                 label={{
                     value: embedded ? "" : (xAxis.label || ""),
-                    position: "insideBottomRight",
-                    offset: 0,
+                    position: String(xAxis?.label || "").trim() ? "bottom" : responsiveCivilDateAxis.labelPosition,
+                    offset: String(xAxis?.label || "").trim() ? 18 : responsiveCivilDateAxis.labelOffset,
                     ...axisLabelStyle,
                 }}
             />
@@ -1095,6 +1128,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         name={primarySeries.name || primarySeries.label}
                         fill={primarySeries.color}
                         barSize={barSize}
+                        isAnimationActive={resolveChartAnimationActive(chart)}
                         {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(primarySeries.value, payload) } : {})}
                     >
                         {showHorizontalDataLabels ? (
@@ -1117,6 +1151,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                             name={entry.name || entry.label}
                             fill={entry.color}
                             barSize={barSize}
+                            isAnimationActive={resolveChartAnimationActive(chart)}
                             stackId={responsiveChartType === "funnel_bar" ? undefined : entry.stackId}
                             {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}
                         >
@@ -1146,21 +1181,23 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         ? chartData.filter((row) => selectedDataKeys.includes(row.name))
         : [];
     const piePalette = palette.length > 0 ? palette : ['#137cbd', '#0f9960', '#d9822b', '#8f398f', '#c23030', '#5c7080', '#2965cc', '#29a634'];
-    const pieInnerRadius = type === "donut" ? "45%" : 0;
+    const compactPie = isPieChart && Number(chartSize.width || 0) > 0 && Number(chartSize.width || 0) <= 520;
+    const pieInnerRadius = type === "donut" ? (compactPie ? "34%" : "45%") : 0;
     const pieChart = (
         <PieChart margin={embedded ? {top: 8, right: 8, bottom: 8, left: 8} : {top: 10, right: 10, bottom: 10, left: 10}}>
             <Pie
                 data={pieFilteredData}
                 dataKey="value"
                 nameKey="name"
+                isAnimationActive={resolveChartAnimationActive(chart)}
                 {...(interactiveDatumSelection ? { onClick: emitDatumSelection } : {})}
                 cx="50%"
-                cy="50%"
+                cy={compactPie ? "38%" : "50%"}
                 innerRadius={pieInnerRadius}
-                outerRadius="78%"
+                outerRadius={compactPie ? "52%" : "78%"}
                 paddingAngle={pieFilteredData.length > 1 ? 2 : 0}
-                label={embedded ? false : ({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
-                labelLine={!embedded}
+                label={embedded || compactPie ? false : ({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
+                labelLine={!embedded && !compactPie}
             >
                 {pieFilteredData.map((entry, index) => (
                     <Cell key={buildPieSliceCellKey(entry, index)} fill={piePalette[index % piePalette.length]} />
@@ -1173,6 +1210,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             {showChartLegend ? (
                 <Legend
                     {...(embedded ? {wrapperStyle: {fontSize: "11px"}, iconSize: 10} : {})}
+                    {...(compactPie ? {verticalAlign: "bottom", align: "center", wrapperStyle: {fontSize: "11px", lineHeight: 1.4, paddingTop: "8px"}, iconSize: 9} : {})}
                     {...(interactiveLegendContent ? { content: interactiveLegendContent } : {})}
                 />
             ) : null}

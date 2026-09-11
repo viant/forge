@@ -75,6 +75,19 @@ export function beginDataSourceFetch(control = {}) {
     return {...(control || {}), loading: true, loaded: false, error: null, stale: false};
 }
 
+export function consumeDataSourceFetchRequest(input = {}, request = "fetch") {
+    const current = isPlainObject(input) ? input : {};
+    const requestedFlag = request === "refresh" ? "refresh" : "fetch";
+    if (current?.[requestedFlag] !== true) {
+        return null;
+    }
+    return {
+        ...current,
+        fetch: false,
+        refresh: false,
+    };
+}
+
 export function recoverInterruptedFetchOnMount(dataSource = {}, input = {}, control = {}, initialObservation = false) {
     // A loading flag is owned by the DataSource instance that started the
     // request. If a new instance observes it on mount, the owner was
