@@ -125,6 +125,20 @@ fun MenuListRenderer(
     val visibleItems = items.filter(::shouldRenderItem)
     if (visibleItems.isEmpty()) return
 
+    if (visibleItems.any { com.viant.forgeandroid.runtime.NativeWidgetContract.kind(it) !in setOf("label", "link", "button") }) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            visibleItems.forEach { item ->
+                val kind = com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item)
+                val target = resolveMenuListContext(window, baseContext, container, item)
+                if (kind !in setOf("label", "link", "button")) {
+                    if (target != null) FormRenderer(runtime, target, listOf(item))
+                    else NativeWidgetView(item.copy(readOnly = true), item.value, onChange = {})
+                } else InlineItem(runtime, window, baseContext, container, item)
+            }
+        }
+        return
+    }
+
     val useTiles = visibleItems.any { it.properties["tile"].asString() == "true" }
     val useSummaryCards = visibleItems.size >= 2 && visibleItems.all(::isSummaryLabelItem)
     val useHeading = visibleItems.size == 1 &&

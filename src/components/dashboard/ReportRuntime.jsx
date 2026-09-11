@@ -1,3 +1,4 @@
+import { resolveReportRuntimeCompositeOwnership } from "./reportRuntimeStructure.js";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@blueprintjs/core";
 
@@ -211,8 +212,8 @@ function RuntimePanel({ title = "", subtitle = "", children, className = "", sty
         ...style,
       }}
     >
-      {title || subtitle ? (
-        <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+      {title || subtitle || headerAction ? (
+        <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <span style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {title ? <h3 style={{ margin: 0, fontSize: 15, color: "#182026" }}>{title}</h3> : null}
             {subtitle ? <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: "#5f6b7c" }}>{subtitle}</p> : null}
@@ -1702,13 +1703,14 @@ function CollectionBlock({ block = {}, diagnostics = [], locale = "en-US", onRet
   );
 }
 
-function SectionHeaderBlock({ block = {} }) {
+function SectionHeaderBlock({ block = {}, headerAction = null }) {
   const content = block?.content && typeof block.content === "object" && !Array.isArray(block.content)
     ? block.content
     : {};
   return (
     <RuntimePanel
       className="forge-report-runtime-section-panel"
+      headerAction={headerAction}
       title={normalizeString(block?.title || content?.title || "Section")}
       subtitle={normalizeString(content?.subtitle || block?.subtitle)}
     >
@@ -2142,20 +2144,7 @@ function resolveRuntimeTabGroupConfig(blocks = []) {
 function resolveRuntimeCompositeConfig(blocks = []) {
   const composites = (Array.isArray(blocks) ? blocks : [])
     .filter((block) => normalizeString(block?.kind) === "compositeBlock");
-  const childBlockIdSet = new Set();
-  composites.forEach((block) => {
-    const childBlockIds = Array.isArray(block?.content?.childBlockIds)
-      ? block.content.childBlockIds
-      : (Array.isArray(block?.childBlockIds) ? block.childBlockIds : []);
-    childBlockIds
-      .map((blockId) => normalizeString(blockId))
-      .filter(Boolean)
-      .forEach((blockId) => childBlockIdSet.add(blockId));
-  });
-  return {
-    composites,
-    childBlockIdSet,
-  };
+  return { composites, ...resolveReportRuntimeCompositeOwnership(blocks) };
 }
 
 function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false }) {
@@ -2856,6 +2845,7 @@ function UnsupportedBlock({ block = {} }) {
 
 export default function ReportRuntime({
   reportSpec = {},
+  headerActions = null,
   reportDocument = null,
   reportFill = {},
   title = "",
@@ -3141,7 +3131,7 @@ export default function ReportRuntime({
       return null;
     }
     if (kind === "sectionBlock") {
-      return <SectionHeaderBlock key={block.id} block={block} />;
+      return <SectionHeaderBlock key={block.id} block={block} headerAction={headerActions?.get(normalizeString(block.id))} />;
     }
     if (kind === "stepperBlock") {
       return <StepperBlock key={block.id} block={block} />;
@@ -3312,9 +3302,7 @@ export default function ReportRuntime({
       return <GeoMapBlock key={block.id} block={block} diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset, publicDiagnosticsMode)} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />;
     }
     if (kind === "compositeBlock") {
-      const childBlockIds = Array.isArray(block?.content?.childBlockIds)
-        ? block.content.childBlockIds
-        : (Array.isArray(block?.childBlockIds) ? block.childBlockIds : []);
+      const childBlockIds = runtimeCompositeConfig.childrenById.get(normalizeString(block?.id)) || [];
       const childBlocks = childBlockIds
         .map((blockId) => runtimeBlockIndex.get(normalizeString(blockId)) || null)
         .filter(Boolean);
@@ -3324,6 +3312,7 @@ export default function ReportRuntime({
       return (
         <RuntimePanel
           key={block.id}
+          headerAction={headerActions?.get(normalizeString(block.id))}
           title={normalizeString(block?.title || block?.content?.title || "Grouped Panel")}
           subtitle={normalizeString(block?.content?.description || block?.description)}
         >
@@ -3358,29 +3347,19 @@ export default function ReportRuntime({
     return <UnsupportedBlock key={block?.id || kind} block={block} />;
   };
 
-  const runtimeSections = useMemo(
-    () => buildRuntimeSections(allRuntimeBlocks, runtimeCompositeConfig.childBlockIdSet),
-    [allRuntimeBlocks, runtimeCompositeConfig],
-  );
+  const runtimeSections = buildRuntimeSections(allRuntimeBlocks, runtimeCompositeConfig.childBlockIdSet)
+    .filter((section) => !section.block || isReportRuntimeBlockVisible(section.block, {
+      metrics: resolveRuntimeDataset(section.block)?.rows?.[0] || {},
+      filters: runtimeFilterValues,
+      selection: runtimeSelection,
+    }));
   const runtimeTabGroup = useMemo(
     () => resolveRuntimeTabGroupConfig(allRuntimeBlocks),
     [allRuntimeBlocks],
   );
-  const visibleRuntimeBlocks = useMemo(
-    () => (
-      Array.isArray(allRuntimeBlocks)
-        ? allRuntimeBlocks.filter((block) => {
-          const blockId = normalizeString(block?.id);
-          const kind = normalizeString(block?.kind);
-          if (kind === "tabGroupBlock") {
-            return false;
-          }
-          return !runtimeCompositeConfig.childBlockIdSet.has(blockId);
-        })
-        : []
-    ),
-    [allRuntimeBlocks, runtimeCompositeConfig],
-  );
+  const visibleRuntimeBlocks = runtimeSections.flatMap((section) => (
+    section.block ? [section.block, ...section.items] : section.items
+  ));
   const resolvedActiveSectionId = normalizeString(activeSectionId || runtimeTabGroup?.defaultSectionId || runtimeSections[0]?.id);
 
   useEffect(() => {

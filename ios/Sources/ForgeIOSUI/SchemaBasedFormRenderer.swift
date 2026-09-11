@@ -14,6 +14,7 @@ public struct SchemaBasedFormRenderer: View {
     /// Seed values applied once on first render. Keys match field.key.
     public var seedValues: [String: JSONValue]?
 
+    @State private var widgetValues: [String: JSONValue] = [:]
     @State private var formValues: [String: String] = [:]
     @State private var multiSelectValues: [String: Set<String>] = [:]
     @State private var dynamicFormState: [String: JSONValue] = [:]
@@ -118,6 +119,9 @@ public struct SchemaBasedFormRenderer: View {
                 Text(field.label).font(.body.weight(.medium))
                 if field.required { Text("*").foregroundStyle(.red) }
             }
+            if field.lookup == nil && (field.widget != nil || !field.nativeProperties.isEmpty) {
+                NativeWidgetView(item: SchemaFormRuntime.nativeItem(for: field), value: widgetValues[field.key] ?? dynamicFormState[field.key] ?? field.defaultValue ?? .string(formValues[field.key] ?? ""), onChange: { commitValue($0, for: field.key) })
+            } else {
             switch field.type {
             case .text:
                 TextField(field.placeholder ?? field.key, text: binding(for: field.key))
@@ -216,6 +220,7 @@ public struct SchemaBasedFormRenderer: View {
                     }
                 }
             }
+            }
             if let message = validationErrors[field.key] {
                 Text(message)
                     .font(.caption)
@@ -243,6 +248,7 @@ public struct SchemaBasedFormRenderer: View {
                 continue
             }
             // Schema default fallback
+            if let value = field.defaultValue, field.widget != nil || !field.nativeProperties.isEmpty { applyValue(value, for: field); continue }
             switch field.type {
             case .multiSelect:
                 let defaults = field.defaultValue?.arrayValue?.compactMap(\.stringValue) ?? []
@@ -270,6 +276,7 @@ public struct SchemaBasedFormRenderer: View {
     }
 
     private func applyValue(_ value: JSONValue, for field: ResolvedSchemaField) {
+        if field.widget != nil || !field.nativeProperties.isEmpty { widgetValues[field.key] = value }
         switch field.type {
         case .multiSelect:
             let items: [String]
@@ -296,6 +303,7 @@ public struct SchemaBasedFormRenderer: View {
     private func buildPayload(fields: [ResolvedSchemaField]) -> [String: JSONValue] {
         var result: [String: JSONValue] = [:]
         for field in fields {
+            if let value = widgetValues[field.key] { result[field.key] = value; continue }
             switch field.type {
             case .multiSelect:
                 let selected = multiSelectValues[field.key, default: []]
@@ -376,6 +384,7 @@ public struct SchemaBasedFormRenderer: View {
     }
 
     private func commitValue(_ value: JSONValue, for key: String) {
+        if let field = resolvedFields.first(where: { $0.key == key }), field.widget != nil || !field.nativeProperties.isEmpty { widgetValues[key] = value }
         switch value {
         case .string(let text): formValues[key] = text
         case .bool(let flag): formValues[key] = flag ? "true" : "false"

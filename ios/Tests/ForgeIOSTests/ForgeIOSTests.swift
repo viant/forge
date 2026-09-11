@@ -4933,9 +4933,9 @@ final class ForgeIOSTests: XCTestCase {
 
     func testOpenWindowRequestLoaderReceivesResourceAndConversationContext() async throws {
         let runtime = ForgeRuntime()
-        var captured: ForgeRuntime.WindowMetadataRequest?
+        let capture = WindowMetadataRequestCapture()
         await runtime.registerWindowMetadataRequestLoader { request in
-            captured = request
+            await capture.set(request)
             return WindowMetadata(view: ViewDef(content: ContentDef(id: "permitted")))
         }
 
@@ -4949,6 +4949,7 @@ final class ForgeIOSTests: XCTestCase {
 
         let signal = await runtime.signals.metadata(windowID: state.id)
         _ = await signal.peek()
+        let captured = await capture.value
         XCTAssertEqual(captured?.windowKey, "advertiser")
         XCTAssertEqual(captured?.conversationID, "conv-1")
         XCTAssertEqual(captured?.parameters["AdvertiserId"], .array([.number(85141)]))
@@ -7033,4 +7034,9 @@ private final class MetadataURLProtocol: URLProtocol {
         }
         return data
     }
+}
+
+private actor WindowMetadataRequestCapture {
+    var value: ForgeRuntime.WindowMetadataRequest?
+    func set(_ request: ForgeRuntime.WindowMetadataRequest) { value = request }
 }

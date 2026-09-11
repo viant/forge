@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button, Dialog, Icon, Menu, MenuDivider, MenuItem, Popover, Tooltip } from "@blueprintjs/core";
 import { useSignals } from "@preact/signals-react/runtime";
 
@@ -744,6 +744,7 @@ import {
 import { applyReportBuilderRuntimeFieldCatalog } from "./reportBuilderRuntimeFieldCatalog.js";
 import ReportBuilderOptionControls from "./ReportBuilderOptionControls.jsx";
 import {
+    partitionReportBuilderOptions,
     buildReportBuilderFilterToolbarModel,
     countModifiedReportBuilderOptions,
     normalizeReportBuilderOptionDefinitions,
@@ -1871,6 +1872,16 @@ function ReportBuilderDefinitionStatus({ status = "loading", message = "" }) {
             <p style={{ margin: 0 }}>{message || (failed ? "The report cannot be initialized." : "Loading report definition…")}</p>
         </section>
     );
+}
+
+// Register actual mounted slots so hidden blocks, inactive tabs and unavailable
+// runtimes leave their options in the rail. Layout effects settle before paint.
+function ReportOptionHeader({ anchor, setMountedHeaders, children }) {
+    useLayoutEffect(() => {
+        setMountedHeaders((current) => ({ ...current, [anchor]: (Number.isInteger(current[anchor]) ? current[anchor] : 0) + 1 }));
+        return () => setMountedHeaders((current) => ({ ...current, [anchor]: Math.max(0, (Number.isInteger(current[anchor]) ? current[anchor] : 0) - 1) }));
+    }, [anchor, setMountedHeaders]);
+    return children;
 }
 
 export default function ReportBuilder({ container: sourceContainer, context }) {
@@ -4211,6 +4222,8 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         () => normalizeReportBuilderOptionDefinitions(config?.reportOptions),
         [config?.reportOptions],
     );
+    const [mountedOptionHeaders, setMountedOptionHeaders] = useState({});
+    const reportOptionGroups = partitionReportBuilderOptions(reportOptionDefinitions, mountedOptionHeaders, compactMode);
     const effectiveReportOptions = useMemo(
         () => resolveEffectiveReportBuilderOptions(reportOptionDefinitions, state?.reportOptions),
         [reportOptionDefinitions, state?.reportOptions],
@@ -5544,7 +5557,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         data-report-filter-surface-placement={!designWorkspaceMode ? reportFilterSurfaceModel?.placement : undefined}
         >
             <ReportBuilderOptionControls
-                definitions={reportOptionDefinitions}
+                definitions={reportOptionGroups.rail}
                 values={effectiveReportOptions}
                 onChange={setReportOptionValue}
                 onReset={resetReportFiltersAndOptions}
@@ -10148,13 +10161,14 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         });
     }, [authoredDocumentBlockDiagnostics, authoredRuntimePreviewModel, container, displayConfig, reportWorkspaceMode, runtimePreviewDatasetPayloadState.payloads, runtimePreviewArtifactDiagnostics, runtimePreviewConfig?.subtitle, runtimePreviewConfig?.title, runtimePreviewDetailDiagnostic, runtimePreviewHostIntent, runtimePreviewPrimaryDatasetPayload?.diagnostics, runtimePreviewPrimaryDatasetPayload?.hasMore, runtimePreviewPrimaryDatasetPayload?.rows, runtimePreviewRowsSource.error, runtimePreviewRowsSource.hasMore, runtimePreviewRowsSource.rows, state]);
     const runtimeExportMetadata = useMemo(() => ({
+        ...(reportOptionDefinitions.length ? { reportOptions: reportOptionDefinitions } : {}),
         conversationId: String(container?.conversationId || builderContext?.conversationId || builderContext?.windowState?.conversationId || "").trim(),
         workspaceId: String(container?.windowKey || container?.id || "").trim(),
         renderHints: {
             source: "reportBuilder",
             viewMode: String(state?.viewMode || "").trim() || "table",
         },
-    }), [builderContext?.conversationId, builderContext?.windowState?.conversationId, container?.conversationId, container?.id, container?.windowKey, state?.viewMode]);
+    }), [builderContext?.conversationId, builderContext?.windowState?.conversationId, container?.conversationId, container?.id, container?.windowKey, state?.viewMode, reportOptionDefinitions]);
     const draftExportRequest = useMemo(() => {
         if (!runtimePreviewArtifact?.document || !runtimePreviewArtifact?.reportSpec || !runtimePreviewArtifact?.reportFill) {
             return runtimePreviewArtifact?.exportRequest || null;
@@ -12000,6 +12014,24 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             page: 1,
         });
     };
+    const reportOptionHeaderActions = new Map([...reportOptionGroups.headers].map(([anchor, definitions]) => [anchor, (
+        <ReportOptionHeader key={anchor} anchor={anchor} setMountedHeaders={setMountedOptionHeaders}>
+            <ReportBuilderOptionControls
+                definitions={definitions}
+                values={effectiveReportOptions}
+                onChange={setReportOptionValue}
+                presentation="header"
+                headingId={`report-builder-options-header-${anchor}`}
+                activeCount={countModifiedReportBuilderOptions(definitions, effectiveReportOptions)}
+                onReset={() => {
+                    const currentState = currentBuilderStateRef.current || state;
+                    const selected = { ...currentState.reportOptions };
+                    definitions.forEach(({ name }) => delete selected[name]);
+                    persistExplorationMutation({ ...currentState, reportOptions: resolveEffectiveReportBuilderOptions(reportOptionDefinitions, selected), page: 1 });
+                }}
+            />
+        </ReportOptionHeader>
+    )]));
     const runtimePreviewHandlers = useMemo(() => ({
         ...(runtimePreviewSurface.runtimeHandlers || {}),
         toggleScopeParamOption: (filter, optionValue) => toggleStaticFilter(filter, optionValue),
@@ -19951,6 +19983,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                         failureNotice: importedPipelineExportFailureNotice,
                     })}
                 <ReportRuntime
+                    headerActions={reportOptionHeaderActions}
                     reportSpec={importedPipelineRuntimeConfig.reportSpec}
                     reportDocument={importedPipelineRuntimeArtifact?.document || null}
                     reportFill={importedPipelineRuntimeConfig.reportFill}
@@ -20079,6 +20112,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                     }
                     const runtimeContent = (
                         <ReportRuntime
+                            headerActions={reportOptionHeaderActions}
                             reportSpec={authoredRuntimePreviewState.runtimeConfig.reportSpec}
                             reportDocument={runtimePreviewArtifact?.document || null}
                             reportFill={authoredRuntimePreviewState.runtimeConfig.reportFill}

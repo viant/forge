@@ -356,10 +356,33 @@ private fun FormItemRenderer(
         }
     }
 
-    val key = itemValueKey(item) ?: return
+    val key = itemValueKey(item) ?: item.label?.takeIf { com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item) == "button" } ?: return
     val value = resolveItemValue(item, key, form, metrics, windowForm)
     val validationError = validationErrors[key]
-    when (if (item.lookup != null) "lookup" else item.type) {
+    if (item.lookup == null && com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item) != "label" && item.link == null) {
+        val rawWidgetValue = resolveItemRawValue(item, key, form, metrics, windowForm, collection)
+        val owner = when (item.scope?.lowercase()) { "windowform" -> windowForm; "metrics" -> metrics; else -> form }
+        val widgetValue = if (rawWidgetValue == null && !com.viant.forgeandroid.runtime.NativeWidgetContract.hasValue(owner, key)) com.viant.forgeandroid.runtime.NativeWidgetContract.initialValue(item) else com.viant.forgeandroid.runtime.JsonUtil.anyToElement(rawWidgetValue)
+    LaunchedEffect(item, widgetValue, metrics) {
+        if (com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item) == "daterangepreset") {
+            com.viant.forgeandroid.runtime.NativeDateRangePreset.patch(item, com.viant.forgeandroid.runtime.NativeWidgetContract.text(widgetValue), metrics)?.let { patch ->
+                val start = item.startField ?: (item.properties["startField"] as? JsonPrimitive)?.content ?: "customDateStart"
+                val end = item.endField ?: (item.properties["endField"] as? JsonPrimitive)?.content ?: "customDateEnd"
+                if (windowForm[start] != patch[start] || windowForm[end] != patch[end]) runtime.setWindowFormValues(context.window.windowId, patch, bumpPrefillRevision = false)
+            }
+        }
+    }
+        NativeWidgetView(item, widgetValue, onChange = { next ->
+            if (com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item) == "daterangepreset") {
+                com.viant.forgeandroid.runtime.NativeDateRangePreset.patch(item, com.viant.forgeandroid.runtime.NativeWidgetContract.text(next), metrics)?.let { patch -> runtime.setWindowFormValues(context.window.windowId, patch, bumpPrefillRevision = false) }
+            }
+            setScopedItemValue(runtime, dataSourceContext, item, key, com.viant.forgeandroid.runtime.JsonUtil.elementToAny(next))
+        }, windowForm = windowForm, onDraftChange = { runtime.setWindowFormValues(context.window.windowId, it, bumpPrefillRevision = false) }, onAction = {
+            item.on.filter { it.event == "onClick" || it.event == "onPress" }.forEach { runtime.execute(it, dataSourceContext, mapOf("item" to item)) }
+        })
+        return
+    }
+    when (if (item.lookup != null) "lookup" else com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item)) {
                 "label" -> LabelItemCard(
                     label = item.label ?: key,
                     value = resolveItemDisplayValue(item, key, form, metrics, windowForm)
@@ -935,7 +958,7 @@ internal fun shouldRenderItem(item: ItemDef): Boolean {
 }
 
 internal fun isSummaryLabelItem(item: ItemDef): Boolean {
-    val type = item.type?.trim()?.lowercase().orEmpty()
+    val type = com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item)
     return type.isEmpty() || type == "label"
 }
 

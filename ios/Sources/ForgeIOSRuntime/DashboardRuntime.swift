@@ -614,6 +614,8 @@ public struct DashboardReportRuntimeGeoMapValue: Sendable, Equatable {
 }
 
 public struct DashboardReportRuntimeBlockSummary: Sendable, Equatable, Identifiable {
+    public var children: [DashboardReportRuntimeBlockSummary] = []
+    public var compositeParentID: String? = nil
     public let id: String
     public let kind: String
     public let title: String
@@ -851,7 +853,10 @@ public enum DashboardRuntime {
                 ?? nonBlank(block["label"]?.stringValue)
                 ?? nonBlank(block["content"]?.objectValue?["title"]?.stringValue)
                 ?? id
-            let content = block["content"]?.objectValue ?? [:]
+            var content = block["content"]?.objectValue ?? block
+            for key in ["childBlockIds", "collapsible", "defaultCollapsed"] where content[key] == nil {
+                content[key] = block[key]
+            }
             let markdown = kind == "markdownBlock"
                 ? nonBlank(content["markdown"]?.stringValue) ?? nonBlank(block["markdown"]?.stringValue)
                 : nil
@@ -879,7 +884,7 @@ public enum DashboardRuntime {
                 kind: kind,
                 title: title,
                 diagnostics: blockDiagnostics,
-                content: presentationKinds.contains(kind) || kind == "kpiBlock" ? content : [:],
+                content: kind == "tableBlock" ? content.filter { ["collapsible", "defaultCollapsed"].contains($0.key) } : (presentationKinds.contains(kind) || kind == "kpiBlock" ? content : [:]),
                 runtime: block["runtime"]?.objectValue ?? [:],
                 markdown: markdown,
                 kpi: kpi,
@@ -890,7 +895,7 @@ public enum DashboardRuntime {
                 geoMap: geoMap
             )
         }
-        guard !blockOrder.isEmpty else { return blocks }
+        guard !blockOrder.isEmpty else { return ReportRuntimeStructure.composites(blocks) }
         let blockByID: [String: DashboardReportRuntimeBlockSummary] = Dictionary(
             uniqueKeysWithValues: blocks.map { ($0.id, $0) }
         )
@@ -902,7 +907,7 @@ public enum DashboardRuntime {
             ordered.append(block)
         }
         ordered.append(contentsOf: blocks.filter { !seen.contains($0.id) })
-        return ordered
+        return ReportRuntimeStructure.composites(ordered)
     }
 
     public static func dashboardReportRuntimeBlockVisible(

@@ -135,16 +135,7 @@ public struct ContainerRenderer: View {
                 if let toolbar = container.toolbar, !toolbar.items.isEmpty {
                     containerActionToolbar(toolbar)
                 }
-                WorkflowPresentationPrimitives(
-                    runtime: runtime,
-                    window: window,
-                    container: resolvedContainer(),
-                    form: visibilityForm,
-                    collection: visibilityCollection,
-                    metrics: visibilityMetrics,
-                    windowForm: visibilityWindowForm,
-                    selection: visibilitySelection
-                )
+                ScopedWorkflowPrimitives(runtime: runtime, window: window, container: resolvedContainer())
                 renderedBody
             }
         }
@@ -209,6 +200,7 @@ public struct ContainerRenderer: View {
 
     private var observesPrimitiveState: Bool {
         container.visibleWhen != nil
+            || container.stableTabs != nil
             || container.dataStateBoundary != nil
             || container.relationDrill != nil
             || container.notificationRules != nil
@@ -216,6 +208,13 @@ public struct ContainerRenderer: View {
             || container.detailView != nil
             || container.mutationCommand != nil
             || container.permissionBoundary != nil
+            || container.draftForm != nil
+            || container.resourceHeader != nil
+            || container.editableCollection != nil
+            || container.statusWorkflow != nil
+            || container.historyDiff != nil
+            || container.queryToolbar != nil
+            || container.wizard != nil
     }
 
     private var permissionTaskKey: String {
@@ -517,6 +516,8 @@ public struct ContainerRenderer: View {
                 titleBlock
                 FileBrowserRenderer(runtime: runtime, window: window, container: effectiveContainer, fileBrowser: fileBrowser)
             }
+        } else if effectiveContainer.stableTabs != nil {
+            StableTabsRenderer(runtime: runtime, window: window, container: effectiveContainer, form: visibilityForm, collection: visibilityCollection, metrics: visibilityMetrics, windowForm: visibilityWindowForm, selection: visibilitySelection)
         } else if effectiveContainer.tabs != nil, !effectiveContainer.containers.isEmpty {
             TabsRenderer(runtime: runtime, window: window, container: effectiveContainer)
         } else if let editor = effectiveContainer.editor {

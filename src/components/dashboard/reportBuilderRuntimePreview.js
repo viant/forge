@@ -640,6 +640,7 @@ export function buildReportBuilderRuntimePreviewModel({
   });
   return {
     ...previewModelSource,
+    reportOptionDefinitions: cloneValue(effectiveConfig?.reportOptions || []),
     ...(previewContext?.document ? { document: cloneValue(previewContext.document) } : {}),
     ...(previewContext?.reportSpec ? { reportSpec: cloneValue(previewContext.reportSpec) } : {}),
     ...(semanticBindingViewState ? { semanticBindingViewState: cloneValue(semanticBindingViewState) } : {}),
@@ -752,6 +753,7 @@ export function buildReportBuilderRuntimePreviewArtifacts({
     reportSpec: normalizedReportSpec,
     reportFill: previewReportFill,
     reportPrint: previewReportPrint,
+    ...(model?.reportOptionDefinitions?.length ? { metadata: { reportOptions: cloneValue(model.reportOptionDefinitions) } } : {}),
     format: "pdf",
   });
   return {

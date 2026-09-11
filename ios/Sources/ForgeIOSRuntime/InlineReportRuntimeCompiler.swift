@@ -73,7 +73,7 @@ public enum InlineReportRuntimeCompiler {
         }
     }
 
-    public static func compile(_ report: TranscriptCanonicalReport) throws -> InlineReportRuntimeArtifact {
+    public static func compile(_ report: TranscriptCanonicalReport, reportOptions: [JSONValue] = [], optionValues: [String: JSONValue] = [:], includeExport: Bool = true) throws -> InlineReportRuntimeArtifact {
         let status = report.status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if !status.isEmpty && status != "committed" && status != "ready" {
             throw InlineReportRuntimeCompilerError.unavailableStatus(status)
@@ -135,7 +135,7 @@ public enum InlineReportRuntimeCompiler {
                 "title": .string(title)
             ]),
             "reportId": .string(report.id),
-            "fences": .array(try exportFences(report))
+            "fences": .array(includeExport ? try exportFences(report, reportOptions: reportOptions, optionValues: optionValues) : [])
         ]
         if let subtitle { runtime["subtitle"] = .string(subtitle) }
         let metadata = WindowMetadata(
@@ -153,20 +153,26 @@ public enum InlineReportRuntimeCompiler {
         return InlineReportRuntimeArtifact(reportSpec: reportSpec, reportFill: reportFill, metadata: metadata)
     }
 
-    public static func exportFences(_ report: TranscriptCanonicalReport) throws -> [JSONValue] {
+    public static func exportFences(_ report: TranscriptCanonicalReport, reportOptions: [JSONValue] = [], optionValues: [String: JSONValue] = [:]) throws -> [JSONValue] {
         guard let source = report.source.objectValue else {
             throw InlineReportRuntimeCompilerError.invalidSource
         }
         var exportSource = source
         var exportGrammar = report.grammar
         if report.grammar.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "dashboard-v1" {
-            let compiled = try compile(report)
+            let compiled = try compile(report, includeExport: false)
             exportSource["blocks"] = compiled.reportSpec.objectValue?["blocks"] ?? .array([])
             exportGrammar = "report-document-v1"
         }
         let exportScope = safeFenceSegment(nonEmpty(source["scope"]?.stringValue) ?? report.scope, fallback: "message")
         var sequence = 1
         var start = pdfSource(exportSource)
+        if !optionValues.isEmpty {
+            var metadata = start["metadata"]?.objectValue ?? [:]
+            metadata["reportOptions"] = .array(reportOptions)
+            metadata["options"] = .object(optionValues)
+            start["metadata"] = .object(metadata)
+        }
         start["version"] = .number(1)
         start["scope"] = .string(exportScope)
         start["id"] = .string(report.id)

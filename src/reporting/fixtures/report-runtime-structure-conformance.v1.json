@@ -1,0 +1,32 @@
+{
+  "cases": [
+    {
+      "name": "nested composite owns children exactly once",
+      "blocks": [
+        {"id":"pathways","kind":"compositeBlock","childBlockIds":["metric","detail","missing","metric"]},
+        {"id":"metric","kind":"kpiBlock"},
+        {"id":"detail","kind":"compositeBlock","childBlockIds":["table"]},
+        {"id":"table","kind":"tableBlock"},
+        {"id":"outside","kind":"markdownBlock"}
+      ],
+      "parents": {"metric":"pathways","detail":"pathways","table":"detail"},
+      "roots": ["pathways","outside"]
+    },
+    {
+      "name": "duplicate ownership and cycles cannot duplicate or lose blocks",
+      "blocks": [
+        {"id":"a","kind":"compositeBlock","content":{"childBlockIds":["a","b","leaf"]}},
+        {"id":"b","kind":"compositeBlock","content":{"childBlockIds":["a","leaf"]}},
+        {"id":"leaf","kind":"tableBlock"}
+      ],
+      "parents": {"b":"a","leaf":"a"},
+      "roots": ["a"]
+    },
+    {
+      "name": "absent composite references do not change standalone blocks",
+      "blocks": [{"id":"group","kind":"compositeBlock","childBlockIds":["missing"]},{"id":"table","kind":"tableBlock"}],
+      "parents": {},
+      "roots": ["group","table"]
+    }
+  ]
+}

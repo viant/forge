@@ -101,7 +101,7 @@ struct WorkflowPresentationPrimitives: View {
                 baseline: selection.selected ?? [:],
                 valid: spec.validWhen == nil || conditionAllows(spec.validWhen),
                 dirty: spec.dirtyWhen.map { conditionAllows($0) } ?? (form != (selection.selected ?? [:]))
-            )
+            ).id((spec.dataSourceRef ?? container.dataSourceRef ?? "") + NativeWidgetContract.text(selection.selected.map(JSONValue.object)))
         }
     }
 
@@ -135,7 +135,8 @@ struct WorkflowPresentationPrimitives: View {
                                 sourceDataSourceRef: spec.dataSourceRef ?? container.dataSourceRef ?? mutation.dataSourceRef,
                                 command: mutation,
                                 labelOverride: action.label,
-                                extras: ["resource": .object(record)]
+                                extras: ["record": .object(record)],
+                                externallyDisabled: action.disabledWhen != nil && conditionAllows(action.disabledWhen)
                             )
                         } else if let handler = action.handler, let runtime, let window {
                             Button(action.label ?? action.id) {
@@ -143,7 +144,7 @@ struct WorkflowPresentationPrimitives: View {
                                     _ = await runtime.execute(
                                         ExecutionDef(action: handler),
                                         context: ExecutionContext(windowID: window.windowID, dataSourceRef: spec.dataSourceRef ?? container.dataSourceRef ?? ""),
-                                        args: ["resource": .object(record)]
+                                        args: ["record": .object(record), "action": (try? JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(action))) ?? .null]
                                     )
                                 }
                             }
@@ -456,7 +457,10 @@ private struct DraftFormActions: View {
     let valid: Bool
     let dirty: Bool
 
+    @State private var draftState = NativeDraftState()
+    @State private var reading = false
     @State private var discardConfirmationVisible = false
+    private var isDirty: Bool { spec.dirtyWhen == nil ? draftState.dirty(form) : dirty }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -464,7 +468,7 @@ private struct DraftFormActions: View {
                 if spec.confirmDiscard?.isEmpty == false { discardConfirmationVisible = true }
                 else { reset() }
             }
-            .disabled(!dirty)
+            .disabled(!isDirty || reading)
             if let submit = spec.submit {
                 MutationCommandButton(
                     runtime: runtime,
@@ -472,27 +476,41 @@ private struct DraftFormActions: View {
                     sourceDataSourceRef: dataSourceRef,
                     command: submit,
                     labelOverride: spec.saveLabel ?? submit.label,
-                    extras: ["draft": .object(form)],
-                    externallyDisabled: !valid || !dirty
+                    extras: NativeDraftState.submitExtras(form),
+                    externallyDisabled: !valid || !isDirty || reading,
+                    onSettled: { result in if result.status == "succeeded" { draftState.baseline = form } }
                 )
             }
-            if dirty { Text("Unsaved changes").font(.caption).foregroundStyle(.secondary) }
+            if isDirty { Text("Unsaved changes").font(.caption).foregroundStyle(.secondary) }
         }
         .alert(spec.confirmDiscard ?? "Discard changes?", isPresented: $discardConfirmationVisible) {
             Button("Cancel", role: .cancel) {}
             Button("Discard", role: .destructive) { reset() }
+        }
+        .onAppear { if draftState.baseline == nil { draftState.baseline = form } }
+        .onChange(of: baseline) { draftState.baseline = form }
+        .task(id: dataSourceRef) {
+            var previous = await runtime.dataSourceControl(windowID: window.windowID, dataSourceRef: dataSourceRef).loading
+            reading = previous
+            for await control in await runtime.dataSourceControlUpdates(windowID: window.windowID, dataSourceRef: dataSourceRef) {
+                reading = control.loading
+                if previous && !control.loading && control.error?.isEmpty != false {
+                    draftState.baseline = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: dataSourceRef)
+                }
+                previous = control.loading
+            }
         }
         .accessibilityIdentifier("forge-draft-form")
     }
 
     private func reset() {
         Task {
-            await runtime.setDataSourceForm(windowID: window.windowID, dataSourceRef: dataSourceRef, values: baseline)
+            await runtime.setDataSourceForm(windowID: window.windowID, dataSourceRef: dataSourceRef, values: draftState.resetValue(form))
             if let handler = spec.onReset, !handler.isEmpty {
                 _ = await runtime.execute(
                     ExecutionDef(action: handler),
                     context: ExecutionContext(windowID: window.windowID, dataSourceRef: dataSourceRef),
-                    args: ["form": .object(baseline)]
+                    args: draftState.resetExtras(form)
                 )
             }
         }

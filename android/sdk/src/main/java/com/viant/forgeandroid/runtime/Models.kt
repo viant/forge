@@ -293,6 +293,7 @@ data class DashboardReportCatalogPresetDef(
 
 @Serializable
 data class DashboardReportBuilderDef(
+    val reportOptions: List<JsonElement> = emptyList(),
     val title: String? = null,
     val subtitle: String? = null,
     val hooks: ReportBuilderHooksDef? = null,
@@ -1135,7 +1136,26 @@ data class ItemDef(
     val on: List<ExecutionDef> = emptyList(),
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap(),
-    val subtitle: String? = null
+    val subtitle: String? = null,
+    val widget: String? = null,
+    val readOnly: Boolean? = null,
+    val disabled: Boolean? = null,
+    @SerialName("enum") val enumValues: List<JsonElement> = emptyList(),
+    val min: JsonElement? = null,
+    val max: JsonElement? = null,
+    val accept: String? = null,
+    val placeholder: String? = null,
+    val separator: String? = null,
+    val timeZone: String? = null,
+    val timeZoneSelector: String? = null,
+    val lifetimeStartSelector: String? = null,
+    val lifetimeStart: String? = null,
+    val startField: String? = null,
+    val endField: String? = null,
+    val granularityField: String? = null,
+    val includePartialDataField: String? = null,
+    val customApplyEnabled: Boolean? = null,
+    @SerialName("default") val defaultValue: JsonElement? = null
 )
 
 fun ItemDef.valueKey(): String? {
@@ -1145,11 +1165,12 @@ fun ItemDef.valueKey(): String? {
         ?: id?.trim()?.takeIf { it.isNotEmpty() }
 }
 
-@Serializable
+@Serializable(with = OptionDefSerializer::class)
 data class OptionDef(
     val value: String? = null,
     val label: String? = null,
-    val default: Boolean? = null
+    val default: Boolean? = null,
+    val rawValue: JsonElement? = value?.let { JsonPrimitive(it) }
 )
 
 @Serializable

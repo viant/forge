@@ -19,6 +19,8 @@ public struct DashboardRenderer: View {
     @State private var dashboardSelection = DashboardSelectionState()
     @State private var dashboardCollections: [String: [[String: JSONValue]]] = [:]
     @State private var dashboardDimensionsModes: [String: String] = [:]
+    @State private var reportRuntimeCollapsedTables: [String: Bool] = [:]
+    @State private var reportRuntimeActionRowLimits: [String: Int] = [:]
     @State private var reportRuntimeTabSelections: [String: String] = [:]
     @State private var reportRuntimeExportExecutionID: String?
 
@@ -1120,7 +1122,8 @@ public struct DashboardRenderer: View {
         let repeatsContainerTitle = normalizedReportHeading(summary.title) == normalizedReportHeading(container.title)
         let repeatsContainerSubtitle = normalizedReportHeading(summary.subtitle) == normalizedReportHeading(container.subtitle)
         let nestedBlockIDs = reportRuntimeNestedTabBlockIDs(summary.blocks)
-        let topLevelBlocks = summary.blocks.filter { !nestedBlockIDs.contains($0.id) }
+        let strictTabs = summary.blocks.first { $0.kind == "tabGroupBlock" && $0.content["includeUnlistedSections"] == .bool(false) }
+        let topLevelBlocks = summary.blocks.filter { !nestedBlockIDs.contains($0.id) && $0.compositeParentID == nil && (strictTabs == nil || $0.id == strictTabs?.id) }
         let flatSections = reportRuntimeFlatSections(topLevelBlocks)
         let hasExplicitTabGroup = topLevelBlocks.contains { $0.kind == "tabGroupBlock" }
         let exportExecution = DashboardRuntime.dashboardReportRuntimeExportExecution(container)
@@ -1250,6 +1253,10 @@ public struct DashboardRenderer: View {
         _ sections: [ReportRuntimeFlatSection],
         selectionKey: String
     ) -> some View {
+        let sections = sections.filter { section in
+            guard let header = section.blocks.first(where: { $0.kind == "sectionBlock" }) else { return true }
+            return DashboardRuntime.dashboardReportRuntimeBlockVisible(header, metrics: reportRuntimeBlockMetrics(header), filters: dashboardFilters.mapValues(dashboardJSONAny), selection: dashboardSelection)
+        }
         let selectedID = reportRuntimeTabSelections[selectionKey]
             .flatMap { candidate in sections.contains(where: { $0.id == candidate }) ? candidate : nil }
             ?? sections.first?.id
@@ -1345,9 +1352,12 @@ public struct DashboardRenderer: View {
     ) -> some View {
         let blockByID = Dictionary(uniqueKeysWithValues: blocks.map { ($0.id, $0) })
         let sectionIDs = reportRuntimeReferenceIDs(tabGroup.content, keys: ["sectionIds", "sections"])
-        let sections = sectionIDs.compactMap { blockByID[$0] }
+        let sections = sectionIDs.compactMap { blockByID[$0] }.filter {
+            DashboardRuntime.dashboardReportRuntimeBlockVisible($0, metrics: reportRuntimeBlockMetrics($0), filters: dashboardFilters.mapValues(dashboardJSONAny), selection: dashboardSelection)
+        }
         let selectedID = reportRuntimeTabSelections[tabGroup.id]
             .flatMap { selected in sections.contains(where: { $0.id == selected }) ? selected : nil }
+            ?? sections.first(where: { $0.id == tabGroup.content["defaultSectionId"]?.stringValue })?.id
             ?? sections.first?.id
 
         if sections.isEmpty {
@@ -1404,11 +1414,11 @@ public struct DashboardRenderer: View {
             section.content,
             keys: ["childBlockIds", "blockIds", "children"]
         ).compactMap { blockByID[$0] }
-        if !explicit.isEmpty { return explicit }
+        if !explicit.isEmpty { return explicit.filter { $0.compositeParentID == nil } }
         guard let index = blocks.firstIndex(where: { $0.id == section.id }) else { return [] }
         return Array(blocks.dropFirst(index + 1).prefix {
             $0.kind != "sectionBlock" && $0.kind != "tabGroupBlock"
-        })
+        }).filter { $0.compositeParentID == nil }
     }
 
     private func reportRuntimeReferenceIDs(
@@ -1437,7 +1447,9 @@ public struct DashboardRenderer: View {
 
     @ViewBuilder
     private func reportRuntimeAuthoredBlockBody(_ block: DashboardReportRuntimeBlockSummary) -> some View {
-        if block.kind == "markdownBlock", let markdown = block.markdown {
+        if block.kind == "compositeBlock" {
+            reportRuntimeComposite(block)
+        } else if block.kind == "markdownBlock", let markdown = block.markdown {
             VStack(alignment: .leading, spacing: 6) {
                 if !block.title.isEmpty {
                     Text(block.title)
@@ -1484,8 +1496,18 @@ public struct DashboardRenderer: View {
         } else if block.kind == "refinementBarBlock", let refinementBar = block.refinementBar {
             reportRuntimeRefinementBarPreview(refinementBar)
         } else if block.kind == "tableBlock", let table = block.table {
-            reportRuntimeTablePreview(block: block, table: table)
-                .accessibilityIdentifier("forge-report-runtime-table-\(block.id)")
+            let collapsible = block.content["collapsible"] == .bool(true)
+            let defaultCollapsed = block.content["defaultCollapsed"] == .bool(true)
+            let collapsed = collapsible && (reportRuntimeCollapsedTables[block.id] ?? defaultCollapsed)
+            VStack(alignment: .leading, spacing: 8) {
+                if collapsible {
+                    Button(collapsed ? "Expand \(block.title)" : "Collapse \(block.title)") { reportRuntimeCollapsedTables[block.id] = !collapsed }
+                        .accessibilityValue(collapsed ? "Collapsed" : "Expanded")
+                }
+                if !collapsed { reportRuntimeTablePreview(block: block, table: table) }
+            }
+            .onChange(of: defaultCollapsed) { reportRuntimeCollapsedTables[block.id] = defaultCollapsed }
+            .accessibilityIdentifier("forge-report-runtime-table-\(block.id)")
         } else if block.kind == "chartBlock", let chart = block.chart {
             ChartRenderer(
                 runtime: runtime,
@@ -1519,6 +1541,17 @@ public struct DashboardRenderer: View {
                     .foregroundStyle(.primary)
             }
         }
+    }
+
+    private func reportRuntimeComposite(_ block: DashboardReportRuntimeBlockSummary) -> AnyView {
+        AnyView(VStack(alignment: .leading, spacing: 12) {
+            reportRuntimePresentationBlock(block)
+            ForEach(block.children) { child in
+                if DashboardRuntime.dashboardReportRuntimeBlockVisible(child, metrics: reportRuntimeBlockMetrics(child), filters: dashboardFilters.mapValues(dashboardJSONAny), selection: dashboardSelection) {
+                    reportRuntimeAuthoredBlock(child)
+                }
+            }
+        }.padding(12).background(Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 12)))
     }
 
     private static let reportRuntimePresentationKinds: Set<String> = [
@@ -1693,7 +1726,7 @@ public struct DashboardRenderer: View {
         block: DashboardReportRuntimeBlockSummary,
         table: DashboardReportRuntimeTableValue
     ) -> some View {
-        let rows = table.rows.prefix(6).enumerated().map { ($0.offset, $0.element) }
+        let rows = table.rows.enumerated().map { ($0.offset, $0.element) }
         let rowActions = rows.compactMap { index, row -> (Int, String, [DashboardReportRuntimeActionExecution])? in
             let executions = reportRuntimeTableActionExecutions(block: block, table: table, row: row)
             guard !executions.isEmpty else { return nil }
@@ -1705,7 +1738,7 @@ public struct DashboardRenderer: View {
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
-                ForEach(rowActions, id: \.0) { _, label, executions in
+                ForEach(Array(rowActions.prefix(reportRuntimeActionRowLimits[block.id] ?? 6)), id: \.0) { _, label, executions in
                     HStack(spacing: 8) {
                         Text(label)
                             .font(.caption)
@@ -1732,6 +1765,9 @@ public struct DashboardRenderer: View {
                         RoundedRectangle(cornerRadius: 10)
                             .stroke(Color.black.opacity(0.05), lineWidth: 1)
                     )
+                }
+                if rowActions.count > (reportRuntimeActionRowLimits[block.id] ?? 6) {
+                    Button("Show more row actions") { reportRuntimeActionRowLimits[block.id] = (reportRuntimeActionRowLimits[block.id] ?? 6) + 6 }
                 }
             }
         }

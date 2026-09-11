@@ -1,0 +1,452 @@
+{
+  "scope": "Historical audit with current backfill status. Native implementation paths exist for all catalog widgets; device UI validation remains separate.",
+  "primitiveCount": 22,
+  "blueprintWidgetCount": 31,
+  "primitives": [
+    {
+      "primitive": "editableCollection",
+      "ios": "implemented; see backfill validation",
+      "android": "implemented; see backfill validation",
+      "note": "Audited contract gap repaired; device/host integration proof remains separate.",
+      "webSource": "src/components/primitives/EditableCollection.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/WorkflowPresentationPrimitives.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/WorkflowPresentationPrimitives.kt",
+      "previousNote": "iOS standalone selection/form observation gap; native action UI differs."
+    },
+    {
+      "primitive": "assignmentPicker",
+      "ios": "paired",
+      "android": "paired",
+      "note": "Dedicated native dual-list renderers; live writer/readback parity still needs host proof.",
+      "webSource": "src/components/primitives/AssignmentPicker.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/AssignmentPickerRenderer.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/AssignmentPickerRenderer.kt"
+    },
+    {
+      "primitive": "mutationCommand",
+      "ios": "paired",
+      "android": "paired",
+      "note": "Shared executor implementations and targeted lifecycle/guard tests exist.",
+      "webSource": "src/components/primitives/MutationCommand.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/WorkflowPresentationPrimitives.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/WorkflowPresentationPrimitives.kt"
+    },
+    {
+      "primitive": "statusWorkflow",
+      "ios": "implemented; see backfill validation",
+      "android": "implemented; see backfill validation",
+      "note": "Audited contract gap repaired; device/host integration proof remains separate.",
+      "webSource": "src/components/primitives/StatusWorkflow.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/WorkflowPresentationPrimitives.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/WorkflowPresentationPrimitives.kt",
+      "previousNote": "iOS standalone state subscription gap can affect current state and transitions."
+    },
+    {
+      "primitive": "treeEditor",
+      "ios": "paired",
+      "android": "paired",
+      "note": "Dedicated renderers and shared hierarchy/selection model behavior.",
+      "webSource": "src/components/primitives/TreeEditor.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/TreeEditorRenderer.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/TreeEditorRenderer.kt"
+    },
+    {
+      "primitive": "wizard",
+      "ios": "paired",
+      "android": "paired",
+      "note": "Dedicated step/validation/submit renderers; device focus/mount parity unproven.",
+      "webSource": "src/components/primitives/Wizard.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/WorkflowWizardRenderer.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/WorkflowWizardRenderer.kt"
+    },
+    {
+      "primitive": "uploadCollection",
+      "ios": "paired",
+      "android": "paired",
+      "note": "Dedicated upload validation and byte/MCP-blob paths.",
+      "webSource": "src/components/primitives/UploadCollection.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/UploadCollectionRenderer.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/UploadCollectionRenderer.kt"
+    },
+    {
+      "primitive": "derivedDataSource",
+      "ios": "paired",
+      "android": "paired",
+      "note": "Dedicated bounded pipeline runtimes; targeted native model tests exist.",
+      "webSource": "src/components/primitives/DerivedDataSource.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/DerivedDataSourceRenderer.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/DerivedDataSourceRenderer.kt"
+    },
+    {
+      "primitive": "permissionBoundary",
+      "ios": "paired",
+      "android": "paired",
+      "note": "Fail-closed boundary logic exists; host capability contracts remain authoritative.",
+      "webSource": "src/components/primitives/PermissionBoundary.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/ContainerRenderer.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/ContainerRenderer.kt"
+    },
+    {
+      "primitive": "responsiveDataGrid",
+      "ios": "paired",
+      "android": "paired",
+      "note": "Breakpoint metadata lowers into native tables; visual sticky/card parity is not established.",
+      "webSource": "src/components/primitives/ResponsiveDataGrid.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/ContainerRenderer.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/ContainerRenderer.kt"
+    },
+    {
+      "primitive": "historyDiff",
+      "ios": "implemented; see backfill validation",
+      "android": "implemented; see backfill validation",
+      "note": "Audited contract gap repaired; device/host integration proof remains separate.",
+      "webSource": "src/components/primitives/HistoryDiff.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/WorkflowPresentationPrimitives.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/WorkflowPresentationPrimitives.kt",
+      "previousNote": "Nested diff/redaction models exist; per-primitive datasource context is not independently resolved."
+    },
+    {
+      "primitive": "scheduleEditor",
+      "ios": "paired",
+      "android": "paired",
+      "note": "Dedicated editors with timezone/range/overlap validation paths.",
+      "webSource": "src/components/primitives/ScheduleEditor.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/ScheduleEditorRenderer.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/ScheduleEditorRenderer.kt"
+    },
+    {
+      "primitive": "draftForm",
+      "ios": "implemented; see backfill validation",
+      "android": "implemented; see backfill validation",
+      "note": "Audited contract gap repaired; device/host integration proof remains separate.",
+      "webSource": "src/components/primitives/DraftForm.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/WorkflowPresentationPrimitives.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/WorkflowPresentationPrimitives.kt",
+      "previousNote": "Payload keys, baseline lifecycle, and source context diverge; iOS also lacks standalone observation."
+    },
+    {
+      "primitive": "queryToolbar",
+      "ios": "implemented; see backfill validation",
+      "android": "implemented; see backfill validation",
+      "note": "Audited contract gap repaired; device/host integration proof remains separate.",
+      "webSource": "src/components/primitives/QueryToolbar.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/WorkflowPresentationPrimitives.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/WorkflowPresentationPrimitives.kt",
+      "previousNote": "Items render through native forms; spec.dataSourceRef and web TableToolbar semantics are not equivalent."
+    },
+    {
+      "primitive": "stableTabs",
+      "ios": "implemented; see backfill validation",
+      "android": "implemented; see backfill validation",
+      "note": "Audited contract gap repaired; device/host integration proof remains separate.",
+      "webSource": "src/components/Container.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/TabsRenderer.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/TabsRenderer.kt",
+      "previousNote": "Adapter copies default selection/appearance; full persistence/mount-policy/pruning contract is not implemented."
+    },
+    {
+      "primitive": "resourceHeader",
+      "ios": "implemented; see backfill validation",
+      "android": "implemented; see backfill validation",
+      "note": "Audited contract gap repaired; device/host integration proof remains separate.",
+      "webSource": "src/components/primitives/ResourceHeader.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/WorkflowPresentationPrimitives.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/WorkflowPresentationPrimitives.kt",
+      "previousNote": "Payload uses resource instead of record; mutation disabledWhen omitted; source-context gaps."
+    },
+    {
+      "primitive": "dataStateBoundary",
+      "ios": "paired",
+      "android": "paired",
+      "note": "Dedicated loaded/empty/error/stale branches and model tests.",
+      "webSource": "src/components/primitives/DataStateBoundary.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/ContainerRenderer.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/ContainerRenderer.kt"
+    },
+    {
+      "primitive": "relationDrill",
+      "ios": "paired",
+      "android": "paired",
+      "note": "Native relation actions and source-context paths exist; live host actions need proof.",
+      "webSource": "src/components/primitives/RelationDrill.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/WorkflowPresentationPrimitives.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/WorkflowPresentationPrimitives.kt"
+    },
+    {
+      "primitive": "notificationRules",
+      "ios": "paired",
+      "android": "paired",
+      "note": "Native visibility/action/disabled handling exists; composite context limitations still apply.",
+      "webSource": "src/components/primitives/NotificationRules.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/WorkflowPresentationPrimitives.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/WorkflowPresentationPrimitives.kt"
+    },
+    {
+      "primitive": "metricSummary",
+      "ios": "paired",
+      "android": "paired",
+      "note": "Native metric/comparison rendering and dedicated datasource selection exist.",
+      "webSource": "src/components/primitives/MetricSummary.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/WorkflowPresentationPrimitives.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/WorkflowPresentationPrimitives.kt"
+    },
+    {
+      "primitive": "detailView",
+      "ios": "paired",
+      "android": "paired",
+      "note": "Native fields/sections/source selection exist; device formatting/layout proof remains.",
+      "webSource": "src/components/primitives/DetailView.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/WorkflowPresentationPrimitives.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/WorkflowPresentationPrimitives.kt"
+    },
+    {
+      "primitive": "masterDetail",
+      "ios": "paired",
+      "android": "paired",
+      "note": "Dedicated native master/detail and identity/binding models.",
+      "webSource": "src/components/primitives/MasterDetail.jsx",
+      "iosSource": "ios/Sources/ForgeIOSUI/MasterDetailRenderer.swift",
+      "androidSource": "android/sdk/src/main/java/com/viant/forgeandroid/ui/MasterDetailRenderer.kt"
+    }
+  ],
+  "widgets": [
+    {
+      "widget": "text",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "direct",
+      "previousAndroid": "direct"
+    },
+    {
+      "widget": "password",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "no secure item editor",
+      "previousAndroid": "no masked item editor"
+    },
+    {
+      "widget": "file",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "separate uploadCollection primitive only",
+      "previousAndroid": "separate uploadCollection primitive only"
+    },
+    {
+      "widget": "object",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "schema-form JSON editor; ordinary item fallback",
+      "previousAndroid": "JSON item branch"
+    },
+    {
+      "widget": "number",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "string-backed editor",
+      "previousAndroid": "string-backed generic editor"
+    },
+    {
+      "widget": "textarea",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "direct",
+      "previousAndroid": "direct"
+    },
+    {
+      "widget": "schema",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "schema-form JSON editor; ordinary item fallback",
+      "previousAndroid": "JSON item branch"
+    },
+    {
+      "widget": "checkbox",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "direct",
+      "previousAndroid": "direct"
+    },
+    {
+      "widget": "toggle",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "direct",
+      "previousAndroid": "direct"
+    },
+    {
+      "widget": "switch",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "fallback label",
+      "previousAndroid": "fallback text"
+    },
+    {
+      "widget": "booleanPill",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "schema boolean lowering only",
+      "previousAndroid": "schema toggle lowering only"
+    },
+    {
+      "widget": "chipList",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "no dedicated same-key widget",
+      "previousAndroid": "no dedicated same-key widget"
+    },
+    {
+      "widget": "select",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "direct",
+      "previousAndroid": "direct"
+    },
+    {
+      "widget": "multiSelect",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "direct",
+      "previousAndroid": "direct"
+    },
+    {
+      "widget": "link",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "direct",
+      "previousAndroid": "no dedicated FormItemRenderer link branch"
+    },
+    {
+      "widget": "currency",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "fallback label",
+      "previousAndroid": "generic text; no currency contract"
+    },
+    {
+      "widget": "mediaPreview",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "no dedicated same-key widget",
+      "previousAndroid": "no dedicated same-key widget"
+    },
+    {
+      "widget": "percentFraction2Input",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "no dedicated same-key widget",
+      "previousAndroid": "no dedicated same-key widget"
+    },
+    {
+      "widget": "dateRange",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "schema-form date-range only",
+      "previousAndroid": "direct date-range branch"
+    },
+    {
+      "widget": "dateRangePreset",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "no dedicated same-key widget",
+      "previousAndroid": "no dedicated same-key widget"
+    },
+    {
+      "widget": "radio",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "option-group path",
+      "previousAndroid": "direct"
+    },
+    {
+      "widget": "treeMultiSelect",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "no same-key widget; treeEditor/tree lookup alternative",
+      "previousAndroid": "no same-key widget; treeEditor/tree lookup alternative"
+    },
+    {
+      "widget": "progressBar",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "no dedicated same-key widget",
+      "previousAndroid": "no dedicated same-key widget"
+    },
+    {
+      "widget": "button",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "no dedicated same-key widget",
+      "previousAndroid": "no dedicated same-key widget"
+    },
+    {
+      "widget": "label",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "direct",
+      "previousAndroid": "direct"
+    },
+    {
+      "widget": "math",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "no same-key widget",
+      "previousAndroid": "generic text fallback"
+    },
+    {
+      "widget": "keyValuePairs",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "no dedicated same-key widget",
+      "previousAndroid": "no dedicated same-key widget"
+    },
+    {
+      "widget": "markdown",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "direct",
+      "previousAndroid": "direct"
+    },
+    {
+      "widget": "document",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "no dedicated same-key widget",
+      "previousAndroid": "no dedicated same-key widget"
+    },
+    {
+      "widget": "date",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "no dedicated item date widget",
+      "previousAndroid": "no dedicated item date widget"
+    },
+    {
+      "widget": "datetime",
+      "ios": "implemented: native widget dispatch",
+      "android": "implemented: native widget dispatch",
+      "previousIos": "no dedicated item datetime widget",
+      "previousAndroid": "no dedicated item datetime widget"
+    }
+  ],
+  "validation": {
+    "webWorkflowGate": "passed",
+    "iosWorkflowTests": {
+      "tests": 18,
+      "failures": 0
+    },
+    "androidSelectedTests": {
+      "tests": 39,
+      "failures": 0
+    },
+    "limitations": "Existing tests do not exercise the identified cross-platform UI event/payload mismatches."
+  },
+  "backfillDocument": "doc/native-widget-backfill.md",
+  "backfillValidation": {
+    "iosTests": 311,
+    "androidTests": 335,
+    "failures": 0,
+    "sharedWidgetFixtures": "passed",
+    "webWorkflowGate": "passed",
+    "deviceUISmoke": "not run"
+  }
+}
