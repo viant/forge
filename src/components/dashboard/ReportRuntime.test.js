@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { WorkspacePresentationProvider } from "../../core/context/WorkspacePresentation.jsx";
 
 import ReportRuntime, {
   buildRuntimeSections,
@@ -176,6 +177,7 @@ const html = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
     reportSpec,
     reportFill,
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
     subtitle: "Compiled authored report runtime surface.",
   }),
@@ -292,6 +294,7 @@ const hiddenContextSummaryHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
     reportSpec,
     reportFill,
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
     subtitle: "Compiled authored report runtime surface.",
     showContextSummary: false,
@@ -1087,6 +1090,7 @@ const bindingOnlyHtml = renderToStaticMarkup(
       datasets: [],
       blocks: [],
     },
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
   }),
 );
@@ -1133,6 +1137,7 @@ const emptySummaryBindingFallbackHtml = renderToStaticMarkup(
       datasets: [],
       blocks: [],
     },
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
   }),
 );
@@ -1182,6 +1187,7 @@ const mixedSummaryBindingFallbackHtml = renderToStaticMarkup(
       datasets: [],
       blocks: [],
     },
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
   }),
 );
@@ -1232,6 +1238,7 @@ const mixedMeasureSummaryBindingFallbackHtml = renderToStaticMarkup(
       datasets: [],
       blocks: [],
     },
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
   }),
 );
@@ -1264,6 +1271,7 @@ const overflowBindingHtml = renderToStaticMarkup(
       datasets: [],
       blocks: [],
     },
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
   }),
 );
@@ -1336,6 +1344,7 @@ const overflowSemanticSummaryHtml = renderToStaticMarkup(
       datasets: [],
       blocks: [],
     },
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
   }),
 );
@@ -1422,6 +1431,7 @@ const overflowSemanticSummaryPlusTwoHtml = renderToStaticMarkup(
       datasets: [],
       blocks: [],
     },
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
   }),
 );
@@ -1489,6 +1499,7 @@ const scopeFilterHtml = renderToStaticMarkup(
         },
       ],
     },
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
   }),
 );
@@ -1581,6 +1592,7 @@ const editableScopeFilterHtml = renderToStaticMarkup(
       toggleScopeParamOption() {},
       setScopeParamDate() {},
     },
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
   }),
 );
@@ -1639,6 +1651,7 @@ const scopedEditableFilterHtml = renderToStaticMarkup(
     runtimeHandlers: {
       toggleScopeParamOption() {},
     },
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
   }),
 );
@@ -1701,6 +1714,7 @@ const scopeFilterWithActiveDrillHtml = renderToStaticMarkup(
         },
       ],
     },
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
   }),
 );
@@ -1779,6 +1793,7 @@ const scopeFilterWithDedicatedRefinementBarHtml = renderToStaticMarkup(
         },
       ],
     },
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
   }),
 );
@@ -1827,6 +1842,7 @@ const scopeFilterWithDedicatedRefinementBarAndAuthoredDrillLabelHtml = renderToS
         },
       ],
     },
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
   }),
 );
@@ -1864,6 +1880,7 @@ const scopeFilterWithoutActiveRefinementsHtml = renderToStaticMarkup(
         },
       ],
     },
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
   }),
 );
@@ -1902,6 +1919,7 @@ const emptyRuntimeHtml = renderToStaticMarkup(
         },
       ],
     },
+    defaultContextSummaryOpen: true,
     title: "Runtime Preview",
   }),
 );
@@ -3145,7 +3163,7 @@ assert.ok(!authoredReportHtml.includes("Semantic Binding"));
 assert.ok(!authoredReportHtml.includes("Governed model and field selections compiled into this runtime artifact."));
 assert.ok(!authoredReportHtml.includes("Chart actions are unavailable because this runtime preview is read-only."));
 assert.ok(!authoredReportHtml.includes('aria-label="Chart series selector"'));
-assert.ok(authoredReportHtml.includes("Filters"));
+assert.ok(!authoredReportHtml.includes("Report metadata"));
 assert.ok(!authoredReportHtml.includes("Baseline filters authored for this report. Live keep, exclude, and drill changes appear in Active refinements."));
 
 const sectionTabsRuntimeHtml = renderToStaticMarkup(
@@ -3357,6 +3375,7 @@ assert.ok(calloutRuntimeHtml.includes("Publisher activation is staged for Friday
 
 const documentBackedRuntimeHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
+    defaultContextSummaryOpen: true,
     reportSpec: {
       title: "Thin Runtime Spec",
       layoutIntent: {
@@ -3474,3 +3493,67 @@ const hiddenCompositeHtml = renderToStaticMarkup(React.createElement(ReportRunti
 }));
 assert.doesNotMatch(hiddenCompositeHtml, /Composite child must stay hidden/);
 assert.match(hiddenCompositeHtml, /Public content remains visible/);
+
+// Merge regression: workspace presentation and the metadata disclosure must coexist.
+const collapsedMetadataHtml = renderToStaticMarkup(React.createElement(ReportRuntime, {
+  reportSpec, reportFill, title: "Metadata-only report title",
+}));
+assert.match(collapsedMetadataHtml, /Show report metadata/);
+assert.match(collapsedMetadataHtml, /aria-expanded="false"/);
+assert.doesNotMatch(collapsedMetadataHtml, /Metadata-only report title|Semantic Binding/);
+const expandedWorkspaceHtml = renderToStaticMarkup(React.createElement(WorkspacePresentationProvider, {
+  value: { label: "Runtime Preview" },
+}, React.createElement(ReportRuntime, {
+  reportSpec, reportFill, title: "Runtime Preview", defaultContextSummaryOpen: true,
+})));
+assert.match(expandedWorkspaceHtml, /Hide report metadata/);
+assert.match(expandedWorkspaceHtml, /Semantic Binding/);
+assert.doesNotMatch(expandedWorkspaceHtml, /<h3[^>]*>Runtime Preview<\/h3>/);
+
+const mergedSections = [
+  { id: "overview", kind: "sectionBlock", title: "Overview", navigationLabel: "Overview" },
+  { id: "body", kind: "markdownBlock", title: "Overview", content: { markdown: "Visible section body" } },
+  { id: "details", kind: "sectionBlock", title: "Details" },
+  { id: "detailsBody", kind: "markdownBlock", content: { markdown: "Other section body" } },
+];
+const renderMergedSections = (blocks, headerActions = null) => renderToStaticMarkup(
+  React.createElement(WorkspacePresentationProvider, { value: { label: "Workspace" } },
+    React.createElement(ReportRuntime, {
+      reportSpec: { blocks }, reportFill: { blocks },
+      presentationMode: "report", headerActions,
+    }),
+  ),
+);
+const mergedSectionsHtml = renderMergedSections(mergedSections);
+assert.match(mergedSectionsHtml, /Visible section body/);
+assert.match(mergedSectionsHtml, /aria-label="Report sections"/);
+assert.doesNotMatch(mergedSectionsHtml, /<h3[^>]*>Overview<\/h3>/);
+assert.doesNotMatch(mergedSectionsHtml, /forge-report-runtime-section-panel/);
+const sectionDetailsHtml = renderMergedSections([
+  { ...mergedSections[0], subtitle: "Operational context", description: "Keep this description" },
+  ...mergedSections.slice(1),
+]);
+assert.match(sectionDetailsHtml, /Operational context/);
+assert.match(sectionDetailsHtml, /Keep this description/);
+const sectionActionHtml = renderMergedSections(mergedSections, new Map([
+  ["overview", React.createElement("button", { type: "button" }, "Section action")],
+]));
+assert.match(sectionActionHtml, /Section action/);
+assert.doesNotMatch(sectionActionHtml, /<h3[^>]*>Overview<\/h3>/);
+
+const renderConditionalRuntime = (conditionValues, scope) => renderToStaticMarkup(React.createElement(ReportRuntime, {
+  reportSpec: { blocks: hiddenCompositeBlocks, scope },
+  reportFill: { blocks: hiddenCompositeBlocks }, conditionValues,
+}));
+assert.match(renderConditionalRuntime({ showDetails: true }), /Composite child must stay hidden/);
+assert.doesNotMatch(renderConditionalRuntime({ showDetails: false }), /Composite child must stay hidden/);
+assert.doesNotMatch(renderConditionalRuntime({ showDetails: true }, {
+  params: [{ id: "showDetails", value: false }],
+}), /Composite child must stay hidden/);
+console.log("ReportRuntime ✓ preserves metadata disclosure, workspace titles, section details/actions, and option visibility after merge");
+
+const distinctSectionTitleHtml = renderMergedSections([
+  { ...mergedSections[0], title: "Regional utilization" },
+  ...mergedSections.slice(1),
+]);
+assert.match(distinctSectionTitleHtml, /Regional utilization/);
