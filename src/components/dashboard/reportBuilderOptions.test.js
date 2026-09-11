@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+  partitionReportBuilderOptions,
   buildReportBuilderFilterToolbarModel,
   countModifiedReportBuilderOptions,
   isDemandSideReportOptionName,
@@ -107,3 +108,25 @@ const runtimePreview = buildReportBuilderRuntimePreview({ model: runtimeModel, r
 assert.deepEqual(runtimePreview.exportRequest?.reportSpec?.datasets?.find((entry) => entry.id === "primary")?.request?.options, changedOptions, "export request retains effective options");
 
 console.log("reportBuilderOptions ✓ defaults, validation, refresh identity, persistence, backend refetch, and compatibility");
+
+const contextual = normalizeReportBuilderOptionDefinitions([{
+  name: "exposurePerspective", label: "First vs. Last Exposure", type: "string",
+  default: "Last", values: ["First", "Last"],
+  presentation: { anchorBlockId: " mtaExposureComparison ", placement: "header", left: 10 },
+}]);
+assert.deepEqual(contextual[0].presentation, { anchorBlockId: "mtaExposureComparison", placement: "header" });
+assert.deepEqual(normalizeReportBuilderOptionDefinitions(contextual), contextual);
+for (const presentation of [{ placement: "header" }, { anchorBlockId: "x", placement: "floating" }, { anchorBlockId: 42, placement: "header" }]) {
+  const [option] = normalizeReportBuilderOptionDefinitions([{ ...contextual[0], presentation }]);
+  assert.equal(option.presentation, undefined);
+  assert.equal(option.default, "Last");
+}
+assert.deepEqual(partitionReportBuilderOptions(contextual).rail, contextual, "missing, hidden, unsupported or not-yet-mounted headers fall back to rail");
+assert.deepEqual(partitionReportBuilderOptions(contextual, { mtaExposureComparison: 1 }).rail, []);
+assert.deepEqual(partitionReportBuilderOptions(contextual, { mtaExposureComparison: 0 }).rail, contextual, "unmounted headers restore rail controls");
+const phone = partitionReportBuilderOptions(contextual, { mtaExposureComparison: 1 }, true);
+assert.deepEqual(phone.rail, contextual);
+assert.equal(phone.headers.size, 0);
+assert.deepEqual(resolveEffectiveReportBuilderOptions(contextual, { exposurePerspective: "First" }), { exposurePerspective: "First" });
+
+assert.deepEqual(runtimePreview.exportRequest.metadata.reportOptions, config.reportOptions);

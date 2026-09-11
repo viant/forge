@@ -53,6 +53,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -2491,8 +2492,8 @@ private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowCon
         .mapNotNull(blockById::get)
         .flatMap { reportRuntimeSectionChildren(it, summary.blocks).map(DashboardReportRuntimeBlockSummary::id) }
     val nestedBlockIds = (tabSectionIds + tabChildIds).toSet()
-    var selectedTabs by remember(summary.blocks) { mutableStateOf(emptyMap<String, String>()) }
-    var selectedMobileSection by remember(summary.blocks) { mutableStateOf<String?>(null) }
+    var selectedTabs by remember(window.windowId, container.id) { mutableStateOf(emptyMap<String, String>()) }
+    var selectedMobileSection by remember(window.windowId, container.id) { mutableStateOf<String?>(null) }
     var pdfExporting by remember(window.windowId, container.id) { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -2585,7 +2586,8 @@ private fun DashboardReportRuntimeBlock(runtime: ForgeRuntime, window: WindowCon
         }
         // Diagnostics describe authoring/schema repair work. Keep them in the
         // runtime model, but do not expose codes or paths to viewers.
-        val topLevelBlocks = summary.blocks.filterNot { it.id in nestedBlockIds }
+        val strictTabs = summary.blocks.firstOrNull { it.kind == "tabGroupBlock" && it.content["includeUnlistedSections"] == JsonPrimitive(false) }
+        val topLevelBlocks = summary.blocks.filterNot { it.id in nestedBlockIds || it.compositeParentId != null || (strictTabs != null && it.id != strictTabs.id) }
         val mobileSections = reportRuntimeMobileSections(topLevelBlocks)
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             if (mobileSections.size > 1 && topLevelBlocks.none { it.kind == "tabGroupBlock" }) {
@@ -2635,13 +2637,15 @@ internal fun DashboardReportRuntimeSurface(
     container: ContainerDef,
     dashboardRoot: ContainerDef
 ) {
+    val filters by window.dashboardFilterSignal(dashboardRoot).flow.collectAsState(initial = emptyMap())
+    val selection by window.dashboardSelectionSignal(dashboardRoot).flow.collectAsState(initial = DashboardSelectionState())
     DashboardReportRuntimeBlock(
         runtime = runtime,
         window = window,
         container = container,
         dashboardRoot = dashboardRoot,
-        filters = emptyMap(),
-        selection = DashboardSelectionState()
+        filters = filters,
+        selection = selection
     )
 }
 
@@ -2685,10 +2689,14 @@ private fun DashboardReportRuntimeMobileSectionTabs(
     filters: Map<String, Any?>,
     selection: DashboardSelectionState
 ) {
-    val selectedSection = sections.firstOrNull { it.id == selectedId } ?: sections.first()
+    val visibleSections = sections.filter { section ->
+        val header = section.blocks.firstOrNull { it.kind == "sectionBlock" }
+        header == null || dashboardReportRuntimeBlockVisible(header, (header.table?.rows?.firstOrNull() ?: header.chart?.rows?.firstOrNull()).orEmpty(), filters, selection)
+    }
+    val selectedSection = visibleSections.firstOrNull { it.id == selectedId } ?: visibleSections.firstOrNull() ?: return
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val entries = sections.map { it.id to it.title }
+            val entries = visibleSections.map { it.id to it.title }
             if (maxWidth < 600.dp) {
                 CompactReportSectionPicker(entries, selectedSection.id, onSelect)
             } else {
@@ -2725,7 +2733,8 @@ private fun DashboardReportRuntimeTabGroup(
     val blockById = blocks.associateBy { it.id }
     val sections = reportRuntimeReferenceIds(tabGroup.content, "sectionIds", "sections")
         .mapNotNull(blockById::get)
-    val selectedSection = sections.firstOrNull { it.id == selectedId } ?: sections.firstOrNull()
+        .filter { dashboardReportRuntimeBlockVisible(it, (it.table?.rows?.firstOrNull() ?: it.chart?.rows?.firstOrNull()).orEmpty(), filters, selection) }
+    val selectedSection = sections.firstOrNull { it.id == selectedId } ?: sections.firstOrNull { it.id == (tabGroup.content["defaultSectionId"] as? JsonPrimitive)?.content } ?: sections.firstOrNull()
     if (selectedSection == null) {
         DashboardReportRuntimeAuthoredBlock(runtime, window, dashboardRoot, tabGroup)
         return
@@ -2766,13 +2775,13 @@ internal fun reportRuntimeSectionChildren(
         "blockIds",
         "children"
     ).mapNotNull(blockById::get)
-    if (explicit.isNotEmpty()) return explicit
+    if (explicit.isNotEmpty()) return explicit.filter { it.compositeParentId == null }
 
     val sectionIndex = blocks.indexOfFirst { it.id == section.id }
     if (sectionIndex < 0) return emptyList()
     return blocks.drop(sectionIndex + 1).takeWhile { candidate ->
         candidate.kind != "sectionBlock" && candidate.kind != "tabGroupBlock"
-    }
+    }.filter { it.compositeParentId == null }
 }
 
 @Composable
@@ -2854,6 +2863,14 @@ private fun DashboardReportRuntimeAuthoredBlock(runtime: ForgeRuntime, window: W
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         DashboardReportRuntimeAuthoredBlockBody(runtime, window, dashboardRoot, block)
+        if (block.kind == "compositeBlock") {
+            val filters by window.dashboardFilterSignal(dashboardRoot).flow.collectAsState(initial = emptyMap())
+            val selection by window.dashboardSelectionSignal(dashboardRoot).flow.collectAsState(initial = DashboardSelectionState())
+            block.children.forEach { child ->
+                val metrics = (child.table?.rows?.firstOrNull() ?: child.chart?.rows?.firstOrNull()).orEmpty()
+                if (dashboardReportRuntimeBlockVisible(child, metrics, filters, selection)) DashboardReportRuntimeAuthoredBlock(runtime, window, dashboardRoot, child)
+            }
+        }
     }
 }
 
@@ -3344,6 +3361,13 @@ private fun DashboardReportRuntimeTablePreview(
     block: DashboardReportRuntimeBlockSummary
 ) {
     val table = block.table ?: return
+    val collapsible = block.content["collapsible"] == JsonPrimitive(true)
+    val defaultCollapsed = block.content["defaultCollapsed"] == JsonPrimitive(true)
+    var collapsed by remember(block.id, defaultCollapsed) { mutableStateOf(defaultCollapsed) }
+    if (collapsible) {
+        TextButton(onClick = { collapsed = !collapsed }) { Text(if (collapsed) "Expand ${block.title}" else "Collapse ${block.title}") }
+        if (collapsed) return
+    }
     if (table.columns.isEmpty()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -3543,7 +3567,8 @@ private fun DashboardReportRuntimeTableActionStrip(
     block: DashboardReportRuntimeBlockSummary,
     table: DashboardReportRuntimeTableValue
 ) {
-    val rowActions = table.rows.take(6).mapIndexedNotNull { index, row ->
+    var actionRowLimit by remember(block.id) { mutableStateOf(6) }
+    val rowActions = table.rows.mapIndexedNotNull { index, row ->
         val executions = dashboardReportRuntimeTableActionExecutions(block, table, row)
         if (executions.isEmpty()) {
             null
@@ -3564,7 +3589,7 @@ private fun DashboardReportRuntimeTableActionStrip(
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        rowActions.forEach { (_, label, executions) ->
+        rowActions.take(actionRowLimit).forEach { (_, label, executions) ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -3593,6 +3618,9 @@ private fun DashboardReportRuntimeTableActionStrip(
                     }
                 }
             }
+        }
+        if (rowActions.size > actionRowLimit) {
+            TextButton(onClick = { actionRowLimit += 6 }) { Text("Show more row actions") }
         }
     }
 }

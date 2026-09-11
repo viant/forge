@@ -391,6 +391,10 @@ fun ContainerRenderer(
             }
         }
 
+        if (container.stableTabs != null) {
+            StableTabsRenderer(runtime, window, container, inheritedDataSourceRef)
+            return@Column
+        }
         if ((container.tabs != null || container.stableTabs != null) && container.containers.isNotEmpty()) {
             val tabContainer = if (container.tabs != null) container else container.copy(
                 tabs = com.viant.forgeandroid.runtime.TabsDef(

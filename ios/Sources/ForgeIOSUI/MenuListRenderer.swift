@@ -145,32 +145,36 @@ public struct MenuListRenderer: View {
 
     @ViewBuilder
     private func renderedItem(_ item: ItemDef) -> some View {
-        if item.lookup != nil {
-            lookupInputItem(item)
-        } else if shouldRenderOptionGroup(item) {
-            optionGroupItem(item)
-        } else {
-            switch (item.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-            case "markdown":
-                markdownItem(item)
-            case "link":
-                linkItem(item)
-            case "button":
-                buttonItem(item)
-            case "select", "dropdown":
-                selectMenuItem(item)
-            case "text", "number":
-                editableTextItem(item)
-            case "textarea":
-                editableTextAreaItem(item)
-            case "checkbox", "toggle", "boolean":
-                editableToggleItem(item)
-            case "multiselect":
-                multiSelectOptionItem(item)
-            default:
-                labelItem(item)
+        Group {
+            if item.lookup != nil { lookupInputItem(item) }
+            else if NativeWidgetContract.kind(item) == "button" { buttonItem(item) }
+            else if NativeWidgetContract.kind(item) == "link", item.link != nil { linkItem(item) }
+            else if NativeWidgetContract.kind(item) == "label" { labelItem(item) }
+            else {
+                NativeWidgetView(item: item, value: resolvedItemValue(item) ?? NativeWidgetContract.initialValue(item), onChange: { value in
+                    if NativeWidgetContract.kind(item) == "daterangepreset", let runtime, let window,
+                       let patch = NativeDateRangePreset.patch(item: item, value: value, metrics: metricsValuesByDataSource[resolveItemDataSourceRef(item) ?? ""] ?? [:]) {
+                        Task {
+                            await runtime.setWindowFormValue(windowID: window.windowID, values: patch, bumpPrefillRevision: false)
+                            applyItemValue(value, for: item)
+                        }
+                    } else { applyItemValue(value, for: item) }
+                }, windowForm: windowFormValues, onDraftChange: { values in
+                    if let runtime, let window { Task { await runtime.setWindowFormValue(windowID: window.windowID, values: values, bumpPrefillRevision: false) } }
+                }, onCustomApply: { values in
+                    if let runtime, let window { Task {
+                        await runtime.setWindowFormValue(windowID: window.windowID, values: values, bumpPrefillRevision: false)
+                        applyItemValue(.string("custom"), for: item)
+                    } }
+                }, presetSyncKey: item.properties.signature + metricsValuesByDataSource.keys.sorted().map { $0 + (metricsValuesByDataSource[$0]?.signature ?? "") }.joined(), onPresetSync: { value in
+                    guard let runtime, let window, let patch = NativeDateRangePreset.patch(item: item, value: value, metrics: metricsValuesByDataSource[resolveItemDataSourceRef(item) ?? ""] ?? [:]) else { return }
+                    let start = item.properties["startField"]?.stringValue ?? "customDateStart", end = item.properties["endField"]?.stringValue ?? "customDateEnd"
+                    if windowFormValues[start] != patch[start] || windowFormValues[end] != patch[end] {
+                        Task { await runtime.setWindowFormValue(windowID: window.windowID, values: patch, bumpPrefillRevision: false) }
+                    }
+                })
             }
-        }
+        }.disabled(NativeWidgetContract.presentationDisabled(item))
     }
 
     @ViewBuilder
@@ -1024,8 +1028,7 @@ public struct MenuListRenderer: View {
 
     private var shouldUseSummaryGrid: Bool {
         visibleItems.count >= 2 && visibleItems.allSatisfy { item in
-            let type = (item.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            return (type.isEmpty || type == "label") && item.options.isEmpty
+            return NativeWidgetContract.kind(item) == "label" && item.options.isEmpty
         }
     }
 

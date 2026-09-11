@@ -86,7 +86,7 @@ func reportBuilderPublishedRequest(
     calendar: Calendar = .current
 ) -> [String: JSONValue] {
     var inherited: [String: JSONValue] = [:]
-    for key in ["filters", "refinements", "timeoutMs"] where primaryRequest[key] != nil {
+    for key in ["filters", "refinements", "timeoutMs", "options"] where primaryRequest[key] != nil {
         inherited[key] = primaryRequest[key]
     }
     let generated = reportBuilderPublishedFieldRequest(
@@ -325,7 +325,8 @@ struct ReportBuilderAuthoredResult: View {
                 dataSources: Dictionary(uniqueKeysWithValues: sources.map { id, rows in
                     (id, TranscriptCanonicalData(id: id, format: "json", payload: .array(rows)))
                 })
-            )
+            ),
+            reportOptions: config.reportOptions, optionValues: primaryRequest["options"]?.objectValue ?? [:]
         ) else { return nil }
         return artifact.metadata.view?.content?.containers.first
     }

@@ -75,7 +75,11 @@ export function normalizeReportBuilderOptionDefinitions(values = []) {
         && (allowedKeys.size === 0 || allowedKeys.has(valueKey(coercedDefault)))
         ? coercedDefault
         : undefined;
+      const presentation = entry.presentation;
+      const anchorBlockId = typeof presentation?.anchorBlockId === "string" ? presentation.anchorBlockId.trim() : "";
       return {
+        ...(anchorBlockId && presentation?.placement === "header"
+          ? { presentation: { anchorBlockId, placement: "header" } } : {}),
         name,
         label: normalizeString(entry.label) || name,
         type,
@@ -138,4 +142,20 @@ export function buildReportBuilderFilterToolbarModel({
 
 export function isDemandSideReportOptionName(name = "") {
   return isEntityOptionName(name);
+}
+
+// Anchor availability is resolved by mounted runtime headers, after the document
+// and its visibility/navigation state are known. Never discard the semantic option.
+export function partitionReportBuilderOptions(definitions = [], mountedHeaders = {}, compact = false) {
+  const headers = new Map();
+  const rail = [];
+  definitions.forEach((definition) => {
+    const anchor = definition.presentation?.placement === "header" ? definition.presentation.anchorBlockId : "";
+    if (!compact && anchor) {
+      if (!headers.has(anchor)) headers.set(anchor, []);
+      headers.get(anchor).push(definition);
+    }
+    if (compact || !anchor || !(Number.isInteger(mountedHeaders[anchor]) && mountedHeaders[anchor] > 0)) rail.push(definition);
+  });
+  return { headers, rail };
 }

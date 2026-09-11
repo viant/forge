@@ -28,10 +28,10 @@ data class InlineReportRuntimeArtifact(
  * The host application owns placement and datasource transport; report semantics stay here.
  */
 object InlineReportRuntimeCompiler {
-    fun exportFences(report: TranscriptCanonicalReport): List<JsonElement> {
+    fun exportFences(report: TranscriptCanonicalReport, reportOptions: List<JsonElement> = emptyList(), optionValues: Map<String, JsonElement> = emptyMap()): List<JsonElement> {
         val source = report.source as? JsonObject ?: error("Inline report source must be a JSON object.")
         val exportSource = if (report.grammar.trim().lowercase() == "dashboard-v1") {
-            source.toMutableMap().apply { put("blocks", compile(report).reportSpec["blocks"] ?: JsonArray(emptyList())) }
+            source.toMutableMap().apply { put("blocks", compile(report, includeExport = false).reportSpec["blocks"] ?: JsonArray(emptyList())) }
         } else source.toMutableMap()
         val exportGrammar = if (report.grammar.trim().lowercase() == "dashboard-v1") "report-document-v1" else report.grammar
         val exportScope = safeFenceSegment(string(source["scope"]) ?: report.scope, "message")
@@ -43,6 +43,12 @@ object InlineReportRuntimeCompiler {
             put("sequence", JsonPrimitive(sequence++))
             put("mode", JsonPrimitive("start"))
             put("grammar", JsonPrimitive(exportGrammar))
+        }
+        if (optionValues.isNotEmpty()) {
+            val metadata = (start["metadata"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
+            metadata["reportOptions"] = JsonArray(reportOptions)
+            metadata["options"] = JsonObject(optionValues)
+            start["metadata"] = JsonObject(metadata)
         }
         val fences = mutableListOf<JsonElement>(exportFence("forge-report", 0, JsonObject(start)))
         val emitted = mutableSetOf<String>()
@@ -124,7 +130,7 @@ object InlineReportRuntimeCompiler {
         }
     }
 
-    fun compile(report: TranscriptCanonicalReport): InlineReportRuntimeArtifact {
+    fun compile(report: TranscriptCanonicalReport, reportOptions: List<JsonElement> = emptyList(), optionValues: Map<String, JsonElement> = emptyMap(), includeExport: Boolean = true): InlineReportRuntimeArtifact {
         val status = report.status.trim().lowercase()
         require(status == "committed" || status == "ready") {
             "Inline report status '$status' cannot be rendered."
@@ -179,6 +185,9 @@ object InlineReportRuntimeCompiler {
             subtitle?.let { put("subtitle", JsonPrimitive(it)) }
             put("reportSpec", reportSpec)
             put("reportFill", reportFill)
+            put("reportPrint", JsonObject(mapOf("version" to JsonPrimitive(1), "kind" to JsonPrimitive("reportPrint"), "specVersion" to JsonPrimitive(1), "reportId" to JsonPrimitive(report.id), "title" to JsonPrimitive(title))))
+            put("reportId", JsonPrimitive(report.id))
+            if (includeExport) put("fences", JsonArray(exportFences(report, reportOptions, optionValues)))
         })
         val metadata = WindowMetadata(
             namespace = "forge.inline-report",

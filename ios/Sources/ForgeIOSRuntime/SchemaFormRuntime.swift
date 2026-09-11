@@ -1,6 +1,20 @@
 import Foundation
 
 public enum SchemaFormRuntime {
+    public static func nativeItem(for field: ResolvedSchemaField) -> ItemDef {
+        let properties = field.nativeProperties
+        var widget = properties["x-ui-widget"]?.stringValue
+        if widget == nil {
+            if field.type == .multiSelect { widget = "multiSelect" }
+            else if field.type == .json { widget = "object" }
+            else if properties["enum"]?.arrayValue?.isEmpty != false { widget = field.widget }
+        }
+        if widget == "integer" || widget == "numeric" { widget = "number" }
+        if widget == "date-time" { widget = "datetime" }
+        if widget == "json" { widget = "object" }
+        return ItemDef(widget: widget, readOnly: properties["readOnly"]?.boolValue, id: field.key, label: field.label, format: properties["format"]?.stringValue, type: properties["type"]?.stringValue ?? "text", options: field.options.map { OptionDef(value: $0, label: $0) }, properties: properties)
+    }
+
     public static func resolvedFields(
         for form: SchemaBasedFormDef,
         formState: [String: JSONValue] = [:]
@@ -22,8 +36,9 @@ public enum SchemaFormRuntime {
                     options: field.enumValues,
                     placeholder: field.placeholder,
                     defaultValue: field.defaultValue,
-                    widget: field.widget,
-                    lookup: field.lookup
+                    widget: field.widget ?? (["number", "integer", "password", "date", "datetime"].contains(field.type ?? "") ? field.type : nil),
+                    lookup: field.lookup,
+                    nativeProperties: ["type": .string(field.type ?? "text"), "enum": .array(field.enumValues.map(JSONValue.string)), "x-ui-widget": field.widget.map(JSONValue.string) ?? .null]
                 )
             }
         }
@@ -38,8 +53,8 @@ public enum SchemaFormRuntime {
         let requiredSet = Set(schema["required"]?.arrayValue?.compactMap(\.stringValue) ?? [])
         return sortedSchemaProperties(properties).compactMap { name, propertyValue in
             guard let property = propertyValue.objectValue else { return nil }
-            let enumValues = property["enum"]?.arrayValue?.compactMap(\.stringValue) ?? []
-            let widget = property["x-ui-widget"]?.stringValue
+            let enumValues = property["enum"]?.arrayValue?.map { NativeWidgetContract.text($0) } ?? []
+            let widget = property["x-ui-widget"]?.stringValue ?? property["format"]?.stringValue ?? (["number", "integer"].contains(property["type"]?.stringValue ?? "") ? property["type"]?.stringValue : nil)
             let schemaType = property["type"]?.stringValue
             let lookup = property["lookup"]
             return ResolvedSchemaField(
@@ -56,7 +71,8 @@ public enum SchemaFormRuntime {
                 placeholder: property["description"]?.stringValue,
                 defaultValue: property["default"],
                 widget: widget,
-                lookup: lookup
+                lookup: lookup,
+                nativeProperties: property
             )
         }
     }
@@ -250,7 +266,7 @@ public enum SchemaFormRuntime {
         case .string(let text):
             return !options.contains(text)
         case .array(let values):
-            return values.compactMap(\.stringValue).contains { !options.contains($0) }
+            return values.contains { !options.contains(NativeWidgetContract.text($0)) }
         default:
             let display = displayValue(for: value)
             return !display.isEmpty && !options.contains(display)
@@ -364,6 +380,7 @@ public struct ResolvedSchemaField: Sendable, Equatable, Identifiable {
     public let defaultValue: JSONValue?
     public let widget: String?
     public let lookup: JSONValue?
+    public let nativeProperties: [String: JSONValue]
 
     public init(
         key: String,
@@ -374,7 +391,8 @@ public struct ResolvedSchemaField: Sendable, Equatable, Identifiable {
         placeholder: String?,
         defaultValue: JSONValue?,
         widget: String? = nil,
-        lookup: JSONValue? = nil
+        lookup: JSONValue? = nil,
+        nativeProperties: [String: JSONValue] = [:]
     ) {
         self.key = key
         self.label = label
@@ -385,6 +403,7 @@ public struct ResolvedSchemaField: Sendable, Equatable, Identifiable {
         self.defaultValue = defaultValue
         self.widget = widget
         self.lookup = lookup
+        self.nativeProperties = nativeProperties
     }
 
     public var id: String { key }

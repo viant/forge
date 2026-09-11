@@ -324,6 +324,11 @@ public actor ForgeRuntime {
         return await signal.peek()
     }
 
+    public func windowMetadataUpdates(id: String) async -> AsyncStream<WindowMetadata?> {
+        let signal = await signals.metadata(windowID: id)
+        return await signal.stream()
+    }
+
     public func configureWindowMetadata(baseURL: URL?, path: String = "/v1/api/forge/window") {
         defaultDataSourceBaseURL = baseURL
         windowMetadataEndpoint = Self.makeWindowMetadataEndpoint(baseURL: baseURL, path: path)

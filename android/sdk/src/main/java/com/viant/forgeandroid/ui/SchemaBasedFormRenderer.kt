@@ -1,5 +1,6 @@
 package com.viant.forgeandroid.ui
 
+import kotlinx.serialization.json.booleanOrNull
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -79,6 +80,8 @@ internal fun schemaBasedFormItems(
                 ?: return@mapNotNull null
             val label = field.label?.trim()?.takeIf { it.isNotEmpty() } ?: key
             ItemDef(
+                defaultValue = field.default,
+                widget = field.widget ?: field.type?.takeIf { it in setOf("number", "integer", "password", "date", "datetime") }?.let { if (it == "integer") "number" else it },
                 id = key,
                 dataField = key,
                 label = label,
@@ -120,6 +123,10 @@ internal fun schemaBasedFormItems(
             val enumLabels = property["x-ui-enum-labels"] as? JsonObject
             val defaultValue = property["default"]
             ItemDef(
+                defaultValue = defaultValue,
+                widget = widget ?: if (enumValues.isNotEmpty()) { if (type == "array") "multiSelect" else null } else (property["format"] as? JsonPrimitive)?.content ?: type?.takeIf { it in setOf("number", "integer") }?.let { "number" },
+                enumValues = (property["enum"] as? JsonArray).orEmpty(),
+                readOnly = (property["readOnly"] as? JsonPrimitive)?.booleanOrNull,
                 id = name,
                 dataField = name,
                 label = (property["title"] as? JsonPrimitive)?.content ?: name,
@@ -136,7 +143,7 @@ internal fun schemaBasedFormItems(
                         }
                     )
                 },
-                properties = mapOfLookup(lookup)
+                properties = property + mapOfLookup(lookup)
             )
         }
 }
@@ -150,6 +157,13 @@ internal fun schemaFormValidationErrors(
         val value = itemPayloadValue(payload, key)
         if (item.required == true && isMissingFormValue(value)) {
             errors[key] = "Required"
+            return@fold errors
+        }
+        val nativeOptions = com.viant.forgeandroid.runtime.NativeWidgetContract.options(item).map { it.first }
+        if (nativeOptions.isNotEmpty() && !isMissingFormValue(value)) {
+            val supplied = com.viant.forgeandroid.runtime.JsonUtil.anyToElement(value)
+            val values = if (supplied is JsonArray) supplied.toList() else listOf(supplied)
+            if (values.any { candidate -> nativeOptions.none { com.viant.forgeandroid.runtime.NativeWidgetContract.equivalent(candidate, it) } }) errors[key] = "Invalid value"
             return@fold errors
         }
         val options = item.options.mapNotNull { option ->
@@ -169,10 +183,8 @@ internal fun schemaFormSubmission(
     items: List<ItemDef>,
     formState: Map<String, Any?>
 ): SchemaFormSubmission {
-    return SchemaFormSubmission(
-        payload = schemaFormPayload(items, formState),
-        errors = schemaFormValidationErrors(items, formState)
-    )
+    val payload = schemaFormPayload(items, formState)
+    return SchemaFormSubmission(payload = payload, errors = schemaFormValidationErrors(items, payload))
 }
 
 private fun schemaFieldOrder(property: JsonObject?): Double {
@@ -243,8 +255,8 @@ private fun itemPayloadValue(payload: Map<String, Any?>, key: String): Any? {
 private fun schemaFormPayload(items: List<ItemDef>, formState: Map<String, Any?>): Map<String, Any?> {
     return items.mapNotNull { item ->
         val key = itemValidationKey(item) ?: return@mapNotNull null
-        val value = itemPayloadValue(formState, key)
-        if (isMissingFormValue(value)) null else key to value
+        if (com.viant.forgeandroid.runtime.NativeWidgetContract.hasValue(formState, key)) key to itemPayloadValue(formState, key)
+        else com.viant.forgeandroid.runtime.NativeWidgetContract.initialValue(item)?.let { key to com.viant.forgeandroid.runtime.JsonUtil.elementToAny(it) }
     }.toMap()
 }
 

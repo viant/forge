@@ -17,6 +17,8 @@
     ".": "./index.js"
   },
   "scripts": {
+    "test:widget-pairing": "node --no-warnings src/components/primitives/nativeWidgetContract.test.js",
+    "test:reporting-parity": "node --no-warnings src/components/dashboard/reportRuntimeStructure.test.js && npm run test:report-builder-options && node --no-warnings ./node_modules/vite-node/vite-node.mjs src/components/dashboard/ReportRuntime.test.js",
     "build": "vite build",
     "dev": "vite",
     "dev:report-builder-preview": "vite --host 127.0.0.1 --port 5175",

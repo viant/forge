@@ -318,7 +318,9 @@ data class DashboardReportRuntimeBlockSummary(
     val refinementBar: DashboardReportRuntimeRefinementBarValue? = null,
     val table: DashboardReportRuntimeTableValue? = null,
     val chart: DashboardReportRuntimeChartValue? = null,
-    val geoMap: DashboardReportRuntimeGeoMapValue? = null
+    val geoMap: DashboardReportRuntimeGeoMapValue? = null,
+    val children: List<DashboardReportRuntimeBlockSummary> = emptyList(),
+    val compositeParentId: String? = null
 )
 
 data class DashboardReportRuntimeSummary(
@@ -428,6 +430,10 @@ fun dashboardReportRuntimeExportExecution(container: ContainerDef): DashboardRep
         reportSpec?.let { put("reportSpec", JsonUtil.elementToAny(it)) }
         reportFill?.let { put("reportFill", JsonUtil.elementToAny(it)) }
         put("reportPrint", JsonUtil.elementToAny(reportPrint))
+        (config["fences"] as? JsonArray)?.takeIf { it.isNotEmpty() }?.let {
+            put("fences", JsonUtil.elementToAny(it))
+            put("reportId", jsonString(config["reportId"]) ?: title)
+        }
     }
     return DashboardReportRuntimeActionExecution(
         id = "reportRuntime.exportPdf",
@@ -458,7 +464,11 @@ fun dashboardReportRuntimeBlocks(
             jsonString(block["type"]),
             "block"
         ) ?: "block"
-        val content = block["content"] as? JsonObject
+        val content = JsonObject(((block["content"] as? JsonObject) ?: block).toMutableMap().apply {
+            for (key in listOf("childBlockIds", "collapsible", "defaultCollapsed")) {
+                if (key !in this) block[key]?.let { put(key, it) }
+            }
+        })
         val title = firstNonBlank(
             jsonString(block["title"]),
             jsonString(block["label"]),
@@ -501,7 +511,7 @@ fun dashboardReportRuntimeBlocks(
             kind = kind,
             title = title,
             diagnostics = diagnostics.filter { it.blockId == id } + datasetDiagnostics[jsonString(block["datasetRef"])].orEmpty(),
-            content = if (kind in setOf(
+            content = if (kind == "tableBlock") content.filterKeys { it == "collapsible" || it == "defaultCollapsed" } else if (kind in setOf(
                     "badgesBlock", "collectionBlock", "sectionBlock", "tabGroupBlock", "compositeBlock",
                     "stepperBlock", "infoPanelBlock", "calloutBlock", "kanbanBlock", "timelineBlock"
                 )) content.orEmpty() else emptyMap(),
@@ -516,7 +526,7 @@ fun dashboardReportRuntimeBlocks(
         )
     }
     if (blockOrder.isEmpty()) {
-        return blocks
+        return ReportRuntimeStructure.composites(blocks)
     }
     val blockById = blocks.associateBy { it.id }
     val seen = mutableSetOf<String>()
@@ -528,7 +538,7 @@ fun dashboardReportRuntimeBlocks(
         }
     }
     ordered += blocks.filter { it.id !in seen }
-    return ordered
+    return ReportRuntimeStructure.composites(ordered)
 }
 
 fun dashboardReportRuntimeBlockVisible(

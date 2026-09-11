@@ -16,6 +16,7 @@ public struct ReportBuilderRenderer: View {
     @State private var viewMode: String = "table"
     @State private var selectedPreviousTitle: String = ""
     @State private var storedPresets: [StoredReportBuilderChartPreset] = []
+    @State private var reportOptions: [String: JSONValue] = [:]
     @State private var staticFilters: [String: ReportBuilderStaticFilterValue] = [:]
     @State private var dynamicGroups: [String: [ReportBuilderDynamicRowState]] = [:]
     @State private var dynamicFilterDrafts: [String: String] = [:]
@@ -215,6 +216,7 @@ public struct ReportBuilderRenderer: View {
         [
             selectedMeasures.joined(separator: "|"),
             selectedDimensions.joined(separator: "|"),
+            JSONValue.object(effectiveReportOptions).jsonSignature,
             staticFiltersSignature,
             dynamicGroupsSignature,
             dictionarySignature(dynamicFilterDrafts),
@@ -227,6 +229,7 @@ public struct ReportBuilderRenderer: View {
         [
             selectedMeasures.joined(separator: "|"),
             selectedDimensions.joined(separator: "|"),
+            JSONValue.object(effectiveReportOptions).jsonSignature,
             staticFiltersSignature,
             dynamicGroupsSignature
         ].joined(separator: "::")
@@ -279,13 +282,14 @@ public struct ReportBuilderRenderer: View {
     }
 
     private var requestPayload: [String: JSONValue] {
-        let base = Self.buildRequestPayload(
+        var base = Self.buildRequestPayload(
             config: config,
             selectedMeasures: selectedMeasures,
             selectedDimensions: selectedDimensions,
             staticFilters: staticFilters,
             dynamicGroups: dynamicGroups
         )
+        if !effectiveReportOptions.isEmpty { base["options"] = .object(effectiveReportOptions) }
         let scoped = Self.applyWindowFormPrefill(
             config: config,
             request: applyBuildRequestHook(base),
@@ -305,8 +309,56 @@ public struct ReportBuilderRenderer: View {
         AnyView(breakdownSection(title: "Breakdowns", items: dimensionItems, selection: $selectedDimensions))
     }
 
+    private var effectiveReportOptions: [String: JSONValue] {
+        ReportBuilderOptions.effective(config.reportOptions, selected: reportOptions)
+    }
+
+    @ViewBuilder private var reportOptionsSection: some View {
+        let options = ReportBuilderOptions.normalize(config.reportOptions)
+        if !options.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Report options").font(.headline)
+                    Spacer()
+                    Button("Reset to defaults") { reportOptions = [:] }
+                        .accessibilityLabel("Reset report options to defaults")
+                        .disabled(!options.contains { effectiveReportOptions[$0.name] != $0.defaultValue })
+                }
+                ForEach(options) { option in
+                    VStack(alignment: .leading, spacing: 4) {
+                        if option.type == "boolean" {
+                            Toggle(option.label, isOn: Binding(
+                                get: { effectiveReportOptions[option.name] == .bool(true) },
+                                set: { reportOptions[option.name] = .bool($0) }
+                            ))
+                        } else if !option.values.isEmpty {
+                            Picker(option.label, selection: Binding(
+                                get: { option.values.firstIndex { $0.value == effectiveReportOptions[option.name] } ?? -1 },
+                                set: { if option.values.indices.contains($0) { reportOptions[option.name] = option.values[$0].value } }
+                            )) {
+                                Text("Select").tag(-1)
+                                ForEach(option.values.indices, id: \.self) { index in
+                                    Text(option.values[index].label).tag(index)
+                                }
+                            }
+                        } else {
+                            TextField(option.label, text: Binding(
+                                get: { reportOptions[option.name].map(ReportBuilderOptions.text) ?? effectiveReportOptions[option.name].map(ReportBuilderOptions.text) ?? "" },
+                                set: { reportOptions[option.name] = .string($0) }
+                            )).textFieldStyle(.roundedBorder).accessibilityLabel(option.label)
+                        }
+                        if !option.description.isEmpty { Text(option.description).font(.caption).foregroundStyle(.secondary) }
+                    }.accessibilityElement(children: .contain).accessibilityHint(option.description)
+                }
+            }
+        }
+    }
+
     private var staticFiltersSectionView: AnyView {
-        AnyView(staticFilterSection)
+        AnyView(VStack(alignment: .leading, spacing: 12) {
+            reportOptionsSection
+            staticFilterSection
+        })
     }
 
     private var dynamicFiltersSectionView: AnyView {
@@ -464,7 +516,7 @@ public struct ReportBuilderRenderer: View {
     }
 
     private var hasFilterControls: Bool {
-        !config.staticFilters.isEmpty
+        !ReportBuilderOptions.normalize(config.reportOptions).isEmpty || !config.staticFilters.isEmpty
             || !config.dynamicFilterGroups.isEmpty
             || !config.dynamicFilterFamilies.isEmpty
     }
@@ -487,7 +539,7 @@ public struct ReportBuilderRenderer: View {
             .reduce(0) { total, row in
                 total + max(1, row.selections.count)
             }
-        return staticCount + dynamicCount
+        return staticCount + dynamicCount + ReportBuilderOptions.normalize(config.reportOptions).filter { effectiveReportOptions[$0.name] != $0.defaultValue }.count
     }
 
     @ViewBuilder
@@ -1335,7 +1387,8 @@ public struct ReportBuilderRenderer: View {
             viewMode: viewMode,
             staticFilters: staticFilters.mapValues { StoredStaticFilterValue(runtimeValue: $0) },
             dynamicGroups: dynamicGroups,
-            dynamicFilterDrafts: dynamicFilterDrafts
+            dynamicFilterDrafts: dynamicFilterDrafts,
+            reportOptions: effectiveReportOptions
         )
     }
 
@@ -1372,6 +1425,7 @@ public struct ReportBuilderRenderer: View {
         viewMode = "table"
         selectedPreviousTitle = ""
         storedPresets = []
+        reportOptions = [:]
         staticFilters = [:]
         dynamicGroups = [:]
         dynamicFilterDrafts = [:]
@@ -1387,6 +1441,7 @@ public struct ReportBuilderRenderer: View {
 
     @MainActor
     private func apply(restored state: StoredReportBuilderState) {
+        reportOptions = ReportBuilderOptions.effective(config.reportOptions, selected: state.reportOptions ?? [:])
         selectedMeasures = state.selectedMeasures
         selectedDimensions = state.selectedDimensions
         chartSpec = state.chartSpec
@@ -1461,6 +1516,7 @@ public struct ReportBuilderRenderer: View {
         var object: [String: JSONValue] = [
             "selectedMeasures": .array(state.selectedMeasures.map(JSONValue.string)),
             "selectedDimensions": .array(state.selectedDimensions.map(JSONValue.string)),
+            "reportOptions": .object(state.reportOptions ?? [:]),
             "viewMode": .string(state.viewMode),
             "staticFilters": .object(state.staticFilters.mapValues { staticFilterJSONValue($0.runtimeValue) }),
             "dynamicFilterValues": .object(legacyDynamicFilterValues(state.dynamicGroups).mapValues(JSONValue.string)),
@@ -1495,7 +1551,8 @@ public struct ReportBuilderRenderer: View {
                 : fallback.dynamicGroups,
             dynamicFilterDrafts: object.keys.contains("dynamicFilterDrafts")
                 ? (stringMap(from: object["dynamicFilterDrafts"]) ?? fallback.dynamicFilterDrafts)
-                : fallback.dynamicFilterDrafts
+                : fallback.dynamicFilterDrafts,
+            reportOptions: object["reportOptions"]?.objectValue ?? fallback.reportOptions
         )
     }
 
@@ -1535,9 +1592,17 @@ public struct ReportBuilderRenderer: View {
                 result[key] = .list(list)
             } else if let range = rawValue.objectValue,
                       range.keys.contains("start") || range.keys.contains("end") {
+                let rawStart = range["start"]
+                let rawEnd = range["end"]
+                let start = rawStart?.stringValue
+                    ?? rawStart?.intValue.map(String.init)
+                    ?? ""
+                let end = rawEnd?.stringValue
+                    ?? rawEnd?.intValue.map(String.init)
+                    ?? ""
                 result[key] = .dateRange(
-                    start: range["start"]?.stringValue ?? range["start"]?.intValue.map { String($0) } ?? "",
-                    end: range["end"]?.stringValue ?? range["end"]?.intValue.map { String($0) } ?? ""
+                    start: start,
+                    end: end
                 )
             } else if let scalar = rawValue.stringValue ?? rawValue.intValue.map({ String($0) }) ?? rawValue.doubleLike.map({ String($0) }) {
                 result[key] = .list([scalar])
@@ -2396,6 +2461,7 @@ struct StoredReportBuilderState: Codable, Sendable {
     let staticFilters: [String: StoredStaticFilterValue]
     let dynamicGroups: [String: [ReportBuilderDynamicRowState]]
     let dynamicFilterDrafts: [String: String]
+    var reportOptions: [String: JSONValue]? = nil
 }
 
 struct ReportBuilderDynamicRowState: Codable, Sendable, Identifiable, Equatable {

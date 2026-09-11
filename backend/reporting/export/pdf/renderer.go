@@ -2,6 +2,7 @@ package pdf
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
@@ -20,6 +21,8 @@ import (
 const pdfUnicodeFontFamily = "ForgeSans"
 
 type Options struct {
+	ReportSpec   json.RawMessage
+	Metadata     json.RawMessage
 	CreationDate time.Time
 }
 
@@ -48,6 +51,11 @@ func Render(report *reportprint.ReportPrint, options Options) (*RenderResult, er
 		return nil, fmt.Errorf("reportPrint is required")
 	}
 	if err := report.Validate(); err != nil {
+		return nil, err
+	}
+	var err error
+	report, err = withReportOptionContext(report, options)
+	if err != nil {
 		return nil, err
 	}
 	program := buildDocumentProgram(report)

@@ -7363,3 +7363,23 @@ button.forge-report-builder__dialog-source-card:focus-visible {
 @media print {
     .forge-dashboard-lookup-chips { display: none; }
 }
+
+.forge-report-builder__report-options--header {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+}
+.forge-report-builder__report-options--header .forge-report-builder__bottom-label {
+    font-size: 12px;
+}
+.forge-report-builder__report-options--header .forge-report-builder__report-options-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+}
+.forge-report-builder__report-options--header .forge-report-builder__report-option {
+    min-width: 140px;
+}

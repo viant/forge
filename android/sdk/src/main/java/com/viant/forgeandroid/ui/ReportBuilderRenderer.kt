@@ -42,6 +42,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.material3.Switch
+import com.viant.forgeandroid.runtime.ReportBuilderOptions
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -126,7 +130,8 @@ internal data class StoredReportBuilderState(
     // Legacy fields kept only so previously persisted state can still decode.
     val dynamicFilterValues: Map<String, String> = emptyMap(),
     val dynamicFilterSelections: Map<String, List<ReportBuilderDynamicSelectionState>> = emptyMap(),
-    val activeDynamicFilterKeys: List<String> = emptyList()
+    val activeDynamicFilterKeys: List<String> = emptyList(),
+    val reportOptions: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -152,7 +157,8 @@ internal data class ReportBuilderStateValues(
     val viewMode: String,
     val staticFilters: Map<String, Any?>,
     val dynamicGroups: Map<String, List<ReportBuilderDynamicRowState>>,
-    val dynamicFilterDrafts: Map<String, String> = emptyMap()
+    val dynamicFilterDrafts: Map<String, String> = emptyMap(),
+    val reportOptions: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -277,6 +283,8 @@ fun ReportBuilderRenderer(
     var chartSpec by remember(config, builderStateKey) { mutableStateOf<ReportBuilderChartSpecDef?>(null) }
     var viewMode by remember(config, builderStateKey) { mutableStateOf(if (explicitChartMode) "table" else (config.result?.defaultMode ?: "chart")) }
     var previousMenuExpanded by remember { mutableStateOf(false) }
+    var reportOptions by remember(config, builderStateKey) { mutableStateOf(emptyMap<String, JsonElement>()) }
+    val effectiveReportOptions = ReportBuilderOptions.effective(config.reportOptions, reportOptions)
     var staticFilters by remember(config, builderStateKey) {
         mutableStateOf(defaultReportBuilderStaticFilters(config.staticFilters))
     }
@@ -294,7 +302,7 @@ fun ReportBuilderRenderer(
     var lastAutoCollapsedRequestSignature by remember(config, window.windowId, builderStateKey) { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
     val settingsHash = remember(selectedDimensions, selectedMeasures) { buildSettingsHash(selectedDimensions, selectedMeasures) }
-    val stateValues = remember(selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts) {
+    val stateValues = remember(selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts, reportOptions) {
         ReportBuilderStateValues(
             selectedMeasures = selectedMeasures,
             selectedDimensions = selectedDimensions,
@@ -302,7 +310,8 @@ fun ReportBuilderRenderer(
             viewMode = viewMode,
             staticFilters = staticFilters,
             dynamicGroups = dynamicGroups,
-            dynamicFilterDrafts = dynamicFilterDrafts
+            dynamicFilterDrafts = dynamicFilterDrafts,
+            reportOptions = effectiveReportOptions
         )
     }
     fun applyStateValues(values: ReportBuilderStateValues) {
@@ -310,6 +319,7 @@ fun ReportBuilderRenderer(
         selectedDimensions = values.selectedDimensions
         chartSpec = values.chartSpec
         viewMode = values.viewMode
+        reportOptions = ReportBuilderOptions.effective(config.reportOptions, values.reportOptions)
         staticFilters = values.staticFilters
         dynamicGroups = values.dynamicGroups
         dynamicFilterDrafts = values.dynamicFilterDrafts
@@ -371,7 +381,7 @@ fun ReportBuilderRenderer(
             hiddenDynamicGroupIds = config.hiddenDynamicGroupIds.toSet()
         )
     }
-    val hasFilterControls = config.staticFilters.isNotEmpty() || config.dynamicFilterGroups.isNotEmpty() || config.dynamicFilterFamilies.isNotEmpty()
+    val hasFilterControls = config.reportOptions.isNotEmpty() || config.staticFilters.isNotEmpty() || config.dynamicFilterGroups.isNotEmpty() || config.dynamicFilterFamilies.isNotEmpty()
 
     val currentChartSpec = chartSpec
     val chartRows = remember(aggregatedRows, currentChartSpec) {
@@ -438,7 +448,7 @@ fun ReportBuilderRenderer(
             context.setInputParameters(requestPayload, fetch = true)
         }
     }
-    LaunchedEffect(selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts) {
+    LaunchedEffect(selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts, reportOptions) {
         if (!restoredStoredState) {
             return@LaunchedEffect
         }
@@ -569,12 +579,44 @@ fun ReportBuilderRenderer(
             }
             if (hasFilterControls) {
                 ReportBuilderFilterSummary(
-                    activeFilterCount = activeFilterCount,
+                    activeFilterCount = activeFilterCount + ReportBuilderOptions.normalize(config.reportOptions).count { effectiveReportOptions[it.name] != it.defaultValue },
                     expanded = filtersExpanded,
                     onToggle = { filtersExpanded = !filtersExpanded }
                 )
             }
             if (filtersExpanded) {
+                val options = ReportBuilderOptions.normalize(config.reportOptions)
+                if (options.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Report options", style = MaterialTheme.typography.titleSmall)
+                        TextButton(onClick = { reportOptions = emptyMap() }, enabled = options.any { effectiveReportOptions[it.name] != it.defaultValue }) { Text("Reset report options to defaults") }
+                        options.forEach { option ->
+                            val value = effectiveReportOptions[option.name]
+                            Column {
+                                if (option.type == "boolean") {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(option.label, modifier = Modifier.weight(1f))
+                                        Switch(checked = value == JsonPrimitive(true), onCheckedChange = { reportOptions = reportOptions + (option.name to JsonPrimitive(it)) }, modifier = Modifier.semantics { contentDescription = option.label })
+                                    }
+                                } else if (option.values.isNotEmpty()) {
+                                    var expanded by remember(option.name) { mutableStateOf(false) }
+                                    Text(option.label)
+                                    Box {
+                                        TextButton(onClick = { expanded = true }) { Text(option.values.firstOrNull { it.first == value }?.second ?: "Select") }
+                                        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                                            option.values.forEach { entry ->
+                                                DropdownMenuItem(text = { Text(entry.second) }, onClick = { reportOptions = reportOptions + (option.name to entry.first); expanded = false })
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    OutlinedTextField(value = reportOptions[option.name]?.let(ReportBuilderOptions::text) ?: value?.let(ReportBuilderOptions::text).orEmpty(), onValueChange = { reportOptions = reportOptions + (option.name to JsonPrimitive(it)) }, label = { Text(option.label) })
+                                }
+                                if (option.description.isNotEmpty()) Text(option.description, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
                 StaticFilterSection(config.staticFilters, staticFilters) { key, value ->
                     staticFilters = staticFilters.toMutableMap().apply { put(key, value) }
                 }
@@ -2325,6 +2367,9 @@ internal fun buildReportBuilderRequestPayload(
             setNestedValue(request, filter.paramPath ?: "filters.$filterKey", mapped)
         }
     }
+    val selectedOptions = (hookState["reportOptions"] as? Map<*, *>)?.entries?.associate { it.key.toString() to JsonUtil.anyToElement(it.value) }.orEmpty()
+    val options = ReportBuilderOptions.effective(config.reportOptions, selectedOptions)
+    if (options.isNotEmpty()) request["options"] = options.mapValues { JsonUtil.elementToAny(it.value) }
     val baseRequest = request.toMap()
     val hookName = config.hooks?.buildRequest?.trim().orEmpty()
     if (hookName.isBlank()) {
@@ -2522,6 +2567,7 @@ private fun currentReportBuilderHookState(values: ReportBuilderStateValues): Map
         "chartSpec" to values.chartSpec?.let {
             JsonUtil.elementToAny(JsonUtil.json.encodeToJsonElement(ReportBuilderChartSpecDef.serializer(), it))
         },
+        "reportOptions" to values.reportOptions.mapValues { JsonUtil.elementToAny(it.value) },
         "viewMode" to values.viewMode,
         "staticFilters" to values.staticFilters,
         "dynamicFilterValues" to legacyDynamicFilterValues(values.dynamicGroups),
@@ -2540,6 +2586,7 @@ private fun reportBuilderStateValuesFromHookResult(
         fallback.dynamicGroups
     }
     return fallback.copy(
+        reportOptions = if (result.containsKey("reportOptions")) JsonUtil.asStringMap(result["reportOptions"]).mapValues { JsonUtil.anyToElement(it.value) } else fallback.reportOptions,
         selectedMeasures = result.stringListOrNull("selectedMeasures") ?: fallback.selectedMeasures,
         selectedDimensions = result.stringListOrNull("selectedDimensions") ?: fallback.selectedDimensions,
         chartSpec = if (result.containsKey("chartSpec")) {
@@ -2623,6 +2670,7 @@ internal fun StoredReportBuilderState.toReportBuilderStateValues(
         chartSpec = chartSpec,
         viewMode = viewMode,
         staticFilters = staticFilters.mapValues { it.value.toRuntimeValue() },
+        reportOptions = ReportBuilderOptions.effective(config.reportOptions, reportOptions),
         dynamicGroups = migratedDynamicGroups(config, this),
         dynamicFilterDrafts = dynamicFilterDrafts
     )
@@ -2630,6 +2678,7 @@ internal fun StoredReportBuilderState.toReportBuilderStateValues(
 
 private fun ReportBuilderStateValues.toStoredReportBuilderState(): StoredReportBuilderState {
     return StoredReportBuilderState(
+        reportOptions = reportOptions,
         selectedMeasures = selectedMeasures,
         selectedDimensions = selectedDimensions,
         chartSpec = chartSpec,

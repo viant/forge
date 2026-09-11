@@ -55,8 +55,17 @@ internal fun WorkflowPresentationPrimitives(
     window: WindowContext,
     container: ContainerDef,
     context: DataSourceContext?,
-    windowForm: Map<String, Any?>
+    windowForm: Map<String, Any?>,
+    scoped: Boolean = false
 ) {
+    if (!scoped) {
+        com.viant.forgeandroid.runtime.PrimitivePairing.scopedContainers(container).forEach { part ->
+            androidx.compose.runtime.key(part.id) {
+                WorkflowPresentationPrimitives(runtime, window, part, part.dataSourceRef?.let(window::contextOrNull) ?: context ?: part.mutationCommand?.dataSourceRef?.let(window::contextOrNull), windowForm, scoped = true)
+            }
+        }
+        return
+    }
     val form by context?.form?.flow?.collectAsState(initial = context.form.peek())
         ?: androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
     val collection by context?.collection?.flow?.collectAsState(initial = context.collection.peek())
@@ -65,6 +74,9 @@ internal fun WorkflowPresentationPrimitives(
         ?: androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
     val selection by context?.selection?.flow?.collectAsState(initial = context.selection.peek())
         ?: androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.viant.forgeandroid.runtime.SelectionState()) }
+    androidx.compose.runtime.LaunchedEffect(context?.dataSourceRef) {
+        if (container.mutationCommand == null && context != null && context.dataSource.autoFetch != false && !context.control.peek().resolved) context.fetchCollection()
+    }
     val record = WorkflowPrimitiveRuntime.presentationRecord(form, collection, metrics)
     val detailRecord = when (container.detailView?.source?.lowercase()) {
         "selection" -> selection.selected ?: selection.selection.lastOrNull().orEmpty()
@@ -103,12 +115,13 @@ internal fun WorkflowPresentationPrimitives(
                                 MutationCommandButton(
                                     runtime, window, context, action.mutation,
                                     labelOverride = action.label,
-                                    extras = mapOf("resource" to record)
+                                    extras = mapOf("record" to record),
+                                    externallyDisabled = action.disabledWhen != null && evaluateDashboardCondition(action.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection)
                                 )
                             } else if (!action.handler.isNullOrBlank() && context != null) {
                                 Button(
                                     enabled = action.disabledWhen == null || !evaluateDashboardCondition(action.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection),
-                                    onClick = { runtime.execute(com.viant.forgeandroid.runtime.ExecutionDef(handler = action.handler), context, mapOf("resource" to record)) }
+                                    onClick = { runtime.execute(com.viant.forgeandroid.runtime.ExecutionDef(handler = action.handler), context, mapOf("record" to record, "action" to com.viant.forgeandroid.runtime.JsonUtil.elementToAny(com.viant.forgeandroid.runtime.JsonUtil.json.encodeToJsonElement(com.viant.forgeandroid.runtime.ResourceHeaderActionSpec.serializer(), action)))) }
                                 ) { Text(action.label ?: action.id) }
                             }
                         }
@@ -277,26 +290,35 @@ private fun DraftFormActions(
     valid: Boolean,
     dirty: Boolean
 ) {
+    var draftState by remember(context.dataSourceRef, baseline) { mutableStateOf(com.viant.forgeandroid.runtime.NativeDraftState(form.toMap())) }
+    val control by context.control.flow.collectAsState(initial = context.control.peek())
+    var wasLoading by remember(context.dataSourceRef) { mutableStateOf(control.loading) }
+    androidx.compose.runtime.LaunchedEffect(control.loading, control.error) {
+        if (wasLoading && !control.loading && control.error.isNullOrBlank()) draftState = draftState.accepted(context.form.peek())
+        wasLoading = control.loading
+    }
+    val isDirty = if (spec.dirtyWhen == null) draftState.dirty(form) else dirty
     var confirmationVisible by remember { mutableStateOf(false) }
     fun reset() {
-        context.setForm(baseline)
+        context.setForm(draftState.baseline)
         spec.onReset?.takeIf(String::isNotBlank)?.let { handler ->
-            runtime.execute(com.viant.forgeandroid.runtime.ExecutionDef(handler = handler), context, mapOf("form" to baseline))
+            runtime.execute(com.viant.forgeandroid.runtime.ExecutionDef(handler = handler), context, draftState.resetExtras())
         }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(enabled = dirty, onClick = {
+        Button(enabled = isDirty && !control.loading, onClick = {
             if (!spec.confirmDiscard.isNullOrBlank()) confirmationVisible = true else reset()
         }) { Text(spec.resetLabel ?: "Reset") }
         spec.submit?.let { submit ->
             MutationCommandButton(
                 runtime, window, context, submit,
                 labelOverride = spec.saveLabel ?: submit.label,
-                extras = mapOf("draft" to form),
-                externallyDisabled = !valid || !dirty
+                extras = draftState.submitExtras(form),
+                externallyDisabled = !valid || !isDirty || control.loading,
+                onSettled = { result -> if (result.status == "succeeded") draftState = draftState.accepted(form) }
             )
         }
-        if (dirty) Text("Unsaved changes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (isDirty) Text("Unsaved changes", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     if (confirmationVisible) {
         AlertDialog(

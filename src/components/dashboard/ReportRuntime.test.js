@@ -3453,3 +3453,24 @@ assert.ok(collapsedTableHtml.includes("Showing 1 of 1 row"));
 assert.ok(collapsedTableHtml.includes("Kroil"));
 
 console.log("ReportRuntime ✓ renders semantic binding chips and actionable runtime diagnostics");
+
+for (const kind of ["sectionBlock", "compositeBlock", "textBlock"]) {
+  const slotHtml = renderToStaticMarkup(React.createElement(ReportRuntime, {
+    reportSpec: { blocks: [{ id: "pathways", kind, title: "Pathways" }] },
+    reportFill: { blocks: [{ id: "pathways", kind, title: "Pathways" }] },
+    headerActions: new Map([["pathways", React.createElement("button", { type: "button" }, "Exposure option")]]),
+  }));
+  if (kind === "textBlock") assert.doesNotMatch(slotHtml, /Exposure option/);
+  else assert.match(slotHtml, /<header[^>]*>[\s\S]*Exposure option[\s\S]*<\/header>/);
+}
+
+const hiddenCompositeBlocks = [
+  { id: "hiddenGroup", kind: "compositeBlock", title: "Hidden group", content: { childBlockIds: ["privateChild"] }, runtime: { visibleWhen: { source: "filters", field: "showDetails", equals: true } } },
+  { id: "privateChild", kind: "markdownBlock", title: "Private child", content: { markdown: "Composite child must stay hidden" } },
+  { id: "publicChild", kind: "markdownBlock", title: "Public child", content: { markdown: "Public content remains visible" } },
+];
+const hiddenCompositeHtml = renderToStaticMarkup(React.createElement(ReportRuntime, {
+  reportSpec: { blocks: hiddenCompositeBlocks }, reportFill: { blocks: hiddenCompositeBlocks },
+}));
+assert.doesNotMatch(hiddenCompositeHtml, /Composite child must stay hidden/);
+assert.match(hiddenCompositeHtml, /Public content remains visible/);

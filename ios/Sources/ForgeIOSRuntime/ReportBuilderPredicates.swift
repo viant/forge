@@ -137,6 +137,7 @@ public func lowerReportBuilderPredicates(_ config: DashboardReportBuilderDef) ->
     }
 
     return DashboardReportBuilderDef(
+        reportOptions: config.reportOptions,
         title: config.title,
         subtitle: config.subtitle,
         hooks: config.hooks,

@@ -268,7 +268,7 @@ internal fun ReportBuilderAuthoredResult(
     }
 
     val preparedDocument = remember(document) { materializeReportBuilderAuthoredDocument(document) }
-    val artifact = remember(preparedDocument, rowsById.toMap()) {
+    val artifact = remember(preparedDocument, rowsById.toMap(), primaryRequest, config.reportOptions) {
         InlineReportRuntimeCompiler.compile(
             TranscriptCanonicalReport(
                 scope = "report-builder",
@@ -283,7 +283,8 @@ internal fun ReportBuilderAuthoredResult(
                         payload = JsonArray(rows.map(JsonUtil::anyToElement))
                     )
                 }
-            )
+            ),
+            reportOptions = config.reportOptions, optionValues = JsonUtil.asStringMap(primaryRequest["options"]).mapValues { JsonUtil.anyToElement(it.value) }
         )
     }
     val runtimeContainer = remember(artifact.metadata) {

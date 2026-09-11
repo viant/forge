@@ -27,3 +27,13 @@ assert.match(css, /@media \(max-width: 900px\)[\s\S]*report-options-grid[\s\S]*r
 assert.match(css, /@media \(max-width: 600px\)[\s\S]*report-options-grid[\s\S]*grid-template-columns: 1fr/, "phone uses one column");
 
 console.log("ReportBuilderOptionControls ✓ accessible control markup for responsive report options");
+
+const headerHtml = renderToStaticMarkup(<ReportBuilderOptionControls
+  definitions={definitions.slice(0, 1)} values={{ model: "linear" }}
+  presentation="header" headingId="pathways-options" activeCount={1} onReset={() => {}}
+/>);
+assert.match(headerHtml, /report-options--header/);
+assert.match(headerHtml, /aria-labelledby="pathways-options"/);
+assert.match(headerHtml, /Select a model/);
+assert.match(headerHtml, /Reset report options to defaults/);
+assert.doesNotMatch(headerHtml, /Lookback days|Include organic|Adjust server-published/);
