@@ -1,5 +1,6 @@
 package com.viant.forgeandroid.ui
 
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -70,4 +71,15 @@ class MarkdownRendererTest {
             normalizedMarkdownTableRow(listOf("Agriculture"), 2)
         )
     }
+    @Test fun elicitationInlineMarkupIsRendered() {
+        val text = inlineMarkdownAnnotatedString("**Approve** this *change* to `budget`.")
+        assertEquals("Approve this change to budget.", text.text)
+        assertTrue(text.spanStyles.any { it.item.fontWeight == FontWeight.Bold })
+        assertTrue(text.spanStyles.any { it.item.fontStyle == FontStyle.Italic })
+    }
+    @Test fun codeKeepsLiteralMarkup() {
+        assertEquals("**literal**", inlineMarkdownAnnotatedString("`**literal**`").text)
+        assertEquals("Run", inlineMarkdownAnnotatedString("[Run](javascript:alert)").text)
+    }
+
 }
