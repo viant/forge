@@ -597,11 +597,13 @@ function buildReportFillCollectionContent(block = {}, dataset = {}, {
 }
 
 function buildReportFillSectionContent(block = {}) {
+  const blockIds = normalizeReportFillTabGroupSectionIds(block?.blockIds);
   return {
     title: normalizeString(block?.title || "Section") || "Section",
     ...(normalizeString(block?.subtitle) ? { subtitle: normalizeString(block.subtitle) } : {}),
     ...(normalizeString(block?.description) ? { description: normalizeString(block.description) } : {}),
     navigationLabel: normalizeString(block?.navigationLabel || block?.title || "Section") || "Section",
+    ...(blockIds.length > 0 ? { blockIds } : {}),
   };
 }
 

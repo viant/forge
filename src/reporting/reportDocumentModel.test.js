@@ -24,6 +24,8 @@ import {
   buildReportDocumentRefinementBarBlock,
   buildReportDocumentTableBlock,
   buildStaticDatasetReportBuilderConfig,
+  buildExclusiveReportSectionOwnership,
+  filterExclusiveReportRuntimeBlocks,
   lowerReportDocumentToReportSpec,
   normalizeReportDocumentBuilderConfig,
   resolveReportDocumentBinding,
@@ -37,6 +39,26 @@ function resolveBuilderBlock(document = null) {
     ? (document.blocks.find((block) => block?.kind === "reportBuilderBlock") || null)
     : null;
 }
+
+assert.deepEqual(Object.fromEntries(buildExclusiveReportSectionOwnership([
+  { id: "tabs", kind: "tabGroupBlock", sectionIds: ["summary"], includeUnlistedSections: false },
+  { id: "summary", kind: "sectionBlock", blockIds: ["ownedChart"] },
+  { id: "ownedChart", kind: "chartBlock" },
+  { id: "trailingFallback", kind: "tableBlock" },
+])), { summary: ["ownedChart"] });
+assert.deepEqual(filterExclusiveReportRuntimeBlocks([
+  { id: "tabs", kind: "tabGroupBlock" },
+  { id: "summary", kind: "sectionBlock", blockIds: ["ownedChart"] },
+  { id: "ownedChart", kind: "chartBlock" },
+], [
+  { id: "primaryTable", kind: "tableBlock" },
+  { id: "primaryChart", kind: "chartBlock" },
+  { id: "headlineKpi", kind: "kpiBlock" },
+  { id: "deliveryComparison", kind: "tableBlock" },
+  { id: "tabs", kind: "tabGroupBlock" },
+  { id: "summary", kind: "sectionBlock" },
+  { id: "ownedChart", kind: "chartBlock" },
+], new Map([["summary", ["ownedChart"]]])).map((block) => block.id), ["tabs", "summary", "ownedChart"]);
 
 const config = {
   title: "Performance Report",
@@ -325,12 +347,14 @@ assert.deepEqual(buildReportDocumentCompositeBlock({
   id: "kpiGrid",
   title: "KPI grid",
   layout: "responsiveGrid",
+  runtime: { mobileColumns: 2 },
   childBlockIds: ["kpiA", "kpiB", "kpiC"],
 }), {
   id: "kpiGrid",
   kind: "compositeBlock",
   title: "KPI grid",
   layout: "responsiveGrid",
+  runtime: { mobileColumns: 2 },
   childBlockIds: ["kpiA", "kpiB", "kpiC"],
 });
 assert.deepEqual(buildReportDocumentStepperBlock({
@@ -983,6 +1007,7 @@ assert.deepEqual(lowered.blocks.find((block) => block.id === "channelTrend"), {
   id: "channelTrend",
   kind: "chartBlock",
   datasetRef: "primary",
+  rowLimit: 8,
   chartSpec: {
     title: "Channel Trend",
     type: "line",

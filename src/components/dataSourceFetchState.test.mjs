@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
     beginDataSourceFetch,
+    consumeDataSourceFetchRequest,
     reconcileRestoredPendingFetch,
     recoverInterruptedFetchOnMount,
     resolveFetchPage,
@@ -13,6 +14,19 @@ import {
 
 const begunRefresh = beginDataSourceFetch({loading: false, loaded: true, error: new Error('old'), stale: true});
 assert.deepEqual(begunRefresh, {loading: true, loaded: false, error: null, stale: false});
+assert.deepEqual(
+    consumeDataSourceFetchRequest({fetch: true, refresh: false, parameters: {id: 7}}, "fetch"),
+    {fetch: false, refresh: false, parameters: {id: 7}},
+);
+assert.equal(
+    consumeDataSourceFetchRequest({fetch: false, refresh: false, parameters: {id: 7}}, "fetch"),
+    null,
+    "a nested render must not consume the same fetch twice",
+);
+assert.deepEqual(
+    consumeDataSourceFetchRequest({fetch: false, refresh: true, page: 2}, "refresh"),
+    {fetch: false, refresh: false, page: 2},
+);
 assert.deepEqual(
     recoverInterruptedFetchOnMount({}, {fetch: false}, begunRefresh, true),
     {input: {fetch: true, refresh: false}, control: {loading: false, loaded: false, error: null, stale: true}},

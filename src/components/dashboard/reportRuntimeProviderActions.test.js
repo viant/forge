@@ -7,6 +7,7 @@ import {
   buildResolvedReportRuntimeProviderActionsState,
   loadReportRuntimeProviderActions,
   resolveReportRuntimeProviderActions,
+  settleMissingReportRuntimeProviderActionsState,
 } from "./reportRuntimeProviderActions.js";
 import { buildReportRuntimeTableActionDescriptors } from "./reportRuntimeTableActionModel.js";
 
@@ -69,6 +70,17 @@ assert.deepEqual(buildIdleReportRuntimeProviderActionsState(), {
   providerDiagnostics: [],
   loading: false,
 });
+const alreadyIdleProviderState = buildIdleReportRuntimeProviderActionsState();
+assert.equal(
+  settleMissingReportRuntimeProviderActionsState(alreadyIdleProviderState),
+  alreadyIdleProviderState,
+  "an absent provider must preserve an already-idle state identity and cannot drive an effect loop",
+);
+assert.deepEqual(settleMissingReportRuntimeProviderActionsState({
+  providerActionsByField: new Map([["stale", []]]),
+  providerDiagnostics: [{ code: "stale" }],
+  loading: true,
+}), buildIdleReportRuntimeProviderActionsState());
 
 assert.deepEqual(buildPendingReportRuntimeProviderActionsState({
   providerActionsByField: new Map([

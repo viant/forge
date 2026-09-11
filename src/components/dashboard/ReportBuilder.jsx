@@ -7572,6 +7572,61 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         </div>
     );
 
+    const renderCompactHostedReportToolbar = () => (
+        <div className="forge-report-builder__compact-report-toolbar" aria-label="Report actions">
+            <div className="forge-report-builder__compact-report-toolbar-title">
+                {normalizeString(state.reportDocumentTitle || runtimePreviewArtifact?.document?.title || container.title || config.title || "Report")}
+            </div>
+            <div className="forge-report-builder__compact-report-toolbar-actions">
+                {hasFilterDrawerContent && authoredPrimaryFilterBarPlacement !== "hidden" ? (
+                    <Button
+                        small
+                        outlined
+                        icon="filter"
+                        aria-label={(!compactMode && reportFilterRailOpen) ? "Close report filters and options" : "Open report filters and options"}
+                        aria-expanded={compactMode ? compactSheetOpen : reportFilterRailOpen}
+                        onClick={() => {
+                            if (compactMode) {
+                                setCompactSheetTab("filters");
+                                setCompactSheetOpen(true);
+                                return;
+                            }
+                            setReportFilterRailOpen((open) => !open);
+                        }}
+                    >
+                        Filters{totalActiveControlCount > 0 ? ` (${totalActiveControlCount})` : ""}
+                    </Button>
+                ) : null}
+                <Button
+                    small
+                    outlined
+                    icon="refresh"
+                    aria-label="Refresh report"
+                    disabled={!canRunReport || loading}
+                    loading={loading}
+                    onClick={runReport}
+                >
+                    Refresh
+                </Button>
+                <Popover
+                    placement="bottom-start"
+                    usePortal={false}
+                    content={renderDraftExportMenuContent()}
+                >
+                    <Button
+                        small
+                        outlined
+                        icon="download"
+                        aria-label="Export report"
+                        disabled={!canOpenDraftExportMenu}
+                    >
+                        Export
+                    </Button>
+                </Popover>
+            </div>
+        </div>
+    );
+
     const renderCompactSetupSheet = () => {
         if (!compactMode || !compactSheetOpen) {
             return null;
@@ -7589,20 +7644,53 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 >
                     <div className="forge-report-builder__compact-sheet-header">
                         <div>
-                            <div className="forge-report-builder__shelf-label">Setup</div>
-                            <div className="forge-report-builder__compact-sheet-title">{container.title || config.title || "Report Builder"}</div>
+                            <div className="forge-report-builder__shelf-label">{reportWorkspaceMode ? "Report controls" : "Setup"}</div>
+                            <div className="forge-report-builder__compact-sheet-title">
+                                {reportWorkspaceMode ? "Filters and options" : (container.title || config.title || "Report Builder")}
+                            </div>
                         </div>
                         <button type="button" className="forge-report-builder__panel-toggle" onClick={closeCompactSheet}>
                             Close
                         </button>
                     </div>
-                    <div className="forge-report-builder__compact-sheet-tabs">
-                        <ReportBuilderCompactSheetTab active={compactSheetTab === "scope"} icon="calendar" label="Scope" onClick={() => setCompactSheetTab("scope")} />
-                        <ReportBuilderCompactSheetTab active={compactSheetTab === "data"} icon="database" label="Data" onClick={() => setCompactSheetTab("data")} />
-                        <ReportBuilderCompactSheetTab active={compactSheetTab === "filters"} icon="filter" label="Filters" onClick={() => setCompactSheetTab("filters")} />
-                    </div>
+                    {!reportWorkspaceMode ? (
+                        <div className="forge-report-builder__compact-sheet-tabs">
+                            <ReportBuilderCompactSheetTab active={compactSheetTab === "scope"} icon="calendar" label="Scope" onClick={() => setCompactSheetTab("scope")} />
+                            <ReportBuilderCompactSheetTab active={compactSheetTab === "data"} icon="database" label="Data" onClick={() => setCompactSheetTab("data")} />
+                            <ReportBuilderCompactSheetTab active={compactSheetTab === "filters"} icon="filter" label="Filters" onClick={() => setCompactSheetTab("filters")} />
+                        </div>
+                    ) : null}
                     <div className="forge-report-builder__compact-sheet-body">
-                        {compactSheetTab === "scope" ? (
+                        {reportWorkspaceMode ? (
+                            <div className="forge-report-builder__compact-panel-stack">
+                                <ReportBuilderOptionControls
+                                    definitions={reportOptionDefinitions}
+                                    values={effectiveReportOptions}
+                                    onChange={setReportOptionValue}
+                                    headingId="report-builder-options-compact-report-heading"
+                                />
+                                {compactRequiredStaticFilters.map((filter) => renderStaticFilterSection(filter))}
+                                <section
+                                    className="forge-report-builder__bottom-group forge-report-builder__bottom-group--static"
+                                    aria-label="Filters"
+                                    aria-labelledby="report-builder-filters-compact-report-heading"
+                                >
+                                    <div className="forge-report-builder__bottom-header">
+                                        <div>
+                                            <h3 id="report-builder-filters-compact-report-heading" className="forge-report-builder__bottom-label forge-report-builder__bottom-label--featured">Filters</h3>
+                                            <div className="forge-report-builder__bottom-description">
+                                                Refine this report; changes refresh the authorized result.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="forge-report-builder__bottom-body">
+                                        {renderFilterCategoryControls()}
+                                        {renderFilterBody({ includeRequiredStaticFilters: false })}
+                                    </div>
+                                </section>
+                            </div>
+                        ) : null}
+                        {!reportWorkspaceMode && compactSheetTab === "scope" ? (
                             <div className="forge-report-builder__compact-panel-stack">
                                 <ReportBuilderOptionControls
                                     definitions={reportOptionDefinitions}
@@ -7621,7 +7709,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                 </section>
                             </div>
                         ) : null}
-                        {compactSheetTab === "data" ? (
+                        {!reportWorkspaceMode && compactSheetTab === "data" ? (
                             <div className="forge-report-builder__compact-panel-stack">
                                 <section className="forge-report-builder__panel forge-report-builder__panel--bottom">
                                     <div className="forge-report-builder__panel-headerline">
@@ -7632,7 +7720,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                 {renderBreakdownPanel({ collapsible: false })}
                             </div>
                         ) : null}
-                        {compactSheetTab === "filters" ? (
+                        {!reportWorkspaceMode && compactSheetTab === "filters" ? (
                             <div className="forge-report-builder__compact-panel-stack">
                                 <section
                                     className="forge-report-builder__bottom-group forge-report-builder__bottom-group--static"
@@ -10314,7 +10402,6 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             showAuthoredReportSurface,
         ],
     );
-    const canOpenDraftExportMenu = !!draftExportRequest || !!draftXlsxExportRequest;
     const reopenedExportRequest = useMemo(() => {
         const reopenedExportSeed = reopenedSavedRecord?.savedReportPayload
             || (reopenedSavedRecord?.exportable === true ? reopenedSavedRecord : null);
@@ -10592,6 +10679,10 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         }),
         [chartDataPolicy, chartQueryCollection, computedCollection, showingChartView],
     );
+    const canDownloadCsv = authoredDocumentCompileValidation.valid
+        && Array.isArray(selectedColumns) && selectedColumns.length > 0
+        && Array.isArray(exportCollection) && exportCollection.length > 0;
+    const canOpenDraftExportMenu = !!draftExportRequest || !!draftXlsxExportRequest || canDownloadCsv;
 
     const { activeResultLoading, activeResultError, reportBuilderStateMarker } = useMemo(() => resolveReportBuilderActiveResultState({
         loading,
@@ -11760,6 +11851,10 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         if (!nextState || typeof nextState !== "object" || Array.isArray(nextState)) {
             return;
         }
+        if (reportWorkspaceMode) {
+            persistState(nextState, { skipExplorationHistory: true });
+            return;
+        }
         const currentState = currentBuilderStateRef.current || {};
         const currentCanShowResults = canShowResultsRef.current;
         const currentExplorationActive = isReportBuilderExplorationActive(currentState);
@@ -11780,7 +11875,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 ? `Draft started from ${normalizeString(sourceContext.label)}.`
                 : "Draft started.",
         });
-    }, [container, persistState]);
+    }, [container, persistState, reportWorkspaceMode]);
 
     const persistPassiveViewState = React.useCallback((nextState) => {
         if (!nextState || typeof nextState !== "object" || Array.isArray(nextState)) {
@@ -15610,11 +15705,18 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                     disabled={!draftXlsxExportRequest || draftXlsxPending}
                     onClick={closeAndRun(triggerDraftXlsxExport)}
                 />
+                <MenuItem
+                    icon="th-list"
+                    text="CSV"
+                    disabled={!canDownloadCsv}
+                    onClick={closeAndRun(downloadCsv)}
+                />
             </Menu>
         );
     }, [
         downloadDraftExportArtifact,
         downloadDraftXlsxExportArtifact,
+        downloadCsv,
         draftExportActionState?.submitDisabled,
         draftExportRequest,
         draftPdfFormatLabel,
@@ -15624,6 +15726,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         draftXlsxFormatLabel,
         draftXlsxPending,
         draftXlsxReady,
+        canDownloadCsv,
         triggerDraftExport,
         triggerDraftXlsxExport,
     ]);
@@ -19996,7 +20099,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                     );
                     return runtimeContent;
                 })()}
-                {authoredRuntimePreviewState.canRenderRuntime && desktopResultHeaderState.quickActions.enabled ? (
+                {authoredRuntimePreviewState.canRenderRuntime && !reportWorkspaceMode && desktopResultHeaderState.quickActions.enabled ? (
                     <div className="forge-report-builder__result-header-actions" style={{ marginBottom: 12 }}>
                         <ReportBuilderChartQuickActions
                             canCreate={desktopResultHeaderState.quickActions.canCreate}
@@ -20413,7 +20516,9 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             />
             <div className="forge-report-builder__top">
                 {compactMode ? (
-                    hostedExecuteOnOpen && reportWorkspaceMode ? null : renderCompactHeader()
+                    hostedExecuteOnOpen && reportWorkspaceMode ? renderCompactHostedReportToolbar() : renderCompactHeader()
+                ) : hostedExecuteOnOpen && reportWorkspaceMode ? (
+                    renderCompactHostedReportToolbar()
                 ) : (
                     <div className="forge-report-builder__shelf">
                         <div className="forge-report-builder__topline">
@@ -20578,11 +20683,6 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                     ) : null}
                 </section>
             ) : null}
-            {!designWorkspaceMode ? renderCompileDiagnosticsNotice(authoredDocumentCompileDiagnosticsNotice, {
-                actionForDiagnostic: handleDocumentBlockDiagnosticAction,
-                actionLabel: resolveDocumentBlockDiagnosticActionLabel,
-            }) : null}
-            {!designWorkspaceMode ? renderCompileDiagnosticsNotice(dashboardAdapterDiagnosticsNotice) : null}
             <div className="forge-report-builder__body">
                 {showLeftRail ? (
                     <aside

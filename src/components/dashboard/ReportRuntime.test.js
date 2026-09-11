@@ -61,6 +61,17 @@ assert.deepEqual(buildRuntimeSections([
   ...sectionContractBlocks.slice(1),
 ]).map((section) => section.id), ["detailsSection"]);
 
+const exclusiveOwnedSections = buildRuntimeSections([
+  { id: "tabs", kind: "tabGroupBlock", sectionIds: ["details"], includeUnlistedSections: false },
+  { id: "details", kind: "sectionBlock", title: "Details", blockIds: ["ownedTable"] },
+  { id: "ownedTable", kind: "tableBlock", title: "Owned table" },
+  { id: "trailingStarter", kind: "chartBlock", title: "Trailing starter" },
+]);
+assert.deepEqual(exclusiveOwnedSections.map((section) => ({
+  id: section.id,
+  itemIds: section.items.map((item) => item.id),
+})), [{ id: "details", itemIds: ["ownedTable"] }]);
+
 const reportSpec = {
   title: "Semantic Runtime Report",
   parameters: {
@@ -236,9 +247,7 @@ assert.equal(hasUsableReportRuntimeData({
 assert.deepEqual(resolvePublicReportRuntimeDiagnostics([
   { code: "runtimePreviewDatasetFetchFailed", severity: "error" },
   { code: "documentBlockColumnUnavailable", severity: "error" },
-], { datasets: [{ id: "saved", rows: [{ value: 42 }] }] }), [
-  { code: "documentBlockColumnUnavailable", severity: "error" },
-]);
+], { datasets: [{ id: "saved", rows: [{ value: 42 }] }] }), []);
 
 const populatedSavedDatasetHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
@@ -3294,6 +3303,10 @@ assert.equal(resolveReportRuntimeCompositeColumns(responsiveComposite, 800), 2);
 assert.equal(resolveReportRuntimeCompositeColumns(responsiveComposite, 500), 1);
 assert.equal(resolveReportRuntimeCompositeColumns({...responsiveComposite, runtime: {mobileColumns: 2}}, 500), 2);
 assert.equal(resolveReportRuntimeCompositeColumns({...responsiveComposite, runtime: {mobileColumns: 9}}, 500), 3);
+assert.equal(resolveReportRuntimeCompositeColumns({...responsiveComposite, runtime: {desktopColumns: 2}}, 1200), 2);
+assert.equal(resolveReportRuntimeCompositeColumns({...responsiveComposite, runtime: {tabletColumns: 1}}, 800), 1);
+assert.equal(resolveReportRuntimeCompositeColumns({...responsiveComposite, runtime: {desktopColumns: 2, minColumnWidth: 520}}, 1440), 2);
+assert.equal(resolveReportRuntimeCompositeColumns({...responsiveComposite, runtime: {desktopColumns: 2, minColumnWidth: 520}}, 1024), 1);
 assert.ok(compositeRuntimeHtml.includes("Summary panel"));
 assert.ok(compositeRuntimeHtml.includes("Summary child"));
 assert.ok(compositeRuntimeHtml.includes("Headline child KPI"));

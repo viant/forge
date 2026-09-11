@@ -1164,6 +1164,7 @@ export const reportSpecSchema = {
         subtitle: { type: "string" },
         description: { type: "string" },
         navigationLabel: { type: "string" },
+        blockIds: { type: "array", items: { type: "string" }, uniqueItems: true },
       },
     },
     compositeBlock: {

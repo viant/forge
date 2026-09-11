@@ -57,8 +57,9 @@ export function formatDashboardTableCellText(cell, row, column, locale) {
     const formatOptions = {
         timeZone: column?.timeZone || (column?.timeZoneSelector ? resolveKey(row, column.timeZoneSelector) : undefined),
     };
+    const tableFormat = column?.format === 'currency' ? 'currency2' : column?.format;
     if (typeof cell === 'number' || column?.format === 'date' || column?.format === 'dateTime' || column?.format === 'wallClockHour' || column?.format === 'wallClockDate') {
-        return formatDashboardValue(cell, column?.format, locale, formatOptions);
+        return formatDashboardValue(cell, tableFormat, locale, formatOptions);
     }
     return String(cell ?? '-');
 }

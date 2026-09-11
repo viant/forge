@@ -3,7 +3,7 @@ import React, {useEffect, useState} from "react";
 import {getLogger} from "../utils/logger.js";
 import {useSignals} from '@preact/signals-react/runtime';
 import { extractData, isDeferredCacheHitEnvelope } from "./dataSourceExtract.js";
-import { beginDataSourceFetch, reconcileRestoredPendingFetch, recoverInterruptedFetchOnMount, resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, withFetchedPageInfo } from "./dataSourceFetchState.js";
+import { beginDataSourceFetch, consumeDataSourceFetchRequest, reconcileRestoredPendingFetch, recoverInterruptedFetchOnMount, resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, withFetchedPageInfo } from "./dataSourceFetchState.js";
 import {reconcileMultiSelection, reconcileSingleSelection} from "./dataSourceSelection.js";
 import {applyFetchTransform} from "./dataSourceTransform.js";
 import {hasResolvedDependencies} from "./dataSourceDependencies.js";
@@ -218,11 +218,9 @@ export default function DataSource({context}) {
         }
 
         if (refresh) {
-            input.value = {
-                ...input.peek(),
-                fetch: false,
-                refresh: false,
-            };
+            const consumed = consumeDataSourceFetchRequest(input.peek(), "refresh");
+            if (!consumed) return;
+            input.value = consumed;
             if (dataSource.dataSourceRef) {
                 try { log.debug('[watch] refresh: upstream branch', { ds: context?.identity?.dataSourceRef, upstream: dataSource.dataSourceRef }); } catch(_) {}
                 handleUpstream()
@@ -235,22 +233,18 @@ export default function DataSource({context}) {
             return;
         }
         if (dataSource.dataSourceRef) {
-            input.value = {
-                ...input.peek(),
-                fetch: false,
-                refresh: false,
-            };
+            const consumed = consumeDataSourceFetchRequest(input.peek(), "fetch");
+            if (!consumed) return;
+            input.value = consumed;
             try { log.debug('[watch] fetch: upstream branch', { ds: context?.identity?.dataSourceRef, upstream: dataSource.dataSourceRef }); } catch(_) {}
             handleUpstream()
             return
         }
 
         try { log.debug('[watch] fetch: direct branch', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
-        input.value = {
-            ...input.peek(),
-            fetch: false,
-            refresh: false,
-        };
+        const consumed = consumeDataSourceFetchRequest(input.peek(), "fetch");
+        if (!consumed) return;
+        input.value = consumed;
         void doFetchRecords().finally(() => {
             try { log.debug('[watch] fetch flag consumed', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
         });

@@ -65,10 +65,10 @@ export function resolveHorizontalBarLayout({
     const width = Math.max(0, Number(containerWidth) || 0);
     const compact = width > 0 && width <= 520;
     const lines = Math.max(1, Math.min(2, Number(categoryLabel?.lines) || 2));
-    const categoryShare = compact ? 0.34 : 0.42;
+    const categoryShare = compact ? 0.4 : 0.42;
     const categoryWidth = Math.round(Math.max(
-        compact ? 76 : 110,
-        Math.min(compact ? 104 : 420, width * categoryShare || (compact ? 96 : 220)),
+        compact ? 84 : 110,
+        Math.min(compact ? 120 : 420, width * categoryShare || (compact ? 104 : 220)),
     ));
     const charactersPerLine = Math.max(compact ? 10 : 12, Math.floor(Math.max(64, categoryWidth - 16) / 6.5));
     const responsiveMaxCharacters = charactersPerLine;
@@ -78,7 +78,7 @@ export function resolveHorizontalBarLayout({
         : responsiveMaxCharacters;
     const bottomOffset = lines === 2 ? 14 : 0;
     const margin = compact
-        ? { top: embedded ? 20 : 10, right: 36, left: 0, bottom: (embedded ? 32 : 40) + bottomOffset }
+        ? { top: embedded ? 20 : 10, right: 36, left: 8, bottom: (embedded ? 32 : 40) + bottomOffset }
         : (embedded
             ? { top: 24, right: 12, left: 6, bottom: 34 + bottomOffset }
             : { top: 10, right: 60, left: 14, bottom: 42 + bottomOffset });
@@ -115,6 +115,23 @@ export function resolveResponsiveChartType(chartType = "", containerWidth = 0, {
         value instanceof Date || /^\d{4}-\d{2}-\d{2}(?:[T\s]|$)/.test(String(value ?? "").trim())
     ));
     return temporal ? normalizedType : "horizontal_bar";
+}
+
+export function resolveResponsiveCivilDateAxis(rows = [], dataKey = "", containerWidth = 0) {
+    const source = Array.isArray(rows) ? rows : [];
+    const key = String(dataKey || "").trim();
+    const width = Math.max(0, Number(containerWidth) || 0);
+    const values = key ? source.map((row) => readChartDataValue(row, key)).filter((value) => value != null) : [];
+    const temporal = values.length > 0 && values.every((value) => /^\d{4}-\d{2}-\d{2}(?:[T\s]|$)/.test(String(value).trim()));
+    if (!temporal || width <= 0 || width > 520) {
+        return { compact: false, ticks: undefined, tickFormat: "", bottomMargin: 0, labelPosition: "insideBottomRight", labelOffset: 0 };
+    }
+    const unique = values.filter((value, index) => index === 0 || String(value) !== String(values[index - 1]));
+    const targetCount = Math.min(unique.length, width < 360 ? 2 : 4);
+    const ticks = Array.from({ length: targetCount }, (_, index) => (
+        unique[Math.round((index * (unique.length - 1)) / Math.max(1, targetCount - 1))]
+    )).filter((value, index, all) => index === 0 || String(value) !== String(all[index - 1]));
+    return { compact: true, ticks, tickFormat: "MM/dd", bottomMargin: 72, labelPosition: "bottom", labelOffset: 18 };
 }
 
 export function hasNonZeroChartSeriesValue(rows = [], seriesKeys = []) {
@@ -500,4 +517,8 @@ export function resolveChartValueAxisDomain(chartType = "", explicitDomain = und
         (dataMin) => Math.min(0, Number.isFinite(Number(dataMin)) ? Number(dataMin) : 0),
         (dataMax) => Math.max(0, Number.isFinite(Number(dataMax)) ? Number(dataMax) : 0),
     ];
+}
+
+export function resolveChartAnimationActive(chart = {}) {
+    return chart?.animate === true || chart?.animation === true;
 }

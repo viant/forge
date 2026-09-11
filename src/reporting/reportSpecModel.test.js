@@ -4,6 +4,7 @@ import {
   buildReportBuilderPublishedDatasetConfig,
   buildReportBuilderPublishedDatasetDeclarations,
   buildReportBuilderReportSpec,
+  buildReportSpecChartBlock,
   normalizeReportBuilderPublishedDataSources,
 } from "./reportSpecModel.js";
 import { applyReportBuilderSemanticConfig } from "../components/dashboard/reportBuilderSemantic.js";
@@ -96,6 +97,16 @@ const rawState = {
     dateRange: { start: "2026-05-01", end: "2026-05-04" },
   },
 };
+
+const limitedChartBlock = buildReportSpecChartBlock({
+  container: { dataSourceRef: "primary" },
+  config: rawConfig,
+  state: rawState,
+  blockId: "limitedChart",
+  rowLimit: 4,
+  chartSpec: { type: "bar", xField: "eventDate", yFields: ["totalSpend"] },
+});
+assert.equal(limitedChartBlock?.rowLimit, 4);
 
 const rawSpec = buildReportBuilderReportSpec({
   container: {

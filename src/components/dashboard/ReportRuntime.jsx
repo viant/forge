@@ -27,6 +27,7 @@ import {
   buildPendingReportRuntimeProviderActionsState,
   buildResolvedReportRuntimeProviderActionsState,
   loadReportRuntimeProviderActions,
+  settleMissingReportRuntimeProviderActionsState,
 } from "./reportRuntimeProviderActions.js";
 import { resolveReportRuntimeChartInteractionSupport } from "./reportRuntimeChartInteractions.js";
 import {
@@ -273,16 +274,27 @@ export function resolveReportRuntimeCompositeColumns(block = {}, viewportWidth =
     return 1;
   }
   const normalizedWidth = Number(viewportWidth) || 0;
+  const runtime = block?.content?.runtime || block?.runtime || {};
+  const requestedColumns = (name, fallback) => {
+    const requested = Number(runtime?.[name]);
+    return Number.isFinite(requested)
+      ? Math.max(1, Math.min(3, Math.floor(requested)))
+      : fallback;
+  };
+  const constrainForMinimumWidth = (columns) => {
+    const minimumWidth = Number(runtime?.minColumnWidth);
+    if (!normalizedWidth || !Number.isFinite(minimumWidth) || minimumWidth <= 0) {
+      return columns;
+    }
+    return Math.max(1, Math.min(columns, Math.floor(normalizedWidth / Math.max(160, minimumWidth)) || 1));
+  };
   if (normalizedWidth > 0 && normalizedWidth <= 640) {
-    const requestedMobileColumns = Number(block?.content?.runtime?.mobileColumns ?? block?.runtime?.mobileColumns);
-    return Number.isFinite(requestedMobileColumns)
-      ? Math.max(1, Math.min(3, Math.floor(requestedMobileColumns)))
-      : 1;
+    return constrainForMinimumWidth(requestedColumns("mobileColumns", 1));
   }
   if (normalizedWidth > 0 && normalizedWidth <= 960) {
-    return 2;
+    return constrainForMinimumWidth(requestedColumns("tabletColumns", 2));
   }
-  return 3;
+  return constrainForMinimumWidth(requestedColumns("desktopColumns", 3));
 }
 
 function formatKpiValue(value, format = "", locale = "en-US") {
@@ -1067,7 +1079,10 @@ export function resolvePublicReportRuntimeDiagnostics(diagnostics = [], reportFi
   if (!hasUsableReportRuntimeData(reportFill)) {
     return source;
   }
-  return source.filter((diagnostic) => !isReportRuntimeRefreshDiagnostic(diagnostic));
+  // A populated saved report is the usable public state. Runtime/provider
+  // diagnostics describe refresh mechanics and remain available in developer
+  // mode, but must not replace or globally warn over materialized report data.
+  return [];
 }
 
 export function sanitizeReportRuntimeDiagnostics(diagnostics = [], publicMode = false) {
@@ -2059,12 +2074,18 @@ export function buildRuntimeSections(blocks = [], hiddenBlockIds = new Set()) {
       return;
     }
     if (kind === "sectionBlock") {
+      const ownedBlockIds = (Array.isArray(block?.content?.blockIds)
+        ? block.content.blockIds
+        : (Array.isArray(block?.blockIds) ? block.blockIds : []))
+        .map((ownedBlockId) => normalizeString(ownedBlockId))
+        .filter(Boolean);
       current = {
         id: normalizeString(block?.id || `section_${index + 1}`) || `section_${index + 1}`,
         title: normalizeString(block?.title || block?.content?.title || `Section ${sections.length + 1}`) || `Section ${sections.length + 1}`,
         navigationLabel: normalizeString(block?.content?.navigationLabel || block?.navigationLabel || block?.title || `Section ${sections.length + 1}`) || `Section ${sections.length + 1}`,
         block,
         items: [],
+        ownedBlockIds,
       };
       sections.push(current);
       return;
@@ -2076,8 +2097,12 @@ export function buildRuntimeSections(blocks = [], hiddenBlockIds = new Set()) {
         navigationLabel: "Overview",
         block: null,
         items: [],
+        ownedBlockIds: [],
       };
       sections.push(current);
+    }
+    if (includeUnlistedSections === false && current.ownedBlockIds.length > 0 && !current.ownedBlockIds.includes(normalizeString(block?.id))) {
+      return;
     }
     current.items.push(block);
   });
@@ -3009,6 +3034,10 @@ export default function ReportRuntime({
   }, [reportFill?.specHash]);
 
   useEffect(() => {
+    if (!drillMetadataProvider) {
+      setProviderActionState((current) => settleMissingReportRuntimeProviderActionsState(current));
+      return undefined;
+    }
     let cancelled = false;
     async function loadProviderActions() {
       setProviderActionState((current) => buildPendingReportRuntimeProviderActionsState(current));

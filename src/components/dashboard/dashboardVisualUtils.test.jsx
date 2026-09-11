@@ -4,9 +4,13 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import {
+  formatDashboardTableCellText,
   renderDashboardTableCell,
   renderExplicitReportTableCellVisual,
 } from "./dashboardVisualUtils.jsx";
+
+assert.equal(formatDashboardTableCellText(11.03573785, {}, { format: "currency" }, "en-US"), "$11.04");
+assert.equal(formatDashboardTableCellText(11.03573785, {}, { format: "compactNumber" }, "en-US"), "11");
 
 const badgeHtml = renderToStaticMarkup(
   renderExplicitReportTableCellVisual(

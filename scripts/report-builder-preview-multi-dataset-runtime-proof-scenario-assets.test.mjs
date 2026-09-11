@@ -14,5 +14,6 @@ assert.equal(steps.some((step) => step.type === "clickRole" && step.role === "ta
 assert.equal(steps.some((step) => step.type === "clickRole" && String(step.name).startsWith("Expand ")), true);
 assert.equal(steps.some((step) => step.type === "clickRole" && step.role === "tab" && step.name === "Filters"), true);
 assert.equal(steps.some((step) => step.type === "clickRole" && step.name === "Export"), true);
+assert.equal(steps.some((step) => step.type === "clickRole" && step.role === "menuitem" && step.name === "CSV"), true);
 
 console.log("report-builder-preview-multi-dataset-runtime-proof-scenario-assets ✓ covers seeded datasets, tabs, collapsed table, filters, responsive viewports, and export controls");
