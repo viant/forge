@@ -244,22 +244,9 @@ const html = renderToStaticMarkup(
   }),
 );
 
-assert.ok(html.includes("Authored Semantic Report"));
-assert.ok(html.includes("Live builder state compiled into the current authored report runtime contract."));
-assert.ok(html.includes("Model Ad Delivery"));
-assert.ok(html.includes("Entity Line Delivery"));
-assert.ok(html.includes("Dimensions Market"));
-assert.ok(html.includes("Measures Available Impressions, Household Uniques"));
-assert.ok(html.includes("Owner team://example/performance"));
-assert.ok(html.includes("1 deprecated"));
-assert.ok(html.includes("1 draft"));
-assert.ok(html.includes("Runtime Diagnostics"));
-assert.ok(html.includes("Market • Owner team://example/performance • Deprecated"));
-assert.ok(html.includes("Available Impressions • Owner team://example/performance • Draft"));
-assert.ok(html.includes("Primary Table references unavailable table column"));
-assert.ok(html.includes("Re-select the field in the builder or edit the table block to use one of the current selected dimensions or measures."));
-assert.ok(html.includes("documentBlockColumnUnavailable"));
-assert.ok(html.includes("Block primaryTable"));
-assert.ok(html.includes("reportDocument.blocks.primaryTable.columns[0]"));
+assert.ok(html.includes("Show report metadata"));
+assert.ok(html.includes("Report metadata"));
+assert.ok(!html.includes("Authored Semantic Report"));
+assert.ok(!html.includes("Live builder state compiled into the current authored report runtime contract."));
 
-console.log("DashboardReportRuntime ✓ renders reopened semantic runtime blocks with binding chips and actionable diagnostics");
+console.log("DashboardReportRuntime ✓ keeps reopened semantic runtime metadata collapsed by default");
