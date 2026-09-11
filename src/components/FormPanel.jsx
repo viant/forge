@@ -1,3 +1,4 @@
+import {useWorkspacePresentation} from '../core/context/WorkspacePresentation.jsx';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
     Tabs,
@@ -13,6 +14,7 @@ import SectionTabRail from './SectionTabRail.jsx';
 
 const FormPanel = ({context, container, children, dataSourceFetchMode = 'always'}) => {
     useSignals();
+    const workspacePresentation = useWorkspacePresentation();
     const containers = container.containers || [];
     containers.forEach((entry) => trackContainerVisibility(entry, context));
     const visibleContainers = containers.filter((entry) => isContainerVisible(entry, context));
@@ -129,7 +131,7 @@ const FormPanel = ({context, container, children, dataSourceFetchMode = 'always'
                     items={visibleContainers.map((tab) => ({id: tab.id, label: tab.title, icon: tab.icon}))}
                     selectedId={selected?.id}
                     onChange={handleTabChange}
-                    ariaLabel={container?.tabs?.ariaLabel || 'Sections'}
+                    ariaLabel={container?.tabs?.ariaLabel || (workspacePresentation?.kind === 'report' ? 'Report sections' : 'Resource sections')}
                     showIcons={container?.tabs?.showIcons === true}
                     compact={compactTabs}
                     idPrefix={tabDOMPrefix}

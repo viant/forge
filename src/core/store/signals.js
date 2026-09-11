@@ -664,6 +664,7 @@ export const restoreWindowsFromSnapshot = (snapshot) => {
         region: win?.region || '',
         workspaceSharePct: win?.workspaceSharePct ?? undefined,
         workspaceMinHeight: win?.workspaceMinHeight ?? undefined,
+        workspaceObject: win?.workspaceObject && !containsSnapshotSerializationMarker(win.workspaceObject) ? win.workspaceObject : undefined,
         navigation: win?.navigation && typeof win.navigation === 'object' && !containsSnapshotSerializationMarker(win.navigation) ? { ...win.navigation } : undefined,
         mcpUI: win?.mcpUI && typeof win.mcpUI === 'object' && !containsSnapshotSerializationMarker(win.mcpUI) ? { ...win.mcpUI } : undefined,
         workspaceCollapsed: win?.workspaceCollapsed === true,
@@ -727,7 +728,7 @@ const resolveWindowHostOpenState = (options = {}) => {
         return 'fresh';
     }
     const requested = String(options?.hostOpenState || '').trim().toLowerCase();
-    if (requested === 'fresh' || requested === 'historical_replay') {
+    if (requested === 'fresh' || requested === 'historical_replay' || requested === 'user_requested') {
         return requested;
     }
     return 'unknown';
@@ -814,6 +815,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
         const computedTitle = computeWindowTitle(windowTitle, options && options.autoIndexTitle === true, instanceIndex);
 
         let newWindow = {
+            workspaceObject: options.workspaceObject,
             windowTitle: computedTitle,
             windowId,
             hostOpenState,
@@ -885,6 +887,11 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
             windowKey,
             presentation: nextPresentation,
             region: nextRegion,
+            workspaceObject: !replacingSemanticWindow && existingWindow.workspaceObject
+                ? (options.workspaceObject ? { ...existingWindow.workspaceObject, ...options.workspaceObject,
+                    origin: existingWindow.workspaceObject.origin || options.workspaceObject.origin,
+                  } : existingWindow.workspaceObject)
+                : options.workspaceObject,
             navigation: options.navigation && typeof options.navigation === 'object' ? { ...options.navigation } : undefined,
             mcpUI: options.mcpUI && typeof options.mcpUI === 'object' ? { ...options.mcpUI } : undefined,
             windowData,

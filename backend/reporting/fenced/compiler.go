@@ -545,7 +545,8 @@ func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw 
 			if tabSections[id] && len(elements) > 0 {
 				flush()
 			}
-			ensure(44)
+			// Keep the section heading with the following block title and first rows.
+			ensure(140)
 			titleID := id + "__title"
 			elements = append(elements, rectElement(id+"__rule", margin, y, 4, 28, "#2563eb"))
 			elements = append(elements, textElement(titleID, margin+12, y+3, width-2*margin-12, 24, blockTitle, 16, "700"))
@@ -1250,7 +1251,23 @@ func buildChartSVG(rows []map[string]any, chartSpec map[string]any, width, heigh
 	fmt.Fprintf(&svg, `<rect width="%.0f" height="%.0f" rx="6" fill="#ffffff" stroke="#d0d5dd"/>`, width, height)
 	fmt.Fprintf(&svg, `<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#98a2b3"/>`, left, top+plotHeight, left+plotWidth, top+plotHeight)
 	palette := []string{"#2563eb", "#16a34a", "#f59e0b", "#7c3aed"}
-	if chartType == "bar" || chartType == "column" {
+	if chartType == "horizontalbar" {
+		labelWidth := math.Min(120, width*0.25)
+		available := width - labelWidth - right
+		slot := plotHeight / float64(max(1, len(rows)))
+		barHeight := slot * 0.7 / float64(max(1, len(yFields)))
+		for rowIndex, row := range rows {
+			center := top + float64(rowIndex)*slot + slot/2
+			fmt.Fprintf(&svg, `<text x="%.1f" y="%.1f" text-anchor="end" font-size="9" fill="#667085">%s</text>`, labelWidth-8, center+3, html.EscapeString(textValue(row[xField])))
+			for seriesIndex, field := range yFields {
+				value, _ := numberValue(row[field])
+				y := top + float64(rowIndex)*slot + slot*0.15 + float64(seriesIndex)*barHeight
+				fmt.Fprintf(&svg, `<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="%s"/>`, labelWidth, y, math.Max(0, value/maxValue*available), barHeight, palette[seriesIndex%len(palette)])
+			}
+		}
+		svg.WriteString(`</svg>`)
+		return svg.String()
+	} else if chartType == "bar" || chartType == "column" {
 		count := max(1, len(rows)*len(yFields))
 		barWidth := plotWidth / float64(count) * 0.72
 		slot := plotWidth / float64(count)
@@ -1278,7 +1295,7 @@ func buildChartSVG(rows []map[string]any, chartSpec map[string]any, width, heigh
 				points = append(points, fmt.Sprintf("%.1f,%.1f", x, y))
 			}
 			if len(points) > 0 {
-				fmt.Fprintf(&svg, `<polyline points="%s" fill="none" stroke="%s" stroke-width="2.5"/>`, strings.Join(points, " "), palette[seriesIndex%len(palette)])
+				fmt.Fprintf(&svg, `<path d="M %s" fill="none" stroke="%s" stroke-width="2.5"/>`, strings.Join(points, " L "), palette[seriesIndex%len(palette)])
 			}
 		}
 	}
@@ -1293,7 +1310,13 @@ func buildChartSVG(rows []map[string]any, chartSpec map[string]any, width, heigh
 			x += float64(rowIndex) * plotWidth / float64(len(rows)-1)
 		}
 		label := html.EscapeString(textValue(rows[rowIndex][xField]))
-		fmt.Fprintf(&svg, `<text x="%.1f" y="%.1f" text-anchor="middle" font-size="9" fill="#667085">%s</text>`, x, height-10, label)
+		anchor := "middle"
+		if rowIndex == 0 {
+			anchor = "start"
+		} else if rowIndex == len(rows)-1 {
+			anchor = "end"
+		}
+		fmt.Fprintf(&svg, `<text x="%.1f" y="%.1f" text-anchor="%s" font-size="9" fill="#667085">%s</text>`, x, height-10, anchor, label)
 	}
 	svg.WriteString(`</svg>`)
 	return svg.String()

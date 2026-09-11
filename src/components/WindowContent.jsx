@@ -1008,6 +1008,7 @@ function WindowContentInner({window, metadata, services}) {
  * ------------------------------------------------------------------ */
 
 export default function WindowContent({window, isInTab = false}) {
+    useSignals();
     const {windowKey, windowId} = window;
     const baseKey = windowKey.split('?')[0];
 
@@ -1156,6 +1157,18 @@ export default function WindowContent({window, isInTab = false}) {
     const metadata = metadataSignalHandle?.peek?.();
 
     const displayState = resolveWindowMetadataDisplayState({loading, signalsReady, metadata, fetchError});
+
+    useEffect(() => {
+        if (!window?.workspaceObject || (displayState !== 'ready' && displayState !== 'error')) return;
+        const lifecycleState = displayState === 'ready' ? 'ready' : 'failed';
+        const entries = activeWindows.peek();
+        const entry = entries.find((item) => item.windowId === windowId);
+        if (!entry || entry.workspaceObject?.lifecycle?.state === lifecycleState) return;
+        activeWindows.value = entries.map((item) => item.windowId === windowId ? {
+            ...item,
+            workspaceObject: { ...item.workspaceObject, lifecycle: { ...item.workspaceObject.lifecycle, state: lifecycleState } },
+        } : item);
+    }, [displayState, windowId, window?.workspaceObject]);
 
     if (displayState === 'error') {
         return (
