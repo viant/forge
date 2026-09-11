@@ -25,6 +25,8 @@ import {
 
 assert.equal(formatTimestamp('', 'MM/dd'), '');
 assert.equal(formatTimestamp(null, 'MM/dd'), '');
+assert.equal(formatChartXAxisValue('2026-09-05', 'MM/dd'), '09/05');
+assert.equal(formatChartXAxisValue('2026-09-11', 'MM/dd'), '09/11');
 assert.equal(formatTimestamp('not-a-date', 'MM/dd'), 'not-a-date');
 assert.equal(formatTimestamp('2026-05-14T12:00:00Z', 'MM/dd'), '05/14');
 assert.equal(formatChartXAxisValue(5), '5');

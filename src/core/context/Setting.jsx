@@ -5,8 +5,9 @@ import { ensureUIBridgeClientId } from '../ui/bridge.js';
 
 const Setting = createContext({});
 const NoopAuthContext = createContext({});
+const EMPTY_SETTINGS = Object.freeze({});
 
-export const SettingProvider = ({endpoints, connectorConfig, authContext, services={}, targetContext = {}, children}) => {
+export const SettingProvider = ({endpoints, connectorConfig, authContext, services=EMPTY_SETTINGS, targetContext = EMPTY_SETTINGS, children}) => {
 
     const safeAuthContext = authContext || NoopAuthContext;
     const useAuth = () => useContext(safeAuthContext);

@@ -1,3 +1,4 @@
+import {WorkspacePresentationProvider, useWorkspacePresentation, distinctWorkspaceTitle} from '../../core/context/WorkspacePresentation.jsx';
 import { resolveReportRuntimeCompositeOwnership } from "./reportRuntimeStructure.js";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@blueprintjs/core";
@@ -197,6 +198,8 @@ function buildRuntimeTableRows(block = {}, dataset = {}) {
 }
 
 function RuntimePanel({ title = "", subtitle = "", children, className = "", style = {}, headerAction = null }) {
+  const presentation = useWorkspacePresentation();
+  title = distinctWorkspaceTitle(title, presentation?.sectionLabel);
   return (
     <section
       className={className || undefined}
@@ -2859,6 +2862,7 @@ export default function ReportRuntime({
   suppressFilterBarBlockDatasetRefs = [],
   showDeveloperDiagnostics = false,
 }) {
+  const workspacePresentation = useWorkspacePresentation();
   const reportPresentation = normalizeString(presentationMode).toLowerCase() === "report";
   const publicDiagnosticsMode = reportPresentation && !showDeveloperDiagnostics;
   const [selectedChartSelectionsByBlock, setSelectedChartSelectionsByBlock] = useState({});
@@ -3409,7 +3413,7 @@ export default function ReportRuntime({
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {showContextSummary ? (
         <RuntimePanel
-          title={normalizeString(title || reportDocument?.title || reportSpec?.title || (reportPresentation ? "Report" : "Report Runtime Preview"))}
+          title={distinctWorkspaceTitle(normalizeString(title || reportDocument?.title || reportSpec?.title || (reportPresentation ? "Report" : "Report Runtime Preview")), workspacePresentation?.label)}
           subtitle={normalizeString(subtitle)}
         >
           {!reportPresentation ? <BindingChips bindingSummary={bindingSummary} /> : null}
@@ -3457,7 +3461,7 @@ export default function ReportRuntime({
       <DiagnosticsPanel diagnostics={visibleRuntimeDiagnostics} developerMode={!reportPresentation || showDeveloperDiagnostics} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />
       {runtimeSections.length > 1 || (runtimeTabGroup?.includeUnlistedSections === false && runtimeSections.length > 0) ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {runtimeTabGroup?.title ? (
+          {distinctWorkspaceTitle(runtimeTabGroup?.title, workspacePresentation?.label) ? (
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "#486579" }}>
               {runtimeTabGroup.title}
             </div>
@@ -3466,17 +3470,17 @@ export default function ReportRuntime({
             items={runtimeSections.map((section) => ({id: section.id, label: section.navigationLabel}))}
             selectedId={resolvedActiveSectionId}
             onChange={setActiveSectionId}
-            ariaLabel={runtimeTabGroup?.title || "Report sections"}
+            ariaLabel="Report sections"
           />
           {runtimeSections.map((section) => {
             if (normalizeString(section?.id) !== resolvedActiveSectionId) {
               return null;
             }
             return (
-              <div key={section.id} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <WorkspacePresentationProvider key={section.id} value={{...workspacePresentation, sectionLabel: section.navigationLabel}}><div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {section.block ? renderBlock(section.block) : null}
                 {renderLayoutBlockGrid(section.items, `runtime:${section.id}`)}
-              </div>
+              </div></WorkspacePresentationProvider>
             );
           })}
         </div>

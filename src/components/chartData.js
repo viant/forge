@@ -378,7 +378,7 @@ export function formatTimestamp(timestamp, fmt = "MM/dd", valueMode = "") {
     if (timestamp === null || timestamp === undefined || timestamp === "") {
         return "";
     }
-    const civilMatch = valueMode === "civil" && typeof timestamp === "string"
+    const civilMatch = typeof timestamp === "string" && (valueMode === "civil" || /^\d{4}-\d{2}-\d{2}$/.test(timestamp))
         ? timestamp.match(/^(\d{4})-(\d{2})-(\d{2})/)
         : null;
     const date = civilMatch

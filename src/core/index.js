@@ -5,3 +5,5 @@ export * from './context/registry.js';
 export * from './store/signals.js';
 export * from './bus.js';
 export * from './ui/index.js';
+
+export * from './context/WorkspacePresentation.jsx';

@@ -1,3 +1,4 @@
+import { getViewSignal } from '../../core/store/signals.js';
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { HTMLTable, Spinner } from "@blueprintjs/core";
 import numeral from "numeral";
@@ -220,7 +221,6 @@ const Basic = ({ context, container, columns, pagination, children, renderRows }
         };
     }, [context, dataSource?.filterMode, clientPagination, pagingSize, activeFilterSet]);
 
-    const enforceColumnSize = container?.table?.enforceColumnSize !== false; // default to true
 
     const handleShowFullContent = (content) => {
         setPopupContent(content);
@@ -271,6 +271,9 @@ const Basic = ({ context, container, columns, pagination, children, renderRows }
     );
 
     const [columnsToUse, setColumnsToUse] = useState(visibleColumns);
+    // Fit wide tables when space allows; narrow panes retain readable declared widths.
+    const enforceColumnSize = container?.table?.enforceColumnSize === true
+        || (container?.table?.enforceColumnSize !== false && tableWidth >= scrollableTableWidth(visibleColumns));
 
     useEffect(() => {
         const data = handlers.dataSource.getCollection();
@@ -519,7 +522,29 @@ const Basic = ({ context, container, columns, pagination, children, renderRows }
             setHorizontalOverflow({left: false, right: false, cueTop: null});
             return undefined;
         }
+        const windowId = context?.identity?.windowId;
+        const viewSignal = windowId ? getViewSignal(windowId) : null;
+        const scrollKey = container?.id || 'table';
+        let wasVisible = false;
+        let remembered = viewSignal?.peek?.()?.tableScroll?.[scrollKey] || { left: 0, top: 0 };
+        const rememberScroll = () => {
+            if (!scroller.getClientRects().length || !wasVisible) return;
+            remembered = { left: scroller.scrollLeft, top: scroller.scrollTop };
+            if (viewSignal) {
+                const previous = viewSignal.peek() || {};
+                const saved = previous.tableScroll?.[scrollKey];
+                if (saved?.left !== remembered.left || saved?.top !== remembered.top) {
+                    viewSignal.value = { ...previous, tableScroll: { ...previous.tableScroll, [scrollKey]: remembered } };
+                }
+            }
+        };
         const update = () => {
+            const visible = scroller.getClientRects().length > 0 && scroller.clientWidth > 0;
+            if (visible && !wasVisible) {
+                scroller.scrollLeft = remembered.left;
+                scroller.scrollTop = remembered.top;
+            }
+            wasVisible = visible;
             const maxLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
             const wrapperRect = tableRef.current?.getBoundingClientRect?.();
             const scrollRect = scroller.getBoundingClientRect?.();
@@ -535,11 +560,13 @@ const Basic = ({ context, container, columns, pagination, children, renderRows }
             ));
         };
         update();
+        scroller.addEventListener('scroll', rememberScroll, {passive: true});
         scroller.addEventListener('scroll', update, {passive: true});
         const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(update) : null;
         observer?.observe(scroller);
         if (scroller.firstElementChild) observer?.observe(scroller.firstElementChild);
         return () => {
+            scroller.removeEventListener('scroll', rememberScroll);
             scroller.removeEventListener('scroll', update);
             observer?.disconnect();
         };
