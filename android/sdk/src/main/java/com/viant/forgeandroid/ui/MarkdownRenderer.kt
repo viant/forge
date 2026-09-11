@@ -33,6 +33,9 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -285,7 +288,7 @@ private fun inlineMarkdown(text: String): String {
 
 internal fun inlineMarkdownAnnotatedString(text: String): AnnotatedString = buildAnnotatedString {
     var cursor = 0
-    val token = Regex("@\\{([a-zA-Z][a-zA-Z0-9_-]*):([^\\s\"]+)\\s+\"((?:[^\"\\\\]|\\\\.)*)\"\\}|\\*\\*(.+?)\\*\\*|`(.+?)`|\\[(.+?)]\\((.+?)\\)")
+    val token = Regex("@\\{([a-zA-Z][a-zA-Z0-9_-]*):([^\\s\"]+)\\s+\"((?:[^\"\\\\]|\\\\.)*)\"\\}|\\*\\*(.+?)\\*\\*|`(.+?)`|\\[(.+?)]\\((.+?)\\)|\\*([^*\\n]+)\\*|(?<!\\w)_([^_\\n]+)_|~~(.+?)~~")
     token.findAll(text).forEach { match ->
         if (match.range.first > cursor) append(text.substring(cursor, match.range.first))
         when {
@@ -322,9 +325,19 @@ internal fun inlineMarkdownAnnotatedString(text: String): AnnotatedString = buil
                 append(match.groups[5]?.value.orEmpty())
                 pop()
             }
-            else -> {
+            match.groups[6] != null -> {
+                val url = match.groups[7]?.value.orEmpty().trim()
+                val allowed = Regex("^(https?://|mailto:|tel:)", RegexOption.IGNORE_CASE).containsMatchIn(url)
+                if (allowed) pushLink(LinkAnnotation.Url(url))
                 pushStyle(SpanStyle(color = Color(0xFF1D4ED8)))
                 append(match.groups[6]?.value.orEmpty())
+                pop()
+                if (allowed) pop()
+            }
+            else -> {
+                val italic = match.groups[8]?.value ?: match.groups[9]?.value
+                pushStyle(if (italic != null) SpanStyle(fontStyle = FontStyle.Italic) else SpanStyle(textDecoration = TextDecoration.LineThrough))
+                append(italic ?: match.groups[10]?.value.orEmpty())
                 pop()
             }
         }
