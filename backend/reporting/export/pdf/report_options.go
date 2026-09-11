@@ -17,9 +17,12 @@ import (
 func reportOptionLines(options Options) []string {
 	var metadata struct {
 		Definitions []struct {
-			Name   string            `json:"name"`
-			Label  string            `json:"label"`
-			Values []json.RawMessage `json:"values"`
+			Name         string            `json:"name"`
+			Hidden       bool              `json:"hidden"`
+			Visible      *bool             `json:"visible"`
+			Presentation json.RawMessage   `json:"presentation"`
+			Label        string            `json:"label"`
+			Values       []json.RawMessage `json:"values"`
 		} `json:"reportOptions"`
 		Values map[string]any `json:"options"`
 	}
@@ -52,6 +55,28 @@ func reportOptionLines(options Options) []string {
 		}
 		sort.Strings(names)
 		for _, name := range names {
+			// A definition list is the public control catalog. Compatibility
+			// request fields absent from it must not become printed controls.
+			visible := len(metadata.Definitions) == 0
+			for _, definition := range metadata.Definitions {
+				if definition.Name != name {
+					continue
+				}
+				visible = !definition.Hidden && (definition.Visible == nil || *definition.Visible)
+				var placement string
+				var presentation struct {
+					Placement string `json:"placement"`
+				}
+				_ = json.Unmarshal(definition.Presentation, &placement)
+				_ = json.Unmarshal(definition.Presentation, &presentation)
+				if placement == "hidden" || presentation.Placement == "hidden" {
+					visible = false
+				}
+				break
+			}
+			if !visible {
+				continue
+			}
 			value := selected[name]
 			switch value.(type) {
 			case string, bool, float64:
