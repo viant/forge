@@ -33,7 +33,7 @@ import kotlinx.serialization.json.*
 import java.time.*
 
 @Composable
-internal fun NativeWidgetView(sourceItem: ItemDef, value: JsonElement?, onChange: (JsonElement) -> Unit, onAction: (() -> Unit)? = null, windowForm: Map<String, Any?> = emptyMap(), onDraftChange: ((Map<String, Any?>) -> Unit)? = null) {
+internal fun NativeWidgetView(sourceItem: ItemDef, value: JsonElement?, onChange: (JsonElement) -> Unit, onAction: (() -> Unit)? = null, windowForm: Map<String, Any?> = emptyMap(), onDraftChange: ((Map<String, Any?>) -> Unit)? = null, loadedOptions: List<Pair<JsonElement, String>>? = null) {
     val item = sourceItem.copy(properties = sourceItem.properties + buildMap {
         sourceItem.min?.let { put("min", it) }; sourceItem.max?.let { put("max", it) }
         sourceItem.accept?.let { put("accept", JsonPrimitive(it)) }; sourceItem.separator?.let { put("separator", JsonPrimitive(it)) }
@@ -92,7 +92,7 @@ internal fun NativeWidgetView(sourceItem: ItemDef, value: JsonElement?, onChange
             }
             "select","radio","daterangepreset" -> {
                 var expanded by remember(item.id) { mutableStateOf(false) }
-                val options = NativeWidgetContract.options(item)
+                val options = loadedOptions ?: NativeWidgetContract.options(item)
                 Text(label)
                 Box {
                     OutlinedButton(onClick = { expanded = true }, enabled = !unavailable) { Text(options.firstOrNull { NativeWidgetContract.equivalent(it.first, value) }?.second ?: "Select") }
@@ -117,11 +117,11 @@ internal fun NativeWidgetView(sourceItem: ItemDef, value: JsonElement?, onChange
                     if (!customEnabled) Text("Custom dates are saved as a draft and do not refresh data yet.")
                 }
             }
-            "treemultiselect" -> NativeTreeChoices(NativeWidgetContract.options(item), (value as? JsonArray).orEmpty(), (item.properties["separator"] as? JsonPrimitive)?.content ?: "_", !unavailable, onChange = { onChange(JsonArray(it)) })
+            "treemultiselect" -> NativeTreeChoices(loadedOptions ?: NativeWidgetContract.options(item), (value as? JsonArray).orEmpty(), (item.properties["separator"] as? JsonPrimitive)?.content ?: "_", !unavailable, onChange = { onChange(JsonArray(it)) })
             "multiselect" -> {
                 Text(label)
                 val selected = (value as? JsonArray).orEmpty()
-                NativeWidgetContract.options(item).forEach { option ->
+                (loadedOptions ?: NativeWidgetContract.options(item)).forEach { option ->
                     Row { Checkbox(checked = selected.any { NativeWidgetContract.equivalent(it, option.first) }, enabled = !unavailable, onCheckedChange = { checked -> onChange(JsonArray(if (checked) (selected + option.first).distinct() else selected.filterNot { NativeWidgetContract.equivalent(it, option.first) })) }); Text(option.second) }
                 }
             }

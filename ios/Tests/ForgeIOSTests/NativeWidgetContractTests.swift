@@ -3,6 +3,13 @@ import XCTest
 @testable import ForgeIOSUI
 
 final class NativeWidgetContractTests: XCTestCase {
+    func testNativeChartTypeNormalizationMatchesSharedAliasesAndDefault() {
+        XCTAssertEqual(normalizeNativeChartType(nil), "line")
+        XCTAssertEqual(normalizeNativeChartType("Horizontal-Bar"), "horizontal_bar")
+        XCTAssertEqual(normalizeNativeChartType("horizontalBar"), "horizontal_bar")
+        XCTAssertEqual(normalizeNativeChartType("funnel"), "funnel_bar")
+        XCTAssertEqual(normalizeNativeChartType("stackedBar"), "stacked_bar")
+    }
     func testConditionalEditabilitySurvivesItemRoundTrip() throws {
         let raw = Data(#"{"id":"contact","readOnlyWhen":{"source":"authorization","field":"resource.capabilities.write","notEquals":true}}"#.utf8)
         let item = try JSONDecoder().decode(ItemDef.self, from: raw)

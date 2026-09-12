@@ -3,6 +3,21 @@ import SwiftUI
 import Charts
 import ForgeIOSRuntime
 
+internal func normalizeNativeChartType(_ value: String?) -> String {
+    let normalized = (value ?? "")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+        .replacingOccurrences(of: "-", with: "_")
+        .replacingOccurrences(of: " ", with: "_")
+    switch normalized {
+    case "", "default": return "line"
+    case "horizontalbar", "horizontal_bar_chart", "bar_horizontal": return "horizontal_bar"
+    case "funnel", "funnelbar", "funnel_bar_chart": return "funnel_bar"
+    case "stackedbar", "stacked_bar_chart": return "stacked_bar"
+    default: return normalized
+    }
+}
+
 public struct ChartRenderer: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.forgePresentationDensity) private var presentationDensity
@@ -191,7 +206,7 @@ public struct ChartRenderer: View {
             Chart(displayChartSeriesData) { item in
                 let series = displayByKey[item.seriesKey]
                 let seriesType = series?.type ?? type
-                if singleCategory && seriesType != "bar" && seriesType != "stacked_bar" {
+                if singleCategory && !["bar", "stacked_bar", "horizontal_bar", "funnel_bar"].contains(seriesType) {
                     BarMark(
                         x: .value("Category", item.category),
                         y: .value("Value", item.chartValue)
@@ -236,6 +251,13 @@ public struct ChartRenderer: View {
                             y: .value("Value", item.chartValue)
                         )
                         .foregroundStyle(by: .value("Series", item.seriesKey))
+                    case "horizontal_bar", "funnel_bar":
+                        BarMark(
+                            x: .value("Value", item.chartValue),
+                            y: .value("Category", item.category)
+                        )
+                        .foregroundStyle(by: .value("Series", item.seriesKey))
+                        .position(by: .value("Series", item.seriesKey))
                     default:
                         LineMark(
                             x: .value("Category", item.category),
@@ -246,30 +268,46 @@ public struct ChartRenderer: View {
                         .foregroundStyle(by: .value("Series", item.seriesKey))
                     }
                 }
-                if item.category == selectedCategory, type != "bar", type != "stacked_bar" {
-                    PointMark(
-                        x: .value("Category", item.category),
-                        y: .value("Value", item.chartValue)
-                    )
-                    .foregroundStyle(by: .value("Series", item.seriesKey))
-                    .symbolSize(72)
+                if item.category == selectedCategory, !["bar", "stacked_bar"].contains(type) {
+                    if ["horizontal_bar", "funnel_bar"].contains(type) {
+                        PointMark(x: .value("Value", item.chartValue), y: .value("Category", item.category))
+                            .foregroundStyle(by: .value("Series", item.seriesKey))
+                            .symbolSize(72)
+                    } else {
+                        PointMark(x: .value("Category", item.category), y: .value("Value", item.chartValue))
+                            .foregroundStyle(by: .value("Series", item.seriesKey))
+                            .symbolSize(72)
+                    }
                 }
             }
             .chartForegroundStyleScale(domain: seriesKeys, range: seriesColors)
             .chartXAxis {
-                AxisMarks(values: sampledChartAxisLabels(
-                    displayChartSeriesData.map(\.category),
-                    maximum: isCompactPresentation ? 4 : 6
-                )) { value in
-                    AxisGridLine()
-                    AxisTick()
-                    if let raw = value.as(String.self) {
-                        AxisValueLabel { Text(formatChartAxisLabel(raw, tickFormat: resolvedXTickFormat)) }
+                if ["horizontal_bar", "funnel_bar"].contains(type) {
+                    AxisMarks(position: .bottom) {
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel()
+                    }
+                } else {
+                    AxisMarks(values: sampledChartAxisLabels(
+                        displayChartSeriesData.map(\.category),
+                        maximum: isCompactPresentation ? 4 : 6
+                    )) { value in
+                        AxisGridLine()
+                        AxisTick()
+                        if let raw = value.as(String.self) {
+                            AxisValueLabel { Text(formatChartAxisLabel(raw, tickFormat: resolvedXTickFormat)) }
+                        }
                     }
                 }
             }
             .chartYAxis {
-                if chartAxisOrder.count > 1 {
+                if ["horizontal_bar", "funnel_bar"].contains(type) {
+                    AxisMarks(position: .leading) {
+                        AxisTick()
+                        AxisValueLabel()
+                    }
+                } else if chartAxisOrder.count > 1 {
                     if let axis = chartAxisOrder.first {
                         AxisMarks(position: .leading, values: [0.0, 0.5, 1.0]) { value in
                             AxisGridLine()
@@ -297,13 +335,13 @@ public struct ChartRenderer: View {
                         AxisTick()
                         if let raw = value.as(Double.self) {
                             AxisValueLabel {
-                                Text(formatChartValue(raw, format: seriesDisplays.first?.format))
+                                Text(formatChartValue(raw, format: seriesDisplays.first { filteredSeriesKeys.contains($0.key) }?.format))
                             }
                         }
                     }
                 }
             }
-            .chartXSelection(value: $selectedCategory)
+            .nativeChartCategorySelection(type: type, selection: $selectedCategory)
         }
     }
 
@@ -335,7 +373,7 @@ public struct ChartRenderer: View {
     }
 
     private var normalizedChartType: String {
-        (chart.type ?? chart.kind ?? "bar").lowercased()
+        normalizeNativeChartType(chart.type ?? chart.kind)
     }
 
     private var seriesKeys: [String] {
@@ -343,7 +381,7 @@ public struct ChartRenderer: View {
     }
 
     private var supportsSeriesSelection: Bool {
-        let type = (chart.type ?? chart.kind ?? "bar").lowercased()
+        let type = normalizedChartType
         return seriesKeys.count > 1 && type != "pie" && type != "donut"
     }
 
@@ -491,7 +529,7 @@ public struct ChartRenderer: View {
                     ?? nonEmptyChartString(option.name)
                     ?? titleizedSeriesKey(key),
                 color: color,
-                type: nonEmptyChartString(option.type)?.lowercased()
+                type: nonEmptyChartString(option.type).map(normalizeNativeChartType)
                     ?? (composed && index == 0 ? "area" : "line"),
                 axis: axis,
                 format: nonEmptyChartString(option.format)
@@ -879,11 +917,7 @@ public struct ChartRenderer: View {
     }
 
     private var chartAxisOrder: [String] {
-        seriesDisplays.reduce(into: [String]()) { result, series in
-            if !result.contains(series.axis) {
-                result.append(series.axis)
-            }
-        }
+        activeChartAxisOrder(data: chartSeriesData, seriesOrder: seriesKeys, axisBySeries: chartAxisBySeries)
     }
 
     private var chartAxisMaxima: [String: Double] {
@@ -926,6 +960,17 @@ public struct ChartRenderer: View {
         }
         selectedSeriesKeys = reconciledChartSeriesSelection(current: selectedSeriesKeys, available: seriesKeys)
         appliedSeriesKeys = seriesKeys
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func nativeChartCategorySelection(type: String, selection: Binding<String?>) -> some View {
+        if ["horizontal_bar", "funnel_bar"].contains(type) {
+            chartYSelection(value: selection)
+        } else {
+            chartXSelection(value: selection)
+        }
     }
 }
 
@@ -1089,6 +1134,14 @@ internal func chartAxisMaximums(
     data.reduce(into: [String: Double]()) { result, item in
         let axis = axisBySeries[item.seriesKey] ?? "default"
         result[axis] = max(result[axis] ?? 1, item.value, 1)
+    }
+}
+
+internal func activeChartAxisOrder(data: [SeriesDatum], seriesOrder: [String], axisBySeries: [String: String]) -> [String] {
+    let plottedSeries = Set(data.map(\.seriesKey))
+    return seriesOrder.filter { plottedSeries.contains($0) }.reduce(into: []) { axes, key in
+        let axis = axisBySeries[key] ?? "default"
+        if !axes.contains(axis) { axes.append(axis) }
     }
 }
 

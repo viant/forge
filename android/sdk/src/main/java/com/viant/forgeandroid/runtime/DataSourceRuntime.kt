@@ -113,7 +113,8 @@ class DataSourceRuntime(
         }
     }
 
-    private suspend fun fetchCollection(ctx: DataSourceContext) {
+    private suspend fun fetchCollection(ctx: DataSourceContext, lifecyclePath: List<String> = emptyList()) {
+        val currentPath = lifecyclePath + ctx.dataSourceRef
         ctx.control.set(ctx.control.peek().copy(loading = true, error = null, resolved = false))
 
         try {
@@ -143,8 +144,8 @@ class DataSourceRuntime(
                     ctx.toggleSelection(data.first(), 0)
                 }
                 ctx.metrics.set(loaderResult.metrics)
-                trigger(ctx, "onFetch", mapOf("collection" to data))
-                trigger(ctx, "onSuccess", mapOf("collection" to data))
+                trigger(ctx, "onFetch", mapOf("collection" to data), currentPath)
+                trigger(ctx, "onSuccess", mapOf("collection" to data), currentPath)
                 finishFetch(ctx)
                 return
             }
@@ -170,13 +171,13 @@ class DataSourceRuntime(
             } else {
                 ctx.metrics.set(extractPagingMetrics(response, ctx.dataSource))
             }
-            trigger(ctx, "onFetch", mapOf("collection" to data, "response" to response))
-            trigger(ctx, "onSuccess", mapOf("collection" to data, "response" to response))
+            trigger(ctx, "onFetch", mapOf("collection" to data, "response" to response), currentPath)
+            trigger(ctx, "onSuccess", mapOf("collection" to data, "response" to response), currentPath)
             finishFetch(ctx)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            trigger(ctx, "onError", mapOf("error" to (e.message ?: "Unknown error")))
+            trigger(ctx, "onError", mapOf("error" to (e.message ?: "Unknown error")), currentPath)
             finishFetch(ctx, error = e.message)
         }
     }
@@ -535,12 +536,75 @@ class DataSourceRuntime(
         }
     }
 
-    private fun trigger(ctx: DataSourceContext, event: String, args: Map<String, Any?> = emptyMap()) {
+    private suspend fun trigger(
+        ctx: DataSourceContext,
+        event: String,
+        args: Map<String, Any?> = emptyMap(),
+        lifecyclePath: List<String> = listOf(ctx.dataSourceRef)
+    ) {
+        val metadata = ctx.window.metadata.peek()
+        val namespace = metadata?.namespace?.trim().orEmpty()
         ctx.dataSource.on
             .filter { it.event == event }
             .forEach { execution ->
-                executor?.invoke(execution, ctx, args)
+                val handler = execution.handler?.trim().orEmpty()
+                val code = metadata?.actions?.code?.trim().orEmpty()
+                if (metadata != null && code.isNotBlank() && namespace.isNotBlank() && handler.startsWith("$namespace.")) {
+                    runLifecycleHook(ctx, execution, code, metadata, args["collection"] as? List<Map<String, Any?>> ?: ctx.collection.peek(), lifecyclePath)
+                } else {
+                    executor?.invoke(execution, ctx, args)
+                }
             }
+    }
+
+    private suspend fun runLifecycleHook(
+        source: DataSourceContext,
+        execution: ExecutionDef,
+        code: String,
+        metadata: WindowMetadata,
+        collection: List<Map<String, Any?>>,
+        lifecyclePath: List<String>
+    ) {
+        val handler = execution.handler ?: return
+        try {
+            val snapshots = JsonObject(metadata.dataSources.keys.associateWith { ref ->
+                val context = source.window.contextOrNull(ref)
+                JsonObject(
+                    mapOf(
+                        "form" to JsonUtil.anyToElement(context?.form?.peek().orEmpty()),
+                        "collection" to JsonUtil.anyToElement(context?.collection?.peek().orEmpty())
+                    )
+                )
+            })
+            val effects = DataSourceHookProjection.invoke(
+                code = code,
+                functionName = handler,
+                namespace = metadata.namespace,
+                source = source.dataSourceRef,
+                snapshots = snapshots,
+                collection = collection
+            )
+            effects.forEach { effect ->
+                val target = source.window.contextOrNull(effect.ref) ?: return@forEach
+                when (effect.kind) {
+                    "form" -> (JsonUtil.elementToAny(effect.value) as? Map<*, *>)?.let { value ->
+                        target.setForm(value.entries.associate { it.key.toString() to it.value })
+                    }
+                    "input" -> (JsonUtil.elementToAny(effect.value) as? Map<*, *>)?.let { value ->
+                        target.setInputParameters(value.entries.associate { it.key.toString() to it.value })
+                    }
+                    "fetch" -> {
+                        if (effect.ref in lifecyclePath || lifecyclePath.size >= 16) {
+                            println("Forge datasource hook cycle rejected: $lifecyclePath -> ${effect.ref}")
+                        } else {
+                            fetchCollection(target, lifecyclePath)
+                        }
+                    }
+                }
+            }
+        } catch (error: Exception) {
+            println("Forge datasource lifecycle hook failed [$handler]: ${error.message}")
+        }
     }
 
     @Suppress("UNCHECKED_CAST")

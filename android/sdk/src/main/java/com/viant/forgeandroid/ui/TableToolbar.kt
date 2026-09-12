@@ -362,7 +362,7 @@ private fun ToolbarFilterControl(item: ToolbarItemDef, context: DataSourceContex
                         next.remove(key)
                         draft[key]?.takeIf(String::isNotBlank)?.let { next[key] = parseFilterDraft(it, field.type) }
                     }
-                    context.setFilter(next)
+                    setToolbarFilter(context, next)
                     open = false
                 }) { Text("Apply") }
             },
@@ -370,7 +370,7 @@ private fun ToolbarFilterControl(item: ToolbarItemDef, context: DataSourceContex
                 TextButton(onClick = {
                     val next = context.peekFilter().toMutableMap()
                     fields.forEach { field -> (field.id ?: field.field)?.let(next::remove) }
-                    context.setFilter(next)
+                    setToolbarFilter(context, next)
                     draft = emptyMap()
                     open = false
                 }) { Text("Clear") }
@@ -382,6 +382,14 @@ private fun ToolbarFilterControl(item: ToolbarItemDef, context: DataSourceContex
 private fun filterDraftText(value: Any?): String = when (value) {
     is Iterable<*> -> value.joinToString(", ") { it.toString() }
     else -> value?.toString().orEmpty()
+}
+
+private fun setToolbarFilter(context: DataSourceContext, filter: Map<String, Any?>) {
+    if (context.dataSource.filterMode.equals("client", true)) {
+        context.input.set(context.input.peek().copy(filter = filter, fetch = false))
+    } else {
+        context.setFilter(filter)
+    }
 }
 
 internal fun parseFilterDraft(value: String, type: String?): Any {

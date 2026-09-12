@@ -12,6 +12,14 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ChartRendererTest {
+    @Test
+    fun `native chart type normalization matches shared aliases and default`() {
+        assertEquals("line", normalizeNativeChartType(null))
+        assertEquals("horizontal_bar", normalizeNativeChartType("Horizontal-Bar"))
+        assertEquals("horizontal_bar", normalizeNativeChartType("horizontalBar"))
+        assertEquals("funnel_bar", normalizeNativeChartType("funnel"))
+        assertEquals("stacked_bar", normalizeNativeChartType("stackedBar"))
+    }
 
     @Test
     fun `sampled chart axis labels preserve boundaries and deduplicate categories`() {
@@ -243,9 +251,9 @@ class ChartRendererTest {
     }
 
     @Test
-    fun `prepareChartData uses stacked totals for bar charts`() {
+    fun `prepareChartData distinguishes grouped and stacked bar maxima`() {
         val chart = ChartDef(
-            type = "bar",
+            type = "stacked_bar",
             xAxis = ChartAxisDef(dataKey = "name"),
             series = ChartSeriesDef(
                 values = listOf(
@@ -265,12 +273,16 @@ class ChartRendererTest {
 
         assertEquals(10.0, prepared.maxValue)
         assertEquals(10.0, prepared.points.first().total)
+        assertEquals(6.0, prepareChartData(
+            rows = listOf(mapOf("name" to "A", "approved" to 6, "pending" to 4)),
+            chart = chart.copy(type = "bar")
+        ).maxValue)
     }
 
     @Test
     fun `filterPreparedChartData keeps stacked totals for selected bar series`() {
         val chart = ChartDef(
-            type = "bar",
+            type = "stacked_bar",
             xAxis = ChartAxisDef(dataKey = "name"),
             series = ChartSeriesDef(
                 values = listOf(
@@ -291,7 +303,7 @@ class ChartRendererTest {
         val filtered = filterPreparedChartData(
             prepared = prepared,
             selectedSeriesKeys = setOf("approved", "pending"),
-            chartType = "bar"
+            chartType = "stacked_bar"
         )
 
         assertEquals(10.0, filtered.maxValue)

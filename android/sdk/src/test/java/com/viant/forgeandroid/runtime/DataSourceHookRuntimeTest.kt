@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
@@ -15,6 +16,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -124,6 +126,85 @@ class DataSourceHookRuntimeTest {
         val row = ctx.collection.peek().first()
         assertEquals("APPROVED", row["applyStatus"])
         assertEquals(2L, row["id"])
+    }
+
+    @Test
+    fun namespacedLifecycleHooksApplyOrderedCrossDatasourceEffectsAndRejectCycles() = runBlocking {
+        val metadata = JsonUtil.json.decodeFromString(
+            WindowMetadata.serializer(),
+            """
+            {
+              "namespace":"Test",
+              "actions":{"code":"({load: ({context}) => {const target=context.Context('labels'); target.handlers.dataSource.setInputParameters({Id:7}); target.handlers.dataSource.fetchCollection();}, apply: ({context,collection}) => {const source=context.Context('source'); source.signals.form.value={summary:collection[0].label}; source.handlers.dataSource.fetchCollection();}})"},
+              "dataSource":{
+                "source":{"on":[{"event":"onSuccess","handler":"Test.load"}]},
+                "labels":{"on":[{"event":"onSuccess","handler":"Test.apply"}]}
+              }
+            }
+            """.trimIndent()
+        )
+        val runtime = ForgeRuntime(emptyMap(), CoroutineScope(Dispatchers.Unconfined))
+        runtime.registerWindowMetadataLoader { metadata }
+        val calls = mutableListOf<String>()
+        runtime.registerDataSourceLoader { request ->
+            calls += request.dataSourceRef
+            if (request.dataSourceRef == "labels") {
+                assertEquals(7L, request.input.parameters["Id"])
+                ForgeRuntime.DataSourceFetchResult(rows = listOf(mapOf("label" to "Resolved targeting")))
+            } else {
+                ForgeRuntime.DataSourceFetchResult(rows = listOf(mapOf("id" to 7)))
+            }
+        }
+        val window = runtime.openWindow("test")
+        withTimeout(1_000) { runtime.metadataSignal(window.windowId).flow.filterNotNull().first() }
+
+        runtime.refreshDataSourceCollection(window.windowId, "source")
+        withTimeout(2_000) {
+            while (runtime.windowContext(window.windowId).context("source").peekForm()["summary"] != "Resolved targeting") delay(10)
+        }
+
+        assertEquals(listOf("source", "labels"), calls)
+    }
+
+    @Test
+    fun lifecycleProjectionRejectsDelayedTimers() = runBlocking {
+        assertFailsWith<Exception> {
+            DataSourceHookProjection.invoke(
+                code = "({load: () => setTimeout(() => {}, 1000)})",
+                functionName = "load",
+                namespace = null,
+                source = "source",
+                snapshots = JsonObject(mapOf("source" to JsonObject(emptyMap()))),
+                collection = emptyList()
+            )
+        }
+        Unit
+    }
+
+    @Test
+    fun registeredLoaderRunsProjectedSuccessAndFailureHooks() = runBlocking {
+        val metadata = JsonUtil.json.decodeFromString(
+            WindowMetadata.serializer(),
+            """{"namespace":"Test","actions":{"code":"({success: ({context}) => {context.signals.form.value={status:'loaded'};}, failure: ({context}) => {context.signals.form.value={status:'failed'};}})"},"dataSource":{"source":{"on":[{"event":"onSuccess","handler":"Test.success"},{"event":"onError","handler":"Test.failure"}]}}}"""
+        )
+        val runtime = ForgeRuntime(emptyMap(), CoroutineScope(Dispatchers.Unconfined))
+        runtime.registerWindowMetadataLoader { metadata }
+        var fail = false
+        runtime.registerDataSourceLoader {
+            if (fail) error("synthetic failure")
+            ForgeRuntime.DataSourceFetchResult(rows = listOf(mapOf("id" to 1)))
+        }
+        val window = runtime.openWindow("test")
+        withTimeout(1_000) { runtime.metadataSignal(window.windowId).flow.filterNotNull().first() }
+        val source = runtime.windowContext(window.windowId).context("source")
+
+        runtime.refreshDataSourceCollection(window.windowId, "source")
+        withTimeout(1_000) { while (source.peekForm()["status"] != "loaded") delay(10) }
+        fail = true
+        runtime.refreshDataSourceCollection(window.windowId, "source")
+        withTimeout(1_000) { while (source.peekForm()["status"] != "failed") delay(10) }
+
+        assertEquals("failed", source.peekForm()["status"])
     }
 
     @Test

@@ -659,13 +659,14 @@ internal fun isHeadlessDataBinding(container: ContainerDef): Boolean {
 
 internal fun shouldUseMenuList(items: List<ItemDef>): Boolean {
     if (items.isEmpty()) return false
-    val formControlTypes = setOf(
-        "text", "textarea", "number", "numeric", "currency", "date", "datetime",
-        "checkbox", "toggle", "radio", "select", "dropdown", "multiselect", "lookup",
-        "object", "schema", "keyvaluepairs", "treemultiselect"
+    val formControlKinds = setOf(
+        "text", "password", "file", "textarea", "number", "currency", "percentfraction2input",
+        "date", "datetime", "daterange", "daterangepreset", "checkbox", "toggle", "switch",
+        "booleanpill", "radio", "select", "multiselect", "chiplist", "object", "schema",
+        "keyvaluepairs", "treemultiselect"
     )
     if (items.any { item ->
-            item.lookup != null || item.type?.trim()?.lowercase() in formControlTypes
+            item.lookup != null || com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item) in formControlKinds
         }) {
         return false
     }

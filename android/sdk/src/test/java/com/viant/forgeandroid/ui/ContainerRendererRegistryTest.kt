@@ -48,6 +48,8 @@ class ContainerRendererRegistryTest {
                 )
             )
         )
+        assertFalse(shouldUseMenuList(listOf(ItemDef(id = "category", widget = "select"))))
+        assertFalse(shouldUseMenuList(listOf(ItemDef(id = "secret", widget = "password"))))
     }
 
     @Test

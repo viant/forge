@@ -215,7 +215,15 @@ fun ChartRenderer(
 
             when {
                 type == "bar" || type == "stacked_bar" -> {
-                    StackedBarChart(
+                    VerticalBarChart(
+                        prepared = activePrepared,
+                        stacked = type == "stacked_bar",
+                        selection = selection,
+                        onSelect = { selection = it }
+                    )
+                }
+                type == "horizontal_bar" || type == "funnel_bar" -> {
+                    HorizontalBarChart(
                         prepared = activePrepared,
                         selection = selection,
                         onSelect = { selection = it }
@@ -449,6 +457,118 @@ private fun StackedBarChart(
         }
     }
     if (prepared.series.size <= 1) {
+        ChartLegend(prepared.series)
+    }
+}
+
+@Composable
+private fun HorizontalBarChart(
+    prepared: PreparedChartData,
+    selection: ChartSelection?,
+    onSelect: (ChartSelection?) -> Unit
+) {
+    val maximum = prepared.points.flatMap { it.values }.maxOfOrNull { it.value }?.coerceAtLeast(1.0) ?: 1.0
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        prepared.points.forEach { point ->
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(point.label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                point.values.forEach { value ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onSelect(ChartSelection(point.rowIndex, point.label, value.label, value.key, formatChartValue(value.value), value.color))
+                            },
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(value.label, style = MaterialTheme.typography.labelSmall, color = ChartMutedText)
+                            Text(formatChartValue(value.value), style = MaterialTheme.typography.labelSmall)
+                        }
+                        Box(
+                            Modifier
+                                .fillMaxWidth((value.value / maximum).toFloat().coerceIn(0.01f, 1f))
+                                .height(if (selection?.matches(point.label, value.key) == true) 12.dp else 9.dp)
+                                .background(value.color, RoundedCornerShape(999.dp))
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VerticalBarChart(
+    prepared: PreparedChartData,
+    stacked: Boolean,
+    selection: ChartSelection?,
+    onSelect: (ChartSelection?) -> Unit
+) {
+    val height = 220.dp
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Canvas(
+            Modifier
+                .fillMaxWidth()
+                .height(height)
+                .background(ChartCanvasColor, RoundedCornerShape(14.dp))
+                .padding(12.dp)
+                .pointerInput(prepared, stacked) {
+                    detectTapGestures { tap ->
+                        if (prepared.points.isEmpty()) return@detectTapGestures
+                        val groupWidth = size.width.toFloat() / prepared.points.size
+                        val pointIndex = (tap.x / groupWidth).toInt().coerceIn(0, prepared.points.lastIndex)
+                        val point = prepared.points[pointIndex]
+                        val chosen = if (stacked) {
+                            val fromBottom = size.height.toFloat() - tap.y
+                            var accumulated = 0f
+                            point.values.firstOrNull { value ->
+                                accumulated += (value.value / prepared.maxValue).toFloat() * size.height
+                                fromBottom <= accumulated
+                            }
+                        } else {
+                            val localX = tap.x - pointIndex * groupWidth
+                            val index = (localX / (groupWidth / max(1, point.values.size))).toInt().coerceIn(0, point.values.lastIndex)
+                            point.values.getOrNull(index)
+                        }
+                        onSelect(chosen?.let { ChartSelection(point.rowIndex, point.label, it.label, it.key, formatChartValue(it.value), it.color) })
+                    }
+                }
+        ) {
+            drawGridLines(size.width, size.height)
+            val groupWidth = size.width / prepared.points.size.coerceAtLeast(1)
+            prepared.points.forEachIndexed { pointIndex, point ->
+                if (stacked) {
+                    val barWidth = groupWidth * 0.62f
+                    var bottom = size.height
+                    point.values.forEach { value ->
+                        val barHeight = (value.value / prepared.maxValue).toFloat().coerceAtLeast(0f) * size.height
+                        bottom -= barHeight
+                        drawRect(
+                            color = if (selection?.matches(point.label, value.key) == true) value.color.copy(alpha = 0.78f) else value.color,
+                            topLeft = Offset(pointIndex * groupWidth + (groupWidth - barWidth) / 2f, bottom),
+                            size = Size(barWidth, barHeight)
+                        )
+                    }
+                } else {
+                    val slotWidth = groupWidth / point.values.size.coerceAtLeast(1)
+                    point.values.forEachIndexed { valueIndex, value ->
+                        val barWidth = slotWidth * 0.72f
+                        val barHeight = (value.value / prepared.maxValue).toFloat().coerceAtLeast(0f) * size.height
+                        drawRect(
+                            color = if (selection?.matches(point.label, value.key) == true) value.color.copy(alpha = 0.78f) else value.color,
+                            topLeft = Offset(pointIndex * groupWidth + valueIndex * slotWidth + (slotWidth - barWidth) / 2f, size.height - barHeight),
+                            size = Size(barWidth, barHeight)
+                        )
+                    }
+                }
+            }
+        }
+        Row(Modifier.fillMaxWidth()) {
+            prepared.points.forEach { point ->
+                Text(point.label, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+            }
+        }
         ChartLegend(prepared.series)
     }
 }
@@ -971,7 +1091,8 @@ internal fun prepareChartData(rows: List<Map<String, Any?>>, chart: ChartDef): P
         sourcePoints
     }
     val maxValue = when (type) {
-        "bar", "stacked_bar" -> points.maxOfOrNull { it.total }
+        "stacked_bar" -> points.maxOfOrNull { it.total }
+        "bar", "horizontal_bar", "funnel_bar" -> points.maxOfOrNull { point -> point.values.maxOfOrNull { it.value } ?: 0.0 }
         "pie", "donut" -> points.maxOfOrNull { point -> point.values.maxOfOrNull { it.value } ?: 0.0 }
         else -> points.maxOfOrNull { point -> point.values.maxOfOrNull { it.value } ?: 0.0 }
     } ?: 0.0
@@ -1119,7 +1240,8 @@ internal fun filterPreparedChartData(
     }
     val normalizedType = chartType.trim().lowercase()
     val maxValue = when (normalizedType) {
-        "bar", "stacked_bar" -> filteredPoints.maxOfOrNull { it.total }
+        "stacked_bar" -> filteredPoints.maxOfOrNull { it.total }
+        "bar", "horizontal_bar", "funnel_bar" -> filteredPoints.maxOfOrNull { point -> point.values.maxOfOrNull { it.value } ?: 0.0 }
         else -> filteredPoints.maxOfOrNull { point ->
             point.values.maxOfOrNull { it.value } ?: 0.0
         }
@@ -1171,8 +1293,18 @@ private fun resolveSeriesDefinitions(chart: ChartDef): List<ChartSeriesDisplay> 
     }
 }
 
-private fun chartType(chart: ChartDef): String =
-    (chart.type ?: chart.kind ?: "line").trim().lowercase()
+private fun chartType(chart: ChartDef): String = normalizeNativeChartType(chart.type ?: chart.kind)
+
+internal fun normalizeNativeChartType(value: String?): String {
+    val normalized = value?.trim()?.lowercase().orEmpty().replace('-', '_').replace(' ', '_')
+    return when (normalized) {
+        "", "default" -> "line"
+        "horizontalbar", "horizontal_bar_chart", "bar_horizontal" -> "horizontal_bar"
+        "funnel", "funnelbar", "funnel_bar_chart" -> "funnel_bar"
+        "stackedbar", "stacked_bar_chart" -> "stacked_bar"
+        else -> normalized
+    }
+}
 
 internal fun findCartesianSelection(
     tap: Offset,

@@ -59,8 +59,10 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.ColumnDef
+import com.viant.forgeandroid.runtime.ClientFilterRuntime
 import com.viant.forgeandroid.runtime.DataSourceContext
 import com.viant.forgeandroid.runtime.ForgeRuntime
+import com.viant.forgeandroid.runtime.JsonUtil
 import com.viant.forgeandroid.runtime.SelectionState
 import com.viant.forgeandroid.runtime.SelectorUtil
 import com.viant.forgeandroid.runtime.TableDef
@@ -94,28 +96,35 @@ fun TableRenderer(
     val quickSearchItem = table.toolbar?.items?.firstOrNull(::toolbarItemIsQuickSearch)
     val quickSearchField = quickSearchItem?.let { toolbarQuickSearchField(it, quickFilterSetForTable(context)) }
     val quickSearchQuery = quickSearchField?.let { input.filter[it]?.toString()?.trim() }.orEmpty()
-    var projectedSearchValues by remember(rows, table.columns, quickSearchField) { mutableStateOf<Map<Int, String>>(emptyMap()) }
-    LaunchedEffect(rows, table.columns, quickSearchField) {
-        val field = quickSearchField
-        val column = table.columns.firstOrNull { tableColumnKey(it) == field }
-        val execution = column?.on?.firstOrNull { it.event == "onValue" }
-        projectedSearchValues = if (field == null || column == null) {
-            emptyMap()
-        } else {
-            rows.mapIndexed { index, row ->
-                val raw = SelectorUtil.resolve(row, field)
-                val projected = execution?.let {
-                    runtime.evaluateMetadataAction(it, context, mapOf("row" to row, "value" to raw, "rowIndex" to index))
+    var projectedDisplayValues by remember(rows, table.columns) { mutableStateOf<Map<Int, Map<String, Any?>>>(emptyMap()) }
+    LaunchedEffect(rows, table.columns) {
+        val sourceRows = rows
+        val projected = buildMap {
+            sourceRows.forEachIndexed { index, row ->
+                val values = buildMap<String, Any?> {
+                    table.columns.forEach { column ->
+                        val key = tableColumnKey(column) ?: return@forEach
+                        val execution = column.on.firstOrNull { it.event.equals("onValue", true) } ?: return@forEach
+                        val raw = SelectorUtil.resolve(row, key)
+                        runtime.evaluateMetadataAction(
+                            execution,
+                            context,
+                            mapOf("row" to row, "value" to raw, "rowIndex" to index)
+                        )?.let { put(key, it) }
+                    }
                 }
-                index to formatTableValue(projected ?: raw, column)
-            }.toMap()
+                if (values.isNotEmpty()) put(index, values)
+            }
         }
+        if (sourceRows == rows) projectedDisplayValues = projected
     }
-    val sortedRows = sortedTableRows(rows, sortColumnId, sortAscending).let { indexed ->
+    val baseSortedRows = sortedTableRows(rows, sortColumnId, sortAscending, projectedDisplayValues)
+    val clientSortedRows = if (context.dataSource.filterMode.equals("client", true)) {
+        applyClientTableFilters(baseSortedRows, quickFilterSetForTable(context), input.filter)
+    } else baseSortedRows
+    val sortedRows = clientSortedRows.let { indexed ->
         if (quickSearchQuery.isBlank()) indexed else indexed.filter { row ->
-            val projected = projectedSearchValues[row.originalIndex]
-            val raw = quickSearchField?.let { SelectorUtil.resolve(row.row, it) }
-            val searchable = projected ?: raw?.toString().orEmpty()
+            val searchable = quickSearchField?.let { field -> SelectorUtil.resolve(row.displayRow, field)?.toString() }.orEmpty()
             searchable.contains(quickSearchQuery, ignoreCase = true)
         }
     }
@@ -136,7 +145,7 @@ fun TableRenderer(
                 context,
                 tb,
                 table = table,
-                rows = sortedRows.map { it.row },
+                rows = sortedRows.map { it.displayRow },
                 hiddenColumnKeys = hiddenColumnKeys,
                 onHiddenColumnKeysChange = { hiddenColumnKeys = it },
                 hiddenItemIds = if (showMetadataEmptyState) table.emptyState?.hideToolbarItems.orEmpty().toSet() else emptySet()
@@ -212,9 +221,10 @@ fun TableRenderer(
                         ) {
                             itemsIndexed(sortedRows) { displayIndex, indexed ->
                                 val row = indexed.row
+                                val displayRow = indexed.displayRow
                                 val rowIndex = indexed.originalIndex
                                 val isSelected = tableRowIsSelected(selection, row, rowIndex)
-                                DesktopTableRow(runtime, context, effectiveTable, row, rowIndex, displayIndex, isSelected, form, metrics, windowForm) {
+                                DesktopTableRow(runtime, context, effectiveTable, row, displayRow, rowIndex, displayIndex, isSelected, form, metrics, windowForm) {
                                     coroutineScope.launch { context.toggleSelection(row, rowIndex, selectionModeOverride) }
                                 }
                             }
@@ -230,6 +240,27 @@ fun TableRenderer(
                 currentPage = input.page ?: 1
             )
         }
+    }
+}
+
+internal fun applyClientTableFilters(
+    rows: List<IndexedTableRow>,
+    filterSet: com.viant.forgeandroid.runtime.FilterSetDef?,
+    filters: Map<String, Any?>
+): List<IndexedTableRow> {
+    val active = filterSet?.template.orEmpty().mapNotNull { definition ->
+        val inputKey = definition.id ?: definition.field ?: return@mapNotNull null
+        val expected = filters[inputKey] ?: return@mapNotNull null
+        Triple(definition.field ?: inputKey, definition.operator ?: "equal", JsonUtil.anyToElement(expected))
+    }
+    if (active.isEmpty()) return rows
+    return rows.filter { indexed ->
+        val matches = active.all { (field, operation, expected) ->
+            runCatching {
+                ClientFilterRuntime.matches(JsonUtil.anyToElement(SelectorUtil.resolve(indexed.displayRow, field)), expected, operation)
+            }.getOrDefault(false)
+        }
+        matches
     }
 }
 
@@ -300,13 +331,13 @@ private fun CompactTabularTable(
                     .fillMaxWidth()
                     .background(if (selected) Color(0xFFF0F5FF) else Color.White)
                     .clickable { onSelect(indexed.row, indexed.originalIndex) }
-                    .semantics { contentDescription = tableRowAccessibilityLabel(table, indexed.row) }
+                    .semantics { contentDescription = tableRowAccessibilityLabel(table, indexed.displayRow) }
                     .padding(horizontal = 10.dp, vertical = 12.dp)
             ) {
                 frozenColumns.forEach { (index, column) ->
                     val key = tableColumnKey(column).orEmpty()
                     CompactTabularCell(
-                        value = SelectorUtil.resolve(indexed.row, key),
+                        value = SelectorUtil.resolve(indexed.displayRow, key),
                         column = column,
                         emphasized = index == 0,
                         width = compactTableColumnWidth(column, index)
@@ -316,7 +347,7 @@ private fun CompactTabularTable(
                     scrollingColumns.forEach { (index, column) ->
                         val key = tableColumnKey(column).orEmpty()
                         CompactTabularCell(
-                            value = SelectorUtil.resolve(indexed.row, key),
+                            value = SelectorUtil.resolve(indexed.displayRow, key),
                             column = column,
                             emphasized = index == 0,
                             width = compactTableColumnWidth(column, index)
@@ -692,6 +723,7 @@ private fun DesktopTableRow(
     context: DataSourceContext,
     table: TableDef,
     row: Map<String, Any?>,
+    displayRow: Map<String, Any?>,
     index: Int,
     displayIndex: Int,
     isSelected: Boolean,
@@ -714,7 +746,7 @@ private fun DesktopTableRow(
                 if (isSelected) Color(0xFFF4F7FF) else if (displayIndex.isEven()) Color.White else Color(0xFFFBFCFE)
             )
             .semantics {
-                contentDescription = tableRowAccessibilityLabel(table, row)
+                contentDescription = tableRowAccessibilityLabel(table, displayRow)
             }
             .clickable(onClick = onToggleSelection)
             .padding(horizontal = 12.dp, vertical = 10.dp)
@@ -740,7 +772,7 @@ private fun DesktopTableRow(
                 }
                 else -> {
                     val key = tableColumnKey(col) ?: ""
-                    val value = formatTableValue(row[key], col)
+                    val value = formatTableValue(SelectorUtil.resolve(displayRow, key), col)
                     val linkTarget = resolveColumnLinkTargetFromContext(
                         col,
                         LinkResolutionContext(
@@ -900,20 +932,22 @@ private fun tableColumnLabel(column: ColumnDef, key: String): String {
 
 internal data class IndexedTableRow(
     val originalIndex: Int,
-    val row: Map<String, Any?>
+    val row: Map<String, Any?>,
+    val displayRow: Map<String, Any?> = row
 )
 
 internal fun sortedTableRows(
     rows: List<Map<String, Any?>>,
     sortColumnId: String?,
-    ascending: Boolean
+    ascending: Boolean,
+    projectedValues: Map<Int, Map<String, Any?>> = emptyMap()
 ): List<IndexedTableRow> {
-    val indexed = rows.mapIndexed { index, row -> IndexedTableRow(index, row) }
+    val indexed = rows.mapIndexed { index, row -> IndexedTableRow(index, row, row + projectedValues[index].orEmpty()) }
     val columnId = sortColumnId?.takeIf { it.isNotBlank() } ?: return indexed
     return indexed.sortedWith { left, right ->
         compareTableSortValues(
-            SelectorUtil.resolve(left.row, columnId),
-            SelectorUtil.resolve(right.row, columnId),
+            SelectorUtil.resolve(left.displayRow, columnId),
+            SelectorUtil.resolve(right.displayRow, columnId),
             ascending
         )
     }

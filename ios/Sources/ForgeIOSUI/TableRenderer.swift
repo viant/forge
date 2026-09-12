@@ -71,6 +71,9 @@ public struct TableRenderer: View {
     @State private var plannerSubmitState: PlannerSubmitState = .idle
     @State private var isRefreshing = false
     @State private var authorizationSnapshot: [String: JSONValue] = [:]
+    @State private var toolbarForm: [String: JSONValue] = [:]
+    @State private var toolbarWindowForm: [String: JSONValue] = [:]
+    @State private var toolbarSelection = SelectionState()
 
     public init(
         runtime: ForgeRuntime? = nil,
@@ -152,7 +155,12 @@ public struct TableRenderer: View {
             if case .failure = result { exportError = "The CSV could not be exported." }
         }
         .sheet(item: $filterDraft) { draft in
-            TableFilterSheet(draft: draft) { values in activeFilters = values; clientPage = 1 }
+            TableFilterSheet(draft: draft) { values in
+                guard let item = table.toolbar?.items.first(where: { $0.id?.lowercased() == "filterlist" }),
+                      toolbarItemIsVisible(item), !toolbarItemIsDisabled(item) else { return }
+                activeFilters = values
+                clientPage = 1
+            }
         }
         .alert("Export failed", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } })) {
             Button("OK") { exportError = nil }
@@ -174,6 +182,9 @@ public struct TableRenderer: View {
         }
         .task(id: authorizationTaskKey) {
             await observeAuthorization()
+        }
+        .task(id: "\(subscriptionTaskKey):toolbar-context") {
+            await observeToolbarConditionContext()
         }
     }
 
@@ -519,6 +530,33 @@ public struct TableRenderer: View {
         for await metadata in updates {
             guard !Task.isCancelled else { return }
             await MainActor.run { authorizationSnapshot = metadata?.authorizationSnapshot ?? [:] }
+        }
+    }
+
+    private func observeToolbarConditionContext() async {
+        guard let runtime, let window, !resolvedDataSourceRef.isEmpty else { return }
+        toolbarForm = await runtime.dataSourceForm(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+        toolbarWindowForm = await runtime.windowFormJSONValue(windowID: window.windowID)
+        toolbarSelection = await runtime.dataSourceSelectionState(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask {
+                for await next in await runtime.dataSourceFormUpdates(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef) {
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run { toolbarForm = next }
+                }
+            }
+            group.addTask {
+                for await next in await runtime.windowFormUpdates(windowID: window.windowID) {
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run { toolbarWindowForm = next }
+                }
+            }
+            group.addTask {
+                for await next in await runtime.dataSourceSelectionUpdates(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef) {
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run { toolbarSelection = next }
+                }
+            }
         }
     }
 
@@ -1146,11 +1184,14 @@ public struct TableRenderer: View {
     private func tableToolbar(_ toolbar: ToolbarDef) -> some View {
         HStack(spacing: 4) {
         if clientFiltering, let fields = filterDefinition?.selectedFilterFields, !fields.isEmpty,
-           toolbar.items.contains(where: { $0.id?.lowercased() == "filterlist" }) {
-            Button { filterDraft = TableFilterDraft(fields: fields, values: activeFilters) } label: {
+           let filterItem = toolbar.items.first(where: { $0.id?.lowercased() == "filterlist" }) {
+            Button {
+                guard toolbarItemIsVisible(filterItem), !toolbarItemIsDisabled(filterItem) else { return }
+                filterDraft = TableFilterDraft(fields: fields, values: activeFilters)
+            } label: {
                 Image(systemName: activeFilters.isEmpty ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
                     .frame(width: 44, height: 44)
-            }.accessibilityLabel("Filter rows")
+            }.accessibilityLabel("Filter rows").disabled(toolbarItemIsDisabled(filterItem))
         }
         if clientFiltering, let search = toolbar.items.first(where: { $0.type?.lowercased() == "quicksearch" }) {
             TextField(search.properties["label"]?.stringValue ?? "Search", text: $searchText)
@@ -1242,7 +1283,10 @@ public struct TableRenderer: View {
             item.visibleWhen,
             metrics: metrics.mapValues(tableConditionAnyValue),
             filters: input.filter.mapValues(tableConditionAnyValue),
+            form: toolbarForm.mapValues(tableConditionAnyValue),
+            windowForm: toolbarWindowForm.mapValues(tableConditionAnyValue),
             collection: rows.map { $0.mapValues(tableConditionAnyValue) },
+            selectionValues: tableSelectionConditionValues(toolbarSelection),
             authorization: authorizationSnapshot.mapValues(tableConditionAnyValue)
         )
     }
@@ -1252,7 +1296,10 @@ public struct TableRenderer: View {
             item.disabledWhen,
             metrics: metrics.mapValues(tableConditionAnyValue),
             filters: input.filter.mapValues(tableConditionAnyValue),
+            form: toolbarForm.mapValues(tableConditionAnyValue),
+            windowForm: toolbarWindowForm.mapValues(tableConditionAnyValue),
             collection: rows.map { $0.mapValues(tableConditionAnyValue) },
+            selectionValues: tableSelectionConditionValues(toolbarSelection),
             authorization: authorizationSnapshot.mapValues(tableConditionAnyValue)
         ))
     }
@@ -1679,6 +1726,17 @@ private func tableConditionAnyValue(_ value: JSONValue) -> Any {
     case .array(let values): return values.map(tableConditionAnyValue)
     case .object(let values): return values.mapValues(tableConditionAnyValue)
     }
+}
+
+private func tableSelectionConditionValues(_ selection: SelectionState) -> [String: Any] {
+    var values: [String: Any] = [
+        "selection": selection.selection.map { $0.mapValues(tableConditionAnyValue) },
+        "rowIndex": selection.rowIndex
+    ]
+    if let selected = selection.selected {
+        values["selected"] = selected.mapValues(tableConditionAnyValue)
+    }
+    return values
 }
 
 private func tableToolbarSymbol(_ icon: String?) -> String {
