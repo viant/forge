@@ -16,6 +16,7 @@ struct TableWindowFormSelector: View {
     let runtime: ForgeRuntime?
     let window: WindowContext?
     let dataSourceRef: String
+    var externallyDisabled: Bool = false
     @State private var values: [String: JSONValue] = [:]
 
     private var field: String { item.field ?? item.dataField ?? item.id ?? "" }
@@ -45,7 +46,7 @@ struct TableWindowFormSelector: View {
                 .font(.subheadline)
                 .frame(minHeight: 44)
         }
-        .disabled(item.disabled == true || item.enabled == false || field.isEmpty || runtime == nil)
+        .disabled(externallyDisabled || item.disabled == true || item.enabled == false || field.isEmpty || runtime == nil)
         .accessibilityLabel(item.ariaLabel ?? item.label ?? "Choose")
         .accessibilityValue(caption)
         .task(id: window?.windowID ?? "") {
@@ -61,7 +62,7 @@ struct TableWindowFormSelector: View {
     }
 
     private func select(_ value: JSONValue) async {
-        guard let runtime, let window, !field.isEmpty else { return }
+        guard let runtime, let window, !field.isEmpty, !externallyDisabled else { return }
         await runtime.setWindowFormValue(windowID: window.windowID, values: [field: value])
         values[field] = value
         if !dataSourceRef.isEmpty {

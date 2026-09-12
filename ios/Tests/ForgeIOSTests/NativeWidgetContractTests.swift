@@ -101,6 +101,12 @@ final class NativeWidgetContractTests: XCTestCase {
         )
         XCTAssertTrue(NativeWidgetContract.text(.object(["id": .number(7)])).contains("\"id\""))
     }
+    func testNativeOptionEqualityBridgesNumericStrings() {
+        XCTAssertTrue(NativeWidgetContract.equivalent(.number(8), .string("8")))
+        XCTAssertTrue(NativeWidgetContract.equivalent(.string("45.0"), .number(45)))
+        XCTAssertFalse(NativeWidgetContract.equivalent(.string("45"), .number(8)))
+        XCTAssertFalse(NativeWidgetContract.equivalent(.string("08x"), .number(8)))
+    }
     func testDraftBaselineResetAndSuccessfulSaveContract() {
         let initial: [String: JSONValue] = ["id": .number(1), "name": .string("Before")]
         let edited: [String: JSONValue] = ["id": .number(1), "name": .string("After")]

@@ -1070,16 +1070,21 @@ data class ToolbarItemDef(
     val appearance: String? = null,
     val tooltip: String? = null,
     val ariaLabel: String? = null,
+    val hideLabel: Boolean? = null,
     val style: Map<String, JsonElement> = emptyMap(),
     val className: String? = null,
     val type: String? = null,
     val field: String? = null,
+    val dataField: String? = null,
     val scope: String? = null,
     val value: JsonElement? = null,
     val options: List<OptionDef> = emptyList(),
     val placeholder: String? = null,
     val properties: Map<String, JsonElement> = emptyMap(),
     val visibleWhen: DashboardConditionDef? = null,
+    val disabledWhen: DashboardConditionDef? = null,
+    val disabled: Boolean? = null,
+    val enabled: Boolean? = null,
     val on: List<ExecutionDef> = emptyList(),
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
@@ -1269,7 +1274,8 @@ data class FilterFieldDef(
     val optionLabel: String? = null,
     val placeholder: String? = null,
     val width: Int? = null,
-    val operator: String? = null
+    val operator: String? = null,
+    val type: String? = null
 )
 
 @Serializable

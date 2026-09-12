@@ -70,7 +70,7 @@ struct NativeWidgetView: View {
             Toggle(label, isOn: Binding(get: { NativeWidgetContract.truthy(value) }, set: { onChange(.bool($0)) }))
         case "select", "radio":
             let options = loadedOptions ?? NativeWidgetContract.options(item)
-            Picker(label, selection: Binding(get: { options.firstIndex { $0.0 == value } ?? -1 }, set: { if options.indices.contains($0) { onChange(options[$0].0) } })) {
+            Picker(label, selection: Binding(get: { options.firstIndex { NativeWidgetContract.equivalent($0.0, value) } ?? -1 }, set: { if options.indices.contains($0) { onChange(options[$0].0) } })) {
                 Text(value == nil || value == .null ? "Select" : NativeWidgetContract.text(value)).tag(-1)
                 ForEach(options.indices, id: \.self) { index in Text(options[index].1).tag(index) }
             }.accessibilityLabel(label)
@@ -80,8 +80,8 @@ struct NativeWidgetView: View {
             let options = NativeWidgetContract.options(item)
             let selected = value?.arrayValue ?? []
             ForEach(options.indices, id: \.self) { index in
-                Toggle(options[index].1, isOn: Binding(get: { selected.contains(options[index].0) }, set: { included in
-                    onChange(.array(included ? selected + (selected.contains(options[index].0) ? [] : [options[index].0]) : selected.filter { $0 != options[index].0 }))
+                Toggle(options[index].1, isOn: Binding(get: { selected.contains { NativeWidgetContract.equivalent($0, options[index].0) } }, set: { included in
+                    onChange(.array(included ? selected + (selected.contains { NativeWidgetContract.equivalent($0, options[index].0) } ? [] : [options[index].0]) : selected.filter { !NativeWidgetContract.equivalent($0, options[index].0) }))
                 }))
             }
         case "chiplist":

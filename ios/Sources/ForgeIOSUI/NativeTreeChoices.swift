@@ -24,16 +24,16 @@ struct NativeTreeChoices: View {
             let branch = group.1.contains { NativeWidgetContract.text($0.0).components(separatedBy: separator.isEmpty ? "_" : separator).count > depth + 1 }
             if branch {
                 DisclosureGroup {
-                    Toggle("Select all \(group.0)", isOn: Binding(get: { group.1.allSatisfy { selected.contains($0.0) } }, set: { checked in
+                    Toggle("Select all \(group.0)", isOn: Binding(get: { group.1.allSatisfy { option in selected.contains { NativeWidgetContract.equivalent($0, option.0) } } }, set: { checked in
                         let values = group.1.map(\.0)
-                        onChange(checked ? selected + values.filter { !selected.contains($0) } : selected.filter { !values.contains($0) })
+                        onChange(checked ? selected + values.filter { value in !selected.contains { NativeWidgetContract.equivalent($0, value) } } : selected.filter { selectedValue in !values.contains { NativeWidgetContract.equivalent($0, selectedValue) } })
                     })).disabled(!enabled)
                     AnyView(NativeTreeChoices(options: group.1, selected: selected, separator: separator, enabled: enabled, onChange: onChange, depth: depth + 1))
                 } label: { Text(group.0) }
             } else {
                 ForEach(group.1.indices, id: \.self) { leaf in
                     let option = group.1[leaf]
-                    Toggle(option.1, isOn: Binding(get: { selected.contains(option.0) }, set: { checked in onChange(checked ? selected + (selected.contains(option.0) ? [] : [option.0]) : selected.filter { $0 != option.0 }) })).disabled(!enabled)
+                    Toggle(option.1, isOn: Binding(get: { selected.contains { NativeWidgetContract.equivalent($0, option.0) } }, set: { checked in onChange(checked ? selected + (selected.contains { NativeWidgetContract.equivalent($0, option.0) } ? [] : [option.0]) : selected.filter { !NativeWidgetContract.equivalent($0, option.0) }) })).disabled(!enabled)
                 }
             }
         }

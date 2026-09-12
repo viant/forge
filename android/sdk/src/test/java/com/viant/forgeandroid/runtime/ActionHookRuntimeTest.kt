@@ -186,6 +186,29 @@ class ActionHookRuntimeTest {
     }
 
     @Test
+    fun updatePreviewPrincipalPublishesMetadataAndPreservesResourceCapabilities() = runBlocking {
+        val runtime = ForgeRuntime(emptyMap(), CoroutineScope(Dispatchers.Unconfined))
+        runtime.registerWindowMetadataLoader {
+            WindowMetadata(
+                authorizationSnapshot = mapOf(
+                    "principal" to JsonObject(mapOf("roles" to JsonArray(listOf(JsonPrimitive("VIEWER"))))),
+                    "resource" to JsonObject(mapOf("capabilities" to JsonObject(mapOf("write" to JsonPrimitive(false)))))
+                )
+            )
+        }
+        val state = runtime.openWindow("advertiser")
+        withTimeout(1_000) { runtime.metadataSignal(state.windowId).flow.filterNotNull().first() }
+
+        runtime.updatePreviewPrincipal(state.windowId, setOf("ADMIN", "VIEWER"), setOf("EXPOSE_CAPI"))
+
+        val updated = runtime.metadataSignal(state.windowId).peek()!!.authorizationSnapshot
+        val principal = updated["principal"]!!.jsonObject
+        assertEquals(listOf("ADMIN", "VIEWER"), principal["roles"]!!.let { it as JsonArray }.map { it.jsonPrimitive.content })
+        assertEquals(listOf("EXPOSE_CAPI"), principal["features"]!!.let { it as JsonArray }.map { it.jsonPrimitive.content })
+        assertEquals(false, updated["resource"]!!.jsonObject["capabilities"]!!.jsonObject["write"]!!.jsonPrimitive.content.toBoolean())
+    }
+
+    @Test
     fun openWindowRequestLoaderReceivesResourceAndConversationContext() = runBlocking {
         val runtime = ForgeRuntime(
             endpoints = emptyMap(),

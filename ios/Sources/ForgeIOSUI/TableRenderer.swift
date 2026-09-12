@@ -70,6 +70,7 @@ public struct TableRenderer: View {
     @State private var plannerSelectionTouched = false
     @State private var plannerSubmitState: PlannerSubmitState = .idle
     @State private var isRefreshing = false
+    @State private var authorizationSnapshot: [String: JSONValue] = [:]
 
     public init(
         runtime: ForgeRuntime? = nil,
@@ -97,6 +98,7 @@ public struct TableRenderer: View {
                     ToolbarDef(
                         items: toolbar.items.filter { item in
                             !(rows.isEmpty && (table.emptyState?.hideToolbarItems.contains(item.id ?? "") == true))
+                                && toolbarItemIsVisible(item)
                         }
                     )
                 )
@@ -170,6 +172,9 @@ public struct TableRenderer: View {
         .task(id: pagingTaskKey) {
             await loadPaging()
         }
+        .task(id: authorizationTaskKey) {
+            await observeAuthorization()
+        }
     }
 
     private var resolvedTableTitle: String? {
@@ -214,6 +219,10 @@ public struct TableRenderer: View {
 
     private var pagingTaskKey: String {
         [window?.windowID ?? "", resolvedDataSourceRef, "paging"].joined(separator: ":")
+    }
+
+    private var authorizationTaskKey: String {
+        [window?.windowID ?? "", "authorization"].joined(separator: ":")
     }
 
     private var resolvedDataSourceRef: String {
@@ -500,6 +509,16 @@ public struct TableRenderer: View {
             await MainActor.run {
                 controlState = next
             }
+        }
+    }
+
+    private func observeAuthorization() async {
+        guard let runtime, let window else { return }
+        authorizationSnapshot = await runtime.windowMetadata(id: window.windowID)?.authorizationSnapshot ?? [:]
+        let updates = await runtime.windowMetadataUpdates(id: window.windowID)
+        for await metadata in updates {
+            guard !Task.isCancelled else { return }
+            await MainActor.run { authorizationSnapshot = metadata?.authorizationSnapshot ?? [:] }
         }
     }
 
@@ -1138,11 +1157,12 @@ public struct TableRenderer: View {
                 .modifier(ForgeThemeInputModifier())
                 .frame(maxWidth: .infinity)
                 .accessibilityLabel(search.properties["label"]?.stringValue ?? "Search table")
+                .disabled(toolbarItemIsDisabled(search))
                 .onChange(of: searchText) { _, _ in clientPage = 1 }
         } else {
             Spacer(minLength: 0)
         }
-        if toolbar.items.contains(where: { $0.id?.lowercased() == "settings" }) {
+        if let settings = toolbar.items.first(where: { $0.id?.lowercased() == "settings" }) {
             Menu {
                 ForEach(table.columns.filter { !["button", "icon"].contains($0.type?.lowercased() ?? "") }, id: \.identityKey) { column in
                     Toggle(column.displayLabel, isOn: Binding(
@@ -1159,13 +1179,15 @@ public struct TableRenderer: View {
                 Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44)
             }
             .accessibilityLabel("Customize columns")
+            .disabled(toolbarItemIsDisabled(settings))
         }
-        if toolbar.items.contains(where: { $0.type?.lowercased() == "tableexport" }) {
+        if let export = toolbar.items.first(where: { $0.type?.lowercased() == "tableexport" }) {
             Button { exportingCSV = true } label: {
                 Image(systemName: "square.and.arrow.up")
                     .frame(width: 44, height: 44)
             }
             .accessibilityLabel("Export CSV")
+            .disabled(toolbarItemIsDisabled(export))
         }
         if !tableToolbarHasRefreshAction,
            tableRefreshControlVisible(dataSourceRef: resolvedDataSourceRef, usesProvidedRows: providedRows != nil) {
@@ -1176,7 +1198,7 @@ public struct TableRenderer: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(toolbar.items.filter { $0.type?.lowercased() == "select" && $0.scope?.lowercased() == "windowform" }) { item in
-                    TableWindowFormSelector(item: item, runtime: runtime, window: window, dataSourceRef: resolvedDataSourceRef)
+                    TableWindowFormSelector(item: item, runtime: runtime, window: window, dataSourceRef: resolvedDataSourceRef, externallyDisabled: toolbarItemIsDisabled(item))
                 }
                 ForEach(toolbar.items.filter(tableToolbarActionItem)) { item in
                     TableToolbarActionButton(
@@ -1185,7 +1207,8 @@ public struct TableRenderer: View {
                         context: window.map {
                             ExecutionContext(windowID: $0.windowID, dataSourceRef: container.dataSourceRef ?? "")
                         },
-                        stateKey: selectedRowIndex.map(String.init) ?? "none"
+                        stateKey: selectedRowIndex.map(String.init) ?? "none",
+                        externallyDisabled: toolbarItemIsDisabled(item)
                     )
                 }
             }
@@ -1212,6 +1235,26 @@ public struct TableRenderer: View {
         let id = item.id?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
         guard !["pagination", "quickfilter", "quickfilterinputs"].contains(id) else { return false }
         return item.on.contains { $0.event == "onClick" }
+    }
+
+    private func toolbarItemIsVisible(_ item: ToolbarItemDef) -> Bool {
+        DashboardRuntime.evaluateDashboardCondition(
+            item.visibleWhen,
+            metrics: metrics.mapValues(tableConditionAnyValue),
+            filters: input.filter.mapValues(tableConditionAnyValue),
+            collection: rows.map { $0.mapValues(tableConditionAnyValue) },
+            authorization: authorizationSnapshot.mapValues(tableConditionAnyValue)
+        )
+    }
+
+    private func toolbarItemIsDisabled(_ item: ToolbarItemDef) -> Bool {
+        item.disabled == true || item.enabled == false || (item.disabledWhen != nil && DashboardRuntime.evaluateDashboardCondition(
+            item.disabledWhen,
+            metrics: metrics.mapValues(tableConditionAnyValue),
+            filters: input.filter.mapValues(tableConditionAnyValue),
+            collection: rows.map { $0.mapValues(tableConditionAnyValue) },
+            authorization: authorizationSnapshot.mapValues(tableConditionAnyValue)
+        ))
     }
 
     @ViewBuilder
@@ -1566,14 +1609,16 @@ private struct TableToolbarActionButton: View {
     let runtime: ForgeRuntime?
     let context: ExecutionContext?
     let stateKey: String
+    let externallyDisabled: Bool
 
     @State private var isVisible: Bool
 
-    init(item: ToolbarItemDef, runtime: ForgeRuntime?, context: ExecutionContext?, stateKey: String) {
+    init(item: ToolbarItemDef, runtime: ForgeRuntime?, context: ExecutionContext?, stateKey: String, externallyDisabled: Bool = false) {
         self.item = item
         self.runtime = runtime
         self.context = context
         self.stateKey = stateKey
+        self.externallyDisabled = externallyDisabled
         _isVisible = State(initialValue: !item.on.contains { $0.event == "onVisible" })
     }
 
@@ -1581,7 +1626,7 @@ private struct TableToolbarActionButton: View {
         ZStack {
             if isVisible {
                 Button {
-                    guard let runtime else { return }
+                    guard let runtime, !externallyDisabled else { return }
                     Task {
                         for execution in item.on where execution.event == "onClick" {
                             _ = await runtime.execute(execution, context: context)
@@ -1602,7 +1647,7 @@ private struct TableToolbarActionButton: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .disabled(item.enabled == false)
+                .disabled(externallyDisabled || item.disabled == true || item.enabled == false)
                 .accessibilityLabel(item.ariaLabel ?? item.tooltip ?? item.label ?? item.id ?? "Action")
             } else {
                 Color.clear.frame(width: 0, height: 0)
@@ -1622,6 +1667,17 @@ private struct TableToolbarActionButton: View {
             }
             isVisible = visible
         }
+    }
+}
+
+private func tableConditionAnyValue(_ value: JSONValue) -> Any {
+    switch value {
+    case .null: return NSNull()
+    case .bool(let value): return value
+    case .number(let value): return value
+    case .string(let value): return value
+    case .array(let values): return values.map(tableConditionAnyValue)
+    case .object(let values): return values.mapValues(tableConditionAnyValue)
     }
 }
 

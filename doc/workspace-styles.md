@@ -70,5 +70,5 @@ green surface with red border. Focus is blue. Use `--forge-lookup-*`,
 `--forge-required-*`, and `--forge-focus-color` rather than inline colors.
 
 For the complete host manifest/token contract, see
-[agently-core workspace CSS](../../agently-core/workspace-css.md). Native token support is
+[agently-core workspace CSS](https://github.com/viant/agently-core/blob/main/workspace-css.md). Native token support is
 explicit; arbitrary web CSS does not apply to native renderers.
