@@ -1259,6 +1259,8 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
 }
 
 public struct DataSourceDef: Codable, Sendable {
+    public var filterSet: [JSONValue] = []
+    public var quickFilterSet: String? = nil
     public var filterMode: String? = nil
     public var paginationMode: String? = nil
     public let service: DataSourceServiceDef?
@@ -1281,6 +1283,7 @@ public struct DataSourceDef: Codable, Sendable {
         case service
         case paginationMode
         case filterMode
+        case filterSet, quickFilterSet
         case selectionMode
         case autoSelect
         case autoFetch
@@ -1336,6 +1339,8 @@ public struct DataSourceDef: Codable, Sendable {
         service = try container.decodeIfPresent(DataSourceServiceDef.self, forKey: .service)
         paginationMode = try container.decodeIfPresent(String.self, forKey: .paginationMode)
         filterMode = try container.decodeIfPresent(String.self, forKey: .filterMode)
+        filterSet = try container.decodeIfPresent([JSONValue].self, forKey: .filterSet) ?? []
+        quickFilterSet = try container.decodeIfPresent(String.self, forKey: .quickFilterSet)
         selectionMode = try container.decodeIfPresent(String.self, forKey: .selectionMode)
         autoSelect = try container.decodeIfPresent(Bool.self, forKey: .autoSelect)
         autoFetch = try container.decodeIfPresent(Bool.self, forKey: .autoFetch)

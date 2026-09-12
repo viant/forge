@@ -55,6 +55,7 @@ public struct TableRenderer: View {
     @State private var clientPaging = false
     @State private var clientPage = 1
     @State private var clientFiltering = false
+    @State private var filterDefinition: DataSourceDef?
     @State private var searchText = ""
     @State private var exportingCSV = false
     @State private var exportError: String?
@@ -507,6 +508,7 @@ public struct TableRenderer: View {
             paging = metadata?.dataSources[resolvedDataSourceRef]?.paging
             clientPaging = metadata?.dataSources[resolvedDataSourceRef]?.paginationMode?.lowercased() == "client"
             clientFiltering = metadata?.dataSources[resolvedDataSourceRef]?.filterMode?.lowercased() == "client"
+            filterDefinition = metadata?.dataSources[resolvedDataSourceRef]
         }
     }
 
@@ -541,7 +543,8 @@ public struct TableRenderer: View {
     private func matchesSearch(_ row: [String: JSONValue]) -> Bool {
         guard clientFiltering, !searchText.isEmpty,
               let search = table.toolbar?.items.first(where: { $0.type?.lowercased() == "quicksearch" }),
-              let field = search.properties["field"]?.stringValue else { return true }
+              let identifier = search.properties["field"]?.stringValue else { return true }
+        let field = filterDefinition?.filterField(for: identifier) ?? identifier
         let key = row.keys.first { $0.caseInsensitiveCompare(field) == .orderedSame } ?? field
         if let column = displayColumns.first(where: { columnKey($0).caseInsensitiveCompare(field) == .orderedSame }) {
             return displayValue(projectedValue(row: row, column: column), column: column)
