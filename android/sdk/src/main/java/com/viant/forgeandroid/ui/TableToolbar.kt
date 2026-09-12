@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -137,6 +139,7 @@ private fun ToolbarGroup(
             items.forEach { item ->
                 when {
                     toolbarItemIsQuickSearch(item) -> QuickFilter(context, item)
+                    item.type.equals("select", ignoreCase = true) -> ToolbarSelect(runtime, context, item)
                     item.on.any { it.event == "onClick" } -> ToolbarAction(runtime, context, item, actionSize)
                 }
             }
@@ -150,8 +153,55 @@ private fun ToolbarGroup(
             items.forEach { item ->
                 when {
                     toolbarItemIsQuickSearch(item) -> QuickFilter(context, item)
+                    item.type.equals("select", ignoreCase = true) -> ToolbarSelect(runtime, context, item)
                     item.on.any { it.event == "onClick" } -> ToolbarAction(runtime, context, item, actionSize)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ToolbarSelect(runtime: ForgeRuntime, context: DataSourceContext, item: ToolbarItemDef) {
+    val windowForm by context.window.windowFormSignal().flow.collectAsState(initial = context.window.peekWindowForm())
+    val field = item.field?.trim().orEmpty().ifBlank { item.id?.trim().orEmpty() }
+    if (field.isBlank() || item.options.isEmpty()) return
+    val defaultValue = item.value?.let(JsonUtil::elementToAny)
+    val selectedValue = if (item.scope.equals("windowForm", ignoreCase = true)) windowForm[field] ?: defaultValue
+        else context.peekForm()[field] ?: defaultValue
+    val selected = item.options.firstOrNull { toolbarValuesEquivalent(it.rawValue?.let(JsonUtil::elementToAny), selectedValue) }
+    var expanded by remember(item.id, field) { mutableStateOf(false) }
+    val label = selected?.label ?: selected?.value ?: item.label ?: "Select"
+
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.semantics { contentDescription = item.ariaLabel ?: item.label ?: field }
+        ) {
+            Text(label, maxLines = 1)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            item.options.forEach { option ->
+                val raw = option.rawValue?.let(JsonUtil::elementToAny)
+                DropdownMenuItem(
+                    text = { Text(option.label ?: option.value.orEmpty()) },
+                    onClick = {
+                        expanded = false
+                        if (item.scope.equals("windowForm", ignoreCase = true)) {
+                            runtime.setWindowFormValues(
+                                context.window.windowId,
+                                mapOf(field to raw),
+                                bumpPrefillRevision = false
+                            )
+                        } else {
+                            context.setFormField(field, raw)
+                        }
+                        item.on.filter { it.event in setOf("onChange", "onSelection") }.forEach { execution ->
+                            runtime.execute(execution, context, mapOf("item" to item, "field" to field, "value" to raw))
+                        }
+                        context.fetchCollection()
+                      }
+                )
             }
         }
     }
@@ -285,6 +335,16 @@ internal fun toolbarQuickSearchField(item: ToolbarItemDef, filterSet: FilterSetD
         ?: filterSet?.template?.firstOrNull()?.field?.takeIf { !it.isNullOrBlank() }
         ?: filterSet?.template?.firstOrNull()?.id?.takeIf { !it.isNullOrBlank() }
         ?: "name"
+}
+
+internal fun toolbarValuesEquivalent(left: Any?, right: Any?): Boolean {
+    if (left == null || right == null) return left == right
+    val leftText = left.toString().trim()
+    val rightText = right.toString().trim()
+    val leftNumber = leftText.toBigDecimalOrNull()
+    val rightNumber = rightText.toBigDecimalOrNull()
+    return if (leftNumber != null && rightNumber != null) leftNumber.compareTo(rightNumber) == 0
+    else leftText == rightText
 }
 
 private fun quickFilterSet(context: DataSourceContext): FilterSetDef? {

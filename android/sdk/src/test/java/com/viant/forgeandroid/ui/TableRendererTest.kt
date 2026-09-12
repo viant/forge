@@ -10,6 +10,7 @@ import com.viant.forgeandroid.runtime.FilterFieldDef
 import com.viant.forgeandroid.runtime.FilterSetDef
 import com.viant.forgeandroid.runtime.SelectionState
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
@@ -294,5 +295,20 @@ class TableRendererTest {
         val filterSet = FilterSetDef(template = listOf(FilterFieldDef(id = "Name", field = "groupName")))
 
         assertEquals("groupName", toolbarQuickSearchField(item, filterSet))
+    }
+
+    @Test
+    fun `toolbar select preserves authored binding and numeric options`() {
+        val item = Json { ignoreUnknownKeys = true }.decodeFromString(
+            ToolbarItemDef.serializer(),
+            """{"id":"exchange","type":"select","field":"publisherId","scope":"windowForm","value":8,"options":[{"value":8,"label":"Xandr"},{"value":45,"label":"Google Ad Exchange"}]}"""
+        )
+
+        assertEquals("publisherId", item.field)
+        assertEquals("windowForm", item.scope)
+        assertEquals(2, item.options.size)
+        assertTrue(toolbarValuesEquivalent(item.options.first().rawValue?.toString(), 8))
+        assertTrue(toolbarValuesEquivalent("45", 45L))
+        assertFalse(toolbarValuesEquivalent("45", 8))
     }
 }
