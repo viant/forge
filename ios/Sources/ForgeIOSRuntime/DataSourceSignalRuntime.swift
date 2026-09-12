@@ -1,6 +1,13 @@
 import Foundation
 
 extension ForgeRuntime {
+    public func dataSourceForm(windowID: String, dataSourceRef: String) async -> [String: JSONValue] {
+        let signal = await signals.form(
+            dataSourceID: WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        )
+        return await signal.peek()
+    }
+
     public func dataSourceFormUpdates(
         windowID: String,
         dataSourceRef: String

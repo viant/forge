@@ -367,4 +367,38 @@ class TableRendererTest {
         assertEquals(true, parseFilterDraft("true", "boolean"))
         assertEquals(listOf("active", "paused"), parseFilterDraft("active, paused", "string[]"))
     }
+
+    @Test
+    fun `projected display values drive sorting without mutating source rows`() {
+        val rows = listOf(
+            mapOf<String, Any?>("id" to 1, "principal" to null, "groupName" to "Zulu"),
+            mapOf<String, Any?>("id" to 2, "principal" to "Raw", "groupName" to "Alpha")
+        )
+        val sorted = sortedTableRows(
+            rows,
+            sortColumnId = "principal",
+            ascending = true,
+            projectedValues = mapOf(0 to mapOf("principal" to "Zulu"), 1 to mapOf("principal" to "Alpha"))
+        )
+
+        assertEquals(listOf(2, 1), sorted.map { it.row["id"] })
+        assertEquals(null, sorted.last().row["principal"])
+        assertEquals("Zulu", sorted.last().displayRow["principal"])
+    }
+
+    @Test
+    fun `client table filters use authored operators typed values and display projections`() {
+        val rows = listOf(
+            IndexedTableRow(0, mapOf("id" to 1, "contactName" to null), mapOf("id" to 1, "contactName" to "Alpha Group", "status" to 2)),
+            IndexedTableRow(1, mapOf("id" to 2, "contactName" to "Beta User"), mapOf("id" to 2, "contactName" to "Beta User", "status" to 3))
+        )
+        val filterSet = FilterSetDef(template = listOf(
+            FilterFieldDef(id = "Principal", field = "contactName", operator = "contains"),
+            FilterFieldDef(id = "Status", field = "status", operator = "in", type = "int[]")
+        ))
+
+        val filtered = applyClientTableFilters(rows, filterSet, mapOf("Principal" to "group", "Status" to listOf(2)))
+
+        assertEquals(listOf(1), filtered.map { it.row["id"] })
+    }
 }

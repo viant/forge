@@ -20,6 +20,7 @@ request values, runtime actions, and the Go PDF exporter. Phone layouts may diff
 | Authored table collapse/defaultCollapsed | Supported | Added | Added | Native compilation and retained block metadata |
 | Access to row actions after row six | Supported | Added progressive disclosure | Added progressive disclosure | Existing action execution tests; native rendering no longer truncates the action list |
 | PDF rendering and option context | Shared Go | Shared Go | Shared Go | Go PDF tests compare web request values with mobile metadata; core export tests |
+| Chart type normalization and bar orientation | Supported | Line default; grouped/stacked vertical and horizontal/funnel axes | Line default; grouped/stacked vertical and horizontal/funnel geometry | Native chart normalization and renderer tests |
 
 Composite layouts stack on phones. This preserves ownership, data, and actions;
 it does not reproduce desktop column widths.
@@ -30,7 +31,6 @@ it does not reproduce desktop column widths.
 |---|---|---|
 | Full document designer | Web has block authoring/reordering, calculated fields, themes, and document lifecycle tools that native builders do not mirror | Define and implement the native authoring surface or deliberately expose the shared web designer |
 | Runtime field catalog hydration | Web has a dedicated dynamic field-catalog adapter; native builders primarily use decoded configuration | Add shared catalog-hydration contract fixtures and native adaptation |
-| Advanced chart families | Native rendering covers a smaller set; horizontal-bar aliases and grouped/stacked bar orientation differ between renderers | Preserve chart orientation and extend chart-family rendering/interaction tests |
 | Runtime tables | Native action strips and incremental rows differ from the web table's integrated controls | Device-level sorting/filtering/paging and action reachability proofs |
 | Rich presentation blocks | Native blocks may render simplified lists/cards instead of the web visual treatment | Per-kind device snapshots and interaction proofs, especially collection/kanban/timeline |
 | Saved/shared report lifecycle | Shared backend exists, but native builder menus do not mirror every web authoring/lifecycle entry point | Host integration tests and native UX implementation |

@@ -65,6 +65,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -312,6 +313,11 @@ private fun FormItemRenderer(
 ) {
     val metadata by context.window.metadata.flow.collectAsState(initial = context.window.metadata.peek())
     val authorization = metadata?.authorizationSnapshot?.mapValues { JsonUtil.elementToAny(it.value) }.orEmpty()
+    val optionsDataSourceRef = item.optionsDataSourceRef?.trim().orEmpty()
+        .ifBlank { (item.properties["optionsDataSourceRef"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty() }
+    val optionsContext = optionsDataSourceRef.takeIf(String::isNotBlank)?.let(context.window::contextOrNull)
+    val optionsCollection by optionsContext?.collection?.flow?.collectAsState(initial = optionsContext.collection.peek())
+        ?: remember { mutableStateOf(emptyList()) }
     val dataSourceContext = resolveItemDataSourceContext(context, item)
     val form by dataSourceContext.form.flow.collectAsState(initial = emptyMap())
     val metrics by dataSourceContext.metrics.flow.collectAsState(initial = emptyMap())
@@ -351,12 +357,20 @@ private fun FormItemRenderer(
         authorization = authorization
     )
     if (!callbackVisible || !metadataVisible) return
+    val conditionDisabled = item.disabled == true || item.readOnly == true ||
+        itemConditionDisables(item, metrics, input.filter, form, windowForm, collection, selection, authorization)
+    val renderItem = if (conditionDisabled && item.disabled != true) item.copy(disabled = true) else item
 
     LaunchedEffect(dataSourceContext.dataSourceRef) {
         if (dataSourceContext.dataSourceRef != context.dataSourceRef &&
             dataSourceContext.dataSource.autoFetch != false
         ) {
             dataSourceContext.fetchCollection()
+        }
+    }
+    LaunchedEffect(optionsContext?.dataSourceRef) {
+        if (optionsContext != null && optionsContext.dataSource.autoFetch != false && !optionsContext.control.peek().resolved) {
+            optionsContext.fetchCollection()
         }
     }
 
@@ -376,14 +390,14 @@ private fun FormItemRenderer(
             }
         }
     }
-        NativeWidgetView(item, widgetValue, onChange = { next ->
+        NativeWidgetView(renderItem, widgetValue, onChange = { next ->
             if (com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item) == "daterangepreset") {
                 com.viant.forgeandroid.runtime.NativeDateRangePreset.patch(item, com.viant.forgeandroid.runtime.NativeWidgetContract.text(next), metrics)?.let { patch -> runtime.setWindowFormValues(context.window.windowId, patch, bumpPrefillRevision = false) }
             }
             setScopedItemValue(runtime, dataSourceContext, item, key, com.viant.forgeandroid.runtime.JsonUtil.elementToAny(next))
         }, windowForm = windowForm, onDraftChange = { runtime.setWindowFormValues(context.window.windowId, it, bumpPrefillRevision = false) }, onAction = {
             item.on.filter { it.event == "onClick" || it.event == "onPress" }.forEach { runtime.execute(it, dataSourceContext, mapOf("item" to item)) }
-        })
+        }, loadedOptions = loadedNativeWidgetOptions(item, optionsCollection))
         return
     }
     when (if (item.lookup != null) "lookup" else com.viant.forgeandroid.runtime.NativeWidgetContract.kind(item)) {
@@ -562,7 +576,7 @@ private fun FormItemRenderer(
                                 )
                                 IconButton(
                                     onClick = { openLookup(runtime, dataSourceContext, item, lookup) },
-                                    enabled = lookupDialogId(lookup) != null,
+                                    enabled = !conditionDisabled && lookupDialogId(lookup) != null,
                                     modifier = Modifier.size(40.dp)
                                 ) {
                                     Icon(Icons.Filled.Search, contentDescription = "Open lookup")
@@ -581,7 +595,7 @@ private fun FormItemRenderer(
                             )
                             IconButton(
                                 onClick = { openLookup(runtime, dataSourceContext, item, lookup) },
-                                enabled = lookupDialogId(lookup) != null,
+                                enabled = !conditionDisabled && lookupDialogId(lookup) != null,
                                 modifier = Modifier.padding(top = 8.dp)
                             ) {
                                 Icon(Icons.Filled.Search, contentDescription = "Open lookup")
@@ -642,6 +656,54 @@ private fun FormItemRenderer(
             modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
         )
     }
+}
+
+internal fun loadedNativeWidgetOptions(item: ItemDef, rows: List<Map<String, Any?>>): List<Pair<JsonElement, String>>? {
+    item.optionsDataSourceRef?.takeIf(String::isNotBlank)
+        ?: (item.properties["optionsDataSourceRef"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank)
+        ?: return null
+    val valueField = item.optionValueField?.takeIf(String::isNotBlank)
+        ?: (item.properties["optionValueField"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) ?: "value"
+    val labelField = item.optionLabelField?.takeIf(String::isNotBlank)
+        ?: (item.properties["optionLabelField"] as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) ?: "label"
+    return rows.mapNotNull { row ->
+        val raw = SelectorUtil.resolve(row, valueField) ?: return@mapNotNull null
+        val value = JsonUtil.anyToElement(raw)
+        val label = SelectorUtil.resolve(row, labelField)?.let(JsonUtil::anyToElement)?.let(com.viant.forgeandroid.runtime.NativeWidgetContract::displayText)
+            ?.takeIf(String::isNotBlank) ?: com.viant.forgeandroid.runtime.NativeWidgetContract.displayText(value)
+        value to label
+    }
+}
+
+internal fun itemConditionDisables(
+    item: ItemDef,
+    metrics: Map<String, Any?> = emptyMap(),
+    filters: Map<String, Any?> = emptyMap(),
+    form: Map<String, Any?> = emptyMap(),
+    windowForm: Map<String, Any?> = emptyMap(),
+    collection: List<Map<String, Any?>> = emptyList(),
+    selection: com.viant.forgeandroid.runtime.SelectionState = com.viant.forgeandroid.runtime.SelectionState(),
+    authorization: Map<String, Any?> = emptyMap()
+): Boolean {
+    fun decoded(name: String, direct: com.viant.forgeandroid.runtime.DashboardConditionDef?): com.viant.forgeandroid.runtime.DashboardConditionDef? {
+        if (direct != null) return direct
+        val raw = item.properties[name] ?: return null
+        return runCatching { JsonUtil.json.decodeFromJsonElement(com.viant.forgeandroid.runtime.DashboardConditionDef.serializer(), raw) }.getOrNull()
+    }
+    return listOf(decoded("readOnlyWhen", item.readOnlyWhen), decoded("disabledWhen", item.disabledWhen))
+        .filterNotNull()
+        .any { condition ->
+            com.viant.forgeandroid.runtime.evaluateDashboardCondition(
+                condition,
+                metrics = metrics,
+                filters = filters,
+                form = form,
+                windowForm = windowForm,
+                collection = collection,
+                selectionValues = mapOf("selected" to selection.selected, "selection" to selection.selection, "rowIndex" to selection.rowIndex),
+                authorization = authorization
+            )
+        }
 }
 
 @Composable

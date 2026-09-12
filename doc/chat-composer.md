@@ -58,3 +58,18 @@ to every Forge window.
 Implementation: [Composer](../src/components/chat/Composer.jsx),
 [CameraCapture](../src/components/chat/CameraCapture.jsx),
 [camera lifecycle](../src/components/chat/cameraCapture.js).
+
+## Skill autocomplete in the Agently host
+
+The Agently chat input offers `$` hints alongside `/` lookups. A leading `$`
+opens the installed skills visible to the selected agent; matching names and
+short descriptions are listed. Arrow keys navigate, Enter/Tab insert the prefix,
+and Escape dismisses. Picking an entry never sends or activates a skill by itself.
+Mid-sentence dollar signs do not trigger skill activation hints.
+
+Hosts can list skills before creating a conversation with
+`GET /v1/skills?agentId=coder`, or use `conversationId` for the conversation's
+agent. When both are supplied, the explicitly selected agent determines the list.
+Go, TypeScript, iOS and Android SDKs expose this optional agent scope. The
+TypeScript SDK provides `listSkills` and `activateSkill`; autocomplete uses only
+the read-only list operation. Forge does not load skill instructions itself.
