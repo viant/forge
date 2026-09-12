@@ -17,7 +17,7 @@ public enum MetadataResolver {
         return decoded
     }
 
-    private static func resolveValue(_ value: JSONValue, for targetContext: ForgeTargetContext) -> JSONValue? {
+    static func resolveValue(_ value: JSONValue, for targetContext: ForgeTargetContext) -> JSONValue? {
         switch value {
         case .array(let items):
             return .array(items.compactMap { resolveValue($0, for: targetContext) })

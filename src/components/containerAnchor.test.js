@@ -7,3 +7,6 @@ assert.deepEqual(containerAnchorProps({id: 'details'}), {'data-forge-container-i
 assert.deepEqual(containerAnchorProps({id: '  '}), {});
 
 console.log('container anchor tests passed');
+
+assert.deepEqual(containerAnchorProps({id: 'details', className: 'ws-card dense'}), {'data-forge-container-id': 'details', className: 'ws-card dense'});
+assert.deepEqual(containerAnchorProps({className: 'ws-card'}), {className: 'ws-card'});

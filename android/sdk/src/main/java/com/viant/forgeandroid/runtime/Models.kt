@@ -82,6 +82,7 @@ data class ContainerDef(
     val kind: String? = null,
     val scrollMode: String? = null,
     val role: String? = null,
+    val className: String? = null,
     val dataSourceRef: String? = null,
     val card: CardDef? = null,
     val section: SectionDef? = null,
@@ -212,7 +213,8 @@ data class TabsDef(
     val vertical: Boolean? = null,
     val presentation: String? = null,
     val showBack: Boolean? = null,
-    val listTitle: String? = null
+    val listTitle: String? = null,
+    val flattenNestedOnCompact: Boolean? = null
 )
 
 @Serializable
@@ -222,9 +224,31 @@ data class LayoutDef(
     val rows: Int? = null,
     val columns: Int? = null,
     val labelPosition: String? = null,
+    @Serializable(with = NullableScalarStringSerializer::class)
     val gap: String? = null,
+    @Serializable(with = NullableScalarStringSerializer::class)
     val rowGap: String? = null
 )
+
+object NullableScalarStringSerializer : KSerializer<String?> {
+    override val descriptor: SerialDescriptor = JsonElement.serializer().descriptor
+
+    override fun deserialize(decoder: Decoder): String? {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: throw SerializationException("NullableScalarStringSerializer can only decode JSON")
+        return when (val element = jsonDecoder.decodeJsonElement()) {
+            JsonNull -> null
+            is JsonPrimitive -> element.contentOrNull
+            else -> throw SerializationException("Expected a string or numeric layout spacing value")
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: String?) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw SerializationException("NullableScalarStringSerializer can only encode JSON")
+        jsonEncoder.encodeJsonElement(value?.let(::JsonPrimitive) ?: JsonNull)
+    }
+}
 
 @Serializable
 data class DashboardConditionDef(
@@ -240,6 +264,7 @@ data class DashboardConditionDef(
     val whenValue: JsonElement? = null,
     val equals: JsonElement? = null,
     val notEquals: JsonElement? = null,
+    val contains: JsonElement? = null,
     @SerialName("in")
     val inValues: List<JsonElement> = emptyList(),
     val gt: Double? = null,
@@ -1049,6 +1074,7 @@ data class ToolbarItemDef(
     val className: String? = null,
     val type: String? = null,
     val placeholder: String? = null,
+    val properties: Map<String, JsonElement> = emptyMap(),
     val visibleWhen: DashboardConditionDef? = null,
     val on: List<ExecutionDef> = emptyList(),
     val target: JsonElement? = null,
@@ -1068,6 +1094,7 @@ data class ColumnDef(
     val link: LinkDef? = null,
     val width: Int? = null,
     val frozen: Boolean? = null,
+    val sticky: String? = null,
     val icon: String? = null,
     val cellVisual: JsonObject? = null,
     val editor: JsonElement? = null,
@@ -1214,6 +1241,8 @@ data class DataSourceDef(
     val on: List<ExecutionDef> = emptyList(),
     val filterSet: List<FilterSetDef> = emptyList(),
     val quickFilterSet: String? = null,
+    val filterMode: String? = null,
+    val paginationMode: String? = null,
     val target: JsonElement? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap(),
     val resourceModelRef: String? = null
@@ -1231,6 +1260,7 @@ data class FilterSetDef(
 @Serializable
 data class FilterFieldDef(
     val id: String? = null,
+    val field: String? = null,
     val label: String? = null,
     val optionLabel: String? = null,
     val placeholder: String? = null,

@@ -37,7 +37,10 @@ struct TreeEditorRenderer: View {
                                 Text("None").tag(0); Text("Include").tag(1); Text("Exclude").tag(2)
                             }.pickerStyle(.segmented)
                         } else {
-                            Toggle(row.label, isOn: selectedBinding(row.id)).toggleStyle(.checkbox)
+                            Toggle(row.label, isOn: selectedBinding(row.id))
+                            #if os(macOS)
+                                .toggleStyle(.checkbox)
+                            #endif
                         }
                     }
                 }

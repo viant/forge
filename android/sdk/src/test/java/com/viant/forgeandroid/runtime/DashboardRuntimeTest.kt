@@ -218,6 +218,20 @@ class DashboardRuntimeTest {
     }
 
     @Test
+    fun evaluateDashboardConditionSupportsAuthorizationContains() {
+        val condition = DashboardConditionDef(
+            source = "authorization",
+            field = "principal.features",
+            contains = JsonPrimitive("EXPOSE_UNIVERSAL_PIXELS")
+        )
+        val authorization = mapOf(
+            "principal" to mapOf("features" to listOf("EXPOSE_UNIVERSAL_PIXELS", "OTHER"))
+        )
+        assertTrue(evaluateDashboardCondition(condition, authorization = authorization))
+        assertFalse(evaluateDashboardCondition(condition, authorization = emptyMap()))
+    }
+
+    @Test
     fun visibleDashboardDetailChildrenHonorsChildVisibleWhen() {
         val detail = ContainerDef(
             id = "detail",

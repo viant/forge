@@ -44,10 +44,9 @@ export default function SectionTabRail({items = [], selectedId = '', onChange, a
         };
         const frame = requestAnimationFrame(update);
         rail.addEventListener('scroll', update, {passive: true});
-        const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {
-            update();
-            revealSelected('auto');
-        }) : null;
+        // Cue visibility changes the rail width. Re-centering selection here
+        // would undo an explicit scroll-button action on every cue transition.
+        const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(update) : null;
         observer?.observe(rail);
         return () => {
             cancelAnimationFrame(frame);

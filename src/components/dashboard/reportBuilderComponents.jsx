@@ -4858,6 +4858,7 @@ export function InlineStaticFilterControl({
         return null;
     }
     const options = Array.isArray(filter.options) ? filter.options : [];
+    const plainOptions = !String(filter.presentation || "").trim() && options.every((option) => !option.icon);
     const activeValues = filter.multiple
         ? (Array.isArray(value) ? value : [])
         : (value == null || value === "" ? [] : [value]);
@@ -4909,7 +4910,7 @@ export function InlineStaticFilterControl({
         <div className={rootClassName} title={title}>
             <div className="forge-report-builder__inline-filter-row">
                 <span className="forge-report-builder__inline-filter-label">{filter.label || filter.id}</span>
-                <div className={String(filter.presentation || "").trim() === "compactIconRow" ? "forge-report-builder-icon-row forge-report-builder-icon-row--compact" : "forge-report-builder-icon-row"}>
+                <div className={plainOptions ? "forge-report-builder-text-options" : String(filter.presentation || "").trim() === "compactIconRow" ? "forge-report-builder-icon-row forge-report-builder-icon-row--compact" : "forge-report-builder-icon-row"}>
                     {options.map((option) => {
                         const active = activeValues.includes(option.value);
                         return (
@@ -4917,16 +4918,15 @@ export function InlineStaticFilterControl({
                                 key={String(option.value)}
                                 type="button"
                                 className={[
-                                    "forge-report-builder-icon-button",
+                                    plainOptions ? "forge-report-builder-text-option" : "forge-report-builder-icon-button",
                                     String(filter.presentation || "").trim() === "compactIconRow" ? "forge-report-builder-icon-button--compact" : "",
                                     active ? "is-active" : "",
                                 ].filter(Boolean).join(" ")}
+                                aria-pressed={active}
                                 onClick={() => onToggle(option.value)}
                                 title={option.label}
                             >
-                                <span className="forge-report-builder-icon-button__icon">
-                                    {option.icon ? <Icon icon={option.icon} size={18} /> : null}
-                                </span>
+                                {option.icon ? <span className="forge-report-builder-icon-button__icon"><Icon icon={option.icon} size={18} /></span> : null}
                                 <span className="forge-report-builder-icon-button__label">{option.label}</span>
                             </button>
                         );

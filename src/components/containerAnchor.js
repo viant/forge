@@ -2,5 +2,8 @@ export const normalizeContainerAnchor = (container) => String(container?.id || '
 
 export const containerAnchorProps = (container) => {
     const id = normalizeContainerAnchor(container);
-    return id ? {'data-forge-container-id': id} : {};
+    return {
+        ...(id ? {'data-forge-container-id': id} : {}),
+        ...(container?.className ? {className: container.className} : {}),
+    };
 };

@@ -43,3 +43,5 @@ export {
     applyToolsSelection,
     applyAutoSelectToolsSelection,
 } from './chatCommandCenterActions.js';
+
+export {ForgeThemeProvider, ForgeThemeBoundary} from './ThemeBoundary.jsx';

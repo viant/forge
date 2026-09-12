@@ -1,5 +1,5 @@
 // Minimal ControlWrapper used by WidgetRenderer (Phase 1 – placeholder)
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useId } from 'react';
 import { getWrapper } from './wrapperRegistry.js';
 import { registerControlTarget, unregisterControlTarget } from '../core/ui/registry.js';
 
@@ -20,20 +20,16 @@ const findFocusable = (root) => {
 };
 
 export default function ControlWrapper({ item, container, context, framework = 'core', disabled = false, readOnly = false, children }) {
-    // Allow per-item override to skip wrapper
-    if (item?.wrapper === 'none') {
-        if (item?.validationError) {
-            return (
-                <div className="forge-control-validation-shell" data-forge-control-id={item?.id || undefined}>
-                    {children}
-                    <div className="forge-control-validation-message" role="alert">
-                        {item.validationError}
-                    </div>
-                </div>
-            );
-        }
-        return children;
-    }
+    const generatedId = useId();
+    const controlId = children?.props?.id || item?.id || generatedId;
+    const helperId = `${generatedId}-help`;
+    const helperText = item?.validationError || item?.helperText || item?.description;
+    const bypassHelper = item?.wrapper === 'none' || (framework === 'blueprint' && item?.isStandalone);
+    const hasHelper = bypassHelper ? !!item?.validationError : !!helperText;
+    const child = React.isValidElement(children) ? React.cloneElement(children, {
+        id: controlId,
+        'aria-describedby': [children.props['aria-describedby'], hasHelper ? helperId : null].filter(Boolean).join(' ') || undefined,
+    }) : children;
 
     const wrapperRef = useRef(null);
     const regKeyRef = useRef(null);
@@ -66,7 +62,7 @@ export default function ControlWrapper({ item, container, context, framework = '
         const windowId = context?.identity?.windowId;
         const dataSourceRef = context?.identity?.dataSourceRef;
         const controlId = item?.id;
-        if (!windowId || !controlId) return;
+        if (!windowId || !controlId || item?.wrapper === 'none') return;
 
         const wrapper = wrapperRef.current;
         const meta = {
@@ -91,7 +87,17 @@ export default function ControlWrapper({ item, container, context, framework = '
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [context?.identity?.windowId, context?.identity?.dataSourceRef, item?.id]);
+    }, [context?.identity?.windowId, context?.identity?.dataSourceRef, item?.id, item?.wrapper]);
+
+    // Keep hooks unconditional when metadata changes wrapper mode.
+    if (item?.wrapper === 'none') {
+        if (!item?.validationError) return child;
+        return <div className="forge-control-validation-shell" data-forge-control-id={item?.id || undefined}>
+            {child}
+            <div className="forge-control-validation-message" id={helperId}
+                data-forge-part="validation-message" role="alert">{item.validationError}</div>
+        </div>;
+    }
 
     if (custom) {
         return (
@@ -102,7 +108,7 @@ export default function ControlWrapper({ item, container, context, framework = '
                 data-forge-control-id={item?.id || undefined}
                 {...accessibilityProps}
             >
-                {custom(item, container, children, context)}
+                {custom(item, container, child, context, {controlId, helperId, disabled, readOnly})}
             </div>
         );
     }
@@ -117,13 +123,17 @@ export default function ControlWrapper({ item, container, context, framework = '
         >
             {item?.label && !item.hideLabel && !isLabelWidget && (
                 <label
+                    data-forge-part="label"
+                    htmlFor={controlId}
                     style={{ display: inline ? 'inline-block' : 'block', marginRight: inline ? 8 : 0 }}
                     title={item.tooltip || undefined}
                 >
                     {item.label}
                 </label>
             )}
-            {children}
+            {child}
+            {hasHelper && <div id={helperId} data-forge-part={item?.validationError ? 'validation-message' : 'helper-text'}
+                role={item?.validationError ? 'alert' : undefined}>{helperText}</div>}
         </div>
     );
 }

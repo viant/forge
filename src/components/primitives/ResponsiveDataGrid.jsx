@@ -1,3 +1,4 @@
+import {containerSizingStyle} from '../containerSizing.js';
 import React from 'react';
 import {Button} from '@blueprintjs/core';
 import {useSignals} from '@preact/signals-react/runtime';
@@ -112,7 +113,7 @@ export function ResponsiveCardRows({rows, columns, context, identityColumns = ['
   ))}</dl></article>)}</div>;
 }
 
-export default function ResponsiveDataGrid({container, context, isActive}) {
+export default function ResponsiveDataGrid({toolbarActions, sizingMode = 'fill', container, context, isActive}) {
   useSignals();
   const host = React.useRef(null);
   const [target, setTarget] = React.useState('desktop');
@@ -123,15 +124,15 @@ export default function ResponsiveDataGrid({container, context, isActive}) {
     return () => observer.disconnect();
   }, []);
   const state = responsiveDataGridState(container.responsiveDataGrid, target);
-  const responsiveStyle = responsiveGridStyle(state);
+  const responsiveStyle = {...responsiveGridStyle(state), ...containerSizingStyle(container,sizingMode,{chrome:true})};
   const dataContext = container.dataSourceRef && context?.identity?.dataSourceRef !== container.dataSourceRef ? context.Context?.(container.dataSourceRef) || context : context;
   const authoredColumns = container.table?.columns || [];
   const projected = projectResponsiveColumns(authoredColumns, state.columns);
   const columns = applyResponsiveColumnState(projected, state);
   const table = {...container.table, columns, density: state.density || container.table?.density};
-  if (target === 'phone' && state.rowLayout === 'cards' && state.readOnlyCards === true && responsiveCardsSupported(container.table, dataContext?.dataSource)) {
+  if (container.table?.fillRemainingWidth !== true && !(Number(container.table?.minRows) > 0 || Number(container.table?.rowHeight) > 0) && target === 'phone' && state.rowLayout === 'cards' && state.readOnlyCards === true && responsiveCardsSupported(container.table, dataContext?.dataSource)) {
     return <div ref={host} className="forge-responsive-grid forge-responsive-grid--phone" data-forge-primitive="responsiveDataGrid" data-row-layout="cards" style={responsiveStyle}>
-      <TablePanel
+      <TablePanel toolbarActions={toolbarActions} sizingMode={sizingMode}
         container={{...container, table}}
         context={dataContext}
         isActive={isActive}
@@ -141,5 +142,5 @@ export default function ResponsiveDataGrid({container, context, isActive}) {
       />
     </div>;
   }
-  return <div ref={host} className={`forge-responsive-grid forge-responsive-grid--${target}`} data-forge-primitive="responsiveDataGrid" data-row-layout="table" style={responsiveStyle}><TablePanel container={{...container, table}} context={dataContext} isActive={isActive}/></div>;
+  return <div ref={host} className={`forge-responsive-grid forge-responsive-grid--${target}`} data-forge-primitive="responsiveDataGrid" data-row-layout="table" style={responsiveStyle}><TablePanel toolbarActions={toolbarActions} sizingMode={sizingMode} container={{...container, table}} context={dataContext} isActive={isActive}/></div>;
 }

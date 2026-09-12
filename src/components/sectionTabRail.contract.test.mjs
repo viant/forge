@@ -14,10 +14,10 @@ assert.match(source, /Scroll tabs right/);
 assert.match(styles, /scroll-padding-inline:\s*44px/);
 assert.match(styles, /scroll-margin-inline:\s*44px/);
 assert.match(styles, /\.forge-section-tab\s*\{[\s\S]*?flex:\s*0 0 auto/);
-assert.match(styles, /\.forge-section-tab-rail\s*\{[\s\S]*?flex:\s*0 0 auto/);
+assert.match(styles, /\.forge-section-tab-rail\s*\{[\s\S]*?flex:\s*1 1 auto/);
 assert.match(styles, /\.forge-section-tab-rail\.is-compact\s*\{[\s\S]*?min-height:\s*35px/);
 assert.match(styles, /\.forge-section-tab\.is-selected\s*\{[\s\S]*?border-bottom-color/);
-assert.match(styles, /\.forge-section-tab-rail-frame\.has-right-overflow::after/);
+assert.doesNotMatch(styles, /position:\s*absolute/);
 assert.doesNotMatch(styles, /@media\s*\(min-width:[\s\S]*?\.forge-section-tab[^}]*flex:\s*1/);
 assert.match(styles, /@media\s*\(max-width:\s*480px\)[\s\S]*?min-height:\s*40px/);
 

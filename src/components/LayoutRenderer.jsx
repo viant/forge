@@ -12,12 +12,12 @@ function resolveChildContext(context, dataSourceRef) {
     return context.Context(targetRef);
 }
 
-const LayoutRenderer = ({context, container}) => {
+const LayoutRenderer = ({context, container, sizingMode}) => {
     if (!container) {
         return <div>No container provided to LayoutRenderer.</div>;
     }
     const dataSourceRef = container.dataSourceRef || context.identity.dataSourceRef;
-    return <Container context={resolveChildContext(context, dataSourceRef)} container={container}/>;
+    return <Container context={resolveChildContext(context, dataSourceRef)} container={container} sizingMode={sizingMode}/>;
 };
 
 

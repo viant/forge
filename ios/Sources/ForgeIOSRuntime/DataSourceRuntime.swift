@@ -150,18 +150,33 @@ public actor DataSourceRuntime {
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             }
 
-            let (data, _) = try await session.data(for: request)
+            let (data, response) = try await session.data(for: request)
+            if let response = response as? HTTPURLResponse,
+               !(200..<300).contains(response.statusCode) {
+                throw NSError(
+                    domain: "Forge.DataSource.HTTP",
+                    code: response.statusCode,
+                    userInfo: [NSLocalizedDescriptionKey: "Unable to load data (HTTP \(response.statusCode)). Please retry."]
+                )
+            }
             let raw = try JSONDecoder().decode(JSONValue.self, from: data)
             let rows = normalizeCollection(raw, selector: selectors?.data)
             setCollection(dataSourceID: dataSourceID, rows: rows)
+            let selectedMetrics = normalizeDataInfo(raw, selector: selectors?.metrics)
             let dataInfo = normalizeDataInfo(raw, selector: selectors?.dataInfo)
-            if dataInfo.isEmpty {
+            if !selectedMetrics.isEmpty {
+                setMetrics(dataSourceID: dataSourceID, values: selectedMetrics)
+            } else if dataInfo.isEmpty {
                 setMetrics(dataSourceID: dataSourceID, values: extractPagingMetrics(raw, paging: paging))
             } else {
                 setMetrics(dataSourceID: dataSourceID, values: dataInfo)
             }
             setControl(dataSourceID: dataSourceID, control: ControlState())
         } catch {
+            if Task.isCancelled || (error as? URLError)?.code == .cancelled || error is CancellationError {
+                setControl(dataSourceID: dataSourceID, control: ControlState())
+                return
+            }
             setControl(dataSourceID: dataSourceID,
                        control: ControlState(error: error.localizedDescription))
         }

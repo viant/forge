@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import './GridLayoutRenderer.css';
 import {useSignals} from '@preact/signals-react/runtime';
 import ControlRenderer from './ControlRenderer.jsx';
 import {evaluatePlainVisibleWhen, trackVisibleWhen} from './visibleWhen.js';
@@ -188,7 +189,7 @@ export default function GridLayoutRenderer({
     const labelMode = (labels.mode || 'left');
     const controlGap = labels?.controlGap !== undefined ? Number(labels.controlGap) : 8;
     const gridSpacing = resolveGridSpacing(layout, labelMode);
-    const labelStyle = { fontWeight: 700, color: '#1f2937', ...(labels.style || labels.labelStyle || {}) };
+    const labelStyle = { ...(labels.style || labels.labelStyle || {}) };
     const sourceEntries = entries || items || [];
     sourceEntries.forEach((item) => {
         const dsRef = item?.dataSourceRef || baseDataSourceRef;
@@ -241,7 +242,7 @@ export default function GridLayoutRenderer({
 
                 // Label cell (if applicable)
                 const labelNode = hasLabel ? (
-                    <label
+                    <label className="forge-grid-label" data-forge-part="label"
                         key={`${item.id || item.name}-label`}
                         htmlFor={item.id || undefined}
                         title={item.tooltip || undefined}

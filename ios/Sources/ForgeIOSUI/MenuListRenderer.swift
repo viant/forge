@@ -14,11 +14,14 @@ public struct MenuListRenderer: View {
     private let items: [ItemDef]
 
     @State private var windowFormValues: [String: JSONValue] = [:]
+    @State private var authorizationValues: [String: JSONValue] = [:]
     @State private var formValuesByDataSource: [String: [String: JSONValue]] = [:]
     @State private var metricsValuesByDataSource: [String: [String: JSONValue]] = [:]
     @State private var collectionValuesByDataSource: [String: [[String: JSONValue]]] = [:]
     @State private var eventVisibilityByItemID: [String: Bool] = [:]
     @State private var expandedSummaryValue: ExpandedMenuSummaryValue?
+    @State private var displayProjectionRevision = 0
+    @State private var projectedLabelValues: [String: JSONValue] = [:]
 
     public init(runtime: ForgeRuntime? = nil, window: WindowContext? = nil, container: ContainerDef, items: [ItemDef]) {
         self.runtime = runtime
@@ -70,10 +73,20 @@ public struct MenuListRenderer: View {
         .task(id: dataTaskKey) {
             await loadValues()
         }
+        .onChange(of: formValuesByDataSource) { _, _ in displayProjectionRevision += 1 }
+        .onChange(of: metricsValuesByDataSource) { _, _ in displayProjectionRevision += 1 }
+        .onChange(of: collectionValuesByDataSource) { _, _ in displayProjectionRevision += 1 }
+        .onChange(of: windowFormValues) { _, _ in displayProjectionRevision += 1 }
+        .task(id: "\(dataTaskKey):labels:\(displayProjectionRevision)") {
+            await projectLabelValues()
+        }
         .task(id: dataSubscriptionKey) {
             await observeDataSources()
         }
         .task(id: window?.windowID ?? "") {
+            if let runtime, let window {
+                authorizationValues = await runtime.windowMetadata(id: window.windowID)?.authorizationSnapshot ?? [:]
+            }
             await observeWindowForm()
         }
         .task(id: itemVisibilityTaskKey) {
@@ -135,7 +148,7 @@ public struct MenuListRenderer: View {
     private var relevantDataSourceRefs: [String] {
         mergedMenuListDataSourceRefs(
             containerDataSourceRef: container.dataSourceRef,
-            itemDataSourceRefs: items.map(resolveItemDataSourceRef(_:))
+            itemDataSourceRefs: items.map(resolveItemDataSourceRef(_:)) + items.map { $0.properties["optionsDataSourceRef"]?.stringValue }
         )
     }
 
@@ -172,9 +185,19 @@ public struct MenuListRenderer: View {
                     if windowFormValues[start] != patch[start] || windowFormValues[end] != patch[end] {
                         Task { await runtime.setWindowFormValue(windowID: window.windowID, values: patch, bumpPrefillRevision: false) }
                     }
-                })
+                }, loadedOptions: loadedOptions(for: item))
             }
-        }.disabled(NativeWidgetContract.presentationDisabled(item))
+        }.disabled(NativeWidgetContract.presentationDisabled(item) || conditionDisables(item))
+    }
+
+    private func loadedOptions(for item: ItemDef) -> [(JSONValue, String)]? {
+        guard let ref = item.properties["optionsDataSourceRef"]?.stringValue else { return nil }
+        let valueKey = item.properties["optionValueField"]?.stringValue ?? "value"
+        let labelKey = item.properties["optionLabelField"]?.stringValue ?? "label"
+        return (collectionValuesByDataSource[ref] ?? []).compactMap { row in
+            guard let value = row[valueKey] else { return nil }
+            return (value, NativeWidgetContract.text(row[labelKey] ?? value))
+        }
     }
 
     @ViewBuilder
@@ -240,8 +263,7 @@ public struct MenuListRenderer: View {
             Text("\(title): \(value)")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 11)
                 .padding(.vertical, 7)
@@ -473,24 +495,24 @@ public struct MenuListRenderer: View {
     @ViewBuilder
     private func lookupInputItem(_ item: ItemDef) -> some View {
         let title = item.label ?? item.id ?? "Lookup"
+        let required = item.required == true || item.properties["required"] == .bool(true)
         let value = editableItemText(item)
         VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            Text(title + (required ? " *" : "")).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             HStack(spacing: 6) {
                 TextField(item.properties["placeholder"]?.displayString ?? "Select \(title.lowercased())", text: Binding(
                     get: { value },
                     set: { applyItemValue(.string($0), for: item) }
                 ))
-                .padding(.horizontal, 11)
-                .frame(height: 38)
-                .background(Color(red: 0.93, green: 0.97, blue: 0.94), in: RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(red: 0.72, green: 0.85, blue: 0.75), lineWidth: 1))
+                .modifier(ForgeThemeInputModifier(required: required, lookup: true))
+                .accessibilityLabel(title + (required ? ", required" : ""))
                 Button { openItemLookup(item) } label: {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 34, height: 34)
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.bordered)
+                .accessibilityLabel("Choose \(title)")
             }
         }
     }
@@ -712,6 +734,12 @@ public struct MenuListRenderer: View {
         await withTaskGroup(of: Void.self) { group in
             for ref in relevantDataSourceRefs {
                 group.addTask {
+                    let stream = await runtime.dataSourceCollectionUpdates(windowID: window.windowID, dataSourceRef: ref)
+                    for await next in stream {
+                        await MainActor.run { collectionValuesByDataSource[ref] = next }
+                    }
+                }
+                group.addTask {
                     let stream = await runtime.dataSourceFormUpdates(windowID: window.windowID, dataSourceRef: ref)
                     for await next in stream {
                         await MainActor.run {
@@ -853,7 +881,40 @@ public struct MenuListRenderer: View {
     }
 
     private func resolvedItemDisplayValue(_ item: ItemDef) -> String? {
-        menuListFormattedValue(resolvedItemValue(item), format: item.format)
+        menuListFormattedValue(projectedLabelValues[labelProjectionKey(item)] ?? resolvedItemValue(item), format: item.format)
+    }
+
+    private func labelProjectionKey(_ item: ItemDef) -> String {
+        "\(resolveItemDataSourceRef(item) ?? ""):\(item.id ?? item.valueKey ?? item.label ?? "")"
+    }
+
+    private func projectLabelValues() async {
+        guard let runtime, let window,
+              let metadata = await runtime.windowMetadata(id: window.windowID),
+              let code = metadata.actions?.code else { return }
+        var results: [String: JSONValue] = [:]
+        for item in container.items where item.type?.lowercased() == "label" {
+            guard !Task.isCancelled else { return }
+            var value = resolvedItemValue(item)
+            for hook in item.on where hook.event?.lowercased() == "onvalue" {
+                var function = hook.action
+                if let namespace = metadata.namespace, function.hasPrefix(namespace + ".") {
+                    function.removeFirst(namespace.count + 1)
+                }
+                do {
+                    if let result = try ActionHookRuntime.invoke(code: code, functionName: function, props: .object(["value": value ?? .null])) {
+                        value = result
+                    }
+                } catch {
+                    print("Forge label value hook failed [\(item.id ?? "label")]: \(error.localizedDescription)")
+                }
+            }
+            if item.on.contains(where: { $0.event?.lowercased() == "onvalue" }) {
+                results[labelProjectionKey(item)] = value
+            }
+        }
+        guard !Task.isCancelled else { return }
+        projectedLabelValues = results
     }
 
     private func resolvedLinkDisplayText(_ item: ItemDef) -> String {
@@ -980,41 +1041,31 @@ public struct MenuListRenderer: View {
     }
 
     private func isVisible(_ item: ItemDef) -> Bool {
-        guard let visibleWhen = item.visibleWhen else {
-            return true
+        evaluateCondition(item.visibleWhen, for: item)
+    }
+
+    private func conditionDisables(_ item: ItemDef) -> Bool {
+        ["readOnlyWhen", "disabledWhen"].contains { key in
+            guard let raw = item.properties[key] else { return false }
+            guard let data = try? JSONEncoder().encode(raw),
+                  let condition = try? JSONDecoder().decode(DashboardConditionDef.self, from: data) else { return true }
+            return evaluateCondition(condition, for: item)
         }
-        let source = visibleWhen.source?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
-        let field = visibleWhen.field?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !field.isEmpty else {
-            return true
-        }
-        let candidate: JSONValue?
-        switch source {
-        case "windowform":
-            candidate = jsonValue(from: SelectorUtil.resolve(windowFormValues, selector: field))
-        case "metrics":
-            if let ref = resolveItemDataSourceRef(item) {
-                if let resolved = jsonValue(from: SelectorUtil.resolve(metricsValuesByDataSource[ref], selector: field)),
-                   resolved != .null {
-                    candidate = resolved
-                } else {
-                    let firstRow = collectionValuesByDataSource[ref]?.first ?? [:]
-                    candidate = jsonValue(from: SelectorUtil.resolve(firstRow, selector: field))
-                }
-            } else {
-                candidate = nil
-            }
-        default:
-            if let ref = resolveItemDataSourceRef(item) {
-                candidate = jsonValue(from: SelectorUtil.resolve(formValuesByDataSource[ref], selector: field))
-            } else {
-                candidate = nil
-            }
-        }
-        if let equals = visibleWhen.equals?.displayString {
-            return candidate?.displayString == equals
-        }
-        return candidate != nil && candidate?.displayString != "—"
+    }
+
+    private func evaluateCondition(_ condition: DashboardConditionDef?, for item: ItemDef) -> Bool {
+        let ref = resolveItemDataSourceRef(item) ?? ""
+        let metrics = metricsValuesByDataSource[ref] ?? [:]
+        let rows = collectionValuesByDataSource[ref] ?? []
+        let effectiveMetrics = (rows.first ?? [:]).merging(metrics) { _, metric in metric }
+        return DashboardRuntime.evaluateDashboardCondition(
+            condition,
+            metrics: effectiveMetrics.mapValues { $0.menuListAnyValue as Any },
+            form: (formValuesByDataSource[ref] ?? [:]).mapValues { $0.menuListAnyValue as Any },
+            windowForm: windowFormValues.mapValues { $0.menuListAnyValue as Any },
+            collection: rows.map { $0.mapValues { $0.menuListAnyValue as Any } },
+            authorization: authorizationValues.mapValues { $0.menuListAnyValue as Any }
+        )
     }
 
     private func orderedUnique(_ refs: [String]) -> [String] {
@@ -1084,9 +1135,12 @@ public struct MenuListRenderer: View {
             if scope == "windowform" {
                 await runtime.setWindowFormValue(windowID: window.windowID, values: [key: value])
             } else if !dataSourceRef.isEmpty {
-                var current = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: dataSourceRef)
-                current[key] = value
-                await runtime.setDataSourceForm(windowID: window.windowID, dataSourceRef: dataSourceRef, values: current)
+                let current = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: dataSourceRef)
+                guard let updated = SelectorUtil.setting(value, in: .object(current), selector: key)?.objectValue else {
+                    print("Forge form update rejected invalid path: \(key)")
+                    return
+                }
+                await runtime.setDataSourceForm(windowID: window.windowID, dataSourceRef: dataSourceRef, values: updated)
             }
             await runtime.emitInteraction(
                 kind: "feed.form_changed",

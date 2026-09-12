@@ -83,7 +83,17 @@ public struct WindowContentView: View {
                 )
             }
         }
+        .modifier(ForgeThemeSurfaceModifier())
         .environment(\.forgePresentationDensity, resolvedPresentationDensity)
+        .background(alignment: .topLeading) {
+            ForEach((metadata.view?.content?.containers ?? []).filter(\.isHiddenBinding)) { container in
+                ContainerRenderer(runtime: runtime, window: window, container: container)
+                    .frame(width: 0, height: 0)
+                    .clipped()
+                    .hidden()
+                    .accessibilityHidden(true)
+            }
+        }
         .task(id: onInitTaskKey) {
             await runWindowLifecycle(event: "onInit")
         }
@@ -142,7 +152,7 @@ public struct WindowContentView: View {
 
     @ViewBuilder
     private func renderedContainers(lazy: Bool) -> some View {
-        let containers = metadata.view?.content?.containers ?? []
+        let containers = (metadata.view?.content?.containers ?? []).filter { !$0.isHiddenBinding }
         let layout = metadata.view?.content?.layout
         if layout?.kind?.lowercased() == "split", containers.count >= 2, horizontalSizeClass == .regular {
             let spacing: CGFloat = 16

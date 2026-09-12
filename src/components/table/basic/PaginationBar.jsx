@@ -3,7 +3,7 @@
 import React, {useState} from "react";
 import {Button} from "@blueprintjs/core";
 import {useSignalEffect} from "@preact/signals-react";
-import {canNavigateNext, compactPaginationStatusLabel, paginationStatusLabel, resolvePaginationState} from "./PaginationState.js";
+import {canNavigateNext, paginationStatusLabel, resolvePaginationState} from "./PaginationState.js";
 
 const buttonProperties = {
     'pagination.first': {label: "First Page", icon: "double-chevron-left"},
@@ -14,6 +14,9 @@ const buttonProperties = {
 
 const PaginationBar = ({
                            context,
+                           showBoundaryButtons = true,
+                           pagingEnabled = true,
+                           children,
                        }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(null);
@@ -84,33 +87,31 @@ const PaginationBar = ({
                 minimal={true}
                 small={true}
                 aria-label={properties.label}
-                title={properties.label}
+                title={actionKey === 'pagination.last' && totalPages == null ? 'Last page unavailable' : properties.label}
             />
         );
     };
 
-    const canGoPrevious = !inactive && currentPage > 1;
-    const canGoNext = canNavigateNext({inactive, initialLoading, currentPage, totalPages, recordCount, hasMore});
-    const canGoLast = !inactive && totalPages != null && currentPage < totalPages;
-    const statusLabel = paginationStatusLabel({initialLoading, currentPage, totalPages, recordCount});
-    const compactStatusLabel = compactPaginationStatusLabel({initialLoading, currentPage, totalPages, recordCount});
+    const busy = context?.signals?.control?.value?.loading === true;
+    const canGoPrevious = pagingEnabled && !busy && !inactive && currentPage > 1;
+    const canGoNext = pagingEnabled && !busy && canNavigateNext({inactive, initialLoading, currentPage, totalPages, recordCount, hasMore});
+    const canGoLast = pagingEnabled && !busy && !inactive && totalPages != null && currentPage < totalPages;
+    const statusLabel = paginationStatusLabel({initialLoading, currentPage, totalPages});
 
     return (
         <div className="pagination-bar" aria-busy={initialLoading || undefined}>
             <div>
-                {renderActionButton("pagination.first", onFirstPage, !canGoPrevious)}
+                {showBoundaryButtons ? renderActionButton("pagination.first", onFirstPage, !canGoPrevious) : null}
                 {renderActionButton("pagination.previous", onPreviousPage, !canGoPrevious)}
 
 
-                    <span role="status" aria-live="polite">
-                        <span className="pagination-status-full">{statusLabel}</span>
-                        <span className="pagination-status-compact" aria-hidden="true">{compactStatusLabel}</span>
-                    </span>
+                    <span className="forge-pagination-announcement" role="status" aria-live="polite">{pagingEnabled ? statusLabel : 'All loaded rows'}</span>
+                    {children}
 
 
 
                 {renderActionButton("pagination.next", onNextPage, !canGoNext)}
-                {totalPages != null ? renderActionButton("pagination.last", onLastPage, !canGoLast) : null}
+                {showBoundaryButtons ? renderActionButton("pagination.last", onLastPage, !canGoLast) : null}
             </div>
         </div>
     );

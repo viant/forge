@@ -599,7 +599,8 @@ public actor ForgeRuntime {
         windowID: String,
         dataSourceRef: String,
         baseURL: String = "",
-        additionalHeaders: [String: String] = [:]
+        additionalHeaders: [String: String] = [:],
+        lifecyclePath: [String] = []
     ) async {
         let signal = await signals.metadata(windowID: windowID)
         guard let metadata = await signal.peek() else { return }
@@ -672,6 +673,11 @@ public actor ForgeRuntime {
                             await formSignal.set(preparedSelection)
                         }
                     }
+                    await applyDataSourceLifecycleHooks(
+                        windowID: windowID, dataSourceRef: dataSourceRef, metadata: metadata,
+                        event: "onSuccess", rows: hookedRows, generation: fetchGeneration,
+                        path: lifecyclePath + [dataSourceRef]
+                    )
                     return
                 }
             } catch {
@@ -698,6 +704,11 @@ public actor ForgeRuntime {
                 )
                 let controlSignal = await signals.control(dataSourceID: dataSourceID)
                 await controlSignal.set(ControlState(error: error.localizedDescription))
+                await applyDataSourceLifecycleHooks(
+                    windowID: windowID, dataSourceRef: dataSourceRef, metadata: metadata,
+                    event: "onError", rows: [], generation: fetchGeneration,
+                    path: lifecyclePath + [dataSourceRef]
+                )
                 return
             }
         }
@@ -734,8 +745,18 @@ public actor ForgeRuntime {
             additionalHeaders: additionalHeaders,
             session: session
         )
+        guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, !Task.isCancelled else { return }
+        let fetchedRows = await dataSourceRuntime.collection(dataSourceID: dataSourceID)
+        if dataSource.autoSelect != false,
+           let first = fetchedRows.first,
+           await dataSourceRuntime.selection(dataSourceID: dataSourceID).selected == nil {
+            let prepared = applySelectionHook(metadata: metadata, row: first, rowIndex: 0)
+            let selection = SelectionState(selected: prepared, rowIndex: 0)
+            await dataSourceRuntime.setSelection(dataSourceID: dataSourceID, selection: selection)
+            await dataSourceRuntime.setForm(dataSourceID: dataSourceID, values: prepared)
+        }
         let collectionSignal = await signals.collection(dataSourceID: dataSourceID)
-        await collectionSignal.set(await dataSourceRuntime.collection(dataSourceID: dataSourceID))
+        await collectionSignal.set(fetchedRows)
         let metricsSignal = await signals.metrics(dataSourceID: dataSourceID)
         await metricsSignal.set(await dataSourceRuntime.metrics(dataSourceID: dataSourceID))
         let formSignal = await signals.form(dataSourceID: dataSourceID)
@@ -744,6 +765,60 @@ public actor ForgeRuntime {
         await selectionSignal.set(await dataSourceRuntime.selection(dataSourceID: dataSourceID))
         let controlSignal = await signals.control(dataSourceID: dataSourceID)
         await controlSignal.set(await dataSourceRuntime.control(dataSourceID: dataSourceID))
+        let control = await dataSourceRuntime.control(dataSourceID: dataSourceID)
+        await applyDataSourceLifecycleHooks(
+            windowID: windowID, dataSourceRef: dataSourceRef, metadata: metadata,
+            event: control.error == nil ? "onSuccess" : "onError", rows: fetchedRows,
+            generation: fetchGeneration, path: lifecyclePath + [dataSourceRef]
+        )
+    }
+
+    private func applyDataSourceLifecycleHooks(windowID: String, dataSourceRef: String,
+                                               metadata: WindowMetadata, event: String,
+                                               rows: [[String: JSONValue]], generation: UInt64,
+                                               path: [String]) async {
+        let hooks = metadata.dataSources[dataSourceRef]?.on.filter { $0.event == event } ?? []
+        guard !hooks.isEmpty, let code = metadata.actions?.code else { return }
+        let sourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
+        for hook in hooks {
+            var snapshots: [String: JSONValue] = [:]
+            for ref in metadata.dataSources.keys {
+                let id = WindowIdentity(windowID: windowID).dataSourceID(ref: ref)
+                snapshots[ref] = .object([
+                    "form": .object(await dataSourceRuntime.form(dataSourceID: id)),
+                    "collection": .array(await dataSourceRuntime.collection(dataSourceID: id).map(JSONValue.object))
+                ])
+            }
+            guard dataSourceFetchGenerations[sourceID] == generation, !Task.isCancelled else { return }
+            do {
+                let effects = try DataSourceHookProjection.invoke(code: code, function: hook.action,
+                    namespace: metadata.namespace, source: dataSourceRef, snapshots: snapshots, collection: rows)
+                for effect in effects {
+                    guard dataSourceFetchGenerations[sourceID] == generation, !Task.isCancelled else { return }
+                    guard let object = effect.objectValue, let ref = object["ref"]?.stringValue,
+                          metadata.dataSources[ref] != nil else { continue }
+                    switch object["kind"]?.stringValue {
+                    case "form":
+                        if let value = object["value"]?.objectValue {
+                            await setDataSourceForm(windowID: windowID, dataSourceRef: ref, values: value)
+                        }
+                    case "input":
+                        if let value = object["value"]?.objectValue {
+                            await setDataSourceInputParameters(windowID: windowID, dataSourceRef: ref, parameters: value)
+                        }
+                    case "fetch":
+                        guard !path.contains(ref), path.count < 16 else {
+                            print("Forge datasource hook cycle rejected: \(path) -> \(ref)")
+                            continue
+                        }
+                        await refreshDataSourceCollection(windowID: windowID, dataSourceRef: ref, lifecyclePath: path)
+                    default: break
+                    }
+                }
+            } catch {
+                print("Forge datasource lifecycle hook failed [\(hook.action)]: \(error.localizedDescription)")
+            }
+        }
     }
 
     // MARK: - Handler registry

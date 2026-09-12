@@ -20,6 +20,8 @@ describe('toolbarItemLabel', () => {
     it('hides icon-only labels while preserving their accessible metadata elsewhere', () => {
         expect(toolbarItemLabel({label: 'Save changes', hideLabel: true})).toBeNull();
         expect(toolbarItemLabel({label: 'Save changes'})).toBe('Save changes');
+        expect(toolbarItemLabel({label: 'Export', icon: 'export'})).toBeNull();
+        expect(toolbarItemLabel({label: 'Export', icon: 'export', hideLabel: false})).toBe('Export');
     });
 });
 

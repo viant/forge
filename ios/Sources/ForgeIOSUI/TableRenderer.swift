@@ -1,7 +1,28 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import ForgeIOSRuntime
 
 private let hostedWorkspaceDidOpenNotification = Notification.Name("forgeHostedWorkspaceDidOpen")
+
+internal func tableCSVFilename(_ toolbar: ToolbarDef?) -> String {
+    let raw = toolbar?.items.first { $0.type?.lowercased() == "tableexport" }?.properties["filename"]?.stringValue ?? "table"
+    let name = raw.components(separatedBy: CharacterSet(charactersIn: "/\\:").union(.controlCharacters))
+        .joined(separator: "_").trimmingCharacters(in: .whitespacesAndNewlines)
+    let safe = name.isEmpty || name == "." || name == ".." ? "table" : name
+    return safe.lowercased().hasSuffix(".csv") ? safe : safe + ".csv"
+}
+
+private struct TableCSVDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.commaSeparatedText] }
+    var text: String
+    init(text: String) { self.text = text }
+    init(configuration: ReadConfiguration) throws {
+        text = String(decoding: configuration.file.regularFileContents ?? Data(), as: UTF8.self)
+    }
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(text.utf8))
+    }
+}
 
 internal func tableShouldAutoFetch(
     fetchData: Bool?,
@@ -14,6 +35,9 @@ internal func tableShouldAutoFetch(
 public struct TableRenderer: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.forgeEmbeddedNonScrolling) private var forgeEmbeddedNonScrolling
+    @ScaledMetric(relativeTo: .body) private var tableTextScale: CGFloat = 1
+    @ScaledMetric(relativeTo: .body) private var gridRowHeight: CGFloat = 48
+    @ScaledMetric(relativeTo: .caption) private var gridHeaderHeight: CGFloat = 40
 
     private let runtime: ForgeRuntime?
     private let window: WindowContext?
@@ -21,9 +45,20 @@ public struct TableRenderer: View {
     private let table: TableDef
     private let providedRows: [[String: JSONValue]]?
     @State private var rows: [[String: JSONValue]] = []
+    @State private var gridViewportWidth: CGFloat = 0
+    @State private var projectionRevision = 0
+    @State private var projectedSourceRows: [[String: JSONValue]] = []
+    @State private var projectedValues: [[String: JSONValue]] = []
     @State private var metrics: [String: JSONValue] = [:]
     @State private var input: InputState = InputState()
     @State private var paging: DataSourcePagingDef? = nil
+    @State private var clientPaging = false
+    @State private var clientPage = 1
+    @State private var clientFiltering = false
+    @State private var searchText = ""
+    @State private var exportingCSV = false
+    @State private var exportError: String?
+    @State private var hiddenColumnKeys: Set<String> = []
     @State private var selectedRowIndex: Int? = nil
     @State private var controlState = ControlState()
     @State private var sortColumnKey: String? = nil
@@ -64,6 +99,7 @@ public struct TableRenderer: View {
                 )
             }
             if !(rows.isEmpty && table.emptyState != nil),
+               table.toolbar == nil,
                !tableToolbarHasRefreshAction,
                tableRefreshControlVisible(dataSourceRef: resolvedDataSourceRef, usesProvidedRows: providedRows != nil) {
                 tableRefreshControl
@@ -86,11 +122,11 @@ public struct TableRenderer: View {
                         emptyTableState
                     }
                 }
+                if !(rows.isEmpty && table.emptyState != nil) {
+                    paginationFooter
+                }
             } else {
                 contentTable
-            }
-            if !(rows.isEmpty && table.emptyState != nil) {
-                paginationFooter
             }
         }
         .padding(10)
@@ -98,10 +134,21 @@ public struct TableRenderer: View {
         .overlay(
             RoundedRectangle(cornerRadius: 18)
                 .stroke(Color.black.opacity(0.05), lineWidth: 1)
+                .allowsHitTesting(false)
         )
         .task(id: tableTaskKey) {
             await loadRows()
         }
+        .onChange(of: rows) { _, _ in projectionRevision += 1 }
+        .task(id: "\(tableTaskKey):projection:\(projectionRevision)") {
+            await projectDisplayValues()
+        }
+        .fileExporter(isPresented: $exportingCSV, document: TableCSVDocument(text: visiblePageCSV), contentType: .commaSeparatedText, defaultFilename: tableCSVFilename(table.toolbar)) { result in
+            if case .failure = result { exportError = "The CSV could not be exported." }
+        }
+        .alert("Export failed", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } })) {
+            Button("OK") { exportError = nil }
+        } message: { Text(exportError ?? "") }
         .task(id: subscriptionTaskKey) {
             await observeRows()
         }
@@ -218,7 +265,6 @@ public struct TableRenderer: View {
     private var tableRefreshControl: some View {
         let feedback = currentTableRefreshFeedback
         HStack {
-            Spacer(minLength: 0)
             Button {
                 refreshRows()
             } label: {
@@ -232,7 +278,8 @@ public struct TableRenderer: View {
                         .frame(width: 18, height: 18)
                 }
             }
-            .buttonStyle(.bordered)
+            .frame(width: 44, height: 44)
+            .buttonStyle(.plain)
             .controlSize(.small)
             .disabled(feedback.busy)
             .accessibilityLabel(feedback.busy ? "Refreshing table" : "Refresh table")
@@ -339,6 +386,41 @@ public struct TableRenderer: View {
         }
     }
 
+    private func projectDisplayValues() async {
+        guard let runtime, let window,
+              let metadata = await runtime.windowMetadata(id: window.windowID),
+              let code = metadata.actions?.code else { return }
+        let source = rows
+        let columns = table.columns.filter { $0.on.contains { $0.event?.lowercased() == "onvalue" } }
+        guard !columns.isEmpty else { return }
+        var projected: [[String: JSONValue]] = []
+        for row in source {
+            guard !Task.isCancelled else { return }
+            var values: [String: JSONValue] = [:]
+            for column in columns {
+                do {
+                    values[columnKey(column)] = try TableValueProjection.value(
+                        row: row, column: column, code: code, namespace: metadata.namespace
+                    )
+                } catch {
+                    // Keep the original value visible, but retain diagnostic evidence.
+                    print("Forge table value hook failed [\(columnKey(column))]: \(error.localizedDescription)")
+                }
+            }
+            projected.append(values)
+        }
+        guard !Task.isCancelled, source == rows else { return }
+        projectedSourceRows = source
+        projectedValues = projected
+    }
+
+    private func projectedValue(row: [String: JSONValue], column: ColumnDef) -> JSONValue? {
+        let key = columnKey(column)
+        if let index = projectedSourceRows.firstIndex(of: row), projectedValues.indices.contains(index),
+           let value = projectedValues[index][key] { return value }
+        return row[key]
+    }
+
     private func observeRows() async {
         guard providedRows == nil else {
             return
@@ -423,10 +505,15 @@ public struct TableRenderer: View {
         let metadata = await runtime.windowMetadata(id: window.windowID)
         await MainActor.run {
             paging = metadata?.dataSources[resolvedDataSourceRef]?.paging
+            clientPaging = metadata?.dataSources[resolvedDataSourceRef]?.paginationMode?.lowercased() == "client"
+            clientFiltering = metadata?.dataSources[resolvedDataSourceRef]?.filterMode?.lowercased() == "client"
         }
     }
 
     private var presentationMode: TablePresentationMode {
+        if ["phone", "mobile"].contains(runtime?.targetContext.formFactor.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "") {
+            return .regularGrid
+        }
         if table.presentation?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() == "tabular" {
             return .regularGrid
         }
@@ -438,11 +525,36 @@ public struct TableRenderer: View {
         )
     }
 
+    private var visibleSortedRows: [IndexedTableRow] {
+        let sorted = sortedTableRows(rows: rows, sortColumnKey: sortColumnKey, ascending: sortAscending).filter { matchesSearch($0.row) }
+        guard clientPaging, paging?.enabled != false else { return sorted }
+        return clientTablePage(sorted, page: effectiveClientPage, size: paging?.size ?? 10)
+    }
+
+    private var effectiveClientPage: Int {
+        let size = max(1, paging?.size ?? 10)
+        let count = rows.filter(matchesSearch).count
+        let pages = max(1, count / size + (count % size == 0 ? 0 : 1))
+        return min(max(1, clientPage), pages)
+    }
+
+    private func matchesSearch(_ row: [String: JSONValue]) -> Bool {
+        guard clientFiltering, !searchText.isEmpty,
+              let search = table.toolbar?.items.first(where: { $0.type?.lowercased() == "quicksearch" }),
+              let field = search.properties["field"]?.stringValue else { return true }
+        let key = row.keys.first { $0.caseInsensitiveCompare(field) == .orderedSame } ?? field
+        if let column = displayColumns.first(where: { columnKey($0).caseInsensitiveCompare(field) == .orderedSame }) {
+            return displayValue(projectedValue(row: row, column: column), column: column)
+                .localizedCaseInsensitiveContains(searchText)
+        }
+        return NativeWidgetContract.text(row[key]).localizedCaseInsensitiveContains(searchText)
+    }
+
     private func metadataEmptyTableState(_ emptyState: TableEmptyStateDef) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Image(systemName: emptyState.icon == "plus" ? "plus.circle.fill" : "clock.badge.checkmark")
                 .font(.system(size: 30, weight: .semibold))
-                .foregroundStyle(Color(red: 0.37, green: 0.45, blue: 0.63))
+                .foregroundStyle(Color.accentColor)
             if let kicker = emptyState.kicker, !kicker.isEmpty {
                 Text(kicker.uppercased())
                     .font(.caption2.weight(.bold))
@@ -450,7 +562,7 @@ public struct TableRenderer: View {
             }
             Text(emptyState.title ?? "Nothing here yet")
                 .font(.title3.weight(.semibold))
-                .foregroundStyle(Color(red: 0.15, green: 0.21, blue: 0.31))
+                .foregroundStyle(.primary)
             if let body = emptyState.body, !body.isEmpty {
                 Text(body).font(.subheadline).foregroundStyle(.secondary)
             }
@@ -493,11 +605,30 @@ public struct TableRenderer: View {
 
     private var contentTable: some View {
         Group {
+            if clientFiltering && !searchText.isEmpty && !rows.contains(where: matchesSearch) {
+                Text("No rows match your search.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 16)
+            }
             switch presentationMode {
             case .compactCards:
-                compactCardTable
+                VStack(spacing: 8) {
+                    compactCardTable
+                    paginationFooter
+                }
             case .regularGrid:
-                regularGridTable
+                VStack(spacing: 0) {
+                    regularGridTable
+                    paginationFooter
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.forgeSecondarySystemBackground)
+                        .overlay(alignment: .top) { Divider() }
+                }
+                .background(Color.forgeSystemBackground, in: RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.black.opacity(0.05), lineWidth: 1).allowsHitTesting(false))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
             }
         }
     }
@@ -530,7 +661,7 @@ public struct TableRenderer: View {
     }
 
     private var compactCardTable: some View {
-        let sortedRows = sortedTableRows(rows: rows, sortColumnKey: sortColumnKey, ascending: sortAscending)
+        let sortedRows = visibleSortedRows
         return Group {
             if forgeEmbeddedNonScrolling {
                 VStack(alignment: .leading, spacing: 12) {
@@ -612,8 +743,133 @@ public struct TableRenderer: View {
         }
     }
 
+    @ViewBuilder
     private var regularGridTable: some View {
-        let sortedRows = sortedTableRows(rows: rows, sortColumnKey: sortColumnKey, ascending: sortAscending)
+        if isPlannerTable {
+            legacyRegularGridTable
+        } else {
+            frozenGridTable
+        }
+    }
+
+    private var frozenGridTable: some View {
+        let sortedRows = visibleSortedRows
+        let frozen = frozenIdentityColumn
+        let scrollingColumns = frozen.map { identity in
+            displayColumns.filter { $0.identityKey != identity.identityKey }
+        } ?? displayColumns
+        let frozenWidth = frozen.map { min(190, max(Self.columnWidth(for: $0) + 20, Self.columnWidth(for: $0) * tableTextScale)) } ?? 0
+        let naturalWidth = frozenWidth + scrollingColumns.reduce(0) { $0 + Self.columnWidth(for: $1) + 20 } + (actionColumns.isEmpty ? 0 : 180)
+        let extraWidth = table.fillRemainingWidth == true && !scrollingColumns.isEmpty
+            ? max(0, gridViewportWidth - naturalWidth) / CGFloat(scrollingColumns.count) : 0
+        return HStack(alignment: .top, spacing: 0) {
+            if let frozen {
+                frozenColumnRows(column: frozen, width: frozenWidth, sortedRows: sortedRows)
+                    .frame(width: frozenWidth)
+                    .background(Color.forgeSystemBackground)
+                    .overlay(alignment: .trailing) { Divider() }
+                    .zIndex(1)
+            }
+            ScrollView(.horizontal, showsIndicators: true) {
+                gridRows(sortedRows: sortedRows, columns: scrollingColumns, extraWidth: extraWidth)
+            }
+        }
+        .background(Color.forgeSystemBackground)
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { gridViewportWidth = proxy.size.width }
+                    .onChange(of: proxy.size.width) { _, width in gridViewportWidth = width }
+            }
+        }
+    }
+
+    private func gridRows(sortedRows: [IndexedTableRow], columns: [ColumnDef], extraWidth: CGFloat = 0) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            headerRow(columns: columns, extraWidth: extraWidth)
+            Divider().overlay(Color.black.opacity(0.05))
+            ForEach(Array(sortedRows.enumerated()), id: \.element.id) { displayIndex, indexed in
+                dataRow(row: indexed.row, index: indexed.originalIndex, displayIndex: displayIndex, columns: columns, extraWidth: extraWidth)
+                if displayIndex != sortedRows.indices.last { Divider().overlay(Color.black.opacity(0.05)) }
+            }
+        }
+    }
+
+    private func frozenColumnRows(column: ColumnDef, width: CGFloat, sortedRows: [IndexedTableRow]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            gridHeaderCell(column: column, width: max(44, width - 20))
+            Divider().overlay(Color.black.opacity(0.05))
+            ForEach(Array(sortedRows.enumerated()), id: \.element.id) { displayIndex, indexed in
+                valueLabel(row: indexed.row, column: column, font: .subheadline, color: .primary)
+                    .frame(width: max(44, width - 20), height: gridRowHeight, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .background(displayIndex.isMultiple(of: 2) ? Color.clear : Color.black.opacity(0.014))
+                if displayIndex != sortedRows.indices.last { Divider().overlay(Color.black.opacity(0.05)) }
+            }
+        }
+    }
+
+    private var frozenIdentityColumn: ColumnDef? {
+        displayColumns.first
+    }
+
+    private func headerRow(columns: [ColumnDef], extraWidth: CGFloat = 0) -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            ForEach(columns, id: \.identityKey) { column in
+                gridHeaderCell(column: column, width: Self.columnWidth(for: column) + extraWidth)
+            }
+            if !actionColumns.isEmpty {
+                Text("Actions").font(.caption2.weight(.semibold)).foregroundStyle(.secondary).textCase(.uppercase)
+                    .frame(width: 160, height: gridHeaderHeight, alignment: .trailing).padding(.horizontal, 10)
+            }
+        }
+        .background(Color.forgeSecondarySystemBackground)
+    }
+
+    private func gridHeaderCell(column: ColumnDef, width: CGFloat) -> some View {
+        let label = Text(sortedHeaderLabel(for: column, key: columnKey(column)))
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+                .lineLimit(2)
+                .frame(width: width, height: gridHeaderHeight, alignment: .leading)
+                .padding(.horizontal, 10)
+        return Group {
+            if column.sortable == true {
+                Button { toggleSort(columnKey: columnKey(column)) } label: { label }
+                    .buttonStyle(.plain)
+            } else {
+                label
+            }
+        }
+        .background(Color.forgeSecondarySystemBackground)
+    }
+
+    @ViewBuilder
+    private func dataRow(row: [String: JSONValue], index: Int, displayIndex: Int, columns: [ColumnDef], extraWidth: CGFloat = 0) -> some View {
+        let content = HStack(alignment: .top, spacing: 0) {
+            ForEach(columns, id: \.identityKey) { column in
+                valueLabel(row: row, column: column, font: .subheadline, color: .primary)
+                    .frame(width: Self.columnWidth(for: column) + extraWidth, height: gridRowHeight, alignment: .leading)
+                    .padding(.horizontal, 10)
+            }
+            if !actionColumns.isEmpty {
+                HStack(spacing: 6) { actionButtons(row: row, rowIndex: index, compact: false) }
+                    .frame(width: 160, height: gridRowHeight, alignment: .trailing).padding(.horizontal, 10)
+            }
+        }
+        .background(selectedRowIndex == index ? Color.accentColor.opacity(0.08) : (displayIndex.isMultiple(of: 2) ? Color.clear : Color.black.opacity(0.014)))
+        .contentShape(Rectangle())
+        .accessibilityElement(children: actionColumns.isEmpty ? .combine : .contain)
+        .accessibilityLabel(rowAccessibilityLabel(row: row))
+
+        if !isPlannerTable && actionColumns.isEmpty && !rowHasInteractiveLinks(row) {
+            Button { handleRowSelection(row: row, rowIndex: index) } label: { content }.buttonStyle(.plain)
+        } else { content.onTapGesture { handleRowSelection(row: row, rowIndex: index) } }
+    }
+
+    private var legacyRegularGridTable: some View {
+        let sortedRows = visibleSortedRows
         return ScrollView(.horizontal, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 headerRow
@@ -740,6 +996,7 @@ public struct TableRenderer: View {
     }
 
     private func toggleSort(columnKey: String) {
+        clientPage = 1
         if sortColumnKey == columnKey {
             sortAscending.toggle()
         } else {
@@ -757,12 +1014,13 @@ public struct TableRenderer: View {
 
     @ViewBuilder
     private var paginationFooter: some View {
-        if let state = tablePaginationState(paging: paging, metrics: metrics, input: input) {
+        if let state = tablePaginationState(paging: paging, metrics: clientPaging ? ["totalCount": .number(Double(rows.filter(matchesSearch).count))] : metrics, input: clientPaging ? InputState(page: effectiveClientPage) : input) {
             HStack(spacing: 8) {
                 Button {
                     setPage(1)
                 } label: {
                     Image(systemName: "backward.end.fill")
+                        .frame(width: 44, height: 44)
                 }
                 .disabled(!state.canGoPrevious)
                 .accessibilityLabel("First page")
@@ -771,6 +1029,7 @@ public struct TableRenderer: View {
                     setPage(max(1, state.currentPage - 1))
                 } label: {
                     Image(systemName: "chevron.left")
+                        .frame(width: 44, height: 44)
                 }
                 .disabled(!state.canGoPrevious)
                 .accessibilityLabel("Previous page")
@@ -778,12 +1037,14 @@ public struct TableRenderer: View {
                 Text(state.label)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .frame(minWidth: 92)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, minHeight: 44)
 
                 Button {
                     setPage(state.currentPage + 1)
                 } label: {
                     Image(systemName: "chevron.right")
+                        .frame(width: 44, height: 44)
                 }
                 .disabled(!state.canGoNext)
                 .accessibilityLabel("Next page")
@@ -794,17 +1055,23 @@ public struct TableRenderer: View {
                     }
                 } label: {
                     Image(systemName: "forward.end.fill")
+                        .frame(width: 44, height: 44)
                 }
                 .disabled(!state.canGoLast)
                 .accessibilityLabel("Last page")
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            .buttonStyle(.plain)
+            .padding(.horizontal, 8)
             .padding(.top, 2)
         }
     }
 
     private func setPage(_ page: Int) {
+        if clientPaging {
+            let size = max(1, paging?.size ?? 10)
+            clientPage = min(max(1, page), max(1, (rows.count + size - 1) / size))
+            return
+        }
         guard let runtime, let window, !resolvedDataSourceRef.isEmpty else {
             return
         }
@@ -842,8 +1109,52 @@ public struct TableRenderer: View {
 
     @ViewBuilder
     private func tableToolbar(_ toolbar: ToolbarDef) -> some View {
+        HStack(spacing: 4) {
+        if clientFiltering, let search = toolbar.items.first(where: { $0.type?.lowercased() == "quicksearch" }) {
+            TextField(search.properties["label"]?.stringValue ?? "Search", text: $searchText)
+                .modifier(ForgeThemeInputModifier())
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel(search.properties["label"]?.stringValue ?? "Search table")
+                .onChange(of: searchText) { _, _ in clientPage = 1 }
+        } else {
+            Spacer(minLength: 0)
+        }
+        if toolbar.items.contains(where: { $0.id?.lowercased() == "settings" }) {
+            Menu {
+                ForEach(table.columns.filter { !["button", "icon"].contains($0.type?.lowercased() ?? "") }, id: \.identityKey) { column in
+                    Toggle(column.displayLabel, isOn: Binding(
+                        get: { !hiddenColumnKeys.contains(column.identityKey) },
+                        set: { visible in
+                            if visible { hiddenColumnKeys.remove(column.identityKey) }
+                            else { hiddenColumnKeys.insert(column.identityKey) }
+                        }
+                    ))
+                    .disabled(column.identityKey == firstIdentityColumnKey)
+                }
+                Button("Show all columns") { hiddenColumnKeys.removeAll() }
+            } label: {
+                Image(systemName: "slider.horizontal.3").frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Customize columns")
+        }
+        if toolbar.items.contains(where: { $0.type?.lowercased() == "tableexport" }) {
+            Button { exportingCSV = true } label: {
+                Image(systemName: "square.and.arrow.up")
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Export CSV")
+        }
+        if !tableToolbarHasRefreshAction,
+           tableRefreshControlVisible(dataSourceRef: resolvedDataSourceRef, usesProvidedRows: providedRows != nil) {
+            tableRefreshControl
+        }
+        }
+        .font(.subheadline)
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                ForEach(toolbar.items.filter { $0.type?.lowercased() == "select" && $0.scope?.lowercased() == "windowform" }) { item in
+                    TableWindowFormSelector(item: item, runtime: runtime, window: window, dataSourceRef: resolvedDataSourceRef)
+                }
                 ForEach(toolbar.items.filter(tableToolbarActionItem)) { item in
                     TableToolbarActionButton(
                         item: item,
@@ -864,6 +1175,16 @@ public struct TableRenderer: View {
         } == true
     }
 
+    private var visiblePageCSV: String {
+        let header = displayColumns.map { plannerCSVCell($0.displayLabel) }.joined(separator: ",")
+        let records = visibleSortedRows.map { indexed in
+            displayColumns.map { column in
+                plannerCSVCell(displayValue(projectedValue(row: indexed.row, column: column), column: column))
+            }.joined(separator: ",")
+        }
+        return ([header] + records).joined(separator: "\r\n")
+    }
+
     private func tableToolbarActionItem(_ item: ToolbarItemDef) -> Bool {
         let id = item.id?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
         guard !["pagination", "quickfilter", "quickfilterinputs"].contains(id) else { return false }
@@ -877,7 +1198,7 @@ public struct TableRenderer: View {
                 Button {
                     executeRowAction(column: column, row: row, rowIndex: rowIndex)
                 } label: {
-                    Text(actionLabel(for: column))
+                    rowActionLabel(column)
                 }
                 .buttonStyle(BorderedProminentButtonStyle())
                 .controlSize(.small)
@@ -885,7 +1206,7 @@ public struct TableRenderer: View {
                 Button {
                     executeRowAction(column: column, row: row, rowIndex: rowIndex)
                 } label: {
-                    Text(actionLabel(for: column))
+                    rowActionLabel(column)
                 }
                 .buttonStyle(BorderedButtonStyle())
                 .controlSize(.small)
@@ -896,8 +1217,23 @@ public struct TableRenderer: View {
     private var displayColumns: [ColumnDef] {
         table.columns.filter { column in
             let type = (column.type ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            return type != "button" && type != "icon"
+            return type != "button" && type != "icon" && !hiddenColumnKeys.contains(column.identityKey)
         }
+    }
+
+    @ViewBuilder
+    private func rowActionLabel(_ column: ColumnDef) -> some View {
+        if column.icon == "star-empty" || column.icon == "star" {
+            Image(systemName: column.icon == "star-empty" ? "star" : "star.fill")
+                .frame(minWidth: 44, minHeight: 44)
+                .accessibilityLabel(column.label ?? "Toggle favorite")
+        } else {
+            Text(actionLabel(for: column)).frame(minHeight: 44)
+        }
+    }
+
+    private var firstIdentityColumnKey: String? {
+        table.columns.first { !["button", "icon"].contains($0.type?.lowercased() ?? "") }?.identityKey
     }
 
     private var actionColumns: [ColumnDef] {
@@ -1075,7 +1411,11 @@ public struct TableRenderer: View {
     }
 
     private func rowAccessibilityLabel(row: [String: JSONValue]) -> String {
-        tableRowAccessibilityLabel(columns: displayColumns, row: row)
+        var displayRow = row
+        for column in displayColumns {
+            displayRow[columnKey(column)] = projectedValue(row: row, column: column)
+        }
+        return tableRowAccessibilityLabel(columns: displayColumns, row: displayRow)
     }
 
     private func rowHasInteractiveLinks(_ row: [String: JSONValue]) -> Bool {
@@ -1102,7 +1442,7 @@ public struct TableRenderer: View {
 
     @ViewBuilder
     private func valueLabel(row: [String: JSONValue], column: ColumnDef, fallback: String? = nil, font: Font, color: Color) -> some View {
-        let text = displayValue(row[columnKey(column)], column: column, fallback: fallback)
+        let text = displayValue(projectedValue(row: row, column: column), column: column, fallback: fallback)
         if let fraction = dataBarFraction(row: row, column: column) {
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 9)
@@ -1402,6 +1742,13 @@ struct PlannerTableSubmitFeedback: Equatable {
     }
 }
 
+func clientTablePage<T>(_ rows: [T], page: Int, size: Int) -> [T] {
+    let size = max(1, size)
+    let lastPage = max(1, rows.count / size + (rows.count % size == 0 ? 0 : 1))
+    let offset = (min(max(1, page), lastPage) - 1) * size
+    return Array(rows.dropFirst(offset).prefix(size))
+}
+
 struct TablePaginationState: Equatable {
     let currentPage: Int
     let totalPages: Int?
@@ -1427,8 +1774,12 @@ func tablePaginationState(
     input: InputState
 ) -> TablePaginationState? {
     let enabledByPaging = paging?.enabled == true || (paging?.size ?? 0) > 0
-    let pageCount = positiveInt(metrics["pageCount"])
     let totalCount = nonNegativeInt(metrics["totalCount"])
+    let inferredPageCount: Int? = {
+        guard let totalCount, let size = paging?.size, size > 0 else { return nil }
+        return max(1, totalCount / size + (totalCount % size == 0 ? 0 : 1))
+    }()
+    let pageCount = positiveInt(metrics["pageCount"]) ?? inferredPageCount
     let hasMore = boolValue(metrics["hasMore"]) ?? false
     guard enabledByPaging || pageCount != nil || hasMore || totalCount != nil else {
         return nil

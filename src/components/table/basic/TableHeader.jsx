@@ -1,7 +1,8 @@
 import React from "react";
 import { Icon, Tooltip, Position } from "@blueprintjs/core";
 
-const TableHeader = ({ context, columns, tableTitle, sortConfig }) => {
+const TableHeader = ({ context,
+                       fillerWidth = 0, columns, tableTitle, sortConfig }) => {
     const { onSort, sortColumnId, sortDirection } = sortConfig;
     const handlers = context?.handlers || {};
     const dataSourceConfig = context?.dataSource || {};
@@ -61,7 +62,7 @@ const TableHeader = ({ context, columns, tableTitle, sortConfig }) => {
                         onChange={handleHeaderCheckboxClick}
                     />
                 ) : null}
-                {displayName || name}
+                <span className="forge-table-header-label">{displayName || name}</span>
                 {col.sortable && (
                     <Icon
                         icon={
@@ -82,12 +83,12 @@ const TableHeader = ({ context, columns, tableTitle, sortConfig }) => {
         if (col.tooltip) {
             return (
                 <Tooltip content={col.tooltip} position={Position.TOP}>
-                    <span>{content}</span>
+                    <span className="forge-table-header-content">{content}</span>
                 </Tooltip>
             );
         }
 
-        return content;
+        return <span className="forge-table-header-content">{content}</span>;
     };
 
     return (
@@ -104,11 +105,12 @@ const TableHeader = ({ context, columns, tableTitle, sortConfig }) => {
                     ...(String(col?.sticky || '').toLowerCase() === 'left' ? {left: col.stickyOffset || 0} : {}),
                 };
                 return (
-                    <th key={id} className={`${String(col?.sticky || '').toLowerCase() === 'left' ? 'is-sticky-left' : ''}${col?.stickyEdge ? ' is-sticky-edge' : ''}`} style={style} onClick={() => handleSort(col)}>
-                        {renderHeaderContent(col)}
+                    <th key={id} className={`${String(col?.sticky || '').toLowerCase() === 'left' ? 'is-sticky-left' : ''}${col?.stickyEdge ? ' is-sticky-edge' : ''}`} style={style} title={[col.multiSelect ? 'Select all rows' : col.displayName || col.name, col.tooltip].filter(Boolean).join(' — ') || undefined} aria-sort={sortable ? sortColumnId === id ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none' : undefined}>
+                        {sortable ? <button type="button" className="forge-table-header-sort" aria-label={`Sort by ${col.displayName || col.name || col.id}`} onClick={() => handleSort(col)}>{renderHeaderContent(col)}</button> : renderHeaderContent(col)}
                     </th>
                 );
             })}
+            {fillerWidth > 0 ? <th className="forge-table-trailing-space" aria-hidden="true" style={{width:fillerWidth}}/> : null}
         </tr>
         </thead>
     );

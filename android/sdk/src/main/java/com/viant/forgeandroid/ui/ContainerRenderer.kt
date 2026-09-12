@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Text
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Button
@@ -23,7 +24,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import com.viant.forgeandroid.runtime.ContainerDef
@@ -182,7 +189,8 @@ fun ContainerRenderer(
                 "selected" to visibilitySelection.selected,
                 "selection" to visibilitySelection.selection,
                 "rowIndex" to visibilitySelection.rowIndex
-            )
+            ),
+            authorization = authorizationSnapshot
         )
     ) {
         return
@@ -212,33 +220,32 @@ fun ContainerRenderer(
                         filters = visibilityInput.filter,
                         form = visibilityForm,
                         windowForm = windowForm,
-                        collection = visibilityCollection
+                        collection = visibilityCollection,
+                        authorization = authorizationSnapshot
                     )
                 } == true
                 if (!suppressed) {
-                    Column(modifier = modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(boundary.errorMessage ?: visibilityContext?.control?.peek()?.error ?: "Unable to load data.", color = Color(0xFFB42318))
-                        boundary.errorAction?.let { action ->
-                            Button(
-                                onClick = {
-                                    val ref = action.dataSourceRef?.trim().orEmpty().ifBlank {
-                                        boundary.dataSourceRefs.firstOrNull().orEmpty().ifBlank { container.dataSourceRef ?: inheritedDataSourceRef.orEmpty() }
+                    val action = boundary.errorAction
+                    CompactDataBoundaryErrorState(
+                        message = boundary.errorMessage ?: visibilityContext?.control?.peek()?.error ?: "Unable to load data.",
+                        actionLabel = action?.label,
+                        modifier = modifier,
+                        onRetry = action?.let {
+                            {
+                                val ref = it.dataSourceRef?.trim().orEmpty().ifBlank {
+                                    boundary.dataSourceRefs.firstOrNull().orEmpty().ifBlank {
+                                        container.dataSourceRef ?: inheritedDataSourceRef.orEmpty()
                                     }
-                                    if (ref.isNotBlank()) runtime.refreshDataSourceCollection(window.windowId, ref)
-                                },
-                                modifier = Modifier.semantics { contentDescription = action.label ?: "Retry" }
-                            ) { Text(action.label ?: "Retry") }
+                                }
+                                if (ref.isNotBlank()) runtime.refreshDataSourceCollection(window.windowId, ref)
+                            }
                         }
-                    }
+                    )
                 }
                 return
             }
             DataStateBoundaryKind.Empty -> if (!boundary.renderEmptyContent) {
-                Text(
-                    boundary.emptyMessage ?: "No data",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = modifier.fillMaxWidth().padding(12.dp)
-                )
+                CompactDataBoundaryEmptyState(boundary.emptyMessage ?: "No data", modifier)
                 return
             }
             else -> Unit
@@ -275,6 +282,10 @@ fun ContainerRenderer(
         if (controlContext != null) {
             MobileControlSheetRenderer(runtime, controlContext, container.items, container.title)
         }
+        return
+    }
+
+    if (isHeadlessDataBinding(container)) {
         return
     }
 
@@ -573,6 +584,76 @@ fun ContainerRenderer(
             )
         }
     }
+}
+
+@Composable
+private fun CompactDataBoundaryErrorState(
+    message: String,
+    actionLabel: String?,
+    modifier: Modifier,
+    onRetry: (() -> Unit)?,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth().heightIn(min = 320.dp).padding(horizontal = 24.dp, vertical = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterVertically)
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.ErrorOutline,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.75f),
+            modifier = Modifier.size(52.dp)
+        )
+        Text(
+            text = message,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.error,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+        if (onRetry != null) {
+            Button(
+                onClick = onRetry,
+                modifier = Modifier.semantics { contentDescription = actionLabel ?: "Retry" }
+            ) { Text(actionLabel ?: "Retry") }
+        }
+    }
+}
+
+@Composable
+private fun CompactDataBoundaryEmptyState(message: String, modifier: Modifier) {
+    Column(
+        modifier = modifier.fillMaxWidth().heightIn(min = 320.dp).padding(horizontal = 24.dp, vertical = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically)
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Inbox,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            modifier = Modifier.size(52.dp)
+        )
+        Text(
+            text = message,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+    }
+}
+
+internal fun isHeadlessDataBinding(container: ContainerDef): Boolean {
+    if (container.className.orEmpty().split(' ').any { it == "forge-container-hidden" }) return true
+    return !container.dataSourceRef.isNullOrBlank() &&
+        container.title.isNullOrBlank() && container.subtitle.isNullOrBlank() &&
+        container.items.isEmpty() && container.containers.isEmpty() &&
+        container.table == null && container.chart == null && container.dashboard == null &&
+        container.tabs == null && container.stableTabs == null && container.toolbar == null &&
+        container.treeBrowser == null && container.fileBrowser == null && container.editor == null &&
+        container.terminal == null && container.chat == null && container.schemaBasedForm == null &&
+        container.wizard == null && container.assignmentPicker == null && container.scheduleEditor == null &&
+        container.treeEditor == null && container.uploadCollection == null && container.masterDetail == null
 }
 
 internal fun shouldUseMenuList(items: List<ItemDef>): Boolean {

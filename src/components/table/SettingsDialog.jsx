@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
     Button,
+    Checkbox,
     Classes,
     Dialog,
     DialogBody,
@@ -19,17 +20,20 @@ const SettingsDialog = ({
                             isOpen,
                             onClose,
                             columns,
+                            density = 'normal',
                             onSaveColumnSettings,
                             onResetColumns,
                         }) => {
     const [localColumns, setLocalColumns] = useState(columns || []);
     const [selectedTabId, setSelectedTabId] = useState('visibility');
+    const [localDensity,setLocalDensity] = useState(density);
 
     useEffect(() => {
         if (isOpen && columns) {
             setLocalColumns(columns);
+            setLocalDensity(density);
         }
-    }, [isOpen, columns]);
+    }, [isOpen, columns, density]);
 
     const handleTabChange = (newTabId) => {
         setSelectedTabId(newTabId);
@@ -123,7 +127,8 @@ const SettingsDialog = ({
                             <FormGroup label="Width" labelFor={`width-${col.id}`}>
                                 <NumericInput
                                     id={`width-${col.id}`}
-                                    min={0}
+                                    min={24}
+                                    max={4096}
                                     value={col.width || ''}
                                     onValueChange={(valueAsNumber) => handleWidthChange(col.id, valueAsNumber)}
                                     placeholder="Width (px)"
@@ -141,6 +146,7 @@ const SettingsDialog = ({
                                     onChange={(e) => handleAlignChange(col.id, e.currentTarget.value)}
                                 />
                             </FormGroup>
+                            <Checkbox label="Freeze column" checked={col.sticky === 'left'} onChange={event=>setLocalColumns(previous=>previous.map(entry=>entry.id===col.id?{...entry,sticky:event.target.checked?'left':false}:entry))}/>
                             <FormGroup
                                 label="Tooltip"
                                 labelFor={`tooltip-${col.id}`}
@@ -167,9 +173,9 @@ const SettingsDialog = ({
             style={{
                 zIndex: 100,
             }}
-            className={Classes.DARK}
         >
             <DialogBody>
+                <FormGroup label="Density" labelFor="table-preference-density"><HTMLSelect id="table-preference-density" value={localDensity} onChange={event=>setLocalDensity(event.target.value)} options={[{label:'Compact',value:'compact'},{label:'Normal',value:'normal'}]}/></FormGroup>
                 <Tabs id="settings-tabs" selectedTabId={selectedTabId} onChange={handleTabChange} animate={false}>
                     <Tab id="visibility" title="Visibility" panel={renderVisibilityPanel()} />
                     <Tab id="columns" title="Columns" panel={renderColumnsPanel()} />
@@ -191,7 +197,7 @@ const SettingsDialog = ({
                         intent="primary"
                         text="Save"
                         onClick={() => {
-                            onSaveColumnSettings(localColumns);
+                            onSaveColumnSettings(localColumns,{density:localDensity,frozenColumnIds:localColumns.filter(column=>column.sticky==='left').map(column=>column.id)});
                             onClose();
                         }}
                     />,

@@ -12,10 +12,11 @@ struct CompactSectionNavigator: View {
                 guard selectedIndex > 0 else { return }
                 onSelect(entries[selectedIndex - 1].id)
             } label: {
-                Image(systemName: "chevron.left").frame(width: 34, height: 34)
+                Image(systemName: "chevron.left").frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
             .disabled(selectedIndex == 0)
+            .accessibilityLabel("Previous section")
 
             Menu {
                 ForEach(entries, id: \.id) { entry in
@@ -27,12 +28,13 @@ struct CompactSectionNavigator: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
-                    Text("\(selectedIndex + 1) of \(entries.count) · tap to choose")
+                    Text("\(selectedIndex + 1) of \(entries.count)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             }
+            .accessibilityHint("Choose a section")
 
             Image(systemName: "chevron.down").font(.caption.weight(.semibold))
 
@@ -40,10 +42,11 @@ struct CompactSectionNavigator: View {
                 guard selectedIndex + 1 < entries.count else { return }
                 onSelect(entries[selectedIndex + 1].id)
             } label: {
-                Image(systemName: "chevron.right").frame(width: 34, height: 34)
+                Image(systemName: "chevron.right").frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
             .disabled(selectedIndex + 1 >= entries.count)
+            .accessibilityLabel("Next section")
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 5)

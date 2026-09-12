@@ -1381,23 +1381,24 @@ fun evaluateDashboardCondition(
     windowForm: Map<String, Any?> = emptyMap(),
     collection: List<Map<String, Any?>> = emptyList(),
     input: Map<String, Any?> = emptyMap(),
-    selectionValues: Map<String, Any?> = emptyMap()
+    selectionValues: Map<String, Any?> = emptyMap(),
+    authorization: Map<String, Any?> = emptyMap()
 ): Boolean {
     if (condition == null) {
         return true
     }
     if (condition.all.isNotEmpty() && condition.all.any {
-            !evaluateDashboardCondition(it, metrics, filters, selection, form, windowForm, collection, input, selectionValues)
+            !evaluateDashboardCondition(it, metrics, filters, selection, form, windowForm, collection, input, selectionValues, authorization)
         }) {
         return false
     }
     if (condition.any.isNotEmpty() && condition.any.none {
-            evaluateDashboardCondition(it, metrics, filters, selection, form, windowForm, collection, input, selectionValues)
+            evaluateDashboardCondition(it, metrics, filters, selection, form, windowForm, collection, input, selectionValues, authorization)
         }) {
         return false
     }
     if (condition.not != null &&
-        evaluateDashboardCondition(condition.not, metrics, filters, selection, form, windowForm, collection, input, selectionValues)
+        evaluateDashboardCondition(condition.not, metrics, filters, selection, form, windowForm, collection, input, selectionValues, authorization)
     ) {
         return false
     }
@@ -1412,7 +1413,8 @@ fun evaluateDashboardCondition(
         windowForm,
         collection,
         input,
-        selectionValues
+        selectionValues,
+        authorization
     )
 
     condition.whenValue?.let { expected ->
@@ -1429,6 +1431,16 @@ fun evaluateDashboardCondition(
         if (dashboardValuesEqual(actual, expected)) {
             return false
         }
+    }
+    condition.contains?.let { expected ->
+        val matches = when (actual) {
+            is String -> actual.contains(JsonUtil.elementToAny(expected)?.toString().orEmpty())
+            is Collection<*> -> actual.any { dashboardValuesEqual(it, expected) }
+            is Map<*, *> -> actual.keys.any { dashboardValuesEqual(it, expected) } ||
+                actual.values.any { dashboardValuesEqual(it, expected) }
+            else -> false
+        }
+        if (!matches) return false
     }
     if (condition.inValues.isNotEmpty() && condition.inValues.none { dashboardValuesEqual(actual, it) }) {
         return false
@@ -1461,7 +1473,7 @@ fun evaluateDashboardCondition(
             return false
         }
     }
-    val hasDirectPredicate = condition.whenValue != null || condition.equals != null || condition.notEquals != null ||
+    val hasDirectPredicate = condition.whenValue != null || condition.equals != null || condition.notEquals != null || condition.contains != null ||
         condition.inValues.isNotEmpty() || condition.gt != null || condition.gte != null || condition.lt != null ||
         condition.lte != null || condition.empty != null || condition.notEmpty != null
     if (!hasDirectPredicate && !selector.isNullOrBlank()) {
@@ -1822,7 +1834,8 @@ private fun resolveDashboardValue(
     windowForm: Map<String, Any?> = emptyMap(),
     collection: List<Map<String, Any?>> = emptyList(),
     input: Map<String, Any?> = emptyMap(),
-    selectionValues: Map<String, Any?> = emptyMap()
+    selectionValues: Map<String, Any?> = emptyMap(),
+    authorization: Map<String, Any?> = emptyMap()
 ): Any? {
     val dashboardSelection = mapOf(
         "dimension" to selection.dimension,
@@ -1841,6 +1854,7 @@ private fun resolveDashboardValue(
             "windowform" -> windowForm
             "collection" -> collection
             "input" -> input
+            "authorization" -> authorization
             else -> metrics
         }
     }
@@ -1851,6 +1865,7 @@ private fun resolveDashboardValue(
         "windowform" -> SelectorUtil.resolve(windowForm, selector)
         "collection" -> SelectorUtil.resolve(collection, selector)
         "input" -> SelectorUtil.resolve(input, selector)
+        "authorization" -> SelectorUtil.resolve(authorization, selector)
         else -> when {
             selector.startsWith("filters.") -> SelectorUtil.resolve(filters, selector.removePrefix("filters."))
             selector.startsWith("selection.") -> SelectorUtil.resolve(effectiveSelection, selector.removePrefix("selection."))

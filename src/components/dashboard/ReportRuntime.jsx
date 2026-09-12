@@ -3482,15 +3482,15 @@ export default function ReportRuntime({
             type="button"
             aria-label="Toggle report filters"
             title={`Filters${filterToolbarModel.activeCount > 0 ? ` (${filterToolbarModel.activeCount} active)` : ""}`}
-            className={workspacePresentation ? "forge-workspace-icon-action" : undefined}
+            className={`forge-report-runtime-filter-toggle${workspacePresentation ? " forge-workspace-icon-action" : ""}`}
             aria-pressed={filterPanelOpen}
             onClick={() => setFilterPanelOpen((open) => !open)}
-            style={{ border: "1px solid #d8e1e8", background: filterPanelOpen ? "#eef4fb" : "#fff", borderRadius: 8, padding: workspacePresentation ? 6 : "6px 10px", color: workspacePresentation ? "var(--forge-workspace-accent, var(--app-accent, #2d6cdf))" : undefined, cursor: "pointer", fontSize: 12, fontWeight: 700 }}
+            style={{ padding: workspacePresentation ? 6 : "6px 10px" }}
           >
             <Icon icon="filter" size={13} aria-hidden="true" />{!workspacePresentation ? <> Filters{filterToolbarModel.activeCount > 0 ? ` (${filterToolbarModel.activeCount})` : ""}</> : null}
           </button>
           {filterToolbarModel.activeCount > 0 && typeof runtimeHandlers?.clearScopeParams === "function" ? (
-            <button type="button" aria-label="Clear all report filters" onClick={() => runtimeHandlers.clearScopeParams(filterToolbarModel.filters)} style={{ border: 0, background: "transparent", cursor: "pointer", color: "#21538f", fontSize: 11 }}>
+            <button type="button" className="forge-report-runtime-filter-clear" aria-label="Clear all report filters" onClick={() => runtimeHandlers.clearScopeParams(filterToolbarModel.filters)} >
               Clear all
             </button>
           ) : null}

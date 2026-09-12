@@ -37,6 +37,7 @@ export const shouldShowFullContentButton = (column, overflowing) => overflowing 
 
 const TableCell = ({
                        context,
+                       fixedRowHeight,
                        cell,
                        rowStyle,
                        rowClassName,
@@ -324,7 +325,7 @@ const TableCell = ({
                 aria-label={resolvedBadge.hideLabel ? resolvedBadge.tooltip : undefined}
             >
                 {resolvedBadge.icon === 'sparkles'
-                    ? <span className="forge-sparkles-icon" aria-hidden="true">✦</span>
+                    ? <svg className="forge-sparkles-icon" aria-hidden="true" viewBox="0 0 16 16"><path fill="currentColor" d="M8 1 10 6 15 8 10 10 8 15 6 10 1 8 6 6Z"/></svg>
                     : (resolvedBadge.icon ? <Icon icon={resolvedBadge.icon} size={12}/> : null)}
                 {resolvedBadge.hideLabel ? null : <span>{resolvedBadge.label}</span>}
             </span>
@@ -333,7 +334,7 @@ const TableCell = ({
         const resolvedBadge = resolvedBadges[0];
         const badgeContent = renderBadge(resolvedBadge, 'badge');
         cellContent = resolvedBadge.replaceValue ? badgeContent : (
-            <div className="forge-table-cell-stack">
+            <div className={`forge-table-cell-stack${resolvedBadge.hideLabel ? ' is-inline-badge' : ''}`}>
                 <div className="forge-table-cell-stack__primary">{cellContent}</div>
                 {badgeContent}
             </div>
@@ -373,7 +374,7 @@ const TableCell = ({
 
     return (
         <td style={tdStyle} className={tdClass} {...dataAttrs}>
-            {cellContent}
+            {fixedRowHeight ? <div className="forge-fixed-row-content" title={typeof displayedText === 'string' || typeof displayedText === 'number' ? String(displayedText) : undefined}>{cellContent}</div> : cellContent}
         </td>
     );
 };

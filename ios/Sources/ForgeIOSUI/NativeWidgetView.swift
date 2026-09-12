@@ -15,13 +15,16 @@ struct NativeWidgetView: View {
     var onCustomApply: (([String: JSONValue]) -> Void)? = nil
     var presetSyncKey: String = ""
     var onPresetSync: ((JSONValue) -> Void)? = nil
+    var loadedOptions: [(JSONValue, String)]? = nil
+    @Environment(\.forgeThemeAppearance) private var themeAppearance
     @State private var draft: String? = nil
     @State private var error = ""
     @State private var importing = false
     private var kind: String { NativeWidgetContract.kind(item) }
     private var label: String { item.label ?? item.title ?? item.id ?? "Field" }
     private var unavailable: Bool { NativeWidgetContract.disabled(item) }
-    private var text: String { NativeWidgetContract.text(value) }
+    private var required: Bool { item.required == true || item.properties["required"] == .bool(true) }
+    private var text: String { NativeWidgetContract.editorText(value, kind: kind) }
     private var editText: String {
         if let draft { return draft }
         if kind == "percentfraction2input", let number = value?.widgetNumber { return String(format: "%.2f", number * 100) }
@@ -34,9 +37,9 @@ struct NativeWidgetView: View {
     }) }
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if !["checkbox","toggle","switch","booleanpill","button","link"].contains(kind) { Text(label).font(.caption.weight(.semibold)) }
+            if !["checkbox","toggle","switch","booleanpill","button","link"].contains(kind) { Text(label + (required ? " *" : "")).font(.caption.weight(.semibold)) }
             control
-            if !error.isEmpty { Text(error).font(.caption).foregroundStyle(.red).accessibilityLabel(error) }
+            if !error.isEmpty { Text(error).font(.caption).foregroundStyle(themeAppearance?.validationBorder ?? .red).accessibilityLabel(error) }
         }
         .disabled(NativeWidgetContract.presentationDisabled(item))
         .accessibilityElement(children: .contain)
@@ -57,18 +60,18 @@ struct NativeWidgetView: View {
     }
     @ViewBuilder private var control: some View {
         switch kind {
-        case "password": SecureField(label, text: textBinding).textFieldStyle(.roundedBorder).accessibilityLabel(label)
-        case "text", "number", "currency", "percentfraction2input", "math": TextField(label, text: textBinding).textFieldStyle(.roundedBorder).accessibilityLabel(label)
+        case "password": SecureField(label, text: textBinding).modifier(ForgeThemeInputModifier(invalid: !error.isEmpty, required: required)).accessibilityLabel(label)
+        case "text", "number", "currency", "percentfraction2input", "math": TextField(label, text: textBinding).modifier(ForgeThemeInputModifier(invalid: !error.isEmpty, required: required)).accessibilityLabel(label)
         case "textarea", "document", "object":
-            TextEditor(text: textBinding).frame(minHeight: 100).accessibilityLabel(label)
+            TextEditor(text: textBinding).frame(minHeight: 100).modifier(ForgeThemeInputModifier(invalid: !error.isEmpty, multiline: true, required: required)).accessibilityLabel(label)
             if kind == "document" { MarkdownRenderer(markdown: editText) }
         case "schema": ScrollView { Text(text).font(.caption.monospaced()).textSelection(.enabled) }.frame(maxHeight: 300)
         case "checkbox", "toggle", "switch", "booleanpill":
             Toggle(label, isOn: Binding(get: { NativeWidgetContract.truthy(value) }, set: { onChange(.bool($0)) }))
         case "select", "radio":
-            let options = NativeWidgetContract.options(item)
+            let options = loadedOptions ?? NativeWidgetContract.options(item)
             Picker(label, selection: Binding(get: { options.firstIndex { $0.0 == value } ?? -1 }, set: { if options.indices.contains($0) { onChange(options[$0].0) } })) {
-                Text("Select").tag(-1)
+                Text(value == nil || value == .null ? "Select" : NativeWidgetContract.text(value)).tag(-1)
                 ForEach(options.indices, id: \.self) { index in Text(options[index].1).tag(index) }
             }.accessibilityLabel(label)
         case "treemultiselect":
@@ -141,7 +144,7 @@ struct NativeWidgetView: View {
                 Link("Open \(label)", destination: url)
             } else { Text("No media") }
         case "markdown": MarkdownRenderer(markdown: text)
-        case "button": Button(label) { onAction?() }
+        case "button": Button(label) { onAction?() }.modifier(ForgeThemeButtonModifier())
         case "label": Text(text).textSelection(.enabled)
         default: Text("Unsupported widget: \(kind)").foregroundStyle(.secondary)
         }

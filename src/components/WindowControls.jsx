@@ -11,29 +11,32 @@ const WindowControls = ({
     return (
         <div className="window-controls">
             <button
+                type="button" aria-label="Close window"
                 className="window-control close-control"
                 onClick={(e) => {
                     e.stopPropagation();
                     onClose(e);
                 }}
-            />
+            ><span className="window-control__indicator" aria-hidden="true" /></button>
             {showMinimize && (
                 <button
-                    className="window-control minimize-control"
+                    type="button" aria-label="Minimize window"
+                className="window-control minimize-control"
                     onClick={(e) => {
                         e.stopPropagation();
                         onMinimize(e);
                     }}
-                />
+                ><span className="window-control__indicator" aria-hidden="true" /></button>
             )}
             {showMaximize && (
                 <button
-                    className="window-control maximize-control"
+                    type="button" aria-label="Maximize window"
+                className="window-control maximize-control"
                     onClick={(e) => {
                         e.stopPropagation();
                         onMaximize(e);
                     }}
-                />
+                ><span className="window-control__indicator" aria-hidden="true" /></button>
             )}
         </div>
     );

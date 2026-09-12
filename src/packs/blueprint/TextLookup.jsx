@@ -11,17 +11,17 @@ export default function TextLookup(props) {
 
     const handleOpen = React.useMemo(() => createLookupOpenHandler(latest, openLookup), []);
 
-    const handleBlur = async (event) => {
-        try {
-            rest?.onBlur?.(event);
-        } catch (_) {}
-        const raw = event?.target?.value ?? value;
+    const requestTrigger = item?.lookup?.requestTrigger === 'change' ? 'change' : 'blur';
+    const requestVersion = React.useRef(0);
+    React.useEffect(() => () => { ++requestVersion.current; }, []);
+    const resolve = async (raw) => {
+        const version = ++requestVersion.current;
         if (readOnly) return;
         if (!item?.lookup?.dataSource || !item?.lookup?.resolveInput) return;
         if (raw == null || String(raw).trim() === '') return;
         try {
             const resolved = await resolveLookupValue({ item, value: raw });
-            if (!resolved) return;
+            if (!resolved || version !== requestVersion.current) return;
             applyLookupSelection({
                 item,
                 context,
@@ -30,34 +30,32 @@ export default function TextLookup(props) {
                 record: resolved,
             });
         } catch (e) {
-            console.error('lookup resolve on blur failed', e);
+            console.error('lookup resolve failed', e);
         }
     };
 
-    // Optional visual customisation via metadata:
-    //  - item.lookup.intent (primary|success|warning|danger)
-    //  - item.intent (fallback)
-    //  - item.properties.style (inline CSS)
-    const intent = (item?.lookup?.intent) || item?.intent || rest?.intent;
-    const defaultLookupStyle = { backgroundColor: '#f0fff4', borderColor: '#c6f6d5' };
-    // Apply a gentle default style for lookups; allow explicit style to override
-    const inputStyle = { ...defaultLookupStyle, ...(rest?.style || {}) };
+    const intent = item?.lookup?.intent || item?.intent || rest?.intent;
     const rightElement = React.useMemo(() => (
-        <Button icon="search" minimal onClick={handleOpen} />
+        <Button icon="search" minimal onClick={handleOpen} aria-label="Open lookup" disabled={readOnly || rest.disabled} data-forge-part="button" />
     ), [handleOpen]);
 
     return (
         <InputGroup
             {...rest}
             intent={intent}
-            style={inputStyle}
+            className={[rest.className, 'forge-text-lookup'].filter(Boolean).join(' ')}
             value={value ?? ''}
             readOnly={readOnly}
             onChange={(e) => {
                 const v = e?.target?.value ?? e;
+                ++requestVersion.current;
                 try { adapter.set(v); } catch (_) {}
+                if (requestTrigger === 'change') void resolve(v);
             }}
-            onBlur={handleBlur}
+            onBlur={event => {
+                rest?.onBlur?.(event);
+                if (requestTrigger === 'blur') void resolve(event.target.value);
+            }}
             rightElement={rightElement}
         />
     );

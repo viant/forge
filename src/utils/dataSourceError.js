@@ -3,7 +3,8 @@ export function normalizeDataSourceError(error) {
         return null;
     }
     if (error.__forgeDataSourceError === true) {
-        return error;
+        const display = String(error.displayMessage || error.message || 'Unable to load data. Please retry.').trim() || 'Unable to load data. Please retry.';
+        return {...error, displayMessage: resolveDisplayMessage(Number(error.status) || undefined, display)};
     }
     const status = Number.isFinite(Number(error?.status)) ? Number(error.status) : undefined;
     const statusText = String(error?.statusText || '').trim() || undefined;
@@ -46,7 +47,7 @@ function resolveErrorMessage(error, status, statusText) {
         return `Request failed: ${status}`;
     }
     const text = String(error || '').trim();
-    return text || 'Request failed';
+    return !text || text === '[object Object]' ? 'Unable to load data. Please retry.' : text;
 }
 
 function resolveDisplayMessage(status, message) {
@@ -62,6 +63,9 @@ function resolveDisplayMessage(status, message) {
     const validationMessage = extractValidationMessage(message);
     if (validationMessage) {
         return validationMessage;
+    }
+    if (status === 422 || /\b422\b[\s\S]*\{/.test(message)) {
+        return 'Some request parameters are invalid. Check the filters and retry.';
     }
     if ((status && status >= 500) || /(?:internal server error|parameter\s+"?(?:auth|sysconfig)"?|seed\s+"?[a-z0-9_]+"?\s*:)/i.test(message)) {
         return 'This data is temporarily unavailable. Retry in a moment.';

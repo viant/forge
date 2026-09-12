@@ -1,8 +1,9 @@
 // Composer.jsx – TextArea prompt with send/upload/tools controls
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Menu, MenuDivider, MenuItem, Popover, Tag, TextArea } from "@blueprintjs/core";
-import { PaperPlaneRight, StopCircle, Microphone, MicrophoneSlash, ListBullets, UserCircle, Lightbulb, Brain } from '@phosphor-icons/react';
+import { PaperPlaneRight, Stop, Microphone, ListBullets, UserCircle, Lightbulb, Brain, ImageSquare, XCircle, CaretDown, CaretUp } from '@phosphor-icons/react';
 import BundlesDialog from "./BundlesDialog.jsx";
+import CameraCapture from "./CameraCapture.jsx";
 
 function composerMaxHeightPx(maxRows, paddingTopPx) {
     const safeRows = Math.max(1, Number(maxRows) || 1);
@@ -132,6 +133,7 @@ export default function Composer({
     defaultMicOn = false,
     onToggleMic,
     onCaptureAudio,
+    onCaptureImage,
     inputComponent: InputComponent,
     inputProps = {},
     disabled = false,
@@ -161,6 +163,7 @@ export default function Composer({
 	}, [getMessageHistoryProp]);
 
 	const [draft, setDraft] = useState(String(draftValue || ""));
+    const [composerCollapsed, setComposerCollapsed] = useState(false);
 	const [historyOpen, setHistoryOpen] = useState(false);
 	const [historySuggestions, setHistorySuggestions] = useState([]);
 	const historyCloseTimerRef = useRef(null);
@@ -659,7 +662,7 @@ export default function Composer({
     ) : (
         <PaperPlaneRight size={18} weight="fill" />
     );
-    const abortIconEl = <StopCircle size={18} weight="fill" />;
+    const abortIconEl = <Stop size={18} weight="fill" />;
 
     const hasToolsPicker = Array.isArray(toolOptions) ? toolOptions.length > 0 : Array.isArray(tools) && tools.length > 0;
     const effectiveToolOptions = Array.isArray(toolOptions)
@@ -1273,7 +1276,7 @@ export default function Composer({
 	            active={String(agentValue || '') === 'auto'}
 	            data-testid="chat-composer-agent"
 	            aria-label="Agent"
-	            title="Agent"
+	            title={`Agent: ${currentAgentLabel}`}
 	            className="composer-icon-btn composer-icon-btn--agent composer-icon-btn--labelText"
 	            icon={<UserCircle size={20} weight="duotone" />}
 	            text={currentAgentLabel}
@@ -1288,10 +1291,10 @@ export default function Composer({
 	            disabled={disabled}
 	            data-testid="chat-composer-model"
 	            aria-label="Model"
-	            title="Model"
+	            title={`Model: ${currentModelLabel}`}
 	            className="composer-icon-btn composer-icon-btn--model composer-icon-btn--labelText"
-	            icon={<Lightbulb size={20} weight="duotone" />}
-	            text={currentModelLabel === '—' ? 'Model' : currentModelLabel}
+	            icon={<Brain size={20} weight="duotone" />}
+	            text={currentModelLabel}
 	            onClick={(e) => { e.preventDefault(); setModelOpen((v) => !v); }}
 	        />,
 	        `Model: ${optionLabel(normalizedModelOptions, modelValue)}`
@@ -1332,10 +1335,10 @@ export default function Composer({
 	            small
 	            disabled={disabled}
 	            data-testid="chat-composer-reasoning"
-	            icon={<Brain size={18} weight="duotone" />}
+	            icon={<Lightbulb size={18} weight="duotone" />}
 	            className="composer-icon-btn composer-icon-btn--reasoning composer-icon-btn--labelText"
 	            aria-label="Reasoning"
-	            title="Reasoning"
+	            title={String(reasoningValue || '').trim() ? `Reasoning: ${reasoningValue}` : 'Reasoning: default'}
 	            onClick={(e) => { e.preventDefault(); setReasoningOpen((v) => !v); }}
 	        >
 	            {String(reasoningValue || '').trim() ? `Reasoning: ${reasoningValue}` : 'Reasoning'}
@@ -1344,25 +1347,28 @@ export default function Composer({
 
 	    if (commandCenter) {
 	        return (
-	            <form className="chat-composer flex flex-col gap-2" onSubmit={handleSubmit} data-testid="chat-composer">
+	            <form className={`chat-composer flex flex-col gap-2${composerCollapsed ? " is-collapsed" : ""}`} onSubmit={handleSubmit} data-testid="chat-composer">
                     {queueTray}
 	                <div className="composer-shell" data-testid="chat-composer-shell">
 	                <div className="composer-bar" data-testid="chat-composer-bar">
 	                    <div className="composer-bar-left">
+                        {draft.length > 0 && <Button type="button" minimal small disabled={disabled} icon={<XCircle size={20} weight="fill" />} className="composer-icon-btn composer-icon-btn--clear" aria-label="Clear message" title="Clear message" onClick={() => setDraft('')} />}
+                        <Button type="button" minimal small disabled={disabled} icon={composerCollapsed ? <CaretUp size={20} /> : <CaretDown size={20} />} className="composer-icon-btn composer-icon-btn--collapse" aria-label={composerCollapsed ? 'Expand composer' : 'Collapse composer'} title={composerCollapsed ? 'Expand composer' : 'Collapse composer'} aria-expanded={!composerCollapsed} onClick={() => setComposerCollapsed(value => !value)} />
                         {showUpload && withTooltip(
                             <Button
-                                icon="plus"
+                                icon={<ImageSquare size={20} />}
                                 minimal
                                 small
                                 disabled={disabled}
                                 className="composer-icon-btn composer-icon-btn--attach"
                                 data-testid="chat-composer-attach"
-                                aria-label={uploadTooltip}
-                                title={uploadTooltip}
+                                aria-label={uploadTooltip === 'upload' ? 'Add photos or files' : uploadTooltip}
+                                title={uploadTooltip === 'upload' ? 'Add photos or files' : uploadTooltip}
                                 onClick={(e) => { e.preventDefault(); onOpenAttach?.(); }}
                             />,
 	                            uploadTooltip
 	                        )}
+                        {showUpload && typeof onCaptureImage === 'function' && <CameraCapture disabled={disabled} onCapture={onCaptureImage}/>}
 	                        {Array.isArray(normalizedAgentOptions) && normalizedAgentOptions.length > 0 && (
 	                            renderStablePopover({
 	                                open: agentOpen,
@@ -1454,7 +1460,7 @@ export default function Composer({
                                 title={micTooltip || (micOn ? 'Disable mic' : 'Enable mic')}
                                 onClick={(e) => { e.preventDefault(); toggleMic(); }}
                             >
-                                {micOn ? <Microphone size={18} weight="fill" /> : <MicrophoneSlash size={18} />}
+                                {micOn ? <Stop size={18} weight="fill" /> : <Microphone size={18} />}
                             </Button>,
                             micTooltip
                         )}
@@ -1746,7 +1752,7 @@ export default function Composer({
                             aria-label={micTooltip || (micOn ? 'Disable mic' : 'Enable mic')}
                             title={micTooltip || (micOn ? 'Disable mic' : 'Enable mic')}
                         >
-                            {micOn ? <Microphone size={18} weight="fill" /> : <MicrophoneSlash size={18} />}
+                            {micOn ? <Stop size={18} weight="fill" /> : <Microphone size={18} />}
                         </Button>,
                         micTooltip
                     )}

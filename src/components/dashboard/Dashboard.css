@@ -7383,3 +7383,37 @@ button.forge-report-builder__dialog-source-card:focus-visible {
 .forge-report-builder__report-options--header .forge-report-builder__report-option {
     min-width: 140px;
 }
+
+/* Label-only report filters use the space required by their text. */
+.forge-report-builder-text-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.forge-report-builder-text-option {
+    min-height: 30px;
+    padding: 4px 8px;
+    border: 1px solid var(--forge-border-color, #d9e2ea);
+    border-radius: 4px;
+    background: var(--forge-surface, #fff);
+    color: inherit;
+    cursor: pointer;
+}
+.forge-report-builder-text-option .forge-report-builder-icon-button__label {
+    font-size: 12px;
+    font-weight: 400;
+}
+.forge-report-builder-text-option.is-active {
+    border-color: var(--forge-dashboard-accent, #2367d1);
+    background: var(--forge-selected-background, #eef4ff);
+}
+.forge-report-builder-text-option:focus-visible {
+    outline: 2px solid var(--forge-focus-color, #2367d1);
+    outline-offset: 2px;
+}
+
+.forge-report-runtime-filter-toggle { border:1px solid var(--forge-control-border, #d8e1e8); background:var(--forge-control-bg, #fff); color:var(--forge-text, #263244); border-radius:8px; cursor:pointer; font-size:12px; font-weight:700; }
+.forge-report-runtime-filter-toggle[aria-pressed="true"] { background:var(--forge-table-header-surface, #eef4fb); }
+.forge-report-runtime-filter-clear { border:0; background:transparent; cursor:pointer; color:var(--forge-focus-color, #21538f); font-size:11px; }
+.agently-workspace[data-forge-theme] .forge-report-builder-text-option { background:var(--forge-control-bg); color:var(--forge-text); border-color:var(--forge-control-border); }
+.agently-workspace[data-forge-theme] .forge-report-builder-text-option.is-active { background:var(--forge-table-hover-surface); color:var(--forge-text); border-color:var(--forge-focus-color); }

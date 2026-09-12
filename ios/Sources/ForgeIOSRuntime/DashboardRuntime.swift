@@ -2125,7 +2125,8 @@ public enum DashboardRuntime {
         windowForm: [String: Any] = [:],
         collection: [[String: Any]] = [],
         input: [String: Any] = [:],
-        selectionValues: [String: Any] = [:]
+        selectionValues: [String: Any] = [:],
+        authorization: [String: Any] = [:]
     ) -> Bool {
         guard let condition else { return true }
         if !condition.all.isEmpty && condition.all.contains(where: {
@@ -2138,7 +2139,8 @@ public enum DashboardRuntime {
                 windowForm: windowForm,
                 collection: collection,
                 input: input,
-                selectionValues: selectionValues
+                selectionValues: selectionValues,
+                authorization: authorization
             )
         }) { return false }
         if !condition.any.isEmpty && !condition.any.contains(where: {
@@ -2151,7 +2153,8 @@ public enum DashboardRuntime {
                 windowForm: windowForm,
                 collection: collection,
                 input: input,
-                selectionValues: selectionValues
+                selectionValues: selectionValues,
+                authorization: authorization
             )
         }) { return false }
         if let negated = condition.not,
@@ -2164,7 +2167,8 @@ public enum DashboardRuntime {
                windowForm: windowForm,
                collection: collection,
                input: input,
-               selectionValues: selectionValues
+               selectionValues: selectionValues,
+               authorization: authorization
            ) { return false }
         let selector = condition.selector ?? condition.field ?? condition.key
         let actual = resolveDashboardValue(
@@ -2177,7 +2181,8 @@ public enum DashboardRuntime {
             windowForm: windowForm,
             collection: collection,
             input: input,
-            selectionValues: selectionValues
+            selectionValues: selectionValues,
+            authorization: authorization
         )
 
         if let expected = condition.whenValue, !dashboardValuesEqual(actual: actual, expected: expected) {
@@ -2188,6 +2193,9 @@ public enum DashboardRuntime {
             return false
         }
         if let notEquals = condition.notEquals, dashboardValuesEqual(actual: actual, expected: notEquals) {
+            return false
+        }
+        if let contains = condition.containsValue, !dashboardValueContains(actual: actual, expected: contains) {
             return false
         }
         if !condition.inValues.isEmpty && !condition.inValues.contains(where: { dashboardValuesEqual(actual: actual, expected: $0) }) {
@@ -2224,7 +2232,8 @@ public enum DashboardRuntime {
         windowForm: [String: Any] = [:],
         collection: [[String: Any]] = [],
         input: [String: Any] = [:],
-        selectionValues: [String: Any] = [:]
+        selectionValues: [String: Any] = [:],
+        authorization: [String: Any] = [:]
     ) -> Any? {
         let selectionPayload = selectionDictionary(selection)
 
@@ -2244,6 +2253,8 @@ public enum DashboardRuntime {
                 return input
             case "selectionvalues":
                 return selectionValues
+            case "authorization":
+                return authorization
             default:
                 return metrics
             }
@@ -2264,6 +2275,8 @@ public enum DashboardRuntime {
             return SelectorUtil.resolve(input, selector: selector)
         case "selectionvalues":
             return SelectorUtil.resolve(selectionValues, selector: selector)
+        case "authorization":
+            return SelectorUtil.resolve(authorization, selector: selector)
         default:
             if selector.hasPrefix("filters.") {
                 return SelectorUtil.resolve(filters, selector: String(selector.dropFirst("filters.".count)))
@@ -2332,6 +2345,12 @@ public enum DashboardRuntime {
         let normalized = format?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let locale = Locale(identifier: "en_US")
         switch normalized {
+        case "raw":
+            if let text = value as? String { return text }
+            if let number = numericValue(value), number.isFinite, number.rounded(.towardZero) == number {
+                return String(format: "%.0f", locale: Locale(identifier: "en_US_POSIX"), number)
+            }
+            return String(describing: value)
         case "date":
             if let date = dashboardDateValue(value) {
                 return formatDashboardDateValue(date, pattern: "MMM d, yyyy", locale: locale)
@@ -2339,6 +2358,10 @@ public enum DashboardRuntime {
         case "datetime":
             if let date = dashboardDateValue(value) {
                 return formatDashboardDateValue(date, pattern: "MMM d, yyyy, h:mm a", locale: locale)
+            }
+        case "datetime24":
+            if let date = dashboardDateValue(value) {
+                return formatDashboardDateValue(date, pattern: "MMM d, yyyy, HH:mm", locale: locale)
             }
         case "wallclockdate":
             if let date = dashboardDateValue(value) {
@@ -2375,13 +2398,14 @@ public enum DashboardRuntime {
                 formatter.maximumFractionDigits = 1
                 return "\(formatter.string(from: NSNumber(value: number)) ?? String(number))%"
             }
-        case "percentfraction":
+        case "percentfraction", "percentfraction2", "percentfraction3":
             if let number = numericValue(value) {
                 let formatter = NumberFormatter()
                 formatter.locale = locale
                 formatter.numberStyle = .decimal
-                formatter.minimumFractionDigits = 1
-                formatter.maximumFractionDigits = 1
+                let digits = normalized == "percentfraction3" ? 3 : normalized == "percentfraction2" ? 2 : 1
+                formatter.minimumFractionDigits = digits
+                formatter.maximumFractionDigits = digits
                 let scaled = number * 100
                 return "\(formatter.string(from: NSNumber(value: scaled)) ?? String(scaled))%"
             }
@@ -2507,6 +2531,17 @@ public enum DashboardRuntime {
             return false
         }
         return actualJSON == expected
+    }
+
+    private static func dashboardValueContains(actual: Any?, expected: JSONValue) -> Bool {
+        let actual = unwrapOptional(actual)
+        if let values = actual as? [Any] {
+            return values.contains { dashboardValuesEqual(actual: $0, expected: expected) }
+        }
+        if let text = actual as? String, let expectedText = expected.stringValue {
+            return text.localizedCaseInsensitiveContains(expectedText)
+        }
+        return false
     }
 
     private static func dashboardPrimitiveValuesEqual(actual: Any?, expected: JSONPrimitive) -> Bool {

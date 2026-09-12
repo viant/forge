@@ -1,3 +1,5 @@
+import {windowFillsAllocatedSpace, showWindowSelectionFooter} from './windowPresentationPolicy.js';
+import {ForgeThemeBoundary} from './ThemeBoundary.jsx';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
 
@@ -529,7 +531,7 @@ function WindowContentInner({window, metadata, services}) {
     const {windowKey, windowData, windowId, parameters = {}} = window;
     const isHostedWorkspaceSurface = String(window?.presentation || '').trim().toLowerCase() === 'hosted'
         && String(window?.region || '').trim().toLowerCase() === 'chat.top';
-    const shouldFillParent = isHostedWorkspaceSurface || window.isInTab !== false;
+    const shouldFillParent = windowFillsAllocatedSpace(window, isHostedWorkspaceSurface);
     const defaultDataSourceRef = resolveDefaultDataSourceRef(metadata);
     const initialWindowFormSeed = useMemo(() => ({
         ...(parameters && typeof parameters === 'object' ? parameters : {}),
@@ -975,7 +977,7 @@ function WindowContentInner({window, metadata, services}) {
         <div
             data-window-id={windowId}
             style={{
-                height: shouldFillParent ? '100%' : 'auto',
+                height: 'auto',
                 minHeight: shouldFillParent ? 0 : 'max-content',
                 minWidth: 0,
                 display: 'flex',
@@ -996,7 +998,7 @@ function WindowContentInner({window, metadata, services}) {
                 isInTab={window.isInTab}
                 fillParent={shouldFillParent}
             />
-            {window.isInTab === false && !(window.footer && window.footer.hide === true) ? <FloatingFooter /> : null}
+            {showWindowSelectionFooter(window) ? <FloatingFooter /> : null}
         </div>
     );
 }
@@ -1007,7 +1009,11 @@ function WindowContentInner({window, metadata, services}) {
  * only a stable set of hooks so React never complains about ordering.
  * ------------------------------------------------------------------ */
 
-export default function WindowContent({window, isInTab = false}) {
+export default function WindowContent(props) {
+    return <ForgeThemeBoundary windowKey={props.window?.windowKey}><WindowContentRuntime {...props} /></ForgeThemeBoundary>;
+}
+
+function WindowContentRuntime({window, isInTab = false}) {
     useSignals();
     const {windowKey, windowId} = window;
     const baseKey = windowKey.split('?')[0];
