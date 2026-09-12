@@ -104,3 +104,36 @@ Handlers above are resolved via `Context.lookupHandler` so they can live in
 * Use `setFormData` / `setFormField` for instant UI sync.
 * Trigger a refresh with `fetchCollection`, `refreshSelected` or similar
   helpers when you need server confirmation.
+
+## Parameterized inline fixtures (Agently host)
+
+When an Agently datasource uses `backend.kind: inline`, `backend.inlineFilters`
+can opt into filtering before projection, paging, and caching. This is a host
+backend feature; it is not JavaScript executed by the Forge renderer.
+
+```yaml
+id: example_delivery
+cardinality: collection
+selectors: {data: data}
+backend:
+  kind: inline
+  rows:
+    - {orderId: 710001, day: '2026-09-09', spend: 300}
+    - {orderId: 710002, day: '2026-09-09', spend: 600}
+  inlineFilters:
+    - {field: orderId, input: filters.orderId, operator: eq, type: number}
+    - {field: day, input: filters.From, operator: gte, type: date}
+    - {field: day, input: filters.To, operator: lte, type: date}
+```
+
+Filters accept `eq`, `gte`, and `lte`, with number or date comparison. Equality
+accepts a scalar or a list (membership); range filters need one value. Nested and
+flat input paths are supported. Dates compare inclusive day boundaries. Missing
+filter values do not restrict rows. Existing inline sources without the optional
+mapping retain their previous behavior.
+
+For an inline backend's root-array response, `selectors.data: data` supports the
+root-array fallback; `selectors.data: rows` would try to project a missing field.
+Verify both the public fetch result and the rendered report for the same request.
+A static fixture is test data, not proof that a production backend filters or
+aggregates correctly.

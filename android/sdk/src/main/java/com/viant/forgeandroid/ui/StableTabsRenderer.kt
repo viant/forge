@@ -21,14 +21,15 @@ internal fun StableTabsRenderer(runtime: ForgeRuntime, window: WindowContext, co
     val metrics by source?.metrics?.flow?.collectAsState(initial = source.metrics.peek()) ?: remember { mutableStateOf(emptyMap()) }
     val selection by source?.selection?.flow?.collectAsState(initial = source.selection.peek()) ?: remember { mutableStateOf(SelectionState()) }
     val metadata by window.metadata.flow.collectAsState(initial = window.metadata.peek())
-    fun allows(condition: DashboardConditionDef?) = evaluateDashboardCondition(condition, metrics = metrics, form = form, windowForm = windowForm, collection = collection)
+    val authorization = metadata?.authorizationSnapshot?.mapValues { JsonUtil.elementToAny(it.value) }.orEmpty()
+    fun allows(condition: DashboardConditionDef?) = evaluateDashboardCondition(condition, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization)
     val visible = mutableListOf<ContainerDef>()
     for (child in container.containers) {
         val permission = child.permissionBoundary
         val permissionSource = permission?.dataSourceRef?.let(window::contextOrNull)
         val grants by permissionSource?.collection?.flow?.collectAsState(initial = permissionSource.collection.peek()) ?: remember { mutableStateOf(emptyList()) }
         val rows = when (permission?.mode) { "selection" -> selection.selection.ifEmpty { selection.selected?.let(::listOf).orEmpty() }; "row" -> collection; else -> emptyList() }
-        if (allows(child.visibleWhen) && (permission == null || (allows(permission.visibleWhen) && WorkflowPrimitiveRuntime.permissionAllows(permission, metadata?.authorizationSnapshot?.mapValues { JsonUtil.elementToAny(it.value) }.orEmpty(), rows, grants)))) visible += child
+        if (allows(child.visibleWhen) && (permission == null || (allows(permission.visibleWhen) && WorkflowPrimitiveRuntime.permissionAllows(permission, authorization, rows, grants)))) visible += child
     }
     val ids = visible.mapNotNull { it.id }
     val stateKey = "__forgeStableTab:${container.id ?: container.containers.firstOrNull()?.id ?: "root"}"

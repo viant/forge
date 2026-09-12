@@ -22,7 +22,7 @@ Forge has been **built with LLMs**, leveraging AI-powered capabilities to enhanc
 - [Acknowledgments](#acknowledgments)
 # Documentation
 - [Parameter passing between windows](doc/window-parameter-passing.md)
-- [Schema-driven forms](doc/jsonschema-forms.md)
+- [Widgets and form controls](doc/widgets.md)
 - [Widgets reference](doc/widgets.md)
 
 ## Introduction
@@ -407,7 +407,7 @@ Please ensure your code follows the existing code style and includes appropriate
 
 ## License
 
-This project is licensed under the Apache2 License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache2 License.
 
 
 ## Acknowledgments
@@ -416,3 +416,17 @@ This project is licensed under the Apache2 License. See the [LICENSE](LICENSE) f
 - **Viant AFS**: For the abstract file system used in the backend services.
 - **Blueprint.js**: For the UI components used in the frontend.
 - **CodeMirror**: For providing the editor component with syntax highlighting.
+
+## Configuration and usage guides
+
+- [Table layout, navigation, quick search, export, and preferences](doc/table-behavior.md)
+- [Row/cell formatting and links](doc/table-formatting.md)
+- [Workspace styles, theme selection, and final CSS overrides](doc/workspace-styles.md)
+- [Metadata CSS classes](doc/container-css-classes.md)
+- [Chat composer, webcam capture, and starter-task agent selection](doc/chat-composer.md)
+- [Inline and hosted reporting](doc/reporting.md#inline-report-transactions)
+- [Datasource configuration and parameterized fixtures](doc/data-source.md)
+- [Window parameters](doc/window-parameter-passing.md)
+
+These guides distinguish Forge renderer behavior from host-specific configuration.
+They are usage documentation, not an app-wide native/web parity guarantee.

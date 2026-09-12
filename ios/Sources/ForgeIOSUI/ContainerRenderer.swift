@@ -461,6 +461,11 @@ public struct ContainerRenderer: View {
     private func observeAuthorizationSnapshot() async {
         guard let runtime, let window else { return }
         authorizationSnapshot = await runtime.windowMetadata(id: window.windowID)?.authorizationSnapshot ?? [:]
+        let updates = await runtime.windowMetadataUpdates(id: window.windowID)
+        for await metadata in updates {
+            guard !Task.isCancelled else { return }
+            authorizationSnapshot = metadata?.authorizationSnapshot ?? [:]
+        }
     }
 
     @MainActor

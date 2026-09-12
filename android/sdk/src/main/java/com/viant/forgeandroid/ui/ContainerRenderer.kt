@@ -64,6 +64,7 @@ fun ContainerRenderer(
     suppressTitle: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val liveMetadata by window.metadata.flow.collectAsState(initial = window.metadata.peek())
     val windowFormSignal = window.windowFormSignal()
     val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
     val effectiveDataSourceRef = container.dataSourceRef?.trim().orEmpty().ifBlank { inheritedDataSourceRef.orEmpty() }
@@ -125,7 +126,7 @@ fun ContainerRenderer(
         "row" -> visibilityCollection
         else -> emptyList()
     }
-    val authorizationSnapshot = window.metadata.peek()?.authorizationSnapshot
+    val authorizationSnapshot = liveMetadata?.authorizationSnapshot
         ?.mapValues { JsonUtil.elementToAny(it.value) }
         .orEmpty()
     val permissionPredicateAllows = permissionSpec?.visibleWhen == null || evaluateDashboardCondition(
