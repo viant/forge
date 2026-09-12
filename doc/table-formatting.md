@@ -64,3 +64,7 @@ The row can also emit a structured link value directly:
   }
 }
 ```
+
+For row reservation, frozen columns, shared toolbars, request timing, CSV export,
+and persistence, see [Table behavior](table-behavior.md). Prefer `className` and
+semantic theme tokens for reusable colors instead of duplicating inline styles.

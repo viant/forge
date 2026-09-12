@@ -83,10 +83,17 @@ public struct MenuListRenderer: View {
         .task(id: dataSubscriptionKey) {
             await observeDataSources()
         }
-        .task(id: window?.windowID ?? "") {
+        .task(id: "authorization:\(window?.windowID ?? "")") {
             if let runtime, let window {
                 authorizationValues = await runtime.windowMetadata(id: window.windowID)?.authorizationSnapshot ?? [:]
+                let updates = await runtime.windowMetadataUpdates(id: window.windowID)
+                for await metadata in updates {
+                    guard !Task.isCancelled else { return }
+                    authorizationValues = metadata?.authorizationSnapshot ?? [:]
+                }
             }
+        }
+        .task(id: window?.windowID ?? "") {
             await observeWindowForm()
         }
         .task(id: itemVisibilityTaskKey) {

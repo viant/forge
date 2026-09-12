@@ -1273,3 +1273,57 @@ Changes to reporting should be verified at the narrowest relevant layers:
 For workspace-specific report families, run the same critical scenarios in the
 development UI and the embedded host. A development-only render is not
 sufficient evidence of integration parity.
+
+## Inline report transactions
+
+An inline report is assembled from fenced messages; it does not require a
+registered workspace window. For uploaded data, read the actual attachment before
+choosing measures or emitting datasets. Label fabricated examples as synthetic.
+Do not mix dashboard-v1 block shapes with report-document-v1 block shapes.
+
+The following complete transaction uses synthetic data:
+
+```forge-data
+{"version":2,"scope":"support_example","reportRef":"support_weekly","id":"weekly_rows","sequence":1,"format":"json","mode":"replace","data":[{"week":"2026-09-01","completed":12},{"week":"2026-09-08","completed":18}]}
+```
+
+```forge-report
+{"version":1,"scope":"support_example","id":"support_weekly","sequence":2,"mode":"start","grammar":"dashboard-v1","title":"Support activity — synthetic example","blocks":[{"id":"week_filter","kind":"dashboard.filters","title":"Week","items":[{"id":"week","field":"week","label":"Week","options":[{"label":"September 1","value":"2026-09-01"},{"label":"September 8","value":"2026-09-08"}]}]},{"id":"weekly_detail","kind":"dashboard.table","title":"Weekly detail","dataSourceRef":"weekly_rows","filterBindings":{"week":"week"},"columns":[{"key":"week","label":"Week"},{"key":"completed","label":"Completed"}]}]}
+```
+
+```forge-report
+{"version":1,"scope":"support_example","id":"support_weekly","sequence":3,"mode":"commit"}
+```
+
+Keep `scope` stable, `forge-data.reportRef` equal to `forge-report.id`, and each
+block's `dataSourceRef` equal to a dataset ID. Sequences increase across the data,
+start, and commit frames. An inline filter uses `dashboard.filters.items`; every
+affected block needs top-level `filterBindings`. A visible control alone does not
+filter rows. After a committed report, prefer a complete replacement with a new
+report ID/scope unless the host explicitly supports continued assembly.
+
+PDF export availability depends on the host reporting/export configuration.
+Rendering a fence successfully does not prove that data was read correctly,
+filters work, or exports match the current scope: test those actions separately.
+
+## Executing a report in a workspace window
+
+Hosted report execution is a separate route from inline fences. The host registers
+a window whose content uses `kind: dashboard.reportBuilder`, a datasource, and a
+`reportBuilderRef`. It supplies parameters such as scoped IDs and dates through
+the [window parameter contract](window-parameter-passing.md).
+
+For authored reports, `executeOnOpen: true` requires an execution identity and
+authored report blocks, for example a `reportStarterId` selecting a catalog preset
+with `documentPatch.blocks`. A plain exploratory builder without authored blocks
+can open at Ready to run instead. Historical reopening restores state rather than
+blindly rerunning an old command.
+
+Report materialization and export can fetch datasources independently of the
+visible table's `onFetch` hook. Apply authoritative filtering in the datasource
+backend so rendering and export use the same scope. Do not use a UI-only filter
+to imply the backend excluded rows. Agently's opt-in inline fixture filtering is
+covered in [Datasource backends](data-source.md#parameterized-inline-fixtures-agently-host).
+
+The host owns chat/workspace placement, maximization, and restoration. A generated
+inline report should not be described as a registered workspace window.

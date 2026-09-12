@@ -48,9 +48,10 @@ import com.viant.forgeandroid.runtime.evaluateDashboardCondition
 fun TabsRenderer(runtime: ForgeRuntime, window: WindowContext, container: ContainerDef) {
     val containers = container.containers
     if (containers.isEmpty()) return
+    val metadata by window.metadata.flow.collectAsState(initial = window.metadata.peek())
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val authorization = window.metadata.peek()?.authorizationSnapshot
+        val authorization = metadata?.authorizationSnapshot
             ?.mapValues { JsonUtil.elementToAny(it.value) }
             .orEmpty()
         val compactPages = remember(container, authorization) {

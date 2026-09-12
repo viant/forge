@@ -7,6 +7,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
 
 class ForgeRuntime(
@@ -213,6 +216,18 @@ class ForgeRuntime(
         bumpPrefillRevision: Boolean = true
     ) {
         setWindowFormValue(windowId, values, replace, bumpPrefillRevision)
+    }
+
+    /** Replaces only simulated principal access lists; resource capabilities remain authoritative. */
+    fun updatePreviewPrincipal(windowId: String, roles: Set<String>, features: Set<String>) {
+        val signal = metadataSignal(windowId)
+        val current = signal.peek() ?: return
+        val authorization = current.authorizationSnapshot.toMutableMap()
+        val principal = (authorization["principal"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
+        principal["roles"] = JsonArray(roles.sorted().map(::JsonPrimitive))
+        principal["features"] = JsonArray(features.sorted().map(::JsonPrimitive))
+        authorization["principal"] = JsonObject(principal)
+        signal.set(current.copy(authorizationSnapshot = authorization))
     }
 
     fun refreshDataSourceCollection(windowID: String, dataSourceRef: String) {
