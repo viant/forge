@@ -56,6 +56,8 @@ public struct TableRenderer: View {
     @State private var clientPage = 1
     @State private var clientFiltering = false
     @State private var filterDefinition: DataSourceDef?
+    @State private var activeFilters: [String: JSONValue] = [:]
+    @State private var filterDraft: TableFilterDraft?
     @State private var searchText = ""
     @State private var exportingCSV = false
     @State private var exportError: String?
@@ -146,6 +148,9 @@ public struct TableRenderer: View {
         }
         .fileExporter(isPresented: $exportingCSV, document: TableCSVDocument(text: visiblePageCSV), contentType: .commaSeparatedText, defaultFilename: tableCSVFilename(table.toolbar)) { result in
             if case .failure = result { exportError = "The CSV could not be exported." }
+        }
+        .sheet(item: $filterDraft) { draft in
+            TableFilterSheet(draft: draft) { values in activeFilters = values; clientPage = 1 }
         }
         .alert("Export failed", isPresented: Binding(get: { exportError != nil }, set: { if !$0 { exportError = nil } })) {
             Button("OK") { exportError = nil }
@@ -541,6 +546,14 @@ public struct TableRenderer: View {
     }
 
     private func matchesSearch(_ row: [String: JSONValue]) -> Bool {
+        if clientFiltering {
+            for definition in filterDefinition?.selectedFilterFields ?? [] {
+                guard let id = definition["id"]?.stringValue, let expected = activeFilters[id] else { continue }
+                let field = definition["field"]?.stringValue ?? id
+                let actual = row[field] ?? row.first { $0.key.caseInsensitiveCompare(field) == .orderedSame }?.value
+                guard (try? ClientFilterRuntime.matches(actual, expected: expected, operation: definition["operator"]?.stringValue ?? "equal")) == true else { return false }
+            }
+        }
         guard clientFiltering, !searchText.isEmpty,
               let search = table.toolbar?.items.first(where: { $0.type?.lowercased() == "quicksearch" }),
               let identifier = search.properties["field"]?.stringValue else { return true }
@@ -1113,6 +1126,13 @@ public struct TableRenderer: View {
     @ViewBuilder
     private func tableToolbar(_ toolbar: ToolbarDef) -> some View {
         HStack(spacing: 4) {
+        if clientFiltering, let fields = filterDefinition?.selectedFilterFields, !fields.isEmpty,
+           toolbar.items.contains(where: { $0.id?.lowercased() == "filterlist" }) {
+            Button { filterDraft = TableFilterDraft(fields: fields, values: activeFilters) } label: {
+                Image(systemName: activeFilters.isEmpty ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                    .frame(width: 44, height: 44)
+            }.accessibilityLabel("Filter rows")
+        }
         if clientFiltering, let search = toolbar.items.first(where: { $0.type?.lowercased() == "quicksearch" }) {
             TextField(search.properties["label"]?.stringValue ?? "Search", text: $searchText)
                 .modifier(ForgeThemeInputModifier())
