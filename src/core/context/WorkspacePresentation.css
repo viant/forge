@@ -1,0 +1,16 @@
+
+button.forge-workspace-icon-action {
+  min-width: 32px; min-height: 32px; padding: 6px; border: 0; border-radius: 7px;
+  background: transparent; box-shadow: none; color: var(--forge-workspace-accent, var(--app-accent, #2d6cdf));
+}
+button.forge-workspace-icon-action > .bp6-icon,
+button.forge-workspace-icon-action > .bp5-icon { color: inherit; }
+button.forge-workspace-icon-action:hover:not(:disabled) { background: rgba(45,108,223,.09); }
+button.forge-workspace-icon-action:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+button.forge-workspace-icon-action:disabled, button.forge-workspace-icon-action.bp6-disabled { opacity: .45; }
+button.forge-workspace-icon-action.bp6-button,
+button.forge-workspace-icon-action.bp5-button,
+button.forge-workspace-icon-action.bp6-button > .bp6-icon,
+button.forge-workspace-icon-action.bp5-button > .bp5-icon {
+  color: var(--forge-workspace-accent, var(--app-accent, #2d6cdf));
+}

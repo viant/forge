@@ -7594,7 +7594,9 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 {hasFilterDrawerContent && authoredPrimaryFilterBarPlacement !== "hidden" ? (
                     <Button
                         small
-                        outlined
+                        minimal
+                        className="forge-workspace-icon-action"
+                        title={`Filters${totalActiveControlCount > 0 ? ` (${totalActiveControlCount} active)` : ""}`}
                         icon="filter"
                         aria-label={(!compactMode && reportFilterRailOpen) ? "Close report filters and options" : "Open report filters and options"}
                         aria-expanded={compactMode ? compactSheetOpen : reportFilterRailOpen}
@@ -7606,21 +7608,19 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                             }
                             setReportFilterRailOpen((open) => !open);
                         }}
-                    >
-                        Filters{totalActiveControlCount > 0 ? ` (${totalActiveControlCount})` : ""}
-                    </Button>
+                    />
                 ) : null}
                 <Button
                     small
-                    outlined
+                    minimal
+                    className="forge-workspace-icon-action"
+                    title="Refresh report"
                     icon="refresh"
                     aria-label="Refresh report"
                     disabled={!canRunReport || loading}
                     loading={loading}
                     onClick={runReport}
-                >
-                    Refresh
-                </Button>
+                />
                 <Popover
                     placement="bottom-start"
                     usePortal={false}
@@ -7628,13 +7628,13 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 >
                     <Button
                         small
-                        outlined
+                        minimal
+                        className="forge-workspace-icon-action"
+                        title="Export report"
                         icon="download"
                         aria-label="Export report"
                         disabled={!canOpenDraftExportMenu}
-                    >
-                        Export
-                    </Button>
+                    />
                 </Popover>
             </div>
         </div>
