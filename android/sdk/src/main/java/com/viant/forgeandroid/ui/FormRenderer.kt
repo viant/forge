@@ -309,6 +309,8 @@ private fun FormItemRenderer(
     item: ItemDef,
     validationErrors: Map<String, String>
 ) {
+    val metadata by context.window.metadata.flow.collectAsState(initial = context.window.metadata.peek())
+    val authorization = metadata?.authorizationSnapshot?.mapValues { JsonUtil.elementToAny(it.value) }.orEmpty()
     val dataSourceContext = resolveItemDataSourceContext(context, item)
     val form by dataSourceContext.form.flow.collectAsState(initial = emptyMap())
     val metrics by dataSourceContext.metrics.flow.collectAsState(initial = emptyMap())
@@ -344,7 +346,8 @@ private fun FormItemRenderer(
             "selected" to selection.selected,
             "selection" to selection.selection,
             "rowIndex" to selection.rowIndex
-        )
+        ),
+        authorization = authorization
     )
     if (!callbackVisible || !metadataVisible) return
 
