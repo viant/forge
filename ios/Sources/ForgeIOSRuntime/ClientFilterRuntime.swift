@@ -28,6 +28,11 @@ public enum ClientFilterRuntime {
         case "contains":
             if case .array(let values) = actual { return values.contains { equal($0, expected) } }
             guard actual != .null else { return false }
+            switch (actual, expected) {
+            case (.object, _), (_, .object), (_, .array), (_, .null):
+                throw ClientFilterError.invalidOperand
+            default: break
+            }
             return text(actual).localizedCaseInsensitiveContains(text(expected))
         case "equal", "equals", "eq", "=": return equal(actual, expected)
         case "notequal", "neq", "!=": return !equal(actual, expected)

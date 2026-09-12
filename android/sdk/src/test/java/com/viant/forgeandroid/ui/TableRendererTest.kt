@@ -358,4 +358,13 @@ class TableRendererTest {
             csv
         )
     }
+
+    @Test
+    fun `toolbar filter drafts preserve authored scalar and collection types`() {
+        assertEquals(listOf(8L, 45L), parseFilterDraft("8, 45", "int[]"))
+        assertEquals(12L, parseFilterDraft("12", "int"))
+        assertEquals(2.5, parseFilterDraft("2.5", "double"))
+        assertEquals(true, parseFilterDraft("true", "boolean"))
+        assertEquals(listOf("active", "paused"), parseFilterDraft("active, paused", "string[]"))
+    }
 }

@@ -311,9 +311,11 @@ private fun ToolbarFilterControl(item: ToolbarItemDef, context: DataSourceContex
     var draft by remember(item.id) { mutableStateOf<Map<String, String>>(emptyMap()) }
     IconButton(
         onClick = {
-            draft = fields.associateNotNull { field ->
-                val key = field.id ?: field.field ?: return@associateNotNull null
-                context.peekFilter()[key]?.let { key to filterDraftText(it) }
+            draft = buildMap {
+                fields.forEach { field ->
+                    val key = field.id ?: field.field ?: return@forEach
+                    context.peekFilter()[key]?.let { put(key, filterDraftText(it)) }
+                }
             }
             open = true
         },
@@ -376,9 +378,6 @@ private fun ToolbarFilterControl(item: ToolbarItemDef, context: DataSourceContex
         )
     }
 }
-
-private inline fun <K, V> Iterable<K>.associateNotNull(transform: (K) -> Pair<K, V>?): Map<K, V> =
-    buildMap { for (item in this@associateNotNull) transform(item)?.let { put(it.first, it.second) } }
 
 private fun filterDraftText(value: Any?): String = when (value) {
     is Iterable<*> -> value.joinToString(", ") { it.toString() }
