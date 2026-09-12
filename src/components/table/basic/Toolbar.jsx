@@ -1,3 +1,4 @@
+import {useWorkspacePresentation, workspaceToolbarItem} from '../../../core/context/WorkspacePresentation.jsx';
 
 import React from 'react';
 import {Button, Checkbox, Menu, MenuItem, Popover, Switch} from '@blueprintjs/core';
@@ -158,6 +159,7 @@ function ToolbarStatus({item, context, align}) {
 }
 
 export function TableExportControl({item, align, disabled = false, rows = [], columns = []}) {
+    item = workspaceToolbarItem(item, useWorkspacePresentation());
     const [busy, setBusy] = React.useState(false);
     const [error, setError] = React.useState('');
     const busyRef = React.useRef(false);
@@ -218,7 +220,8 @@ export function TableExportControl({item, align, disabled = false, rows = [], co
                 <Button
                     type="button"
                     icon={toolbarItemIcon(item.icon || 'export')}
-                    rightIcon="caret-down"
+                    rightIcon={item.hideLabel ? undefined : "caret-down"}
+                    className={item.className}
                     loading={busy}
                     disabled={exportDisabled}
                     aria-label={item.ariaLabel || item.tooltip || item.label || 'Export'}
@@ -246,6 +249,7 @@ const Toolbar = ({
 
     useSignals();
 
+    const workspace = useWorkspacePresentation();
     const toolbarEvents = useToolbarControlEvents(context, toolbarItems);
     const { signals } = context;
     const { control, formStatus } = signals;
@@ -254,6 +258,7 @@ const Toolbar = ({
     const hasSelection = toolbarHasSelection(signals?.selection?.value || {});
 
     const renderToolbarItem = (item, align) => {
+        item = workspaceToolbarItem(item, workspace);
         const {events = {}, stateEvents} = toolbarEvents[item.id] || {};
         const isVisible = stateEvents?.onVisible ? stateEvents.onVisible() : true;
         if (!toolbarItemShouldRender(item, context, isVisible)) return null;
@@ -304,12 +309,13 @@ const Toolbar = ({
                         <Button
                             type="button"
                             icon={toolbarItemIcon(item.icon)}
-                            rightIcon="caret-down"
+                            rightIcon={item.hideLabel ? undefined : "caret-down"}
+                            className={item.className}
                             disabled={menuDisabled}
                             aria-label={item.ariaLabel || item.tooltip || item.label || item.id}
                             title={item.tooltip || item.label || item.id}
                         >
-                            {item.label || ''}
+                            {toolbarItemLabel(item)}
                         </Button>
                     </Popover>
                 </span>
