@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import {chromium} from 'playwright';
+const browser=await chromium.launch({headless:true,channel:'chrome'});
+try {
+ const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(process.env.PREVIEW_URL||'http://127.0.0.1:8119/?window=advertiser&parameters=%7B%22AdvertiserId%22%3A%5B700001%5D%7D');
+ await page.getByRole('tab',{name:'Targeting',exact:true}).click();await page.getByRole('tab',{name:'Location Lists',exact:true}).click();
+ const table=page.locator('.basic-table-wrapper').filter({visible:true}).first();await table.waitFor();
+ await page.waitForFunction(()=>[...document.querySelectorAll('.basic-table-wrapper')].some(e=>e.getBoundingClientRect().height&&e.querySelectorAll('tbody tr.row').length===3));
+ await page.getByRole('combobox',{name:'Table width',exact:true}).selectOption('trailing-space');
+ await table.locator('thead .forge-table-trailing-space').waitFor();
+ const widths=await table.evaluate(el=>({surface:el.clientWidth,columns:[...el.querySelectorAll('col')].map(e=>e.getBoundingClientRect().width),headers:[...el.querySelectorAll('th')].map(e=>e.getBoundingClientRect().width),filler:el.querySelector('.forge-table-trailing-space').getBoundingClientRect().width,client:el.querySelector('.basic-table-scroll').clientWidth,scroll:el.querySelector('.basic-table-scroll').scrollWidth}));
+ assert.ok(widths.filler>0,JSON.stringify(widths));assert.equal(widths.client,widths.scroll);
+ assert.ok(widths.columns.every((w,i)=>Math.abs(w-widths.headers[i])<1),JSON.stringify(widths));
+ const before=await table.locator('tbody tr').evaluateAll(es=>es.map(e=>e.className));
+ await table.locator('tbody .forge-table-trailing-space').first().click();
+ assert.deepEqual(await table.locator('tbody tr').evaluateAll(es=>es.map(e=>e.className)),before);
+ assert.equal(await table.locator('.pagination-bar').count(),0);assert.equal(await table.locator('.basic-table-record-status').count(),0);
+ await page.getByRole('combobox',{name:'Table layout'}).selectOption('reserve10');
+ await page.waitForFunction(()=>[...document.querySelectorAll('.has-fixed-row-slots')].some(e=>e.getBoundingClientRect().height&&e.querySelector('tbody')?.children.length===10));
+ assert.equal(await table.locator('tbody tr').count(),10);
+ await page.getByRole('combobox',{name:'Table width'}).selectOption('adaptive');assert.equal(await table.locator('thead .forge-table-trailing-space').count(),0);
+ await page.setViewportSize({width:390,height:844});await page.getByRole('tab',{name:'Orders',exact:true}).click();
+ const orders=page.locator('.basic-table-wrapper').filter({visible:true}).first();await orders.waitFor();
+ const scroll=orders.locator('.basic-table-scroll');
+ const metrics=await scroll.evaluate(el=>({height:el.clientHeight,total:el.scrollHeight}));console.log('phone body',metrics);
+ assert.ok(metrics.height>=64 && metrics.total>metrics.height,JSON.stringify(metrics));
+ const head=orders.locator('thead th').first();const top=(await head.boundingBox()).y;
+ await scroll.evaluate(el=>el.scrollTop=80);
+ assert.ok(Math.abs((await head.boundingBox()).y-top)<2,'Header moved during body scroll');
+ assert.deepEqual(errors,[]);console.log('Trailing filler, unchanged selection, independent row trial, quiet status and actual phone header freeze passed.');
+}finally{await browser.close();}

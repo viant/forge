@@ -1,3 +1,5 @@
+import {actionIconOnly, actionAccessibleName} from '../table/basic/actionPresentation.js';
+import {containerSizingStyle} from '../containerSizing.js';
 import React from 'react';
 import {Button, ButtonGroup} from '@blueprintjs/core';
 import {useSignals} from '@preact/signals-react/runtime';
@@ -14,7 +16,7 @@ import {permissionBoundaryAllows, permissionBoundaryAllowsRows} from './Permissi
 import DisabledActionShell from '../DisabledActionShell.jsx';
 import './workflowPrimitives.css';
 
-export default function EditableCollection({container, context, isActive}) {
+export default function EditableCollection({sizingMode = 'fill', container, context, isActive}) {
   useSignals();
   const spec = container?.editableCollection || {};
   const ref = spec.dataSourceRef || container?.dataSourceRef || context?.identity?.dataSourceRef;
@@ -50,9 +52,7 @@ export default function EditableCollection({container, context, isActive}) {
     return false;
   };
 
-  return (
-    <div className="forge-editable-collection" data-forge-primitive="editableCollection">
-      {operations.length > 0 ? (
+  const toolbarActions = operations.length > 0 ? (
         <ButtonGroup className="forge-editable-collection__operation-bar" minimal={false}>
           {operations.map((operation) => {
             const state = editableCollectionOperationState({...operation, selection: operation.selection || spec.selection}, dataContext, selection);
@@ -68,12 +68,15 @@ export default function EditableCollection({container, context, isActive}) {
             const disabled = state.disabled || !selectionPermitted;
             const button = (
               <Button
+                icon={operation.icon}
+                aria-label={actionAccessibleName(operation)}
+                className={`forge-toolbar-action${actionIconOnly(operation) ? ' is-icon-only' : ''}`}
                 intent={operation.intent || undefined}
                 disabled={disabled}
-                title={operation.tooltip || undefined}
+                title={operation.tooltip || actionAccessibleName(operation)}
                 onClick={() => invoke(operation)}
               >
-                {operation.label || operation.id}
+                {actionIconOnly(operation) ? null : operation.label || operation.id}
               </Button>
             );
             return disabled && operation.tooltip ? (
@@ -83,7 +86,9 @@ export default function EditableCollection({container, context, isActive}) {
             ) : React.cloneElement(button, {key: operation.id});
           })}
         </ButtonGroup>
-      ) : null}
+      ) : null;
+  return (
+    <div style={containerSizingStyle(container,sizingMode,{chrome:true})} className="forge-editable-collection" data-forge-primitive="editableCollection">
       {spec.selectionStatus === true ? (
         <div className="forge-editable-collection__selection-status" role="status" aria-live="polite">
           {selectedRows.length > 0
@@ -92,8 +97,8 @@ export default function EditableCollection({container, context, isActive}) {
         </div>
       ) : null}
       {container.responsiveDataGrid
-        ? <ResponsiveDataGrid container={{...container, dataSourceRef: ref}} context={dataContext} isActive={isActive}/>
-        : <TablePanel container={{...container, dataSourceRef: ref}} context={dataContext} isActive={isActive}/>}
+        ? <ResponsiveDataGrid toolbarActions={toolbarActions} sizingMode={sizingMode} container={{...container, dataSourceRef: ref}} context={dataContext} isActive={isActive}/>
+        : <TablePanel toolbarActions={toolbarActions} sizingMode={sizingMode} container={{...container, dataSourceRef: ref}} context={dataContext} isActive={isActive}/>}
     </div>
   );
 }

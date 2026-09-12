@@ -1,4 +1,5 @@
-import {useState, useEffect, useRef} from 'react';
+import {WindowContentMount, PersistentWindowContent} from './WindowContentMount.jsx';
+import {useState, useCallback, useEffect, useRef} from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
 import {Tabs, Tab, Card} from '@blueprintjs/core';
 import WindowContent from './WindowContent';
@@ -22,6 +23,8 @@ const WindowManager = ({renderWindowContent, isTabVisible}) => {
     const windows = activeWindows.value || [];
     const tabId = selectedTabId.value || null;
     const containerRef = useRef(null);
+    const [contentHosts,setContentHosts] = useState({});
+    const registerContentHost = useCallback((id,node)=>setContentHosts(previous=>previous[id]===node ? previous : {...previous,[id]:node}),[]);
     const [containerSize, setContainerSize] = useState({width: 0, height: 0});
     const defaultSizePadding = 40;
 
@@ -124,7 +127,7 @@ const WindowManager = ({renderWindowContent, isTabVisible}) => {
     };
 
     const renderContent = (win, isInTab) => {
-        const defaultContent = <WindowContent window={win} isInTab={isInTab} />;
+        const defaultContent = <WindowContent window={{...win, fillParent: true}} isInTab={isInTab} />;
         if (typeof renderWindowContent !== 'function') {
             return defaultContent;
         }
@@ -149,10 +152,11 @@ const WindowManager = ({renderWindowContent, isTabVisible}) => {
                 {tabWindows.map((win) => (
                     <Tab
                         id={win.windowId}
+                        panelClassName="forge-window-manager-tabs__panel"
                         key={win.windowId}
                         style={{paddingLeft: '3px'}}
                         title={
-                            <div style={{display: 'grid', gridTemplateColumns: '44px 1fr 44px', alignItems: 'center', width: '100%'}}>
+                            <div style={{display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: '8px', alignItems: 'center', width: '100%'}}>
                                 <div style={{justifySelf: 'start'}}>
                                     <WindowControls
                                         onClose={(e) => handleTabClose(win.windowId, e)}
@@ -170,7 +174,7 @@ const WindowManager = ({renderWindowContent, isTabVisible}) => {
                         }
                         panel={
                             win.windowId === visibleTabId ? (
-                                renderContent(win, true)
+                                <WindowContentMount windowId={win.windowId} register={registerContentHost}/>
                             ) : null
                         }
                     />
@@ -200,6 +204,7 @@ const WindowManager = ({renderWindowContent, isTabVisible}) => {
                     style={{ zIndex: win.zIndex || 10 }}
                     size={{
                         width: (() => {
+                            if (containerSize.width > 0 && containerSize.width <= 600) return containerSize.width;
                             if (typeof win.width === 'number') return win.width;
                             const s = win.size && win.size.width;
                             if (typeof s === 'string' && s.endsWith('%')) {
@@ -212,6 +217,7 @@ const WindowManager = ({renderWindowContent, isTabVisible}) => {
                             return Math.floor(((containerSize.width || 600) * 0.5));
                         })(),
                         height: (() => {
+                            if (containerSize.width > 0 && containerSize.width <= 600) return containerSize.height;
                             if (typeof win.height === 'number') return win.height;
                             const s = win.size && win.size.height;
                             if (typeof s === 'string' && s.endsWith('%')) {
@@ -226,6 +232,7 @@ const WindowManager = ({renderWindowContent, isTabVisible}) => {
                     }}
                     position={{
                         x: (() => {
+                            if (containerSize.width > 0 && containerSize.width <= 600) return 0;
                             if (win.x !== undefined) {
                                 if (typeof win.x === 'string' && win.x.endsWith('%')) {
                                     const pct = Math.max(0, Math.min(100, parseFloat(win.x)));
@@ -251,6 +258,7 @@ const WindowManager = ({renderWindowContent, isTabVisible}) => {
                             return x;
                         })(),
                         y: (() => {
+                            if (containerSize.width > 0 && containerSize.width <= 600) return 0;
                             if (win.y !== undefined) {
                                 if (typeof win.y === 'string' && win.y.endsWith('%')) {
                                     const pct = Math.max(0, Math.min(100, parseFloat(win.y)));
@@ -316,7 +324,7 @@ const WindowManager = ({renderWindowContent, isTabVisible}) => {
                                 padding: '8px 12px',
                                 cursor: 'move',
                                 display: 'grid',
-                                gridTemplateColumns: '56px 1fr 56px',
+                                gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: 8,
                                 alignItems: 'center',
                             }}
                         >
@@ -343,7 +351,7 @@ const WindowManager = ({renderWindowContent, isTabVisible}) => {
                         </div>
                         <div
                             className="window-content"
-                            style={{flexGrow: 1, overflow: 'auto'}}
+                            style={{display: 'flex', flexDirection: 'column', flex: '1 1 0', minHeight: 0, minWidth: 0, overflow: 'hidden'}}
                             onKeyDown={(e) => {
                                 if (!win.isModal) return;
                                 if (e.key !== 'Tab') return;
@@ -365,11 +373,12 @@ const WindowManager = ({renderWindowContent, isTabVisible}) => {
                             }}
                             tabIndex={win.isModal ? 0 : undefined}
                         >
-                            {renderContent(win, false)}
+                            {<WindowContentMount windowId={win.windowId} register={registerContentHost}/>}
                         </div>
                     </div>
                 </Rnd>
             ))}
+            {windows.map(win=><PersistentWindowContent key={win.windowId} host={contentHosts[win.windowId]}>{renderContent(win,win.inTab !== false)}</PersistentWindowContent>)}
         </div>
     );
 };

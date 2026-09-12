@@ -245,6 +245,13 @@ export default function WidgetRenderer({
     // No need to expose unsupported event keys to the widget DOM.
 
     // ------------------------------------------------------------------
+    // Stable styling targets for the initial theme-supported widget family.
+    if (['text', 'password', 'number', 'textarea', 'button'].includes(widgetKey)) {
+        widgetProps['data-forge-widget'] = widgetKey;
+        widgetProps['data-forge-control-id'] = item?.id || undefined;
+        widgetProps['data-forge-part'] = widgetKey === 'button' ? 'button' : 'input';
+    }
+
     // 5. Pass-through of common display properties present directly on item
     // ------------------------------------------------------------------
     ['icon', 'leftIcon', 'rightIcon', 'intent', 'appearance', 'link', 'format', 'className', 'style', 'title', 'hideLabel'].forEach((k) => {

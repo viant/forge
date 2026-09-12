@@ -39,7 +39,41 @@ public enum NativeWidgetContract {
         if case .string(let text) = value { return text }
         if case .number = value { return ReportBuilderOptions.text(value) }
         if case .bool = value { return ReportBuilderOptions.text(value) }
+        if case .object(let object) = value, let label = objectDisplayLabel(object) { return label }
         return (try? JSONEncoder().encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    }
+
+    public static func editorText(_ value: JSONValue?, kind: String) -> String {
+        guard ["object", "schema", "keyvaluepairs"].contains(kind), let value, value != .null else {
+            return text(value)
+        }
+        return (try? JSONEncoder().encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    }
+
+    /// Object-backed fields are common in datasource results even when the
+    /// authored widget is a read-only text or label. Prefer their semantic
+    /// display fields to exposing transport JSON in native UI.
+    private static func objectDisplayLabel(_ object: [String: JSONValue]) -> String? {
+        let label = ["label", "caption", "description", "name", "title", "displayName", "value"]
+            .compactMap { object[$0]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+        guard let label else { return nil }
+
+        if let standard = object["utcOffset"]?.widgetNumber, standard.isFinite {
+            let offsets: String
+            if let daylight = object["utcDstOffset"]?.widgetNumber, daylight.isFinite, daylight != standard {
+                offsets = "\(signedOffset(standard))/\(signedOffset(daylight))"
+            } else {
+                offsets = signedOffset(standard)
+            }
+            return "\(label) (GMT \(offsets))"
+        }
+        return label
+    }
+
+    private static func signedOffset(_ value: Double) -> String {
+        let magnitude = value.formatted(.number.locale(Locale(identifier: "en_US_POSIX")).grouping(.never))
+        return value >= 0 ? "+\(magnitude)" : magnitude
     }
     public static func input(_ text: String, kind: String, properties: [String: JSONValue] = [:]) -> JSONValue? {
         if ["number","currency","percentfraction2input"].contains(kind) {

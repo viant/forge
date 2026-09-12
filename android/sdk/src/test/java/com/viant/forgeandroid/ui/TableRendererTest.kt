@@ -6,15 +6,26 @@ import com.viant.forgeandroid.runtime.TableDef
 import com.viant.forgeandroid.runtime.ToolbarDef
 import com.viant.forgeandroid.runtime.ToolbarItemDef
 import com.viant.forgeandroid.runtime.ExecutionDef
+import com.viant.forgeandroid.runtime.FilterFieldDef
+import com.viant.forgeandroid.runtime.FilterSetDef
 import com.viant.forgeandroid.runtime.SelectionState
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class TableRendererTest {
+    @Test
+    fun `compact table freezes explicit and sticky left columns`() {
+        assertTrue(compactColumnFrozen(ColumnDef(id = "id", frozen = true)))
+        assertTrue(compactColumnFrozen(ColumnDef(id = "name", sticky = "left")))
+        assertFalse(compactColumnFrozen(ColumnDef(id = "status", sticky = "right")))
+    }
 
     @Test
     fun `link metadata is sufficient without redundant link column type`() {
@@ -259,5 +270,29 @@ class TableRendererTest {
         )
 
         assertEquals(listOf("export"), actionableToolbarItems(toolbar).map { it.id })
+    }
+
+    @Test
+    fun `quick search honors toolbar display field before datasource fallback`() {
+        val item = ToolbarItemDef(
+            id = "nameSearch",
+            type = "quickSearch",
+            properties = mapOf("field" to JsonPrimitive("contactName"))
+        )
+        val filterSet = FilterSetDef(
+            defaultField = "Name",
+            template = listOf(FilterFieldDef(id = "Name", field = "rawName"))
+        )
+
+        assertTrue(toolbarItemIsQuickSearch(item))
+        assertEquals("contactName", toolbarQuickSearchField(item, filterSet))
+    }
+
+    @Test
+    fun `quick search falls back to filter template field`() {
+        val item = ToolbarItemDef(id = "quickFilter")
+        val filterSet = FilterSetDef(template = listOf(FilterFieldDef(id = "Name", field = "groupName")))
+
+        assertEquals("groupName", toolbarQuickSearchField(item, filterSet))
     }
 }

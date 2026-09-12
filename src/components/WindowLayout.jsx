@@ -15,6 +15,7 @@ export function resolveWindowLayoutContext(context) {
 
 export function resolveWindowLayoutOverflow(content, fillParent = true) {
     if (!fillParent) return 'visible';
+    if (content?.sizingMode === 'fill' && content?.scrollMode !== 'self') return 'hidden';
     if (String(content?.scrollMode || '').trim().toLowerCase() === 'self') return 'auto';
     if (!content?.dashboard && Array.isArray(content?.containers) && content.containers.length > 1) return 'auto';
     return 'hidden';
@@ -38,17 +39,20 @@ const WindowLayout = ({
         return <div>No content defined in view.</div>;
     }
 
+    const overflow = resolveWindowLayoutOverflow(content, fillParent);
+    // The window viewport owns root scrolling; the root must not duplicate it.
+    const layoutContent = overflow === 'auto' ? {...content, scrollMode: 'parent'} : content;
     const style = {
         flex: fillParent ? 1 : '0 0 auto',
         display: 'flex',
         flexDirection: 'column',
         padding: '0',
-        height: fillParent ? '100%' : 'auto',
+        height: 'auto',
         width: '100%',
         minHeight: fillParent ? 0 : 'max-content',
         minWidth: 0,
-        overflow: resolveWindowLayoutOverflow(content, fillParent),
-        overscrollBehavior: resolveWindowLayoutOverflow(content, fillParent) === 'auto' ? 'contain' : undefined,
+        overflow,
+        overscrollBehavior: overflow === 'auto' ? 'contain' : undefined,
     };
     return (
         <div
@@ -58,7 +62,8 @@ const WindowLayout = ({
         >
             <LayoutRenderer
                 context={renderContext}
-                container={content}
+                container={layoutContent}
+                sizingMode={!fillParent || overflow === 'auto' ? 'content' : 'fill'}
             />
         </div>
     );

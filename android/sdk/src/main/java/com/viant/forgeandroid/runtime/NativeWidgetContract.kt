@@ -45,6 +45,13 @@ object NativeWidgetContract {
     fun presentationDisabled(item: ItemDef): Boolean = if (kind(item) in setOf("link", "mediapreview", "schema", "markdown", "label", "progressbar", "treemultiselect")) item.disabled == true || item.properties["disabled"] == JsonPrimitive(true) else disabled(item)
     fun disabled(item: ItemDef) = item.disabled == true || item.readOnly == true || item.properties["disabled"] == JsonPrimitive(true) || item.properties["readOnly"] == JsonPrimitive(true)
     fun text(value: JsonElement?): String = when (value) { null, JsonNull -> ""; is JsonPrimitive -> ReportBuilderOptions.text(value); else -> value.toString() }
+    fun displayText(value: JsonElement?): String = when (value) {
+        is JsonObject -> listOf("label", "name", "description", "title", "value", "id", "ianaTimezoneStr")
+            .firstNotNullOfOrNull { key -> value[key]?.let(::displayText)?.takeIf(String::isNotBlank) }
+            ?: value.toString()
+        is JsonArray -> value.joinToString(", ") { displayText(it) }
+        else -> text(value)
+    }
     fun input(text: String, kind: String, properties: Map<String, JsonElement> = emptyMap()): JsonElement? {
         if (kind in setOf("number","currency","percentfraction2input")) {
             if (text.isBlank()) return JsonNull

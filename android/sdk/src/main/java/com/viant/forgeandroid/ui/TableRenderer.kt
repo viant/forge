@@ -37,7 +37,10 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -84,7 +87,34 @@ fun TableRenderer(
     val coroutineScope = rememberCoroutineScope()
     var sortColumnId by remember(table.columns) { mutableStateOf<String?>(null) }
     var sortAscending by remember(table.columns) { mutableStateOf(true) }
-    val sortedRows = sortedTableRows(rows, sortColumnId, sortAscending)
+    val quickSearchItem = table.toolbar?.items?.firstOrNull(::toolbarItemIsQuickSearch)
+    val quickSearchField = quickSearchItem?.let { toolbarQuickSearchField(it, quickFilterSetForTable(context)) }
+    val quickSearchQuery = quickSearchField?.let { input.filter[it]?.toString()?.trim() }.orEmpty()
+    var projectedSearchValues by remember(rows, table.columns, quickSearchField) { mutableStateOf<Map<Int, String>>(emptyMap()) }
+    LaunchedEffect(rows, table.columns, quickSearchField) {
+        val field = quickSearchField
+        val column = table.columns.firstOrNull { tableColumnKey(it) == field }
+        val execution = column?.on?.firstOrNull { it.event == "onValue" }
+        projectedSearchValues = if (field == null || column == null) {
+            emptyMap()
+        } else {
+            rows.mapIndexed { index, row ->
+                val raw = SelectorUtil.resolve(row, field)
+                val projected = execution?.let {
+                    runtime.evaluateMetadataAction(it, context, mapOf("row" to row, "value" to raw, "rowIndex" to index))
+                }
+                index to formatTableValue(projected ?: raw, column)
+            }.toMap()
+        }
+    }
+    val sortedRows = sortedTableRows(rows, sortColumnId, sortAscending).let { indexed ->
+        if (quickSearchQuery.isBlank()) indexed else indexed.filter { row ->
+            val projected = projectedSearchValues[row.originalIndex]
+            val raw = quickSearchField?.let { SelectorUtil.resolve(row.row, it) }
+            val searchable = projected ?: raw?.toString().orEmpty()
+            searchable.contains(quickSearchQuery, ignoreCase = true)
+        }
+    }
     val refreshFeedback = tableRefreshFeedback(control.loading, control.error)
     val showMetadataEmptyState = table.emptyState != null && sortedRows.isEmpty() &&
         !control.loading && control.error.isNullOrBlank()
@@ -124,14 +154,18 @@ fun TableRenderer(
         BoxWithConstraints(
             modifier = Modifier.fillMaxWidth()
         ) {
-            val compact = maxWidth < 720.dp
-            if (sortedRows.isEmpty() && !control.loading && control.error.isNullOrBlank()) {
+            val compact = runtime.targetContext.formFactor.equals("phone", ignoreCase = true) || maxWidth < 720.dp
+            if (sortedRows.isEmpty() && control.loading) {
+                CompactTableLoadingState()
+            } else if (sortedRows.isEmpty() && !control.error.isNullOrBlank()) {
+                CompactTableErrorState(control.error ?: "Unable to load data.") { context.fetchCollection() }
+            } else if (sortedRows.isEmpty()) {
                 if (table.emptyState != null) {
                     MetadataTableEmptyState(runtime, context, table.emptyState)
                 } else {
                     EmptyTableState(context.dataSourceRef)
                 }
-            } else if (compact && table.presentation.equals("tabular", ignoreCase = true)) {
+            } else if (compact) {
                 CompactTabularTable(
                     table = table,
                     rows = sortedRows,
@@ -140,38 +174,6 @@ fun TableRenderer(
                         coroutineScope.launch { context.toggleSelection(row, rowIndex, selectionModeOverride) }
                     }
                 )
-            } else if (compact) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    CompactSortControls(table, sortColumnId, sortAscending) { columnId ->
-                        if (sortColumnId == columnId) {
-                            sortAscending = !sortAscending
-                        } else {
-                            sortColumnId = columnId
-                            sortAscending = true
-                        }
-                    }
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        sortedRows.take(MOBILE_TABLE_ROW_LIMIT).forEach { indexed ->
-                            val row = indexed.row
-                            val rowIndex = indexed.originalIndex
-                            val isSelected = tableRowIsSelected(selection, row, rowIndex)
-                            MobileTableCard(runtime, context, table, row, rowIndex, isSelected, form, metrics, windowForm) {
-                                coroutineScope.launch { context.toggleSelection(row, rowIndex, selectionModeOverride) }
-                            }
-                        }
-                        if (sortedRows.size > MOBILE_TABLE_ROW_LIMIT) {
-                            Text(
-                                text = "Showing $MOBILE_TABLE_ROW_LIMIT of ${sortedRows.size} rows",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color(0xFF667085),
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
-                            )
-                        }
-                    }
-                }
             } else {
                 val horizontalScroll = rememberScrollState()
                 Card(
@@ -213,7 +215,7 @@ fun TableRenderer(
                 }
             }
         }
-        if (!showMetadataEmptyState && (context.dataSource.paging?.enabled == true || metrics["pageCount"] != null || metrics["hasMore"] != null)) {
+        if (sortedRows.isNotEmpty() && !showMetadataEmptyState && (context.dataSource.paging?.enabled == true || metrics["pageCount"] != null || metrics["hasMore"] != null)) {
             TablePagination(
                 context = context,
                 metrics = metrics,
@@ -221,6 +223,13 @@ fun TableRenderer(
             )
         }
     }
+}
+
+private fun quickFilterSetForTable(context: DataSourceContext): com.viant.forgeandroid.runtime.FilterSetDef? {
+    val name = context.dataSource.quickFilterSet
+    return context.dataSource.filterSet.firstOrNull { it.name == name }
+        ?: context.dataSource.filterSet.firstOrNull { it.default == true }
+        ?: context.dataSource.filterSet.firstOrNull()
 }
 
 @Composable
@@ -231,20 +240,25 @@ private fun CompactTabularTable(
     onSelect: (Map<String, Any?>, Int) -> Unit
 ) {
     val columns = displayColumns(table)
+    val indexedColumns = columns.withIndex().toList()
+    val declaredFrozenColumns = indexedColumns.filter { (_, column) -> compactColumnFrozen(column) }
+    val frozenColumns = declaredFrozenColumns.take(1).ifEmpty { indexedColumns.take(1) }
+    val frozenIndices = frozenColumns.mapTo(mutableSetOf()) { it.index }
+    val scrollingColumns = indexedColumns.filterNot { it.index in frozenIndices }
     val scroll = rememberScrollState()
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScroll(scroll)
             .background(Color.White, RoundedCornerShape(14.dp))
             .border(BorderStroke(1.dp, Color(0xFFE2E8F0)), RoundedCornerShape(14.dp))
     ) {
         Row(
             modifier = Modifier
+                .fillMaxWidth()
                 .background(Color(0xFFF7F9FC))
                 .padding(horizontal = 10.dp, vertical = 9.dp)
         ) {
-            columns.forEachIndexed { index, column ->
+            frozenColumns.forEach { (index, column) ->
                 Text(
                     text = column.label ?: column.name ?: column.id.orEmpty(),
                     style = MaterialTheme.typography.labelSmall,
@@ -256,17 +270,32 @@ private fun CompactTabularTable(
                         .padding(end = 10.dp)
                 )
             }
+            Row(Modifier.weight(1f).horizontalScroll(scroll)) {
+                scrollingColumns.forEach { (index, column) ->
+                    Text(
+                        text = column.label ?: column.name ?: column.id.orEmpty(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF667085),
+                        maxLines = 1,
+                        modifier = Modifier
+                            .width(compactTableColumnWidth(column, index))
+                            .padding(end = 10.dp)
+                    )
+                }
+            }
         }
         rows.forEach { indexed ->
             val selected = tableRowIsSelected(selection, indexed.row, indexed.originalIndex)
             Row(
                 modifier = Modifier
+                    .fillMaxWidth()
                     .background(if (selected) Color(0xFFF0F5FF) else Color.White)
                     .clickable { onSelect(indexed.row, indexed.originalIndex) }
                     .semantics { contentDescription = tableRowAccessibilityLabel(table, indexed.row) }
                     .padding(horizontal = 10.dp, vertical = 12.dp)
             ) {
-                columns.forEachIndexed { index, column ->
+                frozenColumns.forEach { (index, column) ->
                     val key = tableColumnKey(column).orEmpty()
                     CompactTabularCell(
                         value = SelectorUtil.resolve(indexed.row, key),
@@ -275,10 +304,24 @@ private fun CompactTabularTable(
                         width = compactTableColumnWidth(column, index)
                     )
                 }
+                Row(Modifier.weight(1f).horizontalScroll(scroll)) {
+                    scrollingColumns.forEach { (index, column) ->
+                        val key = tableColumnKey(column).orEmpty()
+                        CompactTabularCell(
+                            value = SelectorUtil.resolve(indexed.row, key),
+                            column = column,
+                            emphasized = index == 0,
+                            width = compactTableColumnWidth(column, index)
+                        )
+                    }
+                }
             }
         }
     }
 }
+
+internal fun compactColumnFrozen(column: ColumnDef): Boolean =
+    column.frozen == true || column.sticky.equals("left", ignoreCase = true)
 
 @Composable
 private fun CompactTabularCell(
@@ -391,6 +434,33 @@ private fun MetadataTableEmptyState(
 private const val MOBILE_TABLE_ROW_LIMIT = 50
 
 @Composable
+private fun CompactTableLoadingState() {
+    Column(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 320.dp).padding(24.dp),
+        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(18.dp, androidx.compose.ui.Alignment.CenterVertically)
+    ) {
+        CircularProgressIndicator()
+        Text("Loading data…", style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Composable
+private fun CompactTableErrorState(message: String, onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 320.dp).padding(24.dp),
+        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(18.dp, androidx.compose.ui.Alignment.CenterVertically)
+    ) {
+        Icon(Icons.Outlined.ErrorOutline, contentDescription = null,
+            tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(52.dp))
+        Text(message, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.error, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Button(onClick = onRetry) { Text("Retry") }
+    }
+}
+
+@Composable
 private fun EmptyTableState(dataSourceRef: String?) {
     val subject = dataSourceRef
         ?.trim()
@@ -402,19 +472,25 @@ private fun EmptyTableState(dataSourceRef: String?) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+            .heightIn(min = 320.dp)
+            .padding(horizontal = 24.dp, vertical = 28.dp),
+        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(18.dp, androidx.compose.ui.Alignment.CenterVertically)
     ) {
+        Icon(Icons.Outlined.Inbox, contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), modifier = Modifier.size(52.dp))
         Text(
             text = "No $subject available",
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
-            color = Color(0xFF344054)
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
         Text(
             text = "Try refreshing or changing the active filters.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Color(0xFF667085)
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
     }
 }

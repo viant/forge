@@ -112,7 +112,7 @@
 .forge-responsive-grid__field dd { margin: 0; overflow-wrap: anywhere; }
 
 .forge-draft-form { position: sticky; bottom: 0; z-index: 4; display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid #d8e1ea; background: rgba(255,255,255,.96); }
-.forge-draft-form__status { margin-right: auto; color: #617184; font-size: 12px; }
+.forge-draft-form__status { margin-right: auto; color: var(--forge-disabled-text, #617184); font-size: 12px; }
 .forge-resource-header { display: grid; grid-template-columns: minmax(180px,1fr) auto auto; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid #d8e1ea; }
 .forge-resource-header h2,.forge-resource-header p { margin: 0; }
 .forge-resource-header p { color: #617184; font-size: 12px; }

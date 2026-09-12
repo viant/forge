@@ -229,6 +229,18 @@ class ForgeRuntime(
         args: Map<String, Any?> = emptyMap()
     ): Any? = execEngine.evaluate(execution, context, args)
 
+    suspend fun evaluateMetadataAction(
+        execution: ExecutionDef,
+        context: DataSourceContext,
+        args: Map<String, Any?> = emptyMap()
+    ): Any? {
+        val handler = execution.handler?.trim().orEmpty()
+        val code = context.window.metadata.peek()?.actions?.code?.trim().orEmpty()
+        if (handler.isBlank() || code.isBlank()) return null
+        return ActionHookRuntime.invoke(code, handler, JsonUtil.anyToElement(args))
+            ?.let(JsonUtil::elementToAny)
+    }
+
     private fun loadWindowMetadata(window: WindowState, forceReload: Boolean = false) {
         scope.launch(Dispatchers.IO) {
             if (window.inlineMetadata != null) {

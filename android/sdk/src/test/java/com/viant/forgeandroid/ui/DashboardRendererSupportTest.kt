@@ -240,7 +240,7 @@ class DashboardRendererSupportTest {
     fun mobileTabsFlattenNestedGroupsIntoIndependentPages() {
         val root = ContainerDef(
             id = "workspace",
-            tabs = com.viant.forgeandroid.runtime.TabsDef(defaultSelectedTabId = "performance"),
+            tabs = com.viant.forgeandroid.runtime.TabsDef(defaultSelectedTabId = "performance", flattenNestedOnCompact = true),
             containers = listOf(
                 ContainerDef(
                     id = "performance",
@@ -261,5 +261,27 @@ class DashboardRendererSupportTest {
 
         assertEquals(listOf("delivery", "kpis", "pacing", "summary", "lines"), pages.map { it.id })
         assertEquals(listOf("Delivery", "KPIs", "Pacing", "Summary", "Lines"), pages.map { it.title })
+    }
+
+    @Test
+    fun mobileTabsPreserveAuthoredTopLevelByDefault() {
+        val root = ContainerDef(
+            id = "root",
+            tabs = com.viant.forgeandroid.runtime.TabsDef(),
+            containers = listOf(
+                ContainerDef(
+                    id = "measurement",
+                    title = "Measurement",
+                    tabs = com.viant.forgeandroid.runtime.TabsDef(),
+                    containers = listOf(ContainerDef(id = "pixels", title = "Pixels"))
+                ),
+                ContainerDef(id = "orders", title = "Orders")
+            )
+        )
+
+        val pages = mobileTabPages(root)
+
+        assertEquals(listOf("measurement", "orders"), pages.map { it.id })
+        assertEquals(listOf("Measurement", "Orders"), pages.map { it.title })
     }
 }

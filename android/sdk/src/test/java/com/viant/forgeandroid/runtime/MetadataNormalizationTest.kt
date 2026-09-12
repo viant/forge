@@ -13,6 +13,17 @@ class MetadataNormalizationTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
+    fun `layout spacing accepts numeric and css string metadata`() {
+        val numeric = json.decodeFromString(LayoutDef.serializer(), """{"gap":8,"rowGap":6.5}""")
+        val css = json.decodeFromString(LayoutDef.serializer(), """{"gap":"8px","rowGap":"0.5rem"}""")
+
+        assertEquals("8", numeric.gap)
+        assertEquals("6.5", numeric.rowGap)
+        assertEquals("8px", css.gap)
+        assertEquals("0.5rem", css.rowGap)
+    }
+
+    @Test
     fun `automation metadata primitives decode for native targets`() {
         val decoded = json.decodeFromString(
             WindowMetadata.serializer(),

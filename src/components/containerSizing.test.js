@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {containerSizingStyle, resolveContainerSizing} from './containerSizing.js';
+assert.equal(resolveContainerSizing({}, 'content'), 'content');
+assert.equal(resolveContainerSizing({sizingMode:'fill'}, 'content'), 'fill');
+assert.equal(resolveContainerSizing({sizingMode:'invalid'}, 'content'), 'content');
+const authored={sizingMode:'content',scrollMode:'self',style:{height:240,minHeight:80,maxHeight:400}};
+const outer=containerSizingStyle(authored);
+const body=containerSizingStyle(authored,'fill',{chrome:true});
+assert.equal(outer.height,240);
+assert.equal(outer.minHeight,80);
+assert.equal(outer.overflow,'auto');
+assert.equal(body.height,'auto');
+assert.equal(body.minHeight,0);
+assert.equal(body.overflow,'visible');
+assert.equal(body.flex,'0 0 auto');
+console.log('Container sizing allocation and single chrome scroll ownership passed.');

@@ -25,42 +25,31 @@
 }
 
 .form-panel,
-.forge-form-panel-tabs.bp4-tabs,
-.forge-form-panel-tabs.bp5-tabs,
-.forge-form-panel-tabs.bp6-tabs {
+.forge-form-panel-tabs {
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
-    height: 100%;
+    min-width: 0;
     min-height: 0;
 }
 
-.forge-form-panel-tabs .bp4-tab-list,
-.forge-form-panel-tabs .bp5-tab-list,
-.forge-form-panel-tabs .bp6-tab-list {
+.forge-form-panel-tabs > [role="tablist"] {
     flex: 0 0 auto;
 }
 
-.forge-form-panel-tabs .bp4-tab-panels,
-.forge-form-panel-tabs .bp5-tab-panels,
-.forge-form-panel-tabs .bp6-tab-panels {
+/* Only this component's panels participate in its sizing contract. */
+.forge-form-panel-tabs > .forge-form-panel-tabs__panel {
     display: flex;
+    flex: 1 1 0;
     flex-direction: column;
-    flex: 1 1 auto;
-    min-height: 0;
-    height: 100%;
-}
-
-.forge-form-panel-tabs .bp4-tab-panel,
-.forge-form-panel-tabs .bp5-tab-panel,
-.forge-form-panel-tabs .bp6-tab-panel {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    height: 100%;
+    min-width: 0;
     min-height: 0;
     overflow: auto;
     overscroll-behavior: contain;
+}
+
+.forge-form-panel-tabs > .forge-form-panel-tabs__panel[aria-hidden="true"] {
+    display: none;
 }
 
 .form-panel.forge-form-panel-section-tabs {
@@ -97,12 +86,13 @@
 
 .form-panel.forge-form-panel-section-tabs.is-fill {
     flex: 1 1 auto;
-    height: 100%;
-    overflow: auto;
+    overflow: hidden;
 }
 
 .form-panel.forge-form-panel-section-tabs.is-fill > .forge-form-panel-section-tabs__panel {
-    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
     overflow: auto;
 }
 
@@ -192,11 +182,11 @@
    resolves against their datasource. */
 .forge-dictionary-input.is-resolved,
 .forge-dictionary-input.is-resolved select {
-    background-color: #f1f8f2;
+    background-color: var(--forge-lookup-bg, #f1f8f2);
 }
 
 .forge-dictionary-input.is-resolved select {
-    border-color: #bfd7c4;
+    border-color: var(--forge-lookup-border, #bfd7c4);
 }
 
 .forge-dictionary-input select:focus {
@@ -211,8 +201,8 @@
     :where(:is(.bp4-input:not(:disabled), .bp5-input:not(:disabled), .bp6-input:not(:disabled),
         .bp4-button:not(:disabled), .bp5-button:not(:disabled), .bp6-button:not(:disabled),
         .bp4-file-input, .bp5-file-input, .bp6-file-input):not(.bp4-intent-danger):not(.bp5-intent-danger):not(.bp6-intent-danger)) {
-    border-color: #d58f98;
-    background-color: #fff3f4;
+    border-color: var(--forge-required-border, #d58f98);
+    background-color: var(--forge-required-bg, #fff3f4);
 }
 
 /* Text/date inputs may receive the required class on the Blueprint input itself
@@ -221,8 +211,8 @@
 :is(.forge-required-input.bp4-input:not(:disabled),
     .forge-required-input.bp5-input:not(:disabled),
     .forge-required-input.bp6-input:not(:disabled)):not(.bp4-intent-danger):not(.bp5-intent-danger):not(.bp6-intent-danger) {
-    border-color: #d58f98;
-    background-color: #fff3f4;
+    border-color: var(--forge-required-border, #d58f98);
+    background-color: var(--forge-required-bg, #fff3f4);
 }
 
 /* Blueprint's numeric-input control-group rule has greater specificity than
@@ -231,15 +221,15 @@
 .forge-required-input .bp4-numeric-input .bp4-input:not(:disabled),
 .forge-required-input .bp5-numeric-input .bp5-input:not(:disabled),
 .forge-required-input .bp6-numeric-input .bp6-input:not(:disabled) {
-    border-color: #d58f98;
-    background-color: #fff3f4;
+    border-color: var(--forge-required-border, #d58f98);
+    background-color: var(--forge-required-bg, #fff3f4);
 }
 
 .forge-required-input .bp4-input:not(:disabled),
 .forge-required-input .bp5-input:not(:disabled),
 .forge-required-input .bp6-input:not(:disabled) {
-    border-color: #d58f98;
-    background-color: #fff3f4;
+    border-color: var(--forge-required-border, #d58f98);
+    background-color: var(--forge-required-bg, #fff3f4);
 }
 
 .forge-required-input
@@ -248,8 +238,8 @@
         .forge-required-resolved.bp4-button, .forge-required-resolved.bp5-button, .forge-required-resolved.bp6-button),
 .forge-required-input .forge-required-resolved
     :is(.bp4-input, .bp5-input, .bp6-input, .bp4-button, .bp5-button, .bp6-button, select) {
-    border-color: #d58f98;
-    background-color: #f1f8f2;
+    border-color: var(--forge-required-border, #d58f98);
+    background-color: var(--forge-lookup-bg, #f1f8f2);
 }
 
 .forge-required-input
@@ -258,8 +248,8 @@
         .forge-required-missing.bp4-button, .forge-required-missing.bp5-button, .forge-required-missing.bp6-button),
 .forge-required-input .forge-required-missing
     :is(.bp4-input, .bp5-input, .bp6-input, .bp4-button, .bp5-button, .bp6-button, select) {
-    border-color: #d58f98;
-    background-color: #fff3f4;
+    border-color: var(--forge-required-border, #d58f98);
+    background-color: var(--forge-required-bg, #fff3f4);
 }
 
 .forge-required-input
@@ -269,7 +259,7 @@
 .forge-required-input .forge-required-invalid
     :is(.bp4-input, .bp5-input, .bp6-input, .bp4-button, .bp5-button, .bp6-button, select) {
     border-color: #c9372c;
-    background-color: #fff3f4;
+    background-color: var(--forge-required-bg, #fff3f4);
 }
 
 /* A resolved dictionary/lookup remains semantically green even when the field
@@ -280,16 +270,16 @@
         .forge-dictionary-input.is-resolved .bp4-button,
         .forge-dictionary-input.is-resolved .bp5-button,
         .forge-dictionary-input.is-resolved .bp6-button) {
-    border-color: #d58f98;
-    background-color: #f1f8f2;
+    border-color: var(--forge-required-border, #d58f98);
+    background-color: var(--forge-lookup-bg, #f1f8f2);
 }
 
 /* Keep resolved lookup semantics ahead of the required-field hint. The
    validation danger intent remains stronger because it is excluded here. */
 .forge-required-input .forge-dictionary-input.is-resolved
     :is(select, .bp4-button, .bp5-button, .bp6-button):not(.bp4-intent-danger):not(.bp5-intent-danger):not(.bp6-intent-danger) {
-    border-color: #d58f98;
-    background-color: #f1f8f2;
+    border-color: var(--forge-required-border, #d58f98);
+    background-color: var(--forge-lookup-bg, #f1f8f2);
 }
 
 .forge-control-validation-shell {
@@ -433,9 +423,9 @@
 .forge-control-wrapper.is-readonly :is(.bp6-input, .bp5-input, .bp4-input):not(.forge-dictionary-input),
 .forge-widget-readonly:not(.forge-dictionary-input) :is(.bp6-input, .bp5-input, .bp4-input),
 :is(.bp6-input.forge-widget-readonly, .bp5-input.forge-widget-readonly, .bp4-input.forge-widget-readonly):not(.forge-dictionary-input) {
-    background: #f1f4f8;
-    color: #66768a;
-    box-shadow: inset 0 0 0 1px #d8e0ea;
+    background: var(--forge-disabled-bg, #f1f4f8);
+    color: var(--forge-disabled-text, #66768a);
+    box-shadow: inset 0 0 0 1px var(--forge-control-border, #d8e0ea);
     cursor: default;
 }
 
@@ -477,3 +467,23 @@
         display: none;
     }
 }
+
+.forge-data-error { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; padding: 10px 12px; color: var(--forge-text, #263244); background: var(--forge-table-header-surface, #f4f5f7); border: 1px solid var(--forge-table-border, #d7dce2); border-radius: 4px; }
+.forge-data-error > div { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 13px; line-height: 1.4; }
+.forge-data-error strong { display: block; font-size: 13px; }
+.forge-data-error > button { flex: none; width: 32px; height: 32px; }
+.forge-data-error > button:focus-visible { outline: 2px solid var(--forge-focus-color, #215db0); }
+
+/* Public class contracts authored in metadata, supplied by Forge itself. */
+.forge-container-hidden { display: none; }
+.forge-container-plain { border: 0; box-shadow: none; background: transparent; }
+.forge-container-subtle { border: 1px solid var(--forge-table-border, #d7dce2); box-shadow: none; background: var(--forge-table-surface, #fff); }
+.forge-fields-between > [data-forge-part="fields"],
+.forge-fields-between > .forge-container-body > [data-forge-part="fields"] {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+}
+.forge-action-icon, button.forge-action-icon[data-forge-part="button"] { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; min-width: 32px; min-height: 32px; padding: 0; }
+.forge-action-icon:focus-visible { outline: 2px solid var(--forge-focus-color, #215db0); outline-offset: 1px; }
+@media (pointer: coarse) { .forge-action-icon, button.forge-action-icon[data-forge-part="button"] { width: 44px; height: 44px; min-width: 44px; min-height: 44px; } }
+
+.forge-container-card.is-compact { padding: var(--forge-card-compact-padding, 8px 12px); }

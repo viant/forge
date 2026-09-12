@@ -136,7 +136,7 @@ private fun ToolbarGroup(
         ) {
             items.forEach { item ->
                 when {
-                    item.id == "quickFilter" || item.id == "quickFilterInputs" -> QuickFilter(context, item)
+                    toolbarItemIsQuickSearch(item) -> QuickFilter(context, item)
                     item.on.any { it.event == "onClick" } -> ToolbarAction(runtime, context, item, actionSize)
                 }
             }
@@ -149,7 +149,7 @@ private fun ToolbarGroup(
         ) {
             items.forEach { item ->
                 when {
-                    item.id == "quickFilter" || item.id == "quickFilterInputs" -> QuickFilter(context, item)
+                    toolbarItemIsQuickSearch(item) -> QuickFilter(context, item)
                     item.on.any { it.event == "onClick" } -> ToolbarAction(runtime, context, item, actionSize)
                 }
             }
@@ -248,10 +248,8 @@ private fun ToolbarAction(runtime: ForgeRuntime, context: DataSourceContext, ite
 private fun QuickFilter(context: DataSourceContext, item: ToolbarItemDef) {
     val input by context.input.flow.collectAsState(initial = context.input.peek())
     val filterSet = quickFilterSet(context)
-    val field = filterSet?.defaultField?.takeIf { it.isNotBlank() }
-        ?: filterSet?.template?.firstOrNull()?.id?.takeIf { !it.isNullOrBlank() }
-        ?: "name"
-    val definition = filterSet?.template?.firstOrNull { it.id == field } ?: filterSet?.template?.firstOrNull()
+    val field = toolbarQuickSearchField(item, filterSet)
+    val definition = filterSet?.template?.firstOrNull { it.field == field || it.id == field } ?: filterSet?.template?.firstOrNull()
     var text by remember(field) { mutableStateOf(input.filter[field]?.toString().orEmpty()) }
     LaunchedEffect(input.filter, field) {
         val external = input.filter[field]?.toString().orEmpty()
@@ -262,7 +260,10 @@ private fun QuickFilter(context: DataSourceContext, item: ToolbarItemDef) {
         val current = context.peekFilter()
         val next = current.toMutableMap()
         if (text.isBlank()) next.remove(field) else next[field] = text
-        if (next != current) context.setFilter(next)
+        if (next != current) {
+            if (context.dataSource.filterMode.equals("client", ignoreCase = true)) context.input.set(context.input.peek().copy(filter = next))
+            else context.setFilter(next)
+        }
     }
     OutlinedTextField(
         value = text,
@@ -272,6 +273,18 @@ private fun QuickFilter(context: DataSourceContext, item: ToolbarItemDef) {
         trailingIcon = { Icon(Icons.Default.Search, contentDescription = "Apply filter") },
         modifier = Modifier.fillMaxWidth()
     )
+}
+
+internal fun toolbarItemIsQuickSearch(item: ToolbarItemDef): Boolean =
+    item.type.equals("quickSearch", ignoreCase = true) || item.id in setOf("quickFilter", "quickFilterInputs")
+
+internal fun toolbarQuickSearchField(item: ToolbarItemDef, filterSet: FilterSetDef?): String {
+    val declared = (item.properties["field"] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
+    return declared.takeIf { it.isNotBlank() }
+        ?: filterSet?.defaultField?.takeIf { it.isNotBlank() }
+        ?: filterSet?.template?.firstOrNull()?.field?.takeIf { !it.isNullOrBlank() }
+        ?: filterSet?.template?.firstOrNull()?.id?.takeIf { !it.isNullOrBlank() }
+        ?: "name"
 }
 
 private fun quickFilterSet(context: DataSourceContext): FilterSetDef? {

@@ -1,3 +1,4 @@
+import {normalizeChartExtent} from './chartExtent.js';
 import React, {useState, useEffect, useMemo} from "react";
 import {useSignals} from '@preact/signals-react/runtime';
 import {
@@ -472,16 +473,6 @@ function areKeyListsEqual(left = [], right = []) {
     return true;
 }
 
-function normalizeChartExtent(value, fallback) {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-        return value;
-    }
-    if (typeof value === 'string') {
-        const normalized = value.trim();
-        return normalized || fallback;
-    }
-    return fallback;
-}
 
 export function hasNonEmptySummary(metrics = {}) {
     if (!metrics || typeof metrics !== 'object') {

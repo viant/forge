@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import {chromium} from 'playwright';
+const browser=await chromium.launch({headless:true,channel:'chrome'});
+try {
+ const page=await browser.newPage({viewport:{width:1440,height:1000}});
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const base=process.env.PREVIEW_URL||'http://127.0.0.1:8119/?window=advertiser&parameters=%7B%22AdvertiserId%22%3A%5B700001%5D%7D';
+ await page.goto(base);await page.getByRole('tab',{name:'Advanced',exact:true}).click();
+ const rates=page.locator('[data-forge-container-id="advertiserAdvancedTierRates"]');await rates.waitFor();
+ const capabilities=await page.locator('.preview-capabilities').innerText();
+ const features=page.locator('.preview-multiselect').nth(1);
+ await features.locator('summary').click();
+ const option=page.getByRole('checkbox',{name:'EXPOSE_ADVERTISER_SPECIFIC_RATES',exact:true});
+ await option.uncheck();await rates.waitFor({state:'hidden'});
+ assert.equal(await page.locator('.preview-capabilities').innerText(),capabilities);
+ await option.check();await rates.waitFor();await features.locator('summary').click();
+ assert.equal(await page.getByRole('button',{name:'Direct',exact:true}).count(),0);
+ await page.reload();await page.getByRole('tab',{name:'Advanced',exact:true}).click();await rates.waitFor();
+ await page.setViewportSize({width:390,height:844});
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+ await features.locator('summary').click();
+ const menu=await features.locator('fieldset').boundingBox();assert.ok(menu.x>=0 && menu.x+menu.width<=390,JSON.stringify(menu));
+ await features.locator('summary').click();
+ await page.setViewportSize({width:1440,height:1000});await page.getByRole('tab',{name:'Campaigns',exact:true}).click();
+ const footer=page.locator('.basic-table-footer').filter({visible:true}).first();await footer.waitFor();
+ const boxes=await footer.evaluate(el=>({height:el.getBoundingClientRect().height,children:[...el.children].map(c=>c.getBoundingClientRect().toJSON())}));
+ assert.ok(boxes.height<=50,JSON.stringify(boxes));
+ if(boxes.children.length>1)assert.ok(Math.max(...boxes.children.map(b=>b.top))-Math.min(...boxes.children.map(b=>b.top))<10,JSON.stringify(boxes));
+ assert.deepEqual(errors,[]);
+ console.log('Preview feature gating, restoration, capabilities, narrow shell and unified footer passed.');
+}finally{await browser.close();}

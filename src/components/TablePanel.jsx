@@ -3,7 +3,9 @@ import Basic from "./table/Basic.jsx";
 
 
 const TablePanel = ({
+                        toolbarActions,
                         container,
+                        sizingMode = 'fill',
                         context,
                         children,
                         tableType = "html",
@@ -57,7 +59,8 @@ const TablePanel = ({
     const {sizing = {}} = container
     const stlye = {
         width: "100%",
-        height: "100%",
+        flex: sizingMode === 'fill' ? '1 1 0' : '0 0 auto',
+        minHeight: 0,
         display: "flex",
         flexDirection: "column"
     }
@@ -73,8 +76,8 @@ const TablePanel = ({
     // available to its Table Settings dialog.
     return (
         <div className="table-panel" style={stlye}>
-            <div style={{flexGrow: 1, overflow: "hidden", minHeight: 0}}>
-                <Basic
+            <div style={{display: 'flex', flexDirection: 'column', flex: sizingMode === 'fill' ? '1 1 0' : '0 0 auto', minHeight: 0}}>
+                <Basic toolbarActions={toolbarActions} sizingMode={sizingMode}
                     context={context}
                     container={container}
                     columns={configuredColumns}

@@ -145,7 +145,7 @@ const FormPanel = ({context, container, children, dataSourceFetchMode = 'always'
                             className="forge-form-panel-section-tabs__panel" role="tabpanel"
                             aria-labelledby={`${tabDOMPrefix}-tab-${tabIndex}`}
                             hidden={!active} style={!active ? {display: 'none'} : undefined}>
-                            <Container context={context} container={tab} isActive={active} suppressTitle dataSourceFetchMode={childDataSourceFetchMode} />
+                            <Container context={context} container={tab} sizingMode={fillSectionTabs ? 'fill' : 'content'} isActive={active} suppressTitle dataSourceFetchMode={childDataSourceFetchMode} />
                         </div>
                     );
                 })}
@@ -160,6 +160,7 @@ const FormPanel = ({context, container, children, dataSourceFetchMode = 'always'
                     <Tab
                         key={tab.id}
                         id={tab.id}
+                        panelClassName="forge-form-panel-tabs__panel"
                         title={tab.icon ? <span className="forge-form-panel-tab-title"><Icon icon={tab.icon} size={14}/><span>{tab.title}</span></span> : tab.title}
                         panel={shouldRenderTabPanel(tab.id) ? (
                             <Container

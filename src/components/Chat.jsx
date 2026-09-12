@@ -4,6 +4,7 @@ import { useDataSourceState } from "../hooks/useDataSourceState.js";
 
 // Re-exported building blocks living under src/components/chat
 import MessageFeed from "./chat/MessageFeed.jsx";
+import "./chat/ChatContainer.css";
 import Composer     from "./chat/Composer.jsx";
 import MessageCard  from "./chat/MessageCard.jsx";
 import FormRenderer from "./FormRenderer.jsx";
@@ -682,7 +683,7 @@ export default function Chat({
         ? (externalComposerProps?.onAutoSelectToolsChange || (() => {}))
         : internalHandleAutoSelectToolsChange;
 
-    const conversationID = normalizeString(conversationSnapshot?.id);
+    const conversationID = normalizeString(externalComposerProps?.conversationId || conversationSnapshot?.id);
     const backendConversationRunning = effectiveBackendConversationRunning(conversationSnapshot);
     const queuedTurns = Array.isArray(conversationSnapshot?.queuedTurns) ? conversationSnapshot.queuedTurns : [];
     const queuedCountValue = conversationSnapshot?.queuedCount;
@@ -1021,16 +1022,10 @@ export default function Chat({
 
     return (
         <div
-            className="w-full px-4 pt-4 gap-3"
+            className={`forge-chat-container px-4 pt-4 gap-3${effectiveHeight !== undefined ? " has-explicit-height" : ""}`}
             data-testid="chat-root"
             style={{
-                height: '100%',
                 ...heightStyle,
-                display: 'flex',
-                flexDirection: 'column',
-                minHeight: 0,
-                minWidth: 0,
-                overflow: 'hidden',
             }}
         >
 
@@ -1075,6 +1070,8 @@ export default function Chat({
                             onSelect={(task) => {
                                 const prompt = String(task?.prompt || '').trim();
                                 if (!prompt) return;
+                                const assignedAgent = String(task?.agentId || '').trim();
+                                if (assignedAgent) handleAgentChange(assignedAgent);
                                 setComposerDraft(prompt);
                             }}
                         />
@@ -1142,6 +1139,7 @@ export default function Chat({
                             events.onMicToggle.execute({ context, active });
                         }
                     }}
+                    onCaptureImage={(file) => { if (file) startUploads([file]); }}
                     onCaptureAudio={(file) => {
                         if (!file) return;
                         startUploads([file]);
@@ -1161,10 +1159,10 @@ export default function Chat({
                     onToolsChange={handleToolsChange}
                     autoSelectTools={currentAutoSelectTools}
                     onAutoSelectToolsChange={handleAutoSelectToolsChange}
-                    agentOptions={composerAgentOptions}
+                    agentOptions={chatCfg.allowAgentSelection === false ? [] : composerAgentOptions}
                     agentValue={currentAgent}
                     onAgentChange={handleAgentChange}
-                    modelOptions={composerModelOptions}
+                    modelOptions={chatCfg.allowModelSelection === false ? [] : composerModelOptions}
                     modelInfo={composerModelInfo}
                     modelValue={currentModel || (usesExternalComposerProps ? '' : defaultAgentModel(metaSnapshot, currentAgent)) || rawCurrentModel || defaultModel}
                     onModelChange={handleModelChange}

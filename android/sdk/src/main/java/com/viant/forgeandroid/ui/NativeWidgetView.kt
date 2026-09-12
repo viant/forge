@@ -9,6 +9,8 @@ import android.provider.OpenableColumns
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -36,6 +38,7 @@ internal fun NativeWidgetView(sourceItem: ItemDef, value: JsonElement?, onChange
         sourceItem.min?.let { put("min", it) }; sourceItem.max?.let { put("max", it) }
         sourceItem.accept?.let { put("accept", JsonPrimitive(it)) }; sourceItem.separator?.let { put("separator", JsonPrimitive(it)) }
     })
+    val appearance = LocalForgeThemeAppearance.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val kind = NativeWidgetContract.kind(item)
@@ -45,7 +48,7 @@ internal fun NativeWidgetView(sourceItem: ItemDef, value: JsonElement?, onChange
     var error by remember(item.id) { mutableStateOf("") }
     LaunchedEffect(value) { error = "" }
     var draft by remember(item.id, value) { mutableStateOf<String?>(null) }
-    val text = NativeWidgetContract.text(value)
+    val text = if (kind == "object") NativeWidgetContract.text(value) else NativeWidgetContract.displayText(value)
     val number = (value as? JsonPrimitive)?.doubleOrNull
     val display = draft ?: if (kind == "percentfraction2input" && number != null) "%.2f".format(java.util.Locale.ROOT, number * 100) else text
     fun edit(raw: String) {
@@ -75,11 +78,11 @@ internal fun NativeWidgetView(sourceItem: ItemDef, value: JsonElement?, onChange
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).semantics { contentDescription = label }, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         when (kind) {
             "text","password","number","currency","percentfraction2input","math","textarea","document","object" -> {
-                OutlinedTextField(value = display, onValueChange = ::edit, label = { Text(label) }, enabled = !unavailable,
+                ForgeThemeTextField(value = display, onValueChange = ::edit, label = label, enabled = !unavailable,
+                    errorMessage = error,
                     visualTransformation = if (kind == "password") PasswordVisualTransformation() else VisualTransformation.None,
                     keyboardOptions = KeyboardOptions(keyboardType = if (kind == "password") KeyboardType.Password else if (kind in setOf("number","currency","percentfraction2input")) KeyboardType.Decimal else KeyboardType.Text),
-                    singleLine = kind !in setOf("textarea","document","object"), minLines = if (kind in setOf("textarea","document","object")) 3 else 1,
-                    modifier = Modifier.fillMaxWidth())
+                    singleLine = kind !in setOf("textarea","document","object"), minLines = if (kind in setOf("textarea","document","object")) 3 else 1)
                 if (kind == "document") MarkdownRenderer(markdown = display)
             }
             "schema" -> { Text(label); Text(text, style = MaterialTheme.typography.bodySmall) }
@@ -168,7 +171,13 @@ internal fun NativeWidgetView(sourceItem: ItemDef, value: JsonElement?, onChange
             }
             "markdown" -> MarkdownRenderer(markdown = text)
             "label" -> { Text(label); Text(text) }
-            "button" -> Button(onClick = { onAction?.invoke() }, enabled = !unavailable) { Text(label) }
+            "button" -> Button(onClick = { onAction?.invoke() }, enabled = !unavailable,
+                modifier = if (appearance != null) Modifier.heightIn(min = maxOf(48f, appearance.controlHeight).dp) else Modifier,
+                shape = appearance?.let { RoundedCornerShape(it.radius.dp) } ?: ButtonDefaults.shape,
+                contentPadding = appearance?.let { PaddingValues(horizontal = it.paddingInline.dp, vertical = 8.dp) } ?: ButtonDefaults.ContentPadding,
+                colors = appearance?.let { ButtonDefaults.buttonColors(containerColor = it.buttonBackground, contentColor = it.buttonForeground,
+                    disabledContainerColor = it.disabledBackground, disabledContentColor = it.disabledForeground) } ?: ButtonDefaults.buttonColors(),
+            ) { Text(label, style = LocalTextStyle.current.let { if (appearance != null) it.copy(fontSize = appearance.fontSize.sp) else it }) }
             else -> Text("Unsupported widget: $kind", color = MaterialTheme.colorScheme.error)
         }
         if (error.isNotEmpty()) Text(error, color = MaterialTheme.colorScheme.error)

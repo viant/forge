@@ -284,6 +284,16 @@ function rebuildInlineRuntime(compiled, datasetPayloads) {
   };
 }
 
+// Rebuild all derived runtime/export content from the same edited scope.
+export function applyInlineReportFilterValues(compiled, values = {}) {
+  const reportDocument = cloneValue(compiled.reportDocument);
+  reportDocument.scope = { ...reportDocument.scope, params: (reportDocument.scope?.params || []).map((param) => (
+    Object.prototype.hasOwnProperty.call(values, param.id) ? { ...param, value: cloneValue(values[param.id]) } : param
+  )) };
+  const reportSpec = lowerReportDocumentToReportSpec(reportDocument, { includePrimaryBlocks: false });
+  return rebuildInlineRuntime({ ...compiled, reportDocument, reportSpec }, compiled.datasetPayloads || {});
+}
+
 export function compileInlineReport({
   reportId = "inlineReport",
   grammar = "dashboard-v1",

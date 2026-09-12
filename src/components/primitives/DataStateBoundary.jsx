@@ -1,10 +1,12 @@
+import {formatDataSourceError} from '../../utils/dataSourceError.js';
+import {containerSizingStyle} from '../containerSizing.js';
 import React from 'react';
-import {Button, Callout, NonIdealState, Spinner} from '@blueprintjs/core';
+import {Button, Callout, Icon, NonIdealState, Spinner} from '@blueprintjs/core';
 import {useSignals} from '@preact/signals-react/runtime';
 import {dataBoundaryState} from './presentationModels.js';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 
-export default function DataStateBoundary({container, context, children}) {
+export default function DataStateBoundary({sizingMode = 'fill', container, context, children}) {
   useSignals();
   const spec = container.dataStateBoundary;
   if (!spec) return <>{children}</>;
@@ -29,8 +31,12 @@ export default function DataStateBoundary({container, context, children}) {
   };
   if (state.kind === 'loading') return <div className="forge-data-state" data-forge-primitive="dataStateBoundary"><Spinner size={24}/><span>{spec.loadingMessage || 'Loading…'}</span></div>;
   if (state.kind === 'error' && spec.suppressErrorWhen && evaluatePlainVisibleWhen(spec.suppressErrorWhen, context)) return null;
-  if (state.kind === 'error') return <Callout intent="danger" data-forge-primitive="dataStateBoundary"><div>{spec.errorMessage || String(state.errors[0]?.message || state.errors[0] || 'Unable to load data.')}</div>{errorAction ? <Button icon={errorAction.icon || 'refresh'} onClick={retryError} style={{marginTop: 10}}>{errorAction.label || 'Retry'}</Button> : null}</Callout>;
+  if (state.kind === 'error') return <div className="forge-data-error" role="alert" data-forge-primitive="dataStateBoundary">
+    <Icon icon="error" aria-hidden="true"/>
+    <div><strong>Unable to load data</strong><div>{String(spec.errorMessage || '').trim() || formatDataSourceError(state.errors[0]) || 'Please retry. If the problem continues, check the connection.'}</div></div>
+    {errorAction ? <Button minimal icon={errorAction.icon || 'refresh'} onClick={retryError} aria-label={errorAction.label || 'Retry'} title={errorAction.label || 'Retry'}/> : null}
+  </div>;
   if (state.kind === 'empty' && !renderEmptyContent) return <NonIdealState icon="search" title={spec.emptyMessage || 'No data'}/>;
-  if (state.kind === 'stale_empty' && !renderEmptyContent) return <div data-forge-primitive="dataStateBoundary"><Callout intent="warning">{spec.staleMessage || 'Cached data may be stale.'}</Callout><NonIdealState icon="search" title={spec.emptyMessage || 'No data'}/></div>;
-  return <div data-forge-primitive="dataStateBoundary">{(state.kind === 'partial' || state.kind === 'stale' || state.kind === 'stale_empty') ? <Callout intent="warning">{(state.kind === 'stale' || state.kind === 'stale_empty') ? spec.staleMessage || 'Showing cached data.' : 'Some data is unavailable.'}</Callout> : null}{children}</div>;
+  if (state.kind === 'stale_empty' && !renderEmptyContent) return <div style={containerSizingStyle(container,sizingMode,{chrome:true})} data-forge-primitive="dataStateBoundary"><Callout intent="warning">{spec.staleMessage || 'Cached data may be stale.'}</Callout><NonIdealState icon="search" title={spec.emptyMessage || 'No data'}/></div>;
+  return <div style={containerSizingStyle(container,sizingMode,{chrome:true})} data-forge-primitive="dataStateBoundary">{(state.kind === 'partial' || state.kind === 'stale' || state.kind === 'stale_empty') ? <Callout intent="warning">{(state.kind === 'stale' || state.kind === 'stale_empty') ? spec.staleMessage || 'Showing cached data.' : 'Some data is unavailable.'}</Callout> : null}{children}</div>;
 }

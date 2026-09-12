@@ -54,7 +54,6 @@ const FilterDialog = ({
             style={{
                 zIndex: 100,
             }}
-            className={Classes.DARK}
         >
             <DialogBody>
                 {filterSets?.length > 1 && (

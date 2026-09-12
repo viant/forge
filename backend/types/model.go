@@ -492,6 +492,7 @@ type Container struct {
 	Subtitle           string                            `json:"subtitle,omitempty" yaml:"subtitle,omitempty"`
 	Kind               string                            `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Role               string                            `json:"role,omitempty" yaml:"role,omitempty"`
+	SizingMode         string                            `json:"sizingMode,omitempty" yaml:"sizingMode,omitempty"`
 	ScrollMode         string                            `json:"scrollMode,omitempty" yaml:"scrollMode,omitempty"`
 	FilterBindings     map[string]string                 `json:"filterBindings,omitempty" yaml:"filterBindings,omitempty"`
 	SelectionBindings  map[string]string                 `json:"selectionBindings,omitempty" yaml:"selectionBindings,omitempty"`
@@ -647,6 +648,9 @@ type Terminal struct {
 }
 
 type Chat struct {
+	// Optional composer selector visibility; omitted preserves existing behavior.
+	AllowAgentSelection *bool `json:"allowAgentSelection,omitempty" yaml:"allowAgentSelection,omitempty"`
+	AllowModelSelection *bool `json:"allowModelSelection,omitempty" yaml:"allowModelSelection,omitempty"`
 	// DataSourceRef points to the data source that supplies messages.
 	DataSourceRef   string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
@@ -1287,6 +1291,9 @@ type Card struct {
 }
 
 type Table struct {
+	FillRemainingWidth   bool                              `json:"fillRemainingWidth,omitempty" yaml:"fillRemainingWidth,omitempty"`
+	MinRows              int                               `json:"minRows,omitempty" yaml:"minRows,omitempty"`
+	RowHeight            int                               `json:"rowHeight,omitempty" yaml:"rowHeight,omitempty"`
 	Columns              []Column                          `json:"columns" yaml:"columns"`
 	Target               *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
 	TargetOverrides      map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
@@ -1527,6 +1534,8 @@ type Item struct {
 // selected record fields back to the caller form.
 
 type Lookup struct {
+	// RequestTrigger controls typed-value resolution: blur (default) or change.
+	RequestTrigger string `json:"requestTrigger,omitempty" yaml:"requestTrigger,omitempty"`
 	// Either DialogId (preferred) or WindowId can be provided. When DialogId
 	// is set, the UI opens a Forge dialog which renders a built-in
 	// Cancel/OK footer. WindowId uses a floating window instead.

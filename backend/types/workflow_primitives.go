@@ -4,6 +4,7 @@ package types
 // primitives. Business validation and persistence remain owned by the target
 // datasource; Forge owns pending/success/error state and reconciliation.
 type MutationCommand struct {
+	ClassName           string                      `json:"className,omitempty" yaml:"className,omitempty"`
 	CommandID           string                      `json:"commandId,omitempty" yaml:"commandId,omitempty"`
 	Label               string                      `json:"label,omitempty" yaml:"label,omitempty"`
 	Icon                string                      `json:"icon,omitempty" yaml:"icon,omitempty"`
@@ -72,6 +73,9 @@ type PrimitiveSelection struct {
 }
 
 type EditableCollectionOperation struct {
+	Icon              string                 `json:"icon,omitempty" yaml:"icon,omitempty"`
+	HideLabel         *bool                  `json:"hideLabel,omitempty" yaml:"hideLabel,omitempty"`
+	AriaLabel         string                 `json:"ariaLabel,omitempty" yaml:"ariaLabel,omitempty"`
 	ID                string                 `json:"id" yaml:"id"`
 	Label             string                 `json:"label" yaml:"label"`
 	Tooltip           string                 `json:"tooltip,omitempty" yaml:"tooltip,omitempty"`

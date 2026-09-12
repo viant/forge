@@ -605,6 +605,10 @@ public struct ContentDef: Codable, Sendable {
 }
 
 public struct ContainerDef: Codable, Sendable, Identifiable {
+    public var className: String? = nil
+    public var isHiddenBinding: Bool {
+        className?.split(whereSeparator: { $0.isWhitespace }).contains("forge-container-hidden") == true
+    }
     public let id: String?
     public let title: String?
     public let subtitle: String?
@@ -779,6 +783,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         case terminal
         case actions
         case on
+        case className
         case reportBuilderRef
         case reportBuilders
         case fetchData
@@ -1068,6 +1073,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         actions = try container.decodeIfPresent([ActionDef].self, forKey: .actions) ?? []
         on = try container.decodeIfPresent([ExecutionDef].self, forKey: .on) ?? []
         reportBuilderRef = try container.decodeIfPresent(String.self, forKey: .reportBuilderRef)
+        className = try container.decodeIfPresent(String.self, forKey: .className)
         reportBuilders = try container.decodeIfPresent([String: DashboardReportBuilderVariantDef].self, forKey: .reportBuilders) ?? [:]
         fetchData = try container.decodeIfPresent(Bool.self, forKey: .fetchData)
         target = try container.decodeIfPresent(JSONValue.self, forKey: .target)
@@ -1160,6 +1166,7 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
         try container.encode(actions, forKey: .actions)
         try container.encode(on, forKey: .on)
         try container.encodeIfPresent(reportBuilderRef, forKey: .reportBuilderRef)
+        try container.encodeIfPresent(className, forKey: .className)
         try container.encode(reportBuilders, forKey: .reportBuilders)
         try container.encodeIfPresent(fetchData, forKey: .fetchData)
         try container.encodeIfPresent(target, forKey: .target)
@@ -1252,6 +1259,8 @@ public struct ContainerDef: Codable, Sendable, Identifiable {
 }
 
 public struct DataSourceDef: Codable, Sendable {
+    public var filterMode: String? = nil
+    public var paginationMode: String? = nil
     public let service: DataSourceServiceDef?
     public let selectionMode: String?
     public let autoSelect: Bool?
@@ -1270,6 +1279,8 @@ public struct DataSourceDef: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case service
+        case paginationMode
+        case filterMode
         case selectionMode
         case autoSelect
         case autoFetch
@@ -1323,6 +1334,8 @@ public struct DataSourceDef: Codable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         service = try container.decodeIfPresent(DataSourceServiceDef.self, forKey: .service)
+        paginationMode = try container.decodeIfPresent(String.self, forKey: .paginationMode)
+        filterMode = try container.decodeIfPresent(String.self, forKey: .filterMode)
         selectionMode = try container.decodeIfPresent(String.self, forKey: .selectionMode)
         autoSelect = try container.decodeIfPresent(Bool.self, forKey: .autoSelect)
         autoFetch = try container.decodeIfPresent(Bool.self, forKey: .autoFetch)
@@ -3089,6 +3102,7 @@ public final class DashboardConditionDef: Codable, @unchecked Sendable {
     public let whenValue: JSONValue?
     public let equals: JSONValue?
     public let notEquals: JSONValue?
+    public let containsValue: JSONValue?
     public let inValues: [JSONValue]
     public let gt: Double?
     public let gte: Double?
@@ -3109,6 +3123,7 @@ public final class DashboardConditionDef: Codable, @unchecked Sendable {
         case whenValue = "when"
         case equals
         case notEquals
+        case containsValue = "contains"
         case inValues = "in"
         case gt
         case gte
@@ -3127,6 +3142,7 @@ public final class DashboardConditionDef: Codable, @unchecked Sendable {
         whenValue: JSONValue? = nil,
         equals: JSONValue? = nil,
         notEquals: JSONValue? = nil,
+        containsValue: JSONValue? = nil,
         inValues: [JSONValue] = [],
         gt: Double? = nil,
         gte: Double? = nil,
@@ -3149,6 +3165,7 @@ public final class DashboardConditionDef: Codable, @unchecked Sendable {
         self.whenValue = whenValue
         self.equals = equals
         self.notEquals = notEquals
+        self.containsValue = containsValue
         self.inValues = inValues
         self.gt = gt
         self.gte = gte
@@ -3171,6 +3188,7 @@ public final class DashboardConditionDef: Codable, @unchecked Sendable {
         whenValue = try container.decodeIfPresent(JSONValue.self, forKey: .whenValue)
         equals = try container.decodeIfPresent(JSONValue.self, forKey: .equals)
         notEquals = try container.decodeIfPresent(JSONValue.self, forKey: .notEquals)
+        containsValue = try container.decodeIfPresent(JSONValue.self, forKey: .containsValue)
         inValues = try container.decodeIfPresent([JSONValue].self, forKey: .inValues) ?? []
         gt = try container.decodeIfPresent(Double.self, forKey: .gt)
         gte = try container.decodeIfPresent(Double.self, forKey: .gte)
@@ -3208,6 +3226,25 @@ public struct LayoutDef: Codable, Sendable {
     public let labelPosition: String?
     public let gap: String?
     public let rowGap: String?
+
+    enum CodingKeys: String, CodingKey {
+        case kind, orientation, rows, columns, labelPosition, gap, rowGap
+    }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try values.decodeIfPresent(String.self, forKey: .kind)
+        orientation = try values.decodeIfPresent(String.self, forKey: .orientation)
+        rows = try values.decodeIfPresent(Int.self, forKey: .rows)
+        columns = try values.decodeIfPresent(Int.self, forKey: .columns)
+        labelPosition = try values.decodeIfPresent(String.self, forKey: .labelPosition)
+        func spacing(_ key: CodingKeys) throws -> String? {
+            if let string = try? values.decode(String.self, forKey: key) { return string }
+            return try values.decodeIfPresent(Double.self, forKey: key).map { String($0) }
+        }
+        gap = try spacing(.gap)
+        rowGap = try spacing(.rowGap)
+    }
 
     public init(
         kind: String? = nil,
@@ -3429,7 +3466,7 @@ public struct ItemDef: Codable, Sendable, Identifiable {
         var widgetProperties = try container.decodeIfPresent([String: JSONValue].self, forKey: .properties) ?? [:]
         let extras = try decoder.container(keyedBy: NativeWidgetCodingKey.self)
         var nativeRootProperties: [String: JSONValue] = [:]
-        for key in ["default", "enum", "min", "max", "step", "nullable", "placeholder", "accept", "separator", "timeZone", "timeZoneSelector", "lifetimeStart", "lifetimeStartSelector", "startField", "endField", "granularityField", "includePartialDataField", "customApplyEnabled", "maxVisible", "emptyText", "trueLabel", "falseLabel"] {
+        for key in ["optionsDataSourceRef", "optionLabelField", "optionValueField", "optionSecondaryField", "readOnlyWhen", "disabledWhen", "default", "enum", "min", "max", "step", "nullable", "placeholder", "accept", "separator", "timeZone", "timeZoneSelector", "lifetimeStart", "lifetimeStartSelector", "startField", "endField", "granularityField", "includePartialDataField", "customApplyEnabled", "maxVisible", "emptyText", "trueLabel", "falseLabel"] {
             if let codingKey = NativeWidgetCodingKey(stringValue: key), let value = try extras.decodeIfPresent(JSONValue.self, forKey: codingKey) { widgetProperties[key] = value; nativeRootProperties[key] = value }
         }
         properties = widgetProperties
@@ -4011,6 +4048,7 @@ public struct ChartValueOption: Codable, Sendable, Equatable {
 }
 
 public struct TableDef: Codable, Sendable {
+    public var fillRemainingWidth: Bool? = nil
     public let title: String?
     public let presentation: String?
     public let columns: [ColumnDef]
@@ -4024,6 +4062,7 @@ public struct TableDef: Codable, Sendable {
     public let targetOverrides: [String: JSONValue]
 
     enum CodingKeys: String, CodingKey {
+        case fillRemainingWidth
         case title
         case presentation
         case columns
@@ -4091,6 +4130,7 @@ public struct TableDef: Codable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        fillRemainingWidth = try container.decodeIfPresent(Bool.self, forKey: .fillRemainingWidth)
         title = try container.decodeIfPresent(String.self, forKey: .title)
         presentation = try container.decodeIfPresent(String.self, forKey: .presentation)
         columns = try container.decodeIfPresent([ColumnDef].self, forKey: .columns) ?? []
@@ -4269,6 +4309,16 @@ public struct ToolbarDef: Codable, Sendable {
 }
 
 public struct ToolbarItemDef: Codable, Sendable, Identifiable {
+    public var field: String? = nil
+    public var value: JSONValue? = nil
+    public var options: [JSONValue] = []
+    public var type: String? = nil
+    public var scope: String? = nil
+    public var dataField: String? = nil
+    public var properties: [String: JSONValue] = [:]
+    public var visibleWhen: DashboardConditionDef? = nil
+    public var disabledWhen: DashboardConditionDef? = nil
+    public var disabled: Bool? = nil
     public let id: String?
     public let label: String?
     public let icon: String?
@@ -4284,6 +4334,9 @@ public struct ToolbarItemDef: Codable, Sendable, Identifiable {
     public let targetOverrides: [String: JSONValue]
 
     enum CodingKeys: String, CodingKey {
+        case field, value, options
+        case visibleWhen, disabledWhen, disabled
+        case type, scope, dataField, properties
         case id
         case label
         case icon
@@ -4331,6 +4384,16 @@ public struct ToolbarItemDef: Codable, Sendable, Identifiable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        field = try container.decodeIfPresent(String.self, forKey: .field)
+        value = try container.decodeIfPresent(JSONValue.self, forKey: .value)
+        options = try container.decodeIfPresent([JSONValue].self, forKey: .options) ?? []
+        visibleWhen = try container.decodeIfPresent(DashboardConditionDef.self, forKey: .visibleWhen)
+        disabledWhen = try container.decodeIfPresent(DashboardConditionDef.self, forKey: .disabledWhen)
+        type = try container.decodeIfPresent(String.self, forKey: .type)
+        scope = try container.decodeIfPresent(String.self, forKey: .scope)
+        dataField = try container.decodeIfPresent(String.self, forKey: .dataField)
+        properties = try container.decodeIfPresent([String: JSONValue].self, forKey: .properties) ?? [:]
+        disabled = try container.decodeIfPresent(Bool.self, forKey: .disabled)
         id = try container.decodeIfPresent(String.self, forKey: .id)
         label = try container.decodeIfPresent(String.self, forKey: .label)
         icon = try container.decodeIfPresent(String.self, forKey: .icon)

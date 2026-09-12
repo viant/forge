@@ -1,3 +1,5 @@
+import ForgeFormGroup from './ForgeFormGroup.jsx';
+import './theme.css';
 /* -------------------------------------------------------------------------
  * Blueprint Pack – Phase 2
  * -------------------------------------------------------------------------
@@ -22,7 +24,6 @@ import {
     ProgressBar,
     Label,
     Tooltip,
-    FormGroup,
     AnchorButton,
     FileInput,
 } from '@blueprintjs/core';
@@ -1095,7 +1096,9 @@ export function registerPack() {
     ), { framework: 'blueprint' });
 
     /* -------------------- Button ------------------------------------ */
-    registerWidget('button', ({ onClick, readOnly, intent, children, className, style, title, item, icon, hideLabel, ...rest }) => {
+    registerWidget('button', ({ onClick, readOnly, disabled, intent, children, className, style, title, item, icon, hideLabel, ...rest }) => {
+        const iconAction = String(className || '').split(/\s+/).includes('forge-action-icon');
+        const unavailable = readOnly === true || disabled === true;
         const intentColors = {
             primary: { background: '#2f6de1', border: '#2f6de1', color: '#fff' },
             success: { background: '#0f9960', border: '#0f9960', color: '#fff' },
@@ -1107,7 +1110,7 @@ export function registerPack() {
             <button
                 type="button"
                 className={className}
-                disabled={readOnly}
+                disabled={unavailable}
                 title={title}
                 onClick={onClick}
                 style={{
@@ -1115,14 +1118,14 @@ export function registerPack() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 6,
-                    minHeight: 30,
-                    minWidth: hideLabel ? 30 : undefined,
-                    padding: hideLabel ? '0 7px' : '0 12px',
-                    borderRadius: 8,
+                    minHeight: iconAction ? undefined : 'var(--forge-control-height, 30px)',
+                    minWidth: !iconAction && hideLabel ? 30 : undefined,
+                    padding: iconAction ? undefined : hideLabel ? '0 7px' : '0 var(--forge-control-padding-inline, 12px)',
+                    borderRadius: 'var(--forge-control-radius, 8px)',
                     border: `1px solid ${palette?.border || '#d0daea'}`,
-                    background: palette?.background || '#f5f8fd',
-                    color: palette?.color || '#2d5a9e',
-                    cursor: readOnly ? 'default' : 'pointer',
+                    background: unavailable ? `var(--forge-disabled-bg, ${palette?.background || '#f5f8fd'})` : (palette?.background || 'var(--forge-button-bg, #f5f8fd)'),
+                    color: unavailable ? `var(--forge-disabled-text, ${palette?.color || '#2d5a9e'})` : (palette?.color || 'var(--forge-button-text, #2d5a9e)'),
+                    cursor: unavailable ? 'default' : 'pointer',
                     font: 'inherit',
                     fontWeight: 600,
                     lineHeight: 1.2,
@@ -1246,12 +1249,13 @@ export function registerPack() {
 registerPack();
 
 // Register Blueprint wrapper globally
-registerWrapper('blueprint', (item, container, children) => {
+registerWrapper('blueprint', (item, container, children, context, accessibility = {}) => {
         const inline = (item.labelPosition || container?.layout?.labelPosition) === 'left';
         const required = !!(item?.required || item?.properties?.required);
-        const requiredEditable = required && !item?.readOnly && !item?.disabled;
+        const requiredEditable = required && !(accessibility.readOnly ?? item?.readOnly) && !(accessibility.disabled ?? item?.disabled);
         // Stand-alone controls like button can disable FormGroup
-        if (item.isStandalone) return children;
+        if (item.isStandalone) return <>{children}{item.validationError && <div
+            id={accessibility.helperId} data-forge-part="validation-message" role="alert">{item.validationError}</div>}</>;
 
         const labelContent = item.hideLabel ? undefined : (
             item.tooltip ? (
@@ -1264,7 +1268,7 @@ registerWrapper('blueprint', (item, container, children) => {
         );
 
         return (
-            <FormGroup
+            <ForgeFormGroup
                 className={[
                     requiredEditable ? 'forge-required-input' : '',
                     item?.requiredState ? `forge-required-${item.requiredState}` : '',
@@ -1272,12 +1276,13 @@ registerWrapper('blueprint', (item, container, children) => {
                 label={labelContent}
                 labelInfo={required ? <span aria-hidden="true">*</span> : undefined}
                 inline={inline}
-                labelFor={item.id}
+                labelFor={accessibility.controlId || item.id}
+                helperId={accessibility.helperId}
                 helperText={item.validationError || item.helperText || item.description}
                 intent={item.validationError ? 'danger' : 'none'}
                 style={{ marginBottom: 0 }}
             >
                 {children}
-            </FormGroup>
+            </ForgeFormGroup>
         );
 });

@@ -1,3 +1,4 @@
+import {containerSizingStyle} from '../containerSizing.js';
 import React from 'react';
 import {Callout} from '@blueprintjs/core';
 import {useSignals} from '@preact/signals-react/runtime';
@@ -24,7 +25,7 @@ export function permissionBoundaryAllowsRows(spec = {}, context = {}, rows = [])
   return rows.every((row) => byID.get(String(row?.[identityField] ?? ''))?.capabilities?.[spec.capability] === true);
 }
 
-export default function PermissionBoundary({container, context, children}) {
+export default function PermissionBoundary({sizingMode = 'fill', container, context, children}) {
   useSignals();
   const spec = container.permissionBoundary || {};
   const enabled = !!container.permissionBoundary;
@@ -38,7 +39,7 @@ export default function PermissionBoundary({container, context, children}) {
   }, [allowed, context, container.dataSourceRef, enabled, mode]);
   if (!enabled) return <>{children}</>;
   if (mode === 'resource' && !allowed) return <Callout intent="warning" icon="lock" data-forge-primitive="permissionBoundary">{spec.deniedMessage || 'You do not have permission to view this content.'}</Callout>;
-  return <div data-forge-primitive="permissionBoundary">
+  return <div style={containerSizingStyle(container,sizingMode,{chrome:true})} data-forge-primitive="permissionBoundary">
     {children}
     {!allowed ? <Callout intent="warning" icon="lock">{spec.deniedMessage || (mode === 'selection' ? 'The current selection is not permitted.' : 'Some rows are not permitted for this action.')}</Callout> : null}
   </div>;

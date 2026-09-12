@@ -40,7 +40,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.font.FontWeight
 import com.viant.forgeandroid.runtime.ContainerDef
 import com.viant.forgeandroid.runtime.ForgeRuntime
+import com.viant.forgeandroid.runtime.JsonUtil
 import com.viant.forgeandroid.runtime.WindowContext
+import com.viant.forgeandroid.runtime.evaluateDashboardCondition
 
 @Composable
 fun TabsRenderer(runtime: ForgeRuntime, window: WindowContext, container: ContainerDef) {
@@ -48,12 +50,25 @@ fun TabsRenderer(runtime: ForgeRuntime, window: WindowContext, container: Contai
     if (containers.isEmpty()) return
 
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val compactPages = remember(container) { mobileTabPages(container) }
+        val authorization = window.metadata.peek()?.authorizationSnapshot
+            ?.mapValues { JsonUtil.elementToAny(it.value) }
+            .orEmpty()
+        val compactPages = remember(container, authorization) {
+            mobileTabPages(container).filter { page ->
+                evaluateDashboardCondition(
+                    condition = page.container.visibleWhen,
+                    windowForm = window.peekWindowForm(),
+                    authorization = authorization
+                )
+            }
+        }
         val tabStyle = container.tabs?.style?.trim()?.lowercase().orEmpty()
         val presentation = container.tabs?.presentation?.trim()?.lowercase().orEmpty()
         if (presentation in setOf("views", "pages", "stack") && compactPages.isNotEmpty()) {
             MobileTabViewStackRenderer(runtime, window, container, compactPages)
-        } else if (maxWidth < 600.dp && tabStyle !in setOf("menu", "dropdown", "picker") && compactPages.isNotEmpty()) {
+        } else if ((runtime.targetContext.formFactor.equals("phone", ignoreCase = true) || maxWidth < 600.dp) &&
+            tabStyle !in setOf("menu", "dropdown", "picker") && compactPages.isNotEmpty()
+        ) {
             MobileTabPagesRenderer(runtime, window, container, compactPages)
         } else {
             StandardTabsRenderer(runtime, window, container)
@@ -112,7 +127,7 @@ internal data class MobileTabPage(
 
 internal fun mobileTabPages(container: ContainerDef): List<MobileTabPage> =
     container.containers.flatMap { child ->
-        if (child.tabs != null && child.containers.isNotEmpty()) {
+        if (container.tabs?.flattenNestedOnCompact == true && child.tabs != null && child.containers.isNotEmpty()) {
             child.containers.mapIndexed { index, nested ->
                 MobileTabPage(
                     id = nested.id ?: "${child.id ?: "tab"}-$index",
@@ -131,7 +146,7 @@ internal fun mobileTabPages(container: ContainerDef): List<MobileTabPage> =
 
 private fun initialMobileTabPageIndex(container: ContainerDef, pages: List<MobileTabPage>): Int {
     val topLevel = container.containers.getOrNull(resolveInitialTabIndex(container)) ?: return 0
-    val requestedId = if (topLevel.tabs != null && topLevel.containers.isNotEmpty()) {
+    val requestedId = if (container.tabs?.flattenNestedOnCompact == true && topLevel.tabs != null && topLevel.containers.isNotEmpty()) {
         topLevel.containers.getOrNull(resolveInitialTabIndex(topLevel))?.id
     } else {
         topLevel.id
@@ -151,7 +166,7 @@ private fun MobileTabPagesRenderer(
     val currentIndex = index.coerceIn(0, pages.lastIndex)
     val currentPage = pages[currentIndex]
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (pages.size > 3) {
+        if (pages.size > 1) {
             CompactSectionNavigator(
                 entries = pages.map { it.id to it.title },
                 selectedId = currentPage.id,
@@ -163,17 +178,6 @@ private fun MobileTabPagesRenderer(
                 },
                 fallbackLabel = "Section",
                 chooserContentDescription = "Choose feed section"
-            )
-        } else {
-            SectionTabRail(
-                items = pages.map { SectionTabItem(it.id, it.title) },
-                selectedId = currentPage.id,
-                onSelect = { selectedId ->
-                    pages.indexOfFirst { it.id == selectedId }.takeIf { it >= 0 }?.let {
-                        index = it
-                        emitTabInteraction(runtime, window, container, pages[it].id, pages[it].title, it)
-                    }
-                }
             )
         }
         key(currentPage.id) {

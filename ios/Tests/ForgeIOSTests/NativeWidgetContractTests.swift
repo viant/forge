@@ -3,6 +3,36 @@ import XCTest
 @testable import ForgeIOSUI
 
 final class NativeWidgetContractTests: XCTestCase {
+    func testConditionalEditabilitySurvivesItemRoundTrip() throws {
+        let raw = Data(#"{"id":"contact","readOnlyWhen":{"source":"authorization","field":"resource.capabilities.write","notEquals":true}}"#.utf8)
+        let item = try JSONDecoder().decode(ItemDef.self, from: raw)
+        let encoded = try JSONEncoder().encode(item)
+        let restored = try JSONDecoder().decode(ItemDef.self, from: encoded)
+        XCTAssertEqual(restored.properties["readOnlyWhen"], item.properties["readOnlyWhen"])
+        XCTAssertNotNil(restored.properties["readOnlyWhen"])
+        let condition = try JSONDecoder().decode(DashboardConditionDef.self, from: JSONEncoder().encode(restored.properties["readOnlyWhen"]!))
+        XCTAssertTrue(DashboardRuntime.evaluateDashboardCondition(condition, authorization: [:]))
+        XCTAssertFalse(DashboardRuntime.evaluateDashboardCondition(condition, authorization: ["resource": ["capabilities": ["write": true]]]))
+    }
+
+    func testHiddenBindingClassSurvivesMetadataRoundTrip() throws {
+        let data = Data(#"{"id":"loader","className":"extra forge-container-hidden","dataSourceRef":"lookup","fetchData":true}"#.utf8)
+        let container = try JSONDecoder().decode(ContainerDef.self, from: data)
+        let restored = try JSONDecoder().decode(ContainerDef.self, from: JSONEncoder().encode(container))
+        XCTAssertTrue(restored.isHiddenBinding)
+        XCTAssertEqual(restored.dataSourceRef, "lookup")
+        XCTAssertEqual(restored.fetchData, true)
+        XCTAssertFalse(ContainerDef(id: "visible").isHiddenBinding)
+    }
+
+    func testObjectEditorPreservesPayloadWhileLabelUsesDisplayName() throws {
+        let value: JSONValue = .object(["name": .string("Pacific Time"), "utcOffset": .number(-8), "id": .number(7)])
+        let encoded = NativeWidgetContract.editorText(value, kind: "object")
+        XCTAssertEqual(NativeWidgetContract.input(encoded, kind: "object"), value)
+        XCTAssertEqual(NativeWidgetContract.editorText(value, kind: "label"), "Pacific Time (GMT -8)")
+        XCTAssertEqual(NativeWidgetContract.text(.object(["name": .string("Zone"), "utcOffset": .string("nan")])), "Zone")
+    }
+
     private func fixtures() throws -> [String: JSONValue] {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         return try JSONDecoder().decode(JSONValue.self, from: Data(contentsOf: root.appendingPathComponent("src/components/primitives/nativeWidgetContract.fixtures.json"))).objectValue!
@@ -53,6 +83,23 @@ final class NativeWidgetContractTests: XCTestCase {
         XCTAssertTrue(NativeWidgetContract.disabled(item))
         let decoded = try JSONDecoder().decode(ItemDef.self, from: JSONEncoder().encode(item))
         XCTAssertEqual(NativeWidgetContract.options(decoded).map(\.0), [.number(2), .bool(false)])
+    }
+
+    func testObjectBackedLabelsUseSemanticNativeText() {
+        XCTAssertEqual(
+            NativeWidgetContract.text(.object([
+                "name": .string("America/Los_Angeles"),
+                "description": .string("Pacific Time"),
+                "utcOffset": .number(-8),
+                "utcDstOffset": .number(-7)
+            ])),
+            "Pacific Time (GMT -8/-7)"
+        )
+        XCTAssertEqual(
+            NativeWidgetContract.text(.object(["id": .number(7), "caption": .string("Retail")])),
+            "Retail"
+        )
+        XCTAssertTrue(NativeWidgetContract.text(.object(["id": .number(7)])).contains("\"id\""))
     }
     func testDraftBaselineResetAndSuccessfulSaveContract() {
         let initial: [String: JSONValue] = ["id": .number(1), "name": .string("Before")]

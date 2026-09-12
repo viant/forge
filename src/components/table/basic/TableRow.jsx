@@ -8,6 +8,8 @@ import {isRowSelectionDisabled} from '../rowSelection.js';
 
 const TableRow = ({
                       context,
+                       fillerWidth = 0,
+                       fixedRowHeight,
                       rowData,
                       rowStyle,
                       rowClassName,
@@ -41,6 +43,7 @@ const TableRow = ({
         const cellSelection = { ...rowSelection, colIndex, col };
         cells.push(
             <TableCell
+                fixedRowHeight={fixedRowHeight}
                 context={context}
                 key={cell.id}
                 cell={cell}
@@ -65,6 +68,7 @@ const TableRow = ({
             data-selection-disabled={rowSelectionDisabled || undefined}
         >
             {cells}
+            {fillerWidth > 0 ? <td className="forge-table-trailing-space" aria-hidden="true" onClick={event=>event.stopPropagation()} onDoubleClick={event=>event.stopPropagation()} onMouseDown={event=>event.stopPropagation()}/> : null}
         </tr>
     );
 };

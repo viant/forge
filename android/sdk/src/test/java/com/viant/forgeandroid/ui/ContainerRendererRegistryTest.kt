@@ -10,6 +10,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import com.viant.forgeandroid.runtime.ExecutionDef
 import com.viant.forgeandroid.runtime.ItemDef
+import com.viant.forgeandroid.runtime.ContainerDef
 
 private object TestContainerRendererExtension : ForgeContainerRendererExtension {
     @Composable
@@ -17,6 +18,12 @@ private object TestContainerRendererExtension : ForgeContainerRendererExtension 
 }
 
 class ContainerRendererRegistryTest {
+    @Test
+    fun `headless datasource bindings occupy no presentation space`() {
+        assertTrue(isHeadlessDataBinding(ContainerDef(id = "loader", dataSourceRef = "rows", fetchData = false)))
+        assertTrue(isHeadlessDataBinding(ContainerDef(id = "hidden", className = "forge-container-hidden")))
+        assertFalse(isHeadlessDataBinding(ContainerDef(id = "table", dataSourceRef = "rows", table = com.viant.forgeandroid.runtime.TableDef())))
+    }
     @Test
     fun `editable controls with callbacks remain forms`() {
         assertFalse(

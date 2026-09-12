@@ -1,37 +1,16 @@
-
-.window-controls {
-    display: flex;
-    align-items: center;
-    margin-left: 8px; /* Adjust as needed */
-}
-
-.window-control {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    margin-right: 6px;
-    border: none;
-    padding: 0;
+.window-controls { display: flex; align-items: center; flex: none; gap: 2px; }
+.window-controls > .window-control {
+    display: inline-flex; align-items: center; justify-content: center;
+    flex: 0 0 28px; width: 28px; height: 28px; min-height: 28px;
+    padding: 0; border: 0; border-radius: 5px; background: transparent;
     cursor: pointer;
-    outline: none;
 }
-
-.close-control {
-    background-color: #ff5f57;
-}
-
-.minimize-control {
-    background-color: #ffbd2e;
-}
-
-.maximize-control {
-    background-color: #28c940;
-}
-
-.window-control:hover {
-    filter: brightness(85%);
-}
-
-.window-control:focus {
-    outline: none;
+.window-control__indicator { display: block; flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--forge-window-control-color); }
+.close-control { --forge-window-control-color: #ff5f57; }
+.minimize-control { --forge-window-control-color: #ffbd2e; }
+.maximize-control { --forge-window-control-color: #28c940; }
+.window-control:hover .window-control__indicator { filter: brightness(.85); }
+.window-controls > .window-control:focus-visible { outline: 2px solid var(--forge-focus-color, #215db0); outline-offset: 1px; }
+@media (pointer: coarse) {
+    .window-controls > .window-control { flex-basis: 44px; width: 44px; height: 44px; }
 }

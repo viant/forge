@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import {sanitizeTablePreferences,applyTableColumnPreferences,createBrowserTablePreferences} from './tablePreferences.js';
+const onClick=()=>{};
+const input={version:1,columns:[{id:'b',width:180,visible:false,onClick,row:{secret:1}},{id:'a',visible:false},{id:'removed'}],density:'compact',frozenColumnIds:['b'],sort:{columnId:'b',direction:'desc'},rows:[{secret:2}]};
+const clean=sanitizeTablePreferences(input);
+assert.ok(!JSON.stringify(clean).includes('secret'));assert.equal(clean.columns[0].onClick,undefined);
+const columns=applyTableColumnPreferences([{id:'a',nonExcludable:true,onClick},{id:'b'},{id:'new'}],clean);
+assert.deepEqual(columns.map(c=>c.id),['b','a','new']);assert.equal(columns[1].visible,true);assert.equal(columns[1].onClick,onClick);assert.equal(columns[0].sticky,'left');
+const data=new Map([['legacy',JSON.stringify([{id:'a',width:90,on:{handler:'never persist'}}])]]);
+const storage={getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)};
+const adapter=createBrowserTablePreferences({storage});
+assert.deepEqual(await adapter.get('legacy'),{version:1,columns:[{id:'a',width:90}]});assert.equal(data.has('legacy'),false);
+await Promise.all([adapter.set('key',input),adapter.set('key',{version:1,columns:[{id:'last'}]})]);assert.equal((await adapter.get('key')).columns[0].id,'last');
+await adapter.reset('key');assert.equal(await adapter.get('key'),null);
+const broken=createBrowserTablePreferences({storage:{getItem:()=>null,setItem:()=>{throw Error('quota');},removeItem:()=>{}}});await assert.rejects(broken.set('key',clean),/quota/);
+console.log('Table preference sanitization, order, migration, write ordering, reset and failures passed.');
+
+const {createTablePreferenceSession,validateTablePreferences}=await import('./tablePreferences.js');
+assert.throws(()=>validateTablePreferences({version:1,columns:[],unexpected:true}));
+assert.throws(()=>validateTablePreferences({version:1,columns:[{id:'a',width:5000}]}));
+let resolveLoad;
+const updates=[],writes=[];
+const session=createTablePreferenceSession({get:()=>new Promise(resolve=>resolveLoad=resolve),set:async(key,value)=>writes.push(['set',key,value]),reset:async key=>writes.push(['reset',key])},'stable',state=>updates.push(state));
+const loading=session.load();await session.save({version:1,columns:[{id:'edited'}]});resolveLoad({version:1,columns:[{id:'stale'}]});await loading;
+assert.equal(updates.at(-1).preferences.columns[0].id,'edited');
+await session.reset();assert.equal(updates.at(-1).preferences,null);assert.deepEqual(writes.map(w=>w[0]),['set','reset']);
+session.dispose();const count=updates.length;await session.save({version:1,columns:[]});assert.equal(updates.length,count);
+const scoped=createBrowserTablePreferences({storage,namespace:'user-two'});assert.equal(await scoped.get('legacy'),null);
+console.log('Strict DTO checks, stale hydration, ordered reset, disposal and namespace isolation passed.');
+
+assert.throws(()=>sanitizeTablePreferences({version:1,columns:Array.from({length:100},(_,i)=>({id:`c${i}`,tooltip:'x'.repeat(1024)}))}),/64 KiB/);

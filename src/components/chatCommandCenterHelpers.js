@@ -58,6 +58,7 @@ export function resolveCurrentModel(metaSnapshot = {}) {
     const selectedAgentPreferredModel = defaultAgentModel(metaSnapshot, currentAgent);
     const rawCurrentModel = normalizeString(metaSnapshot?.model);
     const defaultModel = normalizeString(commandCenterDefaults?.model);
+    if (rawCurrentModel && rawCurrentModel === normalizeString(metaSnapshot?.userDefaultModel)) return rawCurrentModel;
     if (!currentAgent || !selectedAgentPreferredModel) return rawCurrentModel;
     if (!rawCurrentModel || rawCurrentModel === defaultModel) return selectedAgentPreferredModel;
     return rawCurrentModel;

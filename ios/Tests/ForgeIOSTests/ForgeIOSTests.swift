@@ -3,6 +3,27 @@ import XCTest
 @testable import ForgeIOSUI
 
 final class ForgeIOSTests: XCTestCase {
+    func testNativeDateTime24Formatting() {
+        XCTAssertEqual(DashboardRuntime.formatDashboardValue("2027-01-31T23:00:00Z", format: "dateTime24"), "Jan 31, 2027, 23:00")
+        XCTAssertEqual(DashboardRuntime.formatDashboardValue("unknown", format: "dateTime24"), "unknown")
+    }
+
+    func testClientPagesPreserveOrderAndClampAfterRefresh() {
+        let rows = Array(1...23)
+        XCTAssertEqual(clientTablePage(rows, page: 1, size: 10), Array(1...10))
+        XCTAssertEqual(clientTablePage(rows, page: 2, size: 10), Array(11...20))
+        XCTAssertEqual(clientTablePage(rows, page: 3, size: 10), [21, 22, 23])
+        XCTAssertEqual(clientTablePage([1, 2], page: 3, size: 10), [1, 2])
+        XCTAssertEqual(clientTablePage([Int](), page: 3, size: 10), [])
+    }
+
+    func testAdvertiserRawIdentifiersAndFractionPrecision() {
+        XCTAssertEqual(DashboardRuntime.formatDashboardValue(710001.0, format: "raw"), "710001")
+        XCTAssertEqual(DashboardRuntime.formatDashboardValue("00710001", format: "raw"), "00710001")
+        XCTAssertEqual(DashboardRuntime.formatDashboardValue(0.08, format: "percentFraction2"), "8.00%")
+        XCTAssertEqual(DashboardRuntime.formatDashboardValue(0.00073956, format: "percentFraction3"), "0.074%")
+    }
+
     func testWindowMetadataDecodesDashboardConditionJsonOperands() throws {
         let data = Data("""
         {
@@ -2565,6 +2586,12 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(title, "OLV_BAU_AUS (2660900)")
     }
 
+    func testRowWindowTitleUsesNameWithoutExposingRecord() {
+        let link = LinkDef(windowKey: "order", windowTitleSource: "row")
+        XCTAssertEqual(resolveLinkWindowTitleFromContext(link: link, context: LinkResolutionContext(row: ["id": .number(7), "name": .string("Order Seven"), "details": .string("internal detail")]), fallbackTitle: "Order"), "Order Seven")
+        XCTAssertEqual(resolveLinkWindowTitleFromContext(link: link, context: LinkResolutionContext(row: ["id": .number(7)]), fallbackTitle: "Order"), "Order")
+    }
+
     func testResolveColumnLinkTargetRejectsWindowLinksWithoutAKey() {
         let target = resolveColumnLinkTargetFromContext(
             column: ColumnDef(
@@ -2641,6 +2668,18 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(state?.canGoPrevious, true)
         XCTAssertEqual(state?.canGoNext, true)
         XCTAssertEqual(state?.canGoLast, false)
+    }
+
+    func testTablePaginationInfersLastPageFromTotalAndSize() {
+        let paging = DataSourcePagingDef(size: 10, enabled: true)
+        let metrics: [String: JSONValue] = ["totalCount": .number(23)]
+        let first = tablePaginationState(paging: paging, metrics: metrics, input: InputState(page: 1))
+        let last = tablePaginationState(paging: paging, metrics: metrics, input: InputState(page: 3))
+        XCTAssertEqual(first?.totalPages, 3)
+        XCTAssertEqual(first?.canGoNext, true)
+        XCTAssertEqual(first?.canGoLast, true)
+        XCTAssertEqual(last?.canGoNext, false)
+        XCTAssertEqual(last?.canGoPrevious, true)
     }
 
     func testTableDefDecodesLegacyStringColumnsAndRichActionColumns() throws {
@@ -3250,6 +3289,38 @@ final class ForgeIOSTests: XCTestCase {
         XCTAssertEqual(metrics["hasMore"], .bool(false))
     }
 
+    func testDataSourceRuntimeFetchPrefersExplicitMetricsSelector() async {
+        let runtime = DataSourceRuntime()
+        let dataSourceID = "window123DSidentity"
+        let session = makeMockSession(responseBody: #"{"data":[{"id":700001,"name":"Synthetic advertiser"}],"dataInfo":{"hasMore":false}}"#)
+
+        await runtime.fetchCollection(
+            dataSourceID: dataSourceID,
+            baseURL: "https://example.test",
+            path: "/v1/api/datasources/identity/fetch",
+            method: "POST",
+            selectors: DataSourceSelectorDef(data: "data", dataInfo: "dataInfo", metrics: "data.0"),
+            session: session
+        )
+
+        let metrics = await runtime.metrics(dataSourceID: dataSourceID)
+        XCTAssertEqual(metrics["id"], .number(700001))
+        XCTAssertEqual(metrics["name"], .string("Synthetic advertiser"))
+    }
+
+    func testFailedHTTPFetchPreservesRowsAndReportsError() async {
+        let runtime = DataSourceRuntime()
+        let rows: [[String: JSONValue]] = [["id": .number(1)]]
+        await runtime.setCollection(dataSourceID: "orders", rows: rows)
+        let session = makeMockSession(responseBody: #"{"code":"windowPreviewError","message":"upstream unavailable"}"#, statusCode: 422)
+        await runtime.fetchCollection(dataSourceID: "orders", baseURL: "https://example.test", path: "/orders", session: session)
+        let retained = await runtime.collection(dataSourceID: "orders")
+        let control = await runtime.control(dataSourceID: "orders")
+        XCTAssertEqual(retained, rows)
+        XCTAssertEqual(control.error, "Unable to load data (HTTP 422). Please retry.")
+        XCTAssertFalse(control.loading)
+    }
+
     func testDataSourceRuntimeFetchExtractsPagingMetricsWhenDataInfoSelectorMissing() async {
         let runtime = DataSourceRuntime()
         let dataSourceID = "window123DSmain"
@@ -3380,6 +3451,25 @@ final class ForgeIOSTests: XCTestCase {
                     ]
                 ),
                 filters: ["segments": ["enterprise", "direct"]]
+            )
+        )
+    }
+
+    func testEvaluateDashboardConditionSupportsAuthorizationContains() throws {
+        let condition = try JSONDecoder().decode(
+            DashboardConditionDef.self,
+            from: Data(#"{"source":"authorization","field":"principal.features","contains":"EXPOSE_UNIVERSAL_PIXELS"}"#.utf8)
+        )
+        XCTAssertTrue(
+            DashboardRuntime.evaluateDashboardCondition(
+                condition,
+                authorization: ["principal": ["features": ["EXPOSE_UNIVERSAL_PIXELS", "EXPOSE_ROAS_OPTIMIZATION"]]]
+            )
+        )
+        XCTAssertFalse(
+            DashboardRuntime.evaluateDashboardCondition(
+                condition,
+                authorization: ["principal": ["features": ["EXPOSE_ROAS_OPTIMIZATION"]]]
             )
         )
     }

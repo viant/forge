@@ -93,12 +93,17 @@ func resolveLinkWindowTitleFromContext(
     let selector = (link.windowTitleSelector ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
     let source = (link.windowTitleSource ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     if !selector.isEmpty || !source.isEmpty {
+        let value = resolveLinkSourceValue(source: source.isEmpty ? "row" : source, selector: selector, context: context)
+        if let object = value?.objectValue {
+            for key in ["name", "title", "label", "caption"] {
+                if let title = object[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+                    return title
+                }
+            }
+            return (link.windowTitle?.isEmpty == false ? link.windowTitle : nil) ?? fallbackTitle
+        }
         let resolved = (
-            resolveLinkSourceValue(
-            source: source.isEmpty ? "row" : source,
-            selector: selector,
-            context: context
-            )?.linkDisplayString ?? ""
+            value?.linkDisplayString ?? ""
         ).trimmingCharacters(in: .whitespacesAndNewlines)
         if !resolved.isEmpty {
             return resolved

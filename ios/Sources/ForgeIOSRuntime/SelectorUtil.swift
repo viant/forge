@@ -1,6 +1,30 @@
 import Foundation
 
 public enum SelectorUtil {
+    /// Updates the same dotted object/array paths supported by resolve.
+    /// Invalid array indices and traversal through scalar values leave the input unchanged.
+    public static func setting(_ value: JSONValue, in root: JSONValue, selector: String) -> JSONValue? {
+        let parts = selector.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+        guard !parts.isEmpty, parts.allSatisfy({ !$0.isEmpty }) else { return nil }
+        func update(_ node: JSONValue, _ index: Int) -> JSONValue? {
+            guard index < parts.count else { return value }
+            let key = parts[index]
+            switch node {
+            case .object(var object):
+                guard let next = update(object[key] ?? .object([:]), index + 1) else { return nil }
+                object[key] = next
+                return .object(object)
+            case .array(var array):
+                guard let offset = Int(key), array.indices.contains(offset),
+                      let next = update(array[offset], index + 1) else { return nil }
+                array[offset] = next
+                return .array(array)
+            default: return nil
+            }
+        }
+        return update(root, 0)
+    }
+
     public static func resolve(_ values: [String: JSONPrimitive], selector: String?) -> JSONPrimitive? {
         resolve(values as [String: Any], selector: selector).flatMap(JSONPrimitive.init(any:))
     }

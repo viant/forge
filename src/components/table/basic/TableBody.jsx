@@ -9,6 +9,8 @@ import TableRow from "./TableRow.jsx";
  * ------------------------------------------------------------------ */
 const TableBody = ({
                        context,
+                       fillerWidth = 0,
+                       fixedRowHeight,
                        collection,
                        preparedData,
                        columns,
@@ -26,9 +28,10 @@ const TableBody = ({
         return (
             <tbody>
             <TableBackfill
+                fixedRowHeight={fixedRowHeight}
                 context={context}
                 rowCount={backfillCount}
-                colSpan={columns.length}
+                colSpan={columns.length + (fillerWidth > 0 ? 1 : 0)}
                 loading={loading}
                 error={error}
                 collection={collection}
@@ -44,6 +47,8 @@ const TableBody = ({
         const rowSelection = {rowIndex, row};
         rows.push(
             <TableRow
+                fillerWidth={fillerWidth}
+                fixedRowHeight={fixedRowHeight}
                 context={context}
                 key={rowIndex}
                 rowData={rowData}
@@ -63,9 +68,10 @@ const TableBody = ({
         <tbody>
         {rows}
         <TableBackfill
+                fixedRowHeight={fixedRowHeight}
             context={context}
             rowCount={backfillCount}
-            colSpan={columns.length}
+            colSpan={columns.length + (fillerWidth > 0 ? 1 : 0)}
             loading={loading}
             collection={collection}
         />

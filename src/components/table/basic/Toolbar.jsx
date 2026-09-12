@@ -1,3 +1,4 @@
+import {actionIconOnly, actionAccessibleName} from './actionPresentation.js';
 import {useWorkspacePresentation, workspaceToolbarItem} from '../../../core/context/WorkspacePresentation.jsx';
 
 import React from 'react';
@@ -5,6 +6,8 @@ import {Button, Checkbox, Menu, MenuItem, Popover, Switch} from '@blueprintjs/co
 import { useSignals } from '@preact/signals-react/runtime';
 import QuickFilterInputs from './QuickFilterInputs.jsx';
 import QuickFilterToggle from './QuickFilterToggle.jsx';
+import QuickSearch from './QuickSearch.jsx';
+import RefreshAction from './RefreshAction.jsx';
 import PaginationBar from './PaginationBar.jsx';
 import "./Toolbar.css";
 import { useToolbarControlEvents } from '../../../hooks/event.js';
@@ -47,7 +50,7 @@ export function toolbarItemIcon(icon) {
 }
 
 export function toolbarItemLabel(item = {}) {
-    return item.hideLabel === true ? null : (item.label || "");
+    return actionIconOnly(item) ? null : (item.label || "");
 }
 
 export function toolbarDisabledWrapperProps(item = {}, disabled = false) {
@@ -220,14 +223,14 @@ export function TableExportControl({item, align, disabled = false, rows = [], co
                 <Button
                     type="button"
                     icon={toolbarItemIcon(item.icon || 'export')}
-                    rightIcon={item.hideLabel ? undefined : "caret-down"}
-                    className={item.className}
+                    rightIcon={actionIconOnly({...item, icon: item.icon || 'export'}) ? undefined : "caret-down"}
+                    className={['forge-toolbar-action', actionIconOnly(item) ? 'is-icon-only' : '', item.className].filter(Boolean).join(' ')}
                     loading={busy}
                     disabled={exportDisabled}
                     aria-label={item.ariaLabel || item.tooltip || item.label || 'Export'}
                     title={item.tooltip || item.label || 'Export'}
                 >
-                    {toolbarItemLabel(item) || ''}
+                    {toolbarItemLabel({...item, icon: item.icon || 'export'}) || ''}
                 </Button>
             </Popover>
             {error ? <span className="forge-toolbar-export-error" role="alert">{error}</span> : null}
@@ -238,6 +241,8 @@ export function TableExportControl({item, align, disabled = false, rows = [], co
 const Toolbar = ({
                      context,
                      toolbarItems = [],
+                     leftContent,
+                     centerContent,
                      exportRows = [],
                      exportPageRows = [],
                      exportColumns = [],
@@ -263,6 +268,12 @@ const Toolbar = ({
         const isVisible = stateEvents?.onVisible ? stateEvents.onVisible() : true;
         if (!toolbarItemShouldRender(item, context, isVisible)) return null;
         const isReadonly = stateEvents?.onReadonly ? stateEvents.onReadonly() : false;
+        if (item.type === 'quickSearch') {
+            return <QuickSearch key={item.id} context={context} item={item} disabled={item.disabled === true || disabled}/>;
+        }
+        if (item.id === 'refresh' && !item.on?.length) {
+            return <RefreshAction key={item.id} context={context} item={item} disabled={toolbarItemShouldDisable(item,context,isReadonly) || disabled}/>;
+        }
         if (item.type === 'tableExport' || item.widget === 'tableExport') {
             const rows = tableExportRows({filteredSortedRows: exportRows, pageRows: exportPageRows, scope: item?.properties?.scope});
             return <TableExportControl key={`table-export-${item.id}-${align}`} item={item} align={align} disabled={item.disabled === true || disabled || isReadonly} rows={rows} columns={exportColumns}/>;
@@ -309,10 +320,10 @@ const Toolbar = ({
                         <Button
                             type="button"
                             icon={toolbarItemIcon(item.icon)}
-                            rightIcon={item.hideLabel ? undefined : "caret-down"}
-                            className={item.className}
+                            rightIcon={actionIconOnly({...item, icon: item.icon || 'export'}) ? undefined : "caret-down"}
+                            className={['forge-toolbar-action', actionIconOnly(item) ? 'is-icon-only' : '', item.className].filter(Boolean).join(' ')}
                             disabled={menuDisabled}
-                            aria-label={item.ariaLabel || item.tooltip || item.label || item.id}
+                            aria-label={actionAccessibleName(item)}
                             title={item.tooltip || item.label || item.id}
                         >
                             {toolbarItemLabel(item)}
@@ -378,7 +389,7 @@ const Toolbar = ({
             const BooleanControl = item.type === 'switch' || item.widget === 'switch' ? Switch : Checkbox;
             const booleanClassName = item.type === 'switch' || item.widget === 'switch' ? undefined : 'forge-blueprint-checkbox-compat';
             return <span key={`boolean-${item.id}-${align}`} className="forge-toolbar-boolean" style={align === 'right' ? {marginLeft: 10} : {marginRight: 10}}>
-                <BooleanControl className={booleanClassName} checked={checked} disabled={booleanDisabled} readOnly={booleanReadonly} aria-readonly={booleanReadonly || undefined} label={item.label || undefined} aria-label={item.ariaLabel || item.tooltip || item.label || item.id} title={item.tooltip || item.label || item.id} onChange={change}/>
+                <BooleanControl className={booleanClassName} checked={checked} disabled={booleanDisabled} readOnly={booleanReadonly} aria-readonly={booleanReadonly || undefined} label={item.label || undefined} aria-label={actionAccessibleName(item)} title={item.tooltip || item.label || item.id} onChange={change}/>
             </span>;
         }
         if (item.type === 'pagination' || item.id === 'pagination') {
@@ -485,9 +496,9 @@ const Toolbar = ({
                     minimal={item.appearance === 'minimal'}
                     outlined={item.appearance === 'outlined'}
                     data-testid={testID}
-                    aria-label={item.ariaLabel || item.tooltip || item.label || item.id}
+                    aria-label={actionAccessibleName(item)}
                     title={item.tooltip || item.label || item.id}
-                    className={item.className}
+                    className={['forge-toolbar-action', actionIconOnly(item) ? 'is-icon-only' : '', item.className].filter(Boolean).join(' ')}
                     style={item.style}
                 >
                     {toolbarItemLabel(item)}
@@ -517,11 +528,14 @@ const Toolbar = ({
         >
             {/* Items aligned to the left */}
             <div className="toolbar-left">
+                {leftContent}
                 {renderAlignedItems('left')}
             </div>
             {/* Items aligned to the center */}
             <div className="toolbar-center">
-                {renderAlignedItems('center')}
+                {React.isValidElement(centerContent) && centerContent.type === PaginationBar
+                    ? React.cloneElement(centerContent, {}, renderAlignedItems('center'))
+                    : <>{centerContent}{renderAlignedItems('center')}</>}
             </div>
             {/* Items aligned to the right */}
             <div className="toolbar-right">

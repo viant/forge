@@ -1,0 +1,18 @@
+.forge-camera-capture.bp6-dialog {
+    width: 560px;
+    max-width: calc(100vw - 32px);
+    color: var(--forge-text-color, #243247);
+    background: var(--forge-control-bg, #fff);
+}
+.forge-camera-capture video {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: contain;
+    background: #101820;
+    border-radius: 6px;
+}
+.forge-camera-capture p { margin: 0 0 12px; }
+.forge-camera-capture video + p { margin: 12px 0 0; }
+.forge-camera-capture .bp6-button { min-height: 44px; }
+.forge-camera-capture .bp6-button:focus-visible { outline: 2px solid var(--forge-focus-color, #2167cf); outline-offset: 2px; }

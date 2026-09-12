@@ -52,6 +52,14 @@ class NativeWidgetContractTest {
         val decoded = JsonUtil.json.decodeFromString(ItemDef.serializer(),JsonUtil.json.encodeToString(ItemDef.serializer(),item))
         assertEquals(NativeWidgetContract.options(item),NativeWidgetContract.options(decoded))
     }
+    @Test fun objectDisplayUsesHumanReadableIdentityWithoutChangingRawText() {
+        val timezone = buildJsonObject {
+            put("description", "Pacific Time")
+            put("ianaTimezoneStr", "America/Los_Angeles")
+        }
+        assertEquals("Pacific Time", NativeWidgetContract.displayText(timezone))
+        assertEquals(timezone.toString(), NativeWidgetContract.text(timezone))
+    }
     @Test fun draftBaselineResetAndSaveContract() {
         val initial = mapOf("id" to 1, "name" to "Before")
         val edited = mapOf("id" to 1, "name" to "After")

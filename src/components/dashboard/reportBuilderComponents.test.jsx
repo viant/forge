@@ -812,3 +812,11 @@ assert.ok(artifactEntryCardHtml.includes("Use"));
 assert.ok(artifactEntryCardHtml.includes("Remove"));
 
 console.log("reportBuilderComponents ✓ renders semantic scope descriptions and diagnostics across static, inline, and category filter controls");
+
+const plainOptionsHtml = renderToStaticMarkup(<InlineStaticFilterControl filter={{id:"week",label:"Week",options:[{label:"September 1",value:"one"},{label:"September 8",value:"two"}]}} value="one" onToggle={()=>{}} />);
+assert.ok(plainOptionsHtml.includes("forge-report-builder-text-options"));
+assert.ok(plainOptionsHtml.includes('aria-pressed="true"'));
+assert.ok(!plainOptionsHtml.includes('class="forge-report-builder-icon-button__icon"'));
+const iconOptionsHtml = renderToStaticMarkup(<InlineStaticFilterControl filter={{id:"kind",label:"Kind",options:[{label:"Chart",value:"chart",icon:"chart"}]}} onToggle={()=>{}} />);
+assert.ok(iconOptionsHtml.includes('class="forge-report-builder-icon-button__icon"'));
+assert.ok(!iconOptionsHtml.includes('forge-report-builder-text-options'));

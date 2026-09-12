@@ -10,28 +10,15 @@
 }
 
 .basic-table-wrapper {
-    position: relative;
-    display: flex;
-    min-height: 0;
-    flex-direction: column;
-    overflow: hidden;
-    border: 1px solid #d7e0ec;
-    border-radius: 14px;
-    background: #ffffff;
-    box-shadow: 0 8px 22px rgba(22, 34, 51, 0.055);
+    position: relative; display: flex; min-height: 0; min-width: 0; flex-direction: column; overflow: hidden;
+    border: 1px solid var(--forge-table-border, #d7dce2); border-radius: var(--forge-table-radius, 4px);
+    background: var(--forge-table-surface, #fff);
 }
 
 .basic-table-filterbar {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    display: flex;
-    flex: 0 0 auto;
-    align-items: center;
-    min-height: 68px;
-    padding: 12px 16px;
-    border-bottom: 1px solid #e5eaf2;
-    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; gap: 8px;
+    min-height: 40px; padding: 6px 8px; border-bottom: 1px solid var(--forge-table-border, #d7dce2);
+    background: var(--forge-table-surface, #fff);
 }
 
 .basic-table-filterbar .toolbar-container {
@@ -63,8 +50,7 @@
 }
 
 .basic-table-filterbar.is-compact {
-    min-height: 56px;
-    padding: 10px 14px;
+    min-height: 40px; padding: 6px 8px;
 }
 
 .basic-table-filterbar.is-compact .toolbar-container:not(.is-responsive) {
@@ -119,7 +105,7 @@
     .basic-table-filterbar.is-compact .toolbar-container:not(.is-responsive) .toolbar-right,
     .basic-table-filterbar.is-compact .toolbar-left,
     .basic-table-filterbar.is-compact .toolbar-right {
-        flex: 1 1 100%;
+        flex: 1 1 auto;
         min-width: 0;
         flex-wrap: wrap;
     }
@@ -143,7 +129,7 @@
     min-width: 118px;
     border-color: #c8d1dc;
     color: #40506a;
-    background: #f8fafc;
+    background: var(--forge-table-muted-surface, #f8fafc);
     font-weight: 650;
 }
 
@@ -156,8 +142,6 @@
     scrollbar-color: #9aabc0 #edf2f7;
 }
 
-.basic-table-wrapper.has-table-overflow-left .basic-table-scroll { margin-left: 36px; }
-.basic-table-wrapper.has-table-overflow-right .basic-table-scroll { margin-right: 36px; }
 
 .basic-table-scroll::-webkit-scrollbar {
     width: 9px;
@@ -175,29 +159,16 @@
 }
 
 .basic-table-overflow-cue {
-    position: absolute;
-    top: 50%;
-    z-index: 7;
-    display: grid;
-    width: 30px;
-    height: 52px;
-    padding: 0;
-    place-items: center;
-    border: 1px solid #c8d4e2;
-    border-radius: 9px;
-    background: rgba(255, 255, 255, 0.94);
-    box-shadow: 0 4px 14px rgba(24, 45, 69, 0.18);
-    color: #31536d;
-    cursor: pointer;
-    font-size: 25px;
-    line-height: 1;
-    transform: translateY(-50%);
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 32px; height: 32px; padding: 0; border: 1px solid var(--forge-table-border, #d7dce2);
+    border-radius: 4px; background: var(--forge-table-surface, #fff); color: var(--forge-text, #263244);
+    cursor: pointer; font-size: 20px; line-height: 1;
 }
 
 .basic-table-overflow-cue:hover,
 .basic-table-overflow-cue:focus-visible {
     border-color: #7d9fc0;
-    background: #ffffff;
+    background: var(--forge-table-surface, #ffffff);
     color: #174f86;
 }
 
@@ -208,31 +179,21 @@
 .basic-table-wrapper td.is-sticky-left {
     position: sticky;
     z-index: 3;
-    background: #ffffff;
+    background: var(--forge-table-surface, #ffffff);
 }
 
 .basic-table-wrapper thead th.is-sticky-left {
-    z-index: 6;
-    background: #eaf2ff;
+    z-index: 6; background: var(--forge-table-header-surface, #f4f5f7);
 }
 
-.basic-table-wrapper tbody tr:nth-child(even) td.is-sticky-left { background: #f8fafc; }
-.basic-table-wrapper tbody tr:hover td.is-sticky-left { background: #f1f6fd; }
-.basic-table-wrapper .is-sticky-left.is-sticky-edge { box-shadow: 8px 0 12px -10px rgba(31, 51, 73, 0.65); }
+.basic-table-wrapper tbody tr:nth-child(even) td.is-sticky-left { background: var(--forge-table-muted-surface, #f8fafc); }
+.basic-table-wrapper tbody tr:hover td.is-sticky-left { background: var(--forge-table-hover-surface, #f1f6fd); }
+.basic-table-wrapper.has-table-overflow-left .is-sticky-left.is-sticky-edge { box-shadow: 8px 0 12px -10px rgba(31, 51, 73, 0.65); }
 
 .basic-table-paginationbar {
-    position: sticky;
-    bottom: 0;
-    z-index: 5;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 56px;
-    padding: 8px 16px;
-    border-top: 1px solid #d7dee9;
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow: 0 -10px 24px rgba(15, 23, 42, 0.08);
-    backdrop-filter: blur(12px);
+    display: flex; flex: 0 0 auto; align-items: center; justify-content: flex-end;
+    min-height: 40px; padding: 4px 8px; border-top: 1px solid var(--forge-table-border, #d7dce2);
+    background: var(--forge-table-surface, #fff);
 }
 
 .basic-table-paginationbar.is-responsive-rows {
@@ -255,9 +216,9 @@
 
 @media (max-width: 480px) {
     .basic-table-filterbar.is-compact .toolbar-container .toolbar-right {
-        width: 100%;
+        width: auto;
         max-width: 100%;
-        flex: 1 1 100%;
+        flex: 1 1 auto;
         justify-content: flex-start;
     }
 
@@ -482,27 +443,17 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    color: #263244;
+    color: var(--forge-text, #263244);
     font-size: 14px;
 }
 
 .pagination-bar > div {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 36px;
-    padding: 3px 8px;
-    border: 1px solid #dbe3ef;
-    border-radius: 999px;
-    background: #f8fafc;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    display: flex; align-items: center; gap: 4px; min-height: 32px; padding: 0;
     white-space: nowrap;
 }
 
 .pagination-bar span {
-    padding: 0 8px;
-    color: #1f2937;
-    font-weight: 600;
+    padding: 0 4px; color: var(--forge-text, #263244); font-weight: 400;
 }
 
 .pagination-bar .bp4-button,
@@ -511,14 +462,14 @@
     height: 28px;
     min-width: 28px;
     min-height: 28px;
-    border-radius: 50%;
+    border-radius: 4px;
     color: #607086;
 }
 
 .pagination-bar .bp4-button:not(:disabled):hover,
 .pagination-bar .bp6-button:not(:disabled):hover {
     background: #e9f1ff;
-    color: #245cc8;
+    color: var(--forge-focus-color, #245cc8);
 }
 
 .basic-table-wrapper table {
@@ -527,28 +478,17 @@
 }
 
 .basic-table-wrapper thead th {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    height: 22px;
-    padding: 1px 6px;
-    background: #eaf2ff;
-    border-bottom: 1px solid #d7e0ec;
-    color: #1849a9;
-    font-size: 13px;
-    font-weight: 700;
-    line-height: 18px;
-    letter-spacing: 0;
-    overflow-wrap: anywhere;
-    text-transform: none;
-    white-space: normal;
+    position: sticky; top: 0; z-index: 2; height: 32px; padding: 6px 8px;
+    background: var(--forge-table-header-surface, #f4f5f7); border-bottom: 1px solid var(--forge-table-border, #d7dce2);
+    color: var(--forge-text, #263244); font-size: 13px; font-weight: 600; line-height: 18px;
+    overflow-wrap: break-word; white-space: normal;
 }
 
 .basic-table-wrapper tfoot td {
     position: sticky;
     bottom: 0;
     z-index: 2;
-    background: rgba(255, 255, 255, 0.94);
+    background: var(--forge-table-surface, rgba(255, 255, 255, 0.94));
     border-top: 1px solid #d9e0ea;
     backdrop-filter: blur(10px);
 }
@@ -565,7 +505,7 @@
     padding: 5px 8px;
     border: 1px solid #c8d9fb;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.96);
+    background: var(--forge-table-surface, rgba(255, 255, 255, 0.96));
     box-shadow: 0 4px 14px rgba(18, 44, 87, 0.12);
     color: #40506a;
     font-size: 11px;
@@ -618,13 +558,13 @@
 }
 
 .forge-table-link {
-    color: #1757bc;
+    color: var(--forge-focus-color, #1757bc);
     font-weight: 600;
     text-decoration: none;
 }
 
 .forge-table-link:hover {
-    color: #0f4aa3;
+    color: var(--forge-focus-color, #0f4aa3);
     text-decoration: underline;
 }
 
@@ -703,7 +643,7 @@
     padding: 10px 14px;
     margin: 0;
     border-bottom: 1px solid #e2e8f0;
-    background: #ffffff;
+    background: var(--forge-table-surface, #ffffff);
     color: #243247;
     transition: background-color 120ms ease;
 }
@@ -847,3 +787,115 @@
     font-size: 14px;
     line-height: 1;
 }
+
+/* Shared table chrome: all entry paths use the same actions and controls. */
+.basic-table-filterbar > .toolbar-container { flex: 1 1 0; width: auto; min-width: 0; }
+.basic-table-filterbar > .forge-editable-collection__operation-bar { width: auto; margin: 0; }
+.basic-table-filterbar :is(button, input, select), .basic-table-paginationbar button {
+    min-height: 30px; border-radius: 4px; font-size: 13px;
+}
+.basic-table-column-navigation { display: flex; flex: none; justify-content: flex-end; gap: 4px; padding: 4px 8px; border-top: 1px solid var(--forge-table-border, #d7dce2); }
+.basic-table-overflow-cue:focus-visible { outline: 2px solid var(--forge-focus-color, #215db0); outline-offset: -2px; }
+@media (pointer: coarse) {
+    .basic-table-column-navigation button, .pagination-bar button { min-width: 44px; min-height: 44px; }
+}
+
+.basic-table-filterbar .forge-toolbar-action { min-height: 30px; padding: 4px 8px; box-shadow: none; }
+.basic-table-filterbar .forge-toolbar-action.is-icon-only { width: 30px; min-width: 30px; padding: 0; }
+.basic-table-filterbar .forge-toolbar-action:focus-visible { outline: 2px solid var(--forge-focus-color, #215db0); outline-offset: 1px; }
+.basic-table-paginationbar { min-height: 36px; padding-block: 2px; }
+.pagination-bar { font-size: 12px; }
+@media (pointer: coarse) {
+    .basic-table-filterbar .forge-toolbar-action.is-icon-only { width: 44px; min-width: 44px; min-height: 44px; }
+}
+
+.forge-table-error-message { color: var(--forge-text, #263244); }
+
+/* On narrow hosts, stacked toolbars must not consume the data viewport.
+   Preserve natural table content and delegate vertical scrolling to the panel. */
+@media (max-width: 600px) {
+    .basic-table-wrapper { flex-shrink: 0; min-height: min-content; }
+    .basic-table-scroll { flex: 0 0 auto; min-height: min-content; }
+}
+
+/* Conditional formatting classes for metadata rules, on rows or cells. */
+.basic-table-wrapper td.forge-table-tone-muted,
+.basic-table-wrapper tr.forge-table-tone-muted > td { color: var(--forge-table-muted-text, #607086); background: var(--forge-table-muted-surface, #f4f5f7); }
+.basic-table-wrapper td.forge-table-tone-warning,
+.basic-table-wrapper tr.forge-table-tone-warning > td { color: var(--forge-table-warning-text, #684a19); background: var(--forge-table-warning-surface, #faf4e7); }
+.basic-table-wrapper td.forge-table-emphasis,
+.basic-table-wrapper tr.forge-table-emphasis > td { font-weight: 600; }
+
+.basic-table-footer { display: flex; flex: none; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 36px; padding: 2px 8px; border-top: 1px solid var(--forge-table-border, #d7dce2); background: var(--forge-table-surface, #fff); }
+.basic-table-footer > .basic-table-column-navigation { padding: 0; border: 0; }
+.basic-table-footer > .basic-table-paginationbar { width: auto; padding: 0; border: 0; min-height: 32px; }
+.basic-table-wrapper.is-compact-density .basic-table-footer > .basic-table-paginationbar { min-height: 32px; padding: 0 !important; }
+
+/* Opt-in fixed row slots. Blank slots never become records or controls. */
+.basic-table-wrapper.has-fixed-row-slots table tbody tr { height: var(--forge-table-row-height); }
+.basic-table-wrapper.has-fixed-row-slots table tbody td { height: var(--forge-table-row-height) !important; padding: 0 6px !important; max-height: none; vertical-align: middle; }
+.forge-fixed-row-content { display: block; height: calc(var(--forge-table-row-height) - 1px); max-height: calc(var(--forge-table-row-height) - 1px); line-height: calc(var(--forge-table-row-height) - 1px); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.forge-fixed-row-content > * { max-height: 100%; overflow: hidden; text-overflow: ellipsis; }
+.basic-table-wrapper.has-fixed-row-slots .table-state-spacer-row { pointer-events: none; }
+
+/* Reservation is visible space, not merely offscreen DOM rows. The enclosing
+   panel scrolls when its allocation is smaller than the requested row slots. */
+.basic-table-wrapper.has-fixed-row-slots { min-height: min-content; }
+.basic-table-wrapper.has-fixed-row-slots .basic-table-scroll { flex: 0 0 auto; min-height: min-content; }
+
+.basic-table-wrapper.is-content-width .basic-table-scroll { scrollbar-gutter: auto; }
+
+.basic-table-record-status { display: inline-flex; align-items: center; min-height: 32px; padding: 0 4px; font-size: 12px; color: var(--forge-text, #263244); }
+
+/* One toolbar, three stable regions. Pagination never shares column arrows. */
+.basic-table-wrapper .basic-table-filterbar .toolbar-container.has-table-navigation {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px 8px;
+}
+.basic-table-wrapper .basic-table-filterbar .has-table-navigation > .toolbar-left,
+.basic-table-wrapper .basic-table-filterbar .has-table-navigation > .toolbar-right { min-width: 0; width: auto; flex-wrap: wrap; }
+.basic-table-wrapper .basic-table-filterbar .has-table-navigation > .toolbar-left { justify-content: flex-start; }
+.basic-table-wrapper .basic-table-filterbar .has-table-navigation > .toolbar-right { justify-content: flex-end; }
+.basic-table-wrapper .basic-table-filterbar .has-table-navigation > .toolbar-center { display: flex; flex: none; justify-content: center; white-space: nowrap; }
+.basic-table-wrapper .has-table-navigation .forge-editable-collection__operation-bar { width: auto; margin: 0; }
+.basic-table-scroll:focus-visible { outline: 2px solid var(--forge-focus-color, #215db0); outline-offset: -2px; }
+
+.basic-table-wrapper thead th { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.forge-table-header-content { display: flex; align-items: center; gap: 4px; height: 20px; min-width: 0; max-width: 100%; white-space: nowrap; }
+.forge-table-header-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.forge-table-header-content > .bp6-icon, .forge-table-header-content > input { flex: none; }
+.forge-table-header-sort { display: block; width: 100%; min-width: 0; min-height: 0; height: 20px; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: inherit; cursor: pointer; }
+.forge-table-header-sort:focus-visible { outline: 2px solid var(--forge-focus-color, #215db0); outline-offset: -2px; }
+
+.basic-table-wrapper .forge-table-trailing-space { padding: 0 !important; cursor: default; border-left: 0; border-right: 0; }
+
+/* Explicit phone scrolling policy: preserve useful body space and freeze its
+   header in the data scroller, rather than scrolling the whole table away. */
+@media (max-width: 600px) {
+    .basic-table-wrapper, .basic-table-wrapper.has-fixed-row-slots { min-height: 0; max-height: var(--forge-table-available-height, 60dvh); }
+    .basic-table-wrapper .basic-table-scroll,
+    .basic-table-wrapper.has-fixed-row-slots .basic-table-scroll { flex: 1 1 auto; min-height: 64px; }
+}
+
+/* Reserved slots are a continuous empty surface, not striped fake records. */
+.basic-table-wrapper.has-fixed-row-slots tbody tr.table-state-spacer-row > td,
+.basic-table-wrapper.has-fixed-row-slots tbody tr.table-state-spacer-row:hover > td {
+    background: var(--forge-table-surface, #fff); border: 0; box-shadow: none;
+}
+
+.basic-table-wrapper tbody td.forge-table-trailing-space,
+.basic-table-wrapper tbody tr:hover > td.forge-table-trailing-space {
+    background: var(--forge-table-surface, #fff); border: 0; box-shadow: none;
+}
+
+.forge-table-preference-error { padding: 6px 8px; color: var(--forge-text, #263244); background: var(--forge-table-header-surface, #f4f5f7); font-size: 12px; }
+@media (max-width: 600px) {
+    .basic-table-wrapper .basic-table-filterbar .toolbar-container.has-table-navigation {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+    .basic-table-wrapper .has-table-navigation > .toolbar-left { grid-column: 1; grid-row: 1; }
+    .basic-table-wrapper .has-table-navigation > .toolbar-right { grid-column: 2; grid-row: 1; }
+    .basic-table-wrapper .has-table-navigation > .toolbar-center { grid-column: 1 / -1; grid-row: 2; }
+}
+.forge-table-cell-stack.is-inline-badge { flex-direction: row; align-items: center; height: 100%; }
+.forge-table-cell-stack.is-inline-badge > .forge-table-cell-stack__primary { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.forge-table-cell-stack.is-inline-badge > .forge-table-cell-badge { flex: none; padding: 0; background: transparent; }

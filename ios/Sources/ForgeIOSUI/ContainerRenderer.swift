@@ -62,6 +62,9 @@ public struct ContainerRenderer: View {
         .task(id: permissionTaskKey) {
             await observePermissionState()
         }
+        .task(id: window?.windowID ?? "") {
+            await observeAuthorizationSnapshot()
+        }
         .onChange(of: permissionAllowed) { _, allowed in
             guard !allowed,
                   let spec = container.permissionBoundary,
@@ -143,8 +146,14 @@ public struct ContainerRenderer: View {
 
     private func containerActionToolbar(_ toolbar: ToolbarDef) -> some View {
         HStack(spacing: 8) {
-            ForEach(toolbar.items) { item in
+            ForEach(toolbar.items.filter { toolbarCondition($0.visibleWhen) }) { item in
                 if item.align == "right" { Spacer(minLength: 0) }
+                if item.type?.lowercased() == "status" {
+                    let message = toolbarStatusMessage(item)
+                    if !message.isEmpty || item.properties["hideWhenEmpty"] != .bool(true) {
+                        Text(message).font(.caption).foregroundStyle(.secondary)
+                    }
+                } else {
                 Button {
                     guard let runtime, let window else { return }
                     Task {
@@ -170,8 +179,9 @@ public struct ContainerRenderer: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .disabled(item.enabled == false)
+                .disabled(item.enabled == false || item.disabled == true || (item.disabledWhen != nil && toolbarCondition(item.disabledWhen)))
                 .accessibilityLabel(item.ariaLabel ?? item.tooltip ?? item.label ?? item.id ?? "Action")
+                }
             }
         }
         .frame(maxWidth: .infinity)
@@ -200,6 +210,8 @@ public struct ContainerRenderer: View {
 
     private var observesPrimitiveState: Bool {
         container.visibleWhen != nil
+            || container.toolbar?.items.contains(where: { $0.type?.lowercased() == "status" }) == true
+            || container.toolbar?.items.contains(where: { $0.visibleWhen != nil || $0.disabledWhen != nil }) == true
             || container.stableTabs != nil
             || container.dataStateBoundary != nil
             || container.relationDrill != nil
@@ -222,6 +234,29 @@ public struct ContainerRenderer: View {
         return "\(window?.windowID ?? "")#\(spec.dataSourceRef ?? "")#\(spec.capability ?? "")"
     }
 
+    private func toolbarCondition(_ condition: DashboardConditionDef?) -> Bool {
+        DashboardRuntime.evaluateDashboardCondition(
+            condition,
+            metrics: visibilityMetrics.mapValues(containerVisibilityAnyValue),
+            form: visibilityForm.mapValues(containerVisibilityAnyValue),
+            windowForm: visibilityWindowForm.mapValues(containerVisibilityAnyValue),
+            collection: visibilityCollection.map { $0.mapValues(containerVisibilityAnyValue) },
+            authorization: authorizationSnapshot.mapValues(containerVisibilityAnyValue)
+        )
+    }
+
+    private func toolbarStatusMessage(_ item: ToolbarItemDef) -> String {
+        let values: [String: JSONValue]
+        switch item.scope?.lowercased() {
+        case "windowform": values = visibilityWindowForm
+        case "metrics": values = visibilityMetrics
+        default: values = visibilityForm
+        }
+        guard let field = item.dataField else { return "" }
+        let value = SelectorUtil.resolve(values.mapValues(containerVisibilityAnyValue), selector: field)
+        return (value as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private var permissionRows: [[String: JSONValue]] {
         guard let spec = container.permissionBoundary else { return [] }
         switch spec.mode?.lowercased() ?? "resource" {
@@ -240,7 +275,8 @@ public struct ContainerRenderer: View {
             metrics: visibilityMetrics.mapValues(containerVisibilityAnyValue),
             form: visibilityForm.mapValues(containerVisibilityAnyValue),
             windowForm: visibilityWindowForm.mapValues(containerVisibilityAnyValue),
-            collection: visibilityCollection.map { $0.mapValues(containerVisibilityAnyValue) }
+            collection: visibilityCollection.map { $0.mapValues(containerVisibilityAnyValue) },
+            authorization: authorizationSnapshot.mapValues(containerVisibilityAnyValue)
         ) { return false }
         return WorkflowPrimitiveRuntime.permissionAllows(
             spec: spec,
@@ -300,7 +336,8 @@ public struct ContainerRenderer: View {
                 "selected": visibilitySelection.selected?.mapValues(containerVisibilityAnyValue) as Any,
                 "selection": visibilitySelection.selection.map { $0.mapValues(containerVisibilityAnyValue) },
                 "rowIndex": visibilitySelection.rowIndex
-            ]
+            ],
+            authorization: authorizationSnapshot.mapValues(containerVisibilityAnyValue)
         )
     }
 
@@ -421,6 +458,12 @@ public struct ContainerRenderer: View {
     }
 
     @MainActor
+    private func observeAuthorizationSnapshot() async {
+        guard let runtime, let window else { return }
+        authorizationSnapshot = await runtime.windowMetadata(id: window.windowID)?.authorizationSnapshot ?? [:]
+    }
+
+    @MainActor
     private func observePermissionState() async {
         guard let spec = container.permissionBoundary, let runtime, let window else { return }
         authorizationSnapshot = await runtime.windowMetadata(id: window.windowID)?.authorizationSnapshot ?? [:]
@@ -519,7 +562,7 @@ public struct ContainerRenderer: View {
         } else if effectiveContainer.stableTabs != nil {
             StableTabsRenderer(runtime: runtime, window: window, container: effectiveContainer, form: visibilityForm, collection: visibilityCollection, metrics: visibilityMetrics, windowForm: visibilityWindowForm, selection: visibilitySelection)
         } else if effectiveContainer.tabs != nil, !effectiveContainer.containers.isEmpty {
-            TabsRenderer(runtime: runtime, window: window, container: effectiveContainer)
+            TabsRenderer(runtime: runtime, window: window, container: effectiveContainer, suppressTitle: suppressTitle, authorization: authorizationSnapshot)
         } else if let editor = effectiveContainer.editor {
             VStack(alignment: .leading, spacing: 12) {
                 titleBlock
@@ -561,6 +604,11 @@ public struct ContainerRenderer: View {
                     }
                 }
             }
+        } else if effectiveContainer.dataSourceRef?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            // Metadata commonly declares headless datasource bindings alongside
+            // visible containers. They participate in lifecycle/loading but do
+            // not represent authored UI and must not become placeholder cards.
+            EmptyView()
         } else {
             PlaceholderContainerView(container: effectiveContainer)
         }
@@ -720,6 +768,9 @@ public struct ContainerRenderer: View {
 
     private var nestedGridColumns: [GridItem] {
         let layoutColumns = resolvedContainer().layout?.columns ?? 0
+        if horizontalSizeClass == .compact {
+            return [GridItem(.flexible(), spacing: 12, alignment: .top)]
+        }
         if layoutColumns >= 12 && horizontalSizeClass == .regular {
             return [GridItem(.adaptive(minimum: 220), spacing: 12, alignment: .top)]
         }
@@ -749,7 +800,7 @@ public struct ContainerRenderer: View {
             return merged
         }
         let presentation = state.rowLayout?.lowercased() == "table" ? "tabular" : table.presentation
-        return TableDef(
+        var result = TableDef(
             title: table.title,
             presentation: presentation,
             columns: columns,
@@ -762,6 +813,8 @@ public struct ContainerRenderer: View {
             target: table.target,
             targetOverrides: table.targetOverrides
         )
+        result.fillRemainingWidth = table.fillRemainingWidth
+        return result
     }
 
     private func resolvedSpacing(from raw: String?, fallback: CGFloat) -> CGFloat {

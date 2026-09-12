@@ -7,3 +7,5 @@ export * from './bus.js';
 export * from './ui/index.js';
 
 export * from './context/WorkspacePresentation.jsx';
+
+export * from './preferences/tablePreferences.js';

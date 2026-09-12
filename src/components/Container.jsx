@@ -1,3 +1,4 @@
+import {hasContainerClass, containerSurfaceClass} from './containerClasses.js';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
 import {Card, Section} from '@blueprintjs/core';
@@ -53,50 +54,40 @@ import AccessibleSection from './AccessibleSection.jsx';
 import {resolveDynamicDataSourceRef} from '../runtime/dataSourceRef.js';
 import {isPureBoundLabelSection} from './containerEmptyState.js';
 import {containerAnchorProps} from './containerAnchor.js';
+import {containerSizingStyle, resolveContainerSizing} from './containerSizing.js';
 
-const wrapContainerChrome = (container, content, suppressTitle = false, sectionPropertiesOverride = null) => {
+const wrapContainerChrome = (container, content, suppressTitle = false, sectionPropertiesOverride = null, sizingMode = 'fill') => {
     if (!container?.section && !container?.card) {
         return content;
     }
-    const selfScroll = String(container?.scrollMode || '').trim().toLowerCase() === 'self';
-    const requestedMinHeight = container?.style?.minHeight;
-    const requestedHeight = container?.style?.height;
+    const outerStyle = containerSizingStyle(container, sizingMode);
+    const bodyStyle = containerSizingStyle(container, sizingMode, {chrome: true});
 
     const framedContent = (
-        <div {...containerAnchorProps(container)} style={{ width: '100%', height: requestedHeight || '100%', flex: '1 1 auto', minHeight: requestedMinHeight || 0, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: selfScroll ? 'auto' : 'visible' }}>
+        <div {...containerAnchorProps(container)} data-forge-part="container-body" className="forge-container-body" style={bodyStyle}>
             {content}
         </div>
     );
 
     let wrapped = framedContent;
     if (container?.card) {
+        const {compact: compactCard, className: cardClassName, ...cardProperties} = container.card;
+        const cardClasses = [compactCard ? 'is-compact' : '', cardClassName].filter(Boolean).join(' ');
         const cardStyle = {
-            flex: '1 1 auto',
-            height: requestedHeight || '100%',
-            minHeight: requestedMinHeight || 0,
-            minWidth: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: selfScroll ? 'auto' : 'visible',
+            ...(container.section ? bodyStyle : outerStyle),
             ...(container.card?.style || {}),
         };
-        wrapped = <Card {...container.card} style={cardStyle}>{wrapped}</Card>;
+        wrapped = <Card {...cardProperties} data-forge-part="container-card" className={container.section ? ['forge-container-card', cardClasses].filter(Boolean).join(' ') : containerSurfaceClass(container, 'card', cardClasses)} style={cardStyle}>{wrapped}</Card>;
     }
     if (container?.section) {
         const sectionProperties = sectionPropertiesOverride || resolveSectionProperties(container.section);
         const SectionComponent = sectionProperties.collapsible === true ? AccessibleSection : Section;
         const sectionStyle = {
-            flex: '1 1 auto',
-            height: requestedHeight || '100%',
-            minHeight: requestedMinHeight || 0,
-            minWidth: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: selfScroll ? 'auto' : 'visible',
+            ...outerStyle,
             ...(sectionProperties.style || {}),
         };
         wrapped = (
-            <SectionComponent {...(suppressTitle ? {} : {title: container.title || ''})} {...sectionProperties} style={sectionStyle}>
+            <SectionComponent {...(suppressTitle ? {} : {title: container.title || ''})} {...sectionProperties} data-forge-part="container-section" className={containerSurfaceClass(container, 'section', sectionProperties.className)} style={sectionStyle}>
                 {wrapped}
             </SectionComponent>
         );
@@ -144,8 +135,10 @@ const resolveContainerItemValue = (item, context) => {
     return item?.dataField ? resolveSelector(holder, item.dataField) : undefined;
 };
 
-const Container = ({context, container, isActive, suppressTitle = false, dataSourceFetchMode = 'always'}) => {
+const Container = ({context, container, isActive, suppressTitle = false, dataSourceFetchMode = 'always', sizingMode: allocatedMode = 'fill'}) => {
     useSignals();
+    const sizingMode = resolveContainerSizing(container, allocatedMode);
+    const rootSizingStyle = containerSizingStyle(container, sizingMode, {chrome: !!(container.card || container.section)});
     const isDashboardBlock = isSemanticDashboardBlock(container);
     const isDashboardRoot = isDashboardRootContainer(container, context);
     const effectiveContext = isDashboardRoot ? createDashboardContext(context, container) : context;
@@ -216,10 +209,10 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
     if (table) {
         const tableContext = resolveChildContext(effectiveContext, dataSourceRef);
         tablePanel = container.editableCollection
-            ? <EditableCollection context={tableContext} container={container} isActive={isActive}/>
+            ? <EditableCollection sizingMode={sizingMode} context={tableContext} container={container} isActive={isActive}/>
             : container.responsiveDataGrid
-            ? <ResponsiveDataGrid context={tableContext} container={container} isActive={isActive}/>
-            : <TablePanel context={tableContext} container={container} isActive={isActive}/>;
+            ? <ResponsiveDataGrid sizingMode={sizingMode} context={tableContext} container={container} isActive={isActive}/>
+            : <TablePanel sizingMode={sizingMode} context={tableContext} container={container} isActive={isActive}/>;
     }
 
     const assignmentPanel = container.assignmentPicker
@@ -410,6 +403,7 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
 
     const { style = {} } = container;
     const gridStyle = buildGridStyle(style, columns, layout);
+    if (hasContainerClass(container, 'forge-fields-between')) delete gridStyle.display;
 
     let renderedItems = items;
     if (container.repeat) {
@@ -520,11 +514,13 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
                                 display: 'flex',
                                 minHeight: 0,
                                 minWidth: 0,
-                                height: stretchItems ? '100%' : 'auto',
+                                // Auto grid tracks derive their height from content.
+                                height: 'auto',
                                 alignSelf: stretchItems ? 'stretch' : 'start',
                             }}
                         >
                             <Container
+                                sizingMode={entry.sizingMode || 'content'}
                                 context={subCtx}
                                 container={entry}
                                 isActive={isActive}
@@ -572,7 +568,7 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
                     display: 'flex',
                     flexDirection: isHorizontal ? 'row' : 'column',
                     width: '100%',
-                    height: '100%',
+                    flex: sizingMode === 'fill' ? '1 1 0' : '0 0 auto',
                     minHeight: 0,
                     minWidth: 0,
                 }}
@@ -580,14 +576,17 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
                 {containers.map((subContainer, index) => {
                     const isLast = index === containers.length - 1;
                     const childStyle = {
-                        flex: isLast ? '1 1 auto' : '0 0 auto',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        flex: resolveContainerSizing(subContainer, sizingMode === 'fill' && (isHorizontal || isLast) ? 'fill' : 'content') === 'fill' ? '1 1 0' : '0 0 auto',
                         minHeight: 0,
                         minWidth: 0,
-                        overflow: isLast ? 'visible' : 'hidden',
+                        overflow: 'visible',
                     };
                     return (
                         <div key={'dSc' + subContainer.id} style={childStyle}>
                             <Container
+                                sizingMode={sizingMode === 'fill' && (isHorizontal || isLast) ? 'fill' : 'content'}
                                 key={'Sc' + subContainer.id}
                                 context={resolveChildContext(effectiveContext, subContainer.dataSourceRef || dataSourceRef)}
                                 container={subContainer}
@@ -698,9 +697,9 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
     const shouldRenderVisualItems = !shouldRenderSectionNoDataState;
 
     return wrapContainerChrome(container, (
-        <PermissionBoundary container={container} context={effectiveContext}>
-            <DataStateBoundary container={container} context={effectiveContext}>
-            <div style={{ width: '100%', height: '100%', minHeight: 0, minWidth: 0, display: 'flex', flex: '1 1 auto', flexDirection: 'column' }}>
+        <PermissionBoundary sizingMode={sizingMode} container={container} context={effectiveContext}>
+            <DataStateBoundary sizingMode={sizingMode} container={container} context={effectiveContext}>
+            <div {...(!container?.card && !container?.section ? containerAnchorProps(container) : {})} className={!container.card && !container.section ? containerSurfaceClass(container, 'body') : 'forge-container-body'} data-forge-part="container-content" data-forge-sizing={sizingMode} data-forge-scroll={container.scrollMode === 'self' ? 'self' : 'parent'} style={rootSizingStyle}>
                 {resourceHeaderPanel}
                 {notificationRulesPanel}
                 {queryToolbarPanel}
@@ -721,7 +720,7 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
                             style={style}
                         />
                     ) : (
-                        <div style={gridStyle}>
+                        <div data-forge-part="fields" style={gridStyle}>
                             {visualItems.map((item) => {
                                 const subCtx = resolveChildContext(effectiveContext, item.dataSourceRef || dataSourceRef)
                                 return (
@@ -802,7 +801,7 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
                 />
             )}
         </PermissionBoundary>
-    ), suppressTitle, persistentSectionProperties);
+    ), suppressTitle, persistentSectionProperties, sizingMode);
 };
 
 export default Container;

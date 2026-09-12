@@ -9,4 +9,4 @@ export {
 } from "./reportDocumentModel.js";
 export { buildReportFillFromReportSpec } from "./reportFillModel.js";
 export { buildDraftReportExportRequest } from "./reportExportRequestModel.js";
-export { compileInlineReport, materializeInlineReport } from "./inlineReportCompiler.js";
+export { compileInlineReport, materializeInlineReport, applyInlineReportFilterValues } from "./inlineReportCompiler.js";
