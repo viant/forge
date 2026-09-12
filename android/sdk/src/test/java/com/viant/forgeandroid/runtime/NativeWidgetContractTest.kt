@@ -51,6 +51,9 @@ class NativeWidgetContractTest {
         assertTrue(NativeWidgetContract.disabled(item))
         val decoded = JsonUtil.json.decodeFromString(ItemDef.serializer(),JsonUtil.json.encodeToString(ItemDef.serializer(),item))
         assertEquals(NativeWidgetContract.options(item),NativeWidgetContract.options(decoded))
+        assertTrue(NativeWidgetContract.equivalent(JsonPrimitive(8), JsonPrimitive("8")))
+        assertTrue(NativeWidgetContract.equivalent(JsonPrimitive("45.0"), JsonPrimitive(45)))
+        assertFalse(NativeWidgetContract.equivalent(JsonPrimitive("08x"), JsonPrimitive(8)))
     }
     @Test fun objectDisplayUsesHumanReadableIdentityWithoutChangingRawText() {
         val timezone = buildJsonObject {
@@ -59,6 +62,12 @@ class NativeWidgetContractTest {
         }
         assertEquals("Pacific Time", NativeWidgetContract.displayText(timezone))
         assertEquals(timezone.toString(), NativeWidgetContract.text(timezone))
+        assertEquals("Retail", NativeWidgetContract.displayText(buildJsonObject { put("caption", "Retail"); put("id", 7) }))
+        assertEquals("Segment A", NativeWidgetContract.displayText(buildJsonObject { put("displayName", "Segment A") }))
+        assertEquals(
+            "Pacific Time (GMT -8/-7)",
+            NativeWidgetContract.displayText(buildJsonObject { put("name", "Pacific Time"); put("utcOffset", -8); put("utcDstOffset", -7) })
+        )
     }
     @Test fun draftBaselineResetAndSaveContract() {
         val initial = mapOf("id" to 1, "name" to "Before")

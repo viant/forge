@@ -16,19 +16,23 @@ starterTasks:
     title: Analyze CSV and build report
     description: Attach a CSV before sending this task.
     prompt: >-
-      Read the attached CSV and generate an inline Forge report from its real
+      $forge-report-authoring Read the attached CSV and generate an inline Forge report from its real
       data. If no CSV is attached, ask for one and wait. Do not invent records.
 ```
 
 The host passes normalized `starterTasks` to Forge. Clicking a task selects its
 `agentId` through the host callback and fills the prompt; it does not automatically
-send. Without an explicit `agentId`, Agently uses the publishing agent. The host
+send. Starting the prompt with `$forge-report-authoring` activates that installed
+Agently skill directly; merely mentioning its name in prose does not. Without an explicit `agentId`, Agently uses the publishing agent. The host
 must expose the target agent and its needed tools/skills. Switching the agent does
 not grant additional permissions.
 
 A prompt asking for a file is not a client-side required-file validator. Users
 attach the CSV before Send; if missing, the agent must request it rather than
-inventing data. A separate Generate report starter can create an inline report
+inventing data. The Agently backend preserves UTF-8 CSV and other declared text
+attachments as text content for text-only models; images and other binary media
+still require the corresponding model capability. An upload chip alone does not
+prove the model received the file contents. A separate Generate report starter can create an inline report
 from conversation data without any configured workspace report. See
 [inline reporting](reporting.md#inline-report-transactions).
 

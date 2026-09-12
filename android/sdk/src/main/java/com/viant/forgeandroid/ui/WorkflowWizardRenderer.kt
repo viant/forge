@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.viant.forgeandroid.runtime.ContainerDef
 import com.viant.forgeandroid.runtime.DataSourceContext
 import com.viant.forgeandroid.runtime.ForgeRuntime
+import com.viant.forgeandroid.runtime.JsonUtil
 import com.viant.forgeandroid.runtime.WindowContext
 import com.viant.forgeandroid.runtime.evaluateDashboardCondition
 
@@ -37,6 +38,8 @@ internal fun WorkflowWizardRenderer(
     windowForm: Map<String, Any?>
 ) {
     val wizard = container.wizard ?: return
+    val metadata by window.metadata.flow.collectAsState(initial = window.metadata.peek())
+    val authorization = metadata?.authorizationSnapshot?.mapValues { JsonUtil.elementToAny(it.value) }.orEmpty()
     val form by context?.form?.flow?.collectAsState(initial = context.form.peek())
         ?: remember { mutableStateOf(emptyMap()) }
     val collection by context?.collection?.flow?.collectAsState(initial = context.collection.peek())
@@ -44,7 +47,7 @@ internal fun WorkflowWizardRenderer(
     val metrics by context?.metrics?.flow?.collectAsState(initial = context.metrics.peek())
         ?: remember { mutableStateOf(emptyMap()) }
     val visibleSteps = wizard.steps.filter {
-        evaluateDashboardCondition(it.visibleWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection)
+        evaluateDashboardCondition(it.visibleWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization)
     }
     val persisted = wizard.stateKey?.let { windowForm[it]?.toString() }
     var currentStepId by remember(wizard.stateKey, persisted, visibleSteps.map { it.id }) {
@@ -82,7 +85,7 @@ internal fun WorkflowWizardRenderer(
             Button(enabled = currentIndex > 0, onClick = { select(currentIndex - 1) }) { Text("Back") }
             if (currentIndex < visibleSteps.lastIndex) {
                 Button(
-                    enabled = current?.let { evaluateDashboardCondition(it.validWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection) } == true,
+                    enabled = current?.let { evaluateDashboardCondition(it.validWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization) } == true,
                     onClick = { select(currentIndex + 1) }
                 ) { Text("Next") }
             } else if (wizard.submit != null && context != null) {

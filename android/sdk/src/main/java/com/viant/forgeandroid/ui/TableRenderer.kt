@@ -85,6 +85,10 @@ fun TableRenderer(
     val windowForm by context.window.windowFormSignal().flow.collectAsState(initial = context.window.peekWindowForm())
     val input by context.input.flow.collectAsState(initial = com.viant.forgeandroid.runtime.InputState())
     val coroutineScope = rememberCoroutineScope()
+    var hiddenColumnKeys by remember(table.columns) { mutableStateOf<Set<String>>(emptySet()) }
+    val effectiveTable = table.copy(columns = table.columns.filterNot { column ->
+        tableColumnKey(column)?.let(hiddenColumnKeys::contains) == true
+    })
     var sortColumnId by remember(table.columns) { mutableStateOf<String?>(null) }
     var sortAscending by remember(table.columns) { mutableStateOf(true) }
     val quickSearchItem = table.toolbar?.items?.firstOrNull(::toolbarItemIsQuickSearch)
@@ -131,6 +135,10 @@ fun TableRenderer(
                 runtime,
                 context,
                 tb,
+                table = table,
+                rows = sortedRows.map { it.row },
+                hiddenColumnKeys = hiddenColumnKeys,
+                onHiddenColumnKeysChange = { hiddenColumnKeys = it },
                 hiddenItemIds = if (showMetadataEmptyState) table.emptyState?.hideToolbarItems.orEmpty().toSet() else emptySet()
             )
         }
@@ -167,7 +175,7 @@ fun TableRenderer(
                 }
             } else if (compact) {
                 CompactTabularTable(
-                    table = table,
+                    table = effectiveTable,
                     rows = sortedRows,
                     selection = selection,
                     onSelect = { row, rowIndex ->
@@ -190,7 +198,7 @@ fun TableRenderer(
                             .fillMaxSize()
                             .horizontalScroll(horizontalScroll)
                     ) {
-                        DesktopTableHeader(table, sortColumnId, sortAscending) { columnId ->
+                        DesktopTableHeader(effectiveTable, sortColumnId, sortAscending) { columnId ->
                             if (sortColumnId == columnId) {
                                 sortAscending = !sortAscending
                             } else {
@@ -206,7 +214,7 @@ fun TableRenderer(
                                 val row = indexed.row
                                 val rowIndex = indexed.originalIndex
                                 val isSelected = tableRowIsSelected(selection, row, rowIndex)
-                                DesktopTableRow(runtime, context, table, row, rowIndex, displayIndex, isSelected, form, metrics, windowForm) {
+                                DesktopTableRow(runtime, context, effectiveTable, row, rowIndex, displayIndex, isSelected, form, metrics, windowForm) {
                                     coroutineScope.launch { context.toggleSelection(row, rowIndex, selectionModeOverride) }
                                 }
                             }

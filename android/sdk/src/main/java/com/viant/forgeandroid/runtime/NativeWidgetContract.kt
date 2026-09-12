@@ -39,18 +39,34 @@ object NativeWidgetContract {
         return if (kind(item) in setOf("multiselect", "treemultiselect", "chiplist")) defaults.takeIf { it.isNotEmpty() }?.let(::JsonArray) else defaults.firstOrNull()
     }
     fun equivalent(a: JsonElement?, b: JsonElement?): Boolean {
-        if (a is JsonPrimitive && b is JsonPrimitive && !a.isString && !b.isString && a.doubleOrNull != null && b.doubleOrNull != null) return a.doubleOrNull == b.doubleOrNull
+        val leftNumber = (a as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull()
+        val rightNumber = (b as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull()
+        if (leftNumber != null && rightNumber != null && leftNumber.isFinite() && rightNumber.isFinite()) return leftNumber == rightNumber
         return a == b
     }
     fun presentationDisabled(item: ItemDef): Boolean = if (kind(item) in setOf("link", "mediapreview", "schema", "markdown", "label", "progressbar", "treemultiselect")) item.disabled == true || item.properties["disabled"] == JsonPrimitive(true) else disabled(item)
     fun disabled(item: ItemDef) = item.disabled == true || item.readOnly == true || item.properties["disabled"] == JsonPrimitive(true) || item.properties["readOnly"] == JsonPrimitive(true)
     fun text(value: JsonElement?): String = when (value) { null, JsonNull -> ""; is JsonPrimitive -> ReportBuilderOptions.text(value); else -> value.toString() }
     fun displayText(value: JsonElement?): String = when (value) {
-        is JsonObject -> listOf("label", "name", "description", "title", "value", "id", "ianaTimezoneStr")
-            .firstNotNullOfOrNull { key -> value[key]?.let(::displayText)?.takeIf(String::isNotBlank) }
-            ?: value.toString()
+        is JsonObject -> objectDisplayText(value) ?: value.toString()
         is JsonArray -> value.joinToString(", ") { displayText(it) }
         else -> text(value)
+    }
+    private fun objectDisplayText(value: JsonObject): String? {
+        val label = listOf("label", "caption", "description", "name", "title", "displayName", "value", "id", "ianaTimezoneStr")
+            .firstNotNullOfOrNull { key -> value[key]?.let(::displayText)?.trim()?.takeIf(String::isNotBlank) }
+            ?: return null
+        val standard = (value["utcOffset"] as? JsonPrimitive)?.doubleOrNull ?: return label
+        if (!standard.isFinite()) return label
+        val daylight = (value["utcDstOffset"] as? JsonPrimitive)?.doubleOrNull
+        val offsets = if (daylight != null && daylight.isFinite() && daylight != standard) {
+            "${signedOffset(standard)}/${signedOffset(daylight)}"
+        } else signedOffset(standard)
+        return "$label (GMT $offsets)"
+    }
+    private fun signedOffset(value: Double): String {
+        val magnitude = if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+        return if (value >= 0) "+$magnitude" else magnitude
     }
     fun input(text: String, kind: String, properties: Map<String, JsonElement> = emptyMap()): JsonElement? {
         if (kind in setOf("number","currency","percentfraction2input")) {

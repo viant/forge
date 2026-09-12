@@ -311,4 +311,51 @@ class TableRendererTest {
         assertTrue(toolbarValuesEquivalent("45", 45L))
         assertFalse(toolbarValuesEquivalent("45", 8))
     }
+
+    @Test
+    fun `toolbar item preserves declarative visibility and disabled state`() {
+        val item = Json { ignoreUnknownKeys = true }.decodeFromString(
+            ToolbarItemDef.serializer(),
+            """{"id":"edit","enabled":true,"disabled":false,"visibleWhen":{"source":"authorization","field":"principal.features","contains":"EDIT"},"disabledWhen":{"source":"authorization","field":"resource.capabilities.write","notEquals":true}}"""
+        )
+
+        assertEquals(true, item.enabled)
+        assertEquals(false, item.disabled)
+        assertEquals("authorization", item.visibleWhen?.source)
+        assertEquals("authorization", item.disabledWhen?.source)
+    }
+
+    @Test
+    fun `declarative refresh is actionable and icon label preference survives`() {
+        val refresh = Json { ignoreUnknownKeys = true }.decodeFromString(
+            ToolbarItemDef.serializer(),
+            """{"id":"refresh","label":"Refresh","icon":"refresh","hideLabel":true}"""
+        )
+
+        assertTrue(toolbarItemIsAction(refresh))
+        assertEquals(true, refresh.hideLabel)
+    }
+
+    @Test
+    fun `toolbar selector binding falls back through field dataField and id`() {
+        assertEquals("field", toolbarBindingField(ToolbarItemDef(id = "id", dataField = "data", field = "field")))
+        assertEquals("data", toolbarBindingField(ToolbarItemDef(id = "id", dataField = "data")))
+        assertEquals("id", toolbarBindingField(ToolbarItemDef(id = "id")))
+    }
+
+    @Test
+    fun `table csv exports visible values with standard escaping`() {
+        val csv = buildTableCsv(
+            columns = listOf(ColumnDef(id = "name", label = "Name"), ColumnDef(id = "details", label = "Details")),
+            rows = listOf(
+                mapOf("name" to "Alpha, Inc.", "details" to "Said \"hello\""),
+                mapOf("name" to "Beta", "details" to "line one\nline two")
+            )
+        )
+
+        assertEquals(
+            "Name,Details\r\n\"Alpha, Inc.\",\"Said \"\"hello\"\"\"\r\nBeta,\"line one\nline two\"",
+            csv
+        )
+    }
 }

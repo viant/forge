@@ -74,6 +74,8 @@ internal fun WorkflowPresentationPrimitives(
         ?: androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(emptyMap()) }
     val selection by context?.selection?.flow?.collectAsState(initial = context.selection.peek())
         ?: androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(com.viant.forgeandroid.runtime.SelectionState()) }
+    val metadata by window.metadata.flow.collectAsState(initial = window.metadata.peek())
+    val authorization = metadata?.authorizationSnapshot?.mapValues { JsonUtil.elementToAny(it.value) }.orEmpty()
     androidx.compose.runtime.LaunchedEffect(context?.dataSourceRef) {
         if (container.mutationCommand == null && context != null && context.dataSource.autoFetch != false && !context.control.peek().resolved) context.fetchCollection()
     }
@@ -109,18 +111,18 @@ internal fun WorkflowPresentationPrimitives(
                             )
                         }
                     }
-                    spec.actions.filter { evaluateDashboardCondition(it.visibleWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection) }
+                    spec.actions.filter { evaluateDashboardCondition(it.visibleWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization) }
                         .forEach { action ->
                             if (action.mutation != null && context != null) {
                                 MutationCommandButton(
                                     runtime, window, context, action.mutation,
                                     labelOverride = action.label,
                                     extras = mapOf("record" to record),
-                                    externallyDisabled = action.disabledWhen != null && evaluateDashboardCondition(action.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection)
+                                    externallyDisabled = action.disabledWhen != null && evaluateDashboardCondition(action.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization)
                                 )
                             } else if (!action.handler.isNullOrBlank() && context != null) {
                                 Button(
-                                    enabled = action.disabledWhen == null || !evaluateDashboardCondition(action.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection),
+                                    enabled = action.disabledWhen == null || !evaluateDashboardCondition(action.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization),
                                     onClick = { runtime.execute(com.viant.forgeandroid.runtime.ExecutionDef(handler = action.handler), context, mapOf("record" to record, "action" to com.viant.forgeandroid.runtime.JsonUtil.elementToAny(com.viant.forgeandroid.runtime.JsonUtil.json.encodeToJsonElement(com.viant.forgeandroid.runtime.ResourceHeaderActionSpec.serializer(), action)))) }
                                 ) { Text(action.label ?: action.id) }
                             }
@@ -140,17 +142,17 @@ internal fun WorkflowPresentationPrimitives(
         }
 
         container.notificationRules?.rules
-            ?.filter { evaluateDashboardCondition(it.visibleWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection) }
+            ?.filter { evaluateDashboardCondition(it.visibleWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization) }
             ?.forEach { rule ->
                 val color = notificationColor(rule.intent)
                 Column(modifier = Modifier.fillMaxWidth().background(color.copy(alpha = 0.1f), RoundedCornerShape(10.dp)).padding(10.dp).semantics { contentDescription = rule.message }) {
                     Text(text = rule.message, color = color, style = MaterialTheme.typography.bodyMedium)
-                    rule.action?.takeIf { it.visibleWhen == null || evaluateDashboardCondition(it.visibleWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection) }?.let { action ->
+                    rule.action?.takeIf { it.visibleWhen == null || evaluateDashboardCondition(it.visibleWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization) }?.let { action ->
                         if (action.mutation != null && context != null) {
-                            MutationCommandButton(runtime, window, context, action.mutation, labelOverride = action.label, externallyDisabled = action.disabledWhen != null && evaluateDashboardCondition(action.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection))
+                            MutationCommandButton(runtime, window, context, action.mutation, labelOverride = action.label, externallyDisabled = action.disabledWhen != null && evaluateDashboardCondition(action.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization))
                         } else if (!action.handler.isNullOrBlank() && context != null) {
                             Button(
-                                enabled = action.disabledWhen == null || !evaluateDashboardCondition(action.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection),
+                                enabled = action.disabledWhen == null || !evaluateDashboardCondition(action.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization),
                                 onClick = { runtime.execute(com.viant.forgeandroid.runtime.ExecutionDef(handler = action.handler), context) }
                             ) { Text(action.label ?: action.id) }
                         }
@@ -160,8 +162,8 @@ internal fun WorkflowPresentationPrimitives(
 
         container.editableCollection?.takeIf { it.operations.isNotEmpty() }?.let { spec ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                spec.operations.filter { operationVisible(it, metrics, form, windowForm, collection) }.forEach { operation ->
-                    val disabled = operationDisabled(operation, spec, selectedRows, metrics, form, windowForm, collection)
+                spec.operations.filter { operationVisible(it, metrics, form, windowForm, collection, authorization) }.forEach { operation ->
+                    val disabled = operationDisabled(operation, spec, selectedRows, metrics, form, windowForm, collection, authorization)
                     val mutation = operation.mutation ?: spec.mutation
                     if (mutation != null && context != null) {
                         MutationCommandButton(
@@ -193,7 +195,7 @@ internal fun WorkflowPresentationPrimitives(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 workflow.transitions.filter { transition ->
                     (transition.from.isEmpty() || transition.from.any { JsonUtil.elementToAny(it) == current }) &&
-                        evaluateDashboardCondition(transition.availableWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection)
+                        evaluateDashboardCondition(transition.availableWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization)
                 }.forEach { transition ->
                     if (context != null) {
                         MutationCommandButton(
@@ -210,8 +212,8 @@ internal fun WorkflowPresentationPrimitives(
         if (container.draftForm != null && context != null) {
             val spec = container.draftForm
             val baseline = selection.selected.orEmpty()
-            val valid = spec.validWhen == null || evaluateDashboardCondition(spec.validWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection)
-            val dirty = spec.dirtyWhen?.let { evaluateDashboardCondition(it, metrics = metrics, form = form, windowForm = windowForm, collection = collection) }
+            val valid = spec.validWhen == null || evaluateDashboardCondition(spec.validWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization)
+            val dirty = spec.dirtyWhen?.let { evaluateDashboardCondition(it, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization) }
                 ?: (form != baseline)
             DraftFormActions(runtime, window, context, spec, form, baseline, valid, dirty)
         }
@@ -249,7 +251,7 @@ internal fun WorkflowPresentationPrimitives(
         }
 
         container.detailView?.let { spec ->
-            DetailView(spec, detailRecord, metrics, form, windowForm, collection)
+            DetailView(spec, detailRecord, metrics, form, windowForm, collection, authorization)
         }
 
         container.historyDiff?.let { spec ->
@@ -412,9 +414,10 @@ private fun operationVisible(
     metrics: Map<String, Any?>,
     form: Map<String, Any?>,
     windowForm: Map<String, Any?>,
-    collection: List<Map<String, Any?>>
+    collection: List<Map<String, Any?>>,
+    authorization: Map<String, Any?>
 ): Boolean = operation.visibleWhen == null || evaluateDashboardCondition(
-    operation.visibleWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection
+    operation.visibleWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization
 )
 
 private fun operationDisabled(
@@ -424,22 +427,23 @@ private fun operationDisabled(
     metrics: Map<String, Any?>,
     form: Map<String, Any?>,
     windowForm: Map<String, Any?>,
-    collection: List<Map<String, Any?>>
+    collection: List<Map<String, Any?>>,
+    authorization: Map<String, Any?>
 ): Boolean {
     val selection = operation.selection ?: spec.selection
     val minimum = selection?.min ?: if (operation.requiresSelection) 1 else 0
     val maximum = selection?.max ?: 0
     if (selectedRows.size < minimum || (maximum > 0 && selectedRows.size > maximum)) return true
-    if (operation.disabledWhen != null && evaluateDashboardCondition(operation.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection)) return true
-    if (selection?.disabledWhen != null && evaluateDashboardCondition(selection.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection)) return true
+    if (operation.disabledWhen != null && evaluateDashboardCondition(operation.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization)) return true
+    if (selection?.disabledWhen != null && evaluateDashboardCondition(selection.disabledWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization)) return true
     selection?.every?.let { predicate ->
-        if (selectedRows.isEmpty() || selectedRows.any { !evaluateDashboardCondition(predicate, metrics = metrics, form = it, windowForm = windowForm, collection = collection) }) return true
+        if (selectedRows.isEmpty() || selectedRows.any { !evaluateDashboardCondition(predicate, metrics = metrics, form = it, windowForm = windowForm, collection = collection, authorization = authorization) }) return true
     }
     selection?.any?.let { predicate ->
-        if (selectedRows.isEmpty() || selectedRows.none { evaluateDashboardCondition(predicate, metrics = metrics, form = it, windowForm = windowForm, collection = collection) }) return true
+        if (selectedRows.isEmpty() || selectedRows.none { evaluateDashboardCondition(predicate, metrics = metrics, form = it, windowForm = windowForm, collection = collection, authorization = authorization) }) return true
     }
     selection?.none?.let { predicate ->
-        if (selectedRows.any { evaluateDashboardCondition(predicate, metrics = metrics, form = it, windowForm = windowForm, collection = collection) }) return true
+        if (selectedRows.any { evaluateDashboardCondition(predicate, metrics = metrics, form = it, windowForm = windowForm, collection = collection, authorization = authorization) }) return true
     }
     return false
 }
@@ -505,11 +509,12 @@ private fun DetailView(
     metrics: Map<String, Any?>,
     form: Map<String, Any?>,
     windowForm: Map<String, Any?>,
-    collection: List<Map<String, Any?>>
+    collection: List<Map<String, Any?>>,
+    authorization: Map<String, Any?>
 ) {
     val sections = spec.sections.ifEmpty { listOf(DetailViewSectionSpec(id = "details", fields = spec.fields)) }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        sections.filter { evaluateDashboardCondition(it.visibleWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection) }
+        sections.filter { evaluateDashboardCondition(it.visibleWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization) }
             .forEach { section ->
                 section.label?.takeIf(String::isNotBlank)?.let {
                     Text(it, style = MaterialTheme.typography.titleMedium)
@@ -517,7 +522,7 @@ private fun DetailView(
                 section.description?.takeIf(String::isNotBlank)?.let {
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                DetailFields(spec, section.fields, record, metrics, form, windowForm, collection)
+                DetailFields(spec, section.fields, record, metrics, form, windowForm, collection, authorization)
             }
     }
 }
@@ -530,9 +535,10 @@ private fun DetailFields(
     metrics: Map<String, Any?>,
     form: Map<String, Any?>,
     windowForm: Map<String, Any?>,
-    collection: List<Map<String, Any?>>
+    collection: List<Map<String, Any?>>,
+    authorization: Map<String, Any?>
 ) {
-    val visible = fields.filter { evaluateDashboardCondition(it.visibleWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection) }
+    val visible = fields.filter { evaluateDashboardCondition(it.visibleWhen, metrics = metrics, form = form, windowForm = windowForm, collection = collection, authorization = authorization) }
     val columns = (spec.responsiveColumns["phone"] ?: spec.columns ?: 2).coerceIn(1, 2)
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         visible.chunked(columns).forEach { row ->

@@ -22,6 +22,13 @@ public enum NativeWidgetContract {
         guard let value else { return false }
         switch value { case .null: return false; case .bool(let value): return value; case .number(let value): return value != 0; case .string(let value): return !value.isEmpty; case .array, .object: return true }
     }
+    public static func equivalent(_ lhs: JSONValue?, _ rhs: JSONValue?) -> Bool {
+        guard let lhs, let rhs else { return lhs == rhs }
+        if let leftNumber = lhs.widgetNumber, let rightNumber = rhs.widgetNumber {
+            return leftNumber == rightNumber
+        }
+        return lhs == rhs
+    }
     public static func initialValue(_ item: ItemDef) -> JSONValue? {
         if let value = item.value ?? item.properties["default"] { return value }
         let defaults = item.options.filter { $0.default == true }.compactMap(\.rawValue)
