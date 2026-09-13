@@ -3,6 +3,7 @@ package com.viant.forgeandroid.runtime
 import kotlinx.serialization.json.*
 
 data class DataSourceLifecycleEffect(val kind: String, val ref: String, val value: JsonElement)
+data class DataSourceLifecycleProjection(val effects: List<DataSourceLifecycleEffect>, val result: JsonElement?)
 
 /** Executes synchronous metadata lifecycle hooks against snapshots and returns ordered effects. */
 object DataSourceHookProjection {
@@ -13,7 +14,7 @@ object DataSourceHookProjection {
         source: String,
         snapshots: JsonObject,
         collection: List<Map<String, Any?>>
-    ): List<DataSourceLifecycleEffect> {
+    ): DataSourceLifecycleProjection {
         val name = namespace?.takeIf { functionName.startsWith("$it.") }
             ?.let { functionName.removePrefix("$it.") } ?: functionName
         val wrapper = """
@@ -59,7 +60,7 @@ object DataSourceHookProjection {
                   if (++count > 100) throw new Error('Lifecycle timer limit exceeded');
                   timers.shift()();
                 }
-                return effects;
+                return {effects, result: result === undefined ? null : result};
               }};
             })()
         """.trimIndent()
@@ -74,12 +75,13 @@ object DataSourceHookProjection {
                     "collection" to JsonArray(collection.map(JsonUtil::anyToElement))
                 )
             )
-        ) as? JsonArray ?: return emptyList()
-        return result.mapNotNull { element ->
+        ) as? JsonObject ?: return DataSourceLifecycleProjection(emptyList(), null)
+        val effects = (result["effects"] as? JsonArray).orEmpty().mapNotNull { element ->
             val obj = element as? JsonObject ?: return@mapNotNull null
             val kind = (obj["kind"] as? JsonPrimitive)?.contentOrNull ?: return@mapNotNull null
             val ref = (obj["ref"] as? JsonPrimitive)?.contentOrNull ?: return@mapNotNull null
             DataSourceLifecycleEffect(kind, ref, obj["value"] ?: JsonNull)
         }
+        return DataSourceLifecycleProjection(effects, result["result"]?.takeUnless { it is JsonNull })
     }
 }

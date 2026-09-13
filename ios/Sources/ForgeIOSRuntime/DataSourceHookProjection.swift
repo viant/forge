@@ -2,9 +2,14 @@ import Foundation
 
 /// Runs synchronous lifecycle hooks against a snapshot and returns ordered effects.
 /// The adapter has no network access; the runtime must validate and apply effects.
+public struct DataSourceHookProjectionResult: Sendable, Equatable {
+    public let effects: [JSONValue]
+    public let result: JSONValue?
+}
+
 public enum DataSourceHookProjection {
     public static func invoke(code: String, function: String, namespace: String?, source: String,
-                              snapshots: [String: JSONValue], collection: [[String: JSONValue]]) throws -> [JSONValue] {
+                              snapshots: [String: JSONValue], collection: [[String: JSONValue]]) throws -> DataSourceHookProjectionResult {
         var name = function
         if let namespace, name.hasPrefix(namespace + ".") { name.removeFirst(namespace.count + 1) }
         let wrapper = #"""
@@ -50,7 +55,7 @@ public enum DataSourceHookProjection {
               if (++count > 100) throw new Error('Lifecycle timer limit exceeded');
               timers.shift()();
             }
-            return effects;
+            return {effects, result: result === undefined ? null : result};
           }};
         })()
         """#
@@ -58,6 +63,10 @@ public enum DataSourceHookProjection {
             "name": .string(name), "source": .string(source), "snapshots": .object(snapshots),
             "collection": .array(collection.map(JSONValue.object))
         ]))
-        return result?.arrayValue ?? []
+        let object = result?.objectValue ?? [:]
+        return DataSourceHookProjectionResult(
+            effects: object["effects"]?.arrayValue ?? [],
+            result: object["result"] == .null ? nil : object["result"]
+        )
     }
 }

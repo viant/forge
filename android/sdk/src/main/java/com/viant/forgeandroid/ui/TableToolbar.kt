@@ -447,13 +447,20 @@ private fun ToolbarSelect(runtime: ForgeRuntime, context: DataSourceContext, ite
                         item.on.filter { it.event in setOf("onChange", "onSelection") }.forEach { execution ->
                             runtime.execute(execution, context, mapOf("item" to item, "field" to field, "value" to raw))
                         }
-                        context.fetchCollection()
+                        // Window-scoped inputs are observed by the container's datasource
+                        // dependency effect. Fetching here as well races an identical request.
+                        if (shouldFetchAfterToolbarSelection(item.scope)) {
+                            context.fetchCollection()
+                        }
                       }
                 )
             }
         }
     }
 }
+
+internal fun shouldFetchAfterToolbarSelection(scope: String?): Boolean =
+    !scope.equals("windowForm", ignoreCase = true)
 
 @Composable
 private fun ToolbarAction(

@@ -28,6 +28,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -164,9 +165,12 @@ private fun MobileTabPagesRenderer(
     pages: List<MobileTabPage>
 ) {
     val initialIndex = initialMobileTabPageIndex(container, pages)
-    var index by remember(container.id, initialIndex) { mutableStateOf(initialIndex) }
-    val currentIndex = index.coerceIn(0, pages.lastIndex)
+    var selectedPageId by remember(container.id) { mutableStateOf(pages[initialIndex.coerceIn(0, pages.lastIndex)].id) }
+    val currentIndex = resolvedMobilePageIndex(pages.map { it.id }, selectedPageId, initialIndex)
     val currentPage = pages[currentIndex]
+    LaunchedEffect(pages.map { it.id }, currentPage.id) {
+        if (selectedPageId != currentPage.id) selectedPageId = currentPage.id
+    }
     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (pages.size > 1) {
             CompactSectionNavigator(
@@ -174,7 +178,7 @@ private fun MobileTabPagesRenderer(
                 selectedId = currentPage.id,
                 onSelect = { selectedId ->
                     pages.indexOfFirst { it.id == selectedId }.takeIf { it >= 0 }?.let {
-                        index = it
+                        selectedPageId = pages[it].id
                         emitTabInteraction(runtime, window, container, pages[it].id, pages[it].title, it)
                     }
                 },
@@ -192,6 +196,11 @@ private fun MobileTabPagesRenderer(
             )
         }
     }
+}
+
+internal fun resolvedMobilePageIndex(ids: List<String>, selectedId: String?, fallbackIndex: Int): Int {
+    if (ids.isEmpty()) return 0
+    return ids.indexOfFirst { it == selectedId }.takeIf { it >= 0 } ?: fallbackIndex.coerceIn(0, ids.lastIndex)
 }
 
 @Composable

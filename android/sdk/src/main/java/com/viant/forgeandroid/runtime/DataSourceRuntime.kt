@@ -4,6 +4,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
@@ -120,7 +122,8 @@ class DataSourceRuntime(
         try {
             val loaderResult = collectionLoader?.invoke(ctx)
             if (loaderResult != null) {
-                val data = applyCollectionHook(ctx, applyResourceModel(ctx, loaderResult.rows))
+                val data = applyNamedFetchHooks(ctx, applyCollectionHook(ctx, applyResourceModel(ctx, loaderResult.rows)), currentPath)
+                currentCoroutineContext().ensureActive()
                 ctx.collection.set(data)
                 if (loaderResult.form != null) {
                     ctx.form.set(loaderResult.form)
@@ -157,10 +160,11 @@ class DataSourceRuntime(
             }
 
             val response = executeRequest(endpoint, request)
-            val data = applyCollectionHook(
+            val data = applyNamedFetchHooks(ctx, applyCollectionHook(
                 ctx,
                 applyResourceModel(ctx, normalizeCollection(response, ctx.dataSource.selectors?.data))
-            )
+            ), currentPath)
+            currentCoroutineContext().ensureActive()
             val dataInfo = normalizeDataInfo(response, ctx.dataSource.selectors?.dataInfo)
             ctx.collection.set(data)
             if (ctx.dataSource.autoSelect != false && data.isNotEmpty() && ctx.peekSelection().selected == null) {
@@ -549,7 +553,9 @@ class DataSourceRuntime(
             .forEach { execution ->
                 val handler = execution.handler?.trim().orEmpty()
                 val code = metadata?.actions?.code?.trim().orEmpty()
-                if (metadata != null && code.isNotBlank() && namespace.isNotBlank() && handler.startsWith("$namespace.")) {
+                if (event == "onFetch") {
+                    return@forEach
+                } else if (metadata != null && code.isNotBlank() && namespace.isNotBlank() && handler.startsWith("$namespace.")) {
                     runLifecycleHook(ctx, execution, code, metadata, args["collection"] as? List<Map<String, Any?>> ?: ctx.collection.peek(), lifecyclePath)
                 } else {
                     executor?.invoke(execution, ctx, args)
@@ -576,7 +582,7 @@ class DataSourceRuntime(
                     )
                 )
             })
-            val effects = DataSourceHookProjection.invoke(
+            val projection = DataSourceHookProjection.invoke(
                 code = code,
                 functionName = handler,
                 namespace = metadata.namespace,
@@ -584,7 +590,67 @@ class DataSourceRuntime(
                 snapshots = snapshots,
                 collection = collection
             )
-            effects.forEach { effect ->
+            applyLifecycleEffects(source, projection.effects, lifecyclePath)
+        } catch (error: Exception) {
+            println("Forge datasource lifecycle hook failed [$handler]: ${error.message}")
+        }
+    }
+
+    private suspend fun applyNamedFetchHooks(
+        source: DataSourceContext,
+        rows: List<Map<String, Any?>>,
+        lifecyclePath: List<String>
+    ): List<Map<String, Any?>> {
+        val metadata = source.window.metadata.peek() ?: return rows
+        val code = metadata.actions?.code?.trim().orEmpty()
+        val namespace = metadata.namespace?.trim().orEmpty()
+        if (code.isBlank() || namespace.isBlank()) return rows
+        var current = rows
+        source.dataSource.on.filter { it.event == "onFetch" }.forEach { execution ->
+            val handler = execution.handler?.trim().orEmpty()
+            if (!handler.startsWith("$namespace.")) {
+                executor?.invoke(execution, source, mapOf("collection" to current))
+                return@forEach
+            }
+            try {
+                val projection = DataSourceHookProjection.invoke(
+                    code = code,
+                    functionName = handler,
+                    namespace = metadata.namespace,
+                    source = source.dataSourceRef,
+                    snapshots = lifecycleSnapshots(source, metadata),
+                    collection = current
+                )
+                applyLifecycleEffects(source, projection.effects, lifecyclePath)
+                val transformed = projection.result as? JsonArray
+                if (transformed != null) {
+                    current = transformed.mapNotNull { JsonUtil.elementToAny(it) as? Map<*, *> }
+                        .map { row -> row.entries.associate { it.key.toString() to it.value } }
+                }
+            } catch (error: Exception) {
+                println("Forge datasource onFetch hook failed [$handler]: ${error.message}")
+            }
+        }
+        return current
+    }
+
+    private fun lifecycleSnapshots(source: DataSourceContext, metadata: WindowMetadata): JsonObject =
+        JsonObject(metadata.dataSources.keys.associateWith { ref ->
+            val context = source.window.contextOrNull(ref)
+            JsonObject(
+                mapOf(
+                    "form" to JsonUtil.anyToElement(context?.form?.peek().orEmpty()),
+                    "collection" to JsonUtil.anyToElement(context?.collection?.peek().orEmpty())
+                )
+            )
+        })
+
+    private suspend fun applyLifecycleEffects(
+        source: DataSourceContext,
+        effects: List<DataSourceLifecycleEffect>,
+        lifecyclePath: List<String>
+    ) {
+        effects.forEach { effect ->
                 val target = source.window.contextOrNull(effect.ref) ?: return@forEach
                 when (effect.kind) {
                     "form" -> (JsonUtil.elementToAny(effect.value) as? Map<*, *>)?.let { value ->
@@ -601,9 +667,6 @@ class DataSourceRuntime(
                         }
                     }
                 }
-            }
-        } catch (error: Exception) {
-            println("Forge datasource lifecycle hook failed [$handler]: ${error.message}")
         }
     }
 

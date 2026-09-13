@@ -208,6 +208,74 @@ class DataSourceHookRuntimeTest {
     }
 
     @Test
+    fun onFetchTransformsRegisteredRowsBeforePublishingAndOnSuccess() = runBlocking {
+        val metadata = JsonUtil.json.decodeFromString(
+            WindowMetadata.serializer(),
+            """{"namespace":"Test","actions":{"code":"({transform: ({collection}) => collection.map(row => ({...row,label:String(row.label).toUpperCase()})), success: ({context}) => {context.signals.form.value={seen:context.handlers.dataSource.getCollection()[0].label};}})"},"dataSource":{"source":{"on":[{"event":"onFetch","handler":"Test.transform"},{"event":"onSuccess","handler":"Test.success"}]}}}"""
+        )
+        val runtime = ForgeRuntime(emptyMap(), CoroutineScope(Dispatchers.Unconfined))
+        runtime.registerWindowMetadataLoader { metadata }
+        runtime.registerDataSourceLoader { ForgeRuntime.DataSourceFetchResult(rows = listOf(mapOf("id" to 1, "label" to "ready"))) }
+        val window = runtime.openWindow("test")
+        withTimeout(1_000) { runtime.metadataSignal(window.windowId).flow.filterNotNull().first() }
+        val source = runtime.windowContext(window.windowId).context("source")
+
+        runtime.refreshDataSourceCollection(window.windowId, "source")
+        withTimeout(1_000) { while (source.peekForm()["seen"] != "READY") delay(10) }
+
+        assertEquals("READY", source.collection.peek().single()["label"])
+        assertEquals("READY", source.peekForm()["seen"])
+    }
+
+    @Test
+    fun directOnFetchTransformsRowsAndLaterNilOrFailurePreservesThem() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"data":[{"id":1,"label":"raw"}]}"""))
+        server.start()
+        val metadata = JsonUtil.json.decodeFromString(
+            WindowMetadata.serializer(),
+            """{"namespace":"Test","actions":{"code":"({transform: ({collection}) => collection.map(row => ({...row,label:String(row.label).toUpperCase()})), noop: () => undefined, broken: () => {throw new Error('bad transform');}})"},"dataSource":{"source":{"service":{"endpoint":"appAPI","uri":"/source"},"on":[{"event":"onFetch","handler":"Test.transform"},{"event":"onFetch","handler":"Test.noop"},{"event":"onFetch","handler":"Test.broken"}]}}}"""
+        )
+        val runtime = ForgeRuntime(
+            mapOf("appAPI" to EndpointConfig(baseUrl = server.url("/").toString().trimEnd('/'))),
+            CoroutineScope(Dispatchers.Unconfined)
+        )
+        runtime.registerWindowMetadataLoader { metadata }
+        val window = runtime.openWindow("test")
+        withTimeout(1_000) { runtime.metadataSignal(window.windowId).flow.filterNotNull().first() }
+        val source = runtime.windowContext(window.windowId).context("source")
+
+        runtime.refreshDataSourceCollection(window.windowId, "source")
+        withTimeout(1_000) { while (source.collection.peek().isEmpty()) delay(10) }
+
+        assertEquals("RAW", source.collection.peek().single()["label"])
+    }
+
+    @Test
+    fun supersededFetchCannotPublishStaleHookedRows() = runBlocking {
+        val signals = SignalRegistry()
+        val runtime = DataSourceRuntime(signals, RestClient(EndpointRegistry(emptyMap())), CoroutineScope(Dispatchers.Default))
+        val metadataSignal = signals.metadata("W1").also {
+            it.set(WindowMetadata(dataSources = mapOf("source" to DataSourceDef())))
+        }
+        val window = WindowContext("W1", metadataSignal, signals, runtime)
+        var calls = 0
+        runtime.setCollectionLoader {
+            calls += 1
+            val call = calls
+            if (call == 1) delay(150)
+            DataSourceRuntime.LoaderResult(rows = listOf(mapOf("label" to if (call == 1) "stale" else "fresh")))
+        }
+        val source = runtime.attach(window, "source")
+
+        source.fetchCollection()
+        delay(20)
+        source.fetchCollection()
+        withTimeout(1_000) { while (source.collection.peek().firstOrNull()?.get("label") != "fresh") delay(10) }
+
+        assertEquals("fresh", source.collection.peek().single()["label"])
+    }
+
+    @Test
     fun fetchCollectionResolvesDatasourceInputAndFilterParametersIntoQuery() = runBlocking {
         server.enqueue(MockResponse().setBody("""{"data": []}"""))
         server.start()

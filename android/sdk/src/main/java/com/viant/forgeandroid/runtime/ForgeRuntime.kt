@@ -56,6 +56,7 @@ class ForgeRuntime(
     private var filePreviewLoader: (suspend (String, String) -> FilePreviewContent)? = null
     private var feedPatchHandler: ((String, FeedPatchOperation) -> Boolean)? = null
     @Volatile private var interactionObserver: ((ForgeInteraction) -> Unit)? = null
+    @Volatile private var externalURLHandler: ((String) -> Unit)? = null
 
     val windows = windowRuntime.windows()
 
@@ -104,6 +105,10 @@ class ForgeRuntime(
 
     fun registerHandler(name: String, handler: Handler) {
         handlers.register(name, handler)
+    }
+
+    fun registerExternalURLHandler(handler: ((String) -> Unit)?) {
+        externalURLHandler = handler
     }
 
     fun registerFileTextLoader(loader: suspend (String) -> String) {
@@ -254,6 +259,122 @@ class ForgeRuntime(
         if (handler.isBlank() || code.isBlank()) return null
         return ActionHookRuntime.invoke(code, handler, JsonUtil.anyToElement(args))
             ?.let(JsonUtil::elementToAny)
+    }
+
+    internal fun canProjectMetadataExecution(execution: ExecutionDef, context: DataSourceContext?): Boolean {
+        val handler = execution.handler?.trim().orEmpty()
+        val metadata = context?.window?.metadata?.peek() ?: return false
+        val namespace = metadata.namespace?.trim().orEmpty()
+        return handler.isNotBlank() && namespace.isNotBlank() && handler.startsWith("$namespace.") && !metadata.actions?.code.isNullOrBlank()
+    }
+
+    internal suspend fun evaluateMetadataExecution(
+        execution: ExecutionDef,
+        context: DataSourceContext,
+        args: Map<String, Any?>,
+        applyEffects: Boolean
+    ): Any? {
+        val metadata = context.window.metadata.peek() ?: return null
+        val code = metadata.actions?.code?.trim().orEmpty()
+        val handler = execution.handler?.trim().orEmpty()
+        if (code.isBlank() || handler.isBlank()) return null
+        val snapshots = JsonObject(metadata.dataSources.keys.associateWith { ref ->
+            val target = context.window.contextOrNull(ref)
+            val selection = target?.selection?.peek() ?: SelectionState()
+            val input = target?.input?.peek() ?: InputState()
+            JsonObject(mapOf(
+                "form" to JsonUtil.anyToElement(target?.form?.peek().orEmpty()),
+                "collection" to JsonUtil.anyToElement(target?.collection?.peek().orEmpty()),
+                "selection" to JsonUtil.anyToElement(mapOf("selected" to selection.selected, "selection" to selection.selection, "rowIndex" to selection.rowIndex)),
+                "input" to JsonUtil.anyToElement(mapOf("filter" to input.filter, "parameters" to input.parameters, "page" to input.page, "fetch" to input.fetch, "refresh" to input.refresh)),
+                "metrics" to JsonUtil.anyToElement(target?.metrics?.peek().orEmpty())
+            ))
+        })
+        val executionValue = mapOf(
+            "handler" to execution.handler,
+            "event" to execution.event,
+            "args" to execution.args,
+            "parameters" to execution.parameters
+        )
+        val projection = UIActionProjection.invoke(
+            code = code,
+            functionName = handler,
+            namespace = metadata.namespace,
+            source = context.dataSourceRef,
+            snapshots = snapshots,
+            windowForm = JsonUtil.anyToElement(context.window.peekWindowForm()) as JsonObject,
+            props = JsonUtil.anyToElement(args + ("execution" to executionValue)) as JsonObject
+        )
+        if (applyEffects) applyUIActionEffects(context, projection.effects, metadata)
+        return projection.result?.let(JsonUtil::elementToAny)
+    }
+
+    private fun applyUIActionEffects(source: DataSourceContext, effects: List<UIActionEffect>, metadata: WindowMetadata) {
+        effects.forEach { effect ->
+            val value = JsonUtil.elementToAny(effect.value)
+            val target = effect.ref?.let(source.window::contextOrNull)
+            when (effect.kind) {
+                "form" -> (value as? Map<*, *>)?.let { target?.setForm(it.entries.associate { entry -> entry.key.toString() to entry.value }) }
+                "collection" -> (value as? List<*>)?.let { rows ->
+                    target?.collection?.set(rows.mapNotNull { JsonUtil.asStringMap(it).takeIf { row -> row.isNotEmpty() } })
+                }
+                "selection" -> (value as? Map<*, *>)?.let { payload ->
+                    val mapped = payload.entries.associate { it.key.toString() to it.value }
+                    val rows = (mapped["selection"] as? List<*>)?.mapNotNull { JsonUtil.asStringMap(it).takeIf { row -> row.isNotEmpty() } }.orEmpty()
+                    val selected = JsonUtil.asStringMap(mapped["selected"]).takeIf { it.isNotEmpty() } ?: rows.lastOrNull()
+                    target?.setSelection(SelectionState(selected = selected, selection = rows, rowIndex = (mapped["rowIndex"] as? Number)?.toInt() ?: -1))
+                }
+                "windowForm" -> (value as? Map<*, *>)?.let { setWindowFormValues(source.window.windowId, it.entries.associate { entry -> entry.key.toString() to entry.value }, bumpPrefillRevision = false) }
+                "windowFormPatch" -> (value as? Map<*, *>)?.let { setWindowFormValues(source.window.windowId, it.entries.associate { entry -> entry.key.toString() to entry.value }, bumpPrefillRevision = false) }
+                "input" -> (value as? Map<*, *>)?.let { target?.setInputParameters(it.entries.associate { entry -> entry.key.toString() to entry.value }) }
+                "filter" -> (value as? Map<*, *>)?.let { target?.setFilter(it.entries.associate { entry -> entry.key.toString() to entry.value }) }
+                "fetch" -> target?.fetchCollection()
+                "resetSelection" -> target?.resetSelection()
+                "openDialog" -> applyProjectedOpenDialog(source, value, metadata)
+                "closeDialog" -> JsonUtil.asStringMap(value)["dialogId"]?.toString()?.let { closeDialog(source.window.windowId, it) }
+                "openWindow" -> applyProjectedOpenWindow(source, value)
+                "openTarget" -> applyProjectedOpenTarget(source, value, metadata)
+                "openURL" -> {
+                    val href = JsonUtil.asStringMap(value)["href"]?.toString()?.trim().orEmpty()
+                    val scheme = runCatching { java.net.URI(href).scheme?.lowercase() }.getOrNull()
+                    if (scheme in setOf("http", "https", "mailto", "tel")) externalURLHandler?.invoke(href)
+                }
+            }
+        }
+    }
+
+    private fun applyProjectedOpenDialog(source: DataSourceContext, value: Any?, metadata: WindowMetadata) {
+        val payload = JsonUtil.asStringMap(value)
+        val projectedExecution = JsonUtil.asStringMap(payload["execution"])
+        val args = projectedExecution["args"] as? List<*>
+        val dialogId = payload["dialogId"]?.toString() ?: args?.firstOrNull()?.toString() ?: return
+        if (metadata.dialogs.none { it.id == dialogId }) return
+        val parameters = JsonUtil.asStringMap(payload["parameters"])
+        val options = JsonUtil.asStringMap(args?.getOrNull(1))
+        openDialog(source.window.windowId, dialogId, parameters, options["selectionMode"]?.toString())
+    }
+
+    private fun applyProjectedOpenWindow(source: DataSourceContext, value: Any?) {
+        val payload = JsonUtil.asStringMap(value)
+        val projectedExecution = JsonUtil.asStringMap(payload["execution"])
+        val args = projectedExecution["args"] as? List<*>
+        val windowKey = payload["windowKey"]?.toString() ?: args?.firstOrNull()?.toString() ?: return
+        val title = payload["windowTitle"]?.toString() ?: payload["title"]?.toString() ?: args?.getOrNull(1)?.toString() ?: windowKey
+        openWindow(windowKey, title, inTab = payload["inTab"] as? Boolean ?: true, parameters = JsonUtil.asStringMap(payload["parameters"]))
+    }
+
+    private fun applyProjectedOpenTarget(source: DataSourceContext, value: Any?, metadata: WindowMetadata) {
+        val payload = JsonUtil.asStringMap(value)
+        val target = JsonUtil.asStringMap(payload["target"]).ifEmpty { payload }
+        when (target["kind"]?.toString()?.lowercase()) {
+            "dialog" -> applyProjectedOpenDialog(source, target, metadata)
+            "window" -> applyProjectedOpenWindow(source, target)
+            "external", "url", "link" -> {
+                val href = target["href"]?.toString() ?: target["url"]?.toString() ?: return
+                val scheme = runCatching { java.net.URI(href).scheme?.lowercase() }.getOrNull()
+                if (scheme in setOf("http", "https", "mailto", "tel")) externalURLHandler?.invoke(href)
+            }
+        }
     }
 
     private fun loadWindowMetadata(window: WindowState, forceReload: Boolean = false) {
@@ -437,6 +558,9 @@ class ExecutionEngine(
                 invokeHandler(execution, context, args, handler, applyState = true)
             }
         }
+        if (context != null && runtime.canProjectMetadataExecution(execution, context)) {
+            return scope.launch { runtime.evaluateMetadataExecution(execution, context, args, applyEffects = true) }
+        }
         return null
     }
 
@@ -446,8 +570,12 @@ class ExecutionEngine(
         args: Map<String, Any?> = emptyMap()
     ): Any? {
         val handlerName = execution.handler ?: return null
-        val handler = handlers.resolve(handlerName) ?: builtIn(handlerName) ?: return null
-        return invokeHandler(execution, context, args, handler, applyState = false)
+        val handler = handlers.resolve(handlerName) ?: builtIn(handlerName)
+        if (handler != null) return invokeHandler(execution, context, args, handler, applyState = false)
+        if (context != null && runtime.canProjectMetadataExecution(execution, context)) {
+            return runtime.evaluateMetadataExecution(execution, context, args, applyEffects = false)
+        }
+        return null
     }
 
     private suspend fun invokeHandler(

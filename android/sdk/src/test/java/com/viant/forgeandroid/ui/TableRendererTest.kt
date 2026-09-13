@@ -400,5 +400,8 @@ class TableRendererTest {
         val filtered = applyClientTableFilters(rows, filterSet, mapOf("Principal" to "group", "Status" to listOf(2)))
 
         assertEquals(listOf(1), filtered.map { it.row["id"] })
+        assertEquals("Alpha Group", resolveTableField(rows.first().displayRow, "CONTACTNAME"))
+        assertFalse(shouldFetchAfterToolbarSelection("windowForm"))
+        assertTrue(shouldFetchAfterToolbarSelection("form"))
     }
 }
