@@ -2,6 +2,12 @@ import XCTest
 @testable import ForgeIOSUI
 
 final class ChartActiveAxisTests: XCTestCase {
+    func testAccessibilityRemainderCountsOnlyAnnouncedPreviewValues() {
+        let rows = (0..<8).map { ChartAccessibleDataRow(id: "\($0)", category: "Day \($0)", seriesLabel: "Spend", valueLabel: "$1") }
+        XCTAssertTrue(chartAccessibleDataSummary(rows: rows, totalCount: 14).hasSuffix("11 more values."))
+        XCTAssertTrue(chartAccessibleDataSummary(rows: Array(rows.prefix(7)), totalCount: 7).hasSuffix("4 more values."))
+    }
+
     func testDeselectingEitherSeriesKeepsAxisAndPlotUnitsConsistent() {
         let spend = SeriesDatum(rowIndex: 0, category: "Sep 5", seriesKey: "spend", seriesLabel: "Spend", value: 1570, format: "currency")
         let impressions = SeriesDatum(rowIndex: 0, category: "Sep 5", seriesKey: "impressions", seriesLabel: "Impressions", value: 560000, format: "compactNumber")

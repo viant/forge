@@ -1403,7 +1403,7 @@ internal func chartAccessibleDataSummary(rows: [ChartAccessibleDataRow], totalCo
     let preview = rows.prefix(3).map { row in
         "\(row.category), \(row.seriesLabel), \(row.valueLabel)"
     }.joined(separator: "; ")
-    let remaining = max(totalCount - rows.count, 0)
+    let remaining = max(totalCount - min(rows.count, 3), 0)
     if remaining > 0 {
         return "Chart data table, \(totalCount) values. \(preview). \(remaining) more values."
     }
