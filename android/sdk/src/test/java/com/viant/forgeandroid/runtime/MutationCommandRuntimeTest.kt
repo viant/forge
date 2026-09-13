@@ -52,6 +52,7 @@ class MutationCommandRuntimeTest {
         }
         val command = MutationCommandDef(
             commandId = "save-record",
+            timeoutMs = 120_000,
             invocationParameter = "invocationId",
             dataSourceRef = "writer",
             successState = JsonObject(mapOf("saved" to JsonPrimitive(true))),

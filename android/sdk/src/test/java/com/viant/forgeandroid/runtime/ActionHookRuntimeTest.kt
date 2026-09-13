@@ -186,6 +186,52 @@ class ActionHookRuntimeTest {
     }
 
     @Test
+    fun namespacedUiActionsReturnPredicatesAndApplyBoundedEffects() = runBlocking {
+        val metadata = JsonUtil.json.decodeFromString(
+            WindowMetadata.serializer(),
+            """{"namespace":"Test","actions":{"code":"({allowed: ({context}) => {const allowed=context.signals.windowForm.peek().enabled===true;context.signals.windowForm.value={shouldNotApply:true};return allowed;}, open: ({context,row}) => {context.signals.windowForm.value={...context.signals.windowForm.peek(),opened:true};return context.handlers.window.openDialog({execution:{args:['detail']},parameters:{Id:row.id}});}, external: () => window.open('https://example.test/help'), unsafe: () => window.open('javascript:alert(1)')})"},"dataSource":{"source":{}},"dialogs":[{"id":"detail"}]}"""
+        )
+        val runtime = ForgeRuntime(emptyMap(), CoroutineScope(Dispatchers.Unconfined))
+        val openedURLs = mutableListOf<String>()
+        runtime.registerExternalURLHandler(openedURLs::add)
+        runtime.registerWindowMetadataLoader { metadata }
+        val window = runtime.openWindow("test")
+        withTimeout(1_000) { runtime.metadataSignal(window.windowId).flow.filterNotNull().first() }
+        runtime.setWindowFormValues(window.windowId, mapOf("enabled" to true))
+        val source = runtime.windowContext(window.windowId).context("source")
+
+        assertEquals(true, runtime.evaluate(ExecutionDef(handler = "Test.allowed"), source))
+        assertEquals(null, runtime.windowContext(window.windowId).peekWindowForm()["shouldNotApply"])
+        val job = runtime.execute(ExecutionDef(handler = "Test.open"), source, mapOf("row" to mapOf("id" to 7)))
+        job?.join()
+
+        assertEquals(true, runtime.windowContext(window.windowId).peekWindowForm()["opened"])
+        assertEquals(7L, runtime.windowContext(window.windowId).dialogSignal("detail").peek().props["Id"])
+        runtime.execute(ExecutionDef(handler = "Test.external"), source)?.join()
+        runtime.execute(ExecutionDef(handler = "Test.unsafe"), source)?.join()
+        assertEquals(listOf("https://example.test/help"), openedURLs)
+    }
+
+    @Test
+    fun projectedUiActionsApplyAuthoredCollectionSelectionAndWindowFieldEffects() = runBlocking {
+        val metadata = JsonUtil.json.decodeFromString(
+            WindowMetadata.serializer(),
+            """{"namespace":"Test","actions":{"code":"({mutate: ({context}) => {context.handlers.dataSource.setWindowFormField({item:{dataField:'mode'},value:'review'});context.handlers.dataSource.setCollection([{id:2,name:'updated'}]);context.handlers.dataSource.setSelected({selection:[{id:2,name:'updated'}]});return true;}})"},"dataSource":{"source":{}}}"""
+        )
+        val runtime = ForgeRuntime(emptyMap(), CoroutineScope(Dispatchers.Unconfined))
+        runtime.registerWindowMetadataLoader { metadata }
+        val window = runtime.openWindow("test")
+        withTimeout(1_000) { runtime.metadataSignal(window.windowId).flow.filterNotNull().first() }
+        val source = runtime.windowContext(window.windowId).context("source")
+
+        runtime.execute(ExecutionDef(handler = "Test.mutate"), source)?.join()
+
+        assertEquals("review", runtime.windowContext(window.windowId).peekWindowForm()["mode"])
+        assertEquals(2L, source.collection.peek().single()["id"])
+        assertEquals(2L, source.peekSelection().selected?.get("id"))
+    }
+
+    @Test
     fun updatePreviewPrincipalPublishesMetadataAndPreservesResourceCapabilities() = runBlocking {
         val runtime = ForgeRuntime(emptyMap(), CoroutineScope(Dispatchers.Unconfined))
         runtime.registerWindowMetadataLoader {

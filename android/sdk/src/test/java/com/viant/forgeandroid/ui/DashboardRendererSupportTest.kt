@@ -284,4 +284,13 @@ class DashboardRendererSupportTest {
         assertEquals(listOf("measurement", "orders"), pages.map { it.id })
         assertEquals(listOf("Measurement", "Orders"), pages.map { it.title })
     }
+
+    @Test
+    fun mobileTabSelectionFallsBackByStableDefaultInsteadOfClampedIndex() {
+        val before = listOf("pixels", "advanced", "capi")
+        val after = listOf("pixels", "advanced")
+
+        assertEquals(2, resolvedMobilePageIndex(before, "capi", fallbackIndex = 0))
+        assertEquals(0, resolvedMobilePageIndex(after, "capi", fallbackIndex = 0))
+    }
 }

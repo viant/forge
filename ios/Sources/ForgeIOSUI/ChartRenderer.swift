@@ -342,6 +342,8 @@ public struct ChartRenderer: View {
                 }
             }
             .nativeChartCategorySelection(type: type, selection: $selectedCategory)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(chartAccessibleDataSummary(rows: accessibleDataRows, totalCount: accessibleDataTotalCount))
         }
     }
 

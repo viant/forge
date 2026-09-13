@@ -124,7 +124,7 @@ fun TableRenderer(
     } else baseSortedRows
     val sortedRows = clientSortedRows.let { indexed ->
         if (quickSearchQuery.isBlank()) indexed else indexed.filter { row ->
-            val searchable = quickSearchField?.let { field -> SelectorUtil.resolve(row.displayRow, field)?.toString() }.orEmpty()
+            val searchable = quickSearchField?.let { field -> resolveTableField(row.displayRow, field)?.toString() }.orEmpty()
             searchable.contains(quickSearchQuery, ignoreCase = true)
         }
     }
@@ -257,12 +257,15 @@ internal fun applyClientTableFilters(
     return rows.filter { indexed ->
         val matches = active.all { (field, operation, expected) ->
             runCatching {
-                ClientFilterRuntime.matches(JsonUtil.anyToElement(SelectorUtil.resolve(indexed.displayRow, field)), expected, operation)
+                ClientFilterRuntime.matches(JsonUtil.anyToElement(resolveTableField(indexed.displayRow, field)), expected, operation)
             }.getOrDefault(false)
         }
         matches
     }
 }
+
+internal fun resolveTableField(row: Map<String, Any?>, field: String): Any? =
+    SelectorUtil.resolve(row, field) ?: row.entries.firstOrNull { it.key.equals(field, true) }?.value
 
 private fun quickFilterSetForTable(context: DataSourceContext): com.viant.forgeandroid.runtime.FilterSetDef? {
     val name = context.dataSource.quickFilterSet
