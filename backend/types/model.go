@@ -1345,6 +1345,7 @@ type TableLink struct {
 	WindowTitleSelector string                 `json:"windowTitleSelector,omitempty" yaml:"windowTitleSelector,omitempty"`
 	WindowTitleSource   string                 `json:"windowTitleSource,omitempty" yaml:"windowTitleSource,omitempty"`
 	InTab               *bool                  `json:"inTab,omitempty" yaml:"inTab,omitempty"`
+	ReplaceHostedRegion *bool                  `json:"replaceHostedRegion,omitempty" yaml:"replaceHostedRegion,omitempty"`
 	NewInstance         bool                   `json:"newInstance,omitempty" yaml:"newInstance,omitempty"`
 	AutoIndexTitle      bool                   `json:"autoIndexTitle,omitempty" yaml:"autoIndexTitle,omitempty"`
 	AwaitResult         bool                   `json:"awaitResult,omitempty" yaml:"awaitResult,omitempty"`
