@@ -45,6 +45,27 @@ import { getLogger } from '../utils/logger.js';
 import { runWindowLifecycleHandlers } from './windowLifecycle.js';
 import { buildReportBuilderHostServices } from './dashboard/reportBuilderHostServices.js';
 
+export function reuseShallowEqualRuntimeObject(previous = null, candidate = null) {
+    if (!previous || !candidate || typeof previous !== 'object' || typeof candidate !== 'object') {
+        return candidate;
+    }
+    const previousKeys = Object.keys(previous);
+    const candidateKeys = Object.keys(candidate);
+    if (previousKeys.length !== candidateKeys.length) return candidate;
+    return candidateKeys.every((key) => Object.is(previous[key], candidate[key])) ? previous : candidate;
+}
+
+function useStableRuntimeIdentity(dependencies = []) {
+    const holder = useRef(null);
+    const changed = !holder.current
+        || holder.current.dependencies.length !== dependencies.length
+        || dependencies.some((value, index) => !Object.is(value, holder.current.dependencies[index]));
+    if (changed) {
+        holder.current = {dependencies: [...dependencies], identity: {}};
+    }
+    return holder.current.identity;
+}
+
 function collectInitialWindowFormItemValues(node, initial) {
     if (!node || typeof node !== 'object') return;
     if (Array.isArray(node.items)) {
@@ -1017,6 +1038,12 @@ function WindowContentRuntime({window, isInTab = false}) {
     useSignals();
     const {windowKey, windowId} = window;
     const baseKey = windowKey.split('?')[0];
+    const runtimeWindowHolder = useRef(null);
+    runtimeWindowHolder.current = reuseShallowEqualRuntimeObject(
+        runtimeWindowHolder.current,
+        {...window, isInTab},
+    );
+    const runtimeWindow = runtimeWindowHolder.current;
 
     const [metadataSignalHandle, setMetadataSignalHandle] = useState(() => findMetadataSignal(windowId));
     const [loading, setLoading] = useState(() => !(metadataSignalHandle?.peek?.()));
@@ -1030,10 +1057,10 @@ function WindowContentRuntime({window, isInTab = false}) {
         typeof services?.prepareDataConnectorRequest === 'function'
             ? (request) => services.prepareDataConnectorRequest({
                 ...request,
-                windowState: window,
+                windowState: runtimeWindow,
             })
             : undefined
-    ), [services, window]);
+    ), [services, runtimeWindow]);
     if (!connectorConfig.window) {
         throw new Error('No connectorConfig.window found');
     }
@@ -1044,19 +1071,19 @@ function WindowContentRuntime({window, isInTab = false}) {
         endpoints,
         auth,
         endpointName: service?.endpoint,
-        conversationId: window?.conversationId,
+        conversationId: runtimeWindow?.conversationId,
         prepareRequest: prepareConnectorRequest,
-    }), [services, endpoints, auth, service?.endpoint, window?.conversationId, prepareConnectorRequest]);
+    }), [services, endpoints, auth, service?.endpoint, runtimeWindow?.conversationId, prepareConnectorRequest]);
     const resolvedServices = useMemo(() => ({
         ...reportBuilderServices,
-        windowState: window,
+        windowState: runtimeWindow,
         __connectorRuntime: {
             endpoints,
             targetContext,
             auth,
             prepareRequest: prepareConnectorRequest,
         },
-    }), [reportBuilderServices, window, endpoints, targetContext, auth, prepareConnectorRequest]);
+    }), [reportBuilderServices, runtimeWindow, endpoints, targetContext, auth, prepareConnectorRequest]);
     const config  = {service: {...service, uri: `${service.uri}/${baseKey}`, includeTargetContext: true}};
     const connector = useDataConnector(config);
 
@@ -1164,6 +1191,33 @@ function WindowContentRuntime({window, isInTab = false}) {
 
     const displayState = resolveWindowMetadataDisplayState({loading, signalsReady, metadata, fetchError});
 
+    // Keep the service runtime referentially stable while the effective
+    // window, metadata authorization, and host services are unchanged.
+    // WindowContentInner uses these identities to decide whether its Context
+    // is still current; rebuilding them on every render repeatedly disposed
+    // and re-initialized datasource actions such as Agently chat hydration.
+    const runtimePrepareRequest = useMemo(() => (
+        typeof services?.prepareDataConnectorRequest === 'function'
+            ? (request) => services.prepareDataConnectorRequest({...request, windowState: runtimeWindow}) || request
+            : resolvedServices?.__connectorRuntime?.prepareRequest
+    ), [services, resolvedServices, runtimeWindow]);
+    const contextRuntimeIdentity = useStableRuntimeIdentity([
+        resolvedServices,
+        runtimeWindow,
+        metadata?.authorizationSnapshot,
+        runtimePrepareRequest,
+    ]);
+    const runtimeServices = useMemo(() => ({
+        ...resolvedServices,
+        __contextRuntimeIdentity: contextRuntimeIdentity,
+        windowState: runtimeWindow,
+        authorization: metadata?.authorizationSnapshot || resolvedServices.authorization,
+        __connectorRuntime: {
+            ...(resolvedServices.__connectorRuntime || {}),
+            prepareRequest: runtimePrepareRequest,
+        },
+    }), [resolvedServices, runtimeWindow, metadata?.authorizationSnapshot, runtimePrepareRequest, contextRuntimeIdentity]);
+
     useEffect(() => {
         if (!window?.workspaceObject || (displayState !== 'ready' && displayState !== 'error')) return;
         const lifecycleState = displayState === 'ready' ? 'ready' : 'failed';
@@ -1215,19 +1269,6 @@ function WindowContentRuntime({window, isInTab = false}) {
         );
     }
 
-    const runtimeWindow = {...window, isInTab};
-    const runtimePrepareRequest = typeof services?.prepareDataConnectorRequest === 'function'
-        ? (request) => services.prepareDataConnectorRequest({...request, windowState: runtimeWindow}) || request
-        : resolvedServices?.__connectorRuntime?.prepareRequest;
-    const runtimeServices = {
-        ...resolvedServices,
-        windowState: runtimeWindow,
-        authorization: metadata?.authorizationSnapshot || resolvedServices.authorization,
-        __connectorRuntime: {
-            ...(resolvedServices.__connectorRuntime || {}),
-            prepareRequest: runtimePrepareRequest,
-        },
-    };
     return (
         <WindowContentInner
             window={runtimeWindow}
