@@ -171,7 +171,38 @@ reportBuilder:
 	}
 }
 
-func TestDiscoverRejectsDuplicatePresentationViewIdentity(t *testing.T) {
+func TestDiscoverWarnsAndSkipsIncompletePresentationProfile(t *testing.T) {
+	workspace := t.TempDir()
+	writeAsset(t, workspace, "extension/forge/reporting/family/profiles/incomplete.json", `{
+  "kind":"forge.reporting.presentationProfileCatalog",
+  "schemaVersion":1,
+  "familyId":"performance",
+  "views":[{"title":"Legacy presentation"}]
+}`)
+	writeAsset(t, workspace, "extension/forge/reporting/family/builder.yaml", `
+kind: forge.reporting.builder
+id: family
+reportBuilder:
+  presentationProfileRefs: [./profiles/incomplete.json]
+`)
+
+	got, err := Discover(context.Background(), Options{WorkspaceRoot: workspace})
+	if err != nil {
+		t.Fatalf("incomplete optional profile must not prevent discovery: %v", err)
+	}
+	builder := got.Builder("family")
+	if builder == nil {
+		t.Fatal("expected builder to remain available")
+	}
+	if len(builder.PresentationProfiles) != 0 || len(builder.PresentationProfileRefs) != 0 {
+		t.Fatalf("expected incomplete profile to be omitted, got %#v", builder.PresentationProfiles)
+	}
+	if len(got.Warnings) != 1 || got.Warnings[0].Code != "presentationProfileViewInvalid" || !got.Warnings[0].IsWarning() {
+		t.Fatalf("expected presentation profile warning, got %#v", got.Warnings)
+	}
+}
+
+func TestDiscoverWarnsAndSkipsDuplicatePresentationViewIdentity(t *testing.T) {
 	workspace := t.TempDir()
 	profile := `{"kind":"forge.reporting.presentationProfileCatalog","schemaVersion":1,"familyId":"performance","views":[{"reportId":"performance-overview","visualProfile":"performance_overview","revision":"1","tabs":[{"id":"overview","title":"Overview","blockIds":["trend"]}],"blocks":[{"id":"trend","kind":"chartBlock"}]}]}`
 	writeAsset(t, workspace, "extension/forge/reporting/family/profiles/one.json", profile)
@@ -183,9 +214,16 @@ reportBuilder:
   presentationProfileRefs: [./profiles/one.json, ./profiles/two.json]
 `)
 
-	_, err := Discover(context.Background(), Options{WorkspaceRoot: workspace})
-	if err == nil || !strings.Contains(err.Error(), "declared by both") {
-		t.Fatalf("expected duplicate presentation identity rejection, got %v", err)
+	got, err := Discover(context.Background(), Options{WorkspaceRoot: workspace})
+	if err != nil {
+		t.Fatalf("duplicate optional profile must not prevent discovery: %v", err)
+	}
+	builder := got.Builder("family")
+	if builder == nil || len(builder.PresentationProfiles) != 1 {
+		t.Fatalf("expected first valid profile to remain available, got %#v", builder)
+	}
+	if len(got.Warnings) != 1 || !strings.Contains(got.Warnings[0].Message, "declared by both") {
+		t.Fatalf("expected duplicate presentation identity warning, got %#v", got.Warnings)
 	}
 }
 
