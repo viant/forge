@@ -522,7 +522,7 @@ const Toolbar = ({
 
     return (
         <div
-            className={`toolbar-container${density === 'compact' ? ' is-compact' : ''}${layout === 'balanced' || layout === 'responsive' ? ' is-balanced' : ''}${layout === 'responsive' ? ' is-responsive' : ''}${className ? ` ${className}` : ''}`}
+            className={`toolbar-container${density === 'compact' ? ' is-compact' : ''}${layout === 'balanced' || layout === 'responsive' ? ' is-balanced' : ''}${layout === 'responsive' ? ' is-responsive' : ''}${leftContent ? ' has-left-content' : ''}${className ? ` ${className}` : ''}`}
             style={style}
             data-form-dirty={formDirty ? 'true' : 'false'}
         >

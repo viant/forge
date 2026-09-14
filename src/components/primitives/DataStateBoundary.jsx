@@ -23,13 +23,18 @@ export default function DataStateBoundary({sizingMode = 'fill', container, conte
     return Array.isArray(rows) ? rows : [];
   });
   const state = dataBoundaryState(states, collections, spec.allowPartial);
+  // Tables own a complete initial-loading presentation (toolbar, headers and
+  // skeleton rows). Keep that shell mounted so controls such as date presets
+  // can initialize required datasource parameters instead of deadlocking
+  // behind the outer loading boundary.
+  const tableOwnsLoading = state.kind === 'loading' && !!container.table;
   const errorAction = spec.errorAction && typeof spec.errorAction === 'object' ? spec.errorAction : null;
   const retryError = () => {
     const ref = errorAction?.dataSourceRef || spec.dataSourceRefs?.[0] || container.dataSourceRef;
     const target = ref ? (context.Context?.(ref) || context) : context;
     return target?.handlers?.dataSource?.fetchCollection?.({cache: {bypassCache: errorAction?.bypassCache !== false}});
   };
-  if (state.kind === 'loading') return <div className="forge-data-state" data-forge-primitive="dataStateBoundary"><Spinner size={24}/><span>{spec.loadingMessage || 'Loading…'}</span></div>;
+  if (state.kind === 'loading' && !tableOwnsLoading) return <div className="forge-data-state" data-forge-primitive="dataStateBoundary"><Spinner size={24}/><span>{spec.loadingMessage || 'Loading…'}</span></div>;
   if (state.kind === 'error' && spec.suppressErrorWhen && evaluatePlainVisibleWhen(spec.suppressErrorWhen, context)) return null;
   if (state.kind === 'error') return <div className="forge-data-error" role="alert" data-forge-primitive="dataStateBoundary">
     <Icon icon="error" aria-hidden="true"/>
@@ -38,5 +43,5 @@ export default function DataStateBoundary({sizingMode = 'fill', container, conte
   </div>;
   if (state.kind === 'empty' && !renderEmptyContent) return <NonIdealState icon="search" title={spec.emptyMessage || 'No data'}/>;
   if (state.kind === 'stale_empty' && !renderEmptyContent) return <div style={containerSizingStyle(container,sizingMode,{chrome:true})} data-forge-primitive="dataStateBoundary"><Callout intent="warning">{spec.staleMessage || 'Cached data may be stale.'}</Callout><NonIdealState icon="search" title={spec.emptyMessage || 'No data'}/></div>;
-  return <div style={containerSizingStyle(container,sizingMode,{chrome:true})} data-forge-primitive="dataStateBoundary">{(state.kind === 'partial' || state.kind === 'stale' || state.kind === 'stale_empty') ? <Callout intent="warning">{(state.kind === 'stale' || state.kind === 'stale_empty') ? spec.staleMessage || 'Showing cached data.' : 'Some data is unavailable.'}</Callout> : null}{children}</div>;
+  return <div style={containerSizingStyle(container,sizingMode,{chrome:true})} data-forge-primitive="dataStateBoundary" aria-busy={tableOwnsLoading || undefined}>{(state.kind === 'partial' || state.kind === 'stale' || state.kind === 'stale_empty') ? <Callout intent="warning">{(state.kind === 'stale' || state.kind === 'stale_empty') ? spec.staleMessage || 'Showing cached data.' : 'Some data is unavailable.'}</Callout> : null}{children}</div>;
 }
