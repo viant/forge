@@ -24,3 +24,20 @@ func TestTableLinkRetainsDialogID(t *testing.T) {
 		t.Fatalf("dialogId missing from JSON: %s", payload)
 	}
 }
+
+func TestTableLinkRetainsHostedRegionReplacementPolicy(t *testing.T) {
+	var actual Column
+	if err := yaml.Unmarshal([]byte("id: report\ntype: link\nlink:\n  kind: window\n  windowKey: advancedReports\n  replaceHostedRegion: false\n"), &actual); err != nil {
+		t.Fatal(err)
+	}
+	if actual.Link == nil || actual.Link.ReplaceHostedRegion == nil || *actual.Link.ReplaceHostedRegion {
+		t.Fatalf("replaceHostedRegion=false was not retained: %#v", actual.Link)
+	}
+	payload, err := json.Marshal(actual)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(payload), `"replaceHostedRegion":false`) {
+		t.Fatalf("replaceHostedRegion missing from JSON: %s", payload)
+	}
+}
