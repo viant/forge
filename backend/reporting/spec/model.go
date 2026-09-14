@@ -333,6 +333,7 @@ type rawChartBlock struct {
 	DatasetRef string         `json:"datasetRef"`
 	ChartSpec  map[string]any `json:"chartSpec"`
 	ChartModel map[string]any `json:"chartModel"`
+	RowLimit   *int           `json:"rowLimit,omitempty"`
 }
 
 type rawKPIBlock struct {
@@ -404,12 +405,13 @@ type rawGeoMapBlock struct {
 }
 
 type rawSectionBlock struct {
-	ID              string `json:"id"`
-	Kind            string `json:"kind"`
-	Title           string `json:"title"`
-	Subtitle        string `json:"subtitle,omitempty"`
-	Description     string `json:"description,omitempty"`
-	NavigationLabel string `json:"navigationLabel"`
+	ID              string   `json:"id"`
+	Kind            string   `json:"kind"`
+	Title           string   `json:"title"`
+	Subtitle        string   `json:"subtitle,omitempty"`
+	Description     string   `json:"description,omitempty"`
+	NavigationLabel string   `json:"navigationLabel"`
+	BlockIDs        []string `json:"blockIds,omitempty"`
 }
 
 type rawCompositeBlock struct {
@@ -970,6 +972,7 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			DatasetRef: block.DatasetRef,
 			ChartSpec:  block.ChartSpec,
 			ChartModel: block.ChartModel,
+			RowLimit:   block.RowLimit,
 		}, nil
 	case "kpiBlock":
 		block := rawKPIBlock{}
