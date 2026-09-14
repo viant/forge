@@ -124,7 +124,7 @@ func TestDiscoverLoadsBuilderPresentationProfilesFromWorkspaceRelativeRefs(t *te
   "kind":"forge.reporting.presentationProfileCatalog",
   "schemaVersion":1,
   "familyId":"performance",
-  "views":[{"viewId":1294,"visualProfile":"performance_overview","revision":"1","tabs":[{"id":"overview","title":"Overview","blockIds":["trend"]}],"blocks":[{"id":"trend","kind":"chartBlock"}]}]
+  "views":[{"reportId":"performance-overview","visualProfile":"performance_overview","revision":"1","tabs":[{"id":"overview","title":"Overview","blockIds":["trend"]}],"blocks":[{"id":"trend","kind":"chartBlock"}]}]
 }`)
 	writeAsset(t, workspace, "extension/forge/reporting/family/builder.yaml", `
 kind: forge.reporting.builder
@@ -173,7 +173,7 @@ reportBuilder:
 
 func TestDiscoverRejectsDuplicatePresentationViewIdentity(t *testing.T) {
 	workspace := t.TempDir()
-	profile := `{"kind":"forge.reporting.presentationProfileCatalog","schemaVersion":1,"familyId":"performance","views":[{"viewId":1294,"visualProfile":"performance_overview","revision":"1","tabs":[{"id":"overview","title":"Overview","blockIds":["trend"]}],"blocks":[{"id":"trend","kind":"chartBlock"}]}]}`
+	profile := `{"kind":"forge.reporting.presentationProfileCatalog","schemaVersion":1,"familyId":"performance","views":[{"reportId":"performance-overview","visualProfile":"performance_overview","revision":"1","tabs":[{"id":"overview","title":"Overview","blockIds":["trend"]}],"blocks":[{"id":"trend","kind":"chartBlock"}]}]}`
 	writeAsset(t, workspace, "extension/forge/reporting/family/profiles/one.json", profile)
 	writeAsset(t, workspace, "extension/forge/reporting/family/profiles/two.json", profile)
 	writeAsset(t, workspace, "extension/forge/reporting/family/builder.yaml", `

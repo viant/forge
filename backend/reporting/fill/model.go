@@ -74,6 +74,7 @@ type Block struct {
 	Content                  *TableContent         `json:"content,omitempty"`
 	ChartSpec                map[string]any        `json:"chartSpec,omitempty"`
 	ChartModel               map[string]any        `json:"chartModel,omitempty"`
+	RowLimit                 *int                  `json:"rowLimit,omitempty"`
 	ValueField               string                `json:"valueField,omitempty"`
 	ValueLabel               string                `json:"valueLabel,omitempty"`
 	ValueFormat              string                `json:"valueFormat,omitempty"`
@@ -339,10 +340,11 @@ type CollectionContent struct {
 }
 
 type SectionContent struct {
-	Title           string `json:"title"`
-	Subtitle        string `json:"subtitle,omitempty"`
-	Description     string `json:"description,omitempty"`
-	NavigationLabel string `json:"navigationLabel"`
+	Title           string   `json:"title"`
+	Subtitle        string   `json:"subtitle,omitempty"`
+	Description     string   `json:"description,omitempty"`
+	NavigationLabel string   `json:"navigationLabel"`
+	BlockIDs        []string `json:"blockIds,omitempty"`
 }
 
 type CompositeContent struct {
@@ -495,6 +497,7 @@ type rawChartBlock struct {
 	DatasetRef string         `json:"datasetRef"`
 	ChartSpec  map[string]any `json:"chartSpec"`
 	ChartModel map[string]any `json:"chartModel"`
+	RowLimit   *int           `json:"rowLimit,omitempty"`
 	Content    ChartContent   `json:"content"`
 }
 
@@ -604,6 +607,7 @@ type rawSectionBlock struct {
 	Subtitle        string         `json:"subtitle,omitempty"`
 	Description     string         `json:"description,omitempty"`
 	NavigationLabel string         `json:"navigationLabel,omitempty"`
+	BlockIDs        []string       `json:"blockIds,omitempty"`
 	Content         SectionContent `json:"content"`
 }
 
@@ -765,6 +769,7 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				DatasetRef:   chartBlock.DatasetRef,
 				ChartSpec:    chartBlock.ChartSpec,
 				ChartModel:   chartBlock.ChartModel,
+				RowLimit:     chartBlock.RowLimit,
 				ChartContent: &chartBlock.Content,
 			})
 		case "kpiBlock":

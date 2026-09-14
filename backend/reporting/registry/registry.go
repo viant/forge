@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -301,15 +300,15 @@ func loadPresentationProfiles(workspaceRoot, assetFilename string, asset *Asset,
 		}
 		for viewIndex, rawView := range listValue(profile["views"]) {
 			view := mapValue(rawView)
-			viewID, parseErr := strconv.Atoi(stringValue(view["viewId"]))
+			reportID := stringValue(view["reportId"])
 			visualProfile := stringValue(view["visualProfile"])
 			viewPath := fmt.Sprintf("%s.views[%d]", entryPath, viewIndex)
-			if parseErr != nil || viewID <= 0 || visualProfile == "" || stringValue(view["revision"]) == "" || len(listValue(view["tabs"])) == 0 || len(listValue(view["blocks"])) == 0 {
-				diagnostics = append(diagnostics, Diagnostic{Code: "presentationProfileViewInvalid", Message: fmt.Sprintf("presentation profile %q view %d must declare positive viewId, visualProfile, revision, tabs, and blocks", normalizedRef, viewIndex), SourcePath: asset.SourcePath, YAMLPath: viewPath})
+			if reportID == "" || visualProfile == "" || stringValue(view["revision"]) == "" || len(listValue(view["tabs"])) == 0 || len(listValue(view["blocks"])) == 0 {
+				diagnostics = append(diagnostics, Diagnostic{Code: "presentationProfileViewInvalid", Message: fmt.Sprintf("presentation profile %q entry %d must declare reportId, visualProfile, revision, tabs, and blocks", normalizedRef, viewIndex), SourcePath: asset.SourcePath, YAMLPath: viewPath})
 				profileValid = false
 				continue
 			}
-			identity := fmt.Sprintf("%d:%s", viewID, strings.ToLower(visualProfile))
+			identity := strings.ToLower(reportID) + ":" + strings.ToLower(visualProfile)
 			if previousRef, ok := seenViews[identity]; ok {
 				diagnostics = append(diagnostics, Diagnostic{Code: "presentationProfileViewDuplicate", Message: fmt.Sprintf("presentation view %s is declared by both %q and %q", identity, previousRef, normalizedRef), SourcePath: asset.SourcePath, YAMLPath: viewPath})
 				profileValid = false

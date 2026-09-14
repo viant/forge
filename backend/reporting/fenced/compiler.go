@@ -227,9 +227,27 @@ func normalizeSpecBlocks(blocks []map[string]any) {
 				if len(yFields) > 0 {
 					valueKey = yFields[0]
 				}
+				seriesOptions, _ := chartSpec["seriesOptions"].(map[string]any)
+				seriesValues := make([]any, 0, len(yFields))
+				for _, field := range yFields {
+					entry := map[string]any{"value": field, "label": humanize(field), "type": chartSpec["type"]}
+					if options, ok := seriesOptions[field].(map[string]any); ok {
+						for _, key := range []string{"format", "axis", "dataLabels", "label"} {
+							if options[key] != nil {
+								entry[key] = options[key]
+							}
+						}
+					}
+					seriesValues = append(seriesValues, entry)
+				}
+				series := map[string]any{"valueKey": valueKey, "values": seriesValues}
+				chartType := strings.NewReplacer("_", "", "-", "", " ", "").Replace(strings.ToLower(textValue(chartSpec["type"])))
+				if (chartType == "donut" || chartType == "pie") && xField != "" {
+					series["nameKey"] = xField
+				}
 				block["chartModel"] = map[string]any{
 					"type": chartSpec["type"], "xAxis": map[string]any{"dataKey": xField},
-					"series": map[string]any{"valueKey": valueKey, "values": []any{map[string]any{"value": valueKey, "label": humanize(valueKey), "type": chartSpec["type"]}}},
+					"series": series,
 				}
 			}
 		case "sectionBlock":
@@ -317,8 +335,27 @@ func buildFillBlocks(blocks []map[string]any, datasets []any) []any {
 	}
 	result := make([]any, 0, len(blocks))
 	blockByID := map[string]map[string]any{}
+	compositeChildren := map[string]bool{}
 	for _, block := range blocks {
 		blockByID[textValue(block["id"])] = block
+		if textValue(block["kind"]) == "compositeBlock" {
+			for _, childID := range stringSlice(block["childBlockIds"]) {
+				compositeChildren[childID] = true
+			}
+		}
+	}
+	sectionBlockIDs := map[string][]string{}
+	activeSection := ""
+	for _, block := range blocks {
+		id, kind := textValue(block["id"]), textValue(block["kind"])
+		if kind == "sectionBlock" {
+			activeSection = id
+			sectionBlockIDs[id] = []string{}
+			continue
+		}
+		if activeSection != "" && kind != "tabGroupBlock" && !compositeChildren[id] {
+			sectionBlockIDs[activeSection] = append(sectionBlockIDs[activeSection], id)
+		}
 	}
 	for _, source := range blocks {
 		block := cloneMap(source)
@@ -353,20 +390,27 @@ func buildFillBlocks(blocks []map[string]any, datasets []any) []any {
 			block["content"] = map[string]any{"columns": columns, "rowCount": len(rows), "resolvedRows": resolved}
 		case "kpiBlock":
 			field := textValue(block["valueField"])
+			secondaryField := textValue(block["secondaryField"])
 			if field == "" {
 				field = textValue(block["valueKey"])
 				delete(block, "valueKey")
 				block["valueField"] = field
 			}
 			value := any(nil)
+			secondaryValue := any(nil)
 			if len(rows) > 0 {
 				value = rows[0][field]
+				if secondaryField != "" {
+					secondaryValue = rows[0][secondaryField]
+				}
 			}
 			block["content"] = map[string]any{
 				"title": block["title"], "description": block["description"],
 				"valueField": field, "valueLabel": block["valueLabel"], "valueFormat": block["valueFormat"],
 				"suffix": block["suffix"], "tone": block["tone"],
-				"value": value, "rowCount": len(rows), "secondaryValue": nil,
+				"value": value, "rowCount": len(rows), "secondaryField": secondaryField,
+				"secondaryLabel": block["secondaryLabel"], "secondaryFormat": block["secondaryFormat"],
+				"secondaryTrend": block["secondaryTrend"], "secondaryValue": secondaryValue,
 			}
 		case "markdownBlock":
 			block["content"] = map[string]any{"title": block["title"], "markdown": textValue(block["markdown"])}
@@ -381,7 +425,11 @@ func buildFillBlocks(blocks []map[string]any, datasets []any) []any {
 			seriesField := textValue(chartSpec["seriesField"])
 			kind, nameKey, valueKey := "directSeries", "", ""
 			seriesKeys := append([]string(nil), yFields...)
-			if seriesField != "" && len(yFields) > 0 {
+			chartType := strings.NewReplacer("_", "", "-", "", " ", "").Replace(strings.ToLower(textValue(chartSpec["type"])))
+			if (chartType == "donut" || chartType == "pie") && xField != "" && len(yFields) > 0 {
+				kind, nameKey, valueKey = "category", xField, yFields[0]
+				seriesKeys = distinctValues(rows, xField)
+			} else if seriesField != "" && len(yFields) > 0 {
 				kind, nameKey, valueKey = "groupedSeries", seriesField, yFields[0]
 				seriesKeys = distinctValues(rows, seriesField)
 			}
@@ -395,10 +443,12 @@ func buildFillBlocks(blocks []map[string]any, datasets []any) []any {
 					"nameKey": nameKey, "valueKey": valueKey, "seriesKeys": seriesKeys, "rows": rows,
 				},
 			}
+		case "geoMapBlock":
+			block["content"] = buildGeoFillContent(block, rows)
 		case "sectionBlock":
 			block["content"] = map[string]any{
 				"title": block["title"], "subtitle": block["subtitle"], "description": block["description"],
-				"navigationLabel": block["navigationLabel"],
+				"navigationLabel": block["navigationLabel"], "blockIds": sectionBlockIDs[textValue(block["id"])],
 			}
 		case "tabGroupBlock":
 			sectionIDs := stringSlice(block["sectionIds"])
@@ -460,6 +510,136 @@ func buildFillBlocks(blocks []map[string]any, datasets []any) []any {
 	return result
 }
 
+func buildGeoFillContent(block map[string]any, rows []map[string]any) map[string]any {
+	geo, _ := block["geo"].(map[string]any)
+	if geo == nil {
+		geo = map[string]any{}
+	}
+	metric, _ := geo["metric"].(map[string]any)
+	if metric == nil {
+		metric = map[string]any{}
+	}
+	shape := textValue(geo["shape"])
+	if shape == "" {
+		shape = "us-states"
+	}
+	keyField := textValue(geo["key"])
+	if keyField == "" {
+		keyField = textValue(geo["codeKey"])
+	}
+	labelField := textValue(geo["labelKey"])
+	if labelField == "" {
+		labelField = textValue(geo["label"])
+	}
+	if labelField == "" {
+		labelField = keyField
+	}
+	metricKey := textValue(metric["key"])
+	if metricKey == "" {
+		metricKey = textValue(geo["valueKey"])
+	}
+	metricLabel := textValue(metric["label"])
+	if metricLabel == "" {
+		metricLabel = humanize(metricKey)
+	}
+	format := textValue(metric["format"])
+	if format == "" {
+		format = textValue(geo["format"])
+	}
+	if format == "" {
+		format = "number"
+	}
+	aggregate := strings.ToLower(textValue(geo["aggregate"]))
+	if aggregate == "" {
+		aggregate = "sum"
+	}
+	type aggregateRow struct {
+		row   map[string]any
+		value float64
+		count int
+	}
+	byKey := map[string]*aggregateRow{}
+	for _, row := range rows {
+		key := strings.TrimSpace(textValue(row[keyField]))
+		if key == "" {
+			continue
+		}
+		value, ok := numberValue(row[metricKey])
+		if !ok {
+			continue
+		}
+		entry := byKey[key]
+		if entry == nil {
+			entry = &aggregateRow{row: row, value: value}
+			byKey[key] = entry
+		} else {
+			switch aggregate {
+			case "max":
+				if value > entry.value {
+					entry.value, entry.row = value, row
+				}
+			case "min":
+				if value < entry.value {
+					entry.value, entry.row = value, row
+				}
+			default:
+				entry.value += value
+			}
+		}
+		entry.count++
+	}
+	keys := make([]string, 0, len(byKey))
+	for key := range byKey {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	minValue, maxValue := 0.0, 0.0
+	if len(keys) > 0 {
+		minValue, maxValue = byKey[keys[0]].value, byKey[keys[0]].value
+		for _, key := range keys[1:] {
+			value := byKey[key].value
+			if value < minValue {
+				minValue = value
+			}
+			if value > maxValue {
+				maxValue = value
+			}
+		}
+	}
+	palette := []string{"#d9f0ea", "#a8dadc", "#5fa8d3", "#2563eb", "#1d4ed8"}
+	regions := make([]any, 0, len(keys))
+	total := 0.0
+	for _, key := range keys {
+		entry := byKey[key]
+		total += entry.value
+		index := 0
+		if maxValue > minValue {
+			index = int(math.Round((entry.value - minValue) / (maxValue - minValue) * float64(len(palette)-1)))
+		}
+		count := entry.count
+		label := strings.TrimSpace(textValue(entry.row[labelField]))
+		if label == "" {
+			label = key
+		}
+		regions = append(regions, map[string]any{"key": key, "label": label, "rawValue": entry.value, "displayValue": formatValue(entry.value, format), "color": palette[index], "statusColor": "", "statusLabel": "", "rowCount": count})
+	}
+	ranking := append([]any{}, regions...)
+	sort.SliceStable(ranking, func(i, j int) bool {
+		return ranking[i].(map[string]any)["rawValue"].(float64) > ranking[j].(map[string]any)["rawValue"].(float64)
+	})
+	topKey := "-"
+	var active any
+	if len(ranking) > 0 {
+		topKey = textValue(ranking[0].(map[string]any)["key"])
+		active = ranking[0]
+	}
+	resolved := map[string]any{"shape": shape, "keyField": keyField, "labelField": labelField, "metricKey": metricKey, "metricLabel": metricLabel, "format": format, "aggregate": aggregate, "regions": regions, "ranking": ranking, "activeRegion": active, "summary": map[string]any{"regionCount": len(regions), "totalValue": formatValue(total, format), "topKey": topKey}}
+	if geo["legend"] != false {
+		resolved["legend"] = map[string]any{"min": formatValue(minValue, format), "max": formatValue(maxValue, format), "palette": palette}
+	}
+	return map[string]any{"geo": geo, "rowCount": len(rows), "resolvedGeo": resolved}
+}
+
 func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw json.RawMessage, blocks, datasets []any) map[string]any {
 	width, height := 612.0, 792.0
 	for _, item := range blocks {
@@ -516,7 +696,7 @@ func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw 
 	if width >= 700 {
 		kpiColumns = 4
 	}
-	kpiCardHeight, kpiAdvance := 44.0, 52.0
+	kpiCardHeight, kpiAdvance := 58.0, 66.0
 	tabSections := map[string]bool{}
 	for _, item := range blocks {
 		block := item.(map[string]any)
@@ -752,6 +932,28 @@ func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw 
 			valueElement := textElement(id+"__value", x+10, y+20, cardWidth-20, 20, fitTableText(displayValue, cardWidth-20, 16), 16, "700")
 			valueElement["color"] = foreground
 			elements = append(elements, valueElement)
+			secondaryField := textValue(block["secondaryField"])
+			if secondaryField != "" && len(rows) > 0 && rows[0][secondaryField] != nil {
+				secondary := formatValue(rows[0][secondaryField], textValue(block["secondaryFormat"]))
+				if block["secondaryTrend"] == true {
+					if numeric, ok := numberValue(rows[0][secondaryField]); ok {
+						if numeric > 0 {
+							secondary = "Up +" + strings.TrimPrefix(secondary, "+")
+						} else if numeric < 0 {
+							secondary = "Down " + secondary
+						} else {
+							secondary = "No change " + secondary
+						}
+					}
+				}
+				label := textValue(block["secondaryLabel"])
+				if label == "" {
+					label = humanize(secondaryField)
+				}
+				secondaryElement := textElement(id+"__secondary", x+10, y+41, cardWidth-20, 11, fitTableText(label+": "+secondary, cardWidth-20, 8), 8, "")
+				secondaryElement["color"] = foreground
+				elements = append(elements, secondaryElement)
+			}
 			bookmarks = append(bookmarks, bookmark(id, blockTitle, pageNumber, titleID, y))
 			pendingKPIs++
 			if pendingKPIs == kpiColumns {
@@ -1229,7 +1431,7 @@ func buildChartSVG(rows []map[string]any, chartSpec map[string]any, width, heigh
 	if len(yFields) == 0 {
 		return fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="%.0f" height="%.0f"><text x="12" y="24" font-size="12" fill="#667085">No chart measures configured</text></svg>`, width, height)
 	}
-	chartType := strings.ToLower(textValue(chartSpec["type"]))
+	chartType := strings.NewReplacer("_", "", "-", "", " ", "").Replace(strings.ToLower(textValue(chartSpec["type"])))
 	if chartType == "donut" || chartType == "pie" {
 		return buildDonutChartSVG(rows, chartSpec, width, height)
 	}
