@@ -52,6 +52,7 @@ type Registry struct {
 	Presets   []*Asset
 	Fragments []*Asset
 	Groups    []*Asset
+	Warnings  []Diagnostic
 
 	buildersByID  map[string]*Asset
 	presetsByID   map[string]*Asset
@@ -104,10 +105,20 @@ func (r *Registry) PresetsForBuilder(builderRef string) []*Asset {
 type Diagnostic struct {
 	Code       string `json:"code"`
 	Message    string `json:"message"`
+	Severity   string `json:"severity,omitempty"`
 	SourcePath string `json:"sourcePath,omitempty"`
 	YAMLPath   string `json:"yamlPath,omitempty"`
 	Line       int    `json:"line,omitempty"`
 	Column     int    `json:"column,omitempty"`
+}
+
+const (
+	SeverityError   = "error"
+	SeverityWarning = "warning"
+)
+
+func (d Diagnostic) IsWarning() bool {
+	return strings.EqualFold(strings.TrimSpace(d.Severity), SeverityWarning)
 }
 
 func (d Diagnostic) Error() string {

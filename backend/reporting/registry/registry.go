@@ -159,7 +159,17 @@ func Discover(ctx context.Context, options Options) (*Registry, error) {
 	diagnostics = append(diagnostics, result.validateReferences()...)
 	if len(diagnostics) > 0 {
 		sortDiagnostics(diagnostics)
-		return nil, &ValidationError{Diagnostics: diagnostics}
+		blocking := make([]Diagnostic, 0, len(diagnostics))
+		for _, diagnostic := range diagnostics {
+			if diagnostic.IsWarning() {
+				result.Warnings = append(result.Warnings, diagnostic)
+				continue
+			}
+			blocking = append(blocking, diagnostic)
+		}
+		if len(blocking) > 0 {
+			return nil, &ValidationError{Diagnostics: blocking}
+		}
 	}
 	return result, nil
 }
@@ -291,33 +301,42 @@ func loadPresentationProfiles(workspaceRoot, assetFilename string, asset *Asset,
 			continue
 		}
 		if stringValue(profile["kind"]) != "forge.reporting.presentationProfileCatalog" || stringValue(profile["schemaVersion"]) != "1" || len(listValue(profile["views"])) == 0 {
-			diagnostics = append(diagnostics, Diagnostic{Code: "presentationProfileContractInvalid", Message: fmt.Sprintf("presentation profile %q must declare kind forge.reporting.presentationProfileCatalog, schemaVersion 1, and non-empty views", normalizedRef), SourcePath: asset.SourcePath, YAMLPath: entryPath})
+			diagnostics = append(diagnostics, warningDiagnostic("presentationProfileContractInvalid", fmt.Sprintf("presentation profile %q must declare kind forge.reporting.presentationProfileCatalog, schemaVersion 1, and non-empty views", normalizedRef), asset.SourcePath, entryPath))
 			continue
 		}
 		profileValid := stringValue(profile["familyId"]) != ""
 		if !profileValid {
-			diagnostics = append(diagnostics, Diagnostic{Code: "presentationProfileFamilyRequired", Message: fmt.Sprintf("presentation profile %q must declare familyId", normalizedRef), SourcePath: asset.SourcePath, YAMLPath: entryPath})
+			diagnostics = append(diagnostics, warningDiagnostic("presentationProfileFamilyRequired", fmt.Sprintf("presentation profile %q must declare familyId", normalizedRef), asset.SourcePath, entryPath))
 		}
+		profileViews := make(map[string]struct{})
 		for viewIndex, rawView := range listValue(profile["views"]) {
 			view := mapValue(rawView)
 			reportID := stringValue(view["reportId"])
 			visualProfile := stringValue(view["visualProfile"])
 			viewPath := fmt.Sprintf("%s.views[%d]", entryPath, viewIndex)
 			if reportID == "" || visualProfile == "" || stringValue(view["revision"]) == "" || len(listValue(view["tabs"])) == 0 || len(listValue(view["blocks"])) == 0 {
-				diagnostics = append(diagnostics, Diagnostic{Code: "presentationProfileViewInvalid", Message: fmt.Sprintf("presentation profile %q entry %d must declare reportId, visualProfile, revision, tabs, and blocks", normalizedRef, viewIndex), SourcePath: asset.SourcePath, YAMLPath: viewPath})
+				diagnostics = append(diagnostics, warningDiagnostic("presentationProfileViewInvalid", fmt.Sprintf("presentation profile %q entry %d must declare reportId, visualProfile, revision, tabs, and blocks", normalizedRef, viewIndex), asset.SourcePath, viewPath))
 				profileValid = false
 				continue
 			}
 			identity := strings.ToLower(reportID) + ":" + strings.ToLower(visualProfile)
 			if previousRef, ok := seenViews[identity]; ok {
-				diagnostics = append(diagnostics, Diagnostic{Code: "presentationProfileViewDuplicate", Message: fmt.Sprintf("presentation view %s is declared by both %q and %q", identity, previousRef, normalizedRef), SourcePath: asset.SourcePath, YAMLPath: viewPath})
+				diagnostics = append(diagnostics, warningDiagnostic("presentationProfileViewDuplicate", fmt.Sprintf("presentation view %s is declared by both %q and %q", identity, previousRef, normalizedRef), asset.SourcePath, viewPath))
 				profileValid = false
 				continue
 			}
-			seenViews[identity] = normalizedRef
+			if _, ok := profileViews[identity]; ok {
+				diagnostics = append(diagnostics, warningDiagnostic("presentationProfileViewDuplicate", fmt.Sprintf("presentation view %s is declared more than once by %q", identity, normalizedRef), asset.SourcePath, viewPath))
+				profileValid = false
+				continue
+			}
+			profileViews[identity] = struct{}{}
 		}
 		if !profileValid {
 			continue
+		}
+		for identity := range profileViews {
+			seenViews[identity] = normalizedRef
 		}
 		profile["sourceRef"] = normalizedRef
 		profiles = append(profiles, profile)
@@ -638,6 +657,16 @@ func diagnosticAt(code, message, sourcePath, yamlPath string, node *yaml.Node) D
 		result.Column = node.Column
 	}
 	return result
+}
+
+func warningDiagnostic(code, message, sourcePath, yamlPath string) Diagnostic {
+	return Diagnostic{
+		Code:       code,
+		Message:    message,
+		Severity:   SeverityWarning,
+		SourcePath: sourcePath,
+		YAMLPath:   yamlPath,
+	}
 }
 
 func stringValue(value any) string {
