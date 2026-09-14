@@ -319,6 +319,50 @@ assert.equal(typeof cachedRestoredAgainDataSourceContext.signals.input.peek, 'fu
 assert.equal(typeof cachedRestoredAgainDataSourceContext.handlers.dataSource.fetchCollection, 'function');
 clearWindowContext(runtimeWindowId);
 
+const identityWindowId = `${runtimeWindowId}-identity`;
+const identityWindow = {...restoredAgainWindow, windowId: identityWindowId};
+const sharedRuntimeIdentity = {};
+const identityServicesA = {
+  ...runtimeServices(identityWindow, 'identity-a'),
+  __contextRuntimeIdentity: sharedRuntimeIdentity,
+};
+const identityContextA = Context(identityWindowId, metadata, 'lookup', identityServicesA);
+identityContextA.init();
+setWindowContext(identityWindowId, identityContextA);
+const identityServicesB = {
+  ...runtimeServices(identityWindow, 'identity-b'),
+  __contextRuntimeIdentity: sharedRuntimeIdentity,
+};
+const identityContextB = resolveWindowContentContext({
+  existingContext: getWindowContext(identityWindowId),
+  hookContext: Context(identityWindowId, metadata, 'lookup', identityServicesB),
+  metadata,
+  services: identityServicesB,
+  windowState: identityWindow,
+});
+assert.equal(
+  identityContextB,
+  identityContextA,
+  'equivalent runtime wrappers must preserve Context when their explicit identity is unchanged',
+);
+const identityServicesC = {
+  ...runtimeServices(identityWindow, 'identity-c'),
+  __contextRuntimeIdentity: {},
+};
+const identityContextC = resolveWindowContentContext({
+  existingContext: getWindowContext(identityWindowId),
+  hookContext: Context(identityWindowId, metadata, 'lookup', identityServicesC),
+  metadata,
+  services: identityServicesC,
+  windowState: identityWindow,
+});
+assert.notEqual(
+  identityContextC,
+  identityContextA,
+  'a changed explicit runtime identity must replace Context',
+);
+clearWindowContext(identityWindowId);
+
 const windowContentSource = fs.readFileSync(
   path.join(process.cwd(), 'src/components/WindowContent.jsx'),
   'utf8',

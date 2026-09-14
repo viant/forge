@@ -55,7 +55,12 @@ export function resolveWindowContentContext({
     }
     const existingServices = existingContext._globalServices || existingContext.services || null;
     const canonicalWindowState = services?.windowState || windowState;
-    if (existingContext.windowState !== canonicalWindowState || existingServices !== services) {
+    const existingRuntimeIdentity = existingServices?.__contextRuntimeIdentity;
+    const nextRuntimeIdentity = services?.__contextRuntimeIdentity;
+    const servicesChanged = existingRuntimeIdentity && nextRuntimeIdentity
+        ? existingRuntimeIdentity !== nextRuntimeIdentity
+        : existingServices !== services;
+    if (existingContext.windowState !== canonicalWindowState || servicesChanged) {
         // Datasource contexts cache connectors and handlers that close over the
         // service runtime, so replace the root context instead of mutating only
         // its visible windowState and leaving those cached children stale.

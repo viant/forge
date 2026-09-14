@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, isProtectedWindowMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowRootContainer, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
+import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, isProtectedWindowMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowRootContainer, reuseShallowEqualRuntimeObject, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
 import { resolveDataSourceOptions } from '../runtime/WidgetRenderer.jsx';
 
 describe('applyWindowPermissionMetadata', () => {
@@ -339,6 +339,23 @@ describe('bound window title resynchronization contract', () => {
   it('observes the active window title after a repeated open command', async () => {
     const source = await import('node:fs/promises').then(({readFile}) => readFile(new URL('./WindowContent.jsx', import.meta.url), 'utf8'));
     expect(source).toContain('[desiredWindowTitle, windowId, window?.windowTitle]');
+  });
+});
+
+describe('window context runtime identity contract', () => {
+  it('reuses a shallow-equal runtime window despite a decorative parent spread', () => {
+    const parameters = { conversationId: 'conv-1' };
+    const previous = { windowId: 'chat/new', parameters, fillParent: true, isInTab: true };
+    const candidate = { windowId: 'chat/new', parameters, fillParent: true, isInTab: true };
+
+    expect(reuseShallowEqualRuntimeObject(previous, candidate)).toBe(previous);
+  });
+
+  it('replaces runtime identity when conversation parameters change', () => {
+    const previous = { windowId: 'chat/new', parameters: { conversationId: 'conv-1' }, isInTab: true };
+    const candidate = { windowId: 'chat/new', parameters: { conversationId: 'conv-2' }, isInTab: true };
+
+    expect(reuseShallowEqualRuntimeObject(previous, candidate)).toBe(candidate);
   });
 });
 
