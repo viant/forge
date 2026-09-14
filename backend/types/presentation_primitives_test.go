@@ -23,6 +23,7 @@ queryToolbar:
   items: [{id: filter, type: filter, label: Filter}]
 stableTabs:
   defaultSelectedTabId: details
+  fill: true
   renderActiveTabPanelOnly: true
 resourceHeader:
   dataSourceRef: record
@@ -77,6 +78,9 @@ masterDetail:
 	if container.QueryToolbar == nil || len(container.QueryToolbar.Items) != 1 || container.StableTabs == nil {
 		t.Fatal("queryToolbar/stableTabs truncated")
 	}
+	if !container.StableTabs.Fill {
+		t.Fatal("stableTabs.fill truncated")
+	}
 	if container.ResourceHeader == nil || len(container.ResourceHeader.Actions) != 1 || container.ResourceHeader.Actions[0].Handler != "Host.watch" {
 		t.Fatal("resourceHeader truncated")
 	}
@@ -113,5 +117,8 @@ masterDetail:
 		if output[key] == nil {
 			t.Fatalf("%s was not serialized", key)
 		}
+	}
+	if output["stableTabs"].(map[string]interface{})["fill"] != true {
+		t.Fatal("stableTabs.fill was not serialized")
 	}
 }

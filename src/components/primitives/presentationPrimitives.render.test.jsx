@@ -32,6 +32,14 @@ has(renderToStaticMarkup(<DataStateBoundary context={context} container={{dataSo
 const emptyDataContext = {...dataContext, signals: {...dataContext.signals, form: signal({}), collection: signal([]), metrics: signal({}), control: signal({loaded: true})}};
 const emptyBoundaryContext = {...context, Context: () => emptyDataContext};
 has(renderToStaticMarkup(<DataStateBoundary context={emptyBoundaryContext} container={{dataSourceRef: 'record', dataStateBoundary: {dataSourceRefs: ['record'], renderEmptyContent: true}}}><span>Table-owned empty state</span></DataStateBoundary>), 'Table-owned empty state');
+const loadingDataContext = {...dataContext, signals: {...dataContext.signals, form: signal({}), collection: signal([]), metrics: signal({}), control: signal({loaded: false, loading: true})}};
+const loadingBoundaryContext = {...context, Context: () => loadingDataContext};
+const tableLoadingMarkup = renderToStaticMarkup(<DataStateBoundary context={loadingBoundaryContext} container={{dataSourceRef: 'record', table: {columns: []}, dataStateBoundary: {dataSourceRefs: ['record']}}}><span>Table loading shell</span></DataStateBoundary>);
+has(tableLoadingMarkup, 'Table loading shell');
+has(tableLoadingMarkup, 'aria-busy="true"');
+const genericLoadingMarkup = renderToStaticMarkup(<DataStateBoundary context={loadingBoundaryContext} container={{dataSourceRef: 'record', dataStateBoundary: {dataSourceRefs: ['record'], loadingMessage: 'Loading generic data'}}}><span>Hidden while loading</span></DataStateBoundary>);
+has(genericLoadingMarkup, 'Loading generic data');
+if (genericLoadingMarkup.includes('Hidden while loading')) throw new Error(`non-table boundary exposed content while loading: ${genericLoadingMarkup}`);
 const errorDataContext = {...dataContext, signals: {...dataContext.signals, control: signal({loaded: true, error: new Error('duplicate error')}), windowForm: signal({sharedError: 'Actionable parent error'})}};
 const suppressedErrorMarkup = renderToStaticMarkup(<DataStateBoundary context={{...context, signals: errorDataContext.signals, Context: () => errorDataContext}} container={{dataSourceRef: 'record', dataStateBoundary: {dataSourceRefs: ['record'], suppressErrorWhen: {source: 'windowForm', field: 'sharedError', notEmpty: true}}}}/>);
 if (suppressedErrorMarkup.includes('duplicate error')) throw new Error(`duplicate datasource error was not suppressed: ${suppressedErrorMarkup}`);

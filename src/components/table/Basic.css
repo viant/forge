@@ -856,7 +856,16 @@
 .basic-table-wrapper .basic-table-filterbar .has-table-navigation > .toolbar-left { justify-content: flex-start; }
 .basic-table-wrapper .basic-table-filterbar .has-table-navigation > .toolbar-right { justify-content: flex-end; }
 .basic-table-wrapper .basic-table-filterbar .has-table-navigation > .toolbar-center { display: flex; flex: none; justify-content: center; white-space: nowrap; }
-.basic-table-wrapper .has-table-navigation .forge-editable-collection__operation-bar { width: auto; margin: 0; }
+.basic-table-wrapper .has-table-navigation .forge-editable-collection__operation-bar { flex: 0 1 auto !important; width: auto; margin: 0; }
+
+/* Operation-heavy toolbars are intentionally asymmetric. Give business actions
+   the remaining width while preserving intrinsic navigation and utility tracks;
+   the operation bar can then wrap without painting underneath pagination. */
+@media (min-width: 1101px) {
+    .basic-table-wrapper .basic-table-filterbar .toolbar-container.has-table-navigation.is-responsive.has-left-content {
+        grid-template-columns: minmax(0, 1fr) auto auto;
+    }
+}
 .basic-table-scroll:focus-visible { outline: 2px solid var(--forge-focus-color, #215db0); outline-offset: -2px; }
 
 .basic-table-wrapper thead th { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

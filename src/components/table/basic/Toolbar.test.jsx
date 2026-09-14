@@ -232,3 +232,20 @@ describe('table export control', () => {
         expect(noColumns).toContain('disabled=""');
     });
 });
+
+describe('responsive toolbar composition', () => {
+    it('marks operation-heavy toolbars so CSS can reserve non-overlapping tracks', () => {
+        const signal = (value) => ({value, peek() { return this.value; }});
+        const context = {
+            signals: {control: signal({inactive: false}), formStatus: signal({dirty: false}), selection: signal({}), windowForm: signal({}), form: signal({})},
+            handlers: {dataSource: {}},
+            Context() { return this; },
+        };
+        const withActions = renderToStaticMarkup(
+            <Toolbar context={context} toolbarItems={[]} leftContent={<div className="forge-editable-collection__operation-bar"/>} layout="responsive"/>,
+        );
+        const withoutActions = renderToStaticMarkup(<Toolbar context={context} toolbarItems={[]} layout="responsive"/>);
+        expect(withActions).toContain('is-responsive has-left-content');
+        expect(withoutActions).not.toContain('has-left-content');
+    });
+});

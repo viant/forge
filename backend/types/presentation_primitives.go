@@ -23,6 +23,7 @@ type StableTabsSpec struct {
 	DataSourceFetchMode         string `json:"dataSourceFetchMode,omitempty" yaml:"dataSourceFetchMode,omitempty"`
 	Appearance                  string `json:"appearance,omitempty" yaml:"appearance,omitempty"`
 	Compact                     bool   `json:"compact,omitempty" yaml:"compact,omitempty"`
+	Fill                        bool   `json:"fill,omitempty" yaml:"fill,omitempty"`
 	KeepVisitedTabPanelsMounted bool   `json:"keepVisitedTabPanelsMounted,omitempty" yaml:"keepVisitedTabPanelsMounted,omitempty"`
 	RenderActiveTabPanelOnly    *bool  `json:"renderActiveTabPanelOnly,omitempty" yaml:"renderActiveTabPanelOnly,omitempty"`
 }
