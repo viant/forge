@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 
 import {useDialogHandlers, useWindowHandlers} from './window.js';
 import {setWindowContext, clearWindowContext} from '../core/context/registry.js';
-import {activeWindows, getBusSignal, getDashboardFilterSignal, getDashboardSelectionSignal, getDialogSignal, removeWindow} from '../core/store/signals.js';
+import {activeWindows, getBusSignal, getDashboardFilterSignal, getDashboardSelectionSignal, getDialogSignal, getInputSignal, removeWindow} from '../core/store/signals.js';
+import {mirrorQuickFilterDraft} from '../components/table/basic/QuickFilterHelpers.js';
 
 const windowId = 'W_test_dashboard';
 const dashboardId = 'demoDashboard';
@@ -14,6 +15,9 @@ setWindowContext(windowId, {
     dataSourceRef: 'perf',
   },
   metadata: {
+    dataSource: {
+      advertisers: {},
+    },
     view: {
       content: {
         id: dashboardId,
@@ -178,6 +182,15 @@ activeWindows.value = [{
   },
 }];
 
+const filterInput = getInputSignal(`${windowId}DSadvertisers`);
+mirrorQuickFilterDraft(
+  [{field: 'Id'}],
+  {Id: '101705'},
+  ({filter}) => {
+    filterInput.value = {...filterInput.peek(), filter};
+  },
+);
+
 handlers.openTarget({
   target: {
     kind: 'window',
@@ -206,6 +219,7 @@ assert.equal(targetWindow.parentKey, 'chat/new');
 assert.equal(targetWindow.navigationTrail.length, 1);
 assert.equal(targetWindow.navigationTrail[0].windowKey, 'order');
 assert.equal(targetWindow.navigationTrail[0].windowTitle, 'Order Summary');
+assert.deepEqual(targetWindow.navigationTrail[0].dataSourceState.advertisers.input.filter, {Id: '101705'});
 console.log('openTarget ✓ opens a window from a resolved target contract');
 
 activeWindows.value = [{

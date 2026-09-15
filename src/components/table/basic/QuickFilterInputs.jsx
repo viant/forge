@@ -3,8 +3,8 @@ import { InputGroup, ControlGroup, HTMLSelect, Icon } from '@blueprintjs/core';
 import {
     resolveQuickFilterSet,
     isQuickFiltersActive,
+    mirrorQuickFilterDraft,
     normalizeQuickFilterValues,
-    quickFilterValuesEqual,
 } from './QuickFilterHelpers.js';
 
 const QUICK_FILTER_DEBOUNCE_MS = 350;
@@ -31,13 +31,12 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
     });
     const valuesRef = React.useRef(values);
     const commitTimerRef = React.useRef(null);
-    const lastCommittedRef = React.useRef(normalizeQuickFilterValues(filters, currentFilter));
+    const pendingFetchValuesRef = React.useRef(null);
 
     // Keep local state in sync if external filter is changed (e.g. by toggle button)
     React.useEffect(() => {
         const snapshot = normalizeQuickFilterValues(filters, currentFilter);
         valuesRef.current = snapshot;
-        lastCommittedRef.current = snapshot;
         setValues(snapshot);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentFilterKey]);
@@ -47,6 +46,7 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
             if (commitTimerRef.current) {
                 clearTimeout(commitTimerRef.current);
             }
+            pendingFetchValuesRef.current = null;
         };
     }, []);
 
@@ -58,18 +58,28 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
         handlers?.dataSource?.fetchCollection?.();
     }, [handlers]);
 
+    const mirrorValues = React.useCallback(
+        (newValues) => {
+            const normalized = mirrorQuickFilterDraft(
+                filters,
+                newValues,
+                handlers?.dataSource?.setSilentFilterValues,
+            );
+            valuesRef.current = normalized;
+            return normalized;
+        },
+        [handlers, filters]
+    );
+
     const commitValues = React.useCallback(
         (newValues) => {
-            const normalized = normalizeQuickFilterValues(filters, newValues);
-            valuesRef.current = normalized;
-            if (quickFilterValuesEqual(filters, normalized, lastCommittedRef.current)) {
-                return;
-            }
-            lastCommittedRef.current = normalized;
-            handlers?.dataSource?.setSilentFilterValues?.({ filter: normalized });
+            if (commitTimerRef.current) clearTimeout(commitTimerRef.current);
+            commitTimerRef.current = null;
+            mirrorValues(newValues);
+            pendingFetchValuesRef.current = null;
             fetchFirstPage();
         },
-        [fetchFirstPage, handlers, filters]
+        [fetchFirstPage, mirrorValues]
     );
 
     const scheduleCommit = React.useCallback(
@@ -77,23 +87,27 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
             if (commitTimerRef.current) {
                 clearTimeout(commitTimerRef.current);
             }
+            pendingFetchValuesRef.current = normalizeQuickFilterValues(filters, nextValues);
             commitTimerRef.current = setTimeout(() => {
                 commitTimerRef.current = null;
-                commitValues(nextValues);
+                if (!pendingFetchValuesRef.current) return;
+                pendingFetchValuesRef.current = null;
+                fetchFirstPage();
             }, QUICK_FILTER_DEBOUNCE_MS);
         },
-        [commitValues]
+        [fetchFirstPage, filters]
     );
 
     const flushCommit = React.useCallback(
         (nextValues = valuesRef.current) => {
-            if (commitTimerRef.current) {
-                clearTimeout(commitTimerRef.current);
-                commitTimerRef.current = null;
-            }
-            commitValues(nextValues);
+            if (!commitTimerRef.current && !pendingFetchValuesRef.current) return;
+            if (commitTimerRef.current) clearTimeout(commitTimerRef.current);
+            commitTimerRef.current = null;
+            mirrorValues(nextValues);
+            pendingFetchValuesRef.current = null;
+            fetchFirstPage();
         },
-        [commitValues]
+        [fetchFirstPage, mirrorValues]
     );
 
     const handleChange = (field) => (e) => {
@@ -104,7 +118,7 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
         };
         valuesRef.current = nextValues;
         setValues(nextValues);
-        scheduleCommit(nextValues);
+        scheduleCommit(mirrorValues(nextValues));
     };
 
     // Determine whether any quick filter value is currently active
