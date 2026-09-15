@@ -31,6 +31,7 @@ activeWindows.value = [
     workspaceSharePct: 72,
     workspaceMinHeight: 500,
     navigation: { label: 'Reports', icon: 'chart' },
+    navigationTrail: [{ windowId: 'list', windowKey: 'advertiserList', windowTitle: 'Advertisers' }],
     workspaceCollapsed: true,
     parentKey: 'root',
     inTab: true,
@@ -130,6 +131,7 @@ assert.equal(snap.windows[0].region, 'chat.top');
 assert.equal(snap.windows[0].workspaceSharePct, 72);
 assert.equal(snap.windows[0].workspaceMinHeight, 500);
 assert.deepEqual(snap.windows[0].navigation, { label: 'Reports', icon: 'chart' });
+assert.deepEqual(snap.windows[0].navigationTrail, [{ windowId: 'list', windowKey: 'advertiserList', windowTitle: 'Advertisers' }]);
 assert.equal(snap.windows[0].workspaceCollapsed, true);
 assert.equal(snap.windows[0].parentKey, 'root');
 assert.equal(snap.windows[0].inlineMetadataExplicit, true);

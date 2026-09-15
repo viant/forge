@@ -2,7 +2,7 @@
 import {
     activeWindows,
     addWindow,
-    getDialogSignal, removeSignalsForKey,
+    findInputSignal, findSelectionSignal, getDialogSignal, getFormSignal, getViewSignal, removeSignalsForKey,
 } from "../core/store/signals.js";
 import { clearWindowContext, getWindowContext } from "../core/context/registry.js";
 import { resolveSelector } from "../utils/selector.js";
@@ -219,6 +219,76 @@ export function useDialogHandlers(windowId, dialogId) {
 const pendingDialogResolvers  = new Map();
 const pendingWindowResolvers  = new Map();
 
+function cloneNavigationValue(value) {
+    if (value == null) return value;
+    try {
+        return JSON.parse(JSON.stringify(value));
+    } catch (_) {
+        return value;
+    }
+}
+
+export function snapshotWorkspaceNavigationWindow(windowState = null) {
+    const windowId = String(windowState?.windowId || '').trim();
+    const windowKey = String(windowState?.windowKey || '').trim();
+    if (!windowId || !windowKey) return null;
+    const metadata = getWindowContext(windowId)?.metadata || {};
+    const dataSourceState = {};
+    for (const dataSourceRef of Object.keys(metadata?.dataSource || {})) {
+        const dataSourceId = `${windowId}DS${dataSourceRef}`;
+        const input = findInputSignal(dataSourceId)?.peek?.();
+        const selection = findSelectionSignal(dataSourceId)?.peek?.();
+        if (input !== undefined || selection !== undefined) {
+            dataSourceState[dataSourceRef] = {
+                input: cloneNavigationValue(input),
+                selection: cloneNavigationValue(selection),
+            };
+        }
+    }
+    return {
+        windowId,
+        windowKey,
+        windowTitle: String(windowState?.windowTitle || windowKey).trim() || windowKey,
+        windowData: cloneNavigationValue(windowState?.windowData),
+        conversationId: String(windowState?.conversationId || '').trim() || undefined,
+        parentKey: String(windowState?.parentKey || '').trim() || undefined,
+        presentation: String(windowState?.presentation || '').trim() || undefined,
+        region: String(windowState?.region || '').trim() || undefined,
+        workspaceSharePct: windowState?.workspaceSharePct,
+        workspaceMinHeight: windowState?.workspaceMinHeight,
+        workspaceCollapsed: windowState?.workspaceCollapsed === true,
+        inTab: windowState?.inTab !== false,
+        parameters: cloneNavigationValue(windowState?.parameters || {}),
+        navigation: cloneNavigationValue(windowState?.navigation),
+        workspaceObject: cloneNavigationValue(windowState?.workspaceObject),
+        mcpUI: cloneNavigationValue(windowState?.mcpUI),
+        windowForm: cloneNavigationValue(getFormSignal(`${windowId}:windowForm`).peek?.() || {}),
+        viewState: cloneNavigationValue(getViewSignal(windowId).peek?.() || {}),
+        dataSourceState,
+    };
+}
+
+function sameWorkspaceNavigationTarget(currentWindow = null, target = null) {
+    if (String(currentWindow?.windowKey || '').trim() !== String(target?.windowKey || '').trim()) return false;
+    try {
+        return JSON.stringify(currentWindow?.parameters || {}) === JSON.stringify(target?.parameters || {});
+    } catch (_) {
+        return currentWindow?.parameters === target?.parameters;
+    }
+}
+
+export function buildWorkspaceNavigationTrail(currentWindow = null, target = null) {
+    const existing = Array.isArray(currentWindow?.navigationTrail)
+        ? currentWindow.navigationTrail.map((entry) => cloneNavigationValue(entry)).filter(Boolean)
+        : [];
+    if (!currentWindow || sameWorkspaceNavigationTarget(currentWindow, target)) return existing;
+    const snapshot = snapshotWorkspaceNavigationWindow(currentWindow);
+    if (!snapshot) return existing;
+    const last = existing[existing.length - 1];
+    if (last?.windowId === snapshot.windowId) return existing;
+    return [...existing, snapshot];
+}
+
 export function useWindowHandlers(windowId) {
 
     const inTab = true;
@@ -252,6 +322,9 @@ export function useWindowHandlers(windowId) {
                 || maybe.workspaceMinHeight !== undefined
                 || maybe.workspaceCollapsed !== undefined
                 || maybe.identityParameters !== undefined
+                || maybe.navigation !== undefined
+                || maybe.navigationTrail !== undefined
+                || maybe.chipName !== undefined
             )) {
                 options = rawArgs.pop();
             }
@@ -322,6 +395,7 @@ export function useWindowHandlers(windowId) {
                 workspaceSharePct: options.workspaceSharePct,
                 workspaceMinHeight: options.workspaceMinHeight,
                 navigation: options.navigation,
+                navigationTrail: options.navigationTrail,
                 workspaceCollapsed: options.workspaceCollapsed,
                 identityParameters: options.identityParameters,
             }
@@ -396,6 +470,12 @@ export function useWindowHandlers(windowId) {
         if (target.width !== undefined) options.width = target.width;
         if (target.height !== undefined) options.height = target.height;
         if (target.footer !== undefined) options.footer = target.footer;
+        if (target.navigation && typeof target.navigation === 'object' && !Array.isArray(target.navigation)) {
+            options.navigation = {...target.navigation};
+        }
+        if (String(target.chipName || '').trim()) {
+            options.navigation = {...(options.navigation || {}), chipName: String(target.chipName).trim()};
+        }
         if (Array.isArray(target.identityParameters) && target.identityParameters.length > 0) {
             options.identityParameters = [...target.identityParameters];
         }
@@ -427,6 +507,7 @@ export function useWindowHandlers(windowId) {
             if (normalizedPresentation === 'hosted' && normalizedRegion === 'chat.top') {
                 options.replaceHostedRegion = target.replaceHostedRegion !== false;
                 options.parentKey = target.parentKey !== undefined ? target.parentKey : currentWindow.parentKey;
+                options.navigationTrail = buildWorkspaceNavigationTrail(currentWindow, target);
             }
         }
         return openWindow({

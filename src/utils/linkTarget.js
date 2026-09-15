@@ -223,6 +223,7 @@ export function resolveLinkTarget({ linkConfig = null, row = null, value = null,
                 ? {identityParameters: [...linkConfig.identityParameters]}
                 : {}),
             windowTitle,
+            ...(normalizeString(linkConfig.chipName) ? {chipName: normalizeString(linkConfig.chipName)} : {}),
             inTab: linkConfig.inTab !== false,
             newInstance: linkConfig.newInstance === true,
             autoIndexTitle: linkConfig.autoIndexTitle === true,
