@@ -113,6 +113,7 @@ assert.deepEqual(
       kind: 'window',
       windowKey: 'order',
       chipName: 'Order',
+      chipIcon: 'document',
       windowTitleSource: 'row',
       windowTitleTemplate: '{{name}} ({{id}})',
       parameters: {
@@ -126,6 +127,7 @@ assert.deepEqual(
     title: '',
     windowKey: 'order',
     chipName: 'Order',
+    chipIcon: 'document',
     windowTitle: 'Order Alpha (123)',
     inTab: true,
     newInstance: false,
