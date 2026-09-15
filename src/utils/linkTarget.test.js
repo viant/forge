@@ -94,6 +94,7 @@ assert.deepEqual(
     linkConfig: {
       kind: 'window',
       windowKey: 'order',
+      chipName: 'Order',
       identityParameters: ['AdOrderId'],
       parameters: {
         AdOrderId: {source: 'row', selector: 'id', wrap: 'array'},
@@ -111,6 +112,7 @@ assert.deepEqual(
     linkConfig: {
       kind: 'window',
       windowKey: 'order',
+      chipName: 'Order',
       windowTitleSource: 'row',
       windowTitleTemplate: '{{name}} ({{id}})',
       parameters: {
@@ -123,6 +125,7 @@ assert.deepEqual(
     text: 'Order Alpha',
     title: '',
     windowKey: 'order',
+    chipName: 'Order',
     windowTitle: 'Order Alpha (123)',
     inTab: true,
     newInstance: false,

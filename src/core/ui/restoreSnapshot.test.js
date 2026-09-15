@@ -39,6 +39,7 @@ restoreWindowsFromSnapshot({
     windowId: 'orderPerformance_1',
     windowKey: 'orderPerformance',
     windowTitle: 'Order Summary',
+    navigationTrail: [{ windowId: 'advertisers', windowKey: 'advertiserList', windowTitle: 'Advertisers' }],
     inTab: true,
     parameters: { order_performance_profile: { parameters: { AdOrderId: [2667545] } } },
     isModal: false,
@@ -85,6 +86,7 @@ assert.equal(activeWindows.value.length, 1);
 assert.equal(activeWindows.value[0].windowId, 'orderPerformance_1');
 assert.equal(activeWindows.value[0].windowKey, 'orderPerformance');
 assert.equal(activeWindows.value[0].inlineMetadataExplicit, true);
+assert.deepEqual(activeWindows.value[0].navigationTrail, [{ windowId: 'advertisers', windowKey: 'advertiserList', windowTitle: 'Advertisers' }]);
 assert.equal(
   activeWindows.value[0].hostOpenState,
   'historical_replay',

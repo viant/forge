@@ -513,6 +513,11 @@ function syncWindowRuntimeHints(windowId, metadata, windowState = null) {
         next.region = metadataRegion;
         changed = true;
     }
+    const metadataChipName = String(metadata?.chipName || '').trim();
+    if (metadataChipName && String(next.navigation?.chipName || '').trim() !== metadataChipName) {
+        next.navigation = {...(next.navigation || {}), chipName: metadataChipName};
+        changed = true;
+    }
     const metadataWorkspaceSharePct = resolveNumericWindowRuntimeHint(metadata, 'workspaceSharePct');
     if (metadataWorkspaceSharePct !== undefined && next.workspaceSharePct !== metadataWorkspaceSharePct) {
         next.workspaceSharePct = metadataWorkspaceSharePct;

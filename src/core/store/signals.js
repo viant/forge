@@ -666,6 +666,7 @@ export const restoreWindowsFromSnapshot = (snapshot) => {
         workspaceMinHeight: win?.workspaceMinHeight ?? undefined,
         workspaceObject: win?.workspaceObject && !containsSnapshotSerializationMarker(win.workspaceObject) ? win.workspaceObject : undefined,
         navigation: win?.navigation && typeof win.navigation === 'object' && !containsSnapshotSerializationMarker(win.navigation) ? { ...win.navigation } : undefined,
+        navigationTrail: Array.isArray(win?.navigationTrail) && !containsSnapshotSerializationMarker(win.navigationTrail) ? win.navigationTrail : undefined,
         mcpUI: win?.mcpUI && typeof win.mcpUI === 'object' && !containsSnapshotSerializationMarker(win.mcpUI) ? { ...win.mcpUI } : undefined,
         workspaceCollapsed: win?.workspaceCollapsed === true,
         windowData: containsSnapshotSerializationMarker(win?.windowData) ? '' : (win?.windowData || ''),
@@ -780,6 +781,15 @@ const resolveHostedRegionReplacementWindow = (windows, parentKey, inTab, options
     }) || null;
 };
 
+const cloneWindowNavigationTrail = (trail = []) => {
+    if (!Array.isArray(trail)) return [];
+    try {
+        return JSON.parse(JSON.stringify(trail));
+    } catch (_) {
+        return trail.map((entry) => (entry && typeof entry === 'object' ? {...entry} : entry));
+    }
+};
+
 export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab = true, parameters = {}, options = {}) => {
     if(windowData) {
         parameters['windowData'] = windowData;
@@ -825,6 +835,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
             presentation: String(options.presentation || '').trim() || undefined,
             region: String(options.region || '').trim() || undefined,
             navigation: options.navigation && typeof options.navigation === 'object' ? { ...options.navigation } : undefined,
+            navigationTrail: Array.isArray(options.navigationTrail) ? cloneWindowNavigationTrail(options.navigationTrail) : undefined,
             mcpUI: options.mcpUI && typeof options.mcpUI === 'object' ? { ...options.mcpUI } : undefined,
             windowData,
             inTab,
@@ -893,6 +904,9 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
                   } : existingWindow.workspaceObject)
                 : options.workspaceObject,
             navigation: options.navigation && typeof options.navigation === 'object' ? { ...options.navigation } : undefined,
+            navigationTrail: Array.isArray(options.navigationTrail)
+                ? cloneWindowNavigationTrail(options.navigationTrail)
+                : (!replacingSemanticWindow ? existingWindow.navigationTrail : undefined),
             mcpUI: options.mcpUI && typeof options.mcpUI === 'object' ? { ...options.mcpUI } : undefined,
             windowData,
             inTab,

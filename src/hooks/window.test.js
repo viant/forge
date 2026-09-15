@@ -203,6 +203,9 @@ assert.equal(targetWindow.presentation, 'hosted');
 assert.equal(targetWindow.region, 'chat.top');
 assert.equal(targetWindow.conversationId, 'conv-123');
 assert.equal(targetWindow.parentKey, 'chat/new');
+assert.equal(targetWindow.navigationTrail.length, 1);
+assert.equal(targetWindow.navigationTrail[0].windowKey, 'order');
+assert.equal(targetWindow.navigationTrail[0].windowTitle, 'Order Summary');
 console.log('openTarget ✓ opens a window from a resolved target contract');
 
 activeWindows.value = [{
@@ -252,6 +255,8 @@ assert.equal(activeWindows.peek()[0].conversationId, 'conv-123');
 assert.equal(activeWindows.peek()[0].parentKey, 'chat/new');
 assert.equal(activeWindows.peek()[0].workspaceSharePct, 72);
 assert.equal(activeWindows.peek()[0].workspaceMinHeight, undefined);
+assert.equal(activeWindows.peek()[0].navigationTrail.length, 1);
+assert.equal(activeWindows.peek()[0].navigationTrail[0].windowKey, 'line');
 console.log('openTarget ✓ replaces the current hosted workspace region for drillback navigation');
 
 const ownerA = useWindowHandlers('W_owner_a');
