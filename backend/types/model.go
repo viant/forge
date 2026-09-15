@@ -226,6 +226,7 @@ type Window struct {
 	Ns                    []string                          `json:"ns,omitempty" yaml:"ns,omitempty"`
 	WindowKey             string                            `json:"windowKey,omitempty" yaml:"windowKey,omitempty"`
 	ChipName              string                            `json:"chipName,omitempty" yaml:"chipName,omitempty"`
+	ChipIcon              string                            `json:"chipIcon,omitempty" yaml:"chipIcon,omitempty"`
 	Namespace             string                            `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	Presentation          string                            `json:"presentation,omitempty" yaml:"presentation,omitempty"`
 	Region                string                            `json:"region,omitempty" yaml:"region,omitempty"`
@@ -1344,6 +1345,7 @@ type TableLink struct {
 	IdentityParameters  []string               `json:"identityParameters,omitempty" yaml:"identityParameters,omitempty"`
 	WindowTitle         string                 `json:"windowTitle,omitempty" yaml:"windowTitle,omitempty"`
 	ChipName            string                 `json:"chipName,omitempty" yaml:"chipName,omitempty"`
+	ChipIcon            string                 `json:"chipIcon,omitempty" yaml:"chipIcon,omitempty"`
 	WindowTitleSelector string                 `json:"windowTitleSelector,omitempty" yaml:"windowTitleSelector,omitempty"`
 	WindowTitleSource   string                 `json:"windowTitleSource,omitempty" yaml:"windowTitleSource,omitempty"`
 	InTab               *bool                  `json:"inTab,omitempty" yaml:"inTab,omitempty"`

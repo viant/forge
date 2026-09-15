@@ -325,6 +325,7 @@ export function useWindowHandlers(windowId) {
                 || maybe.navigation !== undefined
                 || maybe.navigationTrail !== undefined
                 || maybe.chipName !== undefined
+                || maybe.chipIcon !== undefined
             )) {
                 options = rawArgs.pop();
             }
@@ -475,6 +476,9 @@ export function useWindowHandlers(windowId) {
         }
         if (String(target.chipName || '').trim()) {
             options.navigation = {...(options.navigation || {}), chipName: String(target.chipName).trim()};
+        }
+        if (String(target.chipIcon || '').trim()) {
+            options.navigation = {...(options.navigation || {}), chipIcon: String(target.chipIcon).trim()};
         }
         if (Array.isArray(target.identityParameters) && target.identityParameters.length > 0) {
             options.identityParameters = [...target.identityParameters];
