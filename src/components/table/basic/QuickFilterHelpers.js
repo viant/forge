@@ -48,6 +48,16 @@ export function normalizeQuickFilterValues(filters = [], values = {}) {
     return normalized;
 }
 
+// Persist the latest editor draft synchronously so window navigation can
+// snapshot it even while the remote collection refresh remains debounced.
+export function mirrorQuickFilterDraft(filters = [], values = {}, setSilentFilterValues = null) {
+    const normalized = normalizeQuickFilterValues(filters, values);
+    if (typeof setSilentFilterValues === 'function') {
+        setSilentFilterValues({filter: normalized});
+    }
+    return normalized;
+}
+
 export function quickFilterValuesEqual(filters = [], left = {}, right = {}) {
     const normalizedLeft = normalizeQuickFilterValues(filters, left);
     const normalizedRight = normalizeQuickFilterValues(filters, right);
