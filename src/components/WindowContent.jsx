@@ -518,6 +518,11 @@ function syncWindowRuntimeHints(windowId, metadata, windowState = null) {
         next.navigation = {...(next.navigation || {}), chipName: metadataChipName};
         changed = true;
     }
+    const metadataChipIcon = String(metadata?.chipIcon || '').trim();
+    if (metadataChipIcon && String(next.navigation?.chipIcon || '').trim() !== metadataChipIcon) {
+        next.navigation = {...(next.navigation || {}), chipIcon: metadataChipIcon};
+        changed = true;
+    }
     const metadataWorkspaceSharePct = resolveNumericWindowRuntimeHint(metadata, 'workspaceSharePct');
     if (metadataWorkspaceSharePct !== undefined && next.workspaceSharePct !== metadataWorkspaceSharePct) {
         next.workspaceSharePct = metadataWorkspaceSharePct;
