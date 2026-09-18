@@ -2928,4 +2928,26 @@ assert.deepEqual(geoFill.blocks.find((block) => block.id === "stateGeo").content
   rowCount: 1,
 });
 
+const scopeFilteredFill = buildReportFillFromReportSpec({
+  title: "Publisher scope",
+  datasets: [{ id: "split", dataSourceRef: "spoSplit", request: {} }],
+  blocks: [{
+    id: "multiOnly",
+    kind: "tableBlock",
+    title: "Multi publisher",
+    datasetRef: "split",
+    columns: [{ key: "publisherScope", label: "Publisher scope" }],
+    runtime: {
+      filterBindings: { publisherScope: "publisherScope" },
+      filterValues: { publisherScope: "Multi-Publisher" },
+    },
+  }],
+}, {
+  split: {
+    rows: [{ publisherScope: "Single Publisher" }, { publisherScope: "Multi-Publisher" }],
+  },
+});
+assert.equal(scopeFilteredFill.blocks.find((block) => block.id === "multiOnly").content.rowCount, 1);
+assert.equal(scopeFilteredFill.blocks.find((block) => block.id === "multiOnly").content.resolvedRows[0].cells[0].value, "Multi-Publisher");
+
 console.log("reportFillModel ✓ projects ReportSpec and builder state into deterministic ReportFill");
