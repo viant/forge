@@ -294,7 +294,9 @@ function buildTableProjection(block, prefix, key = "table") {
     title: normalizeString(block?.title || "Table") || "Table",
     datasetRef: ref,
     columns,
-    ...(Array.isArray(block?.formattingRules) ? { formattingRules: cloneValue(block.formattingRules) } : {}),
+    ...(Array.isArray(block?.content?.formattingRules || block?.formattingRules)
+      ? { formattingRules: cloneValue(block?.content?.formattingRules || block.formattingRules) }
+      : {}),
   }], [layoutItem(id, block?.columnSpan)], { ...metadata, datasetFieldHints: hints });
 }
 

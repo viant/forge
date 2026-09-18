@@ -45,6 +45,34 @@ const legacyCollapsibleTableHtml = renderToStaticMarkup(React.createElement(Repo
 }));
 assert.ok(legacyCollapsibleTableHtml.includes('aria-label="Expand Legacy Evidence"'));
 
+const formattedTableHtml = renderToStaticMarkup(React.createElement(ReportRuntime, {
+  reportSpec: {
+    title: "Formatted table report",
+    parameters: { pageSize: 25 },
+    datasets: [{ id: "paths", dataSourceRef: "spo.paths", request: {} }],
+    blocks: [{
+      id: "pathTable",
+      kind: "tableBlock",
+      title: "Paths",
+      datasetRef: "paths",
+      columns: [{ key: "path", label: "Path" }],
+      formattingRules: [{ target: "row", field: "path", value: "Direct", className: "path-direct" }],
+    }],
+  },
+  reportFill: {
+    diagnostics: [],
+    datasets: [{ id: "paths", dataSourceRef: "spo.paths", provenance: { rowCount: 1 }, rows: [{ path: "Direct" }] }],
+    blocks: [{
+      id: "pathTable",
+      kind: "tableBlock",
+      title: "Paths",
+      datasetRef: "paths",
+      columns: [{ key: "path", label: "Path" }],
+    }],
+  },
+}));
+assert.ok(formattedTableHtml.includes('class="path-direct"'));
+
 const sectionContractBlocks = [
   { id: "sectionTabs", kind: "tabGroupBlock", sectionIds: ["detailsSection"] },
   { id: "baseKpi", kind: "kpiBlock" },

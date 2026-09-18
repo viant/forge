@@ -2163,6 +2163,8 @@ function resolveRuntimeCompositeConfig(blocks = []) {
 }
 
 function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false }) {
+  const authoredBlock = (Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : [])
+    .find((candidate) => normalizeString(candidate?.id) === normalizeString(block?.id)) || {};
   const tableAccentTone = normalizeString(block?.content?.accentTone || block?.accentTone).toLowerCase();
   const tableAccent = ["blue", "green", "amber", "rose", "slate"].includes(tableAccentTone)
     ? resolveRuntimeAccentPalette(tableAccentTone).accent
@@ -2309,6 +2311,11 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
               rowActionDisplay: "compact",
               rowActions,
               labelClamp: block?.content?.labelClamp || block?.labelClamp,
+              formattingRules: block?.content?.formattingRules
+                || block?.formattingRules
+                || authoredBlock?.content?.formattingRules
+                || authoredBlock?.formattingRules
+                || [],
             },
           },
         }}

@@ -27,6 +27,23 @@ const DEFAULT_SUBTITLE_STYLE = {
     margin: 0,
 };
 
+const categoricalRowClassField = (key = "") => /(?:status|type|category|scope)$/i.test(String(key).trim());
+const rowClassToken = (value = "") => String(value)
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+export const categoricalRowClassNames = (row = {}, columns = []) => (Array.isArray(columns) ? columns : [])
+    .filter((column) => categoricalRowClassField(column?.key))
+    .map((column) => {
+        const field = rowClassToken(column.key);
+        const value = rowClassToken(resolveKey(row, column.key) || "unknown");
+        return field && value ? `forge-table-row--${field}--${value}` : "";
+    })
+    .filter(Boolean);
+
 function useSignalSnapshot(signalValue, fallbackValue) {
     const [value, setValue] = useState(() => signalValue?.peek?.() ?? signalValue?.value ?? fallbackValue);
 
@@ -283,7 +300,10 @@ export default function DashboardTableContent({
                         {sortedRows.map((row, index) => {
                             const rowRules = matchingRules(row, formattingRules, "row");
                             const rowStyle = mergeStyles(rowRules);
-                            const rowClassName = mergeClassNames(rowRules);
+                            const rowClassName = [
+                                mergeClassNames(rowRules),
+                                ...categoricalRowClassNames(row, displayColumns),
+                            ].filter(Boolean).join(" ");
                             return (
                                 <tr key={index} className={rowClassName} style={rowStyle}>
                                     {multiSelect ? (
