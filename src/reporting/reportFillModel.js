@@ -991,12 +991,15 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
     const runtimeFilterBindings = block?.runtime?.filterBindings && typeof block.runtime.filterBindings === "object" && !Array.isArray(block.runtime.filterBindings)
       ? block.runtime.filterBindings
       : {};
+    const runtimeFilterValuesForBlock = block?.runtime?.filterValues && typeof block.runtime.filterValues === "object" && !Array.isArray(block.runtime.filterValues)
+      ? { ...runtimeFilterValues, ...block.runtime.filterValues }
+      : runtimeFilterValues;
     const runtimeSelectionBindings = block?.runtime?.selectionBindings && typeof block.runtime.selectionBindings === "object" && !Array.isArray(block.runtime.selectionBindings)
       ? block.runtime.selectionBindings
       : {};
     const runtimeRows = sourceDataset
       ? applyDashboardSelectionToCollection(
-        applyDashboardFiltersToCollection(sourceDataset?.rows || [], runtimeFilterBindings, runtimeFilterValues),
+        applyDashboardFiltersToCollection(sourceDataset?.rows || [], runtimeFilterBindings, runtimeFilterValuesForBlock),
         runtimeSelectionBindings,
         runtimeSelection,
       )
