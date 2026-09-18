@@ -28,7 +28,7 @@ const languages = {
     go: go(),
 };
 
-const Editor = ({context, container, isActive = {}}) => {
+const BoundEditor = ({context, container}) => {
     const {editor} = container;
     const {handlers} = context;
     const {selector={}}= editor
@@ -72,4 +72,8 @@ const Editor = ({context, container, isActive = {}}) => {
         </>
     );
 };
+
+const Editor = ({context, container, value, onChange, language, height, readOnly = false}) => value !== undefined
+    ? <CodeMirror value={value || ''} height={height || '280px'} extensions={languages[language || 'sql'] ? [languages[language || 'sql']] : []} onChange={onChange} readOnly={readOnly} />
+    : <BoundEditor context={context} container={container}/>;
 export default Editor;

@@ -6,6 +6,7 @@
     "./core": "./src/core/index.js",
     "./hooks": "./src/hooks/index.js",
     "./components": "./src/components/index.js",
+    "./theme": "./src/components/theme.js",
     "./actions": "./src/actions/index.js",
     "./reporting": "./src/reporting/index.js",
     "./utils": "./src/utils/index.js",
