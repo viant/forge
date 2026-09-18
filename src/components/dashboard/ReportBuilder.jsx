@@ -7647,7 +7647,10 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         return (
             <div className="forge-report-builder__compact-sheet-backdrop" onClick={closeCompactSheet}>
                 <div
-                    className="forge-report-builder__compact-sheet"
+                    className={[
+                        "forge-report-builder__compact-sheet",
+                        reportWorkspaceMode ? "forge-report-builder__compact-sheet--report-controls" : "",
+                    ].filter(Boolean).join(" ")}
                     role="dialog"
                     aria-modal="true"
                     aria-label="Report builder setup"
@@ -7675,14 +7678,18 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                     ) : null}
                     <div className="forge-report-builder__compact-sheet-body">
                         {reportWorkspaceMode ? (
-                            <div className="forge-report-builder__compact-panel-stack">
+                            <div className="forge-report-builder__compact-panel-stack forge-report-builder__compact-panel-stack--report-controls">
                                 <ReportBuilderOptionControls
                                     definitions={reportOptionDefinitions}
                                     values={effectiveReportOptions}
                                     onChange={setReportOptionValue}
                                     headingId="report-builder-options-compact-report-heading"
                                 />
-                                {compactRequiredStaticFilters.map((filter) => renderStaticFilterSection(filter))}
+                                {compactRequiredStaticFilters.length > 0 ? (
+                                    <div className="forge-report-builder__compact-required-filters">
+                                        {compactRequiredStaticFilters.map((filter) => renderStaticFilterSection(filter))}
+                                    </div>
+                                ) : null}
                                 <section
                                     className="forge-report-builder__bottom-group forge-report-builder__bottom-group--static"
                                     aria-label="Filters"
