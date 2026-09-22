@@ -60,6 +60,19 @@ including portalled controls. An invalid update must not replace the last valid
 appearance. Reload workspace appearance refreshes the host's style catalog;
 built-in Forge CSS changes still need a frontend rebuild.
 
+`typography.family: product-primary` selects the host's primary product
+typeface without encoding a particular vendor or font classification in Forge.
+The host loads and registers that family once; Forge surfaces and native form
+controls inherit it from the theme boundary. Code and terminal roles retain
+their explicit monospace stacks.
+
+Standalone dashboard HTML exports use `--forge-font-family`, backed by the same
+`--agently-font-product-primary` registry when it is available. Downloaded HTML
+does not copy host font files or remote URLs, so it intentionally falls back to
+the local system family unless the caller supplies a licensed standalone
+stylesheet. This keeps offline exports functional without silently embedding
+font assets.
+
 Scope overrides to `.agently-workspace[data-forge-window-key="advertiser"]` or
 owned `data-forge-part` selectors. Avoid globally changing `.bp6-*` containers:
 chat, history, and business windows have different sizing responsibilities.
