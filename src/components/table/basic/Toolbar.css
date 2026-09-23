@@ -258,16 +258,16 @@ td .pagination-bar {
 }
 
 .forge-toolbar-status.is-success {
-    color: var(--forge-text-success, #0a6640);
+    color: var(--forge-status-success-foreground, #0a6640);
 }
 
 .forge-toolbar-status.is-danger,
 .forge-toolbar-status.is-error {
-    color: var(--forge-text-danger, #b42318);
+    color: var(--forge-status-danger-foreground, #b42318);
 }
 
 .forge-toolbar-status.is-warning {
-    color: var(--forge-text-warning, #8a5507);
+    color: var(--forge-status-warning-foreground, #8a5507);
 }
 
 .forge-toolbar-status strong {
@@ -282,7 +282,7 @@ td .pagination-bar {
 
 .forge-toolbar-export-error {
     max-width: 260px;
-    color: var(--forge-text-danger, #b42318);
+    color: var(--forge-status-danger-foreground, #b42318);
     font-size: 12px;
     line-height: 1.3;
     white-space: normal;

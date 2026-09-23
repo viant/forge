@@ -1,8 +1,42 @@
 /* Built-in Forge appearance, used when no workspace theme is selected. */
 .agently-workspace:not([data-forge-theme]) {
+    --forge-canvas: #f5f6f8;
     --forge-surface: #ffffff;
+    --forge-surface-subtle: #f1f3f7;
+    --forge-surface-raised: #ffffff;
     --forge-text: #263244;
+    --forge-text-secondary: #3f4a5e;
     --forge-text-muted: #59677b;
+    --forge-text-inverse: #ffffff;
+    --forge-border-color: #d5deeb;
+    --forge-border-strong: #b7c5d9;
+    --forge-interaction-color: #215db0;
+    --forge-interaction-hover-color: #1b4f98;
+    --forge-interaction-active-color: #173f79;
+    --forge-selected-background: #eaf2ff;
+    --forge-status-info-background: #ebf1f5;
+    --forge-status-info-foreground: #30404d;
+    --forge-status-info-border: #ced9e0;
+    --forge-status-success-background: #eef8f0;
+    --forge-status-success-foreground: #0a6640;
+    --forge-status-success-border: #0f9960;
+    --forge-status-warning-background: #fff5d6;
+    --forge-status-warning-foreground: #8a5d00;
+    --forge-status-warning-border: #f5c542;
+    --forge-status-danger-background: #fdecea;
+    --forge-status-danger-foreground: #a82a2a;
+    --forge-status-danger-border: #db3737;
+    --forge-data-categorical-1: #2f6de1;
+    --forge-data-categorical-2: #0f9960;
+    --forge-data-categorical-3: #7c3aed;
+    --forge-data-categorical-4: #d9822b;
+    --forge-data-categorical-5: #137cbd;
+    --forge-data-categorical-6: #8f398f;
+    --forge-data-sequential-1: #eef4ff;
+    --forge-data-sequential-2: #c8daf5;
+    --forge-data-sequential-3: #85a9dd;
+    --forge-data-sequential-4: #4b78b8;
+    --forge-data-sequential-5: #17345d;
     --forge-control-bg: #f6f8fd;
     --forge-control-text: #263244;
     --forge-control-border: #b7c5d9;
@@ -33,6 +67,41 @@
 }
 /* Public theme hooks. No named-theme boundary means existing appearance. */
 .agently-workspace[data-forge-theme] {
+    --forge-canvas: var(--forge-surface);
+    --forge-surface-subtle: var(--forge-control-bg);
+    --forge-surface-raised: var(--forge-surface);
+    --forge-text-secondary: var(--forge-text-muted);
+    --forge-text-muted: var(--forge-disabled-text);
+    --forge-text-inverse: #ffffff;
+    --forge-border-color: var(--forge-control-border);
+    --forge-border-strong: var(--forge-control-border);
+    --forge-interaction-color: var(--forge-button-text);
+    --forge-interaction-hover-color: var(--forge-button-text);
+    --forge-interaction-active-color: var(--forge-button-text);
+    --forge-selected-background: color-mix(in srgb, var(--forge-control-bg) 85%, var(--forge-focus-color));
+    --forge-status-info-background: #ebf1f5;
+    --forge-status-info-foreground: #30404d;
+    --forge-status-info-border: #ced9e0;
+    --forge-status-success-background: #eef8f0;
+    --forge-status-success-foreground: #0a6640;
+    --forge-status-success-border: #0f9960;
+    --forge-status-warning-background: #fff5d6;
+    --forge-status-warning-foreground: #8a5d00;
+    --forge-status-warning-border: #f5c542;
+    --forge-status-danger-background: #fdecea;
+    --forge-status-danger-foreground: #a82a2a;
+    --forge-status-danger-border: #db3737;
+    --forge-data-categorical-1: #2f6de1;
+    --forge-data-categorical-2: #0f9960;
+    --forge-data-categorical-3: #7c3aed;
+    --forge-data-categorical-4: #d9822b;
+    --forge-data-categorical-5: #137cbd;
+    --forge-data-categorical-6: #8f398f;
+    --forge-data-sequential-1: #eef4ff;
+    --forge-data-sequential-2: #c8daf5;
+    --forge-data-sequential-3: #85a9dd;
+    --forge-data-sequential-4: #4b78b8;
+    --forge-data-sequential-5: #17345d;
     background-color: var(--forge-surface);
     color: var(--forge-text);
     font-family: var(--forge-font-family, system-ui, sans-serif);
@@ -85,7 +154,7 @@
     --forge-table-border: var(--forge-control-border);
     --forge-table-header-surface: color-mix(in srgb, var(--forge-control-bg) 88%, var(--forge-text));
     --forge-table-muted-surface: var(--forge-surface);
-    --forge-table-hover-surface: color-mix(in srgb, var(--forge-control-bg) 85%, var(--forge-focus-color));
+    --forge-table-hover-surface: var(--forge-selected-background);
     --forge-table-muted-text: var(--forge-disabled-text);
     --forge-table-radius: var(--forge-control-radius);
 }
