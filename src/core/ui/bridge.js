@@ -535,6 +535,15 @@ export function startUIBridgeHTTP(options = {}) {
     if (!payload || !payload.method || !payload.id) return;
     try {
       const result = await runUICommand({ method: payload.method, params: payload.params || {} });
+      if (payload.method === 'ui.window.open') {
+        // The window is already created. A full snapshot may include expensive
+        // report collections, so acknowledge the open before publishing it.
+        await rpc('ui.response', { id: payload.id, ok: true, result }, `response_${payload.id}`);
+        if (options.snapshotAfterCommand !== false) {
+          void publishSnapshot();
+        }
+        return;
+      }
       if (options.snapshotAfterCommand !== false) {
         await publishSnapshot({ strict: true });
       }
