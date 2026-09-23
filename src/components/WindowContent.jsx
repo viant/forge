@@ -1120,15 +1120,18 @@ function WindowContentRuntime({window, isInTab = false}) {
     const config  = {service: {...service, uri: `${service.uri}/${baseKey}`, includeTargetContext: true}};
     const connector = useDataConnector(config);
 
+    // Restoration can replace the registry entry without changing windowId.
+    // Follow that identity so rendering and UI snapshots share the same signal.
+    const registeredMetadataSignal = findMetadataSignal(windowId);
     useEffect(() => {
-        const existingSignal = findMetadataSignal(windowId);
+        const existingSignal = registeredMetadataSignal;
         if (existingSignal) {
             setMetadataSignalHandle(existingSignal);
             return;
         }
         const createdSignal = getMetadataSignal(windowId);
         setMetadataSignalHandle(createdSignal);
-    }, [windowId]);
+    }, [windowId, registeredMetadataSignal]);
 
     // Fetch metadata once per windowId
     useEffect(() => {
