@@ -3316,6 +3316,7 @@ export default function ReportRuntime({
               context={createRuntimeContext(dataset, locale, { publicMode: publicDiagnosticsMode })}
               isActive
               embedded={false}
+              height={reportPresentation ? 360 : undefined}
               showControls={!reportPresentation}
               onDatumSelect={chartInteractionEnabled ? ((selection) => {
                 setSelectedChartSelection(block.id, selection);
