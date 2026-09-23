@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { buildDashboardExportModel, buildStandaloneDashboardHtml, captureChartSvg, captureDashboardChartSvgs, buildStandaloneDashboardDocument, defaultDashboardExportStyles } from './dashboardExport.js';
 
-assert.match(defaultDashboardExportStyles, /--forge-font-family:\s*var\(--agently-font-product-primary, system-ui, sans-serif\)/);
+assert.match(defaultDashboardExportStyles, /--forge-font-family:\s*system-ui, sans-serif/);
 assert.match(defaultDashboardExportStyles, /body\s*\{[\s\S]*font-family:\s*var\(--forge-font-family\)/);
 
 const html = buildStandaloneDashboardHtml({
