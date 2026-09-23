@@ -130,6 +130,33 @@ try {
   assert.deepEqual(authHelloCalls.slice(0, 4), ['ui.hello', 'ui.hello', 'ui.snapshot.get', 'ui.snapshot']);
   console.log('bridge startup auth retry ✓ retries ui.hello after authorization instead of failing permanently');
 
+  const transientCalls = [];
+  let transientHelloAttempts = 0;
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(String(options.body || '{}'));
+    transientCalls.push(body.method);
+    const headers = new Headers({ 'Mcp-Session-Id': 'session-transient-retry' });
+    if (body.method === 'ui.hello' && ++transientHelloAttempts === 1) {
+      return new Response('', { status: 503, headers });
+    }
+    if (body.method === 'ui.poll') return new Response('', { status: 202, headers });
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+  };
+
+  const stopTransientHello = startUIBridgeHTTP({
+    url: 'http://example.test/v1/ui/rpc',
+    snapshotIntervalMs: 10_000,
+    reconnectDelayMs: 500,
+    pollCycleDelayMs: 100,
+    snapshotBuilder: () => ({ conversationId: 'conv-transient-retry', windows: [] }),
+  });
+  await sleep(650);
+  stopTransientHello();
+  assert.equal(transientHelloAttempts, 2);
+  assert.equal(transientCalls.includes('ui.snapshot'), true);
+  assert.equal(transientCalls.includes('ui.poll'), true);
+  console.log('bridge startup transient retry ✓ recovers without a browser refresh');
+
   const configuredAuthCalls = [];
   let configuredHelloAttempts = 0;
   globalThis.fetch = async (_url, options = {}) => {
