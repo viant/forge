@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import './index.jsx';
@@ -64,3 +65,17 @@ assert.match(lookupHTML, /workspace-lookup/);
 assert.ok(!lookupHTML.includes('background-color:'), 'Lookup defaults must remain CSS overrideable');
 assert.match(lookupHTML, /aria-label="Open lookup"/);
 console.log('lookup class and accessible action contract passed');
+
+const themeCSS = fs.readFileSync(new URL('./theme.css', import.meta.url), 'utf8');
+for (const token of [
+    '--forge-text-muted',
+    '--forge-text-secondary',
+    '--forge-interaction-color',
+    '--forge-selected-background',
+    '--forge-status-danger-foreground',
+    '--forge-status-success-background',
+    '--forge-data-categorical-1',
+]) {
+    assert.ok(themeCSS.includes(token), `missing optional semantic fallback ${token}`);
+}
+console.log('optional semantic color fallbacks passed');
