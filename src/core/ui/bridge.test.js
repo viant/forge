@@ -421,16 +421,11 @@ try {
   stopCommandOrder();
   const responseIndex = commandCalls.findIndex((entry) => entry.method === 'ui.response' && entry.params?.id === 'cmd-open-capacity');
   assert.equal(responseIndex > 0, true);
-  let snapshotBeforeResponse = null;
-  for (let i = responseIndex - 1; i >= 0; i -= 1) {
-    if (commandCalls[i].method === 'ui.snapshot') {
-      snapshotBeforeResponse = commandCalls[i];
-      break;
-    }
-  }
-  assert.equal(!!snapshotBeforeResponse, true);
-  assert.equal(snapshotBeforeResponse.params?.data?.windows?.some((win) => win?.windowId === openedWindowId), true);
-  console.log('bridge command ordering ✓ publishes opened window snapshot before ui.response');
+  const openedWindowSnapshotIndex = commandCalls.findIndex((entry) =>
+    entry.method === 'ui.snapshot'
+    && entry.params?.data?.windows?.some((win) => win?.windowId === openedWindowId));
+  assert.equal(openedWindowSnapshotIndex > responseIndex, true);
+  console.log('bridge command ordering ✓ acknowledges opened window before its full snapshot');
 
   const commandFailureCalls = [];
   const commandFailureResponses = [];
@@ -505,9 +500,8 @@ try {
   stopCommandSnapshotFailure();
   assert.equal(commandFailureResponses.length, 1);
   assert.equal(commandFailureResponses[0]?.id, 'cmd-open-snapshot-fail');
-  assert.equal(commandFailureResponses[0]?.ok, false);
-  assert.match(String(commandFailureResponses[0]?.error || ''), /HTTP 500/);
-  console.log('bridge command failure ✓ rejects success response when opened-window snapshot is not accepted');
+  assert.equal(commandFailureResponses[0]?.ok, true);
+  console.log('bridge command failure ✓ snapshot failure does not hold an opened-window acknowledgement');
 
   let aborted = false;
   globalThis.fetch = async (_url, options = {}) => {
