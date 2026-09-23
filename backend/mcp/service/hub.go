@@ -444,6 +444,21 @@ func (h *Hub) enqueueCommand(ns, clientID string, req rpcRequest) {
 	h.mu.Unlock()
 }
 
+func (h *Hub) removeQueuedCommand(ns, clientID, commandID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	q := h.queues[ns][clientID]
+	if q == nil {
+		return
+	}
+	for i, item := range q.items {
+		if item.ID == commandID {
+			q.items = append(q.items[:i], q.items[i+1:]...)
+			return
+		}
+	}
+}
+
 func (h *Hub) dequeueCommand(ctx context.Context, ns, clientID string) (*rpcRequest, error) {
 	h.mu.Lock()
 	q := h.ensureQueue(ns, clientID)
@@ -556,6 +571,7 @@ func (h *Hub) Call(ctx context.Context, ns, clientID string, method string, para
 		h.pendingMu.Lock()
 		delete(h.pending, id)
 		h.pendingMu.Unlock()
+		h.removeQueuedCommand(ns, clientID, id)
 		return nil, ctx.Err()
 	case resp := <-ch:
 		log.Printf("[forge-ui] call response ns=%q client=%q method=%q id=%q ok=%v err=%q", ns, clientID, method, id, resp.OK, resp.Error)
