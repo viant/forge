@@ -75,6 +75,7 @@ export async function fetchReportRuntimePreviewDatasetPayloadResult({
   requestKind = "runtimePreviewDataset",
   fetcherOptions = null,
   shouldContinue = null,
+  onDatasetSettled = null,
 } = {}) {
   const normalizedDatasets = (Array.isArray(datasets) ? datasets : [])
     .map((dataset) => (
@@ -161,7 +162,12 @@ export async function fetchReportRuntimePreviewDatasetPayloadResult({
           false,
         ];
       }
-    }),
+    }).map((pending) => pending.then((entry) => {
+      if (canContinueDatasetPayloadLifecycle(shouldContinue) && typeof onDatasetSettled === "function" && entry[4] !== true) {
+        onDatasetSettled(entry);
+      }
+      return entry;
+    })),
   );
   const cancelled = entries.some(([, , , , entryCancelled]) => entryCancelled === true);
   if (cancelled) {
@@ -289,12 +295,27 @@ export async function executeReportRuntimePreviewDatasetPayloadFetchLifecycle({
   shouldContinue = null,
   applyState = null,
 } = {}) {
+  const settled = new Map();
   const result = await fetchReportRuntimePreviewDatasetPayloadResult({
     builderContext,
     datasets,
     requestKind,
     fetcherOptions,
     shouldContinue,
+    onDatasetSettled: (entry) => {
+      if (!canContinueDatasetPayloadLifecycle(shouldContinue)) return;
+      settled.set(entry[0], entry);
+      const entries = [...settled.values()];
+      const currentState = typeof getCurrentState === "function" ? getCurrentState() : null;
+      const nextState = buildResolvedReportRuntimePreviewDatasetPayloadState({
+        requestKey,
+        payloads: {...currentState?.payloads, ...Object.fromEntries(entries.map(([id, payload]) => [id, payload]))},
+        freshDatasetIds: entries.filter(([, , fresh]) => fresh).map(([id]) => id),
+        freshnessFailedDatasetIds: entries.filter(([, , , error]) => error).map(([id]) => id),
+        currentState,
+      });
+      if (typeof applyState === "function") applyState({...nextState, loading: true, freshResultRequestKey: "", settledDatasetIds: [...settled.keys()]});
+    },
   });
   if (result.cancelled || !canContinueDatasetPayloadLifecycle(shouldContinue)) {
     return { cancelled: true, nextState: null };

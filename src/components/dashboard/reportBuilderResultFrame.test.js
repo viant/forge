@@ -530,7 +530,7 @@ assert.deepEqual(buildReportBuilderAuthoredRuntimePreviewState({
     updatingNotice: null,
     blockedState: null,
     errorState: null,
-    canRenderRuntime: false,
+    canRenderRuntime: true,
 });
 
 const audienceRuntimePreviewState = buildReportBuilderAuthoredRuntimePreviewState({
@@ -844,7 +844,7 @@ assert.deepEqual(
     carriedSemanticValidationRetryRecoveredPreviewState.semanticBindingFieldGroups,
 );
 assert.equal(carriedSemanticValidationRetryErroredPreviewState.scopeSummaryTitle, "Filters");
-assert.equal(carriedSemanticValidationRetryErroredPreviewState.scopeSummaryText, "Reporting Window: 2026-05-01 – 2026-05-04");
+assert.equal(carriedSemanticValidationRetryErroredPreviewState.scopeSummaryText, "Reporting Window", "label-only scope metadata must not invent dates");
 assert.deepEqual(
     carriedSemanticValidationRetryErroredPreviewState.scopeSummaryItems,
     carriedSemanticValidationRetryRecoveredPreviewState.scopeSummaryItems,
@@ -1465,7 +1465,7 @@ assert.deepEqual(
     semanticValidationRetryRecoveredPreviewState.semanticBindingFieldGroups,
 );
 assert.equal(semanticValidationRetryErroredPreviewState.scopeSummaryTitle, "Filters");
-assert.equal(semanticValidationRetryErroredPreviewState.scopeSummaryText, "Reporting Window: 2026-05-01 – 2026-05-04");
+assert.equal(semanticValidationRetryErroredPreviewState.scopeSummaryText, "Reporting Window", "label-only scope metadata must not invent dates");
 assert.deepEqual(
     semanticValidationRetryErroredPreviewState.scopeSummaryItems,
     semanticValidationRetryRecoveredPreviewState.scopeSummaryItems,
@@ -2025,7 +2025,7 @@ const drillRefreshLoadingWithoutRowsPreviewState = buildReportBuilderAuthoredRun
     canRunReport: true,
 });
 assert.notEqual(drillRefreshLoadingWithoutRowsPreviewState.loadingState, null);
-assert.equal(drillRefreshLoadingWithoutRowsPreviewState.canRenderRuntime, false);
+assert.equal(drillRefreshLoadingWithoutRowsPreviewState.canRenderRuntime, true, "keep authored layout available while datasets load");
 assert.equal(drillRefreshLoadingWithoutRowsPreviewState.updatingNotice, null);
 
 const drillRefreshRetainedRowsDatasets = {
