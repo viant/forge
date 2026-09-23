@@ -3,6 +3,8 @@ import { Button, Dialog, Icon, Menu, MenuDivider, MenuItem, Popover, Tooltip } f
 import { useSignals } from "@preact/signals-react/runtime";
 
 import Chart from "../Chart.jsx";
+import {ReportLoadingStatus} from './ReportLoading.jsx';
+import {reportLoadingProgress} from './reportLoadingProgress.js';
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
 import {
     resolveReportBuilderDefinitionDataSourceRef,
@@ -20008,12 +20010,15 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         if (!authoredRuntimePreviewState) {
             return null;
         }
+        const dataLoading = runtimePreviewDatasetPayloadState.loading || runtimePreviewRowsSource.loading;
+        const progress = reportLoadingProgress(runtimePreviewPublishedDatasets, runtimePreviewDatasetPayloadState, dataLoading);
         return (
             <section
                 className="forge-report-builder__runtime-preview"
                 aria-label={reportWorkspaceMode ? "Authored report" : "Authored runtime preview"}
             >
-                {authoredRuntimePreviewState.loadingState ? (
+                {dataLoading ? <ReportLoadingStatus progress={progress} refreshing={authoredRuntimePreviewState.hasRuntimeRows}/> : null}
+                {authoredRuntimePreviewState.loadingState && !authoredRuntimePreviewState.canRenderRuntime ? (
                     <ReportBuilderResultState
                         icon={authoredRuntimePreviewState.loadingState.icon}
                         eyebrow={authoredRuntimePreviewState.loadingState.eyebrow}
@@ -20123,6 +20128,9 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                             reportSpec={authoredRuntimePreviewState.runtimeConfig.reportSpec}
                             reportDocument={runtimePreviewArtifact?.document || null}
                             reportFill={authoredRuntimePreviewState.runtimeConfig.reportFill}
+                            pendingDatasetIds={progress.pending}
+                            navigationWindowId={builderContext?.identity?.windowId}
+                            navigationContainerId={container?.id}
                             title={runtimePreviewArtifact?.runtimeBlock?.title || ""}
                             subtitle={runtimePreviewArtifact?.runtimeBlock?.subtitle || ""}
                             locale={locale}

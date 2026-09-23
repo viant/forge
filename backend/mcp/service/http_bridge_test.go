@@ -50,6 +50,38 @@ func TestUIRPCHandler_PollWrapsCommandEnvelope(t *testing.T) {
 	}
 }
 
+func TestHubCallRemovesTimedOutQueuedCommand(t *testing.T) {
+	hub := NewHub(&Config{})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+	_, err := hub.Call(ctx, "default", "client-1", "ui.window.open", nil)
+	if err == nil {
+		t.Fatal("expected timeout while no client is polling")
+	}
+	hub.mu.RLock()
+	defer hub.mu.RUnlock()
+	if queue := hub.queues["default"]["client-1"]; queue != nil && len(queue.items) != 0 {
+		t.Fatalf("timed-out command remains queued: %#v", queue.items)
+	}
+}
+
+func TestHubCallFailsFastWhenNoUIPollPicksUpCommand(t *testing.T) {
+	hub := NewHub(&Config{})
+	started := time.Now()
+	_, err := hub.Call(context.Background(), "default", "client-1", "ui.window.open", nil)
+	if err == nil || err.Error() != "no active UI poll picked up the command within 5 seconds" {
+		t.Fatalf("expected missing-poll error, got %v", err)
+	}
+	if elapsed := time.Since(started); elapsed > 7*time.Second {
+		t.Fatalf("unpicked UI command waited too long: %s", elapsed)
+	}
+	hub.mu.RLock()
+	defer hub.mu.RUnlock()
+	if queue := hub.queues["default"]["client-1"]; queue != nil && len(queue.items) != 0 {
+		t.Fatalf("unpicked command remains queued: %#v", queue.items)
+	}
+}
+
 func TestUIRPCHandler_PollWrapsSetFormDataCommandEnvelope(t *testing.T) {
 	hub := NewHub(&Config{})
 	bridge := &httpRPCBridge{hub: hub, sessions: map[string]*httpSessionInfo{}}

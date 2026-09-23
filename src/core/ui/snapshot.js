@@ -16,6 +16,7 @@ import {
 } from '../store/signals.js';
 
 import { enableFocusTracking, getFocusedControlMeta } from './registry.js';
+import {listNavigationTabs} from './navigationRegistry.js';
 
 function toJSONValue(value, options, seen, depth) {
   const {
@@ -185,7 +186,7 @@ function getReportBuilderAuthoringCatalog(content = {}, windowForm = {}) {
 function getWindowMetadataSummary(windowId, options) {
   try {
     const meta = getMetadataSignal(windowId).peek();
-    if (!meta) return { loaded: false };
+    if (!meta) return { loaded: false, view: {tabs: listNavigationTabs(windowId)} };
 
     const dataSourceRefs = Object.keys(meta.dataSource || {});
     const dialogs = Array.isArray(meta.dialogs) ? meta.dialogs : [];
@@ -194,11 +195,14 @@ function getWindowMetadataSummary(windowId, options) {
     const content = view.content || {};
     const windowForm = getFormSignal(`${windowId}:windowForm`).peek() || {};
     const reportBuilder = getReportBuilderAuthoringCatalog(content, windowForm);
-    const tabs = [];
+    const tabs = listNavigationTabs(windowId);
     const controls = [];
     const collectTabs = (node) => {
       if (!node || typeof node !== 'object') return;
-      const items = Array.isArray(node.items) ? node.items : [];
+      const items = [
+        ...(Array.isArray(node.items) ? node.items : []),
+        ...(Array.isArray(node.table?.toolbar?.items) ? node.table.toolbar.items : []),
+      ];
       const containers = Array.isArray(node.containers) ? node.containers : [];
       for (const item of items) {
         const controlId = String(item?.id || '').trim();
