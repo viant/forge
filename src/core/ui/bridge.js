@@ -3,7 +3,6 @@ import { runUICommand } from './commands.js';
 import { restoreWindowsFromSnapshot } from '../store/signals.js';
 
 let activeSnapshotPublisher = null;
-const UI_BRIDGE_CLIENT_STORAGE_KEY = 'forge.uiBridge.clientId';
 let seededUIBridgeClientId = '';
 let activeBridgeReadyState = null;
 const DEFAULT_SNAPSHOT_EVENTS = [
@@ -64,17 +63,12 @@ export function ensureUIBridgeClientId(preferred = '') {
       seededUIBridgeClientId = existing;
       return existing;
     }
-    let stored = '';
-    try {
-      stored = String(window.sessionStorage?.getItem(UI_BRIDGE_CLIENT_STORAGE_KEY) || '').trim();
-    } catch (_) {}
-    const next = preferredText || stored || randomId();
+    // sessionStorage is cloned when a browser tab is duplicated. A transport
+    // identity belongs to this document, never to a restored browser session.
+    const next = preferredText || randomId();
     seededUIBridgeClientId = next;
     try {
       window.__forgeUIBridgeClientId = next;
-    } catch (_) {}
-    try {
-      window.sessionStorage?.setItem(UI_BRIDGE_CLIENT_STORAGE_KEY, next);
     } catch (_) {}
     return next;
   } catch (_) {
