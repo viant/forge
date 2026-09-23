@@ -16,6 +16,7 @@ import {
 } from '../store/signals.js';
 
 import { enableFocusTracking, getFocusedControlMeta } from './registry.js';
+import {listNavigationTabs} from './navigationRegistry.js';
 
 function toJSONValue(value, options, seen, depth) {
   const {
@@ -194,7 +195,7 @@ function getWindowMetadataSummary(windowId, options) {
     const content = view.content || {};
     const windowForm = getFormSignal(`${windowId}:windowForm`).peek() || {};
     const reportBuilder = getReportBuilderAuthoringCatalog(content, windowForm);
-    const tabs = [];
+    const tabs = listNavigationTabs(windowId);
     const controls = [];
     const collectTabs = (node) => {
       if (!node || typeof node !== 'object') return;
