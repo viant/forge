@@ -54,7 +54,7 @@ export const defaultDashboardExportStyles = `
   --muted: #5f6b7c;
   --primary: #137cbd;
   --track: #ebf1f5;
-  --forge-font-family: var(--agently-font-product-primary, system-ui, sans-serif);
+  --forge-font-family: system-ui, sans-serif;
 }
 * { box-sizing: border-box; }
 body {
