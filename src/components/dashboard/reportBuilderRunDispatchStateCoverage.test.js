@@ -166,7 +166,7 @@ assert.equal(
   "Unmount must stop a queued Begin and CAS-fail an enabled post-Begin durable identity before React state, emit, or dispatch.",
 );
 assert.equal(
-  source.includes("reportBuilderMountedRef.current\n                    ? dispatchReportRequestSnapshot(")
+  source.includes("if (!reportBuilderMountedRef.current) return null;")
     && source.includes("const settleReportRunLifecycle = React.useCallback((settlementEvent = null) => {\n        const activeRun = activeRunEventRef.current;\n        if (!reportBuilderMountedRef.current)"),
   true,
   "Datasource dispatch and terminal lifecycle scheduling must both stop after unmount.",

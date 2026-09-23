@@ -132,6 +132,11 @@ function buildPredicateDirection(entry = {}, predicate = {}, direction = "", spe
             filter[field] = clone(value);
         }
     });
+    // A value predicate without a picker must remain editable. Explicit
+    // manualEntry:false and lookup-backed predicates retain their restrictions.
+    if (filter.manualEntry === undefined && !filter.dialogId && !filter.lookup && !filter.targetingFeatureKey) {
+        filter.manualEntry = true;
+    }
     // Row predicates aggregate selections; arrays are the sensible default.
     if (filter.multiple === undefined) {
         filter.multiple = true;

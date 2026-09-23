@@ -1,3 +1,4 @@
+import {draftReportFilters, applyReportFilterDraft} from './reportBuilderFilterDraft.js';
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button, Dialog, Icon, Menu, MenuDivider, MenuItem, Popover, Tooltip } from "@blueprintjs/core";
 import { useSignals } from "@preact/signals-react/runtime";
@@ -1234,14 +1235,6 @@ function countConfiguredDynamicSelections(rows = []) {
     ), 0);
 }
 
-function countEffectiveDynamicSelections(rows = []) {
-    return (Array.isArray(rows) ? rows : []).reduce((total, row) => (
-        row?.enabled === false
-            ? total
-            : total + (Array.isArray(row?.selections) ? row.selections.length : 0)
-    ), 0);
-}
-
 function filterCategoryIcon(category = {}) {
     if (typeof category === "string") {
         return "filter";
@@ -2132,6 +2125,23 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     const state = useMemo(() => mergeReportBuilderState(config, effectivePersistedState), [config, effectivePersistedState]);
     const currentBuilderStateRef = useRef(state);
     currentBuilderStateRef.current = state;
+    const [filterDraft, setFilterDraft] = useState(null);
+    const [filterApplyPending, setFilterApplyPending] = useState(false);
+    const filterDraftRef = useRef(null);
+    const filterState = useMemo(() => ({...state, ...filterDraft}), [state, filterDraft]);
+    const currentFilterStateRef = useRef(filterState);
+    currentFilterStateRef.current = filterState;
+    const stageReportFilters = React.useCallback((next) => {
+        const draft = draftReportFilters(next);
+        filterDraftRef.current = draft;
+        currentFilterStateRef.current = {...currentBuilderStateRef.current, ...draft};
+        setFilterDraft(draft);
+    }, []);
+    useEffect(() => {
+        filterDraftRef.current = null;
+        setFilterDraft(null);
+    }, [stateStorageScope, currentReportDefinitionSignature]);
+
     const effectivePersistedStateRef = useRef(effectivePersistedState);
     effectivePersistedStateRef.current = effectivePersistedState;
     const semanticBinding = state?.binding;
@@ -3268,8 +3278,8 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     }, [resultPanePosition]);
 
     const resolveLookup = React.useCallback((group, filterDef, rowId = "") => (
-        resolveReportBuilderLookupDescriptor(builderContext, config, state, group, filterDef, rowId)
-    ), [builderContext, config, state]);
+        resolveReportBuilderLookupDescriptor(builderContext, config, filterState, group, filterDef, rowId)
+    ), [builderContext, config, filterState]);
     const currentRequest = useMemo(
         () => applyReportBuilderRequestHook(builderContext, semanticDisplayConfig, state, buildReportBuilderRequest(semanticDisplayConfig, state)),
         [builderContext, semanticDisplayConfig, state],
@@ -3531,7 +3541,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     ]);
 
     useEffect(() => {
-        if (!currentRequestFingerprint || requestFingerprintRef.current === currentRequestDispatchFingerprint) {
+        if (filterApplyPending || !currentRequestFingerprint || requestFingerprintRef.current === currentRequestDispatchFingerprint) {
             return;
         }
         if (shouldDeferReportBuilderRequestForPrefill({
@@ -3564,7 +3574,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         if (currentRequestShouldFetch) {
             builderContext?.handlers?.dataSource?.fetchCollection?.();
         }
-    }, [builderContext, currentPrefillSignature, currentRequest, currentRequestDispatchFingerprint, currentRequestFingerprint, currentRequestShouldFetch, hostedReportActivationCurrent, hostedReportStarterId, state]);
+    }, [builderContext, currentPrefillSignature, currentRequest, currentRequestDispatchFingerprint, currentRequestFingerprint, currentRequestShouldFetch, filterApplyPending, hostedReportActivationCurrent, hostedReportStarterId, state]);
 
     useEffect(() => {
         if (!pendingScrollRowId) {
@@ -4229,6 +4239,10 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     const effectiveReportOptions = useMemo(
         () => resolveEffectiveReportBuilderOptions(reportOptionDefinitions, state?.reportOptions),
         [reportOptionDefinitions, state?.reportOptions],
+    );
+    const draftReportOptions = useMemo(
+        () => resolveEffectiveReportBuilderOptions(reportOptionDefinitions, filterState?.reportOptions),
+        [reportOptionDefinitions, filterState?.reportOptions],
     );
     const dynamicFilterGroups = useMemo(() => resolveReportBuilderDynamicFilterGroups(config), [config]);
     const dynamicFilterFamilies = useMemo(() => resolveDynamicFilterFamilies(config), [config]);
@@ -5018,17 +5032,17 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     const activeStaticFilterCount = useMemo(() => (
         staticFilters.reduce((count, filter) => {
             const key = resolveScopeParamId(filter);
-            return key && hasConfiguredFilterValue(filter, getScopeParamValue(state, key)) ? count + 1 : count;
+            return key && hasConfiguredFilterValue(filter, getScopeParamValue(filterState, key)) ? count + 1 : count;
         }, 0)
-    ), [staticFilters, state]);
+    ), [staticFilters, filterState]);
     const activeDynamicFilterCount = useMemo(() => (
         dynamicFilterGroups.reduce((count, group) => {
             if (hiddenDynamicGroupIds.has(group.id)) {
                 return count;
             }
-            return count + (state?.dynamicGroups?.[group.id] || []).filter((row) => Array.isArray(row.selections) && row.selections.length > 0).length;
+            return count + (filterState?.dynamicGroups?.[group.id] || []).filter((row) => Array.isArray(row.selections) && row.selections.length > 0).length;
         }, 0)
-    ), [dynamicFilterGroups, hiddenDynamicGroupIds, state]);
+    ), [dynamicFilterGroups, hiddenDynamicGroupIds, filterState]);
     const visibleActiveDynamicGroupIds = useMemo(
         () => activeDynamicGroupIds.filter((groupId) => !hiddenDynamicGroupIds.has(groupId)),
         [activeDynamicGroupIds, hiddenDynamicGroupIds],
@@ -5038,18 +5052,18 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         [config, visibleActiveDynamicGroupIds],
     );
     const notices = useMemo(() => {
-        const resolved = resolveReportBuilderNotices(config, state);
+        const resolved = resolveReportBuilderNotices(config, filterState);
         return semanticGovernanceNotice
             ? [semanticGovernanceNotice, ...resolved]
             : resolved;
-    }, [config, semanticGovernanceNotice, state]);
+    }, [config, semanticGovernanceNotice, filterState]);
     const familyConfiguredCount = React.useCallback((family) => {
-        const includeRows = state?.dynamicGroups?.include || [];
-        const excludeRows = state?.dynamicGroups?.exclude || [];
+        const includeRows = filterState?.dynamicGroups?.include || [];
+        const excludeRows = filterState?.dynamicGroups?.exclude || [];
         const includeCount = includeRows.filter((row) => family.includeFilterIds.includes(String(row?.filterId || "").trim()) && Array.isArray(row.selections) && row.selections.length > 0).length;
         const excludeCount = excludeRows.filter((row) => family.excludeFilterIds.includes(String(row?.filterId || "").trim()) && Array.isArray(row.selections) && row.selections.length > 0).length;
         return includeCount + excludeCount;
-    }, [state]);
+    }, [filterState]);
     const authoredPrimaryFilterBarBlock = useMemo(
         () => authoredDocumentBlocks.find((block) => normalizeString(block?.kind) === "filterBarBlock" && normalizeString(block?.datasetRef || "primary") === "primary") || null,
         [authoredDocumentBlocks],
@@ -5132,20 +5146,20 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     const showUnifiedRuntimeFilterSurface = false;
     const showRuntimeFilterRail = false;
     const totalActiveFilterCount = activeStaticFilterCount + activeDynamicFilterCount;
-    const modifiedReportOptionCount = countModifiedReportBuilderOptions(reportOptionDefinitions, effectiveReportOptions);
+    const modifiedReportOptionCount = countModifiedReportBuilderOptions(reportOptionDefinitions, draftReportOptions);
     const defaultFilterControlState = buildReportBuilderDefaultState(config);
     const modifiedStaticFilterCount = staticFilters.filter((filter) => {
         const key = resolveScopeParamId(filter);
-        return key && JSON.stringify(getScopeParamValue(state, key)) !== JSON.stringify(getScopeParamValue(defaultFilterControlState, key));
+        return key && JSON.stringify(getScopeParamValue(filterState, key)) !== JSON.stringify(getScopeParamValue(defaultFilterControlState, key));
     }).length;
     const modifiedDynamicFilterCount = [...dynamicFilterGroups, ...dynamicFilterFamilies].filter((entry) => {
         const key = normalizeString(entry?.id);
-        return key && JSON.stringify(state?.dynamicGroups?.[key]) !== JSON.stringify(defaultFilterControlState?.dynamicGroups?.[key]);
+        return key && JSON.stringify(filterState?.dynamicGroups?.[key]) !== JSON.stringify(defaultFilterControlState?.dynamicGroups?.[key]);
     }).length;
     const reportFilterToolbarModel = buildReportBuilderFilterToolbarModel({
         allowedFilterCount: staticFilters.length + dynamicFilterGroups.length + dynamicFilterFamilies.length,
         optionDefinitions: reportOptionDefinitions,
-        optionValues: effectiveReportOptions,
+        optionValues: draftReportOptions,
         modifiedFilterCount: modifiedStaticFilterCount + modifiedDynamicFilterCount,
     });
     const showReportFilterToolbar = !compactMode
@@ -5264,7 +5278,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                         {optionalStaticFilters.map((filter) => {
                             const filterKey = resolveScopeParamId(filter);
                             const active = activeOptionalFilterKeys.includes(filterKey);
-                            const configuredCount = countConfiguredFilterValue(filter, getScopeParamValue(state, filterKey));
+                            const configuredCount = countConfiguredFilterValue(filter, getScopeParamValue(filterState, filterKey));
                             const categoryLabel = filter.label || filter.id;
                             const chipViewModel = buildFilterCategoryChipViewModel({
                                 label: categoryLabel,
@@ -5297,7 +5311,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                         })}
                         {dynamicFilterGroups.filter((group) => !hiddenDynamicGroupIds.has(group.id)).map((group) => {
                             const active = activeDynamicGroupIds.includes(group.id);
-                            const configuredCount = countConfiguredDynamicSelections(state?.dynamicGroups?.[group.id] || []);
+                            const configuredCount = countConfiguredDynamicSelections(filterState?.dynamicGroups?.[group.id] || []);
                             const stateLabel = filterCategoryStateLabel({ active, configuredCount });
                             const categoryLabel = group.label || group.id;
                             return (
@@ -5335,7 +5349,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                         {optionalStaticFilters.map((filter) => {
                             const filterKey = resolveScopeParamId(filter);
                             const active = activeOptionalFilterKeys.includes(filterKey);
-                            const configuredCount = countConfiguredFilterValue(filter, getScopeParamValue(state, filterKey));
+                            const configuredCount = countConfiguredFilterValue(filter, getScopeParamValue(filterState, filterKey));
                             const categoryLabel = filter.label || filter.id;
                             const chipViewModel = buildFilterCategoryChipViewModel({
                                 label: categoryLabel,
@@ -5469,10 +5483,10 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 {inlineUnifiedFilterEntries.map((entry) => {
                     const active = activeInlineUnifiedGroupIds.includes(entry.id);
                     const configuredCount = entry.kind === "static"
-                        ? countConfiguredFilterValue(entry.filter, getScopeParamValue(state, entry.id))
+                        ? countConfiguredFilterValue(entry.filter, getScopeParamValue(filterState, entry.id))
                         : entry.kind === "family"
                             ? familyConfiguredCount(entry.family)
-                            : countConfiguredDynamicSelections(state?.dynamicGroups?.[entry.id] || []);
+                            : countConfiguredDynamicSelections(filterState?.dynamicGroups?.[entry.id] || []);
                     const stateLabel = filterCategoryStateLabel({ active, configuredCount });
                     return (
                         <button
@@ -5560,7 +5574,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         >
             <ReportBuilderOptionControls
                 definitions={reportOptionGroups.rail}
-                values={effectiveReportOptions}
+                values={draftReportOptions}
                 onChange={setReportOptionValue}
                 onReset={resetReportFiltersAndOptions}
                 activeCount={modifiedReportOptionCount}
@@ -5587,6 +5601,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                         </div>
                     </div>
                     <div className="forge-report-builder__bottom-header-actions">
+                        <Button small intent="primary" onClick={runReport} disabled={!filterDraft}>
+                            Apply
+                        </Button>
+                        {filterDraft ? <span role="status">Unapplied changes</span> : null}
+
                         {totalActiveControlCount > 0 ? (
                             <button type="button" className="forge-report-builder__bottom-toggle" aria-label="Reset report filters and options to defaults" onClick={resetReportFiltersAndOptions}>
                                 Reset
@@ -5629,7 +5648,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         const nextOptional = optionalStaticFilters
             .filter((filter) => {
                 const key = resolveScopeParamId(filter);
-                return key && hasConfiguredFilterValue(filter, getScopeParamValue(state, key));
+                return key && hasConfiguredFilterValue(filter, getScopeParamValue(filterState, key));
             })
             .map((filter) => resolveScopeParamId(filter))
             .filter(Boolean);
@@ -5638,7 +5657,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             const nextSorted = [...nextOptional].sort();
             return JSON.stringify(currentSorted) === JSON.stringify(nextSorted) ? current : nextOptional;
         });
-    }, [optionalStaticFilters, state]);
+    }, [optionalStaticFilters, filterState]);
 
     useEffect(() => {
         if (designWorkspaceMode || !useFilterRail || !hasFilterDrawerContent) {
@@ -5666,7 +5685,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     useEffect(() => {
         const nextGroups = dynamicFilterGroups
             .filter((group) => !hiddenDynamicGroupIds.has(group.id))
-            .filter((group) => pinnedDynamicGroupIds.includes(group.id) || (Array.isArray(state?.dynamicGroups?.[group.id]) && state.dynamicGroups[group.id].length > 0))
+            .filter((group) => pinnedDynamicGroupIds.includes(group.id) || (Array.isArray(filterState?.dynamicGroups?.[group.id]) && filterState.dynamicGroups[group.id].length > 0))
             .map((group) => String(group.id || "").trim())
             .filter(Boolean);
         setActiveDynamicGroupIds((current) => {
@@ -5674,7 +5693,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             const nextSorted = [...nextGroups].sort();
             return JSON.stringify(currentSorted) === JSON.stringify(nextSorted) ? current : nextGroups;
         });
-    }, [dynamicFilterGroups, hiddenDynamicGroupIds, pinnedDynamicGroupIds, state]);
+    }, [dynamicFilterGroups, hiddenDynamicGroupIds, pinnedDynamicGroupIds, filterState]);
     useEffect(() => {
         const nextGroupIds = inlineUnifiedFilterEntries
             .map((entry) => entry?.id)
@@ -5689,7 +5708,9 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     }, [authoredPrimaryFilterBarCollapsedGroups, inlineUnifiedFilterEntries]);
     const renderStaticFilterSection = (filter) => {
         const filterKey = resolveScopeParamId(filter);
-        const currentValue = getScopeParamValue(state, filterKey);
+        const currentValue = filter.datasetRef && filter.datasetRef !== "primary"
+            ? (filterState.filterDatasetScopeParams || runtimePreviewInteraction.datasetScopeParams)?.[filter.datasetRef]?.[filterKey]
+            : getScopeParamValue(filterState, filterKey);
         const issue = semanticParameterIssuesById[filterKey] || null;
         const providerDiagnostics = semanticProviderParameterDiagnosticsById[filterKey] || [];
         return (
@@ -7619,8 +7640,8 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                     title="Refresh report"
                     icon="refresh"
                     aria-label="Refresh report"
-                    disabled={!canRunReport || loading}
-                    loading={loading}
+                    disabled={!filterDraft && (!canRunReport || loading)}
+                    loading={loading && !filterDraft}
                     onClick={runReport}
                 />
                 <Popover
@@ -7683,7 +7704,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                             <div className="forge-report-builder__compact-panel-stack forge-report-builder__compact-panel-stack--report-controls">
                                 <ReportBuilderOptionControls
                                     definitions={reportOptionDefinitions}
-                                    values={effectiveReportOptions}
+                                    values={draftReportOptions}
                                     onChange={setReportOptionValue}
                                     headingId="report-builder-options-compact-report-heading"
                                 />
@@ -7716,7 +7737,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                             <div className="forge-report-builder__compact-panel-stack">
                                 <ReportBuilderOptionControls
                                     definitions={reportOptionDefinitions}
-                                    values={effectiveReportOptions}
+                                    values={draftReportOptions}
                                     onChange={setReportOptionValue}
                                     headingId="report-builder-options-compact-heading"
                                 />
@@ -7772,7 +7793,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                             intent="primary"
                             icon="play"
                             className="forge-report-builder__run-button"
-                            disabled={!canRunReport || loading}
+                            disabled={!filterDraft && (!canRunReport || loading)}
                             onClick={() => {
                                 closeCompactSheet();
                                 runReport();
@@ -8474,14 +8495,13 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     const executeCapturedReportRun = React.useCallback((invocationSnapshot, origin = "manual") => (
         beginAndDispatchReportRun(invocationSnapshot, {
             begin: (snapshot) => beginReportRunLifecycle({ origin, invocationSnapshot: snapshot }),
-            dispatch: (snapshot) => (
-                reportBuilderMountedRef.current
-                    ? dispatchReportRequestSnapshot(
-                        snapshot,
-                        { forceFetch: true, markManual: true },
-                    )
-                    : null
-            ),
+            dispatch: (snapshot) => {
+                if (!reportBuilderMountedRef.current) return null;
+                // Release all dataset fetchers alongside the explicit run token,
+                // avoiding an automatic fetch of the just-applied parameters.
+                setFilterApplyPending(false);
+                return dispatchReportRequestSnapshot(snapshot, {forceFetch: true, markManual: true});
+            },
         })
     ), [beginReportRunLifecycle, dispatchReportRequestSnapshot]);
 
@@ -8516,6 +8536,28 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             }
             setFiltersDrawerOpen(false);
         };
+        if (filterDraftRef.current) {
+            const applied = applyReportFilterDraft(currentState, filterDraftRef.current, dynamicFilterGroups);
+            if (applied.error || !resolveStateReadiness(applied.state).canRun) {
+                setChartApplyFeedback({level: "warning", message: applied.error || "Complete the required filters before applying."});
+                return Promise.resolve({ok: false});
+            }
+            if (existingPendingRun) supersedePendingRun();
+            const pending = deferRunUntilCurrentMaterialization();
+            setFilterApplyPending(true);
+            filterDraftRef.current = null;
+            setFilterDraft(null);
+            if (applied.datasetScopeParams) {
+                const interaction = {...runtimePreviewInteractionSnapshot, datasetScopeParams: applied.datasetScopeParams};
+                runtimePreviewInteraction.replaceInteractionState(interaction);
+                persistState(applyReportBuilderPersistedRuntimePreviewInteraction(applied.state, interaction));
+            } else {
+                persistState(applied.state);
+            }
+            prepareRunSurface();
+            if (designWorkspaceMode) setWorkspaceMode("report");
+            return pending;
+        }
         if (designWorkspaceMode) {
             const designPendingAction = resolvePendingReportRunExecutionAction(existingPendingRun, { origin });
             if (designPendingAction === "reuse") {
@@ -8549,7 +8591,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             );
         }
         return executeCapturedReportRun(invocationSnapshot, origin);
-    }, [captureRunDispatchSnapshot, designWorkspaceMode, executeCapturedReportRun, isRunDispatchMaterializationCurrent, state, useFilterDrawer, useFilterRail]);
+    }, [captureRunDispatchSnapshot, designWorkspaceMode, dynamicFilterGroups, executeCapturedReportRun, isRunDispatchMaterializationCurrent, persistState, resolveStateReadiness, runtimePreviewInteraction, runtimePreviewInteractionSnapshot, state, useFilterDrawer, useFilterRail]);
 
     useEffect(() => {
         const pendingRun = pendingReportWorkspaceRunRef.current;
@@ -8584,9 +8626,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         pendingRun.started = true;
         void executeCapturedReportRun(invocationSnapshot, pendingRun.origin).then(
             (result) => {
+                setFilterApplyPending(false);
                 settlePendingReportRunExecution(pendingReportWorkspaceRunRef, pendingRun, result);
             },
             (runError) => {
+                setFilterApplyPending(false);
                 settlePendingReportRunExecution(pendingReportWorkspaceRunRef, pendingRun, {
                     ok: false,
                     error: `Could not run the report. ${renderReportBuilderError(runError)}`,
@@ -10027,6 +10071,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     }), [builderContext, displayConfig]);
     const runtimePreviewRowsState = useReportRuntimePreviewRows({
         enabled: (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
+            && !filterApplyPending
             && !hostedReportActivationPending
             && hostedReportStarterReady
             && !shouldDeferReportBuilderRequestForPrefill({
@@ -10089,6 +10134,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     }), [runtimePreviewPublishedDatasets, runtimePreviewRequestKey]);
     const runtimePreviewDatasetPayloadState = useReportRuntimePreviewDatasetPayloads({
         enabled: (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
+            && !filterApplyPending
             && !hostedReportActivationPending
             && hostedReportStarterReady
             && !shouldDeferReportBuilderRequestForPrefill({
@@ -11916,15 +11962,23 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             : nextState;
         persistState(nextPersistedState, { skipExplorationHistory: true });
     }, [persistState]);
+    const stageDatasetScopeParamValue = ({datasetRef, paramId, value}) => {
+        const current = currentFilterStateRef.current;
+        const scopes = current.filterDatasetScopeParams || runtimePreviewInteraction.datasetScopeParams || {};
+        stageReportFilters({...current, filterDatasetScopeParams: {...scopes,
+            [datasetRef]: {...scopes[datasetRef], [paramId]: value},
+        }});
+    };
     const toggleStaticFilter = (filter, optionValue) => {
         const key = resolveScopeParamId(filter);
         if (!key) return;
         const normalizedDatasetRef = normalizeString(filter?.datasetRef || "primary") || "primary";
         if (normalizedDatasetRef !== "primary") {
-            const currentScopedValues = runtimePreviewInteraction.datasetScopeParams?.[normalizedDatasetRef]
-                && typeof runtimePreviewInteraction.datasetScopeParams[normalizedDatasetRef] === "object"
-                && !Array.isArray(runtimePreviewInteraction.datasetScopeParams[normalizedDatasetRef])
-                    ? runtimePreviewInteraction.datasetScopeParams[normalizedDatasetRef]
+            const scopes = currentFilterStateRef.current.filterDatasetScopeParams || runtimePreviewInteraction.datasetScopeParams;
+            const currentScopedValues = scopes?.[normalizedDatasetRef]
+                && typeof scopes[normalizedDatasetRef] === "object"
+                && !Array.isArray(scopes[normalizedDatasetRef])
+                    ? scopes[normalizedDatasetRef]
                     : {};
             const current = Object.prototype.hasOwnProperty.call(currentScopedValues, key)
                 ? currentScopedValues[key]
@@ -11938,14 +11992,14 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             } else {
                 nextValue = current === optionValue ? "" : optionValue;
             }
-            runtimePreviewInteraction.setDatasetScopeParamValue({
+            stageDatasetScopeParamValue({
                 datasetRef: normalizedDatasetRef,
                 paramId: key,
                 value: nextValue,
             });
             return;
         }
-        const currentState = currentBuilderStateRef.current || state;
+        const currentState = currentFilterStateRef.current || filterState;
         const current = getScopeParamValue(currentState, key);
         let nextValue;
         if (filter.multiple) {
@@ -11956,7 +12010,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         } else {
             nextValue = current === optionValue ? "" : optionValue;
         }
-        persistExplorationMutation({
+        stageReportFilters({
             ...setScopeParamValue(currentState, key, nextValue),
             page: 1,
         });
@@ -11966,15 +12020,16 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         if (!key) return;
         const normalizedDatasetRef = normalizeString(filter?.datasetRef || "primary") || "primary";
         if (normalizedDatasetRef !== "primary") {
-            const currentScopedValues = runtimePreviewInteraction.datasetScopeParams?.[normalizedDatasetRef]
-                && typeof runtimePreviewInteraction.datasetScopeParams[normalizedDatasetRef] === "object"
-                && !Array.isArray(runtimePreviewInteraction.datasetScopeParams[normalizedDatasetRef])
-                    ? runtimePreviewInteraction.datasetScopeParams[normalizedDatasetRef]
+            const scopes = currentFilterStateRef.current.filterDatasetScopeParams || runtimePreviewInteraction.datasetScopeParams;
+            const currentScopedValues = scopes?.[normalizedDatasetRef]
+                && typeof scopes[normalizedDatasetRef] === "object"
+                && !Array.isArray(scopes[normalizedDatasetRef])
+                    ? scopes[normalizedDatasetRef]
                     : {};
             const current = currentScopedValues[key] && typeof currentScopedValues[key] === "object"
                 ? currentScopedValues[key]
                 : {};
-            runtimePreviewInteraction.setDatasetScopeParamValue({
+            stageDatasetScopeParamValue({
                 datasetRef: normalizedDatasetRef,
                 paramId: key,
                 value: {
@@ -11984,10 +12039,10 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             });
             return;
         }
-        const currentState = currentBuilderStateRef.current || state;
+        const currentState = currentFilterStateRef.current || filterState;
         const current = getScopeParamValue(currentState, key);
         const previous = current && typeof current === "object" ? current : {};
-        persistExplorationMutation({
+        stageReportFilters({
             ...setScopeParamValue(currentState, key, {
                 ...previous,
                 [edge]: value || "",
@@ -11996,8 +12051,8 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         });
     };
     const setReportOptionValue = (name, value) => {
-        const currentState = currentBuilderStateRef.current || state;
-        persistExplorationMutation({
+        const currentState = currentFilterStateRef.current || filterState;
+        stageReportFilters({
             ...currentState,
             reportOptions: updateReportBuilderOptionValue(
                 reportOptionDefinitions,
@@ -12009,14 +12064,14 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         });
     };
     const resetReportFiltersAndOptions = () => {
-        const currentState = currentBuilderStateRef.current || state;
+        const currentState = currentFilterStateRef.current || filterState;
         const defaults = buildReportBuilderDefaultState(config);
         let nextState = currentState;
         staticFilters.forEach((filter) => {
             const key = resolveScopeParamId(filter);
             if (key) nextState = setScopeParamValue(nextState, key, getScopeParamValue(defaults, key));
         });
-        persistExplorationMutation({
+        stageReportFilters({
             ...nextState,
             dynamicGroups: defaults.dynamicGroups,
             ...(reportOptionDefinitions.length > 0 ? { reportOptions: defaults.reportOptions } : {}),
@@ -12027,16 +12082,16 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         <ReportOptionHeader key={anchor} anchor={anchor} setMountedHeaders={setMountedOptionHeaders}>
             <ReportBuilderOptionControls
                 definitions={definitions}
-                values={effectiveReportOptions}
+                values={draftReportOptions}
                 onChange={setReportOptionValue}
                 presentation="header"
                 headingId={`report-builder-options-header-${anchor}`}
-                activeCount={countModifiedReportBuilderOptions(definitions, effectiveReportOptions)}
+                activeCount={countModifiedReportBuilderOptions(definitions, draftReportOptions)}
                 onReset={() => {
-                    const currentState = currentBuilderStateRef.current || state;
+                    const currentState = currentFilterStateRef.current || filterState;
                     const selected = { ...currentState.reportOptions };
                     definitions.forEach(({ name }) => delete selected[name]);
-                    persistExplorationMutation({ ...currentState, reportOptions: resolveEffectiveReportBuilderOptions(reportOptionDefinitions, selected), page: 1 });
+                    stageReportFilters({ ...currentState, reportOptions: resolveEffectiveReportBuilderOptions(reportOptionDefinitions, selected), page: 1 });
                 }}
             />
         </ReportOptionHeader>
@@ -12068,33 +12123,6 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 : "Draft started.",
         });
     }, [container, persistState, selectedBuilderChartSelection, state.chartSpec?.title]);
-
-    const persistDynamicScaffoldingMutation = React.useCallback((nextState, groupIds = [], {
-        sourceKind = "reportBuilder.result",
-        sourceContext = null,
-    } = {}) => {
-        if (!nextState || typeof nextState !== "object" || Array.isArray(nextState)) {
-            return;
-        }
-        const currentState = currentBuilderStateRef.current || {};
-        const currentExplorationActive = isReportBuilderExplorationActive(currentState);
-        const relevantGroupIds = normalizeArray(groupIds)
-            .map((entry) => String(entry || "").trim())
-            .filter(Boolean);
-        if (currentExplorationActive || relevantGroupIds.length === 0) {
-            persistExplorationMutation(nextState, { sourceKind, sourceContext });
-            return;
-        }
-        const selectionCountsUnchanged = relevantGroupIds.every((groupId) => (
-            countEffectiveDynamicSelections(currentState?.dynamicGroups?.[groupId] || [])
-            === countEffectiveDynamicSelections(nextState?.dynamicGroups?.[groupId] || [])
-        ));
-        if (selectionCountsUnchanged) {
-            persistPassiveViewState(nextState);
-            return;
-        }
-        persistExplorationMutation(nextState, { sourceKind, sourceContext });
-    }, [persistExplorationMutation, persistPassiveViewState]);
 
     const toggleMeasure = (measureId) => {
         const id = String(measureId || "").trim();
@@ -19518,11 +19546,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         if (!group) {
             return;
         }
-        const existingRows = state?.dynamicGroups?.[groupId] || [];
+        const existingRows = filterState?.dynamicGroups?.[groupId] || [];
         if (Array.isArray(existingRows) && existingRows.length > 0) {
             return;
         }
-        persistDynamicScaffoldingMutation(addDynamicFilterRow(state, group), [groupId]);
+        stageReportFilters(addDynamicFilterRow(filterState, group));
     };
 
     const setGroupBy = (value) => {
@@ -19573,37 +19601,38 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     const addRow = (group) => {
         const groupId = String(group?.id || "").trim();
         if (groupId) {
-            setPendingScrollRowId(nextDynamicRowId(state?.dynamicGroups?.[groupId]));
+            setPendingScrollRowId(nextDynamicRowId(filterState?.dynamicGroups?.[groupId]));
         }
-        persistDynamicScaffoldingMutation(addDynamicFilterRow(state, group), [groupId]);
+        stageReportFilters(addDynamicFilterRow(filterState, group));
     };
 
     const changeDynamicFilterType = (group, rowId, filterId) => {
-        persistDynamicScaffoldingMutation(updateDynamicFilterRow(state, group, rowId, {
+        stageReportFilters(updateDynamicFilterRow(filterState, group, rowId, {
             filterId,
             selections: [],
-        }), [group?.id]);
+            manualValue: "",
+        }));
     };
 
     const removeDynamicSelection = (group, rowId, index) => {
-        const rows = (state?.dynamicGroups?.[group.id] || []).map((row) => {
+        const rows = (filterState?.dynamicGroups?.[group.id] || []).map((row) => {
             if (row.id !== rowId) return row;
             return {
                 ...row,
                 selections: (row.selections || []).filter((_, selectionIndex) => selectionIndex !== index),
             };
         });
-        persistExplorationMutation({
-            ...state,
+        stageReportFilters({
+            ...filterState,
             dynamicGroups: {
-                ...(state.dynamicGroups || {}),
+                ...(filterState.dynamicGroups || {}),
                 [group.id]: rows,
             },
         });
     };
 
     const removeRow = (group, rowId) => {
-        persistDynamicScaffoldingMutation(removeDynamicFilterRow(state, group, rowId), [group?.id]);
+        stageReportFilters(removeDynamicFilterRow(filterState, group, rowId));
     };
 
     const renderDynamicGroup = (groupId) => {
@@ -19615,8 +19644,9 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             <DynamicFilterGroup
                 key={group.id}
                 group={group}
-                rows={state?.dynamicGroups?.[group.id] || []}
+                rows={filterState?.dynamicGroups?.[group.id] || []}
                 resolveLookup={resolveLookup}
+                onChangeDraft={(rowId, value) => stageReportFilters(updateDynamicFilterRow(currentFilterStateRef.current, group, rowId, {manualValue: value}))}
                 onAddRow={() => addRow(group)}
                 onChangeFilter={(rowId, filterId) => changeDynamicFilterType(group, rowId, filterId)}
                 onPick={(rowId, filterDef, lookup) => pickDynamicSelection(group, rowId, filterDef, lookup)}
@@ -19645,8 +19675,9 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             <DynamicFilterGroup
                 key={`${groupId}_${label}`}
                 group={subgroup}
-                rows={(state?.dynamicGroups?.[groupId] || []).filter((row) => filterIds.includes(String(row?.filterId || "").trim()))}
+                rows={(filterState?.dynamicGroups?.[groupId] || []).filter((row) => filterIds.includes(String(row?.filterId || "").trim()))}
                 resolveLookup={resolveLookup}
+                onChangeDraft={(rowId, value) => stageReportFilters(updateDynamicFilterRow(currentFilterStateRef.current, subgroup, rowId, {manualValue: value}))}
                 onAddRow={() => addRow(subgroup)}
                 onChangeFilter={(rowId, filterId) => changeDynamicFilterType(subgroup, rowId, filterId)}
                 onPick={(rowId, filterDef, lookup) => pickDynamicSelection(subgroup, rowId, filterDef, lookup)}
@@ -19690,8 +19721,8 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         if (!subgroup) {
             return;
         }
-        setPendingScrollRowId(nextDynamicRowId(state?.dynamicGroups?.[subgroup.id]));
-        persistDynamicScaffoldingMutation(addDynamicFilterRow(state, subgroup), [subgroup.id]);
+        setPendingScrollRowId(nextDynamicRowId(filterState?.dynamicGroups?.[subgroup.id]));
+        stageReportFilters(addDynamicFilterRow(filterState, subgroup));
     };
 
     const moveFamilyRow = (family, rowId, fromDirection, toDirection, optionKey, patch = {}) => {
@@ -19705,8 +19736,8 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         if (!targetFilter) {
             return;
         }
-        const sourceRows = normalizeArray(state?.dynamicGroups?.[fromDirection]);
-        const targetRows = normalizeArray(state?.dynamicGroups?.[toDirection]);
+        const sourceRows = normalizeArray(filterState?.dynamicGroups?.[fromDirection]);
+        const targetRows = normalizeArray(filterState?.dynamicGroups?.[toDirection]);
         const currentRow = sourceRows.find((row) => String(row?.id || "").trim() === rowId);
         if (!currentRow) {
             return;
@@ -19718,11 +19749,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             filterId: String(targetFilter.id || "").trim(),
         };
         const nextState = persistDirectionalRows(
-            persistDirectionalRows(state, sourceGroup, nextSourceRows),
+            persistDirectionalRows(filterState, sourceGroup, nextSourceRows),
             targetGroup,
             [...targetRows, movedRow],
         );
-        persistExplorationMutation(nextState);
+        stageReportFilters(nextState);
     };
 
     const changeFamilyFilterType = (family, rowId, direction, optionKey) => {
@@ -19734,7 +19765,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             ? (option.includeFilter ? "include" : option.excludeFilter ? "exclude" : direction)
             : (option.excludeFilter ? "exclude" : option.includeFilter ? "include" : direction);
         if (targetDirection !== direction) {
-            moveFamilyRow(family, rowId, direction, targetDirection, optionKey, { selections: [] });
+            moveFamilyRow(family, rowId, direction, targetDirection, optionKey, { selections: [], manualValue: "" });
             return;
         }
         const subgroup = getDirectionalSubgroup(direction, family);
@@ -19742,10 +19773,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         if (!subgroup || !targetFilter) {
             return;
         }
-        persistDynamicScaffoldingMutation(updateDynamicFilterRow(state, subgroup, rowId, {
+        stageReportFilters(updateDynamicFilterRow(filterState, subgroup, rowId, {
             filterId: String(targetFilter.id || "").trim(),
             selections: [],
-        }), [subgroup?.id]);
+            manualValue: "",
+        }));
     };
 
     const changeFamilyDirection = (family, rowId, currentDirection, optionKey, nextDirection) => {
@@ -19768,9 +19800,10 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             {config.unifiedFamilyRows ? (
                 <DynamicFamilyGroup
                     family={family}
-                    rows={buildDynamicFamilyRows(state, family, dynamicFilterGroups)}
+                    rows={buildDynamicFamilyRows(filterState, family, dynamicFilterGroups)}
                     options={buildDynamicFamilyOptions(family, dynamicFilterGroups)}
                     resolveLookup={resolveLookup}
+                    onChangeDraft={(rowId, direction, value) => stageReportFilters(updateDynamicFilterRow(currentFilterStateRef.current, getDirectionalSubgroup(direction, family), rowId, {manualValue: value}))}
                     onAddRow={() => addFamilyRow(family)}
                     onChangeFilter={(rowId, direction, optionKey) => changeFamilyFilterType(family, rowId, direction, optionKey)}
                     onChangeDirection={(rowId, direction, optionKey, nextDirection) => changeFamilyDirection(family, rowId, direction, optionKey, nextDirection)}
@@ -19798,7 +19831,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         if (!selection) {
             return false;
         }
-        const rows = (state?.dynamicGroups?.[group.id] || []).map((row) => {
+        const rows = (filterState?.dynamicGroups?.[group.id] || []).map((row) => {
             if (row.id !== rowId) return row;
             const currentSelections = Array.isArray(row.selections) ? row.selections : [];
             const nextSelections = filterDef.multiple === false
@@ -19810,33 +19843,34 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             return {
                 ...row,
                 selections: nextSelections,
+                manualValue: "",
             };
         });
-        persistDynamicScaffoldingMutation({
-            ...state,
+        stageReportFilters({
+            ...filterState,
             dynamicGroups: {
-                ...(state.dynamicGroups || {}),
+                ...(filterState.dynamicGroups || {}),
                 [group.id]: rows,
             },
-        }, [group?.id]);
+        });
         return true;
     };
 
     const toggleDynamicRowEnabled = (group, rowId) => {
-        const rows = (state?.dynamicGroups?.[group.id] || []).map((row) => {
+        const rows = (filterState?.dynamicGroups?.[group.id] || []).map((row) => {
             if (row.id !== rowId) return row;
             return {
                 ...row,
                 enabled: row?.enabled === false,
             };
         });
-        persistDynamicScaffoldingMutation({
-            ...state,
+        stageReportFilters({
+            ...filterState,
             dynamicGroups: {
-                ...(state.dynamicGroups || {}),
+                ...(filterState.dynamicGroups || {}),
                 [group.id]: rows,
             },
-        }, [group?.id]);
+        });
     };
 
     const pickDynamicSelection = async (group, rowId, filterDef, lookup = null) => {
@@ -19855,7 +19889,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             });
             const selections = projectLookupSelections(filterDef, payload);
             if (selections.length === 0) return;
-            const currentState = currentBuilderStateRef.current || state;
+            const currentState = currentFilterStateRef.current || filterState;
             const rows = (currentState?.dynamicGroups?.[group.id] || []).map((row) => {
                 if (row.id !== rowId) return row;
                 const currentSelections = Array.isArray(row.selections) ? row.selections : [];
@@ -19870,9 +19904,10 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 return {
                     ...row,
                     selections: nextSelections,
+                    manualValue: "",
                 };
             });
-            persistExplorationMutation({
+            stageReportFilters({
                 ...currentState,
                 dynamicGroups: {
                     ...(currentState.dynamicGroups || {}),
@@ -20205,6 +20240,9 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             return;
         }
         restoredReportRehydrationKeyRef.current = decision.key;
+        // An explicit Apply already owns this new materialization. Restoring the
+        // hosted report must not dispatch the same datasets a second time.
+        if (pendingReportWorkspaceRunRef.current) return;
         requestFingerprintRef.current = "";
         lastManualRunFingerprintRef.current = "";
         authoredPreviewAutoFetchKeyRef.current = "";
@@ -20606,7 +20644,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                         intent="primary"
                                         icon="play"
                                         className="forge-report-builder__run-button forge-report-builder__action-button"
-                                        disabled={!canRunReport || loading}
+                                        disabled={!filterDraft && (!canRunReport || loading)}
                                         onClick={runReport}
                                     >
                                         {designWorkspaceMode ? "Preview" : "Run"}
@@ -20679,7 +20717,9 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                     <div className="forge-report-builder__toolbar-group forge-report-builder__toolbar-group--scope">
                                         {inlineToolbarRequiredFilters.map((filter) => {
                                             const filterKey = resolveScopeParamId(filter);
-                                            const currentValue = getScopeParamValue(state, filterKey);
+                                            const currentValue = filter.datasetRef && filter.datasetRef !== "primary"
+            ? (filterState.filterDatasetScopeParams || runtimePreviewInteraction.datasetScopeParams)?.[filter.datasetRef]?.[filterKey]
+            : getScopeParamValue(filterState, filterKey);
                                             const issue = semanticParameterIssuesById[filterKey] || null;
                                             const providerDiagnostics = semanticProviderParameterDiagnosticsById[filterKey] || [];
                                             return (
