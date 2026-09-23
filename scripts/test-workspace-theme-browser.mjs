@@ -19,10 +19,14 @@ try {
     await input.fill('Preserved value');
     assert.equal(await input.inputValue(), 'Preserved value');
     assert.equal(await input.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(255, 255, 255)');
+    const workspaceFont = await input.evaluate(el => getComputedStyle(el.closest('.agently-workspace[data-forge-theme]')).fontFamily);
+    assert.equal(await input.evaluate(el => getComputedStyle(el).fontFamily), workspaceFont);
+    assert.equal(await page.locator('button[data-forge-control-id="save"]').evaluate(el => getComputedStyle(el).fontFamily), workspaceFont);
     await page.getByRole('button', {name: 'Open popup'}).click();
     const portal = page.locator('[data-forge-theme-portal] input[data-forge-control-id="portal"]');
     await portal.waitFor({state: 'visible'});
     assert.equal(await portal.evaluate(el => !!el.closest('[data-custom-portal-host]')), true);
+    assert.equal(await portal.evaluate(el => getComputedStyle(el).fontFamily), workspaceFont);
     await page.getByRole('button', {name: 'Switch mode'}).click();
     assert.equal(await input.inputValue(), 'Preserved value');
     assert.equal(await input.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(36, 45, 61)');
