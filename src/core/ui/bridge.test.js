@@ -357,6 +357,9 @@ try {
   const commandCalls = [];
   let commandPollCount = 0;
   const openedWindowId = 'capacityCubeBuilder__conv-command';
+  let releaseControlSnapshot;
+  let controlSnapshotSettled = false;
+  const stalledControlSnapshot = new Promise((resolve) => { releaseControlSnapshot = resolve; });
   visibilityState = 'visible';
   focused = true;
   globalThis.fetch = async (_url, options = {}) => {
@@ -374,6 +377,10 @@ try {
       }), { status: 200, headers });
     }
     if (body.method === 'ui.snapshot') {
+      if (body.params?.data?.windows?.some((win) => win?.windowId === openedWindowId && win?.windowForm?.viewMode === 'starred')) {
+        await stalledControlSnapshot;
+        controlSnapshotSettled = true;
+      }
       return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
     }
     if (body.method === 'ui.poll') {
@@ -428,7 +435,6 @@ try {
   });
 
   await sleep(180);
-  stopCommandOrder();
   const responseIndex = commandCalls.findIndex((entry) => entry.method === 'ui.response' && entry.params?.id === 'cmd-open-capacity');
   assert.equal(responseIndex > 0, true);
   const openedWindowSnapshotIndex = commandCalls.findIndex((entry) =>
@@ -441,6 +447,10 @@ try {
     && entry.params?.data?.windows?.some((win) => win?.windowId === openedWindowId && win?.windowForm?.viewMode === 'starred'));
   assert.equal(controlResponseIndex > responseIndex, true);
   assert.equal(controlSnapshotIndex > controlResponseIndex, true);
+  assert.equal(controlSnapshotSettled, false, 'control acknowledgement must not wait for the stalled snapshot response');
+  releaseControlSnapshot();
+  await sleep(15);
+  stopCommandOrder();
   console.log('bridge command ordering ✓ acknowledges open and control changes before full snapshots');
 
   const commandFailureCalls = [];
