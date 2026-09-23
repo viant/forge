@@ -54,6 +54,10 @@ getMetadataSignal('W1').value = {
     content: {
       id: 'c1',
       type: 'container',
+      table: { toolbar: { items: [{
+        id: 'advertiserListMode', label: 'View', type: 'select', scope: 'windowForm',
+        options: [{ value: 'all', label: 'All advertisers' }, { value: 'starred', label: 'Starred only' }],
+      }] } },
       dashboard: {
         reportBuilderRef: 'performance',
         reportBuilders: {
@@ -142,7 +146,11 @@ assert.deepEqual(snap.windows[0].metadata.view.tabs, [
   { containerId: 'c1', tabId: 'deliveryTab', title: 'Delivery' },
   { containerId: 'c1', tabId: 'kpiTab', title: 'KPIs' },
 ]);
-assert.deepEqual(snap.windows[0].metadata.view.controls, []);
+assert.deepEqual(snap.windows[0].metadata.view.controls, [{
+  id: 'advertiserListMode', label: 'View', type: 'select', scope: 'windowForm',
+  bindingPath: null, dataField: null,
+  options: [{ value: 'all', label: 'All advertisers' }, { value: 'starred', label: 'Starred only' }],
+}]);
 assert.equal(snap.windows[0].metadata.reportBuilder.builderRef, 'performance');
 assert.equal(
   snap.windows[0].metadata.reportBuilder.authoringContract,

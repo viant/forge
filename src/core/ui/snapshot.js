@@ -198,7 +198,10 @@ function getWindowMetadataSummary(windowId, options) {
     const controls = [];
     const collectTabs = (node) => {
       if (!node || typeof node !== 'object') return;
-      const items = Array.isArray(node.items) ? node.items : [];
+      const items = [
+        ...(Array.isArray(node.items) ? node.items : []),
+        ...(Array.isArray(node.table?.toolbar?.items) ? node.table.toolbar.items : []),
+      ];
       const containers = Array.isArray(node.containers) ? node.containers : [];
       for (const item of items) {
         const controlId = String(item?.id || '').trim();
