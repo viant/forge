@@ -1,4 +1,5 @@
 import { waitForWorkspaceReady } from './workspaceReady.js';
+import {selectRegisteredTab} from './navigationRegistry.js';
 import {
   addWindow,
   removeWindow,
@@ -645,6 +646,7 @@ export async function runUICommand(cmd = {}) {
       const w = getWindowById(windowId);
       if (!w) throw new Error(`window not found: ${windowId}`);
       const containerId = params.containerId ? requireString('containerId', params.containerId) : undefined;
+      const runtimeSelected = selectRegisteredTab({windowId, containerId, tabId});
       const viewSignal = getViewSignal(windowId);
       const previous = viewSignal.peek() || {};
       const nextTabs = {
@@ -655,7 +657,7 @@ export async function runUICommand(cmd = {}) {
         ...previous,
         tabs: nextTabs,
       };
-      sendBusMessage(windowId, { type: 'selectTab', tabId, containerId });
+      if (!runtimeSelected) sendBusMessage(windowId, { type: 'selectTab', tabId, containerId });
       if (params.activate !== false) {
         selectedWindowId.value = windowId;
         if (w.inTab !== false) selectedTabId.value = windowId;

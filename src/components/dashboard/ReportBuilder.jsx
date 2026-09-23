@@ -20129,6 +20129,8 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                             reportDocument={runtimePreviewArtifact?.document || null}
                             reportFill={authoredRuntimePreviewState.runtimeConfig.reportFill}
                             pendingDatasetIds={progress.pending}
+                            navigationWindowId={builderContext?.identity?.windowId}
+                            navigationContainerId={container?.id}
                             title={runtimePreviewArtifact?.runtimeBlock?.title || ""}
                             subtitle={runtimePreviewArtifact?.runtimeBlock?.subtitle || ""}
                             locale={locale}
