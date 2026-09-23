@@ -186,7 +186,7 @@ function getReportBuilderAuthoringCatalog(content = {}, windowForm = {}) {
 function getWindowMetadataSummary(windowId, options) {
   try {
     const meta = getMetadataSignal(windowId).peek();
-    if (!meta) return { loaded: false };
+    if (!meta) return { loaded: false, view: {tabs: listNavigationTabs(windowId)} };
 
     const dataSourceRefs = Object.keys(meta.dataSource || {});
     const dialogs = Array.isArray(meta.dialogs) ? meta.dialogs : [];
