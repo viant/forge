@@ -497,8 +497,14 @@ function resolveFromDataSource(context, location, scope = 'form') {
             fieldPath = location;
         }
     } else {
-        dataSourceRef = location.substring(0, dotIndex);
-        fieldPath = location.substring(dotIndex + 1);
+        const prefix = location.substring(0, dotIndex);
+        if (context.dataSources?.[prefix]) {
+            dataSourceRef = prefix;
+            fieldPath = location.substring(dotIndex + 1);
+        } else {
+            dataSourceRef = context.identity.dataSourceRef;
+            fieldPath = location;
+        }
     }
 
     const dsCtx = context.Context(dataSourceRef);
