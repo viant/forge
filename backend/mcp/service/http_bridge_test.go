@@ -50,6 +50,21 @@ func TestUIRPCHandler_PollWrapsCommandEnvelope(t *testing.T) {
 	}
 }
 
+func TestHubCallRemovesTimedOutQueuedCommand(t *testing.T) {
+	hub := NewHub(&Config{})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+	_, err := hub.Call(ctx, "default", "client-1", "ui.window.open", nil)
+	if err == nil {
+		t.Fatal("expected timeout while no client is polling")
+	}
+	hub.mu.RLock()
+	defer hub.mu.RUnlock()
+	if queue := hub.queues["default"]["client-1"]; queue != nil && len(queue.items) != 0 {
+		t.Fatalf("timed-out command remains queued: %#v", queue.items)
+	}
+}
+
 func TestUIRPCHandler_PollWrapsSetFormDataCommandEnvelope(t *testing.T) {
 	hub := NewHub(&Config{})
 	bridge := &httpRPCBridge{hub: hub, sessions: map[string]*httpSessionInfo{}}
