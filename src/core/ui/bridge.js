@@ -367,10 +367,10 @@ export function startUIBridgeHTTP(options = {}) {
   const publishSnapshot = async (publishOptions = {}) => {
     const strict = publishOptions.strict === true;
     if (!readyToPublish) return false;
-    const snap = snapshotBuilder();
-    const text = snapshotFingerprint(snap);
-    if (text === lastSnapshotText) return true;
     try {
+      const snap = snapshotBuilder();
+      const text = snapshotFingerprint(snap);
+      if (text === lastSnapshotText) return true;
       const result = await rpc('ui.snapshot', { clientId, data: snap }, `snapshot_${Date.now()}_${Math.floor(Math.random() * 1e6)}`);
       if (strict && result == null) {
         throw new Error('UI bridge snapshot was not accepted');
@@ -535,19 +535,12 @@ export function startUIBridgeHTTP(options = {}) {
     if (!payload || !payload.method || !payload.id) return;
     try {
       const result = await runUICommand({ method: payload.method, params: payload.params || {} });
-      if (payload.method === 'ui.window.open') {
-        // The window is already created. A full snapshot may include expensive
-        // report collections, so acknowledge the open before publishing it.
-        await rpc('ui.response', { id: payload.id, ok: true, result }, `response_${payload.id}`);
-        if (options.snapshotAfterCommand !== false) {
-          void publishSnapshot();
-        }
-        return;
-      }
-      if (options.snapshotAfterCommand !== false) {
-        await publishSnapshot({ strict: true });
-      }
+      // A completed UI mutation must not wait for a potentially large snapshot
+      // upload before the caller receives its command acknowledgement.
       await rpc('ui.response', { id: payload.id, ok: true, result }, `response_${payload.id}`);
+      if (options.snapshotAfterCommand !== false) {
+        void publishSnapshot();
+      }
     } catch (e) {
       await rpc('ui.response', { id: payload.id, ok: false, error: String(e?.message || e) }, `response_${payload.id}`);
     }

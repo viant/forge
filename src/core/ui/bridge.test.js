@@ -403,6 +403,15 @@ try {
           }
         }), { status: 200, headers });
       }
+      if (commandPollCount === 2) {
+        return new Response(JSON.stringify({
+          jsonrpc: '2.0', id: body.id,
+          result: { method: 'ui.command', params: {
+            id: 'cmd-set-view', method: 'ui.control.setValue',
+            params: { windowId: openedWindowId, controlId: 'viewMode', scope: 'windowForm', value: 'starred' },
+          } },
+        }), { status: 200, headers });
+      }
       return new Response('', { status: 202, headers });
     }
     if (body.method === 'ui.response') {
@@ -415,9 +424,10 @@ try {
     url: 'http://example.test/v1/ui/rpc',
     snapshotIntervalMs: 10_000,
     reconnectDelayMs: 10,
+    pollCycleDelayMs: 5,
   });
 
-  await sleep(120);
+  await sleep(180);
   stopCommandOrder();
   const responseIndex = commandCalls.findIndex((entry) => entry.method === 'ui.response' && entry.params?.id === 'cmd-open-capacity');
   assert.equal(responseIndex > 0, true);
@@ -425,7 +435,13 @@ try {
     entry.method === 'ui.snapshot'
     && entry.params?.data?.windows?.some((win) => win?.windowId === openedWindowId));
   assert.equal(openedWindowSnapshotIndex > responseIndex, true);
-  console.log('bridge command ordering ✓ acknowledges opened window before its full snapshot');
+  const controlResponseIndex = commandCalls.findIndex((entry) => entry.method === 'ui.response' && entry.params?.id === 'cmd-set-view');
+  const controlSnapshotIndex = commandCalls.findIndex((entry) =>
+    entry.method === 'ui.snapshot'
+    && entry.params?.data?.windows?.some((win) => win?.windowId === openedWindowId && win?.windowForm?.viewMode === 'starred'));
+  assert.equal(controlResponseIndex > responseIndex, true);
+  assert.equal(controlSnapshotIndex > controlResponseIndex, true);
+  console.log('bridge command ordering ✓ acknowledges open and control changes before full snapshots');
 
   const commandFailureCalls = [];
   const commandFailureResponses = [];
