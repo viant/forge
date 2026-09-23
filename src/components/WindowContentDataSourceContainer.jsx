@@ -48,6 +48,12 @@ function DataSourceMount({ windowContext, dsKey, initialParams }) {
 }
 
 export default function WindowContentDataSourceContainer({windowContext, dsKey, initialParams = {}}) {
-    // No hooks here – delegate to child that has a stable hook order
+    const missing = !windowContext?.metadata?.dataSource?.[dsKey];
+    useEffect(() => {
+        if (missing) console.warn('[forge] datasource unavailable; skipping mount', dsKey);
+    }, [missing, dsKey]);
+    // Missing optional lookups must not enter useDsContext and crash the app.
+    // Do not fabricate a datasource or substitute another window's data.
+    if (missing) return null;
     return <DataSourceMount windowContext={windowContext} dsKey={dsKey} initialParams={initialParams} />;
 }
