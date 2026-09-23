@@ -306,6 +306,8 @@ export function startUIBridgeHTTP(options = {}) {
   let detachAuthRetry = null;
   let readyToPublish = false;
   let startInFlight = null;
+  let reconnectTimer = null;
+  let pollLoopVersion = 0;
   const inflightRPC = new Set();
   const startupReadyEvent = String(options.startupReadyEvent || '').trim();
   const startupReadyTimeoutMs = Math.max(0, Number(options.startupReadyTimeoutMs || 0) || 0);
@@ -505,6 +507,7 @@ export function startUIBridgeHTTP(options = {}) {
   };
 
   const resetSessionAndRestart = () => {
+    pollLoopVersion += 1;
     sessionId = null;
     readyToPublish = false;
     lastSnapshotText = '';
@@ -566,8 +569,8 @@ export function startUIBridgeHTTP(options = {}) {
     await handleMessage(msg);
   };
 
-  const pollLoop = async () => {
-    while (!stopped) {
+  const pollLoop = async (version) => {
+    while (!stopped && version === pollLoopVersion) {
       if (!sessionId) {
         await sleep(200);
         continue;
@@ -587,6 +590,7 @@ export function startUIBridgeHTTP(options = {}) {
       } catch (err) {
         if (isMissingSessionError(err)) {
           resetSessionAndRestart();
+          return;
         }
         await sleep(reconnectDelayMs);
       }
@@ -621,7 +625,7 @@ export function startUIBridgeHTTP(options = {}) {
       detachListeners = bindImmediateSnapshotListeners();
       detachLifecycle = bindLifecycleListeners(stop);
       detachOwner = bindOwnerListeners();
-      pollLoop();
+      void pollLoop(pollLoopVersion);
     } catch (err) {
       settleBridgeReadyState(false);
       if (isUnauthorizedError(err)) {
@@ -631,6 +635,12 @@ export function startUIBridgeHTTP(options = {}) {
       }
       // eslint-disable-next-line no-console
       console.warn('[forge][uiBridge] http bridge start failed', err);
+      if (!stopped && !reconnectTimer) {
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          void ensureStarted();
+        }, reconnectDelayMs);
+      }
     }
   };
 
@@ -648,6 +658,9 @@ export function startUIBridgeHTTP(options = {}) {
   function stop() {
     if (stopped) return;
     stopped = true;
+    pollLoopVersion += 1;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = null;
     try { detachListeners?.(); } catch (_) {}
     detachListeners = null;
     try { detachLifecycle?.(); } catch (_) {}
