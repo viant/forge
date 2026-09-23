@@ -23,7 +23,7 @@ import {
   getDialogSignal,
 } from '../store/signals.js';
 
-import { focusControl, listControlTargets, getFocusedControlMeta, enableFocusTracking } from './registry.js';
+import { focusControl, listControlTargets, getFocusedControlMeta, enableFocusTracking, setRegisteredControlValue } from './registry.js';
 import { sendBusMessage } from '../bus.js';
 import { setSelector } from '../../utils/selector.js';
 import { resolveSelector } from '../../utils/selector.js';
@@ -708,6 +708,9 @@ export async function runUICommand(cmd = {}) {
     case 'ui.control.setValue': {
       const windowId = requireString('windowId', params.windowId);
       const controlId = requireString('controlId', params.controlId);
+      if (setRegisteredControlValue({windowId, controlId, dataSourceRef: params.dataSourceRef}, params.value)) {
+        return {ok: true};
+      }
       const item = {
         id: controlId,
         bindingPath: params.bindingPath || controlId,

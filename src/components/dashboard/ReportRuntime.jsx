@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Icon } from "@blueprintjs/core";
 
 import Chart from "../Chart.jsx";
+import {ReportBlockSkeleton} from './ReportLoading.jsx';
 import SectionTabRail from "../SectionTabRail.jsx";
 import {
   REPORT_LAYOUT_GRID_COLUMNS,
@@ -2870,6 +2871,7 @@ export default function ReportRuntime({
   headerActions = null,
   reportDocument = null,
   reportFill = {},
+  pendingDatasetIds = [],
   title = "",
   subtitle = "",
   locale = "en-US",
@@ -3158,6 +3160,11 @@ export default function ReportRuntime({
       return null;
     }
     const kind = normalizeString(block?.kind);
+    const datasetRef = resolveRuntimeBlockDatasetRef(block, {availableDatasetRefs}).datasetRef;
+    if (pendingDatasetIds.includes(datasetRef) && !visibilityDataset?.rows?.length &&
+        ['chartBlock', 'tableBlock', 'kpiBlock'].includes(kind)) {
+      return <ReportBlockSkeleton key={block.id} block={block}/>;
+    }
     if (kind === "tabGroupBlock") {
       return null;
     }

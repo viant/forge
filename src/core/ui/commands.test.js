@@ -331,6 +331,23 @@ await runUICommand({
 });
 assert.equal(getFormSignal('W1:windowForm').peek().granularity, 'hour');
 
+const changes = [];
+const semanticKey = registerControlTarget(
+  {windowId: 'W1', dataSourceRef: 'ds', controlId: 'listMode'},
+  {setValue(value) {
+    if (value !== 'starred') throw new Error('invalid option');
+    changes.push(value);
+  }},
+);
+await runUICommand({method: 'ui.control.setValue', params: {windowId: 'W1', controlId: 'listMode', value: 'starred'}});
+assert.deepEqual(changes, ['starred'], 'agent must invoke the mounted control handler');
+await assert.rejects(runUICommand({method: 'ui.control.setValue', params: {windowId: 'W1', controlId: 'listMode', value: 'invalid'}}), /invalid option/);
+const otherKey = registerControlTarget({windowId: 'W1', dataSourceRef: 'other', controlId: 'listMode'}, {setValue() { throw new Error('wrong datasource'); }});
+await assert.rejects(runUICommand({method: 'ui.control.setValue', params: {windowId: 'W1', controlId: 'listMode', value: 'starred'}}), /ambiguous control/);
+await runUICommand({method: 'ui.control.setValue', params: {windowId: 'W1', dataSourceRef: 'ds', controlId: 'listMode', value: 'starred'}});
+unregisterControlTarget(semanticKey);
+unregisterControlTarget(otherKey);
+
 await runUICommand({
   method: 'ui.window.setFormData',
   params: {
