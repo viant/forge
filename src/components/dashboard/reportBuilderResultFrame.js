@@ -401,7 +401,6 @@ export function buildReportBuilderAuthoredRuntimePreviewState({
             }
             : null,
         canRenderRuntime: !!runtimeConfig
-            && !isLoadingWithoutRuntimeRows
             && (
                 hasRuntimeRows
                 || canRunReport

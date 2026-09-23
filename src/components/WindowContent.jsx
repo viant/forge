@@ -119,6 +119,9 @@ export function formatWindowMetadataError(error) {
     if (Number(error.status) === 401 || error.isUnauthorized) {
         return 'Authentication required. Please sign in to continue.';
     }
+    if (Number(error.status) === 504) {
+        return 'Permission check timed out. Please try again.';
+    }
     return `Failed to load window: ${error.message || 'Unknown error'}`;
 }
 
@@ -149,6 +152,14 @@ export async function applyWindowPermissionMetadata(completeMetadata, {
         conversationId,
         targetContext,
     });
+}
+
+export function withWindowPermissionDeadline(task, timeoutMs = 15000) {
+    let timer;
+    const deadline = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(Object.assign(new Error('Permission check timed out'), {status: 504})), timeoutMs);
+    });
+    return Promise.race([Promise.resolve().then(task), deadline]).finally(() => clearTimeout(timer));
 }
 
 export function resolveInitialWindowFormValues(metadata) {
@@ -193,6 +204,17 @@ function normalizeTargetKey(targetContext = {}) {
         surface: String(targetContext?.surface || '').trim(),
         capabilities,
     });
+}
+
+export function windowMetadataFetchKey(window = {}, targetContext = {}) {
+    return JSON.stringify([
+        String(window?.windowId || '').trim(),
+        String(window?.windowKey || '').split('?')[0],
+        String(window?.conversationId || '').trim(),
+        normalizeTargetKey(targetContext),
+        window?.parameters || {},
+        window?.resource || {},
+    ]);
 }
 
 export function resolveWindowMetadataForTarget(metadata, targetContext = {}) {
@@ -1062,6 +1084,7 @@ function WindowContentRuntime({window, isInTab = false}) {
 
     // Settings & connector
     const {endpoints = {}, connectorConfig = {}, services = {}, targetContext = {}, useAuth = () => ({})} = useSetting();
+    const metadataFetchKey = windowMetadataFetchKey(window, targetContext);
     const auth = useAuth();
     const prepareConnectorRequest = useMemo(() => (
         typeof services?.prepareDataConnectorRequest === 'function'
@@ -1097,15 +1120,18 @@ function WindowContentRuntime({window, isInTab = false}) {
     const config  = {service: {...service, uri: `${service.uri}/${baseKey}`, includeTargetContext: true}};
     const connector = useDataConnector(config);
 
+    // Restoration can replace the registry entry without changing windowId.
+    // Follow that identity so rendering and UI snapshots share the same signal.
+    const registeredMetadataSignal = findMetadataSignal(windowId);
     useEffect(() => {
-        const existingSignal = findMetadataSignal(windowId);
+        const existingSignal = registeredMetadataSignal;
         if (existingSignal) {
             setMetadataSignalHandle(existingSignal);
             return;
         }
         const createdSignal = getMetadataSignal(windowId);
         setMetadataSignalHandle(createdSignal);
-    }, [windowId]);
+    }, [windowId, registeredMetadataSignal]);
 
     // Fetch metadata once per windowId
     useEffect(() => {
@@ -1149,14 +1175,14 @@ function WindowContentRuntime({window, isInTab = false}) {
                 setFetchError(null);
                 const completeMetadata = resolveWindowMetadataForTarget(resp.data, targetContext);
                 fetchedProtectedMetadata = isProtectedWindowMetadata(completeMetadata);
-                const permissionAppliedMetadata = await applyWindowPermissionMetadata(completeMetadata, {
+                const permissionAppliedMetadata = await withWindowPermissionDeadline(() => applyWindowPermissionMetadata(completeMetadata, {
                     services,
                     windowKey: baseKey,
                     resource: window?.resource || window?.parameters || {},
                     windowParams: window?.parameters || {},
                     conversationId: window?.conversationId || '',
                     targetContext,
-                });
+                }));
                 if (cancelled) return;
                 const resolvedMetadata = compilePermissionAppliedMetadata(permissionAppliedMetadata, targetContext, window?.parameters || {});
                 if (!resolvedMetadata) {
@@ -1187,7 +1213,7 @@ function WindowContentRuntime({window, isInTab = false}) {
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [windowId, baseKey, metadataSignalHandle, targetContext, window?.parameters, window?.resource, window?.conversationId]);
+    }, [metadataFetchKey, metadataSignalHandle]);
 
     useEffect(() => {
         const metadata = metadataSignalHandle?.value;

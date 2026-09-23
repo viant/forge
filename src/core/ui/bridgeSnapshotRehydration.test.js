@@ -80,6 +80,41 @@ try {
   assert.equal(reconnectCalls.filter((method) => method === 'ui.hello').length >= 2, true);
   assert.equal(reconnectCalls.filter((method) => method === 'ui.snapshot').length >= 2, true);
   console.log('bridge snapshot rehydration ✓ republishes unchanged state after backend loss');
+
+  let helloCount = 0;
+  let pollCount = 0;
+  let activePolls = 0;
+  let maxActivePolls = 0;
+  globalThis.fetch = async (_url, options = {}) => {
+    const body = JSON.parse(String(options.body || '{}'));
+    if (body.method === 'ui.hello') helloCount += 1;
+    const headers = new Headers({ 'Mcp-Session-Id': `single-poll-${helloCount}` });
+    if (body.method === 'ui.poll') {
+      pollCount += 1;
+      if (pollCount === 1) return new Response('', { status: 404, headers });
+      activePolls += 1;
+      maxActivePolls = Math.max(maxActivePolls, activePolls);
+      await sleep(20);
+      activePolls -= 1;
+      return new Response('', { status: 202, headers });
+    }
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
+  };
+
+  const stopSinglePoll = startUIBridgeHTTP({
+    url: 'http://example.test/v1/ui/rpc',
+    snapshotIntervalMs: 10_000,
+    snapshotStatusIntervalMs: 10_000,
+    reconnectDelayMs: 500,
+    pollCycleDelayMs: 0,
+    snapshotBuilder: () => ({ conversationId: 'conv-single-poll', windows: [] }),
+  });
+  await sleep(750);
+  stopSinglePoll();
+  assert.equal(helloCount >= 2, true);
+  assert.equal(pollCount >= 2, true);
+  assert.equal(maxActivePolls, 1);
+  console.log('bridge reconnect polling ✓ keeps one poll loop after session loss');
 } finally {
   globalThis.fetch = originalFetch;
   globalThis.window = originalWindow;

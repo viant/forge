@@ -87,6 +87,8 @@ type commandQueue struct {
 	waiters []chan rpcRequest
 }
 
+const commandPickupTimeout = 5 * time.Second
+
 func NewHub(cfg *Config) *Hub {
 	if cfg == nil {
 		cfg = &Config{}
@@ -427,7 +429,7 @@ func (h *Hub) unregisterHTTPClient(ns, clientID string, notifier transport.Notif
 	h.mu.Unlock()
 }
 
-func (h *Hub) enqueueCommand(ns, clientID string, req rpcRequest) {
+func (h *Hub) enqueueCommand(ns, clientID string, req rpcRequest) bool {
 	h.mu.Lock()
 	q := h.ensureQueue(ns, clientID)
 	if len(q.waiters) > 0 {
@@ -438,10 +440,27 @@ func (h *Hub) enqueueCommand(ns, clientID string, req rpcRequest) {
 		default:
 		}
 		h.mu.Unlock()
-		return
+		return false
 	}
 	q.items = append(q.items, req)
 	h.mu.Unlock()
+	return true
+}
+
+func (h *Hub) removeQueuedCommand(ns, clientID, commandID string) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	q := h.queues[ns][clientID]
+	if q == nil {
+		return false
+	}
+	for i, item := range q.items {
+		if item.ID == commandID {
+			q.items = append(q.items[:i], q.items[i+1:]...)
+			return true
+		}
+	}
+	return false
 }
 
 func (h *Hub) dequeueCommand(ctx context.Context, ns, clientID string) (*rpcRequest, error) {
@@ -519,6 +538,7 @@ func (h *Hub) Call(ctx context.Context, ns, clientID string, method string, para
 	h.pendingMu.Unlock()
 
 	req := rpcRequest{ID: id, Method: method, Params: params}
+	var pickupTimer *time.Timer
 	log.Printf("[forge-ui] call ns=%q client=%q method=%q mode=%s id=%q", ns, clientID, method, func() string {
 		if c != nil && c.ws != nil {
 			return "ws"
@@ -546,20 +566,38 @@ func (h *Hub) Call(ctx context.Context, ns, clientID string, method string, para
 				Params:  mustJSON(map[string]any{"id": id, "method": method, "params": params}),
 			})
 		} else {
-			h.enqueueCommand(ns, clientID, req)
+			if h.enqueueCommand(ns, clientID, req) {
+				pickupTimer = time.NewTimer(commandPickupTimeout)
+				defer pickupTimer.Stop()
+			}
 		}
 	}
 
-	select {
-	case <-ctx.Done():
-		log.Printf("[forge-ui] call timeout ns=%q client=%q method=%q id=%q err=%v", ns, clientID, method, id, ctx.Err())
-		h.pendingMu.Lock()
-		delete(h.pending, id)
-		h.pendingMu.Unlock()
-		return nil, ctx.Err()
-	case resp := <-ch:
-		log.Printf("[forge-ui] call response ns=%q client=%q method=%q id=%q ok=%v err=%q", ns, clientID, method, id, resp.OK, resp.Error)
-		return resp, nil
+	var pickup <-chan time.Time
+	if pickupTimer != nil {
+		pickup = pickupTimer.C
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			log.Printf("[forge-ui] call timeout ns=%q client=%q method=%q id=%q err=%v", ns, clientID, method, id, ctx.Err())
+			h.pendingMu.Lock()
+			delete(h.pending, id)
+			h.pendingMu.Unlock()
+			h.removeQueuedCommand(ns, clientID, id)
+			return nil, ctx.Err()
+		case <-pickup:
+			if h.removeQueuedCommand(ns, clientID, id) {
+				h.pendingMu.Lock()
+				delete(h.pending, id)
+				h.pendingMu.Unlock()
+				return nil, errors.New("no active UI poll picked up the command within 5 seconds")
+			}
+			pickup = nil
+		case resp := <-ch:
+			log.Printf("[forge-ui] call response ns=%q client=%q method=%q id=%q ok=%v err=%q", ns, clientID, method, id, resp.OK, resp.Error)
+			return resp, nil
+		}
 	}
 }
 
