@@ -545,7 +545,11 @@ export async function runUICommand(cmd = {}) {
         windowId: params.windowId || options.windowId,
       });
       if (options.workspaceObject && win?.windowId) {
-        const workspaceObject = await waitForWorkspaceReady(activeWindows, win.windowId);
+        // Navigation acknowledges creation; metadata authorization and data
+        // loading continue in the renderer and publish their own lifecycle.
+        const workspaceObject = options.waitForReady === true
+          ? await waitForWorkspaceReady(activeWindows, win.windowId)
+          : win.workspaceObject;
         return { windowId: win.windowId, workspaceObject };
       }
       return { windowId: win?.windowId || null };
@@ -592,9 +596,6 @@ export async function runUICommand(cmd = {}) {
       const windowId = requireString('windowId', params.windowId);
       const w = getWindowById(windowId);
       if (!w) throw new Error(`window not found: ${windowId}`);
-      if (['opening', 'failed'].includes(w.workspaceObject?.lifecycle?.state)) {
-        await waitForWorkspaceReady(activeWindows, windowId);
-      }
       if (params.workspaceObject && w.workspaceObject) {
         activeWindows.value = activeWindows.peek().map((entry) => entry.windowId === windowId ? {...entry,
           hostOpenState: 'fresh', workspaceObject: {...entry.workspaceObject,

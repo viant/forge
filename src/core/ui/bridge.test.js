@@ -12,7 +12,7 @@ try {
   const windowTarget = new EventTarget();
   windowTarget.setTimeout = setTimeout.bind(globalThis);
   windowTarget.clearTimeout = clearTimeout.bind(globalThis);
-  let storedClientId = '';
+  let storedClientId = 'cloned-tab-client';
   windowTarget.sessionStorage = {
     getItem(key) {
       return key === 'forge.uiBridge.clientId' ? storedClientId : null;
@@ -37,7 +37,8 @@ try {
   assert.equal(typeof seededId, 'string');
   assert.equal(seededId.length > 0, true);
   assert.equal(ensureUIBridgeClientId(), seededId);
-  assert.equal(storedClientId, seededId);
+  assert.notEqual(seededId, storedClientId);
+  assert.equal(storedClientId, 'cloned-tab-client');
 
   const calls = [];
   let snapshotAttempts = 0;

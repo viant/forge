@@ -853,3 +853,14 @@ assert.deepEqual(resetDashboardState.filters.region, ['NA']);
 assert.equal(resetDashboardState.selection.entityKey, null);
 
 unregisterControlTarget(regKey);
+
+const navigationStarted = Date.now();
+const pendingOpen = await runUICommand({ method: 'ui.window.open', params: {
+  windowKey: 'slowProtectedView', options: { conversationId: 'conv-1',
+    workspaceObject: { version: 1, objectId: 'workspace:slow', lifecycle: { state: 'opening' } },
+  },
+} });
+assert.equal(pendingOpen.workspaceObject.lifecycle.state, 'opening');
+assert.ok(Date.now() - navigationStarted < 1000, 'navigation must not wait for permission or data');
+const pendingActivation = await runUICommand({method: 'ui.window.activate', params: {windowId: pendingOpen.windowId}});
+assert.equal(pendingActivation.ok, true);
