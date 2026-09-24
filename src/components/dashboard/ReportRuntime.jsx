@@ -204,11 +204,11 @@ function RuntimePanel({ title = "", subtitle = "", children, className = "", sty
   title = distinctWorkspaceTitle(title, presentation?.sectionLabel);
   return (
     <section
-      className={className || undefined}
+      className={`forge-report-runtime-panel${className ? ` ${className}` : ""}`}
       style={{
-        border: "1px solid #dbe5ec",
+        border: "1px solid var(--forge-report-border, #dbe5ec)",
         borderRadius: 16,
-        background: "linear-gradient(180deg, #ffffff 0%, #fbfdff 100%)",
+        background: "linear-gradient(180deg, var(--forge-report-surface, #ffffff) 0%, var(--forge-report-surface-subtle, #fbfdff) 100%)",
         boxShadow: "0 8px 18px rgba(16, 22, 26, 0.035), 0 1px 2px rgba(16, 22, 26, 0.05)",
         padding: 16,
         display: "flex",
@@ -220,8 +220,8 @@ function RuntimePanel({ title = "", subtitle = "", children, className = "", sty
       {title || subtitle || headerAction ? (
         <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
           <span style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {title ? <h3 style={{ margin: 0, fontSize: 15, color: "#182026" }}>{title}</h3> : null}
-            {subtitle ? <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: "#5f6b7c" }}>{subtitle}</p> : null}
+            {title ? <h3 style={{ margin: 0, fontSize: "var(--forge-report-type-section-size, 15px)", lineHeight: "var(--forge-report-type-section-line-height, normal)", color: "var(--forge-report-text, #182026)" }}>{title}</h3> : null}
+            {subtitle ? <p style={{ margin: 0, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)", color: "var(--forge-report-text-muted, #5f6b7c)" }}>{subtitle}</p> : null}
           </span>
           {headerAction}
         </header>
@@ -331,16 +331,16 @@ function resolveRuntimeTheme(reportSpec = {}, reportDocument = null) {
 function resolveRuntimeAccentPalette(accentTone = "blue") {
   switch (normalizeString(accentTone).toLowerCase()) {
     case "green":
-      return { accent: "#16a34a", background: "#eef8f0", border: "#cfe7d6", text: "#0f6b3a", chipBackground: "#daf5e4" };
+      return { accent: "var(--forge-report-accent-green, #16a34a)", background: "var(--forge-report-accent-green-background, #eef8f0)", border: "var(--forge-report-accent-green-border, #cfe7d6)", text: "var(--forge-report-accent-green, #0f6b3a)", chipBackground: "var(--forge-report-accent-green-strong-background, #daf5e4)" };
     case "amber":
-      return { accent: "#d9822b", background: "#fff7e1", border: "#f5d28c", text: "#8a5d00", chipBackground: "#fff0c2" };
+      return { accent: "var(--forge-report-accent-amber, #d9822b)", background: "var(--forge-report-accent-amber-background, #fff7e1)", border: "var(--forge-report-accent-amber-border, #f5d28c)", text: "var(--forge-report-accent-amber, #8a5d00)", chipBackground: "var(--forge-report-accent-amber-strong-background, #fff0c2)" };
     case "rose":
-      return { accent: "#d64545", background: "#fff1f0", border: "#f5c2c0", text: "#a82a2a", chipBackground: "#fde2df" };
+      return { accent: "var(--forge-report-accent-rose, #d64545)", background: "var(--forge-report-accent-rose-background, #fff1f0)", border: "var(--forge-report-accent-rose-border, #f5c2c0)", text: "var(--forge-report-accent-rose, #a82a2a)", chipBackground: "var(--forge-report-accent-rose-strong-background, #fde2df)" };
     case "slate":
-      return { accent: "#5f6b7c", background: "#f5f7fa", border: "#d8e2eb", text: "#486581", chipBackground: "#e9eef4" };
+      return { accent: "var(--forge-report-accent-slate, #5f6b7c)", background: "var(--forge-report-accent-slate-background, #f5f7fa)", border: "var(--forge-report-accent-slate-border, #d8e2eb)", text: "var(--forge-report-accent-slate, #486581)", chipBackground: "var(--forge-report-accent-slate-strong-background, #e9eef4)" };
     case "blue":
     default:
-      return { accent: "#2f6de1", background: "#eef4ff", border: "#cddcfd", text: "#2457b8", chipBackground: "#e0edff" };
+      return { accent: "var(--forge-report-accent-blue, #2f6de1)", background: "var(--forge-report-accent-blue-background, #eef4ff)", border: "var(--forge-report-accent-blue-border, #cddcfd)", text: "var(--forge-report-accent-blue, #2457b8)", chipBackground: "var(--forge-report-accent-blue-strong-background, #e0edff)" };
   }
 }
 
@@ -348,26 +348,26 @@ function resolveRuntimeKpiToneStyles(tone = "", theme = {}) {
   const normalizedTone = normalizeString(tone).toLowerCase();
   if (normalizedTone === "danger") {
     return {
-      accent: "#d64545",
-      chipBackground: "#fff1f0",
-      chipBorder: "#f5c2c0",
-      chipText: "#a82a2a",
+      accent: "var(--forge-report-status-danger-border, #d64545)",
+      chipBackground: "var(--forge-report-status-danger-background, #fff1f0)",
+      chipBorder: "var(--forge-report-status-danger-border, #f5c2c0)",
+      chipText: "var(--forge-report-status-danger-foreground, #a82a2a)",
     };
   }
   if (normalizedTone === "warning") {
     return {
-      accent: "#d9822b",
-      chipBackground: "#fff7e1",
-      chipBorder: "#f5d28c",
-      chipText: "#8a5d00",
+      accent: "var(--forge-report-status-warning-border, #d9822b)",
+      chipBackground: "var(--forge-report-status-warning-background, #fff7e1)",
+      chipBorder: "var(--forge-report-status-warning-border, #f5d28c)",
+      chipText: "var(--forge-report-status-warning-foreground, #8a5d00)",
     };
   }
   if (normalizedTone === "success") {
     return {
-      accent: "#16a34a",
-      chipBackground: "#eef8f0",
-      chipBorder: "#cfe7d6",
-      chipText: "#0f6b3a",
+      accent: "var(--forge-report-status-success-border, #16a34a)",
+      chipBackground: "var(--forge-report-status-success-background, #eef8f0)",
+      chipBorder: "var(--forge-report-status-success-border, #cfe7d6)",
+      chipText: "var(--forge-report-status-success-foreground, #0f6b3a)",
     };
   }
   if (normalizedTone === "info") {
@@ -382,9 +382,9 @@ function resolveRuntimeKpiToneStyles(tone = "", theme = {}) {
   const accent = resolveRuntimeAccentPalette(theme?.accentTone);
   return {
     accent: accent.border,
-    chipBackground: theme?.badgePalette === "bold" ? accent.chipBackground : "#f7fafc",
-    chipBorder: theme?.badgePalette === "bold" ? accent.border : "#d8e2eb",
-    chipText: theme?.badgePalette === "bold" ? accent.text : "#486581",
+    chipBackground: theme?.badgePalette === "bold" ? accent.chipBackground : "var(--forge-report-surface-subtle, #f7fafc)",
+    chipBorder: theme?.badgePalette === "bold" ? accent.border : "var(--forge-report-border, #d8e2eb)",
+    chipText: theme?.badgePalette === "bold" ? accent.text : "var(--forge-report-text-muted, #486581)",
   };
 }
 
@@ -393,23 +393,23 @@ function resolveRuntimeBadgeToneStyles(tone = "", theme = {}) {
   const bold = theme?.badgePalette === "bold";
   if (normalizedTone === "danger") {
     return {
-      background: bold ? "#fdd8d5" : "#fff1f0",
-      border: bold ? "#d64545" : "#f5c2c0",
-      text: "#a82a2a",
+      background: bold ? "var(--forge-report-status-danger-strong-background, #fdd8d5)" : "var(--forge-report-status-danger-background, #fff1f0)",
+      border: "var(--forge-report-status-danger-border, #f5c2c0)",
+      text: "var(--forge-report-status-danger-foreground, #a82a2a)",
     };
   }
   if (normalizedTone === "warning") {
     return {
-      background: bold ? "#ffe2a8" : "#fff7e1",
-      border: bold ? "#d9822b" : "#f5d28c",
-      text: "#8a5d00",
+      background: bold ? "var(--forge-report-status-warning-strong-background, #ffe2a8)" : "var(--forge-report-status-warning-background, #fff7e1)",
+      border: "var(--forge-report-status-warning-border, #f5d28c)",
+      text: "var(--forge-report-status-warning-foreground, #8a5d00)",
     };
   }
   if (normalizedTone === "success") {
     return {
-      background: bold ? "#d5f0dc" : "#eef8f0",
-      border: bold ? "#16a34a" : "#cfe7d6",
-      text: "#0f6b3a",
+      background: bold ? "var(--forge-report-status-success-strong-background, #d5f0dc)" : "var(--forge-report-status-success-background, #eef8f0)",
+      border: "var(--forge-report-status-success-border, #cfe7d6)",
+      text: "var(--forge-report-status-success-foreground, #0f6b3a)",
     };
   }
   if (normalizedTone === "info") {
@@ -422,9 +422,9 @@ function resolveRuntimeBadgeToneStyles(tone = "", theme = {}) {
   }
   const accent = resolveRuntimeAccentPalette(theme?.accentTone);
   return {
-    background: bold ? accent.chipBackground : "#f7fafc",
-    border: bold ? accent.border : "#d8e2eb",
-    text: bold ? accent.text : "#486581",
+    background: bold ? accent.chipBackground : "var(--forge-report-surface-subtle, #f7fafc)",
+    border: bold ? accent.border : "var(--forge-report-border, #d8e2eb)",
+    text: bold ? accent.text : "var(--forge-report-text-muted, #486581)",
   };
 }
 
@@ -442,14 +442,14 @@ export function ChartSelectionPanel({
     };
   if (resolvedViewModel.kind === "unsupported") {
     return (
-      <div className={panelClassName} style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+      <div className={panelClassName} style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
         {resolvedViewModel.message}
       </div>
     );
   }
   if (resolvedViewModel.kind === "idle") {
     return (
-      <div className={panelClassName} style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+      <div className={panelClassName} style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
         {resolvedViewModel.message}
       </div>
     );
@@ -458,8 +458,8 @@ export function ChartSelectionPanel({
   return (
     <div className={panelClassName} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <div className="forge-report-runtime-chart-selection__summary" style={{ fontSize: 12, color: "#30404d" }}>
-          <strong style={{ color: "#182026" }}>Selected value:</strong> {resolvedViewModel.summary}
+        <div className="forge-report-runtime-chart-selection__summary" style={{ fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", color: "var(--forge-report-text-secondary, #30404d)" }}>
+          <strong style={{ color: "var(--forge-report-text, #182026)" }}>Selected value:</strong> {resolvedViewModel.summary}
         </div>
         {canClearSelection ? (
           <button
@@ -467,13 +467,14 @@ export function ChartSelectionPanel({
             className="forge-report-runtime-chart-selection__clear"
             onClick={onClearSelection}
             style={{
-              border: "1px solid #d8e1e8",
-              background: "#ffffff",
-              color: "#30404d",
+              border: "1px solid var(--forge-report-control-border, #d8e1e8)",
+              background: "var(--forge-report-control-surface, #ffffff)",
+              color: "var(--forge-report-text-secondary, #30404d)",
               borderRadius: 999,
               padding: "4px 10px",
               cursor: "pointer",
-              fontSize: 11,
+              fontSize: "var(--forge-report-type-caption-size, 11px)",
+              lineHeight: "var(--forge-report-type-caption-line-height, normal)",
               fontWeight: 600,
             }}
           >
@@ -493,13 +494,14 @@ export function ChartSelectionPanel({
               data-action-kind={normalizeString(action?.kind).toLowerCase() || "action"}
               onClick={() => onAction?.(action.id)}
               style={{
-                border: "1px solid #d8e1e8",
-                background: "#ffffff",
-                color: "#30404d",
+                border: "1px solid var(--forge-report-control-border, #d8e1e8)",
+                background: "var(--forge-report-control-surface, #ffffff)",
+                color: "var(--forge-report-text-secondary, #30404d)",
                 borderRadius: 999,
                 padding: "4px 10px",
                 cursor: "pointer",
-                fontSize: 11,
+                fontSize: "var(--forge-report-type-caption-size, 11px)",
+                lineHeight: "var(--forge-report-type-caption-line-height, normal)",
                 fontWeight: 600,
               }}
             >
@@ -525,11 +527,12 @@ function BindingChips({ bindingSummary = null }) {
           style={{
             display: "inline-flex",
             alignItems: "center",
-            fontSize: 11,
+            fontSize: "var(--forge-report-type-caption-size, 11px)",
+            lineHeight: "var(--forge-report-type-caption-line-height, normal)",
             fontWeight: 700,
-            color: "#21538f",
-            background: "#eaf3ff",
-            border: "1px solid #c8dcfb",
+            color: "var(--forge-report-action, #21538f)",
+            background: "var(--forge-report-selected, #eaf3ff)",
+            border: "1px solid var(--forge-report-accent-blue-border, #c8dcfb)",
             borderRadius: 999,
             padding: "4px 10px",
             letterSpacing: "0.02em",
@@ -564,14 +567,14 @@ function CompactBindingChips({ bindingSummary = null }) {
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
-            border: "1px solid #d8e1e8",
+            border: "1px solid var(--forge-report-border, #d8e1e8)",
             borderRadius: 999,
-            background: "#f5f8fb",
-            color: "#30404d",
+            background: "var(--forge-report-surface-subtle, #f5f8fb)",
+            color: "var(--forge-report-text-secondary, #30404d)",
             padding: "4px 10px",
-            fontSize: 11,
+            fontSize: "var(--forge-report-type-caption-size, 11px)",
+            lineHeight: "var(--forge-report-type-caption-line-height, 1.35)",
             fontWeight: 600,
-            lineHeight: 1.35,
           }}
         >
           {chip}
@@ -586,11 +589,11 @@ function BindingFieldGovernanceChips({ field = {} }) {
     ? field.governance
     : {};
   const toneByKind = {
-    deprecated: { background: "#fff1f0", border: "#f5c2c0", text: "#a82a2a" },
-    draft: { background: "#eef6ff", border: "#c9dcf8", text: "#21538f" },
-    approved: { background: "#eef8f2", border: "#cfe7d6", text: "#2d6b3f" },
-    certification: { background: "#edf7ee", border: "#cde5d1", text: "#2d6b3f" },
-    owner: { background: "#f4f7fa", border: "#d7e2ee", text: "#486579" },
+    deprecated: { background: "var(--forge-report-status-danger-background, #fff1f0)", border: "var(--forge-report-status-danger-border, #f5c2c0)", text: "var(--forge-report-status-danger-foreground, #a82a2a)" },
+    draft: { background: "var(--forge-report-status-info-background, #eef6ff)", border: "var(--forge-report-status-info-border, #c9dcf8)", text: "var(--forge-report-status-info-foreground, #21538f)" },
+    approved: { background: "var(--forge-report-status-success-background, #eef8f2)", border: "var(--forge-report-status-success-border, #cfe7d6)", text: "var(--forge-report-status-success-foreground, #2d6b3f)" },
+    certification: { background: "var(--forge-report-status-success-background, #edf7ee)", border: "var(--forge-report-status-success-border, #cde5d1)", text: "var(--forge-report-status-success-foreground, #2d6b3f)" },
+    owner: { background: "var(--forge-report-surface-subtle, #f4f7fa)", border: "var(--forge-report-border, #d7e2ee)", text: "var(--forge-report-text-muted, #486579)" },
   };
   const chips = buildSemanticFieldGovernanceChipViewModels(governance)
     .map((chip) => ({
@@ -610,7 +613,8 @@ function BindingFieldGovernanceChips({ field = {} }) {
             alignItems: "center",
             borderRadius: 999,
             padding: "3px 8px",
-            fontSize: 10,
+            fontSize: "var(--forge-report-type-caption-size, 10px)",
+            lineHeight: "var(--forge-report-type-caption-line-height, normal)",
             fontWeight: 700,
             letterSpacing: "0.03em",
             textTransform: "uppercase",
@@ -638,9 +642,9 @@ function BindingFieldCard({ field = {} }) {
   return (
     <div
       style={{
-        border: "1px solid #dbe5ec",
+        border: "1px solid var(--forge-report-border, #dbe5ec)",
         borderRadius: 12,
-        background: "#ffffff",
+        background: "var(--forge-report-surface, #ffffff)",
         padding: 10,
         display: "flex",
         flexDirection: "column",
@@ -648,7 +652,7 @@ function BindingFieldCard({ field = {} }) {
       }}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#182026" }}>
+        <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", fontWeight: 700, color: "var(--forge-report-text, #182026)" }}>
           {label}
         </div>
         {category ? (
@@ -659,13 +663,14 @@ function BindingFieldCard({ field = {} }) {
                 alignItems: "center",
                 borderRadius: 999,
                 padding: "3px 8px",
-                fontSize: 10,
+                fontSize: "var(--forge-report-type-caption-size, 10px)",
+                lineHeight: "var(--forge-report-type-caption-line-height, normal)",
                 fontWeight: 700,
                 letterSpacing: "0.03em",
                 textTransform: "uppercase",
-                background: "#f1f5f9",
-                border: "1px solid #d9e2ec",
-                color: "#486581",
+                background: "var(--forge-report-surface-subtle, #f1f5f9)",
+                border: "1px solid var(--forge-report-border, #d9e2ec)",
+                color: "var(--forge-report-text-muted, #486581)",
               }}
             >
               {category}
@@ -673,17 +678,17 @@ function BindingFieldCard({ field = {} }) {
           </div>
         ) : null}
         {rawId ? (
-          <div style={{ fontSize: 11, color: "#5f6b7c", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+          <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", color: "var(--forge-report-text-muted, #5f6b7c)", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
             {rawId}
           </div>
         ) : null}
         {definitionRef ? (
-          <div style={{ fontSize: 11, color: "#5f6b7c", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", lineHeight: 1.45 }}>
+          <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", color: "var(--forge-report-text-muted, #5f6b7c)", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", lineHeight: "var(--forge-report-type-caption-line-height, 1.45)" }}>
             {definitionRef}
           </div>
         ) : null}
         {description ? (
-          <div style={{ fontSize: 11, lineHeight: 1.45, color: "#5f6b7c" }}>
+          <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, 1.45)", color: "var(--forge-report-text-muted, #5f6b7c)" }}>
             {description}
           </div>
         ) : null}
@@ -697,7 +702,7 @@ function BindingFieldGroup({ title = "", fields = [] }) {
   const resolvedFields = Array.isArray(fields) ? fields.filter((field) => field && typeof field === "object") : [];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+      <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-report-text-muted, #738694)" }}>
         {title}
       </div>
       {resolvedFields.length > 0 ? (
@@ -710,7 +715,7 @@ function BindingFieldGroup({ title = "", fields = [] }) {
           ))}
         </div>
       ) : (
-        <div style={{ fontSize: 12, color: "#5f6b7c" }}>
+        <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", color: "var(--forge-report-text-muted, #5f6b7c)" }}>
           No fields selected.
         </div>
       )}
@@ -727,25 +732,25 @@ function BindingMetadataCard({ label = "", value = "", description = "" }) {
   return (
     <div
       style={{
-        border: "1px solid #dbe5ec",
+        border: "1px solid var(--forge-report-border, #dbe5ec)",
         borderRadius: 12,
-        background: "#ffffff",
+        background: "var(--forge-report-surface, #ffffff)",
         padding: 12,
         display: "flex",
         flexDirection: "column",
         gap: 6,
       }}
     >
-      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+      <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-report-text-muted, #738694)" }}>
         {label}
       </div>
       {resolvedValue ? (
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#182026" }}>
+        <div style={{ fontSize: "var(--forge-report-type-body-size, 13px)", lineHeight: "var(--forge-report-type-body-line-height, normal)", fontWeight: 700, color: "var(--forge-report-text, #182026)" }}>
           {resolvedValue}
         </div>
       ) : null}
       {resolvedDescription ? (
-        <div style={{ fontSize: 11, lineHeight: 1.5, color: "#5f6b7c" }}>
+        <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, 1.5)", color: "var(--forge-report-text-muted, #5f6b7c)" }}>
           {resolvedDescription}
         </div>
       ) : null}
@@ -770,15 +775,15 @@ function BindingDetailsPanel({ bindingSummary = null, presentationMode = "previe
         display: "flex",
         flexDirection: "column",
         gap: 14,
-        borderTop: "1px solid #e6edf3",
+        borderTop: "1px solid var(--forge-report-border, #e6edf3)",
         paddingTop: 14,
       }}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#21538f" }}>
+        <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-report-action, #21538f)" }}>
           {normalizeString(bindingSummary.title || "Semantic Binding")}
         </div>
-        <div style={{ fontSize: 12, lineHeight: 1.5, color: "#5f6b7c" }}>
+        <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)", color: "var(--forge-report-text-muted, #5f6b7c)" }}>
           Governed model and field selections compiled into this runtime artifact.
         </div>
       </div>
@@ -829,15 +834,15 @@ function ActiveScopeSummary({ activeScopeSummary = null }) {
         display: "flex",
         flexDirection: "column",
         gap: 8,
-        borderTop: "1px dashed #cfdced",
+        borderTop: "1px dashed var(--forge-report-border, #cfdced)",
         paddingTop: 12,
       }}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#21538f" }}>
+        <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-report-action, #21538f)" }}>
           {normalizeString(activeScopeSummary.title || "Active Refinements")} ({activeScopeSummary.count})
         </div>
-        <div style={{ fontSize: 11, lineHeight: 1.5, color: "#5f6b7c" }}>
+        <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, 1.5)", color: "var(--forge-report-text-muted, #5f6b7c)" }}>
           {normalizeString(activeScopeSummary.description)}
         </div>
       </div>
@@ -849,11 +854,12 @@ function ActiveScopeSummary({ activeScopeSummary = null }) {
             style={{
               display: "inline-flex",
               alignItems: "center",
-              fontSize: 12,
+              fontSize: "var(--forge-report-type-small-size, 12px)",
+              lineHeight: "var(--forge-report-type-small-line-height, normal)",
               fontWeight: 600,
-              color: "#21538f",
-              background: "#eef4fb",
-              border: "1px solid #cfdced",
+              color: "var(--forge-report-action, #21538f)",
+              background: "var(--forge-report-selected, #eef4fb)",
+              border: "1px solid var(--forge-report-border, #cfdced)",
               borderRadius: 999,
               padding: "4px 10px",
             }}
@@ -885,16 +891,16 @@ function ScopeDetailsPanel({ scopeSummary = null, activeScopeSummary = null, pre
         display: "flex",
         flexDirection: "column",
         gap: 14,
-        borderTop: "1px solid #e6edf3",
+        borderTop: "1px solid var(--forge-report-border, #e6edf3)",
         paddingTop: 14,
       }}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#21538f" }}>
+        <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-report-action, #21538f)" }}>
           {normalizeString(scopeSummary.title || "Filters")} (baseline)
         </div>
         {baselineSubtitle ? (
-          <div style={{ fontSize: 12, lineHeight: 1.5, color: "#5f6b7c" }}>
+          <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)", color: "var(--forge-report-text-muted, #5f6b7c)" }}>
             {baselineSubtitle}
           </div>
         ) : null}
@@ -926,7 +932,7 @@ function DiagnosticsPanel({ diagnostics = [], developerMode = false, onRetryProv
         className="forge-report-runtime-diagnostics forge-report-runtime-diagnostics--public"
         title={hasError ? "Report refresh unavailable" : "Report notice"}
       >
-        <div style={{ fontSize: 12, lineHeight: 1.6, color: "#30404d" }}>
+        <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, 1.6)", color: "var(--forge-report-text-secondary, #30404d)" }}>
           {hasError
             ? "The latest report data could not be refreshed for the current authorized scope. The saved result remains unchanged. Review the report filters and try again."
             : "Some report details are temporarily unavailable. The saved result remains unchanged."}
@@ -940,10 +946,10 @@ function DiagnosticsPanel({ diagnostics = [], developerMode = false, onRetryProv
         {viewModel.diagnostics.map((diagnostic, index) => {
           const severity = normalizeString(diagnostic?.severity || "info").toLowerCase();
           const tone = severity === "error"
-            ? { background: "#fdecea", border: "#db3737", text: "#a82a2a" }
+            ? { background: "var(--forge-report-status-danger-background, #fdecea)", border: "var(--forge-report-status-danger-border, #db3737)", text: "var(--forge-report-status-danger-foreground, #a82a2a)" }
             : severity === "warning"
-              ? { background: "#fff7e1", border: "#d9822b", text: "#8a5d00" }
-              : { background: "#ebf1f5", border: "#ced9e0", text: "#30404d" };
+              ? { background: "var(--forge-report-status-warning-background, #fff7e1)", border: "var(--forge-report-status-warning-border, #d9822b)", text: "var(--forge-report-status-warning-foreground, #8a5d00)" }
+              : { background: "var(--forge-report-status-info-background, #ebf1f5)", border: "var(--forge-report-status-info-border, #ced9e0)", text: "var(--forge-report-status-info-foreground, #30404d)" };
           return (
             <div
               key={`${diagnostic?.code || "diagnostic"}-${index}`}
@@ -954,20 +960,20 @@ function DiagnosticsPanel({ diagnostics = [], developerMode = false, onRetryProv
                 color: tone.text,
                 borderRadius: 10,
                 padding: "10px 12px",
-                fontSize: 12,
-                lineHeight: 1.5,
+                fontSize: "var(--forge-report-type-small-size, 12px)",
+                lineHeight: "var(--forge-report-type-small-line-height, 1.5)",
               }}
             >
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 <div>
-                  <strong style={{ textTransform: "uppercase", fontSize: 10, letterSpacing: "0.04em" }}>
+                  <strong style={{ textTransform: "uppercase", fontSize: "var(--forge-report-type-caption-size, 10px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", letterSpacing: "0.04em" }}>
                     {severity}
                   </strong>
                   {" "}
                   {diagnostic?.message || diagnostic?.code || "Unknown runtime diagnostic."}
                 </div>
                 {diagnostic?.suggestedFix ? (
-                  <div style={{ fontSize: 11, lineHeight: 1.5, color: tone.text }}>
+                  <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, 1.5)", color: tone.text }}>
                     {diagnostic.suggestedFix}
                   </div>
                 ) : null}
@@ -979,11 +985,12 @@ function DiagnosticsPanel({ diagnostics = [], developerMode = false, onRetryProv
                       disabled={providerActionsLoading}
                       style={{
                         border: `1px solid ${tone.border}`,
-                        background: providerActionsLoading ? "#f4f7fa" : "#ffffff",
-                        color: providerActionsLoading ? "#98a2b3" : tone.text,
+                        background: providerActionsLoading ? "var(--forge-report-disabled-surface, #f4f7fa)" : "var(--forge-report-control-surface, #ffffff)",
+                        color: providerActionsLoading ? "var(--forge-report-disabled-text, #98a2b3)" : tone.text,
                         borderRadius: 999,
                         padding: "4px 10px",
-                        fontSize: 11,
+                        fontSize: "var(--forge-report-type-caption-size, 11px)",
+                        lineHeight: "var(--forge-report-type-caption-line-height, normal)",
                         fontWeight: 600,
                         cursor: providerActionsLoading ? "not-allowed" : "pointer",
                       }}
@@ -1000,10 +1007,11 @@ function DiagnosticsPanel({ diagnostics = [], developerMode = false, onRetryProv
                           display: "inline-flex",
                           alignItems: "center",
                           border: `1px solid ${tone.border}`,
-                          background: "#ffffffaa",
+                        background: "var(--forge-report-surface-translucent, #ffffffaa)",
                           borderRadius: 999,
                           padding: "2px 8px",
-                          fontSize: 10,
+                          fontSize: "var(--forge-report-type-caption-size, 10px)",
+                          lineHeight: "var(--forge-report-type-caption-line-height, normal)",
                           fontWeight: 700,
                           color: tone.text,
                         }}
@@ -1017,10 +1025,11 @@ function DiagnosticsPanel({ diagnostics = [], developerMode = false, onRetryProv
                           display: "inline-flex",
                           alignItems: "center",
                           border: `1px solid ${tone.border}`,
-                          background: "#ffffffaa",
+                          background: "var(--forge-report-surface-translucent, #ffffffaa)",
                           borderRadius: 999,
                           padding: "2px 8px",
-                          fontSize: 10,
+                          fontSize: "var(--forge-report-type-caption-size, 10px)",
+                          lineHeight: "var(--forge-report-type-caption-line-height, normal)",
                           color: tone.text,
                         }}
                       >
@@ -1033,10 +1042,11 @@ function DiagnosticsPanel({ diagnostics = [], developerMode = false, onRetryProv
                           display: "inline-flex",
                           alignItems: "center",
                           border: `1px solid ${tone.border}`,
-                          background: "#ffffffaa",
+                          background: "var(--forge-report-surface-translucent, #ffffffaa)",
                           borderRadius: 999,
                           padding: "2px 8px",
-                          fontSize: 10,
+                          fontSize: "var(--forge-report-type-caption-size, 10px)",
+                          lineHeight: "var(--forge-report-type-caption-line-height, normal)",
                           color: tone.text,
                         }}
                       >
@@ -1120,8 +1130,8 @@ function BlockDiagnosticsCallout({ diagnostics = [], onRetryProviderActions = nu
         <div
           key={`${normalizeString(diagnostic?.code || "diagnostic")}:${normalizeString(diagnostic?.path || "")}:${index}`}
           style={{
-            border: "1px solid #d9b25f",
-            background: "#fff7e6",
+            border: "1px solid var(--forge-report-status-warning-border, #d9b25f)",
+            background: "var(--forge-report-status-warning-background, #fff7e6)",
             borderRadius: 10,
             padding: "10px 12px",
             display: "flex",
@@ -1129,11 +1139,11 @@ function BlockDiagnosticsCallout({ diagnostics = [], onRetryProviderActions = nu
             gap: 6,
           }}
         >
-          <div style={{ fontSize: 12, color: "#8a5d00", lineHeight: 1.5 }}>
+          <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-status-warning-foreground, #8a5d00)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
             {normalizeString(diagnostic?.message || "Runtime warning.")}
           </div>
           {normalizeString(diagnostic?.suggestedFix) ? (
-            <div style={{ fontSize: 11, color: "#8a5d00", lineHeight: 1.5 }}>
+            <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", color: "var(--forge-report-status-warning-foreground, #8a5d00)", lineHeight: "var(--forge-report-type-caption-line-height, 1.5)" }}>
               {normalizeString(diagnostic.suggestedFix)}
             </div>
           ) : null}
@@ -1144,12 +1154,13 @@ function BlockDiagnosticsCallout({ diagnostics = [], onRetryProviderActions = nu
                 onClick={onRetryProviderActions}
                 disabled={providerActionsLoading}
                 style={{
-                  border: "1px solid #d9b25f",
-                  background: providerActionsLoading ? "#f4f7fa" : "#ffffff",
-                  color: providerActionsLoading ? "#98a2b3" : "#8a5d00",
+                  border: "1px solid var(--forge-report-status-warning-border, #d9b25f)",
+                  background: providerActionsLoading ? "var(--forge-report-disabled-surface, #f4f7fa)" : "var(--forge-report-control-surface, #ffffff)",
+                  color: providerActionsLoading ? "var(--forge-report-disabled-text, #98a2b3)" : "var(--forge-report-status-warning-foreground, #8a5d00)",
                   borderRadius: 999,
                   padding: "4px 10px",
-                  fontSize: 11,
+                  fontSize: "var(--forge-report-type-caption-size, 11px)",
+                  lineHeight: "var(--forge-report-type-caption-line-height, normal)",
                   fontWeight: 600,
                   cursor: providerActionsLoading ? "not-allowed" : "pointer",
                 }}
@@ -1170,11 +1181,11 @@ function BlockErrorCallout({ diagnostic = null }) {
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ fontSize: 12, color: "#a82a2a", lineHeight: 1.5 }}>
+      <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-status-danger-foreground, #a82a2a)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
         {diagnostic.message}
       </div>
       {normalizeString(diagnostic?.suggestedFix) ? (
-        <div style={{ fontSize: 11, color: "#8a5d00", lineHeight: 1.5 }}>
+        <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", color: "var(--forge-report-status-warning-foreground, #8a5d00)", lineHeight: "var(--forge-report-type-caption-line-height, 1.5)" }}>
           {normalizeString(diagnostic.suggestedFix)}
         </div>
       ) : null}
@@ -1277,15 +1288,15 @@ function HostIntentPanel({ hostIntent = null, runtimeHandlers = null }) {
     >
       <div className="forge-report-runtime-host-intent__content" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <div className="forge-report-runtime-host-intent__badges" style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          <span style={{ display: "inline-flex", alignItems: "center", fontSize: 11, fontWeight: 700, color: "#21538f", background: "#eaf3ff", border: "1px solid #c8dcfb", borderRadius: 999, padding: "4px 10px" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 700, color: "var(--forge-report-action, #21538f)", background: "var(--forge-report-selected, #eaf3ff)", border: "1px solid var(--forge-report-accent-blue-border, #c8dcfb)", borderRadius: 999, padding: "4px 10px" }}>
             {viewModel.hostIntent.intentKind}
           </span>
-          <span style={{ display: "inline-flex", alignItems: "center", fontSize: 11, fontWeight: 700, color: "#5f6b7c", background: "#f4f7fa", border: "1px solid #d8e1e8", borderRadius: 999, padding: "4px 10px" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 700, color: "var(--forge-report-text-muted, #5f6b7c)", background: "var(--forge-report-surface-subtle, #f4f7fa)", border: "1px solid var(--forge-report-border, #d8e1e8)", borderRadius: 999, padding: "4px 10px" }}>
             {viewModel.hostIntent.navigationMode}
           </span>
         </div>
-        <div className="forge-report-runtime-host-intent__target" style={{ fontSize: 12, color: "#30404d", lineHeight: 1.6 }}>
-          <strong style={{ color: "#182026" }}>Target:</strong> {viewModel.hostIntent.targetRef}
+        <div className="forge-report-runtime-host-intent__target" style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-secondary, #30404d)", lineHeight: "var(--forge-report-type-small-line-height, 1.6)" }}>
+          <strong style={{ color: "var(--forge-report-text, #182026)" }}>Target:</strong> {viewModel.hostIntent.targetRef}
         </div>
         {viewModel.hostIntent.parameters.length > 0 ? (
           <div className="forge-report-runtime-host-intent__parameters" style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -1297,15 +1308,16 @@ function HostIntentPanel({ hostIntent = null, runtimeHandlers = null }) {
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 6,
-                  border: "1px solid #d4dee8",
-                  background: "#f7fafc",
+                  border: "1px solid var(--forge-report-border, #d4dee8)",
+                  background: "var(--forge-report-surface-subtle, #f7fafc)",
                   borderRadius: 999,
                   padding: "6px 10px",
-                  fontSize: 12,
-                  color: "#30404d",
+                  fontSize: "var(--forge-report-type-small-size, 12px)",
+                  lineHeight: "var(--forge-report-type-small-line-height, normal)",
+                  color: "var(--forge-report-text-secondary, #30404d)",
                 }}
               >
-                <strong style={{ color: "#182026" }}>{key}</strong>
+                <strong style={{ color: "var(--forge-report-text, #182026)" }}>{key}</strong>
                 <span>{value}</span>
               </span>
             ))}
@@ -1324,13 +1336,14 @@ function HostIntentPanel({ hostIntent = null, runtimeHandlers = null }) {
                 runtimeHandlers.clearDetailDiagnostic?.();
               }}
               style={{
-                border: "1px solid #d8e1e8",
-                background: "#ffffff",
-                color: "#30404d",
+                border: "1px solid var(--forge-report-control-border, #d8e1e8)",
+                background: "var(--forge-report-control-surface, #ffffff)",
+                color: "var(--forge-report-text-secondary, #30404d)",
                 borderRadius: 999,
                 padding: "4px 10px",
                 cursor: "pointer",
-                fontSize: 11,
+                fontSize: "var(--forge-report-type-caption-size, 11px)",
+                lineHeight: "var(--forge-report-type-caption-line-height, normal)",
                 fontWeight: 600,
               }}
             >
@@ -1354,7 +1367,7 @@ function renderRuntimeMarkdownInline(value = "") {
     }
     if (segment.startsWith("`") && segment.endsWith("`")) {
       return (
-        <code key={index} style={{ fontSize: "0.92em", background: "#eef3f8", borderRadius: 4, padding: "1px 4px" }}>
+        <code key={index} style={{ fontSize: "0.92em", background: "var(--forge-report-surface-subtle, #eef3f8)", borderRadius: 4, padding: "1px 4px" }}>
           {segment.slice(1, -1)}
         </code>
       );
@@ -1372,16 +1385,16 @@ function RuntimeMarkdownBody({ markdown = "" }) {
         return null;
       }
       if (trimmed.startsWith("## ")) {
-        return <h4 key={index} style={{ margin: 0, fontSize: 16, color: "#182026" }}>{renderRuntimeMarkdownInline(trimmed.slice(3))}</h4>;
+        return <h4 key={index} style={{ margin: 0, fontSize: "var(--forge-report-type-section-size, 16px)", lineHeight: "var(--forge-report-type-section-line-height, normal)", color: "var(--forge-report-text, #182026)" }}>{renderRuntimeMarkdownInline(trimmed.slice(3))}</h4>;
       }
       if (trimmed.startsWith("# ")) {
-        return <h3 key={index} style={{ margin: 0, fontSize: 18, color: "#182026" }}>{renderRuntimeMarkdownInline(trimmed.slice(2))}</h3>;
+        return <h3 key={index} style={{ margin: 0, fontSize: "var(--forge-report-type-heading-size, 18px)", lineHeight: "var(--forge-report-type-heading-line-height, normal)", color: "var(--forge-report-text, #182026)" }}>{renderRuntimeMarkdownInline(trimmed.slice(2))}</h3>;
       }
       if (/^\d+\.\s+/.test(trimmed)) {
-        return <p key={index} style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "#30404d" }}>{renderRuntimeMarkdownInline(trimmed)}</p>;
+        return <p key={index} style={{ margin: 0, fontSize: "var(--forge-report-type-body-size, 13px)", lineHeight: "var(--forge-report-type-body-line-height, 1.6)", color: "var(--forge-report-text-secondary, #30404d)" }}>{renderRuntimeMarkdownInline(trimmed)}</p>;
       }
       if (/^[-*+]\s+/.test(trimmed)) {
-        return <p key={index} style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "#30404d" }}>• {renderRuntimeMarkdownInline(trimmed.replace(/^[-*+]\s+/, ""))}</p>;
+        return <p key={index} style={{ margin: 0, fontSize: "var(--forge-report-type-body-size, 13px)", lineHeight: "var(--forge-report-type-body-line-height, 1.6)", color: "var(--forge-report-text-secondary, #30404d)" }}>• {renderRuntimeMarkdownInline(trimmed.replace(/^[-*+]\s+/, ""))}</p>;
       }
       if (trimmed.startsWith("> ")) {
         return (
@@ -1389,18 +1402,20 @@ function RuntimeMarkdownBody({ markdown = "" }) {
             key={index}
             style={{
               margin: 0,
-              fontSize: 13,
-              lineHeight: 1.6,
-              color: "#486581",
-              borderLeft: "3px solid #d8e2eb",
-              paddingLeft: 10,
+              fontSize: "var(--forge-report-type-body-size, 13px)",
+              lineHeight: "var(--forge-report-type-body-line-height, 1.6)",
+              color: "var(--forge-report-text-muted, #486581)",
+              border: "1px solid var(--forge-report-border, #d8e2eb)",
+              borderRadius: 8,
+              background: "var(--forge-report-surface-subtle, transparent)",
+              padding: "8px 10px",
             }}
           >
             {renderRuntimeMarkdownInline(trimmed.slice(2))}
           </p>
         );
       }
-      return <p key={index} style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "#30404d" }}>{renderRuntimeMarkdownInline(trimmed)}</p>;
+      return <p key={index} style={{ margin: 0, fontSize: "var(--forge-report-type-body-size, 13px)", lineHeight: "var(--forge-report-type-body-line-height, 1.6)", color: "var(--forge-report-text-secondary, #30404d)" }}>{renderRuntimeMarkdownInline(trimmed)}</p>;
     })
     .filter(Boolean);
   return (
@@ -1459,7 +1474,7 @@ function BadgesBlock({ block = {}, locale = "en-US", theme = {} }) {
   return (
     <RuntimePanel title={normalizeString(block?.title || content?.title || "Status Pills")}>
       {items.length === 0 ? (
-        <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+        <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
           No pills configured.
         </div>
       ) : (
@@ -1474,7 +1489,8 @@ function BadgesBlock({ block = {}, locale = "en-US", theme = {} }) {
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 6,
-                  fontSize: 12,
+                  fontSize: "var(--forge-report-type-small-size, 12px)",
+                  lineHeight: "var(--forge-report-type-small-line-height, normal)",
                   fontWeight: 700,
                   color: toneStyles.text,
                   background: toneStyles.background,
@@ -1555,7 +1571,7 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
       {invalidDiagnostic ? (
         <BlockErrorCallout diagnostic={invalidDiagnostic} />
       ) : rowCount === 0 || !hasPrimaryValue ? (
-        <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+        <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
           {normalizeString(content?.emptyLabel || "No KPI value available.")}
         </div>
       ) : (
@@ -1564,18 +1580,18 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
             <>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {showValueLabel ? (
-                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#5f6b7c" }}>
+                  <span style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--forge-report-text-muted, #5f6b7c)" }}>
                     {valueLabel}
                   </span>
                 ) : null}
-                <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1.1, color: "#182026" }}>
+                <span style={{ fontSize: "var(--forge-report-type-metric-size, 28px)", fontWeight: 800, lineHeight: "var(--forge-report-type-metric-line-height, 1.1)", color: "var(--forge-report-text, #182026)", fontVariantNumeric: "tabular-nums" }}>
                   {formattedPrimaryValue}
                 </span>
               </div>
               {hasSecondaryValue ? (
                 <div
                   data-report-runtime-kpi-trend-row={secondaryTrendStyle.kind}
-                  style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: secondaryTrendStyle.color }}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", color: secondaryTrendStyle.color }}
                 >
                   <strong style={{ color: "inherit" }}>
                     {normalizeString(content?.secondaryLabel || content?.secondaryField)}
@@ -1593,7 +1609,7 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
           {showBody ? (
             <div
               style={{
-                borderTop: showCard ? "1px solid #e6edf3" : "none",
+                borderTop: showCard ? "1px solid var(--forge-report-border, #e6edf3)" : "none",
                 paddingTop: showCard ? 10 : 0,
               }}
             >
@@ -1640,7 +1656,7 @@ function CollectionBlock({ block = {}, diagnostics = [], locale = "en-US", onRet
       {invalidDiagnostic ? (
         <BlockErrorCallout diagnostic={invalidDiagnostic} />
       ) : items.length === 0 ? (
-        <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+        <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
           {normalizeString(content?.emptyLabel || "No collection items available.")}
         </div>
       ) : (
@@ -1664,10 +1680,9 @@ function CollectionBlock({ block = {}, diagnostics = [], locale = "en-US", onRet
               <div
                 key={normalizeString(item?.id || title || `item_${index + 1}`)}
                 style={{
-                  border: `1px solid ${borderColor || "#dbe5ec"}`,
-                  borderLeft: `4px solid ${textColor || borderColor || "#dbe5ec"}`,
+                  border: `1px solid ${borderColor || "var(--forge-report-border, #dbe5ec)"}`,
                   borderRadius: 12,
-                  background: backgroundColor || "#fff",
+                  background: backgroundColor || "var(--forge-report-surface, #fff)",
                   padding: 12,
                   display: "flex",
                   flexDirection: "column",
@@ -1675,26 +1690,26 @@ function CollectionBlock({ block = {}, diagnostics = [], locale = "en-US", onRet
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: textColor || "#182026" }}>{title}</div>
+                  <div style={{ fontSize: "var(--forge-report-type-body-size, 14px)", lineHeight: "var(--forge-report-type-body-line-height, normal)", fontWeight: 700, color: textColor || "var(--forge-report-text, #182026)" }}>{title}</div>
                   {normalizeString(item?.toneLabel) ? (
-                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: textColor || "#30404d" }}>
+                    <span style={{ fontSize: "var(--forge-report-type-caption-size, 10px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: textColor || "var(--forge-report-text-secondary, #30404d)" }}>
                       {normalizeString(item.toneLabel)}
                     </span>
                   ) : null}
                 </div>
                 {valueLabel ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#5f6b7c" }}>
+                    <span style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--forge-report-text-muted, #5f6b7c)" }}>
                       {valueLabel}
                     </span>
-                    <span style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.1, color: "#182026" }}>
+                    <span style={{ fontSize: "var(--forge-report-type-metric-size, 24px)", fontWeight: 800, lineHeight: "var(--forge-report-type-metric-line-height, 1.1)", color: "var(--forge-report-text, #182026)", fontVariantNumeric: "tabular-nums" }}>
                       {formatKpiValue(item?.value, normalizeString(item?.valueFormat || item?.format), locale)}
                     </span>
                   </div>
                 ) : null}
                 {secondaryLabel ? (
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, color: "#30404d" }}>
-                    <strong style={{ color: "#182026" }}>{secondaryLabel}</strong>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", color: "var(--forge-report-text-secondary, #30404d)" }}>
+                    <strong style={{ color: "var(--forge-report-text, #182026)" }}>{secondaryLabel}</strong>
                     <span>{formatKpiValue(item?.secondaryValue, normalizeString(item?.secondaryFormat), locale)}</span>
                   </div>
                 ) : null}
@@ -1720,7 +1735,7 @@ function SectionHeaderBlock({ block = {}, headerAction = null }) {
       subtitle={normalizeString(content?.subtitle || block?.subtitle)}
     >
       {normalizeString(content?.description || block?.description) ? (
-        <div style={{ fontSize: 13, lineHeight: 1.6, color: "#30404d" }}>
+        <div style={{ fontSize: "var(--forge-report-type-body-size, 13px)", lineHeight: "var(--forge-report-type-body-line-height, 1.6)", color: "var(--forge-report-text-secondary, #30404d)" }}>
           {normalizeString(content?.description || block?.description)}
         </div>
       ) : null}
@@ -1753,7 +1768,7 @@ function StepperBlock({ block = {} }) {
       subtitle={normalizeString(content?.description)}
     >
       {steps.length === 0 ? (
-        <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+        <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
           No process steps configured.
         </div>
       ) : (
@@ -1766,9 +1781,9 @@ function StepperBlock({ block = {} }) {
                 gridTemplateColumns: "40px minmax(0, 1fr)",
                 gap: 12,
                 alignItems: "start",
-                border: "1px solid #dbe5ec",
+                border: "1px solid var(--forge-report-border, #dbe5ec)",
                 borderRadius: 12,
-                background: "#fff",
+                background: "var(--forge-report-surface, #fff)",
                 padding: 12,
               }}
             >
@@ -1777,12 +1792,13 @@ function StepperBlock({ block = {} }) {
                   width: 28,
                   height: 28,
                   borderRadius: 999,
-                  background: "#1d4ed8",
-                  color: "#fff",
+                  background: "var(--forge-report-action, #1d4ed8)",
+                  color: "var(--forge-report-text-inverse, #fff)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 13,
+                  fontSize: "var(--forge-report-type-body-size, 13px)",
+                  lineHeight: "var(--forge-report-type-body-line-height, normal)",
                   fontWeight: 800,
                 }}
               >
@@ -1790,7 +1806,7 @@ function StepperBlock({ block = {} }) {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {normalizeString(step?.title) ? (
-                  <div style={{ fontSize: 14, fontWeight: 700, color: "#182026" }}>{normalizeString(step.title)}</div>
+                  <div style={{ fontSize: "var(--forge-report-type-body-size, 14px)", lineHeight: "var(--forge-report-type-body-line-height, normal)", fontWeight: 700, color: "var(--forge-report-text, #182026)" }}>{normalizeString(step.title)}</div>
                 ) : null}
                 {String(step?.body || "").trim() ? (
                   <RuntimeMarkdownBody markdown={String(step.body || "")} />
@@ -1807,13 +1823,13 @@ function StepperBlock({ block = {} }) {
 function resolveInfoPanelToneStyles(tone = "", theme = {}) {
   const normalized = normalizeString(tone).toLowerCase();
   if (normalized === "warning") {
-    return { border: "#f5c542", background: "#fff9e6", eyebrow: "#8a5d00" };
+    return { border: "var(--forge-report-status-warning-border, #f5c542)", background: "var(--forge-report-status-warning-background, #fff9e6)", eyebrow: "var(--forge-report-status-warning-foreground, #8a5d00)" };
   }
   if (normalized === "danger") {
-    return { border: "#f5c2c0", background: "#fff5f4", eyebrow: "#a82a2a" };
+    return { border: "var(--forge-report-status-danger-border, #f5c2c0)", background: "var(--forge-report-status-danger-background, #fff5f4)", eyebrow: "var(--forge-report-status-danger-foreground, #a82a2a)" };
   }
   if (normalized === "success") {
-    return { border: "#b7e4c7", background: "#f1fbf5", eyebrow: "#0a6640" };
+    return { border: "var(--forge-report-status-success-border, #b7e4c7)", background: "var(--forge-report-status-success-background, #f1fbf5)", eyebrow: "var(--forge-report-status-success-foreground, #0a6640)" };
   }
   const accent = resolveRuntimeAccentPalette(theme?.accentTone);
   return { border: accent.border, background: accent.background, eyebrow: accent.text };
@@ -1838,15 +1854,15 @@ function InfoPanelBlock({ block = {}, theme = {} }) {
       data-report-runtime-info-panel-tone={normalizeString(content?.tone || block?.tone).toLowerCase() || "info"}
     >
       {normalizeString(content?.eyebrow || block?.eyebrow) ? (
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: tone.eyebrow }}>
+        <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: tone.eyebrow }}>
           {normalizeString(content?.eyebrow || block?.eyebrow)}
         </div>
       ) : null}
-      <div style={{ fontSize: 18, fontWeight: 700, color: "#182026" }}>
+      <div style={{ fontSize: "var(--forge-report-type-heading-size, 18px)", lineHeight: "var(--forge-report-type-heading-line-height, normal)", fontWeight: 700, color: "var(--forge-report-text, #182026)" }}>
         {normalizeString(block?.title || content?.title || "Info Panel")}
       </div>
       {normalizeString(content?.description || block?.description) ? (
-        <div style={{ fontSize: 13, lineHeight: 1.6, color: "#30404d" }}>
+        <div style={{ fontSize: "var(--forge-report-type-body-size, 13px)", lineHeight: "var(--forge-report-type-body-line-height, 1.6)", color: "var(--forge-report-text-secondary, #30404d)" }}>
           {normalizeString(content?.description || block?.description)}
         </div>
       ) : null}
@@ -1860,13 +1876,13 @@ function InfoPanelBlock({ block = {}, theme = {} }) {
 function resolveCalloutToneStyles(tone = "", theme = {}) {
   const normalized = normalizeString(tone).toLowerCase();
   if (normalized === "warning") {
-    return { border: "#f5c542", background: "#fff9e6", accent: "#8a5d00", chipBackground: "#fff0c2" };
+    return { border: "var(--forge-report-status-warning-border, #f5c542)", background: "var(--forge-report-status-warning-background, #fff9e6)", accent: "var(--forge-report-status-warning-foreground, #8a5d00)", chipBackground: "var(--forge-report-status-warning-strong-background, #fff0c2)" };
   }
   if (normalized === "danger") {
-    return { border: "#f5c2c0", background: "#fff5f4", accent: "#a82a2a", chipBackground: "#fde2df" };
+    return { border: "var(--forge-report-status-danger-border, #f5c2c0)", background: "var(--forge-report-status-danger-background, #fff5f4)", accent: "var(--forge-report-status-danger-foreground, #a82a2a)", chipBackground: "var(--forge-report-status-danger-strong-background, #fde2df)" };
   }
   if (normalized === "success") {
-    return { border: "#b7e4c7", background: "#f1fbf5", accent: "#0a6640", chipBackground: "#daf5e4" };
+    return { border: "var(--forge-report-status-success-border, #b7e4c7)", background: "var(--forge-report-status-success-background, #f1fbf5)", accent: "var(--forge-report-status-success-foreground, #0a6640)", chipBackground: "var(--forge-report-status-success-strong-background, #daf5e4)" };
   }
   const accent = resolveRuntimeAccentPalette(theme?.accentTone);
   return { border: accent.border, background: accent.background, accent: accent.accent, chipBackground: accent.chipBackground };
@@ -1885,7 +1901,6 @@ function CalloutBlock({ block = {}, theme = {} }) {
     <section
       style={{
         border: `1px solid ${tone.border}`,
-        borderLeft: `6px solid ${tone.accent}`,
         borderRadius: 16,
         background: tone.background,
         padding: 16,
@@ -1897,14 +1912,14 @@ function CalloutBlock({ block = {}, theme = {} }) {
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         {icon ? (
-          <span style={{ fontSize: 18, lineHeight: 1, color: tone.accent }}>{icon}</span>
+          <span style={{ fontSize: "var(--forge-report-type-heading-size, 18px)", lineHeight: 1, color: tone.accent }}>{icon}</span>
         ) : null}
-        <div style={{ fontSize: 18, fontWeight: 700, color: "#182026" }}>
+        <div style={{ fontSize: "var(--forge-report-type-heading-size, 18px)", lineHeight: "var(--forge-report-type-heading-line-height, normal)", fontWeight: 700, color: "var(--forge-report-text, #182026)" }}>
           {normalizeString(block?.title || content?.title || "Callout")}
         </div>
       </div>
       {normalizeString(content?.description || block?.description) ? (
-        <div style={{ fontSize: 13, lineHeight: 1.6, color: "#30404d" }}>
+        <div style={{ fontSize: "var(--forge-report-type-body-size, 13px)", lineHeight: "var(--forge-report-type-body-line-height, 1.6)", color: "var(--forge-report-text-secondary, #30404d)" }}>
           {normalizeString(content?.description || block?.description)}
         </div>
       ) : null}
@@ -1921,7 +1936,8 @@ function CalloutBlock({ block = {}, theme = {} }) {
                 padding: "4px 10px",
                 background: tone.chipBackground,
                 color: tone.accent,
-                fontSize: 11,
+                fontSize: "var(--forge-report-type-caption-size, 11px)",
+                lineHeight: "var(--forge-report-type-caption-line-height, normal)",
                 fontWeight: 700,
               }}
             >
@@ -1950,7 +1966,7 @@ function KanbanBlock({ block = {} }) {
       subtitle={normalizeString(content?.description)}
     >
       {columns.length === 0 ? (
-        <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+        <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
           No pipeline columns configured.
         </div>
       ) : (
@@ -1965,16 +1981,16 @@ function KanbanBlock({ block = {} }) {
             <div
               key={normalizeString(column?.id || `column_${index + 1}`)}
               style={{
-                border: "1px solid #dbe5ec",
+                border: "1px solid var(--forge-report-border, #dbe5ec)",
                 borderRadius: 14,
-                background: "#fbfdff",
+                background: "var(--forge-report-surface-subtle, #fbfdff)",
                 padding: 12,
                 display: "flex",
                 flexDirection: "column",
                 gap: 10,
               }}
             >
-              <div style={{ fontSize: 13, fontWeight: 800, color: "#182026" }}>
+              <div style={{ fontSize: "var(--forge-report-type-body-size, 13px)", lineHeight: "var(--forge-report-type-body-line-height, normal)", fontWeight: 800, color: "var(--forge-report-text, #182026)" }}>
                 {normalizeString(column?.title || `Column ${index + 1}`)}
               </div>
               <div style={{ display: "grid", gap: 10 }}>
@@ -1982,9 +1998,9 @@ function KanbanBlock({ block = {} }) {
                   <div
                     key={normalizeString(card?.id || `card_${cardIndex + 1}`)}
                     style={{
-                      border: "1px solid #d7e2ee",
+                      border: "1px solid var(--forge-report-border, #d7e2ee)",
                       borderRadius: 12,
-                      background: "#fff",
+                      background: "var(--forge-report-surface, #fff)",
                       padding: 12,
                       display: "flex",
                       flexDirection: "column",
@@ -1992,12 +2008,12 @@ function KanbanBlock({ block = {} }) {
                     }}
                   >
                     {normalizeString(card?.badge) ? (
-                      <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: "#486579" }}>
+                      <span style={{ fontSize: "var(--forge-report-type-caption-size, 10px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--forge-report-text-muted, #486579)" }}>
                         {normalizeString(card.badge)}
                       </span>
                     ) : null}
                     {normalizeString(card?.title) ? (
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#182026" }}>{normalizeString(card.title)}</div>
+                      <div style={{ fontSize: "var(--forge-report-type-body-size, 13px)", lineHeight: "var(--forge-report-type-body-line-height, normal)", fontWeight: 700, color: "var(--forge-report-text, #182026)" }}>{normalizeString(card.title)}</div>
                     ) : null}
                     {String(card?.body || "").trim() ? <RuntimeMarkdownBody markdown={String(card.body || "")} /> : null}
                   </div>
@@ -2024,7 +2040,7 @@ function TimelineBlock({ block = {} }) {
       subtitle={normalizeString(content?.description)}
     >
       {events.length === 0 ? (
-        <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+        <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
           No timeline events configured.
         </div>
       ) : (
@@ -2039,14 +2055,14 @@ function TimelineBlock({ block = {} }) {
                 alignItems: "start",
               }}
             >
-              <div style={{ fontSize: 11, fontWeight: 800, color: "#486579", textTransform: "uppercase", letterSpacing: "0.04em", paddingTop: 4 }}>
+              <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 800, color: "var(--forge-report-text-muted, #486579)", textTransform: "uppercase", letterSpacing: "0.04em", paddingTop: 4 }}>
                 {normalizeString(event?.date || event?.badge || `Event ${index + 1}`)}
               </div>
               <div
                 style={{
-                  border: "1px solid #dbe5ec",
+                  border: "1px solid var(--forge-report-border, #dbe5ec)",
                   borderRadius: 12,
-                  background: "#fff",
+                  background: "var(--forge-report-surface, #fff)",
                   padding: 12,
                   display: "flex",
                   flexDirection: "column",
@@ -2055,12 +2071,12 @@ function TimelineBlock({ block = {} }) {
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   {normalizeString(event?.badge) ? (
-                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: "#486579" }}>
+                    <span style={{ fontSize: "var(--forge-report-type-caption-size, 10px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 800, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--forge-report-text-muted, #486579)" }}>
                       {normalizeString(event.badge)}
                     </span>
                   ) : null}
                   {normalizeString(event?.title) ? (
-                    <div style={{ fontSize: 14, fontWeight: 700, color: "#182026" }}>{normalizeString(event.title)}</div>
+                    <div style={{ fontSize: "var(--forge-report-type-body-size, 14px)", lineHeight: "var(--forge-report-type-body-line-height, normal)", fontWeight: 700, color: "var(--forge-report-text, #182026)" }}>{normalizeString(event.title)}</div>
                   ) : null}
                 </div>
                 {String(event?.body || "").trim() ? <RuntimeMarkdownBody markdown={String(event.body || "")} /> : null}
@@ -2171,7 +2187,7 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
   const tableAccent = ["blue", "green", "amber", "rose", "slate"].includes(tableAccentTone)
     ? resolveRuntimeAccentPalette(tableAccentTone).accent
     : "";
-  const tablePanelStyle = tableAccent ? { borderLeft: `4px solid ${tableAccent}` } : {};
+  const tablePanelStyle = tableAccent ? { borderColor: tableAccent } : {};
   const invalidDiagnostic = (Array.isArray(diagnostics) ? diagnostics : [])
     .find((diagnostic) => normalizeString(diagnostic?.severity || "info").toLowerCase() === "error")
     || null;
@@ -2274,7 +2290,7 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
           aria-expanded={!collapsed}
           aria-controls={`${normalizeString(block?.id || "tableBlock")}__table_content`}
           onClick={() => setCollapsed((value) => !value)}
-          style={{ border: "1px solid #d4dee8", background: "#fff", borderRadius: 8, padding: "5px 9px", cursor: "pointer", color: "#30404d", display: "inline-flex", alignItems: "center", gap: 6 }}
+          style={{ border: "1px solid var(--forge-report-control-border, #d4dee8)", background: "var(--forge-report-control-surface, #fff)", borderRadius: 8, padding: "5px 9px", cursor: "pointer", color: "var(--forge-report-text-secondary, #30404d)", display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)" }}
         >
           <Icon icon={collapsed ? "chevron-down" : "chevron-up"} size={14} aria-hidden="true" />
           <span>{collapsed ? "Expand" : "Collapse"}</span>
@@ -2283,14 +2299,14 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
     >
       <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
       {collapsible && collapsed ? (
-        <div className="forge-report-runtime-table-collapsed-summary" aria-live="polite" style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 12, color: "#5f6b7c" }}>
+        <div className="forge-report-runtime-table-collapsed-summary" aria-live="polite" style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", color: "var(--forge-report-text-muted, #5f6b7c)" }}>
           <span>Showing {collapsedPreviewLimit} of {runtimeTableRows.length} {runtimeTableRows.length === 1 ? "row" : "rows"}</span>
           {tablePresentation.sort ? <span>Sorted by {tablePresentation.sort.label} ({tablePresentation.sort.direction})</span> : null}
           {tablePresentation.filter ? <span>Filter: {tablePresentation.filter}</span> : null}
         </div>
       ) : null}
       {columns.length === 0 ? (
-        <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+        <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
           No table fields selected. Edit this table block in Design to choose at least one field.
         </div>
       ) : (
@@ -2388,7 +2404,7 @@ function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummar
                   aria-label={`${filterEnabled ? "Disable" : "Enable"} ${label} filter`}
                   aria-pressed={filterEnabled}
                   onClick={() => runtimeHandlers.setScopeParamEnabled(interactiveFilter, !filterEnabled)}
-                  style={{ border: "1px solid #d8e1e8", background: filterEnabled ? "#eef4fb" : "#fff", borderRadius: 999, padding: "4px 8px", cursor: "pointer", fontSize: 10 }}
+                  style={{ border: "1px solid var(--forge-report-control-border, #d8e1e8)", background: filterEnabled ? "var(--forge-report-selected, #eef4fb)" : "var(--forge-report-control-surface, #fff)", color: "var(--forge-report-text-secondary, #30404d)", borderRadius: 999, padding: "4px 8px", cursor: "pointer", fontSize: "var(--forge-report-type-caption-size, 10px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)" }}
                 >
                   {filterEnabled ? "On" : "Off"}
                 </button>
@@ -2412,30 +2428,31 @@ function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummar
                 alignItems: "flex-start",
                 flexDirection: "column",
                 gap: 4,
-                border: "1px solid #d4dee8",
-                background: "#f7fafc",
+                border: "1px solid var(--forge-report-border, #d4dee8)",
+                background: "var(--forge-report-surface-subtle, #f7fafc)",
                 borderRadius: 14,
                 padding: "6px 10px",
-                fontSize: 12,
-                color: "#30404d",
+                fontSize: "var(--forge-report-type-small-size, 12px)",
+                lineHeight: "var(--forge-report-type-small-line-height, normal)",
+                color: "var(--forge-report-text-secondary, #30404d)",
                 minWidth: 160,
               }}
             >
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                <strong style={{ color: "#182026" }}>{label}</strong>
+                <strong style={{ color: "var(--forge-report-text, #182026)" }}>{label}</strong>
                 <span>{formatReportRuntimeScopeValue({ ...metadata, value: param?.value })}</span>
               </span>
               {description ? (
-                <span style={{ fontSize: 11, lineHeight: 1.4, color: "#5f6b7c" }}>{description}</span>
+                <span style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, 1.4)", color: "var(--forge-report-text-muted, #5f6b7c)" }}>{description}</span>
               ) : null}
             </span>
           );
         })}
-        {params.length === 0 ? <span style={{ fontSize: 12, color: "#5f6b7c" }}>No report filters.</span> : null}
+        {params.length === 0 ? <span style={{ fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", color: "var(--forge-report-text-muted, #5f6b7c)" }}>No report filters.</span> : null}
       </div>
       {criteria.length > 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, borderTop: "1px dashed #d8e1e8", paddingTop: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#738694" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, borderTop: "1px dashed var(--forge-report-border, #d8e1e8)", paddingTop: 12 }}>
+          <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--forge-report-text-muted, #738694)" }}>
             Active Targeting
           </div>
           <div style={{ display: "grid", gap: 8 }}>
@@ -2447,15 +2464,16 @@ function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummar
                   flexWrap: "wrap",
                   alignItems: "center",
                   gap: 8,
-                  border: "1px solid #d4dee8",
-                  background: "#f7fafc",
+                  border: "1px solid var(--forge-report-border, #d4dee8)",
+                  background: "var(--forge-report-surface-subtle, #f7fafc)",
                   borderRadius: 12,
                   padding: "8px 10px",
-                  fontSize: 12,
-                  color: "#30404d",
+                  fontSize: "var(--forge-report-type-small-size, 12px)",
+                  lineHeight: "var(--forge-report-type-small-line-height, normal)",
+                  color: "var(--forge-report-text-secondary, #30404d)",
                 }}
               >
-                <strong style={{ color: "#182026" }}>
+                <strong style={{ color: "var(--forge-report-text, #182026)" }}>
                   {normalizeString(criterion?.label || criterion?.filterLabel || criterion?.id)}
                 </strong>
                 <span>
@@ -2466,7 +2484,7 @@ function FilterBarBlock({ block = {}, scopeParams = new Map(), activeScopeSummar
                       : "—")}
                 </span>
                 {criterion?.enabled === false ? (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#8a5d00" }}>Off</span>
+                  <span style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 700, color: "var(--forge-report-status-warning-foreground, #8a5d00)" }}>Off</span>
                 ) : null}
               </div>
             ))}
@@ -2515,10 +2533,10 @@ export function RefinementBarBlock({ block = {}, runtimeHandlers = null }) {
   return (
     <div className="forge-report-runtime-refinement-block" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div className="forge-report-runtime-refinement-block__header" style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.02em", color: "#182026" }}>
+        <span style={{ fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", fontWeight: 700, letterSpacing: "0.02em", color: "var(--forge-report-text, #182026)" }}>
           {refinementBarTitle}
         </span>
-        <span style={{ fontSize: 11, lineHeight: 1.4, color: "#5f6b7c" }}>
+        <span style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, 1.4)", color: "var(--forge-report-text-muted, #5f6b7c)" }}>
           This session — live keep, exclude, and drill changes layered on top of the baseline scope.
         </span>
       </div>
@@ -2543,11 +2561,12 @@ export function RefinementBarBlock({ block = {}, runtimeHandlers = null }) {
               display: "inline-flex",
               alignItems: "center",
               gap: 8,
-              fontSize: 12,
+              fontSize: "var(--forge-report-type-small-size, 12px)",
+              lineHeight: "var(--forge-report-type-small-line-height, normal)",
               fontWeight: 600,
-              color: "#21538f",
-              background: "#eef4fb",
-              border: "1px solid #cfdced",
+              color: "var(--forge-report-action, #21538f)",
+              background: "var(--forge-report-selected, #eef4fb)",
+              border: "1px solid var(--forge-report-border, #cfdced)",
               borderRadius: 999,
               padding: "6px 10px",
             }}
@@ -2566,9 +2585,10 @@ export function RefinementBarBlock({ block = {}, runtimeHandlers = null }) {
                 style={{
                   border: "none",
                   background: "transparent",
-                  color: "#21538f",
+                  color: "var(--forge-report-action, #21538f)",
                   cursor: "pointer",
-                  fontSize: 12,
+                  fontSize: "var(--forge-report-type-small-size, 12px)",
+                  lineHeight: "var(--forge-report-type-small-line-height, normal)",
                   fontWeight: 700,
                   padding: 0,
                 }}
@@ -2586,13 +2606,14 @@ export function RefinementBarBlock({ block = {}, runtimeHandlers = null }) {
           aria-label="Clear all refinements"
           onClick={() => executeReportRuntimeAction(clearExecution, runtimeHandlers)}
           style={{
-            border: "1px solid #d8e1e8",
-            background: "#ffffff",
-            color: "#30404d",
+            border: "1px solid var(--forge-report-control-border, #d8e1e8)",
+            background: "var(--forge-report-control-surface, #ffffff)",
+            color: "var(--forge-report-text-secondary, #30404d)",
             borderRadius: 999,
             padding: "4px 10px",
             cursor: "pointer",
-            fontSize: 11,
+            fontSize: "var(--forge-report-type-caption-size, 11px)",
+            lineHeight: "var(--forge-report-type-caption-line-height, normal)",
             fontWeight: 600,
           }}
         >
@@ -2611,13 +2632,14 @@ export function RefinementBarBlock({ block = {}, runtimeHandlers = null }) {
             executeReportRuntimeAction(undoExecution, runtimeHandlers);
           }}
           style={{
-            border: "1px solid #d8e1e8",
-            background: undoEnabled ? "#ffffff" : "#f4f7fa",
-            color: undoEnabled ? "#30404d" : "#98a2b3",
+            border: "1px solid var(--forge-report-control-border, #d8e1e8)",
+            background: undoEnabled ? "var(--forge-report-control-surface, #ffffff)" : "var(--forge-report-disabled-surface, #f4f7fa)",
+            color: undoEnabled ? "var(--forge-report-text-secondary, #30404d)" : "var(--forge-report-disabled-text, #98a2b3)",
             borderRadius: 999,
             padding: "4px 10px",
             cursor: undoEnabled ? "pointer" : "not-allowed",
-            fontSize: 11,
+            fontSize: "var(--forge-report-type-caption-size, 11px)",
+            lineHeight: "var(--forge-report-type-caption-line-height, normal)",
             fontWeight: 600,
           }}
         >
@@ -2636,13 +2658,14 @@ export function RefinementBarBlock({ block = {}, runtimeHandlers = null }) {
             executeReportRuntimeAction(redoExecution, runtimeHandlers);
           }}
           style={{
-            border: "1px solid #d8e1e8",
-            background: redoEnabled ? "#ffffff" : "#f4f7fa",
-            color: redoEnabled ? "#30404d" : "#98a2b3",
+            border: "1px solid var(--forge-report-control-border, #d8e1e8)",
+            background: redoEnabled ? "var(--forge-report-control-surface, #ffffff)" : "var(--forge-report-disabled-surface, #f4f7fa)",
+            color: redoEnabled ? "var(--forge-report-text-secondary, #30404d)" : "var(--forge-report-disabled-text, #98a2b3)",
             borderRadius: 999,
             padding: "4px 10px",
             cursor: redoEnabled ? "pointer" : "not-allowed",
-            fontSize: 11,
+            fontSize: "var(--forge-report-type-caption-size, 11px)",
+            lineHeight: "var(--forge-report-type-caption-line-height, normal)",
             fontWeight: 600,
           }}
         >
@@ -2713,17 +2736,17 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
       {invalidDiagnostic ? (
         <BlockErrorCallout diagnostic={invalidDiagnostic} />
       ) : !supportedShape ? (
-        <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+        <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
           Unsupported geo shape: {shape || "unknown"}.
         </div>
       ) : !hasData ? (
-        <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+        <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
           No geo data.
         </div>
       ) : (
         <div className="forge-report-runtime-geo-layout" style={{ display: "grid", gridTemplateColumns: "minmax(320px, 1fr) minmax(220px, 320px)", gap: 16 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: 12, color: "#30404d" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", color: "var(--forge-report-text-secondary, #30404d)" }}>
               <span><strong>{Number(resolvedGeo?.summary?.regionCount || 0)}</strong> Regions</span>
               <span><strong>{normalizeString(resolvedGeo?.summary?.totalValue || "-")}</strong> Total</span>
               <span><strong>{normalizeString(resolvedGeo?.summary?.topKey || "-")}</strong> Top Region</span>
@@ -2753,12 +2776,13 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
                       gridRow: entry.row,
                       borderRadius: 10,
                       border: region ? "1px solid rgba(24,32,38,0.14)" : "1px dashed rgba(95,107,124,0.22)",
-                      background: region?.color || "#eef3f8",
-                      color: region ? resolveGeoTextColor(region.color) : "#5f6b7c",
+                      background: region?.color || "var(--forge-report-surface-subtle, #eef3f8)",
+                      color: region ? resolveGeoTextColor(region.color) : "var(--forge-report-text-muted, #5f6b7c)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: 11,
+                      fontSize: "var(--forge-report-type-caption-size, 11px)",
+                      lineHeight: "var(--forge-report-type-caption-line-height, normal)",
                       fontWeight: 700,
                     }}
                   >
@@ -2769,19 +2793,19 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
             </div>
             {legend ? (
               Array.isArray(legend?.rules) && legend.rules.length > 0 ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: 11, color: "#30404d" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", color: "var(--forge-report-text-secondary, #30404d)" }}>
                   {legend.rules.map((rule) => (
                     <span
                       key={`${rule?.label || rule?.color}`}
                       style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
                     >
-                      <i style={{ width: 10, height: 10, borderRadius: 999, background: rule?.color || "#d8e1e8", display: "inline-block" }} />
+                      <i style={{ width: 10, height: 10, borderRadius: 999, background: rule?.color || "var(--forge-report-border, #d8e1e8)", display: "inline-block" }} />
                       {normalizeString(rule?.label || rule?.color)}
                     </span>
                   ))}
                 </div>
               ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 11, color: "#30404d" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", color: "var(--forge-report-text-secondary, #30404d)" }}>
                   <span>{normalizeString(legend?.min || "-")}</span>
                   <div style={{ display: "flex", gap: 4 }}>
                     {palette.map((color) => (
@@ -2796,32 +2820,32 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
           <aside className="forge-report-runtime-geo-details" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div
               style={{
-                border: "1px solid #d8e1e8",
+                border: "1px solid var(--forge-report-border, #d8e1e8)",
                 borderRadius: 12,
                 padding: "12px 14px",
-                background: "#fbfdff",
+                background: "var(--forge-report-surface-subtle, #fbfdff)",
                 display: "flex",
                 flexDirection: "column",
                 gap: 6,
               }}
             >
-              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#5f6b7c" }}>
+              <span style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--forge-report-text-muted, #5f6b7c)" }}>
                 Selected Area
               </span>
-              <strong style={{ fontSize: 15, color: "#182026" }}>
+              <strong style={{ fontSize: "var(--forge-report-type-section-size, 15px)", lineHeight: "var(--forge-report-type-section-line-height, normal)", color: "var(--forge-report-text, #182026)" }}>
                 {activeRegion ? `${normalizeString(activeRegion.label || activeRegion.key)} (${normalizeString(activeRegion.key)})` : "-"}
               </strong>
-              <span style={{ fontSize: 12, color: "#30404d" }}>
+              <span style={{ fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", color: "var(--forge-report-text-secondary, #30404d)" }}>
                 {normalizeString(resolvedGeo?.metricLabel || geo?.metric?.label || "Metric")}: {normalizeString(activeRegion?.displayValue || "-")}
               </span>
               {normalizeString(activeRegion?.statusLabel) ? (
-                <span style={{ fontSize: 11, color: activeRegion?.statusColor || "#30404d" }}>
+                <span style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", color: activeRegion?.statusColor || "var(--forge-report-text-secondary, #30404d)" }}>
                   {normalizeString(activeRegion.statusLabel)}
                 </span>
               ) : null}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#5f6b7c" }}>
+              <div style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--forge-report-text-muted, #5f6b7c)" }}>
                 Top Regions
               </div>
               {ranking.slice(0, 5).map((region) => (
@@ -2832,18 +2856,19 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
                     gridTemplateColumns: "48px minmax(0, 1fr) auto",
                     gap: 10,
                     alignItems: "center",
-                    fontSize: 12,
-                    color: "#30404d",
+                    fontSize: "var(--forge-report-type-small-size, 12px)",
+                    lineHeight: "var(--forge-report-type-small-line-height, normal)",
+                    color: "var(--forge-report-text-secondary, #30404d)",
                   }}
                 >
-                  <strong style={{ color: "#182026" }}>{normalizeString(region?.key)}</strong>
-                  <div style={{ height: 8, borderRadius: 999, background: "#eef3f8", overflow: "hidden" }}>
+                  <strong style={{ color: "var(--forge-report-text, #182026)" }}>{normalizeString(region?.key)}</strong>
+                  <div style={{ height: 8, borderRadius: 999, background: "var(--forge-report-surface-subtle, #eef3f8)", overflow: "hidden" }}>
                     <i
                       style={{
                         width: `${Math.max(4, Math.min(100, Number(activeRegion?.rawValue || 0) > 0 ? (Number(region?.rawValue || 0) / Number(activeRegion?.rawValue || 1)) * 100 : 4))}%`,
                         height: "100%",
                         display: "block",
-                        background: region?.color || "#9fb3c8",
+                        background: region?.color || "var(--forge-report-accent-slate, #9fb3c8)",
                       }}
                     />
                   </div>
@@ -3325,7 +3350,7 @@ export default function ReportRuntime({
               onLegendItemSelect={!reportPresentation && chartInteractionSupport.legendEnabled ? ((selection) => setSelectedChartSelection(block.id, selection)) : null}
             />
           ) : (
-            <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+            <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
               Chart actions are unavailable because this authored chart does not compile to a runtime chart model.
             </div>
           )}
@@ -3379,7 +3404,7 @@ export default function ReportRuntime({
               ))}
             </div> : renderLayoutBlockGrid(childBlocks, `runtime:${normalizeString(block?.id || "composite")}`)
           ) : (
-            <div style={{ fontSize: 12, color: "#5f6b7c", lineHeight: 1.5 }}>
+            <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
               Add one or more child blocks to this grouped panel.
             </div>
           )}
@@ -3470,12 +3495,13 @@ export default function ReportRuntime({
               gap: 7,
               minHeight: 32,
               padding: "6px 10px",
-              border: "1px solid #d8e1e8",
+              border: "1px solid var(--forge-report-control-border, #d8e1e8)",
               borderRadius: 9,
-              background: "#fff",
-              color: "#30404d",
+              background: "var(--forge-report-control-surface, #fff)",
+              color: "var(--forge-report-text-secondary, #30404d)",
               cursor: "pointer",
-              fontSize: 12,
+              fontSize: "var(--forge-report-type-small-size, 12px)",
+              lineHeight: "var(--forge-report-type-small-line-height, normal)",
               fontWeight: 700,
             }}
           >
@@ -3537,7 +3563,7 @@ export default function ReportRuntime({
       {runtimeSections.length > 1 || (runtimeTabGroup?.includeUnlistedSections === false && runtimeSections.length > 0) ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {distinctWorkspaceTitle(runtimeTabGroup?.title, workspacePresentation?.label) ? (
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "#486579" }}>
+            <div className="forge-report-runtime-section-label" style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--forge-report-text-muted, #486579)" }}>
               {runtimeTabGroup.title}
             </div>
           ) : null}
