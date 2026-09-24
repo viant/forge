@@ -309,12 +309,12 @@ assert.equal(formatChartNumber(0), "0");
 assert.deepEqual(resolveHorizontalBarDataLabelLayout({ x: 300, width: -200, value: -12 }), {
     x: 106,
     textAnchor: "start",
-    fill: "#ffffff",
+    fill: "var(--forge-text-inverse, #ffffff)",
 });
 assert.deepEqual(resolveHorizontalBarDataLabelLayout({ x: 100, width: 12, value: 8 }), {
     x: 118,
     textAnchor: "start",
-    fill: "#5f6b7c",
+    fill: "var(--forge-chart-text-muted, #5f6b7c)",
 });
 assert.deepEqual(resolveHorizontalBarLayout({
     containerWidth: 280,

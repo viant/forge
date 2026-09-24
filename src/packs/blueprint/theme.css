@@ -1,5 +1,23 @@
 /* Built-in Forge appearance, used when no workspace theme is selected. */
 .agently-workspace:not([data-forge-theme]) {
+    --forge-type-caption-size: 11px;
+    --forge-type-caption-line-height: 16px;
+    --forge-type-small-size: 12px;
+    --forge-type-small-line-height: 18px;
+    --forge-type-body-size: 14px;
+    --forge-type-body-line-height: 20px;
+    --forge-type-section-size: 15px;
+    --forge-type-section-line-height: 22px;
+    --forge-type-heading-size: 18px;
+    --forge-type-heading-line-height: 24px;
+    --forge-type-title-size: 22px;
+    --forge-type-title-line-height: 28px;
+    --forge-type-metric-size: 28px;
+    --forge-type-metric-line-height: 34px;
+    --forge-type-display-size: 32px;
+    --forge-type-display-line-height: 40px;
+    --forge-type-code-size: 13px;
+    --forge-type-code-line-height: 20px;
     --forge-canvas: #f5f6f8;
     --forge-surface: #ffffff;
     --forge-surface-subtle: #f1f3f7;
@@ -67,6 +85,24 @@
 }
 /* Public theme hooks. No named-theme boundary means existing appearance. */
 .agently-workspace[data-forge-theme] {
+    --forge-type-caption-size: 11px;
+    --forge-type-caption-line-height: 16px;
+    --forge-type-small-size: 12px;
+    --forge-type-small-line-height: 18px;
+    --forge-type-body-size: var(--forge-font-size, 14px);
+    --forge-type-body-line-height: 20px;
+    --forge-type-section-size: 15px;
+    --forge-type-section-line-height: 22px;
+    --forge-type-heading-size: 18px;
+    --forge-type-heading-line-height: 24px;
+    --forge-type-title-size: 22px;
+    --forge-type-title-line-height: 28px;
+    --forge-type-metric-size: 28px;
+    --forge-type-metric-line-height: 34px;
+    --forge-type-display-size: 32px;
+    --forge-type-display-line-height: 40px;
+    --forge-type-code-size: 13px;
+    --forge-type-code-line-height: 20px;
     --forge-canvas: var(--forge-surface);
     --forge-surface-subtle: var(--forge-control-bg);
     --forge-surface-raised: var(--forge-surface);
@@ -102,6 +138,23 @@
     --forge-data-sequential-3: #85a9dd;
     --forge-data-sequential-4: #4b78b8;
     --forge-data-sequential-5: #17345d;
+    --forge-chart-series-1: var(--forge-data-categorical-1);
+    --forge-chart-series-2: var(--forge-data-categorical-2);
+    --forge-chart-series-3: var(--forge-data-categorical-3);
+    --forge-chart-series-4: var(--forge-data-categorical-4);
+    --forge-chart-series-5: var(--forge-data-categorical-5);
+    --forge-chart-series-6: var(--forge-data-categorical-6);
+    --forge-chart-text: var(--forge-text);
+    --forge-chart-text-muted: var(--forge-text-muted);
+    --forge-chart-surface: var(--forge-surface);
+    --forge-chart-surface-subtle: var(--forge-surface-subtle);
+    --forge-chart-border: var(--forge-border-color);
+    --forge-chart-grid: color-mix(in srgb, var(--forge-border-color) 72%, transparent);
+    --forge-chart-action: var(--forge-interaction-color);
+    --forge-chart-selected: var(--forge-selected-background);
+    --forge-chart-positive: var(--forge-status-success-foreground);
+    --forge-chart-negative: var(--forge-status-danger-foreground);
+    --forge-chart-neutral: var(--forge-text-muted);
     background-color: var(--forge-surface);
     color: var(--forge-text);
     font-family: var(--forge-font-family, system-ui, sans-serif);
