@@ -47,13 +47,13 @@ export function resolveHorizontalBarDataLabelLayout({ x = 0, width = 0, value = 
         return {
             x: negative ? barLeft + 6 : barRight - 6,
             textAnchor: negative ? "start" : "end",
-            fill: "#ffffff",
+            fill: "var(--forge-text-inverse, #ffffff)",
         };
     }
     return {
         x: negative ? barLeft - 6 : barRight + 6,
         textAnchor: negative ? "end" : "start",
-        fill: "#5f6b7c",
+        fill: "var(--forge-chart-text-muted, #5f6b7c)",
     };
 }
 

@@ -75,6 +75,9 @@ for (const token of [
     '--forge-status-danger-foreground',
     '--forge-status-success-background',
     '--forge-data-categorical-1',
+    '--forge-chart-series-1',
+    '--forge-type-caption-size',
+    '--forge-type-metric-line-height',
 ]) {
     assert.ok(themeCSS.includes(token), `missing optional semantic fallback ${token}`);
 }
