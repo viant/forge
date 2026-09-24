@@ -51,6 +51,7 @@ assert.ok(dashboardStyles.includes('font-size: var(--forge-report-type-metric-si
 assert.ok(dashboardStyles.includes('var(--forge-report-status-success-background, #e7f7ef)'));
 assert.ok(tabStyles.includes('var(--forge-report-text-muted, #486579)'));
 assert.ok(tabStyles.includes('var(--forge-report-selected, rgba(47, 109, 225, 0.045))'));
-assert.ok(tabStyles.includes('box-shadow: inset 0 -3px 0 var(--forge-tab-active-color, var(--forge-report-action, #215db0))'));
+assert.ok(tabStyles.includes('border-bottom-color: var(--forge-tab-active-color, var(--forge-report-action, #215db0))'));
+assert.ok(tabStyles.includes('box-shadow: none'));
 
 console.log('report runtime semantic theme contract passed');
