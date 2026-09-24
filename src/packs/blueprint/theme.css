@@ -210,6 +210,24 @@
     --forge-table-hover-surface: var(--forge-selected-background);
     --forge-table-muted-text: var(--forge-disabled-text);
     --forge-table-radius: var(--forge-control-radius);
+    --forge-dashboard-table-surface: var(--forge-table-surface);
+    --forge-dashboard-table-muted-surface: var(--forge-table-muted-surface);
+    --forge-dashboard-table-header-surface: var(--forge-table-header-surface);
+    --forge-dashboard-table-hover-surface: var(--forge-table-hover-surface);
+    --forge-dashboard-table-border: var(--forge-table-border);
+    --forge-dashboard-table-text: var(--forge-text);
+    --forge-dashboard-table-muted-text: var(--forge-table-muted-text);
+    --forge-dashboard-table-link: var(--forge-interaction-color);
+    --forge-dashboard-table-link-hover: var(--forge-interaction-hover);
+    --forge-dashboard-table-focus: var(--forge-focus-color);
+    --forge-dashboard-table-control-surface: var(--forge-control-bg);
+    --forge-dashboard-table-control-border: var(--forge-control-border);
+    --forge-dashboard-table-control-text: var(--forge-control-text);
+    --forge-dashboard-table-caption-size: var(--forge-type-caption-size);
+    --forge-dashboard-table-caption-line-height: var(--forge-type-caption-line-height);
+    --forge-dashboard-table-small-size: var(--forge-type-small-size);
+    --forge-dashboard-table-small-line-height: var(--forge-type-small-line-height);
+    --forge-dashboard-table-numeric-variant: tabular-nums;
 }
 
 .agently-workspace[data-forge-theme] :is([data-forge-part="container-card"], [data-forge-part="container-section"]) {
