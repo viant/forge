@@ -44,7 +44,7 @@
     margin: 0;
     padding: 7px 12px 8px;
     border: 0;
-    border-bottom: 0;
+    border-bottom: 3px solid transparent;
     border-radius: 0;
     background: transparent;
     color: var(--forge-report-text-muted, #486579);
@@ -63,10 +63,11 @@
 }
 
 .forge-section-tab.is-selected {
+    border-bottom-color: var(--forge-tab-active-color, var(--forge-report-action, #215db0));
     background: transparent;
     color: var(--forge-tab-active-color, var(--forge-report-action, #215db0));
     font-weight: var(--forge-section-tab-font-weight);
-    box-shadow: inset 0 -3px 0 var(--forge-tab-active-color, var(--forge-report-action, #215db0));
+    box-shadow: none;
     scroll-margin-inline: 44px;
 }
 
