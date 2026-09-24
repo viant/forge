@@ -22,8 +22,9 @@ import { clampPresentationText, normalizePresentationClampConfig, normalizePrese
 import { buildDashboardTableLayout } from "./dashboardTableLayout.js";
 
 const DEFAULT_SUBTITLE_STYLE = {
-    fontSize: '12px',
-    color: '#5f6b7c',
+    fontSize: 'var(--forge-dashboard-table-small-size, 12px)',
+    lineHeight: 'var(--forge-dashboard-table-small-line-height, normal)',
+    color: 'var(--forge-dashboard-table-muted-text, #5f6b7c)',
     margin: 0,
 };
 
@@ -219,7 +220,7 @@ export default function DashboardTableContent({
     return (
         <>
             {loading ? <div style={subtitleStyle}>Loading…</div> : null}
-            {error ? <div style={{...subtitleStyle, color: '#a82a2a'}}>{String(error)}</div> : null}
+            {error ? <div style={{...subtitleStyle, color: 'var(--forge-status-danger-foreground, #a82a2a)'}}>{String(error)}</div> : null}
             {!loading && !error && sortedRows.length === 0 ? <div style={subtitleStyle}>No data.</div> : null}
             {quickFilterEnabled ? (
                 <div className="forge-dashboard-table-tools">
@@ -278,7 +279,7 @@ export default function DashboardTableContent({
                                         key={col.key}
                                         className={col.frozen ? 'forge-table-frozen-identifier' : undefined}
                                         onClick={() => handleSort(col.key)}
-                                        style={{textAlign: col.align || 'left', color: active ? '#2367d1' : undefined, cursor: 'pointer', userSelect: 'none', ...(col.frozen ? {'--forge-frozen-column-width': `${col.resolvedCompactWidth}px`, '--forge-frozen-left': multiSelect ? '42px' : '0px'} : {})}}
+                                        style={{textAlign: col.align || 'left', color: active ? 'var(--forge-dashboard-table-link, #2367d1)' : undefined, cursor: 'pointer', userSelect: 'none', ...(col.frozen ? {'--forge-frozen-column-width': `${col.resolvedCompactWidth}px`, '--forge-frozen-left': multiSelect ? '42px' : '0px'} : {})}}
                                     >
                                         {col.label}{arrow}
                                     </th>
