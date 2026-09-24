@@ -296,17 +296,35 @@
     --forge-dashboard-table-small-size: var(--forge-type-small-size);
     --forge-dashboard-table-small-line-height: var(--forge-type-small-line-height);
     --forge-dashboard-table-numeric-variant: tabular-nums;
+    --forge-container-surface: var(--forge-surface);
+    --forge-container-text: var(--forge-text);
+    --forge-container-border: var(--forge-border-color);
+    --forge-container-shadow: none;
+    --forge-section-header-surface: var(--forge-surface-subtle);
+    --forge-section-header-text: var(--forge-text);
+    --forge-section-header-border: var(--forge-border-color);
+    --forge-section-header-shadow: none;
+    --forge-section-header-font-size: var(--forge-type-body-size);
+    --forge-section-header-line-height: var(--forge-type-body-line-height);
 }
 
 .agently-workspace[data-forge-theme] :is([data-forge-part="container-card"], [data-forge-part="container-section"]) {
-    background: var(--forge-control-bg);
-    color: var(--forge-text);
+    background: var(--forge-container-surface);
+    border-color: var(--forge-container-border);
+    box-shadow: var(--forge-container-shadow);
+    color: var(--forge-container-text);
 }
 .agently-workspace[data-forge-theme] [data-forge-part="container-section"] > .bp6-section-header {
-    background: var(--forge-table-header-surface);
-    color: var(--forge-text);
+    background: var(--forge-section-header-surface);
+    border-bottom-color: var(--forge-section-header-border);
+    box-shadow: var(--forge-section-header-shadow);
+    color: var(--forge-section-header-text);
 }
-.agently-workspace[data-forge-theme] [data-forge-part="container-section"] > .bp6-section-header .bp6-heading { color: inherit; }
+.agently-workspace[data-forge-theme] [data-forge-part="container-section"] > .bp6-section-header .bp6-heading {
+    color: inherit;
+    font-size: var(--forge-section-header-font-size);
+    line-height: var(--forge-section-header-line-height);
+}
 .agently-workspace[data-forge-theme][data-forge-color-mode="dark"] {
     --forge-lookup-bg: #213c32;
     --forge-lookup-border: #719a80;

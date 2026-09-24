@@ -76,9 +76,15 @@ for (const token of [
     '--forge-status-success-background',
     '--forge-data-categorical-1',
     '--forge-chart-series-1',
+    '--forge-container-surface',
+    '--forge-container-border',
+    '--forge-section-header-surface',
+    '--forge-section-header-text',
     '--forge-type-caption-size',
     '--forge-type-metric-line-height',
 ]) {
     assert.ok(themeCSS.includes(token), `missing optional semantic fallback ${token}`);
 }
+assert.match(themeCSS, /:is\(\[data-forge-part="container-card"\], \[data-forge-part="container-section"\]\)\s*{[^}]*background:\s*var\(--forge-container-surface\)/s);
+assert.match(themeCSS, /\[data-forge-part="container-section"\]\s*>\s*\.bp6-section-header\s*{[^}]*background:\s*var\(--forge-section-header-surface\)/s);
 console.log('optional semantic color fallbacks passed');
