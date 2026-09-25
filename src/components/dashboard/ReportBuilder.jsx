@@ -1,3 +1,8 @@
+import ReportBuilderBlockPreview from "./ReportBuilderBlockPreview.jsx";
+import { captureDesignDocument, designDocumentsEqual, restoreDesignDocument } from "./reportBuilderDesignHistory.js";
+import { renameReportBuilderTabState, reorderReportBuilderTabState, transferReportBuilderBlockState } from "./reportBuilderDocumentBlocks.js";
+import ReportBuilderTabActions from "./ReportBuilderTabActions.jsx";
+import { addReportBuilderTabState, removeReportBuilderTabState } from "./reportBuilderDocumentBlocks.js";
 import SectionTabRail from "../SectionTabRail.jsx";
 import { buildReportBuilderDesignSections, resolveDesignSectionInsertion } from "./reportBuilderDesignSections.js";
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -1886,7 +1891,16 @@ function ReportOptionHeader({ anchor, setMountedHeaders, children }) {
     return children;
 }
 
-export default function ReportBuilder({ container: sourceContainer, context }) {
+const DEFAULT_REPORT_BUILDER_HOST_ADAPTER = Object.freeze({ mode: "dashboard" });
+
+export default function ReportBuilder({ container: sourceContainer, context, hostAdapter = DEFAULT_REPORT_BUILDER_HOST_ADAPTER }) {
+    if (hostAdapter?.mode === "controlled") {
+        return <ReportBuilderReady container={sourceContainer} context={context} embedded={hostAdapter} />;
+    }
+    return <ReportBuilderDefinitionAdapter container={sourceContainer} context={context} />;
+}
+
+function ReportBuilderDefinitionAdapter({ container: sourceContainer, context }) {
     useSignals();
     const rootWindowFormValue = context?.signals?.windowForm?.value || {};
     const definitionConfig = getBuilderConfig(sourceContainer);
@@ -1941,7 +1955,20 @@ export default function ReportBuilder({ container: sourceContainer, context }) {
     return <ReportBuilderReady container={sourceContainer} context={context} />;
 }
 
-function ReportBuilderReady({ container: sourceContainer, context }) {
+function ReportBuilderReady({ container: sourceContainer, context, embedded = null }) {
+    const embeddedMode = !!embedded;
+    const supportedEmbeddedBlockKinds = new Set(["markdownBlock", "chartBlock", "tableBlock", "kpiBlock", "collectionBlock", "sectionBlock", "compositeBlock", "tabGroupBlock", "stepperBlock", "infoPanelBlock", "calloutBlock", "kanbanBlock", "timelineBlock", "badgesBlock", "geoMapBlock", "filterBarBlock", "refinementBarBlock"]);
+    const canAuthorBlockKind = React.useCallback((kind) => {
+        if (!embeddedMode) return true;
+        if (!supportedEmbeddedBlockKinds.has(kind)) return false;
+        const caps = embedded.capabilities || {};
+        if (caps.blockConfiguration === false) return false;
+        if (Array.isArray(caps.blockKinds) && !caps.blockKinds.includes(kind)) return false;
+        const feature = { chartBlock: "chart", tableBlock: "table", kpiBlock: "kpi", markdownBlock: "text",
+            sectionBlock: "documentHierarchy", tabGroupBlock: "documentHierarchy", compositeBlock: "documentHierarchy",
+            filterBarBlock: "filters", refinementBarBlock: "filters" }[kind];
+        return !feature || caps[feature] !== false;
+    }, [embeddedMode, embedded]);
     useSignals();
     const rootWindowFormSignal = context?.signals?.windowForm;
     const rootWindowFormValue = rootWindowFormSignal?.value || {};
@@ -2101,8 +2128,8 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     const persistedState = resolveKey(windowFormValue || {}, stateKey);
     const [persistedStateOverride, setPersistedStateOverride] = useState(null);
     const locallyStoredState = useMemo(
-        () => loadStoredReportBuilderState(stateStorageScope, legacyStateStorageScopes),
-        [legacyStateStorageScopes, stateStorageScope],
+        () => embeddedMode ? null : loadStoredReportBuilderState(stateStorageScope, legacyStateStorageScopes),
+        [embeddedMode, legacyStateStorageScopes, stateStorageScope],
     );
     const effectivePersistedState = useMemo(() => {
         return resolveEffectiveReportBuilderState(persistedStateOverride || persistedState, locallyStoredState);
@@ -2389,7 +2416,14 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     const [sourceEditorError, setSourceEditorError] = useState("");
     const [designDataActionsMenuOpen, setDesignDataActionsMenuOpen] = useState(false);
     const [designSourceCatalogOpen, setDesignSourceCatalogOpen] = useState(false);
+    const [designUndoStack, setDesignUndoStack] = useState([]);
+    const [designSourcesExpanded, setDesignSourcesExpanded] = useState(false);
+    const [designRecentlyAddedId, setDesignRecentlyAddedId] = useState("");
+    const [designPreviewOpen, setDesignPreviewOpen] = useState(false);
     const [designSectionId, setDesignSectionId] = useState("");
+    useEffect(() => {
+        if (embeddedMode && embedded.selectedSectionId) setDesignSectionId(embedded.selectedSectionId);
+    }, [embeddedMode, embedded?.selectedSectionId]);
     const [pendingDocumentSectionId, setPendingDocumentSectionId] = useState("");
     const [designSourceAddMenuRef, setDesignSourceAddMenuRef] = useState("");
     const [designSourceSearchQuery, setDesignSourceSearchQuery] = useState("");
@@ -2402,6 +2436,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     }));
     const [pendingDocumentInsertionPlacement, setPendingDocumentInsertionPlacement] = useState("after");
     const [tableCalculationDialogOpen, setTableCalculationDialogOpen] = useState(false);
+    useEffect(() => {
+        if (!embeddedMode) return;
+        embedded.onEditorDraftChange?.(!!(documentBlockDialogOpen || authoredChartBlockDialogOpen || sourceEditorDialogOpen || chartDialogOpen || calculatedFieldDialogOpen || tableCalculationDialogOpen));
+    }, [embedded, embeddedMode, documentBlockDialogOpen, authoredChartBlockDialogOpen, sourceEditorDialogOpen, chartDialogOpen, calculatedFieldDialogOpen, tableCalculationDialogOpen]);
+
     const [tableCalculationDraft, setTableCalculationDraft] = useState(() => buildReportBuilderTableCalculationDraft());
     const [editingTableCalculationId, setEditingTableCalculationId] = useState("");
     const authoredDetailParameterRowSequenceRef = useRef(1);
@@ -2611,7 +2650,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         if (requestedWorkspaceMode) {
             return normalizeReportBuilderWorkspaceMode(requestedWorkspaceMode, { compactMode: initialCompactMode });
         }
-        return loadStoredReportBuilderWorkspaceMode(
+        return embeddedMode ? "design" : loadStoredReportBuilderWorkspaceMode(
             stateStorageScope,
             initialCompactMode,
             legacyStateStorageScopes,
@@ -2621,14 +2660,14 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     const workspaceModeStorageLoadedValueRef = useRef("");
     const workspaceModeStorageReadyRef = useRef(false);
     const [leftRailWidthPercent, setLeftRailWidthPercent] = useState(() => (
-        configuredLeftRailWidthPercent ?? loadStoredReportBuilderLeftRailWidthPercent(stateStorageScope, legacyStateStorageScopes)
+        configuredLeftRailWidthPercent ?? (embeddedMode ? DEFAULT_REPORT_BUILDER_LEFT_RAIL_WIDTH_PERCENT : loadStoredReportBuilderLeftRailWidthPercent(stateStorageScope, legacyStateStorageScopes))
     ));
     const [resultPanePosition, setResultPanePosition] = useState(() => (
-        loadStoredReportBuilderResultPanePosition(
+        (embeddedMode ? configuredResultPanePosition : loadStoredReportBuilderResultPanePosition(
             stateStorageScope,
             legacyStateStorageScopes,
             configuredResultPanePosition,
-        )
+        ))
     ));
     const [leftRailViewportHeight, setLeftRailViewportHeight] = useState(0);
     const [leftRailResizing, setLeftRailResizing] = useState(false);
@@ -2849,6 +2888,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             ? applyReportBuilderHydratedDocumentSessionState(nextWithExplorationHistory, currentHydratedReportDocumentSession)
             : nextWithExplorationHistory;
         currentBuilderStateRef.current = nextPersistableState;
+        if (embeddedMode) {
+            setPersistedStateOverride(nextPersistableState);
+            embedded.onChange?.(nextPersistableState, effectiveConfig);
+            return;
+        }
         persistStoredReportBuilderState(stateStorageScope, nextPersistableState, legacyStateStorageScopes);
         // Some hosts expose a signal-like window form without a synchronous React update.
         // Keep local interactions visible while the host catches up.
@@ -2866,7 +2910,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             replace: true,
             bumpPrefillRevision: false,
         });
-    }, [builderContext, config, legacyStateStorageScopes, replaceWindowFormBuilderState, stateKey, stateStorageScope, windowFormSignal]);
+    }, [builderContext, config, legacyStateStorageScopes, replaceWindowFormBuilderState, stateKey, stateStorageScope, windowFormSignal, embedded, embeddedMode]);
     const persistState = React.useCallback((next, options = {}) => (
         persistStateWithConfig(next, config, options)
     ), [config, persistStateWithConfig]);
@@ -2894,15 +2938,15 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             setLeftRailWidthPercent(configuredLeftRailWidthPercent);
             return;
         }
-        setLeftRailWidthPercent(loadStoredReportBuilderLeftRailWidthPercent(stateStorageScope, legacyStateStorageScopes));
+        if (!embeddedMode) setLeftRailWidthPercent(loadStoredReportBuilderLeftRailWidthPercent(stateStorageScope, legacyStateStorageScopes));
     }, [configuredLeftRailWidthPercent, legacyStateStorageScopes, stateStorageScope]);
 
     useEffect(() => {
-        persistStoredReportBuilderLeftRailWidthPercent(stateStorageScope, leftRailWidthPercent, legacyStateStorageScopes);
+        if (!embeddedMode) persistStoredReportBuilderLeftRailWidthPercent(stateStorageScope, leftRailWidthPercent, legacyStateStorageScopes);
     }, [leftRailWidthPercent, legacyStateStorageScopes, stateStorageScope]);
 
     useEffect(() => {
-        setResultPanePosition(loadStoredReportBuilderResultPanePosition(
+        if (!embeddedMode) setResultPanePosition(loadStoredReportBuilderResultPanePosition(
             stateStorageScope,
             legacyStateStorageScopes,
             configuredResultPanePosition,
@@ -2910,7 +2954,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     }, [configuredResultPanePosition, legacyStateStorageScopes, stateStorageScope]);
 
     useEffect(() => {
-        persistStoredReportBuilderResultPanePosition(stateStorageScope, resultPanePosition, legacyStateStorageScopes);
+        if (!embeddedMode) persistStoredReportBuilderResultPanePosition(stateStorageScope, resultPanePosition, legacyStateStorageScopes);
     }, [legacyStateStorageScopes, resultPanePosition, stateStorageScope]);
 
     useEffect(() => () => {
@@ -2923,11 +2967,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     useEffect(() => {
         const loadedMode = requestedWorkspaceMode
             ? normalizeReportBuilderWorkspaceMode(requestedWorkspaceMode, { compactMode })
-            : loadStoredReportBuilderWorkspaceMode(
+            : (embeddedMode ? "design" : loadStoredReportBuilderWorkspaceMode(
                 stateStorageScope,
                 compactMode,
                 legacyStateStorageScopes,
-            );
+            ));
         workspaceModeStorageContextKeyRef.current = `${stateStorageScope}::${compactMode ? "compact" : "desktop"}`;
         workspaceModeStorageLoadedValueRef.current = loadedMode;
         workspaceModeStorageReadyRef.current = false;
@@ -2950,6 +2994,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             workspaceModeStorageReadyRef.current = true;
             return;
         }
+        if (embeddedMode) return;
         persistStoredReportBuilderWorkspaceMode(
             stateStorageScope,
             workspaceMode,
@@ -3198,6 +3243,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             return;
         }
         if (normalizedArea === "drill") {
+            if (embeddedMode && (embedded.capabilities?.drillTargets === false || embedded.capabilities?.detailTargets === false)) return;
             setDesignWorkspaceFocus("document");
             setDocumentDataViewOpen(true);
             setDimensionsCollapsed(false);
@@ -3205,7 +3251,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             requestAnimationFrame(() => scrollDesignPanelIntoView(breakdownPanelRef));
             return;
         }
-    }, [scrollDesignPanelIntoView]);
+    }, [scrollDesignPanelIntoView, embeddedMode, embedded]);
 
     const startLeftRailResize = React.useCallback((event) => {
         if (compactMode || !builderRootRef.current) {
@@ -3625,6 +3671,16 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         () => resolveReportBuilderDocumentBlockList(state),
         [state.reportDocumentBlocks, state.reportDocumentLayout],
     );
+    useEffect(() => {
+        if (!designRecentlyAddedId || !designWorkspaceMode) return;
+        const frame = requestAnimationFrame(() => {
+            const nodes = builderRootRef.current?.querySelectorAll('[data-testid="report-builder-outline-node"]') || [];
+            const node = Array.from(nodes).find((entry) => entry.getAttribute("data-outline-entry-id") === designRecentlyAddedId);
+            node?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        });
+        const timer = window.setTimeout(() => setDesignRecentlyAddedId(""), 2600);
+        return () => { cancelAnimationFrame(frame); window.clearTimeout(timer); };
+    }, [designRecentlyAddedId, designWorkspaceMode, authoredDocumentBlocks]);
     const resolveCurrentDefaultInsertionAfterId = React.useCallback(
         () => resolveDefaultReportBuilderInsertionAfterId({
             authoredBlocks: authoredDocumentBlocks,
@@ -6286,7 +6342,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                 })}
                             </div>
                         ) : null}
-                        {(selectedDimensionDefs.length > 0
+                        {(!embeddedMode || (embedded.capabilities?.drillTargets !== false && embedded.capabilities?.detailTargets !== false)) && (selectedDimensionDefs.length > 0
                             || authoredDrillSummary.hierarchyCount > 0
                             || authoredDrillSummary.detailTargetCount > 0
                             || authoredDrillSummary.fieldActionCount > 0) ? (
@@ -6947,7 +7003,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
 
     function openAuthoredAction(actionId = "", options = {}) {
         const normalizedActionId = String(actionId || "").trim();
-        if (!normalizedActionId) {
+        if (!normalizedActionId || !canAuthorBlockKind(normalizedActionId)) {
             return;
         }
         if (normalizedActionId === "chartBlock") {
@@ -8182,6 +8238,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     ), []);
 
     const dispatchReportRequestSnapshot = React.useCallback((snapshot, { forceFetch = false, markManual = false } = {}) => {
+        if (embeddedMode) return { request: snapshot.request, readiness: snapshot.readiness, shouldFetch: false };
         const request = snapshot.request;
         const nextReadiness = snapshot.readiness;
         const fingerprint = snapshot.requestFingerprint || snapshot.fingerprint;
@@ -8206,7 +8263,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             builderContext?.handlers?.dataSource?.fetchCollection?.();
         }
         return { request, fingerprint, readiness: nextReadiness, shouldFetch };
-    }, [builderContext, config.request?.autoFetch]);
+    }, [builderContext, config.request?.autoFetch, embeddedMode]);
 
     const dispatchReportRequest = React.useCallback((nextState, options = {}) => (
         dispatchReportRequestSnapshot(captureRunDispatchSnapshot(nextState), options)
@@ -9660,7 +9717,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     ]);
 
     useEffect(() => {
-        setStoredChartPresets(loadStoredChartPresets(stateStorageScope, legacyChartPresetScopes));
+        setStoredChartPresets(embeddedMode ? [] : loadStoredChartPresets(stateStorageScope, legacyChartPresetScopes));
     }, [legacyChartPresetScopes, stateStorageScope]);
 
     const compactStatusText = useMemo(() => resolveCompactStatusText({
@@ -9877,12 +9934,22 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         [authoredCapabilities.actions],
     );
     const documentDesignActionGroup = useMemo(
-        () => authoredCapabilities.actionGroups.find((group) => group.id === "document") || null,
-        [authoredCapabilities.actionGroups],
+        () => {
+            const group = authoredCapabilities.actionGroups.find((entry) => entry.id === "document") || null;
+            return group && embeddedMode
+                ? { ...group, actionIds: group.actionIds.filter((id) => canAuthorBlockKind(id)) }
+                : group;
+        },
+        [authoredCapabilities.actionGroups, embeddedMode, canAuthorBlockKind],
     );
     const runtimeDesignActionGroup = useMemo(
-        () => authoredCapabilities.actionGroups.find((group) => group.id === "runtime") || null,
-        [authoredCapabilities.actionGroups],
+        () => {
+            const group = authoredCapabilities.actionGroups.find((entry) => entry.id === "runtime") || null;
+            return group && embeddedMode
+                ? { ...group, actionIds: group.actionIds.filter((id) => canAuthorBlockKind(id)) }
+                : group;
+        },
+        [authoredCapabilities.actionGroups, embeddedMode, canAuthorBlockKind],
     );
     const showAuthoredReportSurface = !designWorkspaceMode && authoredDocumentBlockCount > 0;
     const authoredAudienceReportMode = reportWorkspaceMode && showAuthoredReportSurface;
@@ -10041,7 +10108,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         rows,
     }), [builderContext, displayConfig]);
     const runtimePreviewRowsState = useReportRuntimePreviewRows({
-        enabled: (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
+        enabled: !embeddedMode && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
             && !hostedReportActivationPending
             && hostedReportStarterReady
             && !shouldDeferReportBuilderRequestForPrefill({
@@ -10103,7 +10170,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         datasets: runtimePreviewPublishedDatasets,
     }), [runtimePreviewPublishedDatasets, runtimePreviewRequestKey]);
     const runtimePreviewDatasetPayloadState = useReportRuntimePreviewDatasetPayloads({
-        enabled: (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
+        enabled: !embeddedMode && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
             && !hostedReportActivationPending
             && hostedReportStarterReady
             && !shouldDeferReportBuilderRequestForPrefill({
@@ -11889,6 +11956,14 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         if (!nextState || typeof nextState !== "object" || Array.isArray(nextState)) {
             return;
         }
+        const previousDesignState = currentBuilderStateRef.current || {};
+        if (!designDocumentsEqual(previousDesignState, nextState)) {
+            setDesignUndoStack((history) => [...history.slice(-19), {
+                before: captureDesignDocument(previousDesignState), after: captureDesignDocument(nextState),
+                sectionId: designSectionId, selectedId: selectedDocumentOutlineEntryId,
+                label: sourceContext?.label || "Design change",
+            }]);
+        }
         if (reportWorkspaceMode) {
             persistState(nextState, { skipExplorationHistory: true });
             return;
@@ -11913,7 +11988,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 ? `Draft started from ${normalizeString(sourceContext.label)}.`
                 : "Draft started.",
         });
-    }, [container, persistState, reportWorkspaceMode]);
+    }, [container, persistState, reportWorkspaceMode, designSectionId, selectedDocumentOutlineEntryId]);
 
     const persistPassiveViewState = React.useCallback((nextState) => {
         if (!nextState || typeof nextState !== "object" || Array.isArray(nextState)) {
@@ -12208,7 +12283,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             updatedAt: Date.now(),
         });
         setStoredChartPresets(nextPresets);
-        persistStoredChartPresets(stateStorageScope, nextPresets, legacyChartPresetScopes);
+        if (!embeddedMode) persistStoredChartPresets(stateStorageScope, nextPresets, legacyChartPresetScopes);
     }, [legacyChartPresetScopes, settingsHash, stateStorageScope, storedChartPresets]);
 
     const applyChartSpec = React.useCallback((nextChartSpec, { savePreset = true } = {}) => {
@@ -12926,6 +13001,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             },
         });
         setSelectedDocumentOutlineEntryId(result.block.id);
+        if (result.created) setDesignRecentlyAddedId(result.block.id);
         closeDocumentBlockDialog();
         const insertionAnchorTitle = pendingDocumentInsertionAfterId === "primaryBuilder"
             ? ""
@@ -13414,6 +13490,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             },
         });
         setSelectedDocumentOutlineEntryId(result.block.id);
+        if (result.created) setDesignRecentlyAddedId(result.block.id);
         closeAuthoredChartBlockDialog();
         const insertionAnchorTitle = pendingDocumentInsertionAfterId === "primaryBuilder"
             ? ""
@@ -13429,6 +13506,48 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         });
         return true;
     }, [authoredChartBlockDraft, authoredChartConfig, authoredChartDialogFieldOptions, authoredDocumentBlocks, closeAuthoredChartBlockDialog, editingAuthoredChartBlockId, pendingDocumentInsertionAfterId, pendingDocumentInsertionPlacement, pendingDocumentSectionId, persistExplorationMutation, state]);
+    const lastDesignChange = designUndoStack[designUndoStack.length - 1];
+    const canUndoDesign = !!lastDesignChange && designDocumentsEqual(state, lastDesignChange.after);
+    const undoDesign = React.useCallback(() => {
+        if (!lastDesignChange || !designDocumentsEqual(currentBuilderStateRef.current, lastDesignChange.after)) return;
+        persistState(restoreDesignDocument(currentBuilderStateRef.current, lastDesignChange.before), { skipExplorationHistory: true });
+        setDesignUndoStack((history) => history.slice(0, -1));
+        setDesignSectionId(lastDesignChange.sectionId);
+        setSelectedDocumentOutlineEntryId(lastDesignChange.selectedId);
+        setChartApplyFeedback({ level: "success", message: `Undid ${lastDesignChange.label}.` });
+    }, [lastDesignChange, persistState]);
+    const renameDesignTab = React.useCallback((tabId, title) => {
+        persistExplorationMutation(renameReportBuilderTabState(state, tabId, title), { sourceContext: { label: `Rename tab to ${title}` } });
+    }, [state, persistExplorationMutation]);
+    const reorderDesignTab = React.useCallback((tabId, targetId) => {
+        persistExplorationMutation(reorderReportBuilderTabState(state, tabId, targetId), { sourceContext: { label: "Reorder tabs" } });
+    }, [state, persistExplorationMutation]);
+    const transferDesignBlock = React.useCallback((blockId, tabId, duplicate = false) => {
+        const result = transferReportBuilderBlockState(state, blockId, tabId, { duplicate });
+        if (!result.valid) return;
+        const title = authoredDocumentBlocks.find((block) => block.id === blockId)?.title || "Block";
+        const target = designSections.tabs.find((tab) => tab.sectionId === tabId)?.label || "tab";
+        persistExplorationMutation(result.nextState, { sourceContext: { label: `${duplicate ? "Duplicate" : "Move"} ${title} to ${target}` } });
+        setDesignSectionId(tabId);
+        setSelectedDocumentOutlineEntryId(result.blockId);
+        setDesignRecentlyAddedId(result.blockId);
+        setChartApplyFeedback({ level: "success", message: `${title} ${duplicate ? "copied" : "moved"} to ${target}.` });
+    }, [state, authoredDocumentBlocks, designSections, persistExplorationMutation]);
+    const addDesignTab = React.useCallback((title) => {
+        const result = addReportBuilderTabState(state, title);
+        persistExplorationMutation(result.nextState, { sourceKind: "reportBuilder.result", sourceContext: { label: `Add tab ${title}` } });
+        setDesignSectionId(result.sectionId);
+        setSelectedDocumentOutlineEntryId(result.sectionId);
+        setPendingDocumentInsertionPlacement("after");
+    }, [state, persistExplorationMutation]);
+    const removeDesignTab = React.useCallback((tabId) => {
+        const result = removeReportBuilderTabState(state, tabId);
+        persistExplorationMutation(result.nextState, { sourceKind: "reportBuilder.result", sourceContext: { label: "Remove tab and blocks" } });
+        setDesignSectionId("");
+        setSelectedDocumentOutlineEntryId("");
+        setPendingDocumentInsertionPlacement("after");
+    }, [state, persistExplorationMutation]);
+    const designTabRemovalCount = useMemo(() => removeReportBuilderTabState(state, activeDesignSection?.id).removedCount, [state, activeDesignSection?.id]);
     const removeDocumentBlock = React.useCallback((blockId = "") => {
         const normalizedBlockId = String(blockId || "").trim();
         if (!normalizedBlockId) {
@@ -16689,16 +16808,46 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         }
         focusDesignArea(normalizedActionId);
     }, [captureCurrentDrillHierarchy, focusDesignArea]);
+    const documentPreviewDraft = useMemo(() => {
+        if (!documentBlockDialogOpen || !documentBlockDraftValidation.valid) return null;
+        return upsertReportBuilderDocumentBlockState(state, documentBlockDraft, {
+            editingId: editingDocumentBlockId,
+            valueFieldOptions: documentBlockDraftValueFieldOptions,
+            secondaryFieldOptions: documentBlockDraftSecondaryFieldOptions,
+            tableColumnOptions: documentBlockDraftTableColumnOptions,
+            childBlockOptions: authoredCompositeChildBlockOptions,
+            scopeParamOptions: authoredScopeParamOptions,
+            chartConfig: authoredChartConfig, chartFieldOptions: authoredChartFieldOptions,
+        }).block;
+    }, [documentBlockDialogOpen, documentBlockDraftValidation.valid, state, documentBlockDraft, editingDocumentBlockId,
+        documentBlockDraftValueFieldOptions, documentBlockDraftSecondaryFieldOptions, documentBlockDraftTableColumnOptions,
+        authoredCompositeChildBlockOptions, authoredScopeParamOptions, authoredChartConfig, authoredChartFieldOptions]);
+    const chartPreviewDraft = useMemo(() => {
+        if (!authoredChartBlockDialogOpen || !authoredChartBlockDraftValidation.valid) return null;
+        return upsertReportBuilderDocumentBlockState(state, authoredChartBlockDraft, {
+            editingId: editingAuthoredChartBlockId, chartConfig: authoredChartConfig, chartFieldOptions: authoredChartDialogFieldOptions,
+        }).block;
+    }, [authoredChartBlockDialogOpen, authoredChartBlockDraftValidation.valid, state, authoredChartBlockDraft,
+        editingAuthoredChartBlockId, authoredChartConfig, authoredChartDialogFieldOptions]);
+    const renderDesignBlockPreview = React.useCallback((blockId, draft = null, invalid = false) => (
+        <ReportBuilderBlockPreview blockId={blockId} draft={draft} invalid={invalid}
+            document={runtimePreviewArtifact?.document}
+            reportSpec={authoredRuntimePreviewState?.canRenderRuntime ? authoredRuntimePreviewState.runtimeConfig?.reportSpec : null}
+            reportFill={authoredRuntimePreviewState?.canRenderRuntime ? authoredRuntimePreviewState.runtimeConfig?.reportFill : null}
+            locale={locale}
+            unavailableMessage={authoredRuntimePreviewState?.errorState?.description || authoredRuntimePreviewState?.blockedState?.description}
+        />
+    ), [runtimePreviewArtifact?.document, authoredRuntimePreviewState, locale]);
     const renderDesignWorkspaceOverview = React.useCallback(() => {
         if (!designWorkspaceMode) {
             return null;
         }
-        const activeFocus = designWorkspaceFocus === "runtime"
+        const activeFocus = designWorkspaceFocus === "runtime" && (!embeddedMode || embedded.capabilities?.filters !== false)
             ? "runtime"
             : "document";
         const focusOptions = [
             { id: "document", label: "Layout" },
-            { id: "runtime", label: "Filters" },
+            ...(!embeddedMode || embedded.capabilities?.filters !== false ? [{ id: "runtime", label: "Filters" }] : []),
         ];
         const renderStage = (stage = null, {
             primary = false,
@@ -16925,6 +17074,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 return;
             }
             if (normalizedKind === "drillHierarchy" || normalizedKind === "drillPlaceholder") {
+                if (embeddedMode && (embedded.capabilities?.drillTargets === false || embedded.capabilities?.detailTargets === false)) return;
                 focusDesignArea("drill");
                 return;
             }
@@ -16932,6 +17082,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             if (!block) {
                 return;
             }
+            if (!canAuthorBlockKind(normalizedKind)) return;
             if (normalizedKind === "chartBlock") {
                 openAuthoredChartBlockDialog(block);
                 return;
@@ -17037,15 +17188,17 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 const repairDraft = outlineBlock ? buildRepairableDocumentBlockDraft(outlineBlock) : null;
                 const canRepairOutlineBlock = !!repairDraft;
                 const outlineBlockIndex = authoredDocumentBlocks.findIndex((candidate) => normalizeString(candidate?.id) === normalizeString(entry?.id));
-                const canDragOutlineBlock = !!outlineBlock && depth === 0 && !isDrillNode && !isPrimaryBuilder && !isPrimaryChartView && !isPrimaryTableView;
+                const canDragOutlineBlock = !!outlineBlock && (!embeddedMode || embedded.capabilities?.layout !== false) && canAuthorBlockKind(normalizedKind) && depth === 0 && !isDrillNode && !isPrimaryBuilder && !isPrimaryChartView && !isPrimaryTableView;
                 const isOutlineDropTarget = canDragOutlineBlock && isDropTargetEntry;
-                const selectedActionLabel = isPrimaryBuilder || isPrimaryTableView
+                const selectedActionLabel = embeddedMode && !canAuthorBlockKind(normalizedKind)
+                    ? "Read only"
+                    : isPrimaryBuilder || isPrimaryTableView
                     ? (documentDataViewOpen ? "Close data editor" : "Open data editor")
                     : (isPrimaryChartView
                         ? (normalizeString(state?.chartSpec?.title || state?.chartSpec?.type) ? "Edit chart" : "Add chart")
                             : (normalizeString(entry?.actionLabel || (isDrillNode ? "Drill setup" : "Edit block"))
                             || (isDrillNode ? "Drill setup" : "Edit block")));
-                const showInlineToolbar = !!outlineBlock && isSelected;
+                const showInlineToolbar = !!outlineBlock && isSelected && canAuthorBlockKind(normalizedKind);
                 const actionLabel = showInlineToolbar
                     ? ""
                     : (isSelected ? selectedActionLabel : "");
@@ -17184,6 +17337,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                     isOutlineDropTarget ? `is-drop-${documentOutlineDropTarget.placement || "before"}` : "",
                                     isOutlineDropTarget ? "is-drop-target" : "",
                                     isSelected ? "is-selected" : "",
+                                    designRecentlyAddedId === entry.id ? "is-new" : "",
                                 ].filter(Boolean).join(" ")}
                                 data-outline-depth={depth}
                                 data-testid="report-builder-outline-node"
@@ -17223,9 +17377,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                                 {entry.datasetLabel}
                                             </span>
                                         ) : null}
-                                        {entry.widthLabel ? widthTrigger : null}
+                                        {entry.widthLabel && (!embeddedMode || embedded.capabilities?.layout !== false) && canAuthorBlockKind(normalizedKind) ? widthTrigger : null}
                                     </span>
-                                    {entry.summary ? (
+                                    {embeddedMode && !canAuthorBlockKind(normalizedKind) ? (
+                                        <span className="forge-report-builder__design-outline-node-summary">Unsupported block · read only</span>
+                                    ) : entry.summary ? (
                                         <span className="forge-report-builder__design-outline-node-summary">{entry.summary}</span>
                                     ) : null}
                                 </span>
@@ -17274,6 +17430,20 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                         placement="bottom-end"
                                         content={(
                                             <Menu className="forge-report-builder__chart-menu">
+                                                {!["sectionBlock", "tabGroupBlock"].includes(normalizedKind) ? (
+                                                    <>
+                                                        <MenuItem icon="move" text="Move to tab" disabled={!designSections.tabs.some((tab) => tab.sectionId && tab.id !== activeDesignSection?.id)}>
+                                                            {designSections.tabs.filter((tab) => tab.sectionId && tab.id !== activeDesignSection?.id).map((tab) => (
+                                                                <MenuItem key={tab.id} text={tab.label} onClick={() => transferDesignBlock(outlineBlock.id, tab.sectionId)} />
+                                                            ))}
+                                                        </MenuItem>
+                                                        <MenuItem icon="duplicate" text="Duplicate to tab" disabled={!designSections.tabs.some((tab) => tab.sectionId)}>
+                                                            {designSections.tabs.filter((tab) => tab.sectionId).map((tab) => (
+                                                                <MenuItem key={tab.id} text={tab.label} onClick={() => transferDesignBlock(outlineBlock.id, tab.sectionId, true)} />
+                                                            ))}
+                                                        </MenuItem>
+                                                    </>
+                                                ) : null}
                                                 <MenuItem
                                                     icon="trash"
                                                     intent="danger"
@@ -17288,10 +17458,6 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                             className="forge-report-builder__design-outline-toolbar-button"
                                             aria-label={`More actions for ${entry.title}`}
                                             title={`More actions for ${entry.title}`}
-                                            onClick={(event) => {
-                                                event.preventDefault();
-                                                event.stopPropagation();
-                                            }}
                                         >
                                             <Icon icon="more" size={12} />
                                         </button>
@@ -17860,7 +18026,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 ));
             };
             const renderSourceAddAction = (card) => {
-                if (!card.datasetRef || !(card.canAddTable || card.canAddChart || card.canAddKpi || card.canAddCollection)) {
+                if (!card.datasetRef || !(card.canAddTable || card.canAddChart || card.canAddKpi || card.canAddCollection)
+                    || (embeddedMode && ![
+                        card.canAddTable && canAuthorBlockKind("tableBlock"), card.canAddChart && canAuthorBlockKind("chartBlock"),
+                        card.canAddKpi && canAuthorBlockKind("kpiBlock"), card.canAddCollection && canAuthorBlockKind("collectionBlock"),
+                    ].some(Boolean))) {
                     return null;
                 }
                 const sourceCardId = reportBuilderSourceCardId(card);
@@ -17872,7 +18042,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                         placement="bottom-start"
                         content={(
                             <Menu className="forge-report-builder__chart-menu">
-                                {card.canAddTable ? (
+                                {card.canAddTable && canAuthorBlockKind("tableBlock") ? (
                                     <MenuItem
                                         icon="th"
                                         text="Table"
@@ -17885,7 +18055,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                         }))}
                                     />
                                 ) : null}
-                                {card.canAddChart ? (
+                                {card.canAddChart && canAuthorBlockKind("chartBlock") ? (
                                     <MenuItem
                                         icon="timeline-line-chart"
                                         text="Chart"
@@ -17897,7 +18067,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                         }))}
                                     />
                                 ) : null}
-                                {card.canAddKpi ? (
+                                {card.canAddKpi && canAuthorBlockKind("kpiBlock") ? (
                                     <MenuItem
                                         icon="ring"
                                         text="KPI"
@@ -17910,7 +18080,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                         }))}
                                     />
                                 ) : null}
-                                {card.canAddCollection ? (
+                                {card.canAddCollection && canAuthorBlockKind("collectionBlock") ? (
                                     <MenuItem
                                         icon="widget"
                                         text="Collection"
@@ -17979,7 +18149,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                             >
                                 {card.inspected ? "Hide preview" : "Preview"}
                             </Button>
-                            {renderSourceAddAction(card)}
+                            {(!embeddedMode || embedded.capabilities?.sourceManager !== false) ? renderSourceAddAction(card) : null}
                         </div>
                     </article>
                 );
@@ -17988,9 +18158,14 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 <section className="forge-report-builder__design-stage" aria-label="Report data sources">
                     <div className="forge-report-builder__design-stage-header">
                         <div className="forge-report-builder__design-stage-title">Data Sources</div>
+                        <Button small minimal icon={designSourcesExpanded || designSourceCatalogOpen ? "chevron-up" : "chevron-down"}
+                            aria-expanded={designSourcesExpanded || designSourceCatalogOpen}
+                            onClick={() => { setDesignSourcesExpanded(!(designSourcesExpanded || designSourceCatalogOpen)); setDesignSourceCatalogOpen(false); }}>
+                            {designSourcesExpanded || designSourceCatalogOpen ? "Collapse sources" : `Show sources (${visibleReportDataSourceCards.length})`}
+                        </Button>
                     </div>
-                    <div className="forge-report-builder__design-stage-actions">
-                        {reportDataSourceCards.length > linkedReportDataSourceCards.length ? (
+                    {(!embeddedMode || embedded.capabilities?.sourceManager !== false) ? <div className="forge-report-builder__design-stage-actions">
+                        {(!embeddedMode || embedded.capabilities?.sourceManager !== false) && reportDataSourceCards.length > linkedReportDataSourceCards.length ? (
                             <Button
                                 small
                                 outlined
@@ -18035,7 +18210,8 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                 Edit data
                             </Button>
                         </Popover>
-                    </div>
+                    </div> : null}
+                    <div hidden={!designSourcesExpanded && !designSourceCatalogOpen}>
                     {reportBuildProvenance ? (
                         <details className="forge-report-builder__build-provenance">
                             <summary>
@@ -18241,6 +18417,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                             ) : null}
                     </section>
                 ) : null}
+                    </div>
                     {documentDataViewOpen ? renderDocumentDataViewPanel() : null}
                 </section>
             );
@@ -18376,16 +18553,30 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                     </div>
                                 ) : null}
                             </div>
+                            <div className="forge-report-builder__design-insertion-hint" role="status">
+                                Add to {activeDesignSection?.label || "Main"}
+                                {selectedDocumentInsertionTarget.insertionAnchorTitle ? ` · ${pendingDocumentInsertionPlacement === "before" && selectedDocumentInsertionTarget.insertionAfterId !== activeDesignSection?.sectionId ? "before" : "after"} ${selectedDocumentInsertionTarget.insertionAnchorTitle}` : ""}
+                            </div>
                             {designSections.tabs.length > 0 ? (
                                 <>
-                                    <div>
-                                        <Button small minimal icon={designSections.group ? "edit" : "add"}
-                                            onClick={() => openDocumentBlockDialog(designSections.group || "tabGroupBlock")}>
-                                            {designSections.group ? "Edit report tabs" : "Add report tabs"}
-                                        </Button>
-                                    </div>
+                                    <ReportBuilderTabActions
+                                        tab={activeDesignSection}
+                                        tabCount={designSections.tabs.length}
+                                        hasGroup={!!designSections.group}
+                                        removalCount={designTabRemovalCount}
+                                        onAdd={addDesignTab}
+                                        onRemove={removeDesignTab}
+                                        onUndo={undoDesign}
+                                        canUndo={canUndoDesign}
+                                        onEditingChange={embeddedMode ? embedded.onEditorDraftChange : undefined}
+                                        actionsDisabled={embeddedMode && embedded.capabilities?.documentHierarchy === false}
+                                        onEdit={() => openDocumentBlockDialog(designSections.group)}
+                                    />
                                     <SectionTabRail
-                                        items={designSections.tabs}
+                                        items={designSections.tabs.map((tab) => ({ ...tab, editable: !!tab.sectionId }))}
+                                        onRename={!embeddedMode || embedded.capabilities?.documentHierarchy !== false ? renameDesignTab : undefined}
+                                        onReorder={!embeddedMode || (embedded.capabilities?.documentHierarchy !== false && embedded.capabilities?.layout !== false) ? reorderDesignTab : undefined}
+                                        onEditingChange={embeddedMode ? embedded.onEditorDraftChange : undefined}
                                         selectedId={activeDesignSection?.id || ""}
                                         ariaLabel="Report block sections"
                                         onChange={(id) => {
@@ -18397,6 +18588,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                     />
                                 </>
                             ) : null}
+                            <Button small minimal icon="eye-open" active={designPreviewOpen}
+                                onClick={() => setDesignPreviewOpen((open) => !open)} disabled={!selectedDocumentOutlineBlock}>
+                                {designPreviewOpen ? "Hide block preview" : "Preview selected block"}
+                            </Button>
+                            <div className={designPreviewOpen ? "forge-report-builder__design-block-workspace has-preview" : "forge-report-builder__design-block-workspace"}>
                             {visibleDesignOutlineEntries.length > 0 ? (
                                 <>
                                     <div className="forge-report-builder__design-outline-tree">
@@ -18412,6 +18608,8 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                     ) : null}
                                 </div>
                             )}
+                            {designPreviewOpen && selectedDocumentOutlineBlock ? renderDesignBlockPreview(selectedDocumentOutlineBlock.id) : null}
+                            </div>
                             {showSelectedDocumentSemanticContext ? (
                                 <section
                                     className="forge-report-builder__design-stage"
@@ -18500,7 +18698,22 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         compactMode,
         currentSemanticBindingViewState,
         designDocumentOutlineEntries,
+        canAuthorBlockKind,
+        embeddedMode,
+        embedded,
         designSections,
+        addDesignTab,
+        canUndoDesign,
+        undoDesign,
+        renameDesignTab,
+        reorderDesignTab,
+        transferDesignBlock,
+        designSourcesExpanded,
+        designPreviewOpen,
+        renderDesignBlockPreview,
+        designRecentlyAddedId,
+        removeDesignTab,
+        designTabRemovalCount,
         activeDesignSection,
         visibleDesignOutlineEntries,
         designWorkspaceFlowState,
@@ -20286,7 +20499,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     ]);
 
     useEffect(() => {
-        if (pendingReportWorkspaceRunRef.current) {
+        if (embeddedMode || pendingReportWorkspaceRunRef.current) {
             return;
         }
         const autoRunAction = resolveReportBuilderSurfaceAutoRunAction({
@@ -20595,7 +20808,8 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         data-report-builder-chart-title={String(state.chartSpec?.title || "").trim()}
         data-report-builder-chart-type={String(state.chartSpec?.type || "").trim()}
         data-report-builder-left-rail-width={compactMode ? "" : `${resolvedLeftRailWidthPercent.toFixed(2)}%`}
-        data-report-builder-compact={compactMode ? "true" : "false"}>
+        data-report-builder-compact={compactMode ? "true" : "false"}
+        data-report-builder-embedded={embeddedMode ? "true" : undefined}>
             <input
                 ref={importReportFileInputRef}
                 type="file"
@@ -20612,7 +20826,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 style={{ display: "none" }}
                 onChange={importStaticDatasetFile}
             />
-            <div className="forge-report-builder__top">
+            {!embeddedMode ? <div className="forge-report-builder__top">
                 {compactMode ? (
                     hostedExecuteOnOpen && reportWorkspaceMode ? renderCompactHostedReportToolbar() : renderCompactHeader()
                 ) : hostedExecuteOnOpen && reportWorkspaceMode ? (
@@ -20748,7 +20962,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                         </div>
                     </div>
                 )}
-            </div>
+            </div> : null}
 
             {visibleSemanticInlineNotices.map((notice, index) => (
                 <ReportBuilderInlineNotice
@@ -23445,7 +23659,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 </main>
             </div>
 
-            {designWorkspaceMode && !compactMode && !useFilterDrawer && !useFilterRail ? renderFiltersPanel() : null}
+            {designWorkspaceMode && (!embeddedMode || embedded.capabilities?.filters !== false) && !compactMode && !useFilterDrawer && !useFilterRail ? renderFiltersPanel() : null}
             {renderCompactSetupSheet()}
             {renderCompactChartSheet()}
             {renderCompactSemanticSheet()}
@@ -23481,6 +23695,8 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             />
             <ReportBuilderDocumentBlockDialog
                 isOpen={documentBlockDialogOpen}
+                insertionLabel={!editingDocumentBlockId ? `Add to ${activeDesignSection?.label || "Main"}` : ""}
+                preview={documentBlockDialogOpen ? renderDesignBlockPreview(documentPreviewDraft?.id, documentPreviewDraft, !documentBlockDraftValidation.valid) : null}
                 onClose={closeDocumentBlockDialog}
                 draft={documentBlockDraft}
                 onDraftChange={setDocumentBlockDraft}
@@ -23516,6 +23732,8 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             />
             <ReportBuilderChartDialog
                 isOpen={authoredChartBlockDialogOpen}
+                insertionLabel={!editingAuthoredChartBlockId ? `Add to ${activeDesignSection?.label || "Main"}` : ""}
+                preview={authoredChartBlockDialogOpen ? renderDesignBlockPreview(chartPreviewDraft?.id, chartPreviewDraft, !authoredChartBlockDraftValidation.valid) : null}
                 onClose={closeAuthoredChartBlockDialog}
                 draft={authoredChartBlockDraft?.chartSpec || null}
                 datasetRef={authoredChartDialogDatasetRef}

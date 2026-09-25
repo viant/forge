@@ -111,3 +111,15 @@
         font-size: var(--forge-report-type-small-size, 12px);
     }
 }
+
+.forge-section-tab-rename {
+    min-width: 120px;
+    max-width: 240px;
+    margin: 4px;
+    padding: 8px 12px;
+    border: 1px solid var(--forge-report-action, #215db0);
+    border-radius: 6px;
+    color: var(--forge-report-text, #20394b);
+    background: var(--forge-report-surface, #fff);
+    font: inherit;
+}

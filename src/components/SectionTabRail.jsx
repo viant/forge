@@ -16,7 +16,23 @@ export function revealSelectedTab(rail, selected, behavior) {
 }
 
 /** Shared visual navigation primitive used by report sections and form panels. */
-export default function SectionTabRail({items = [], selectedId = '', onChange, ariaLabel = 'Sections', showIcons = false, compact = false, idPrefix = '', panelId = ''}) {
+export default function SectionTabRail({items = [], selectedId = '', onChange, onRename, onReorder, onEditingChange, ariaLabel = 'Sections', showIcons = false, compact = false, idPrefix = '', panelId = ''}) {
+    const [editingId, setEditingId] = React.useState('');
+    const [editingLabel, setEditingLabel] = React.useState('');
+    const draggingId = React.useRef('');
+    const cancelledRename = React.useRef(false);
+    const beginRename = (item) => {
+        if (!onRename || item.editable === false) return;
+        cancelledRename.current = false;
+        setEditingId(item.id);
+        setEditingLabel(item.label || item.title || item.id);
+        onEditingChange?.(true);
+    };
+    const finishRename = (id) => {
+        if (!cancelledRename.current && editingLabel.trim()) onRename?.(id, editingLabel.trim());
+        setEditingId('');
+        onEditingChange?.(false);
+    };
     const tabRefs = React.useRef([]);
     const railRef = React.useRef(null);
     const [overflow, setOverflow] = React.useState({left: false, right: false});
@@ -88,12 +104,41 @@ export default function SectionTabRail({items = [], selectedId = '', onChange, a
         <div ref={railRef} className={`forge-section-tab-rail${compact ? ' is-compact' : ''}`} role="tablist" aria-label={ariaLabel}>
             {items.map((item, index) => {
                 const selected = String(item?.id || '') === String(selectedId || '');
+                if (editingId === item.id) return <input key={item.id} autoFocus
+                    className="forge-section-tab-rename" aria-label={`Rename ${item.label || item.title || 'tab'}`}
+                    value={editingLabel} onFocus={(event) => event.target.select()}
+                    onChange={(event) => setEditingLabel(event.target.value)}
+                    onBlur={() => finishRename(item.id)}
+                    onKeyDown={(event) => {
+                        if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
+                        if (event.key === 'Escape') { cancelledRename.current = true; setEditingId(''); onEditingChange?.(false); }
+                    }} />;
                 return (
                     <button key={item.id} ref={(node) => { tabRefs.current[index] = node; }} id={`${baseId}-tab-${index}`}
                         type="button" role="tab" aria-selected={selected} aria-controls={panelId || undefined}
                         tabIndex={selected || (selectedId === '' && index === selectedIndex) ? 0 : -1}
                         className={`forge-section-tab${selected ? ' is-selected' : ''}`}
-                        onKeyDown={(event) => onTabKeyDown(event, index)}
+                        title={onRename && item.editable !== false ? 'Double-click or press F2 to rename. Drag or Alt+Arrow to reorder.' : undefined}
+                        draggable={!!onReorder && item.editable !== false}
+                        onDragStart={(event) => { draggingId.current = item.id; event.dataTransfer.setData('text/plain', item.id); event.dataTransfer.effectAllowed = 'move'; }}
+                        onDragEnd={() => { draggingId.current = ''; }}
+                        onDragOver={(event) => { if (onReorder && draggingId.current && item.editable !== false) event.preventDefault(); }}
+                        onDrop={(event) => {
+                            event.preventDefault();
+                            if (item.editable !== false && draggingId.current) onReorder?.(draggingId.current, item.id);
+                            draggingId.current = '';
+                        }}
+                        onDoubleClick={() => beginRename(item)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'F2' && onRename) { event.preventDefault(); beginRename(item); return; }
+                            if (event.altKey && onReorder && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+                                event.preventDefault();
+                                const target = items[index + (event.key === 'ArrowLeft' ? -1 : 1)];
+                                if (item.editable !== false && target && target.editable !== false) onReorder(item.id, target.id);
+                                return;
+                            }
+                            onTabKeyDown(event, index);
+                        }}
                         onClick={() => onChange?.(item.id)}>
                         {showIcons && item.icon ? <Icon icon={item.icon} size={14}/> : null}
                         <span>{item.label || item.title || item.id}</span>
