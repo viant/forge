@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 import { buildAuthoredLandscapeSavedReportRecord } from "./authoredLandscapeSavedReportRecordBuilder.js";
 
 const fixtureUrl = new URL("./authored-landscape-saved-report-record-fixture.v1.json", import.meta.url);
-const fixture = JSON.parse(readFileSync(fixtureUrl, "utf8"));
+let fixture = JSON.parse(readFileSync(fixtureUrl, "utf8"));
 
 const record = buildAuthoredLandscapeSavedReportRecord();
+
+if (process.env.REGENERATE_REPORT_PRINT_FIXTURES === "1") {
+  fixture = record;
+  writeFileSync(fixtureUrl, `${JSON.stringify(fixture, null, 2)}\n`);
+}
 
 assert.deepEqual(record, fixture);
 
