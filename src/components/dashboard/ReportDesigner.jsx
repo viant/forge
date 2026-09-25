@@ -66,6 +66,7 @@ export default function ReportDesigner({
     const [operation, setOperation] = useState({ status: "idle" });
     const [sources, setSources] = useState([]);
     const [sourceState, setSourceState] = useState({ status: "idle" });
+    const [pendingSourceAuthoring, setPendingSourceAuthoring] = useState(null);
     const [pendingDatasetUpdate, setPendingDatasetUpdate] = useState(null);
     const requestRef = useRef(null);
     const incomingSignature = signature(report);
@@ -92,7 +93,7 @@ export default function ReportDesigner({
     }, [candidate, onChange, effectiveReadOnly]);
     const replaceFromHost = () => {
         requestRef.current?.abort();
-        setBase(pendingHostReport); setCandidate(pendingHostReport); setPendingHostReport(null); setPendingDatasetUpdate(null);
+        setBase(pendingHostReport); setCandidate(pendingHostReport); setPendingHostReport(null); setPendingDatasetUpdate(null); setPendingSourceAuthoring(null);
         setGeneration((value) => value + 1); setActiveEditorDraft(false); setOperation({ status: "idle" });
     };
     const invoke = async (kind, callback) => {
@@ -123,6 +124,7 @@ export default function ReportDesigner({
     const discover = async () => {
         requestRef.current?.abort();
         const controller = new AbortController(); requestRef.current = controller;
+        setPendingSourceAuthoring(null);
         setSourceState({ status: "loading" });
         try {
             const results = await Promise.allSettled(sourceProviders.map(async (provider) => ({
@@ -145,23 +147,16 @@ export default function ReportDesigner({
             setSourceState({ status: unavailable.length ? (found.length ? "partial" : "unavailable") : "result", message: unavailable.join(" ") });
         } catch (error) { if (!controller.signal.aborted) setSourceState({ status: "error", message: label(error) }); }
     };
-    const selectSource = async ({ provider, source }) => {
-        requestRef.current?.abort();
-        const controller = new AbortController(); requestRef.current = controller;
-        setSourceState({ status: "loading" });
+    const completeSource = async ({ provider, source, described, authored, controller }) => {
         try {
-            const described = await provider.describe({ id: source.id, version: source.version, signal: controller.signal });
-            if (controller.signal.aborted) return;
-            if (described?.status === "denied" || described?.status === "unavailable") {
-                setSourceState({ status: described.status, message: described.message || "Source unavailable." }); return;
-            }
-            const checked = await provider.validate({ source: described, report: candidate, signal: controller.signal });
+            const checked = await provider.validate({ source: described, report: candidate, authored, signal: controller.signal });
             if (controller.signal.aborted) return;
             if (checked?.status === "denied" || checked?.status === "unavailable" || checked?.valid !== true) {
                 setSourceState({ status: checked?.status || "error", message: checked?.message || "Source validation failed." }); return;
             }
             const selectionError = validateProviderSourceSelection(source, described, checked.dataset);
             if (selectionError) { setSourceState({ status: "error", message: selectionError }); return; }
+            setPendingSourceAuthoring(null);
             if ((candidate.datasets || []).some((entry) => entry.id === checked.dataset.id)) {
                 setPendingDatasetUpdate(checked.dataset);
                 setSourceState({ status: "result", message: `${checked.dataset.id} is already declared. Review the source update.` });
@@ -173,6 +168,32 @@ export default function ReportDesigner({
             setSourceState({ status: "result", message: `${checked.dataset.id} added.` });
             setGeneration((value) => value + 1);
         } catch (error) { if (!controller.signal.aborted) setSourceState({ status: "error", message: label(error) }); }
+    };
+    const selectSource = async ({ provider, source }) => {
+        requestRef.current?.abort();
+        const controller = new AbortController(); requestRef.current = controller;
+        setPendingSourceAuthoring(null);
+        setSourceState({ status: "loading" });
+        try {
+            const described = await provider.describe({ id: source.id, version: source.version, signal: controller.signal });
+            if (controller.signal.aborted) return;
+            if (described?.status === "denied" || described?.status === "unavailable") {
+                setSourceState({ status: described.status, message: described.message || "Source unavailable." }); return;
+            }
+            if (typeof provider.renderAuthoring === "function") {
+                setPendingSourceAuthoring({ provider, source, described });
+                setSourceState({ status: "result", message: "Declare the dataset and result contract before adding this source." });
+                return;
+            }
+            await completeSource({ provider, source, described, controller });
+        } catch (error) { if (!controller.signal.aborted) setSourceState({ status: "error", message: label(error) }); }
+    };
+    const submitSourceAuthoring = (authored) => {
+        if (!pendingSourceAuthoring || effectiveReadOnly) return;
+        requestRef.current?.abort();
+        const controller = new AbortController(); requestRef.current = controller;
+        setSourceState({ status: "loading" });
+        void completeSource({ ...pendingSourceAuthoring, authored, controller });
     };
     const effectiveCatalog = datasets || catalog;
     const prepared = prepareEmbeddedReport(candidate, effectiveCatalog);
@@ -209,13 +230,19 @@ export default function ReportDesigner({
             <button key={`${provider.id}:${source.id}:${source.version}`} type="button" disabled={effectiveReadOnly || source.status === "denied" || source.status === "unavailable"}
                 onClick={() => selectSource({ provider, source })}>{source.display?.label || source.id} · {source.version}{source.status && source.status !== "available" ? ` · ${source.status}` : ""}</button>
         ))}</div> : null}
+        {pendingSourceAuthoring ? <div role="group" aria-label="Author source dataset" className="forge-report-designer__source-authoring">
+            {pendingSourceAuthoring.provider.renderAuthoring({ source: pendingSourceAuthoring.described,
+                onSubmit: submitSourceAuthoring, onCancel: () => setPendingSourceAuthoring(null),
+                disabled: effectiveReadOnly || sourceState.status === "loading" })}
+        </div> : null}
         {effectiveReadOnly && (candidate.datasets || []).length ? <details className="forge-report-designer__declared-sources">
             <summary>Declared sources ({candidate.datasets.length})</summary>
             <ul>{candidate.datasets.map((dataset) => <li key={dataset.id}>{dataset.label || dataset.id} · {dataset.dataSourceRef || "Source unavailable"}</li>)}</ul>
         </details> : null}
         {effectiveReadOnly && readOnlyTabs.length > 1 ? <SectionTabRail items={readOnlyTabs} selectedId={readOnlySectionId || readOnlyTabs[0].id}
             onChange={setReadOnlySectionId} ariaLabel="Read-only report tabs" /> : null}
-        <EmbeddedDesignWorkspace key={`${candidate.id}:${generation}`} report={candidate} catalog={effectiveCatalog} capabilities={capabilities} readOnly={effectiveReadOnly}
+        <EmbeddedDesignWorkspace key={`${candidate.id}:${generation}`} report={candidate} catalog={effectiveCatalog}
+            capabilities={{ ...capabilities, sourceManager: capabilities.embeddedSourceManager ?? capabilities.sourceManager }} readOnly={effectiveReadOnly}
             selectedSectionId={readOnlySectionId} onChange={acceptChange} onEditorDraftChange={setActiveEditorDraft} />
         {operation.status === "loading" ? <p role="status">{operation.kind} in progress…</p> : null}
         {["error", "conflict", "denied", "unavailable"].includes(operation.status) ? <p role="alert">{operation.message || `${operation.kind} ${operation.status}.`}</p> : null}

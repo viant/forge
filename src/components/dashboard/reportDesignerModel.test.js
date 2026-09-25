@@ -39,6 +39,8 @@ const added = addEmbeddedDataset(report, declaration);
 assert.equal(added.valid, true);
 assert.equal(added.report.datasets.length, 2);
 assert.equal(report.datasets.length, 1);
+const preparedWithNewSource = prepareEmbeddedReport(added.report, { datasets: [{ id: 'existing', dataSourceRef: 'existing' }] });
+assert.deepEqual(preparedWithNewSource.config.datasets.map((dataset) => dataset.id), ['existing', 'sales', 'new']);
 assert.equal(addEmbeddedDataset(added.report, declaration).valid, false);
 const updated = replaceEmbeddedDataset(added.report, { ...declaration, source: { ...declaration.source, version: 'v2' } });
 assert.equal(updated.valid, true);

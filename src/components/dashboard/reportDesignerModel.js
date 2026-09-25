@@ -12,8 +12,13 @@ export function prepareEmbeddedReport(report, catalog = {}) {
     }
     if (!isObject(report) || !Array.isArray(report.blocks)) return { valid: false, reason: "A native report document with blocks is required." };
     const builder = report.blocks.find((block) => block?.kind === "reportBuilderBlock");
-    const resolved = resolveReportDocumentBuilderContext(report, { ...(builder?.config || {}), ...(catalog || {}) }, builder?.state || {});
-    const config = { ...(resolved.config || {}), ...(catalog || {}) };
+    const catalogDatasets = Array.isArray(catalog?.datasets) ? catalog.datasets : [];
+    const authoredDatasets = Array.isArray(report.datasets) ? report.datasets : [];
+    const authoredIDs = new Set(authoredDatasets.map((dataset) => text(dataset?.id)).filter(Boolean));
+    const mergedDatasets = [...catalogDatasets.filter((dataset) => !authoredIDs.has(text(dataset?.id))), ...authoredDatasets];
+    const designDocument = mergedDatasets.length ? { ...report, datasets: mergedDatasets } : report;
+    const resolved = resolveReportDocumentBuilderContext(designDocument, { ...(builder?.config || {}), ...(catalog || {}) }, builder?.state || {});
+    const config = { ...(catalog || {}), ...(resolved.config || {}) };
     const state = {
         ...(resolved.state || {}),
         ...(Array.isArray(report.scope?.params) ? { scopeParams: {
