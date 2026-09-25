@@ -2422,7 +2422,6 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const [designDataActionsMenuOpen, setDesignDataActionsMenuOpen] = useState(false);
     const [designSourceCatalogOpen, setDesignSourceCatalogOpen] = useState(false);
     const [reportFiltersNeedApply, setReportFiltersNeedApply] = useState(false);
-    const [reportFilterApplySequence, setReportFilterApplySequence] = useState(0);
     const [draftDynamicGroups, setDraftDynamicGroups] = useState(null);
     const [designUndoStack, setDesignUndoStack] = useState([]);
     const [designSourcesExpanded, setDesignSourcesExpanded] = useState(false);
@@ -3341,10 +3340,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const currentRequestFingerprintValueRef = useRef(currentRequestFingerprint);
     currentRequestFingerprintValueRef.current = currentRequestFingerprint;
     const currentRequestShouldFetch = useMemo(
-        () => !reportFiltersNeedApply
-            && (config.request?.autoFetch !== false || (reportFilterRefreshMode === "apply" && reportFilterApplySequence > 0))
-            && resolveStateReadiness(state).canRun,
-        [config.request?.autoFetch, reportFiltersNeedApply, reportFilterApplySequence, resolveStateReadiness, state],
+        () => !reportFiltersNeedApply && config.request?.autoFetch !== false && resolveStateReadiness(state).canRun,
+        [config.request?.autoFetch, reportFiltersNeedApply, resolveStateReadiness, state],
     );
     const currentRequestDispatchFingerprint = useMemo(
         () => `${currentRequestFingerprint}::${currentRequestShouldFetch ? "fetch" : "hold"}`,
@@ -5676,7 +5673,11 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                         {!designWorkspaceMode && reportFilterRefreshMode === "apply" ? (
                             <button type="button" className="forge-report-builder__bottom-toggle"
                                 aria-label={reportFiltersNeedApply ? "Apply filter changes and refresh report" : "Refresh report"}
-                                onClick={() => { setReportFiltersNeedApply(false); setReportFilterApplySequence((value) => value + 1); }}>
+                                onClick={() => {
+                                    setReportFiltersNeedApply(false);
+                                    if (authoredDocumentBlockCount > 0) setManualRunSequence((value) => value + 1);
+                                    else runReport({ origin: "manual" });
+                                }}>
                                 <Icon icon="refresh" size={14} /> {reportFiltersNeedApply ? "Apply filters" : "Refresh"}
                             </button>
                         ) : null}
@@ -8264,7 +8265,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         const request = snapshot.request;
         const nextReadiness = snapshot.readiness;
         const fingerprint = snapshot.requestFingerprint || snapshot.fingerprint;
-        const shouldFetch = !reportFiltersNeedApply && nextReadiness.canRun && (forceFetch || config.request?.autoFetch !== false);
+        const shouldFetch = (!reportFiltersNeedApply || (forceFetch && markManual))
+            && nextReadiness.canRun && (forceFetch || config.request?.autoFetch !== false);
         requestFingerprintRef.current = `${fingerprint}::${shouldFetch ? "fetch" : "hold"}`;
         if (markManual) {
             lastManualRunFingerprintRef.current = fingerprint;
@@ -12054,6 +12056,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             } else {
                 nextValue = current === optionValue ? "" : optionValue;
             }
+            if (reportFilterRefreshMode === "apply") setReportFiltersNeedApply(true);
             runtimePreviewInteraction.setDatasetScopeParamValue({
                 datasetRef: normalizedDatasetRef,
                 paramId: key,
@@ -12090,6 +12093,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             const current = currentScopedValues[key] && typeof currentScopedValues[key] === "object"
                 ? currentScopedValues[key]
                 : {};
+            if (reportFilterRefreshMode === "apply") setReportFiltersNeedApply(true);
             runtimePreviewInteraction.setDatasetScopeParamValue({
                 datasetRef: normalizedDatasetRef,
                 paramId: key,

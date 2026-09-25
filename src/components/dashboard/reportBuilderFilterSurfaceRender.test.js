@@ -35,7 +35,7 @@ assert.match(source, /aria-label="Refresh report"/);
 assert.match(source, /aria-label="Export report"/);
 assert.match(
     source,
-    /authoredRuntimePreviewState\.canRenderRuntime && !reportWorkspaceMode && desktopResultHeaderState\.quickActions\.enabled/,
+    /previewStateForDisplay\.canRenderRuntime && !reportWorkspaceMode && desktopResultHeaderState\.quickActions\.enabled/,
     "an invoked report must not leak chart-authoring actions",
 );
 assert.match(
