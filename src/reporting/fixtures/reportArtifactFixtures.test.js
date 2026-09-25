@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 import {
   buildReportBuilderReportDocument,
@@ -21,7 +21,7 @@ import { applyReportBuilderSemanticConfig } from "../../components/dashboard/rep
 const fixtureUrl = new URL("./performance-report-fixtures.v1.json", import.meta.url);
 const fixtures = JSON.parse(readFileSync(fixtureUrl, "utf8"));
 const printFixtureUrl = new URL("./performance-report-print-fixtures.v1.json", import.meta.url);
-const printFixtures = JSON.parse(readFileSync(printFixtureUrl, "utf8"));
+let printFixtures = JSON.parse(readFileSync(printFixtureUrl, "utf8"));
 
 const rawConfig = {
   title: "Performance Report",
@@ -409,6 +409,19 @@ const authoredPrint = buildReportPrintFromReportFill({
   reportSpec: authoredSpec,
   reportFill: authoredFill,
 });
+
+// Deliberate renderer updates can refresh only the generated print snapshots.
+// The normal test path remains a strict comparison against the committed file.
+if (process.env.REGENERATE_REPORT_PRINT_FIXTURES === "1") {
+  printFixtures = {
+    ...printFixtures,
+    raw: { ...printFixtures.raw, reportPrint: rawPrint },
+    semantic: { ...printFixtures.semantic, reportPrint: semanticPrint },
+    geo: { ...printFixtures.geo, reportPrint: geoPrint },
+    authored: { ...printFixtures.authored, reportPrint: authoredPrint },
+  };
+  writeFileSync(printFixtureUrl, `${JSON.stringify(printFixtures, null, 2)}\n`);
+}
 
 assert.deepEqual(validateReportSpec(fixtures.raw.reportSpec), { valid: true, errors: [] });
 assert.deepEqual(validateReportFill(fixtures.raw.reportFill), { valid: true, errors: [] });
