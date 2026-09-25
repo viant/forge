@@ -3399,7 +3399,7 @@
           "number": 2,
           "elements": [
             {
-              "id": "primaryTable__title_0",
+              "id": "primaryTable__title_page_2_0",
               "kind": "text",
               "box": {
                 "x": 36,
@@ -5024,7 +5024,7 @@
           "number": 3,
           "elements": [
             {
-              "id": "comparisonTable__title_0",
+              "id": "comparisonTable__title_page_3_0",
               "kind": "text",
               "box": {
                 "x": 36,
@@ -7368,7 +7368,7 @@
           "number": 4,
           "elements": [
             {
-              "id": "comparisonTable__title_0",
+              "id": "comparisonTable__title_page_4_0",
               "kind": "text",
               "box": {
                 "x": 36,
@@ -8452,14 +8452,6 @@
           "y": 84
         },
         {
-          "id": "bookmark.primaryTable",
-          "title": "Table (continued)",
-          "pageNumber": 2,
-          "level": 1,
-          "elementId": "primaryTable__title_0",
-          "y": 84
-        },
-        {
           "id": "bookmark.headlineKpi",
           "title": "Headline KPI",
           "pageNumber": 2,
@@ -8474,22 +8466,6 @@
           "level": 1,
           "elementId": "comparisonTable__title_0",
           "y": 558
-        },
-        {
-          "id": "bookmark.comparisonTable",
-          "title": "Comparison Table (continued)",
-          "pageNumber": 3,
-          "level": 1,
-          "elementId": "comparisonTable__title_0",
-          "y": 84
-        },
-        {
-          "id": "bookmark.comparisonTable",
-          "title": "Comparison Table (continued)",
-          "pageNumber": 4,
-          "level": 1,
-          "elementId": "comparisonTable__title_0",
-          "y": 84
         },
         {
           "id": "bookmark.channelTrend",
