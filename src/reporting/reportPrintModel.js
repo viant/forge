@@ -1125,6 +1125,23 @@ function renderReportPrintGridRow(state = {}, entries = []) {
     return;
   }
   ensureReportPrintPage(state);
+  if (rowEntries.length > 1 && state.cursorY > state.contentTop) {
+    // Render the authored row into detached pages first. If either column
+    // would spill, move the whole row together; rendering children directly
+    // from the old cursor can strand a half-width partner on the next page.
+    const probe = { ...state, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null };
+    moveToReportPrintPage(probe, 0);
+    probe.cursorY = state.cursorY;
+    renderReportPrintGridRowAtCurrentPosition(probe, rowEntries);
+    if (probe.currentPageIndex > 0) {
+      startNextReportPrintPage(state);
+    }
+  }
+  renderReportPrintGridRowAtCurrentPosition(state, rowEntries);
+}
+
+function renderReportPrintGridRowAtCurrentPosition(state, rowEntries) {
+  ensureReportPrintPage(state);
   const startPosition = resolveReportPrintStatePosition(state);
   const unitWidth = Math.max(
     1,
