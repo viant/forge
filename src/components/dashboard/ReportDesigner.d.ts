@@ -1,4 +1,4 @@
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 export interface NativeReportDocument {
   version?: number;
@@ -26,10 +26,11 @@ export interface SourceProvider {
   id: string;
   discover(input: { signal: AbortSignal }): Promise<SourceDescriptor[] | { status: "result" | "partial" | "denied" | "unavailable" | "error"; sources?: SourceDescriptor[]; message?: string }>;
   describe(input: { id: string; version: string; signal: AbortSignal }): Promise<SourceDescriptor>;
-  validate(input: { source: SourceDescriptor; report: NativeReportDocument; signal: AbortSignal }): Promise<
+  validate(input: { source: SourceDescriptor; report: NativeReportDocument; authored?: unknown; signal: AbortSignal }): Promise<
     | { valid: true; dataset: Record<string, unknown> }
     | { valid: false; status?: "denied" | "unavailable" | "error"; message: string }
   >;
+  renderAuthoring?(input: { source: SourceDescriptor; onSubmit: (authored: unknown) => void; onCancel: () => void; disabled: boolean }): ReactNode;
 }
 export interface ReportHostResult {
   status: "loading" | "partial" | "result" | "error" | "conflict" | "denied" | "unavailable";
@@ -43,7 +44,7 @@ export interface ReportDesignerProps {
   report: NativeReportDocument;
   catalog?: Record<string, unknown>;
   datasets?: Record<string, unknown>;
-  capabilities?: { blockKinds?: string[]; blockConfiguration?: boolean; documentHierarchy?: boolean; layout?: boolean; filters?: boolean; chart?: boolean; table?: boolean; kpi?: boolean; text?: boolean; drillTargets?: boolean; detailTargets?: boolean; sourceManager?: boolean; [key: string]: unknown };
+  capabilities?: { blockKinds?: string[]; blockConfiguration?: boolean; documentHierarchy?: boolean; layout?: boolean; filters?: boolean; chart?: boolean; table?: boolean; kpi?: boolean; text?: boolean; drillTargets?: boolean; detailTargets?: boolean; sourceManager?: boolean; embeddedSourceManager?: boolean; [key: string]: unknown };
   sourceProviders?: SourceProvider[];
   readOnly?: boolean;
   expectedRevision?: string | number | null;
