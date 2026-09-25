@@ -5546,6 +5546,12 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         </>
     );
 
+    const requiredFilterSummary = buildReportBuilderScopeSummaryFromParams(
+        compactRequiredStaticFilters.map((filter) => {
+            const id = resolveScopeParamId(filter);
+            return {id, label: filter?.label || id, kind: filter?.type, value: getScopeParamValue(state, id)};
+        }),
+    );
     const renderFiltersPanel = ({ inlineReportMode = false } = {}) => (
         <aside className={[
             "forge-report-builder__bottom",
@@ -5581,7 +5587,9 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                             Filters
                         </h3>
                         <div className="forge-report-builder__bottom-description">
-                            Refine scope and targeting for this report.
+                            {!designWorkspaceMode && requiredFilterSummary.items.length > 0
+                                ? requiredFilterSummary.text
+                                : "Refine scope and targeting for this report."}
                         </div>
                     </div>
                     <div className="forge-report-builder__bottom-header-actions">
@@ -20013,6 +20021,11 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                 className="forge-report-builder__runtime-preview"
                 aria-label={reportWorkspaceMode ? "Authored report" : "Authored runtime preview"}
             >
+                {reportFilterSurfaceModel.surfaceCount === 0 && requiredFilterSummary.items.length > 0 ? (
+                    <div className="forge-report-builder__result-meta" aria-label="Active report filters">
+                        <span className="forge-report-builder__result-meta-chip">{requiredFilterSummary.text}</span>
+                    </div>
+                ) : null}
                 {authoredRuntimePreviewState.loadingState ? (
                     <ReportBuilderResultState
                         icon={authoredRuntimePreviewState.loadingState.icon}
