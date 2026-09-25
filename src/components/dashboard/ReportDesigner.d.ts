@@ -24,7 +24,7 @@ export interface SourceDescriptor {
 }
 export interface SourceProvider {
   id: string;
-  discover(input: { signal: AbortSignal }): Promise<SourceDescriptor[] | { status: "result" | "partial" | "denied" | "unavailable" | "error"; sources?: SourceDescriptor[]; message?: string }>;
+  discover(input: { signal: AbortSignal; after?: string }): Promise<SourceDescriptor[] | { status: "result" | "partial" | "denied" | "unavailable" | "error"; sources?: SourceDescriptor[]; message?: string; nextAfter?: string }>;
   describe(input: { id: string; version: string; signal: AbortSignal }): Promise<SourceDescriptor>;
   validate(input: { source: SourceDescriptor; report: NativeReportDocument; authored?: unknown; signal: AbortSignal }): Promise<
     | { valid: true; dataset: Record<string, unknown> }

@@ -65,6 +65,7 @@ export default function ReportDesigner({
     const [generation, setGeneration] = useState(0);
     const [operation, setOperation] = useState({ status: "idle" });
     const [sources, setSources] = useState([]);
+    const [sourcePages, setSourcePages] = useState([]);
     const [sourceState, setSourceState] = useState({ status: "idle" });
     const [pendingSourceAuthoring, setPendingSourceAuthoring] = useState(null);
     const [pendingDatasetUpdate, setPendingDatasetUpdate] = useState(null);
@@ -125,6 +126,7 @@ export default function ReportDesigner({
         requestRef.current?.abort();
         const controller = new AbortController(); requestRef.current = controller;
         setPendingSourceAuthoring(null);
+        setSourcePages([]);
         setSourceState({ status: "loading" });
         try {
             const results = await Promise.allSettled(sourceProviders.map(async (provider) => ({
@@ -134,6 +136,7 @@ export default function ReportDesigner({
             if (controller.signal.aborted) return;
             const found = [];
             const unavailable = [];
+            const pages = [];
             for (const entry of results) {
                 if (entry.status === "rejected") { unavailable.push(label(entry.reason)); continue; }
                 const { provider, response } = entry.value;
@@ -142,10 +145,46 @@ export default function ReportDesigner({
                 }
                 const items = Array.isArray(response) ? response : response?.sources;
                 (Array.isArray(items) ? items : []).forEach((source) => found.push({ provider, source }));
+                if (response?.nextAfter) pages.push({ provider, after: response.nextAfter });
             }
             setSources(found);
-            setSourceState({ status: unavailable.length ? (found.length ? "partial" : "unavailable") : "result", message: unavailable.join(" ") });
+            setSourcePages(pages);
+            setSourceState({ status: unavailable.length || pages.length ? (found.length ? "partial" : "unavailable") : "result", message: unavailable.join(" ") });
         } catch (error) { if (!controller.signal.aborted) setSourceState({ status: "error", message: label(error) }); }
+    };
+    const loadMoreSources = async () => {
+        if (!sourcePages.length) return;
+        requestRef.current?.abort();
+        const controller = new AbortController(); requestRef.current = controller;
+        setSourceState({ status: "loading" });
+        const results = await Promise.allSettled(sourcePages.map(async ({ provider, after }) => ({
+            provider, response: await provider.discover({ after, signal: controller.signal }),
+        })));
+        if (controller.signal.aborted) return;
+        const found = [...sources];
+        const seen = new Set(found.map(({ provider, source }) => `${provider.id}:${source.id}:${source.version}`));
+        const pages = [];
+        const unavailable = [];
+        results.forEach((entry, index) => {
+            if (entry.status === "rejected") {
+                unavailable.push(label(entry.reason));
+                pages.push(sourcePages[index]);
+                return;
+            }
+            const { provider, response } = entry.value;
+            if (!Array.isArray(response) && response?.status && response.status !== "result" && response.status !== "partial") {
+                unavailable.push(response.message || `${provider.id} is ${response.status}.`);
+            }
+            const items = Array.isArray(response) ? response : response?.sources;
+            (Array.isArray(items) ? items : []).forEach((source) => {
+                const key = `${provider.id}:${source.id}:${source.version}`;
+                if (!seen.has(key)) { seen.add(key); found.push({ provider, source }); }
+            });
+            if (response?.nextAfter && response.nextAfter !== sourcePages[index].after) pages.push({ provider, after: response.nextAfter });
+        });
+        setSources(found);
+        setSourcePages(pages);
+        setSourceState({ status: unavailable.length || pages.length ? "partial" : "result", message: unavailable.join(" ") });
     };
     const completeSource = async ({ provider, source, described, authored, controller }) => {
         try {
@@ -230,6 +269,8 @@ export default function ReportDesigner({
             <button key={`${provider.id}:${source.id}:${source.version}`} type="button" disabled={effectiveReadOnly || source.status === "denied" || source.status === "unavailable"}
                 onClick={() => selectSource({ provider, source })}>{source.display?.label || source.id} · {source.version}{source.status && source.status !== "available" ? ` · ${source.status}` : ""}</button>
         ))}</div> : null}
+        {sourcePages.length ? <button type="button" disabled={effectiveReadOnly || sourceState.status === "loading"}
+            onClick={loadMoreSources}>Load more sources</button> : null}
         {pendingSourceAuthoring ? <div role="group" aria-label="Author source dataset" className="forge-report-designer__source-authoring">
             {pendingSourceAuthoring.provider.renderAuthoring({ source: pendingSourceAuthoring.described,
                 onSubmit: submitSourceAuthoring, onCancel: () => setPendingSourceAuthoring(null),
