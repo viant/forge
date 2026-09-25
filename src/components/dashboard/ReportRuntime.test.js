@@ -555,8 +555,8 @@ assert.ok(badgesBlockHtml.includes("Setup: Live"));
 assert.ok(badgesBlockHtml.includes("Pacing: 2.7%"));
 assert.ok(badgesBlockHtml.includes('data-report-runtime-badge-tone="success"'));
 assert.ok(badgesBlockHtml.includes('data-report-runtime-badge-tone="warning"'));
-assert.ok(badgesBlockHtml.includes("#d5f0dc"));
-assert.ok(badgesBlockHtml.includes("#16a34a"));
+assert.ok(badgesBlockHtml.includes("var(--forge-report-status-success-strong-background, #d5f0dc)"));
+assert.ok(badgesBlockHtml.includes("var(--forge-report-status-success-border, #cfe7d6)"));
 
 const themedKpiHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
