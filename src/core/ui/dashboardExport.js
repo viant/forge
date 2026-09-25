@@ -54,12 +54,11 @@ export const defaultDashboardExportStyles = `
   --muted: #5f6b7c;
   --primary: #137cbd;
   --track: #ebf1f5;
-  --forge-font-family: system-ui, sans-serif;
 }
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  font-family: var(--forge-font-family);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--text);
 }

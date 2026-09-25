@@ -28,6 +28,7 @@ export {
 } from './primitives/resourceModel.js';
 export { DashboardBlock } from './dashboard/DashboardBlocks.jsx';
 export { default as ReportRuntime } from './dashboard/ReportRuntime.jsx';
+export { default as ReportBlockDesigner } from './dashboard/ReportBlockDesigner.jsx';
 export {
     normalizeString,
     normalizeBool,

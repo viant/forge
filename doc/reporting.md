@@ -58,6 +58,14 @@ silent fallback behavior.
 
 ### Report builder
 
+Hosts that already own a native `report-document-v1` definition can embed the
+generic `ReportBlockDesigner` from `forge/components`. It accepts authored
+`blocks`, explicit dataset/field options, and an `onChange(nextBlocks)` callback;
+the host owns persistence, authorization, revision checks, and datasource
+execution. The compact editor currently handles table, chart, KPI, and Markdown
+blocks through Forge's report model builders. Other block kinds remain visible
+and read-only, never silently dropped or converted.
+
 `dashboard.reportBuilder` is the metadata-driven authoring surface. It uses the
 same data-source fetch, dialog lookup, window form, chart, table, and report
 runtime contracts as the rest of Forge.

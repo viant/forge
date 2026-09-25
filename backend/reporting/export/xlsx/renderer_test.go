@@ -27,6 +27,10 @@ func TestRender_TableBlockToWorkbook(t *testing.T) {
 	require.Equal(t, "$30.00", mustCellValue(t, workbook, "Report", "B3"))
 }
 
+func TestFormatXLSXNumericValue_Integer(t *testing.T) {
+	require.Equal(t, "42", formatXLSXNumericValue("integer", 42))
+}
+
 func TestRender_RejectsMissingOrMultipleTableBlocks(t *testing.T) {
 	report, err := reportfill.DecodeJSON([]byte(validTestReportFillJSON()))
 	require.NoError(t, err)

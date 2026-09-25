@@ -1,5 +1,4 @@
 import { waitForWorkspaceReady } from './workspaceReady.js';
-import {selectRegisteredTab} from './navigationRegistry.js';
 import {
   addWindow,
   removeWindow,
@@ -24,7 +23,7 @@ import {
   getDialogSignal,
 } from '../store/signals.js';
 
-import { focusControl, listControlTargets, getFocusedControlMeta, enableFocusTracking, setRegisteredControlValue } from './registry.js';
+import { focusControl, listControlTargets, getFocusedControlMeta, enableFocusTracking } from './registry.js';
 import { sendBusMessage } from '../bus.js';
 import { setSelector } from '../../utils/selector.js';
 import { resolveSelector } from '../../utils/selector.js';
@@ -546,11 +545,7 @@ export async function runUICommand(cmd = {}) {
         windowId: params.windowId || options.windowId,
       });
       if (options.workspaceObject && win?.windowId) {
-        // Navigation acknowledges creation; metadata authorization and data
-        // loading continue in the renderer and publish their own lifecycle.
-        const workspaceObject = options.waitForReady === true
-          ? await waitForWorkspaceReady(activeWindows, win.windowId)
-          : win.workspaceObject;
+        const workspaceObject = await waitForWorkspaceReady(activeWindows, win.windowId);
         return { windowId: win.windowId, workspaceObject };
       }
       return { windowId: win?.windowId || null };
@@ -597,6 +592,9 @@ export async function runUICommand(cmd = {}) {
       const windowId = requireString('windowId', params.windowId);
       const w = getWindowById(windowId);
       if (!w) throw new Error(`window not found: ${windowId}`);
+      if (['opening', 'failed'].includes(w.workspaceObject?.lifecycle?.state)) {
+        await waitForWorkspaceReady(activeWindows, windowId);
+      }
       if (params.workspaceObject && w.workspaceObject) {
         activeWindows.value = activeWindows.peek().map((entry) => entry.windowId === windowId ? {...entry,
           hostOpenState: 'fresh', workspaceObject: {...entry.workspaceObject,
@@ -646,7 +644,6 @@ export async function runUICommand(cmd = {}) {
       const w = getWindowById(windowId);
       if (!w) throw new Error(`window not found: ${windowId}`);
       const containerId = params.containerId ? requireString('containerId', params.containerId) : undefined;
-      const runtimeSelected = selectRegisteredTab({windowId, containerId, tabId});
       const viewSignal = getViewSignal(windowId);
       const previous = viewSignal.peek() || {};
       const nextTabs = {
@@ -657,7 +654,7 @@ export async function runUICommand(cmd = {}) {
         ...previous,
         tabs: nextTabs,
       };
-      if (!runtimeSelected) sendBusMessage(windowId, { type: 'selectTab', tabId, containerId });
+      sendBusMessage(windowId, { type: 'selectTab', tabId, containerId });
       if (params.activate !== false) {
         selectedWindowId.value = windowId;
         if (w.inTab !== false) selectedTabId.value = windowId;
@@ -710,9 +707,6 @@ export async function runUICommand(cmd = {}) {
     case 'ui.control.setValue': {
       const windowId = requireString('windowId', params.windowId);
       const controlId = requireString('controlId', params.controlId);
-      if (setRegisteredControlValue({windowId, controlId, dataSourceRef: params.dataSourceRef}, params.value)) {
-        return {ok: true};
-      }
       const item = {
         id: controlId,
         bindingPath: params.bindingPath || controlId,

@@ -18,7 +18,6 @@ import {evaluatePlainVisibleWhen} from '../../visibleWhen.js';
 import {toolbarBooleanField, toolbarBooleanValue, updateToolbarBoolean} from './toolbarBoolean.js';
 import {downloadTableExport, tableExportColumns, tableExportFormats, tableExportRows} from './tableExport.js';
 import DisabledActionShell from '../../DisabledActionShell.jsx';
-import SemanticControlTarget from '../../../runtime/SemanticControlTarget.jsx';
 
 function sanitizeTestID(value) {
     return String(value || '')
@@ -425,16 +424,8 @@ const Toolbar = ({
             const spanStyle = align === 'center'
                 ? { margin: "0 10px", display: 'inline-flex', alignItems: 'center', gap: 6 }
                 : (align === 'right' ? { marginLeft: "10px", display: 'inline-flex', alignItems: 'center', gap: 6 } : { marginRight: "10px", display: 'inline-flex', alignItems: 'center', gap: 6 });
-            const changeValue = (nextValue) => {
-                if (toolbarItemShouldDisable(item, context, isReadonly) || disabled) {
-                    throw new Error(`control is disabled or read-only: ${item.id}`);
-                }
-                const option = (item.options || []).find((entry) => Object.is(entry.value, nextValue));
-                if (!option || option.disabled === true) throw new Error(`invalid option for control: ${item.id}`);
-                return dispatchToolbarSelectChange({target: {value: option.value}}, directChange, events.onChange);
-            };
             return (
-                <SemanticControlTarget key={`select-${item.id}-${align}`} context={ctx} item={item} onValueChange={changeValue} className={item.className || undefined} style={spanStyle}>
+                <span key={`select-${item.id}-${align}`} className={item.className || undefined} style={spanStyle}>
                     {item.label ? <span>{item.label}</span> : null}
                     <Popover
                         placement="bottom-end"
@@ -448,8 +439,7 @@ const Toolbar = ({
                                         text={option.label ?? option.text ?? String(option.value)}
                                         active={String(option.value) === String(value ?? '')}
                                         icon={String(option.value) === String(value ?? '') ? 'tick' : undefined}
-                                        disabled={option.disabled === true}
-                                        onClick={() => changeValue(option.value)}
+                                        onClick={() => dispatchToolbarSelectChange({target: {value: option.value}}, directChange, events.onChange)}
                                     />
                                 ))}
                             </Menu>
@@ -466,7 +456,7 @@ const Toolbar = ({
                             {toolbarSelectLabel(item.options, value)}
                         </Button>
                     </Popover>
-                </SemanticControlTarget>
+                </span>
             );
         }
 

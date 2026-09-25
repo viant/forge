@@ -325,11 +325,12 @@ assert.deepEqual(buildReportBuilderSavedReportPayloadSummary(payload), {
     blockCount: 1,
     datasetCount: 1,
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Reporting Window",
+    scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Reporting Window",
+            value: "2026-05-01 – 2026-05-04",
             description: "Approved reporting window for semantic preview.",
         },
     ],
@@ -362,11 +363,12 @@ assert.deepEqual(buildReportBuilderSavedReportPayloadInspectorState(payload), {
     blockCount: 1,
     datasetCount: 1,
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Reporting Window",
+    scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Reporting Window",
+            value: "2026-05-01 – 2026-05-04",
             description: "Approved reporting window for semantic preview.",
         },
     ],
@@ -559,6 +561,7 @@ assert.deepEqual(audienceSavedPayloadSummary.scopeSummaryItems, [
     {
         id: "dateRange",
         label: "Date Range",
+        value: "2026-05-01 – 2026-05-04",
     },
     {
         id: "channelsFilter",
@@ -567,6 +570,7 @@ assert.deepEqual(audienceSavedPayloadSummary.scopeSummaryItems, [
     {
         id: "audienceSegmentFilter",
         label: "Audience Segment",
+        value: "Young Adults",
     },
 ]);
 
@@ -1932,11 +1936,12 @@ assert.deepEqual(buildReportBuilderSavedReportPayloadSummary(derivedSemanticPayl
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "dateRange",
+    scopeSummaryText: "dateRange: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "dateRange",
+            value: "2026-05-01 – 2026-05-04",
         },
     ],
 });
@@ -1976,11 +1981,12 @@ assert.deepEqual(buildReportBuilderSavedReportPayloadInspectorState(derivedSeman
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "dateRange",
+    scopeSummaryText: "dateRange: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "dateRange",
+            value: "2026-05-01 – 2026-05-04",
         },
     ],
     content: serializeReportBuilderSavedReportPayload(derivedSemanticPayload),

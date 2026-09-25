@@ -35,7 +35,6 @@ export function registerControlTarget(meta, target) {
       element: target?.element || null,
       wrapper: target?.wrapper || null,
       resolver: typeof target?.resolver === 'function' ? target.resolver : null,
-      setValue: typeof target?.setValue === 'function' ? target.setValue : null,
     },
     ts: Date.now(),
   });
@@ -63,19 +62,6 @@ export function getControlTarget(metaOrKey) {
   const key =
     typeof metaOrKey === 'string' ? metaOrKey : makeKey(metaOrKey || {});
   return registry.get(key) || null;
-}
-
-// Invoke the mounted control's semantic change handler, not a DOM event or a
-// guessed datasource field. Omitted datasource scope must resolve uniquely.
-export function setRegisteredControlValue(meta, value) {
-  const candidates = [...registry.values()].filter((entry) =>
-    entry.meta.windowId === meta.windowId && entry.meta.controlId === meta.controlId &&
-    (!meta.dataSourceRef || entry.meta.dataSourceRef === meta.dataSourceRef));
-  if (candidates.length > 1) throw new Error(`ambiguous control: ${meta.controlId}; specify dataSourceRef`);
-  const target = candidates[0]?.target;
-  if (!target?.setValue) return false;
-  target.setValue(value);
-  return true;
 }
 
 export function focusControl(metaOrKey, options = {}) {

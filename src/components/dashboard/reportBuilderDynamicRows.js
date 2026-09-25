@@ -35,7 +35,6 @@ export function normalizeDynamicRow(row = {}, group = {}, index = 0) {
         id: rowId || `row_${index + 1}`,
         filterId: String(row.filterId || firstFilterId).trim(),
         enabled: row?.enabled !== false,
-        ...(typeof row.manualValue === "string" ? {manualValue: row.manualValue} : {}),
         selections: normalizeArray(row.selections).map((entry) => clone(entry)),
     };
 }

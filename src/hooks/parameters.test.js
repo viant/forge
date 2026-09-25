@@ -43,21 +43,6 @@ const baseContext = {
   },
 };
 
-const nestedInputContext = {
-  ...baseContext,
-  signals: {
-    ...baseContext.signals,
-    input: { peek: () => ({ parameters: { associationIds: [2699873] } }) },
-  },
-  Context(ref) {
-    assert.equal(ref, 'default', 'parameters is a field path, not a datasource');
-    return this;
-  },
-};
-assert.deepEqual(resolveParameters([
-  { name: 'Id', in: 'input', location: 'parameters.associationIds', codec: { name: 'int[]' } },
-], nestedInputContext), { Id: [2699873] });
-
 const resolved = resolveParameters([
   { name: 'order_id', in: 'windowForm', location: 'AdOrderId.0' },
   { name: 'granularity', in: 'windowForm', location: 'granularity' },

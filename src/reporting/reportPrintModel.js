@@ -1007,19 +1007,22 @@ function reportPrintTitleHeight(state, block, layoutNote = "") {
 
 function renderReportPrintSectionTitle(state = {}, block = {}, {
   layoutNote = "",
+  continuation = false,
 } = {}) {
   const title = resolveReportPrintBlockTitle(block);
+  const blockId = normalizeString(block?.id || block?.kind || "block");
+  const idSuffix = continuation ? `_page_${state.currentPage?.number}` : "";
   const firstTitleElement = renderReportPrintTextLines(state, {
-    idPrefix: `${normalizeString(block?.id || block?.kind || "block")}__title`,
+    idPrefix: `${blockId}__title${idSuffix}`,
     lines: [title],
     fontSize: REPORT_PRINT_THEME.titleFontSize,
     lineHeight: REPORT_PRINT_THEME.titleLineHeight,
     fontWeight: "600",
     color: REPORT_PRINT_THEME.titleColor,
   });
-  if (firstTitleElement) {
+  if (firstTitleElement && !continuation) {
     pushReportPrintBookmark(state, {
-      id: `bookmark.${normalizeString(block?.id || block?.kind || "block")}`,
+      id: `bookmark.${blockId}`,
       title,
       pageNumber: state.currentPage?.number,
       elementId: firstTitleElement.id,
@@ -1029,7 +1032,7 @@ function renderReportPrintSectionTitle(state = {}, block = {}, {
   }
   if (layoutNote) {
     renderReportPrintTextLines(state, {
-      idPrefix: `${normalizeString(block?.id || block?.kind || "block")}__layout_note`,
+      idPrefix: `${blockId}__layout_note${idSuffix}`,
       lines: [layoutNote],
       fontSize: REPORT_PRINT_THEME.warningFontSize,
       lineHeight: REPORT_PRINT_THEME.warningLineHeight,
@@ -1121,6 +1124,23 @@ function renderReportPrintGridRow(state = {}, entries = []) {
   if (rowEntries.length === 0) {
     return;
   }
+  ensureReportPrintPage(state);
+  if (rowEntries.length > 1 && state.cursorY > state.contentTop) {
+    // Render the authored row into detached pages first. If either column
+    // would spill, move the whole row together; rendering children directly
+    // from the old cursor can strand a half-width partner on the next page.
+    const probe = { ...state, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null };
+    moveToReportPrintPage(probe, 0);
+    probe.cursorY = state.cursorY;
+    renderReportPrintGridRowAtCurrentPosition(probe, rowEntries);
+    if (probe.currentPageIndex > 0) {
+      startNextReportPrintPage(state);
+    }
+  }
+  renderReportPrintGridRowAtCurrentPosition(state, rowEntries);
+}
+
+function renderReportPrintGridRowAtCurrentPosition(state, rowEntries) {
   ensureReportPrintPage(state);
   const startPosition = resolveReportPrintStatePosition(state);
   const unitWidth = Math.max(
@@ -2242,7 +2262,7 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
       const rowHeight = resolveReportPrintTableRowHeight(columns, rows[rowIndex], columnLayout.widths);
       if (state.cursorY + rowHeight > state.contentBottom && state.cursorY > state.contentTop) {
         startNextReportPrintPage(state);
-        renderReportPrintSectionTitle(state, { ...block, title: `${resolveReportPrintBlockTitle(block)} (continued)`, content: { ...block.content, title: `${resolveReportPrintBlockTitle(block)} (continued)` } });
+        renderReportPrintSectionTitle(state, { ...block, title: `${resolveReportPrintBlockTitle(block)} (continued)`, content: { ...block.content, title: `${resolveReportPrintBlockTitle(block)} (continued)` } }, { continuation: true });
         break;
       }
       renderReportPrintTableRow(
@@ -2283,7 +2303,7 @@ function renderReportPrintChartBlock(state = {}, block = {}, {
     const pageBlock = pageIndex === 0 ? block : { ...block, title: `${resolveReportPrintBlockTitle(block)} (continued)`, content: { ...block.content, title: `${resolveReportPrintBlockTitle(block)} (continued)` } };
     const chartHeight = svgResult?.svg ? Math.max(120, Number(svgResult.height) || 0) : REPORT_PRINT_THEME.bodyLineHeight;
     ensureReportPrintSpace(state, titleHeight + chartHeight);
-    renderReportPrintSectionTitle(state, pageBlock, { layoutNote });
+    renderReportPrintSectionTitle(state, pageBlock, { layoutNote, continuation: pageIndex > 0 });
     if (!svgResult?.svg) {
       const placeholder = renderReportPrintTextLines(state, {
         idPrefix: `${normalizeString(block?.id || "chart")}__unsupported`,

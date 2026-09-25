@@ -6,6 +6,7 @@ export {
 export {
   lowerReportDocumentToReportSpec,
   normalizeReportBuilderDocumentBlocks,
+  buildReportDocumentTableBlock,
 } from "./reportDocumentModel.js";
 export { buildReportFillFromReportSpec } from "./reportFillModel.js";
 export { buildDraftReportExportRequest } from "./reportExportRequestModel.js";

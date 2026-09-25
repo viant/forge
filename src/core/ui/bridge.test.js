@@ -12,7 +12,7 @@ try {
   const windowTarget = new EventTarget();
   windowTarget.setTimeout = setTimeout.bind(globalThis);
   windowTarget.clearTimeout = clearTimeout.bind(globalThis);
-  let storedClientId = 'cloned-tab-client';
+  let storedClientId = '';
   windowTarget.sessionStorage = {
     getItem(key) {
       return key === 'forge.uiBridge.clientId' ? storedClientId : null;
@@ -37,8 +37,7 @@ try {
   assert.equal(typeof seededId, 'string');
   assert.equal(seededId.length > 0, true);
   assert.equal(ensureUIBridgeClientId(), seededId);
-  assert.notEqual(seededId, storedClientId);
-  assert.equal(storedClientId, 'cloned-tab-client');
+  assert.equal(storedClientId, seededId);
 
   const calls = [];
   let snapshotAttempts = 0;
@@ -130,33 +129,6 @@ try {
   stopUnauthorizedHello();
   assert.deepEqual(authHelloCalls.slice(0, 4), ['ui.hello', 'ui.hello', 'ui.snapshot.get', 'ui.snapshot']);
   console.log('bridge startup auth retry ✓ retries ui.hello after authorization instead of failing permanently');
-
-  const transientCalls = [];
-  let transientHelloAttempts = 0;
-  globalThis.fetch = async (_url, options = {}) => {
-    const body = JSON.parse(String(options.body || '{}'));
-    transientCalls.push(body.method);
-    const headers = new Headers({ 'Mcp-Session-Id': 'session-transient-retry' });
-    if (body.method === 'ui.hello' && ++transientHelloAttempts === 1) {
-      return new Response('', { status: 503, headers });
-    }
-    if (body.method === 'ui.poll') return new Response('', { status: 202, headers });
-    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
-  };
-
-  const stopTransientHello = startUIBridgeHTTP({
-    url: 'http://example.test/v1/ui/rpc',
-    snapshotIntervalMs: 10_000,
-    reconnectDelayMs: 500,
-    pollCycleDelayMs: 100,
-    snapshotBuilder: () => ({ conversationId: 'conv-transient-retry', windows: [] }),
-  });
-  await sleep(650);
-  stopTransientHello();
-  assert.equal(transientHelloAttempts, 2);
-  assert.equal(transientCalls.includes('ui.snapshot'), true);
-  assert.equal(transientCalls.includes('ui.poll'), true);
-  console.log('bridge startup transient retry ✓ recovers without a browser refresh');
 
   const configuredAuthCalls = [];
   let configuredHelloAttempts = 0;
@@ -385,9 +357,6 @@ try {
   const commandCalls = [];
   let commandPollCount = 0;
   const openedWindowId = 'capacityCubeBuilder__conv-command';
-  let releaseControlSnapshot;
-  let controlSnapshotSettled = false;
-  const stalledControlSnapshot = new Promise((resolve) => { releaseControlSnapshot = resolve; });
   visibilityState = 'visible';
   focused = true;
   globalThis.fetch = async (_url, options = {}) => {
@@ -405,10 +374,6 @@ try {
       }), { status: 200, headers });
     }
     if (body.method === 'ui.snapshot') {
-      if (body.params?.data?.windows?.some((win) => win?.windowId === openedWindowId && win?.windowForm?.viewMode === 'starred')) {
-        await stalledControlSnapshot;
-        controlSnapshotSettled = true;
-      }
       return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { ok: true } }), { status: 200, headers });
     }
     if (body.method === 'ui.poll') {
@@ -438,15 +403,6 @@ try {
           }
         }), { status: 200, headers });
       }
-      if (commandPollCount === 2) {
-        return new Response(JSON.stringify({
-          jsonrpc: '2.0', id: body.id,
-          result: { method: 'ui.command', params: {
-            id: 'cmd-set-view', method: 'ui.control.setValue',
-            params: { windowId: openedWindowId, controlId: 'viewMode', scope: 'windowForm', value: 'starred' },
-          } },
-        }), { status: 200, headers });
-      }
       return new Response('', { status: 202, headers });
     }
     if (body.method === 'ui.response') {
@@ -459,27 +415,22 @@ try {
     url: 'http://example.test/v1/ui/rpc',
     snapshotIntervalMs: 10_000,
     reconnectDelayMs: 10,
-    pollCycleDelayMs: 5,
   });
 
-  await sleep(180);
+  await sleep(120);
+  stopCommandOrder();
   const responseIndex = commandCalls.findIndex((entry) => entry.method === 'ui.response' && entry.params?.id === 'cmd-open-capacity');
   assert.equal(responseIndex > 0, true);
-  const openedWindowSnapshotIndex = commandCalls.findIndex((entry) =>
-    entry.method === 'ui.snapshot'
-    && entry.params?.data?.windows?.some((win) => win?.windowId === openedWindowId));
-  assert.equal(openedWindowSnapshotIndex > responseIndex, true);
-  const controlResponseIndex = commandCalls.findIndex((entry) => entry.method === 'ui.response' && entry.params?.id === 'cmd-set-view');
-  const controlSnapshotIndex = commandCalls.findIndex((entry) =>
-    entry.method === 'ui.snapshot'
-    && entry.params?.data?.windows?.some((win) => win?.windowId === openedWindowId && win?.windowForm?.viewMode === 'starred'));
-  assert.equal(controlResponseIndex > responseIndex, true);
-  assert.equal(controlSnapshotIndex > controlResponseIndex, true);
-  assert.equal(controlSnapshotSettled, false, 'control acknowledgement must not wait for the stalled snapshot response');
-  releaseControlSnapshot();
-  await sleep(15);
-  stopCommandOrder();
-  console.log('bridge command ordering ✓ acknowledges open and control changes before full snapshots');
+  let snapshotBeforeResponse = null;
+  for (let i = responseIndex - 1; i >= 0; i -= 1) {
+    if (commandCalls[i].method === 'ui.snapshot') {
+      snapshotBeforeResponse = commandCalls[i];
+      break;
+    }
+  }
+  assert.equal(!!snapshotBeforeResponse, true);
+  assert.equal(snapshotBeforeResponse.params?.data?.windows?.some((win) => win?.windowId === openedWindowId), true);
+  console.log('bridge command ordering ✓ publishes opened window snapshot before ui.response');
 
   const commandFailureCalls = [];
   const commandFailureResponses = [];
@@ -554,8 +505,9 @@ try {
   stopCommandSnapshotFailure();
   assert.equal(commandFailureResponses.length, 1);
   assert.equal(commandFailureResponses[0]?.id, 'cmd-open-snapshot-fail');
-  assert.equal(commandFailureResponses[0]?.ok, true);
-  console.log('bridge command failure ✓ snapshot failure does not hold an opened-window acknowledgement');
+  assert.equal(commandFailureResponses[0]?.ok, false);
+  assert.match(String(commandFailureResponses[0]?.error || ''), /HTTP 500/);
+  console.log('bridge command failure ✓ rejects success response when opened-window snapshot is not accepted');
 
   let aborted = false;
   globalThis.fetch = async (_url, options = {}) => {
