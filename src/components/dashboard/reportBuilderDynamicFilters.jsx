@@ -58,7 +58,8 @@ export function DynamicFilterGroup({
                     const placeholder = selectedFilter?.placeholder || selectedFilter?.label || "Select value";
                     const dialogId = lookup?.dialogId || selectedFilter?.dialogId || selectedFilter?.lookup?.dialogId || "";
                     const enabled = row?.enabled !== false;
-                    const allowManualEntry = selectedFilter?.manualEntry === true;
+                    const allowManualEntry = selectedFilter?.manualEntry === true
+                        || (selectedFilter?.manualEntry == null && !dialogId);
                     const manualDraft = manualDrafts[row.id] || "";
                     return (
                         <div key={row.id} className={[
@@ -232,7 +233,8 @@ export function DynamicFamilyGroup({
                     const placeholder = fallbackFilter?.placeholder || fallbackFilter?.label || "Select value";
                     const dialogId = lookup?.dialogId || fallbackFilter?.dialogId || fallbackFilter?.lookup?.dialogId || "";
                     const enabled = row?.enabled !== false;
-                    const allowManualEntry = fallbackFilter?.manualEntry === true;
+                    const allowManualEntry = fallbackFilter?.manualEntry === true
+                        || (fallbackFilter?.manualEntry == null && !dialogId);
                     const manualDraft = manualDrafts[row.id] || "";
                     const canInclude = !!option?.includeFilter;
                     const canExclude = !!option?.excludeFilter;
