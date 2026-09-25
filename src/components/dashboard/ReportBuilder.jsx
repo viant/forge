@@ -8164,7 +8164,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                                 intent={draftToolbarExportControlState.intent || "none"}
                                                 icon={draftToolbarExportControlState.icon || "download"}
                                                 loading={draftToolbarExportControlState.loading === true}
-                                                disabled={!canOpenDraftExportMenu || draftToolbarExportControlState.disabled === true}
+                                                disabled={!canOpenDraftExportMenu || draftToolbarExportControlState.disabled === true || reportFiltersNeedApply}
                                             >
                                                 {draftToolbarExportControlState.label}
                                             </Button>
@@ -10811,7 +10811,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const canDownloadCsv = authoredDocumentCompileValidation.valid
         && Array.isArray(selectedColumns) && selectedColumns.length > 0
         && Array.isArray(exportCollection) && exportCollection.length > 0;
-    const canOpenDraftExportMenu = !!draftExportRequest || !!draftXlsxExportRequest || canDownloadCsv;
+    const canOpenDraftExportMenu = !reportFiltersNeedApply && (!!draftExportRequest || !!draftXlsxExportRequest || canDownloadCsv);
 
     const { activeResultLoading, activeResultError, reportBuilderStateMarker } = useMemo(() => resolveReportBuilderActiveResultState({
         loading,
@@ -20931,7 +20931,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                                                 icon={draftToolbarExportControlState.icon || "download"}
                                                 className="forge-report-builder__action-button"
                                                 loading={draftToolbarExportControlState.loading === true}
-                                                disabled={draftToolbarExportControlState.disabled === true}
+                                                disabled={draftToolbarExportControlState.disabled === true || reportFiltersNeedApply}
                                                 onClick={draftToolbarExportControlState.onClick || undefined}
                                             >
                                                 {draftToolbarExportControlState.label}
