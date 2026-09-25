@@ -844,7 +844,7 @@ assert.deepEqual(
     carriedSemanticValidationRetryRecoveredPreviewState.semanticBindingFieldGroups,
 );
 assert.equal(carriedSemanticValidationRetryErroredPreviewState.scopeSummaryTitle, "Filters");
-assert.equal(carriedSemanticValidationRetryErroredPreviewState.scopeSummaryText, "Reporting Window: 2026-05-01 – 2026-05-04");
+assert.equal(carriedSemanticValidationRetryErroredPreviewState.scopeSummaryText, "Reporting Window");
 assert.deepEqual(
     carriedSemanticValidationRetryErroredPreviewState.scopeSummaryItems,
     carriedSemanticValidationRetryRecoveredPreviewState.scopeSummaryItems,
@@ -1465,7 +1465,7 @@ assert.deepEqual(
     semanticValidationRetryRecoveredPreviewState.semanticBindingFieldGroups,
 );
 assert.equal(semanticValidationRetryErroredPreviewState.scopeSummaryTitle, "Filters");
-assert.equal(semanticValidationRetryErroredPreviewState.scopeSummaryText, "Reporting Window: 2026-05-01 – 2026-05-04");
+assert.equal(semanticValidationRetryErroredPreviewState.scopeSummaryText, "Reporting Window");
 assert.deepEqual(
     semanticValidationRetryErroredPreviewState.scopeSummaryItems,
     semanticValidationRetryRecoveredPreviewState.scopeSummaryItems,

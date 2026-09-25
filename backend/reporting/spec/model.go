@@ -266,13 +266,13 @@ type Block struct {
 	Badges                   []string         `json:"badges,omitempty"`
 	BodyFormat               string           `json:"bodyFormat,omitempty"`
 	Body                     string           `json:"body,omitempty"`
-	ColumnsLayout            []KanbanColumn   `json:"columns,omitempty"`
+	ColumnsLayout            []KanbanColumn   `json:"-"`
 	Events                   []TimelineEvent  `json:"events,omitempty"`
 	TimeField                string           `json:"timeField,omitempty"`
 	TitleField               string           `json:"titleField,omitempty"`
 	DescriptionField         string           `json:"descriptionField,omitempty"`
 	Items                    []BadgeItem      `json:"items,omitempty"`
-	CollectionCols           int              `json:"columnsCount,omitempty"`
+	CollectionCols           int              `json:"-"`
 	ItemTitleField           string           `json:"itemTitleField,omitempty"`
 	ItemTitleLabel           string           `json:"itemTitleLabel,omitempty"`
 	ToneField                string           `json:"toneField,omitempty"`

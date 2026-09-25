@@ -142,6 +142,8 @@ func formatXLSXNumericValue(format string, value float64) string {
 		return strconv.FormatFloat(value, 'f', 1, 64) + "%"
 	case "percentfraction":
 		return strconv.FormatFloat(value*100, 'f', 1, 64) + "%"
+	case "integer":
+		return strconv.FormatFloat(value, 'f', 0, 64)
 	case "number", "":
 		return strconv.FormatFloat(value, 'f', 5, 64)
 	default:

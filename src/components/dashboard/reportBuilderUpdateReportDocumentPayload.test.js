@@ -235,11 +235,12 @@ assert.deepEqual(buildReportBuilderUpdateReportDocumentPayloadSummary(payload), 
         "Measures Net Revenue",
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Reporting Window",
+    scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Reporting Window",
+            value: "2026-05-01 – 2026-05-04",
             description: "Approved reporting window for update payload metadata.",
         },
     ],
@@ -397,11 +398,12 @@ assert.deepEqual(buildReportBuilderUpdateReportDocumentPayloadInspectorState(pay
         "Measures Net Revenue",
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Reporting Window",
+    scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Reporting Window",
+            value: "2026-05-01 – 2026-05-04",
             description: "Approved reporting window for update payload metadata.",
         },
     ],
@@ -961,7 +963,7 @@ assert.equal(
 );
 assert.equal(
     buildReportBuilderUpdateReportDocumentPayloadInspectorState(embeddedSemanticUpdatePayload).scopeSummaryText,
-    "Reporting Window",
+    "Reporting Window: 2026-05-01 – 2026-05-04",
 );
 
 assert.equal(buildReportBuilderUpdateReportDocumentPayload(savedReportPayload, { expectedVersion: "" }), null);
