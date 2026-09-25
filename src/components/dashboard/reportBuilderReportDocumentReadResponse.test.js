@@ -3522,11 +3522,12 @@ assert.deepEqual(buildReportBuilderListReportDocumentsEntrySummary(listResponse.
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Reporting Window",
+    scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Reporting Window",
+            value: "2026-05-01 – 2026-05-04",
             description: "Approved reporting window for semantic preview.",
         },
     ],
@@ -3850,11 +3851,12 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(list
             },
         ],
         scopeSummaryTitle: "Filters",
-        scopeSummaryText: "Reporting Window",
+        scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
         scopeSummaryItems: [
             {
                 id: "dateRange",
                 label: "Reporting Window",
+                value: "2026-05-01 – 2026-05-04",
                 description: "Approved reporting window for semantic preview.",
             },
         ],
@@ -3886,11 +3888,12 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(list
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Reporting Window",
+    scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Reporting Window",
+            value: "2026-05-01 – 2026-05-04",
             description: "Approved reporting window for semantic preview.",
         },
     ],
@@ -3971,11 +3974,12 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(sema
             },
         ],
         scopeSummaryTitle: "Filters",
-        scopeSummaryText: "Reporting Window",
+        scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
         scopeSummaryItems: [
             {
                 id: "dateRange",
                 label: "Reporting Window",
+                value: "2026-05-01 – 2026-05-04",
                 description: "Approved reporting window for semantic preview.",
             },
         ],
@@ -4006,11 +4010,12 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(sema
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Reporting Window",
+    scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Reporting Window",
+            value: "2026-05-01 – 2026-05-04",
             description: "Approved reporting window for semantic preview.",
         },
     ],
@@ -4066,11 +4071,12 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(sema
             },
         ],
         scopeSummaryTitle: "Filters",
-        scopeSummaryText: "Reporting Window",
+        scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
         scopeSummaryItems: [
             {
                 id: "dateRange",
                 label: "Reporting Window",
+                value: "2026-05-01 – 2026-05-04",
                 description: "Approved reporting window for semantic preview.",
             },
         ],
@@ -4101,11 +4107,12 @@ assert.deepEqual(buildReportBuilderReportDocumentReadResponseInspectorState(sema
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "Reporting Window",
+    scopeSummaryText: "Reporting Window: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "Reporting Window",
+            value: "2026-05-01 – 2026-05-04",
             description: "Approved reporting window for semantic preview.",
         },
     ],
@@ -5450,11 +5457,12 @@ assert.deepEqual(buildReportBuilderGetReportDocumentResponseSummary(detailTarget
         },
     ],
     scopeSummaryTitle: "Filters",
-    scopeSummaryText: "dateRange",
+    scopeSummaryText: "dateRange: 2026-05-01 – 2026-05-04",
     scopeSummaryItems: [
         {
             id: "dateRange",
             label: "dateRange",
+            value: "2026-05-01 – 2026-05-04",
         },
     ],
     drillHierarchyCount: 0,

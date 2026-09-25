@@ -288,9 +288,9 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("!designWorkspaceMode ? renderCompileDiagnosticsNotice(authoredDocumentCompileDiagnosticsNotice"),
+  source.includes("designWorkspaceMode ? renderCompileDiagnosticsNotice(authoredDocumentCompileDiagnosticsNotice"),
   true,
-  "ReportBuilder should route authored-block validation through the compact compile-diagnostics notice outside Design mode.",
+  "ReportBuilder should route authored-block validation through the compact compile-diagnostics notice in Design mode.",
 );
 
 assert.equal(
