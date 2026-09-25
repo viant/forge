@@ -20,8 +20,22 @@ import ReportDesigner from 'forge/report-designer';
 
 `onChange` receives a candidate native document and a change descriptor. It never means “saved.” The host should retain the candidate until it accepts or discards it. If `report` changes while an edit dialog or candidate draft is open, the designer retains the draft and offers an explicit choice to keep it or load the newer host document. Loading the newer document resets open edit dialogs.
 
+`capabilities.embeddedSourceManager: false` hides the legacy in-builder source
+controls while retaining the outer `sourceProviders` discovery/authoring flow.
+It defaults to `capabilities.sourceManager`, so existing embedded hosts keep
+their current behavior. Use it when only the explicit provider path may add a
+source.
+
 `onPreview`, `onRun`, and `onSave` receive `{report, expectedRevision, signal}`. The host returns a typed state: `result`, `partial`, `error`, `conflict`, `denied`, or `unavailable`. A preview or run result may contain `reportSpec`, `reportFill`, and `reportDocument`, which Forge renders with `ReportRuntime`. The host owns authorization checks, server requests, revision compare-and-swap, audit identity, publishing, and export. The designer aborts an outstanding callback on cancellation, a newer request, or unmount. A partial preview is labelled as partial.
 
 A source provider has an ID and `discover`, `describe`, and `validate` methods. Discovery may return a result with partial, denied, or unavailable status; one failing provider does not hide results from another. Discovery returns `{id, version, display, status}` records. Describe returns the same exact identity plus typed fields, result contract, query inputs, and display metadata. Validate returns `{valid: true, dataset}` or a denied, unavailable, or error result. A dataset declaration must carry `id`, `dataSourceRef`, `source: {id, version, serviceRef, toolRef}`, `resultContract`, and `columns`. Forge checks those identities and leaves credentials and execution to the host. If a validated dataset already exists, the designer asks before replacing its pinned declaration. Seeing a source in discovery does not authorize its execution; the host must recheck on preview, run, and export.
+
+Providers whose result contract or columns must be authored by a person may
+optionally implement `renderAuthoring({source, onSubmit, onCancel, disabled})`.
+Forge displays that host form after `describe` and passes its explicit payload
+as `authored` to `validate`. Providers without this method retain the existing
+one-step describe/validate behavior. Forge does not infer a schema or invoke a
+source to fill the form; the host still rechecks the exact source before
+returning a dataset declaration.
 
 The API is available from `forge/report-designer` with TypeScript declarations, and as `ReportDesigner` from `forge/components`. `ReportBlockDesigner` and `ReportRuntime` remain exported. A document without a primary builder block may still use the declared field catalog for authored blocks; unsupported nodes remain visible and read-only. The host should retain source text and comments outside this native document subtree and skip rewriting that text when no change was emitted.
