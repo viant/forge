@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { normalizeReportFilterRefreshMode, reportFilterValuesChanged } from './reportBuilderFilterRefresh.js';
+assert.equal(normalizeReportFilterRefreshMode('apply'), 'apply');
+assert.equal(normalizeReportFilterRefreshMode('anything'), 'automatic');
+const base = { scopeParams: { path: ['Direct'] }, dynamicGroups: { scope: [{ id: 'row-1', filterId: 'spoPath', selections: [{ value: 'Direct' }] }] }, reportOptions: { mode: 'all' } };
+assert.equal(reportFilterValuesChanged(base, { ...base, dynamicGroups: { scope: [...base.dynamicGroups.scope, { id: 'draft', filterId: 'spoPath', selections: [] }] } }), false);
+assert.equal(reportFilterValuesChanged(base, { ...base, scopeParams: { path: ['Preferred'] } }), true);
+assert.equal(reportFilterValuesChanged(base, { ...base, reportOptions: { mode: 'one' } }), true);
+assert.equal(reportFilterValuesChanged(base, { ...base, dynamicGroups: { scope: [{ ...base.dynamicGroups.scope[0], selections: [{ value: 'Preferred' }] }] } }), true);
+assert.equal(reportFilterValuesChanged(base, { ...base, dynamicGroups: { scope: [] } }), true);
+console.log('reportBuilderFilterRefresh ✓ manual mode, neutral editor rows, and effective filter changes');
