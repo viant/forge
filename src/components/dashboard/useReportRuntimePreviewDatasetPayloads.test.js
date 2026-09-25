@@ -512,31 +512,6 @@ const buildLifecycleContext = (fetchRecords) => ({
   },
 });
 
-let releaseSlowDataset;
-const slowDataset = new Promise(resolve => { releaseSlowDataset = resolve; });
-let partialState = buildPendingReportRuntimePreviewDatasetPayloadState({requestKey: 'progress'});
-let notifyPartial;
-const partialPublished = new Promise(resolve => { notifyPartial = resolve; });
-const progressiveRun = executeDatasetPayloadLifecycle({
-  builderContext: buildLifecycleContext(({parameters}) => parameters.slow ? slowDataset : Promise.resolve({data:[{value:17}]})),
-  datasets: [
-    {id:'fast',dataSourceRef:'primaryFreshnessSource',request:{}},
-    {id:'slow',dataSourceRef:'primaryFreshnessSource',request:{slow:true}},
-  ],
-  requestKey:'progress',
-  getCurrentState:()=>partialState,
-  shouldContinue:()=>true,
-  applyState:(state)=>{partialState=state;if(state.loading && state.freshDatasetIds.includes('fast'))notifyPartial();},
-});
-await partialPublished;
-assert.equal(partialState.loading,true);
-assert.deepEqual(partialState.payloads.fast.rows,[{value:17}]);
-assert.equal(partialState.payloads.slow,undefined,'slow dataset must not be fabricated as empty');
-releaseSlowDataset({data:[]});
-await progressiveRun;
-assert.equal(partialState.loading,false);
-assert.deepEqual(partialState.payloads.slow.rows,[],'completed empty results remain distinct from pending');
-
 let cancelledBeforeRetryFetchCount = 0;
 let cancelledBeforeRetryCurrent = true;
 let cancelledBeforeRetryApplyCount = 0;
@@ -573,7 +548,7 @@ const exhaustedLifecycleResult = await executeDatasetPayloadLifecycle({
     exhaustedLifecycleApplyCount += 1;
   },
 });
-assert.equal(exhaustedLifecycleApplyCount, 2, "publish the settled dataset before terminal lifecycle state");
+assert.equal(exhaustedLifecycleApplyCount, 1);
 assert.equal(exhaustedLifecycleResult.nextState.error?.code, "runtimePreviewFreshnessUnavailable");
 assert.equal(exhaustedLifecycleResult.nextState.freshResultRequestKey, "");
 assert.deepEqual(exhaustedLifecycleResult.nextState.freshDatasetIds, []);

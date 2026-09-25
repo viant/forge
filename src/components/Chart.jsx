@@ -739,12 +739,12 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         ? horizontalBarLayout.categoryLabel
         : authoredCategoryLabelConfig;
     const categoryLabelBottomOffset = categoryLabelConfig?.lines === 2 ? 14 : 0;
-    const hasCartesianAxisTitle = !embedded && String(xAxis?.label || "").trim() !== "";
+    const cartesianAxisTitleBottomMargin = !embedded && String(xAxis?.label || "").trim() ? 64 : 0;
     const chartMargin = isHorizontalBar
         ? horizontalBarLayout.margin
         : (embedded
             ? {top: 24, right: 12, left: 6, bottom: 34 + categoryLabelBottomOffset}
-            : {top: 24, right: 24, left: 14, bottom: 16 + categoryLabelBottomOffset});
+            : {top: 24, right: 60, left: 14, bottom: Math.max(42 + categoryLabelBottomOffset, cartesianAxisTitleBottomMargin, responsiveCivilDateAxis.bottomMargin)});
     const horizontalLegendSeriesCount = directSeriesChart
         ? seriesDefinitions.length
         : availableDataKeys.length;
@@ -1003,9 +1003,6 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             {resolvedChartAnnotations.background}
             <XAxis
                 dataKey={xAxis?.dataKey || "name"}
-                height={hasCartesianAxisTitle ? 64 + categoryLabelBottomOffset : 32 + categoryLabelBottomOffset}
-                padding={{left: 12, right: 12}}
-                tickMargin={8}
                 ticks={responsiveCivilDateAxis.ticks}
                 tickFormatter={(val) => formatChartXAxisValue(
                     val,
@@ -1018,8 +1015,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 minTickGap={responsiveCivilDateAxis.compact ? 18 : (embedded ? 24 : 5)}
                 label={{
                     value: embedded ? "" : (xAxis.label || ""),
-                    position: hasCartesianAxisTitle ? "insideBottom" : responsiveCivilDateAxis.labelPosition,
-                    offset: hasCartesianAxisTitle ? 4 : responsiveCivilDateAxis.labelOffset,
+                    position: String(xAxis?.label || "").trim() ? "bottom" : responsiveCivilDateAxis.labelPosition,
+                    offset: String(xAxis?.label || "").trim() ? 18 : responsiveCivilDateAxis.labelOffset,
                     ...axisLabelStyle,
                 }}
             />

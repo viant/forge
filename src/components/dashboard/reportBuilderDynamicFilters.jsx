@@ -18,7 +18,6 @@ export function DynamicFilterGroup({
     rows,
     resolveLookup,
     onAddRow,
-    onChangeDraft,
     onChangeFilter,
     onPick,
     onAddManualSelection,
@@ -60,7 +59,7 @@ export function DynamicFilterGroup({
                     const dialogId = lookup?.dialogId || selectedFilter?.dialogId || selectedFilter?.lookup?.dialogId || "";
                     const enabled = row?.enabled !== false;
                     const allowManualEntry = selectedFilter?.manualEntry === true;
-                    const manualDraft = onChangeDraft ? (row.manualValue || "") : (manualDrafts[row.id] || "");
+                    const manualDraft = manualDrafts[row.id] || "";
                     return (
                         <div key={row.id} className={[
                             "forge-report-builder-dynamic-row",
@@ -85,7 +84,10 @@ export function DynamicFilterGroup({
                                     browseLabel={placeholder}
                                     allowManualEntry={allowManualEntry}
                                     disabled={!enabled}
-                                    onInputChange={(value) => onChangeDraft ? onChangeDraft(row.id, value) : setManualDrafts((current) => ({...current, [row.id]: value}))}
+                                    onInputChange={(value) => setManualDrafts((current) => ({
+                                        ...current,
+                                        [row.id]: value,
+                                    }))}
                                     onInputCommit={(value) => {
                                         const added = onAddManualSelection(row.id, selectedFilter, value);
                                         if (added) {
@@ -195,7 +197,6 @@ export function DynamicFamilyGroup({
     options,
     resolveLookup,
     onAddRow,
-    onChangeDraft,
     onChangeFilter,
     onChangeDirection,
     onPick,
@@ -232,7 +233,7 @@ export function DynamicFamilyGroup({
                     const dialogId = lookup?.dialogId || fallbackFilter?.dialogId || fallbackFilter?.lookup?.dialogId || "";
                     const enabled = row?.enabled !== false;
                     const allowManualEntry = fallbackFilter?.manualEntry === true;
-                    const manualDraft = onChangeDraft ? (row.manualValue || "") : (manualDrafts[row.id] || "");
+                    const manualDraft = manualDrafts[row.id] || "";
                     const canInclude = !!option?.includeFilter;
                     const canExclude = !!option?.excludeFilter;
                     return (
@@ -274,7 +275,7 @@ export function DynamicFamilyGroup({
                                     browseLabel={placeholder}
                                     allowManualEntry={allowManualEntry}
                                     disabled={!enabled}
-                                    onInputChange={(value) => onChangeDraft ? onChangeDraft(row.id, row.direction, value) : setManualDrafts((current) => ({ ...current, [row.id]: value }))}
+                                    onInputChange={(value) => setManualDrafts((current) => ({ ...current, [row.id]: value }))}
                                     onInputCommit={(value) => {
                                         const added = onAddManualSelection(row.id, row.direction, fallbackFilter, value);
                                         if (added) {

@@ -77,12 +77,6 @@
     background: #f3f0fb;
     color: var(--forge-text);
 }
-/* Native controls do not consistently inherit typography from their parent.
-   Keep Forge controls on the same family as the host/theme boundary, including
-   the built-in appearance and portalled content. */
-.agently-workspace :where(button, input, textarea, select, optgroup, option) {
-    font-family: inherit;
-}
 /* Public theme hooks. No named-theme boundary means existing appearance. */
 .agently-workspace[data-forge-theme] {
     --forge-type-caption-size: 11px;

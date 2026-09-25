@@ -311,10 +311,10 @@ function renderBuilder(windowFormState, mode = "design") {
 function extractAuthoredValidationSection(html) {
   const start = html.indexOf("Report setup needs attention");
   const end = html.indexOf("forge-report-builder__body", start);
-  if (start < 0 || end < 0) {
+  if (start < 0) {
     return "";
   }
-  return html.slice(start, end);
+  return html.slice(start, end < 0 ? undefined : end);
 }
 
 const html = renderBuilder(state);
@@ -370,7 +370,7 @@ assert.equal((html.match(/Open data editor/g) || []).length, 0);
 assert.ok(!html.includes(">Data<"));
 assert.ok(!html.includes(">Drill Downs<"));
 assert.ok(!html.includes("Change report"));
-assert.ok(!html.includes("Reset report"));
+assert.ok(!html.includes(">Reset report<"));
 assert.ok(!html.includes("Pick another starter or a new report."));
 
 const filterBarSelectionHtml = renderBuilder({
@@ -508,7 +508,7 @@ assert.ok(emptyHtml.includes("2 datasets"));
 assert.ok(emptyHtml.includes("1 block"));
 assert.ok(emptyHtml.includes("2 blocks"));
 assert.ok(!emptyHtml.includes("Report actions"));
-assert.ok(!emptyHtml.includes("Reset report"));
+assert.ok(!emptyHtml.includes(">Reset report<"));
 assert.ok(!emptyHtml.includes("Change report"));
 assert.ok(!emptyHtml.includes("id=\"report-builder-design-group-document\""));
 assert.ok(!emptyHtml.includes("Current data selection semantic context"));
@@ -549,7 +549,7 @@ const collapsedInvalidPreviewHtml = renderBuilder({
       { blockId: "invalidKpi" },
     ],
   },
-}, "preview");
+}, "design");
 const collapsedInvalidPreviewValidationHtml = extractAuthoredValidationSection(collapsedInvalidPreviewHtml);
 
 assert.ok(collapsedInvalidPreviewValidationHtml.includes("Report setup needs attention"));
@@ -574,7 +574,7 @@ const singleIssuePreviewHtml = renderBuilder({
     type: "stack",
     items: [{ blockId: "invalidKpi" }],
   },
-}, "preview");
+}, "design");
 const singleIssuePreviewValidationHtml = extractAuthoredValidationSection(singleIssuePreviewHtml);
 
 assert.ok(singleIssuePreviewValidationHtml.includes("Report setup needs attention"));

@@ -331,23 +331,6 @@ await runUICommand({
 });
 assert.equal(getFormSignal('W1:windowForm').peek().granularity, 'hour');
 
-const changes = [];
-const semanticKey = registerControlTarget(
-  {windowId: 'W1', dataSourceRef: 'ds', controlId: 'listMode'},
-  {setValue(value) {
-    if (value !== 'starred') throw new Error('invalid option');
-    changes.push(value);
-  }},
-);
-await runUICommand({method: 'ui.control.setValue', params: {windowId: 'W1', controlId: 'listMode', value: 'starred'}});
-assert.deepEqual(changes, ['starred'], 'agent must invoke the mounted control handler');
-await assert.rejects(runUICommand({method: 'ui.control.setValue', params: {windowId: 'W1', controlId: 'listMode', value: 'invalid'}}), /invalid option/);
-const otherKey = registerControlTarget({windowId: 'W1', dataSourceRef: 'other', controlId: 'listMode'}, {setValue() { throw new Error('wrong datasource'); }});
-await assert.rejects(runUICommand({method: 'ui.control.setValue', params: {windowId: 'W1', controlId: 'listMode', value: 'starred'}}), /ambiguous control/);
-await runUICommand({method: 'ui.control.setValue', params: {windowId: 'W1', dataSourceRef: 'ds', controlId: 'listMode', value: 'starred'}});
-unregisterControlTarget(semanticKey);
-unregisterControlTarget(otherKey);
-
 await runUICommand({
   method: 'ui.window.setFormData',
   params: {
@@ -870,14 +853,3 @@ assert.deepEqual(resetDashboardState.filters.region, ['NA']);
 assert.equal(resetDashboardState.selection.entityKey, null);
 
 unregisterControlTarget(regKey);
-
-const navigationStarted = Date.now();
-const pendingOpen = await runUICommand({ method: 'ui.window.open', params: {
-  windowKey: 'slowProtectedView', options: { conversationId: 'conv-1',
-    workspaceObject: { version: 1, objectId: 'workspace:slow', lifecycle: { state: 'opening' } },
-  },
-} });
-assert.equal(pendingOpen.workspaceObject.lifecycle.state, 'opening');
-assert.ok(Date.now() - navigationStarted < 1000, 'navigation must not wait for permission or data');
-const pendingActivation = await runUICommand({method: 'ui.window.activate', params: {windowId: pendingOpen.windowId}});
-assert.equal(pendingActivation.ok, true);

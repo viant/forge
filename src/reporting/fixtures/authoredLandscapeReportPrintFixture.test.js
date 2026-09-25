@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 import {
   buildReportBuilderReportDocument,
@@ -11,7 +11,7 @@ import { buildReportPrintFromReportFill } from "../reportPrintModel.js";
 import { validateReportPrint } from "../schema/reportSchemas.js";
 
 const fixtureUrl = new URL("./authored-landscape-report-print-fixture.v1.json", import.meta.url);
-const fixture = JSON.parse(readFileSync(fixtureUrl, "utf8"));
+let fixture = JSON.parse(readFileSync(fixtureUrl, "utf8"));
 
 const container = {
   id: "authoredLandscapeBuilder",
@@ -109,6 +109,11 @@ const reportPrint = buildReportPrintFromReportFill({
     footerHeight: 24,
   },
 });
+
+if (process.env.REGENERATE_REPORT_PRINT_FIXTURES === "1") {
+  fixture = reportPrint;
+  writeFileSync(fixtureUrl, `${JSON.stringify(fixture, null, 2)}\n`);
+}
 
 assert.deepEqual(validateReportPrint(reportPrint), { valid: true, errors: [] });
 assert.deepEqual(reportPrint, fixture);

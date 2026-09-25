@@ -50,7 +50,7 @@ export default {
     { type: "clickRole", role: "button", name: "Open report filters and options" },
     { type: "waitForEval", expression: assertPlacement("right", "forge-report-builder--filters-right"), timeoutMs: 60000 },
     { type: "screenshot", file: "filter-surface-right.png", fullPage: true },
-    { type: "clickSelector", selector: ".forge-report-builder__filter-rail-close" },
+    { type: "clickRole", role: "button", name: "Close report filters and options" },
     { type: "waitForEval", expression: assertClosed, timeoutMs: 60000 },
 
     { type: "eval", expression: "window.__REPORT_BUILDER_PREVIEW__.patchBuilderConfig({ filterPresentation: 'top' })" },

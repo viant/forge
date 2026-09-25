@@ -3,6 +3,7 @@ import { runUICommand } from './commands.js';
 import { restoreWindowsFromSnapshot } from '../store/signals.js';
 
 let activeSnapshotPublisher = null;
+const UI_BRIDGE_CLIENT_STORAGE_KEY = 'forge.uiBridge.clientId';
 let seededUIBridgeClientId = '';
 let activeBridgeReadyState = null;
 const DEFAULT_SNAPSHOT_EVENTS = [
@@ -63,12 +64,17 @@ export function ensureUIBridgeClientId(preferred = '') {
       seededUIBridgeClientId = existing;
       return existing;
     }
-    // sessionStorage is cloned when a browser tab is duplicated. A transport
-    // identity belongs to this document, never to a restored browser session.
-    const next = preferredText || randomId();
+    let stored = '';
+    try {
+      stored = String(window.sessionStorage?.getItem(UI_BRIDGE_CLIENT_STORAGE_KEY) || '').trim();
+    } catch (_) {}
+    const next = preferredText || stored || randomId();
     seededUIBridgeClientId = next;
     try {
       window.__forgeUIBridgeClientId = next;
+    } catch (_) {}
+    try {
+      window.sessionStorage?.setItem(UI_BRIDGE_CLIENT_STORAGE_KEY, next);
     } catch (_) {}
     return next;
   } catch (_) {
@@ -300,8 +306,6 @@ export function startUIBridgeHTTP(options = {}) {
   let detachAuthRetry = null;
   let readyToPublish = false;
   let startInFlight = null;
-  let reconnectTimer = null;
-  let pollLoopVersion = 0;
   const inflightRPC = new Set();
   const startupReadyEvent = String(options.startupReadyEvent || '').trim();
   const startupReadyTimeoutMs = Math.max(0, Number(options.startupReadyTimeoutMs || 0) || 0);
@@ -363,10 +367,10 @@ export function startUIBridgeHTTP(options = {}) {
   const publishSnapshot = async (publishOptions = {}) => {
     const strict = publishOptions.strict === true;
     if (!readyToPublish) return false;
+    const snap = snapshotBuilder();
+    const text = snapshotFingerprint(snap);
+    if (text === lastSnapshotText) return true;
     try {
-      const snap = snapshotBuilder();
-      const text = snapshotFingerprint(snap);
-      if (text === lastSnapshotText) return true;
       const result = await rpc('ui.snapshot', { clientId, data: snap }, `snapshot_${Date.now()}_${Math.floor(Math.random() * 1e6)}`);
       if (strict && result == null) {
         throw new Error('UI bridge snapshot was not accepted');
@@ -501,7 +505,6 @@ export function startUIBridgeHTTP(options = {}) {
   };
 
   const resetSessionAndRestart = () => {
-    pollLoopVersion += 1;
     sessionId = null;
     readyToPublish = false;
     lastSnapshotText = '';
@@ -532,12 +535,10 @@ export function startUIBridgeHTTP(options = {}) {
     if (!payload || !payload.method || !payload.id) return;
     try {
       const result = await runUICommand({ method: payload.method, params: payload.params || {} });
-      // A completed UI mutation must not wait for a potentially large snapshot
-      // upload before the caller receives its command acknowledgement.
-      await rpc('ui.response', { id: payload.id, ok: true, result }, `response_${payload.id}`);
       if (options.snapshotAfterCommand !== false) {
-        void publishSnapshot();
+        await publishSnapshot({ strict: true });
       }
+      await rpc('ui.response', { id: payload.id, ok: true, result }, `response_${payload.id}`);
     } catch (e) {
       await rpc('ui.response', { id: payload.id, ok: false, error: String(e?.message || e) }, `response_${payload.id}`);
     }
@@ -563,8 +564,8 @@ export function startUIBridgeHTTP(options = {}) {
     await handleMessage(msg);
   };
 
-  const pollLoop = async (version) => {
-    while (!stopped && version === pollLoopVersion) {
+  const pollLoop = async () => {
+    while (!stopped) {
       if (!sessionId) {
         await sleep(200);
         continue;
@@ -584,7 +585,6 @@ export function startUIBridgeHTTP(options = {}) {
       } catch (err) {
         if (isMissingSessionError(err)) {
           resetSessionAndRestart();
-          return;
         }
         await sleep(reconnectDelayMs);
       }
@@ -619,7 +619,7 @@ export function startUIBridgeHTTP(options = {}) {
       detachListeners = bindImmediateSnapshotListeners();
       detachLifecycle = bindLifecycleListeners(stop);
       detachOwner = bindOwnerListeners();
-      void pollLoop(pollLoopVersion);
+      pollLoop();
     } catch (err) {
       settleBridgeReadyState(false);
       if (isUnauthorizedError(err)) {
@@ -629,12 +629,6 @@ export function startUIBridgeHTTP(options = {}) {
       }
       // eslint-disable-next-line no-console
       console.warn('[forge][uiBridge] http bridge start failed', err);
-      if (!stopped && !reconnectTimer) {
-        reconnectTimer = setTimeout(() => {
-          reconnectTimer = null;
-          void ensureStarted();
-        }, reconnectDelayMs);
-      }
     }
   };
 
@@ -652,9 +646,6 @@ export function startUIBridgeHTTP(options = {}) {
   function stop() {
     if (stopped) return;
     stopped = true;
-    pollLoopVersion += 1;
-    if (reconnectTimer) clearTimeout(reconnectTimer);
-    reconnectTimer = null;
     try { detachListeners?.(); } catch (_) {}
     detachListeners = null;
     try { detachLifecycle?.(); } catch (_) {}

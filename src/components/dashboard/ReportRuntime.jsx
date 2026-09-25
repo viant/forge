@@ -4,9 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Icon } from "@blueprintjs/core";
 
 import Chart from "../Chart.jsx";
-import {ReportBlockSkeleton} from './ReportLoading.jsx';
 import SectionTabRail from "../SectionTabRail.jsx";
-import {registerNavigationGroup} from '../../core/ui/navigationRegistry.js';
 import {
   REPORT_LAYOUT_GRID_COLUMNS,
   resolveReportLayoutSpan,
@@ -2897,9 +2895,6 @@ export default function ReportRuntime({
   headerActions = null,
   reportDocument = null,
   reportFill = {},
-  pendingDatasetIds = [],
-  navigationWindowId = '',
-  navigationContainerId = '',
   title = "",
   subtitle = "",
   locale = "en-US",
@@ -3188,11 +3183,6 @@ export default function ReportRuntime({
       return null;
     }
     const kind = normalizeString(block?.kind);
-    const datasetRef = resolveRuntimeBlockDatasetRef(block, {availableDatasetRefs}).datasetRef;
-    if (pendingDatasetIds.includes(datasetRef) && !visibilityDataset?.rows?.length &&
-        ['chartBlock', 'tableBlock', 'kpiBlock'].includes(kind)) {
-      return <ReportBlockSkeleton key={block.id} block={block}/>;
-    }
     if (kind === "tabGroupBlock") {
       return null;
     }
@@ -3341,7 +3331,6 @@ export default function ReportRuntime({
               context={createRuntimeContext(dataset, locale, { publicMode: publicDiagnosticsMode })}
               isActive
               embedded={false}
-              height={reportPresentation ? 360 : undefined}
               showControls={!reportPresentation}
               onDatumSelect={chartInteractionEnabled ? ((selection) => {
                 setSelectedChartSelection(block.id, selection);
@@ -3428,13 +3417,6 @@ export default function ReportRuntime({
     section.block ? [section.block, ...section.items] : section.items
   ));
   const resolvedActiveSectionId = normalizeString(activeSectionId || runtimeTabGroup?.defaultSectionId || runtimeSections[0]?.id);
-  const navigationTabs = runtimeSections.map(section => ({id:section.id,label:section.navigationLabel}));
-  const navigationTabsKey = JSON.stringify(navigationTabs);
-  useEffect(() => {
-    if (runtimeSections.length <= 1) return undefined;
-    return registerNavigationGroup({windowId:navigationWindowId, containerId:navigationContainerId,
-      tabs:JSON.parse(navigationTabsKey), select:setActiveSectionId});
-  }, [navigationWindowId, navigationContainerId, navigationTabsKey]);
 
   useEffect(() => {
     if (!Array.isArray(runtimeSections) || runtimeSections.length === 0) {

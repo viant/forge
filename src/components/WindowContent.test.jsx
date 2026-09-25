@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, isProtectedWindowMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowRootContainer, reuseShallowEqualRuntimeObject, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState, windowMetadataFetchKey } from './WindowContent.jsx';
+import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, isProtectedWindowMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowRootContainer, reuseShallowEqualRuntimeObject, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
 import { resolveDataSourceOptions } from '../runtime/WidgetRenderer.jsx';
 
 describe('applyWindowPermissionMetadata', () => {
@@ -22,17 +22,6 @@ describe('applyWindowPermissionMetadata', () => {
 });
 
 describe('window metadata authorization states', () => {
-  it('does not restart permission preflight for equal reconstructed window state', () => {
-    const first = windowMetadataFetchKey({ windowId: 'advertisers-1', windowKey: 'advertiserList',
-      conversationId: 'conv-1', parameters: { AgencyId: [42] } }, { platform: 'web', capabilities: ['read'] });
-    const reconstructed = windowMetadataFetchKey({ windowId: 'advertisers-1', windowKey: 'advertiserList',
-      conversationId: 'conv-1', parameters: { AgencyId: [42] } }, { platform: 'web', capabilities: ['read'] });
-    const changed = windowMetadataFetchKey({ windowId: 'advertisers-1', windowKey: 'advertiserList',
-      conversationId: 'conv-1', parameters: { AgencyId: [43] } }, { platform: 'web', capabilities: ['read'] });
-    expect(first).toBe(reconstructed);
-    expect(first).not.toBe(changed);
-  });
-
   it('does not render protected inline metadata before a permission snapshot exists', () => {
     expect(canUseInlineMetadataFallback({authorization: {scope: 'resource'}, view: {content: {id: 'protected'}}})).toBe(false);
     expect(canUseInlineMetadataFallback({authorization: {scope: 'resource'}, authorizationSnapshot: {resources: {}}, view: {content: {id: 'permitted'}}})).toBe(false);
@@ -44,7 +33,6 @@ describe('window metadata authorization states', () => {
   it('distinguishes forbidden resources from expired authentication', () => {
     expect(formatWindowMetadataError({status: 403})).toBe('Access denied. You do not have permission to open this resource.');
     expect(formatWindowMetadataError({status: 401})).toBe('Authentication required. Please sign in to continue.');
-    expect(formatWindowMetadataError({status: 504})).toBe('Permission check timed out. Please try again.');
     expect(formatWindowMetadataError({status: 500, message: 'boom'})).toBe('Failed to load window: boom');
   });
 

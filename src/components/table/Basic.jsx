@@ -610,7 +610,6 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
 
     return (
         <div
-            data-forge-sizing-mode={sizingMode}
             className={`basic-table-wrapper${container.table?.fullWidth !== true && !container.table?.width ? ' is-content-width' : ''}${rowSlots.rowHeight ? ' has-fixed-row-slots' : ''}${String(effectiveDensity || '').toLowerCase() === 'compact' ? " is-compact-density" : ""}${loadingMode === 'refresh' ? " is-refreshing" : ""}${showEmptyState ? " has-metadata-empty-state" : ""}${horizontalOverflow.left ? " has-table-overflow-left" : ""}${horizontalOverflow.right ? " has-table-overflow-right" : ""}`}
             style={{
                 flex: sizingMode === 'fill' && !rowSlots.rowHeight ? '0 1 auto' : '0 0 auto',
