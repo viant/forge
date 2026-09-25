@@ -27,6 +27,8 @@ assert.deepEqual(edited.datasets, report.datasets);
 assert.deepEqual(edited.scope, report.scope);
 const filtered = applyEmbeddedReportChange(report, { ...prepared.state, scopeParams: { time: 'previous' } }, prepared.config);
 assert.equal(filtered.scope.params[0].value, 'previous');
+const manual = applyEmbeddedReportChange(report, { ...prepared.state, reportFilterRefreshMode: 'apply' }, prepared.config);
+assert.equal(manual.blocks.find((block) => block.kind === 'reportBuilderBlock').state.reportFilterRefreshMode, 'apply');
 assert.equal(report.scope.params[0].value, 'current');
 assert.deepEqual(edited.customMetadata, report.customMetadata);
 assert.equal(report.blocks[2].markdown, 'Before');
