@@ -308,7 +308,13 @@ export function buildReportBuilderDocumentOutlineEntries({
         }
         const normalizedKind = normalizeString(block?.kind);
         let summary = summarizeReportBuilderDocumentMarkdown(block?.markdown || "");
-        if (normalizedKind === "tableBlock") {
+        if (normalizedKind === "sectionBlock") {
+            summary = normalizeString(block?.subtitle) || "Report section";
+        } else if (normalizedKind === "tabGroupBlock") {
+            summary = `${block?.sectionIds?.length || 0} report tabs`;
+        } else if (normalizedKind === "compositeBlock") {
+            summary = `${block?.childBlockIds?.length || 0} grouped blocks`;
+        } else if (normalizedKind === "tableBlock") {
             const columnCount = Array.isArray(block?.columns) ? block.columns.length : 0;
             summary = columnCount > 0 ? `${columnCount} ${columnCount === 1 ? "field" : "fields"}` : "No fields selected";
         } else if (normalizedKind === "chartBlock") {
