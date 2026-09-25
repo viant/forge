@@ -20,6 +20,7 @@ import {
     normalizeReportBuilderDocumentBlocks,
 } from "../../reporting/reportDocumentModel.js";
 import { resolveReportBuilderBlock } from "../../reporting/reportBuilderBlockModel.js";
+import { buildReportBuilderDesignSections } from "./reportBuilderDesignSections.js";
 import {
     buildReportLayoutItem,
     resolveNextReportLayoutSpan,
@@ -3414,6 +3415,126 @@ export function upsertReportBuilderDocumentBlockState(state = {}, draft = null, 
         block: normalizedBlock,
         created: existingIndex === -1,
     };
+}
+
+function buildTabDocumentState(state, blocks) {
+    const previousItems = state?.reportDocumentLayout?.items || [];
+    const itemIndex = new Map(previousItems.map((item) => [item.blockId, item]));
+    const items = blocks.map((block) => ({ ...itemIndex.get(block.id), blockId: block.id }));
+    const primaryIndex = previousItems.findIndex((item) => item.blockId === "primaryBuilder");
+    if (primaryIndex >= 0) {
+        const nextId = previousItems.slice(primaryIndex + 1).find((item) => blocks.some((block) => block.id === item.blockId))?.blockId;
+        const position = items.findIndex((item) => item.blockId === nextId);
+        items.splice(position < 0 ? items.length : position, 0, itemIndex.get("primaryBuilder"));
+    }
+    return buildNextDocumentState(state, blocks, { ...state.reportDocumentLayout, items });
+}
+
+export function addReportBuilderTabState(state = {}, title = "New tab") {
+    let blocks = resolveReportBuilderDocumentBlockList(state);
+    let group = blocks.find((block) => block.kind === "tabGroupBlock");
+    if (!group) {
+        // Materialize the implicit Main tab before adding a sibling.
+        if (!blocks.length || blocks[0].kind !== "sectionBlock") {
+            blocks = [{ id: resolveUniqueDocumentBlockId(blocks, "mainSection"), kind: "sectionBlock", title: "Main" }, ...blocks];
+        }
+        const sectionIds = blocks.filter((block) => block.kind === "sectionBlock").map((block) => block.id);
+        group = { id: resolveUniqueDocumentBlockId(blocks, "reportTabs"), kind: "tabGroupBlock", title: "Report tabs", sectionIds, defaultSectionId: sectionIds[0] };
+        blocks = [group, ...blocks];
+    }
+    const section = { id: resolveUniqueDocumentBlockId(blocks, "sectionBlock"), kind: "sectionBlock", title: normalizeString(title) || "New tab" };
+    const sectionIds = buildReportBuilderDesignSections(blocks, blocks).tabs.map((tab) => tab.sectionId).filter(Boolean);
+    blocks = blocks.map((block) => block.id === group.id
+        ? { ...block, sectionIds: [...sectionIds, section.id] } : block);
+    blocks.push(section);
+    return { nextState: buildTabDocumentState(state, blocks), sectionId: section.id };
+}
+
+export function removeReportBuilderTabState(state = {}, tabId = "") {
+    const blocks = resolveReportBuilderDocumentBlockList(state);
+    const model = buildReportBuilderDesignSections(blocks, blocks);
+    const tab = model.tabs.find((entry) => entry.id === tabId);
+    if (!tab || (model.group && !tab.sectionId)) return { nextState: state, removedCount: 0 };
+    const removed = new Set(tab.entries.map((entry) => entry.id));
+    // A shared composite child remains available to surviving tabs.
+    model.tabs.filter((entry) => entry.id !== tab.id).forEach((entry) => {
+        entry.entries.forEach((block) => removed.delete(block.id));
+    });
+    const remainingSectionIds = blocks.filter((block) => block.kind === "sectionBlock" && !removed.has(block.id)).map((block) => block.id);
+    if (!remainingSectionIds.length && model.group) removed.add(model.group.id);
+    const nextBlocks = blocks.filter((block) => !removed.has(block.id)).map((block) => {
+        const next = { ...block };
+        for (const key of ["sectionIds", "childBlockIds", "blockIds"]) {
+            if (Array.isArray(next[key])) next[key] = next[key].filter((id) => !removed.has(id));
+        }
+        if (next.kind === "tabGroupBlock" && removed.has(next.defaultSectionId)) next.defaultSectionId = next.sectionIds?.[0] || remainingSectionIds[0] || "";
+        return next;
+    });
+    return { nextState: buildTabDocumentState(state, nextBlocks), removedCount: tab.entries.filter((entry) => removed.has(entry.id) && entry.kind !== "sectionBlock").length };
+}
+
+export function renameReportBuilderTabState(state, tabId, title) {
+    if (!normalizeString(title)) return state;
+    const blocks = resolveReportBuilderDocumentBlockList(state);
+    return buildTabDocumentState(state, blocks.map((block) => block.id === tabId && block.kind === "sectionBlock"
+        ? { ...block, title: normalizeString(title), navigationLabel: normalizeString(title) } : block));
+}
+
+export function reorderReportBuilderTabState(state, tabId, targetId) {
+    const blocks = resolveReportBuilderDocumentBlockList(state);
+    const model = buildReportBuilderDesignSections(blocks, blocks);
+    const ids = model.tabs.map((tab) => tab.sectionId).filter(Boolean);
+    const from = ids.indexOf(tabId);
+    const to = ids.indexOf(targetId);
+    if (!model.group || from < 0 || to < 0 || from === to) return state;
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    // Change navigation order only; section boundaries continue owning their blocks.
+    return buildTabDocumentState(state, blocks.map((block) => block.id === model.group.id ? { ...block, sectionIds: ids } : block));
+}
+
+export function transferReportBuilderBlockState(state, blockId, sectionId, { duplicate = false } = {}) {
+    const blocks = resolveReportBuilderDocumentBlockList(state);
+    const index = new Map(blocks.map((block) => [block.id, block]));
+    const root = index.get(blockId);
+    const destination = index.get(sectionId);
+    if (!root || ["sectionBlock", "tabGroupBlock"].includes(root.kind) || destination?.kind !== "sectionBlock") return { valid: false, nextState: state };
+    const ids = new Set();
+    const visit = (id) => {
+        if (ids.has(id) || !index.has(id)) return;
+        ids.add(id);
+        (index.get(id).childBlockIds || []).forEach(visit);
+    };
+    visit(blockId);
+    const moving = blocks.filter((block) => ids.has(block.id));
+    const idMap = new Map();
+    const reserved = [...blocks];
+    for (const block of moving) {
+        const id = duplicate ? resolveUniqueDocumentBlockId(reserved, `${block.id}Copy`) : block.id;
+        idMap.set(block.id, id);
+        if (duplicate) reserved.push({ id });
+    }
+    const transferred = moving.map((block) => ({ ...cloneValue(block), id: idMap.get(block.id),
+        ...(duplicate && block.id === blockId ? { title: `${formatDocumentBlockTitle(block)} Copy` } : {}),
+        ...(Array.isArray(block.childBlockIds) ? { childBlockIds: block.childBlockIds.map((id) => idMap.get(id) || id) } : {}),
+    }));
+    let nextBlocks = blocks.filter((block) => duplicate || !ids.has(block.id)).map((block) => {
+        if (duplicate) return block;
+        const next = { ...block };
+        // Moving a child out of a group detaches that child; other shared descendants remain linked.
+        if (Array.isArray(next.childBlockIds)) next.childBlockIds = next.childBlockIds.filter((id) => id !== blockId);
+        if (Array.isArray(next.blockIds)) next.blockIds = next.blockIds.filter((id) => !ids.has(id));
+        return next;
+    });
+    const start = nextBlocks.findIndex((block) => block.id === sectionId);
+    const end = nextBlocks.findIndex((block, i) => i > start && block.kind === "sectionBlock");
+    nextBlocks.splice(end < 0 ? nextBlocks.length : end, 0, ...transferred);
+    nextBlocks = nextBlocks.map((block) => block.id === sectionId && block.blockIds?.length
+        ? { ...block, blockIds: [...block.blockIds, idMap.get(blockId)] } : block);
+    const layout = cloneValue(state.reportDocumentLayout || { items: [] });
+    if (duplicate) layout.items = [...(layout.items || []), ...moving.map((block) => ({
+        ...(layout.items || []).find((item) => item.blockId === block.id), blockId: idMap.get(block.id),
+    }))];
+    return { valid: true, nextState: buildTabDocumentState({ ...state, reportDocumentLayout: layout }, nextBlocks), blockId: idMap.get(blockId), sectionId };
 }
 
 export function removeReportBuilderDocumentBlockState(state = {}, blockId = "") {

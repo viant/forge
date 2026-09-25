@@ -1032,6 +1032,8 @@ function resolveFilterOptions(filter = {}, collection = []) {
 
 export function ReportBuilderChartDialog({
     isOpen = false,
+    preview = null,
+    insertionLabel = "",
     onClose,
     draft,
     datasetRef = "primary",
@@ -1311,8 +1313,10 @@ export function ReportBuilderChartDialog({
             isOpen={isOpen}
             onClose={onClose}
             title={dialogTitle}
-            style={{ width: "min(820px, calc(100vw - 48px))" }}
+            style={{ width: preview ? "min(1280px, calc(100vw - 48px))" : "min(820px, calc(100vw - 48px))" }}
         >
+            {insertionLabel ? <p className="forge-report-builder__design-insertion-hint" role="status">{insertionLabel}</p> : null}
+            <div className={preview ? "forge-report-builder__editor-with-preview" : undefined}>
             <div className="forge-report-builder__chart-dialog">
                 {normalizedDatasetOptions.length > 0 || dataSourceLabel || dataViewLabel ? (
                     <div className="forge-report-builder__chart-field forge-report-builder__chart-field--full" style={{ marginBottom: 14 }}>
@@ -1454,6 +1458,8 @@ export function ReportBuilderChartDialog({
                         ))}
                     </div>
                 ) : null}
+            </div>
+            {preview}
             </div>
             <div className="forge-report-builder__chart-dialog-actions">
                 <Button outlined onClick={onClose}>Cancel</Button>
@@ -1983,6 +1989,8 @@ export function ReportBuilderTableCalculationDialog({
 
 export function ReportBuilderDocumentBlockDialog({
     isOpen = false,
+    preview = null,
+    insertionLabel = "",
     onClose,
     draft = null,
     onDraftChange,
@@ -2804,8 +2812,10 @@ export function ReportBuilderDocumentBlockDialog({
                             : isTableBlock
                                 ? "Add Table Block"
                                 : "Add Narrative Block")}
-            style={{ width: "min(860px, calc(100vw - 48px))" }}
+            style={{ width: preview ? "min(1280px, calc(100vw - 48px))" : "min(860px, calc(100vw - 48px))" }}
         >
+            {insertionLabel ? <p className="forge-report-builder__design-insertion-hint" role="status">{insertionLabel}</p> : null}
+            <div className={preview ? "forge-report-builder__editor-with-preview" : undefined}>
             <div className="forge-report-builder__chart-dialog">
                 <div className="forge-report-builder__chart-dialog-grid">
                     <label className="forge-report-builder__chart-field forge-report-builder__chart-field--full">
@@ -4627,6 +4637,8 @@ export function ReportBuilderDocumentBlockDialog({
                         ))}
                     </div>
                 ) : null}
+            </div>
+            {preview}
             </div>
             <div className="forge-report-builder__chart-dialog-actions">
                 <Button outlined onClick={onClose}>Cancel</Button>

@@ -7484,3 +7484,55 @@ button.forge-report-builder__dialog-source-card:focus-visible {
 .forge-report-runtime-filter-clear { border:0; background:transparent; cursor:pointer; color:var(--forge-focus-color, #21538f); font-size:11px; }
 .agently-workspace[data-forge-theme] .forge-report-builder-text-option { background:var(--forge-control-bg); color:var(--forge-text); border-color:var(--forge-control-border); }
 .agently-workspace[data-forge-theme] .forge-report-builder-text-option.is-active { background:var(--forge-table-hover-surface); color:var(--forge-text); border-color:var(--forge-focus-color); }
+
+.forge-report-builder__design-insertion-hint {
+    color: var(--forge-report-text-secondary, #536477);
+    font-size: var(--forge-report-type-small-size, 13px);
+    margin: 4px 12px;
+}
+.forge-report-builder__design-outline-node.is-new {
+    outline: 2px solid var(--forge-report-action, #215db0);
+    outline-offset: 3px;
+}
+.forge-report-builder__design-block-workspace { min-width: 0; }
+.forge-report-builder__design-block-workspace.has-preview,
+.forge-report-builder__editor-with-preview {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+.forge-report-builder__block-preview {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid var(--forge-report-border, #dbe5ef);
+    border-radius: 12px;
+    background: var(--forge-report-surface, #fff);
+    overflow: auto;
+    max-height: 70vh;
+    position: sticky;
+    top: 12px;
+}
+.forge-report-builder__block-preview-hint {
+    color: var(--forge-report-text-muted, #536477);
+    font-size: var(--forge-report-type-small-size, 13px);
+    margin: 8px 0 12px;
+}
+@media (max-width: 960px) {
+    .forge-report-builder__design-block-workspace.has-preview,
+    .forge-report-builder__editor-with-preview { grid-template-columns: minmax(0, 1fr); }
+    .forge-report-builder__block-preview { position: static; }
+}
+
+.forge-report-designer__workspace { border: 0; padding: 0; margin: 0; min-width: 0; }
+.forge-report-designer__host-actions,
+.forge-report-designer__sources { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.forge-report-designer__host-actions button,
+.forge-report-designer__sources button { padding: 6px 12px; border: 1px solid var(--forge-report-border, #dbe5ef); border-radius: 6px; background: var(--forge-report-surface, #fff); color: var(--forge-report-text, #20394b); cursor: pointer; }
+.forge-report-designer__host-actions button:disabled,
+.forge-report-designer__sources button:disabled { opacity: .5; cursor: default; }
+.forge-report-designer__unsupported { padding: 16px; border: 1px solid var(--forge-report-border, #dbe5ef); }
+.forge-report-builder[data-report-builder-embedded="true"] { height: auto; min-height: 0; }
+.forge-report-designer__workspace.is-read-only .forge-report-builder__design-outline > .forge-section-tab-rail-frame,
+.forge-report-designer__workspace.is-read-only .forge-report-builder__design-insertion-hint { display: none; }
+.forge-report-designer__declared-sources { margin: 8px 0 12px; }
