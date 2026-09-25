@@ -1,3 +1,4 @@
+import { normalizeReportFilterRefreshMode, reportFilterValuesChanged } from "./reportBuilderFilterRefresh.js";
 import ReportBuilderBlockPreview from "./ReportBuilderBlockPreview.jsx";
 import { captureDesignDocument, designDocumentsEqual, restoreDesignDocument } from "./reportBuilderDesignHistory.js";
 import { renameReportBuilderTabState, reorderReportBuilderTabState, transferReportBuilderBlockState } from "./reportBuilderDocumentBlocks.js";
@@ -2157,8 +2158,12 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         setPersistedStateOverride(null);
     }, [currentPrefillSignature, stateStorageScope]);
     const state = useMemo(() => mergeReportBuilderState(config, effectivePersistedState), [config, effectivePersistedState]);
+    const reportFilterRefreshMode = normalizeReportFilterRefreshMode(state.reportFilterRefreshMode || config.filterRefreshMode);
     const currentBuilderStateRef = useRef(state);
     currentBuilderStateRef.current = state;
+    useEffect(() => {
+        if (reportFilterRefreshMode === "automatic") setReportFiltersNeedApply(false);
+    }, [reportFilterRefreshMode]);
     const effectivePersistedStateRef = useRef(effectivePersistedState);
     effectivePersistedStateRef.current = effectivePersistedState;
     const semanticBinding = state?.binding;
@@ -2416,6 +2421,9 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const [sourceEditorError, setSourceEditorError] = useState("");
     const [designDataActionsMenuOpen, setDesignDataActionsMenuOpen] = useState(false);
     const [designSourceCatalogOpen, setDesignSourceCatalogOpen] = useState(false);
+    const [reportFiltersNeedApply, setReportFiltersNeedApply] = useState(false);
+    const [reportFilterApplySequence, setReportFilterApplySequence] = useState(0);
+    const [draftDynamicGroups, setDraftDynamicGroups] = useState(null);
     const [designUndoStack, setDesignUndoStack] = useState([]);
     const [designSourcesExpanded, setDesignSourcesExpanded] = useState(false);
     const [designRecentlyAddedId, setDesignRecentlyAddedId] = useState("");
@@ -2876,6 +2884,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     } = {}) => {
         const normalized = sanitizeReportBuilderState(effectiveConfig, next);
         const currentBuilderState = currentBuilderStateRef.current || state;
+        if (normalizeReportFilterRefreshMode(currentBuilderState.reportFilterRefreshMode || effectiveConfig.filterRefreshMode) === "apply"
+            && reportFilterValuesChanged(currentBuilderState, normalized)) {
+            setReportFiltersNeedApply(true);
+        }
         const nextWithExplorationHistory = skipExplorationHistory
             ? normalizeReportBuilderExplorationState(normalized)
             : recordReportBuilderExplorationHistory(currentBuilderState, normalized);
@@ -3329,8 +3341,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const currentRequestFingerprintValueRef = useRef(currentRequestFingerprint);
     currentRequestFingerprintValueRef.current = currentRequestFingerprint;
     const currentRequestShouldFetch = useMemo(
-        () => config.request?.autoFetch !== false && resolveStateReadiness(state).canRun,
-        [config.request?.autoFetch, resolveStateReadiness, state],
+        () => !reportFiltersNeedApply
+            && (config.request?.autoFetch !== false || (reportFilterRefreshMode === "apply" && reportFilterApplySequence > 0))
+            && resolveStateReadiness(state).canRun,
+        [config.request?.autoFetch, reportFiltersNeedApply, reportFilterApplySequence, resolveStateReadiness, state],
     );
     const currentRequestDispatchFingerprint = useMemo(
         () => `${currentRequestFingerprint}::${currentRequestShouldFetch ? "fetch" : "hold"}`,
@@ -3635,7 +3649,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             }
             setPendingScrollRowId("");
         });
-    }, [pendingScrollRowId, state.dynamicGroups]);
+    }, [pendingScrollRowId, state.dynamicGroups, draftDynamicGroups]);
 
     const measures = useMemo(() => getSelectableReportBuilderMeasures(displayConfig), [displayConfig]);
     const tableCalculationMeasures = useMemo(() => getTableCalculationReportBuilderMeasures(displayConfig), [displayConfig]);
@@ -4988,6 +5002,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     }, [inlineToolbarRequiredFilters, panelRequiredStaticFilters]);
     const showInlineToolbarFilters = !designWorkspaceMode && inlineToolbarRequiredFilters.length > 0;
     const [filterPanels, setFilterPanels] = useState(() => ({ common: !useFilterRail, advanced: false }));
+    const filterEditorState = draftDynamicGroups ? { ...state, dynamicGroups: draftDynamicGroups } : state;
     const [activeOptionalFilterKeys, setActiveOptionalFilterKeys] = useState([]);
     const [activeDynamicGroupIds, setActiveDynamicGroupIds] = useState([]);
     const [activeDynamicFamilyIds, setActiveDynamicFamilyIds] = useState([]);
@@ -5658,6 +5673,13 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                         </div>
                     </div>
                     <div className="forge-report-builder__bottom-header-actions">
+                        {!designWorkspaceMode && reportFilterRefreshMode === "apply" ? (
+                            <button type="button" className="forge-report-builder__bottom-toggle"
+                                aria-label={reportFiltersNeedApply ? "Apply filter changes and refresh report" : "Refresh report"}
+                                onClick={() => { setReportFiltersNeedApply(false); setReportFilterApplySequence((value) => value + 1); }}>
+                                <Icon icon="refresh" size={14} /> {reportFiltersNeedApply ? "Apply filters" : "Refresh"}
+                            </button>
+                        ) : null}
                         {totalActiveControlCount > 0 ? (
                             <button type="button" className="forge-report-builder__bottom-toggle" aria-label="Reset report filters and options to defaults" onClick={resetReportFiltersAndOptions}>
                                 Reset
@@ -8242,7 +8264,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         const request = snapshot.request;
         const nextReadiness = snapshot.readiness;
         const fingerprint = snapshot.requestFingerprint || snapshot.fingerprint;
-        const shouldFetch = nextReadiness.canRun && (forceFetch || config.request?.autoFetch !== false);
+        const shouldFetch = !reportFiltersNeedApply && nextReadiness.canRun && (forceFetch || config.request?.autoFetch !== false);
         requestFingerprintRef.current = `${fingerprint}::${shouldFetch ? "fetch" : "hold"}`;
         if (markManual) {
             lastManualRunFingerprintRef.current = fingerprint;
@@ -8263,7 +8285,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             builderContext?.handlers?.dataSource?.fetchCollection?.();
         }
         return { request, fingerprint, readiness: nextReadiness, shouldFetch };
-    }, [builderContext, config.request?.autoFetch, embeddedMode]);
+    }, [builderContext, config.request?.autoFetch, embeddedMode, reportFiltersNeedApply]);
 
     const dispatchReportRequest = React.useCallback((nextState, options = {}) => (
         dispatchReportRequestSnapshot(captureRunDispatchSnapshot(nextState), options)
@@ -10108,7 +10130,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         rows,
     }), [builderContext, displayConfig]);
     const runtimePreviewRowsState = useReportRuntimePreviewRows({
-        enabled: !embeddedMode && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
+        enabled: !embeddedMode && !reportFiltersNeedApply && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
             && !hostedReportActivationPending
             && hostedReportStarterReady
             && !shouldDeferReportBuilderRequestForPrefill({
@@ -10170,7 +10192,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         datasets: runtimePreviewPublishedDatasets,
     }), [runtimePreviewPublishedDatasets, runtimePreviewRequestKey]);
     const runtimePreviewDatasetPayloadState = useReportRuntimePreviewDatasetPayloads({
-        enabled: !embeddedMode && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
+        enabled: !embeddedMode && !reportFiltersNeedApply && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
             && !hostedReportActivationPending
             && hostedReportStarterReady
             && !shouldDeferReportBuilderRequestForPrefill({
@@ -10847,6 +10869,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         runtimePreviewEnabled,
         runtimePreviewRowsSource,
     ]);
+    const lastAppliedReportPreviewRef = useRef(null);
+    if (!reportFiltersNeedApply && authoredRuntimePreviewState?.canRenderRuntime) {
+        lastAppliedReportPreviewRef.current = { state: authoredRuntimePreviewState, artifact: runtimePreviewArtifact };
+    }
     const authoredRuntimeExpectedResultRequestKey = runtimePreviewPublishedDatasets.length > 0
         ? runtimePreviewPublishedDatasetsRequestKey
         : runtimePreviewRequestKey;
@@ -12180,9 +12206,12 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             === countEffectiveDynamicSelections(nextState?.dynamicGroups?.[groupId] || [])
         ));
         if (selectionCountsUnchanged) {
-            persistPassiveViewState(nextState);
+            // Empty rows and changes to their field selector are editor scaffolding.
+            // Keep them local until a selection changes the effective report query.
+            setDraftDynamicGroups(nextState.dynamicGroups || {});
             return;
         }
+        setDraftDynamicGroups(null);
         persistExplorationMutation(nextState, { sourceKind, sourceContext });
     }, [persistExplorationMutation, persistPassiveViewState]);
 
@@ -18641,6 +18670,15 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                         <div className="forge-report-builder__design-stage-header">
                             <div className="forge-report-builder__design-stage-eyebrow">Live report</div>
                             <div className="forge-report-builder__design-stage-title">Filters</div>
+                            <label className="forge-report-builder__filter-refresh-mode">Report refresh
+                                <select aria-label="Report filter refresh mode" value={reportFilterRefreshMode}
+                                    onChange={(event) => persistExplorationMutation({ ...state, reportFilterRefreshMode: event.target.value }, {
+                                        sourceKind: "reportBuilder.result", sourceContext: { label: "Filter refresh mode" },
+                                    })}>
+                                    <option value="automatic">Automatic on change</option>
+                                    <option value="apply">Apply to refresh</option>
+                                </select>
+                            </label>
                         </div>
                         <div className="forge-report-builder__result-meta" aria-label="Runtime filter summary">
                             <span className="forge-report-builder__result-meta-chip">
@@ -19835,37 +19873,38 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const addRow = (group) => {
         const groupId = String(group?.id || "").trim();
         if (groupId) {
-            setPendingScrollRowId(nextDynamicRowId(state?.dynamicGroups?.[groupId]));
+            setPendingScrollRowId(nextDynamicRowId(filterEditorState?.dynamicGroups?.[groupId]));
         }
-        persistDynamicScaffoldingMutation(addDynamicFilterRow(state, group), [groupId]);
+        persistDynamicScaffoldingMutation(addDynamicFilterRow(filterEditorState, group), [groupId]);
     };
 
     const changeDynamicFilterType = (group, rowId, filterId) => {
-        persistDynamicScaffoldingMutation(updateDynamicFilterRow(state, group, rowId, {
+        persistDynamicScaffoldingMutation(updateDynamicFilterRow(filterEditorState, group, rowId, {
             filterId,
             selections: [],
         }), [group?.id]);
     };
 
     const removeDynamicSelection = (group, rowId, index) => {
-        const rows = (state?.dynamicGroups?.[group.id] || []).map((row) => {
+        const rows = (filterEditorState?.dynamicGroups?.[group.id] || []).map((row) => {
             if (row.id !== rowId) return row;
             return {
                 ...row,
                 selections: (row.selections || []).filter((_, selectionIndex) => selectionIndex !== index),
             };
         });
+        setDraftDynamicGroups(null);
         persistExplorationMutation({
-            ...state,
+            ...filterEditorState,
             dynamicGroups: {
-                ...(state.dynamicGroups || {}),
+                ...(filterEditorState.dynamicGroups || {}),
                 [group.id]: rows,
             },
         });
     };
 
     const removeRow = (group, rowId) => {
-        persistDynamicScaffoldingMutation(removeDynamicFilterRow(state, group, rowId), [group?.id]);
+        persistDynamicScaffoldingMutation(removeDynamicFilterRow(filterEditorState, group, rowId), [group?.id]);
     };
 
     const renderDynamicGroup = (groupId) => {
@@ -19877,7 +19916,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             <DynamicFilterGroup
                 key={group.id}
                 group={group}
-                rows={state?.dynamicGroups?.[group.id] || []}
+                rows={filterEditorState?.dynamicGroups?.[group.id] || []}
                 resolveLookup={resolveLookup}
                 onAddRow={() => addRow(group)}
                 onChangeFilter={(rowId, filterId) => changeDynamicFilterType(group, rowId, filterId)}
@@ -19907,7 +19946,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             <DynamicFilterGroup
                 key={`${groupId}_${label}`}
                 group={subgroup}
-                rows={(state?.dynamicGroups?.[groupId] || []).filter((row) => filterIds.includes(String(row?.filterId || "").trim()))}
+                rows={(filterEditorState?.dynamicGroups?.[groupId] || []).filter((row) => filterIds.includes(String(row?.filterId || "").trim()))}
                 resolveLookup={resolveLookup}
                 onAddRow={() => addRow(subgroup)}
                 onChangeFilter={(rowId, filterId) => changeDynamicFilterType(subgroup, rowId, filterId)}
@@ -19952,8 +19991,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         if (!subgroup) {
             return;
         }
-        setPendingScrollRowId(nextDynamicRowId(state?.dynamicGroups?.[subgroup.id]));
-        persistDynamicScaffoldingMutation(addDynamicFilterRow(state, subgroup), [subgroup.id]);
+        setPendingScrollRowId(nextDynamicRowId(filterEditorState?.dynamicGroups?.[subgroup.id]));
+        persistDynamicScaffoldingMutation(addDynamicFilterRow(filterEditorState, subgroup), [subgroup.id]);
     };
 
     const moveFamilyRow = (family, rowId, fromDirection, toDirection, optionKey, patch = {}) => {
@@ -19967,8 +20006,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         if (!targetFilter) {
             return;
         }
-        const sourceRows = normalizeArray(state?.dynamicGroups?.[fromDirection]);
-        const targetRows = normalizeArray(state?.dynamicGroups?.[toDirection]);
+        const sourceRows = normalizeArray(filterEditorState?.dynamicGroups?.[fromDirection]);
+        const targetRows = normalizeArray(filterEditorState?.dynamicGroups?.[toDirection]);
         const currentRow = sourceRows.find((row) => String(row?.id || "").trim() === rowId);
         if (!currentRow) {
             return;
@@ -19980,10 +20019,11 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             filterId: String(targetFilter.id || "").trim(),
         };
         const nextState = persistDirectionalRows(
-            persistDirectionalRows(state, sourceGroup, nextSourceRows),
+            persistDirectionalRows(filterEditorState, sourceGroup, nextSourceRows),
             targetGroup,
             [...targetRows, movedRow],
         );
+        setDraftDynamicGroups(null);
         persistExplorationMutation(nextState);
     };
 
@@ -20004,7 +20044,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         if (!subgroup || !targetFilter) {
             return;
         }
-        persistDynamicScaffoldingMutation(updateDynamicFilterRow(state, subgroup, rowId, {
+        persistDynamicScaffoldingMutation(updateDynamicFilterRow(filterEditorState, subgroup, rowId, {
             filterId: String(targetFilter.id || "").trim(),
             selections: [],
         }), [subgroup?.id]);
@@ -20030,7 +20070,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             {config.unifiedFamilyRows ? (
                 <DynamicFamilyGroup
                     family={family}
-                    rows={buildDynamicFamilyRows(state, family, dynamicFilterGroups)}
+                    rows={buildDynamicFamilyRows(filterEditorState, family, dynamicFilterGroups)}
                     options={buildDynamicFamilyOptions(family, dynamicFilterGroups)}
                     resolveLookup={resolveLookup}
                     onAddRow={() => addFamilyRow(family)}
@@ -20060,7 +20100,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         if (!selection) {
             return false;
         }
-        const rows = (state?.dynamicGroups?.[group.id] || []).map((row) => {
+        const rows = (filterEditorState?.dynamicGroups?.[group.id] || []).map((row) => {
             if (row.id !== rowId) return row;
             const currentSelections = Array.isArray(row.selections) ? row.selections : [];
             const nextSelections = filterDef.multiple === false
@@ -20075,9 +20115,9 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             };
         });
         persistDynamicScaffoldingMutation({
-            ...state,
+            ...filterEditorState,
             dynamicGroups: {
-                ...(state.dynamicGroups || {}),
+                ...(filterEditorState.dynamicGroups || {}),
                 [group.id]: rows,
             },
         }, [group?.id]);
@@ -20085,7 +20125,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     };
 
     const toggleDynamicRowEnabled = (group, rowId) => {
-        const rows = (state?.dynamicGroups?.[group.id] || []).map((row) => {
+        const rows = (filterEditorState?.dynamicGroups?.[group.id] || []).map((row) => {
             if (row.id !== rowId) return row;
             return {
                 ...row,
@@ -20093,9 +20133,9 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             };
         });
         persistDynamicScaffoldingMutation({
-            ...state,
+            ...filterEditorState,
             dynamicGroups: {
-                ...(state.dynamicGroups || {}),
+                ...(filterEditorState.dynamicGroups || {}),
                 [group.id]: rows,
             },
         }, [group?.id]);
@@ -20117,7 +20157,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             });
             const selections = projectLookupSelections(filterDef, payload);
             if (selections.length === 0) return;
-            const currentState = currentBuilderStateRef.current || state;
+            const currentState = { ...(currentBuilderStateRef.current || filterEditorState), dynamicGroups: draftDynamicGroups || (currentBuilderStateRef.current || filterEditorState).dynamicGroups };
             const rows = (currentState?.dynamicGroups?.[group.id] || []).map((row) => {
                 if (row.id !== rowId) return row;
                 const currentSelections = Array.isArray(row.selections) ? row.selections : [];
@@ -20134,6 +20174,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     selections: nextSelections,
                 };
             });
+            setDraftDynamicGroups(null);
             persistExplorationMutation({
                 ...currentState,
                 dynamicGroups: {
@@ -20269,7 +20310,11 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         );
     };
     const renderRuntimePreview = () => {
-        if (!authoredRuntimePreviewState) {
+        const previewStateForDisplay = reportFiltersNeedApply && lastAppliedReportPreviewRef.current
+            ? lastAppliedReportPreviewRef.current.state : authoredRuntimePreviewState;
+        const previewArtifactForDisplay = reportFiltersNeedApply && lastAppliedReportPreviewRef.current
+            ? lastAppliedReportPreviewRef.current.artifact : runtimePreviewArtifact;
+        if (!previewStateForDisplay) {
             return null;
         }
         return (
@@ -20282,40 +20327,40 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                         <span className="forge-report-builder__result-meta-chip">{requiredFilterSummary.text}</span>
                     </div>
                 ) : null}
-                {authoredRuntimePreviewState.loadingState ? (
+                {previewStateForDisplay.loadingState ? (
                     <ReportBuilderResultState
-                        icon={authoredRuntimePreviewState.loadingState.icon}
-                        eyebrow={authoredRuntimePreviewState.loadingState.eyebrow}
-                        title={authoredRuntimePreviewState.loadingState.title}
-                        description={authoredRuntimePreviewState.loadingState.description}
-                        animated={authoredRuntimePreviewState.loadingState.animated}
+                        icon={previewStateForDisplay.loadingState.icon}
+                        eyebrow={previewStateForDisplay.loadingState.eyebrow}
+                        title={previewStateForDisplay.loadingState.title}
+                        description={previewStateForDisplay.loadingState.description}
+                        animated={previewStateForDisplay.loadingState.animated}
                     />
                 ) : null}
-                {authoredRuntimePreviewState.blockedState && !hideAuthoredRuntimeSemanticBlockedCard ? (
+                {previewStateForDisplay.blockedState && !hideAuthoredRuntimeSemanticBlockedCard ? (
                     <div>
                         <ReportBuilderResultState
-                            tone={authoredRuntimePreviewState.blockedState?.tone || "neutral"}
-                            icon={authoredRuntimePreviewState.blockedState?.icon || "filter-list"}
-                            eyebrow={authoredRuntimePreviewState.blockedState?.eyebrow || "Runtime preview"}
-                            title={authoredRuntimePreviewState.blockedState?.title || "Compile the authored runtime preview"}
-                            description={authoredRuntimePreviewState.blockedState?.description || "Complete the required scope and filters to compile the authored runtime preview."}
-                            actionLabel={authoredRuntimePreviewState.blockedState?.actionLabel || ""}
-                            onAction={resolveReadinessActionHandler(authoredRuntimePreviewState.blockedState?.action)}
+                            tone={previewStateForDisplay.blockedState?.tone || "neutral"}
+                            icon={previewStateForDisplay.blockedState?.icon || "filter-list"}
+                            eyebrow={previewStateForDisplay.blockedState?.eyebrow || "Runtime preview"}
+                            title={previewStateForDisplay.blockedState?.title || "Compile the authored runtime preview"}
+                            description={previewStateForDisplay.blockedState?.description || "Complete the required scope and filters to compile the authored runtime preview."}
+                            actionLabel={previewStateForDisplay.blockedState?.actionLabel || ""}
+                            onAction={resolveReadinessActionHandler(previewStateForDisplay.blockedState?.action)}
                         />
-                        {Array.isArray(authoredRuntimePreviewState.blockedState?.diagnostics) && authoredRuntimePreviewState.blockedState.diagnostics.length > 0 ? (
-                            <section className={`forge-report-builder__semantic-diagnostics forge-report-builder__semantic-diagnostics--${authoredRuntimePreviewState.blockedState.tone === "error" ? "danger" : (authoredRuntimePreviewState.blockedState.tone || "warning")}`} style={{ marginTop: 12 }}>
-                                {authoredRuntimePreviewState.blockedState.diagnosticsTitle || authoredRuntimePreviewState.blockedState.diagnosticsDescription ? (
+                        {Array.isArray(previewStateForDisplay.blockedState?.diagnostics) && previewStateForDisplay.blockedState.diagnostics.length > 0 ? (
+                            <section className={`forge-report-builder__semantic-diagnostics forge-report-builder__semantic-diagnostics--${previewStateForDisplay.blockedState.tone === "error" ? "danger" : (previewStateForDisplay.blockedState.tone || "warning")}`} style={{ marginTop: 12 }}>
+                                {previewStateForDisplay.blockedState.diagnosticsTitle || previewStateForDisplay.blockedState.diagnosticsDescription ? (
                                     <div className="forge-report-builder__semantic-diagnostics-header">
-                                        {authoredRuntimePreviewState.blockedState.diagnosticsTitle ? (
-                                            <div className="forge-report-builder__semantic-diagnostics-title">{authoredRuntimePreviewState.blockedState.diagnosticsTitle}</div>
+                                        {previewStateForDisplay.blockedState.diagnosticsTitle ? (
+                                            <div className="forge-report-builder__semantic-diagnostics-title">{previewStateForDisplay.blockedState.diagnosticsTitle}</div>
                                         ) : null}
-                                        {authoredRuntimePreviewState.blockedState.diagnosticsDescription ? (
-                                            <div className="forge-report-builder__semantic-diagnostics-description">{authoredRuntimePreviewState.blockedState.diagnosticsDescription}</div>
+                                        {previewStateForDisplay.blockedState.diagnosticsDescription ? (
+                                            <div className="forge-report-builder__semantic-diagnostics-description">{previewStateForDisplay.blockedState.diagnosticsDescription}</div>
                                         ) : null}
                                     </div>
                                 ) : null}
                                 <div className="forge-report-builder__semantic-diagnostics-list">
-                                    {authoredRuntimePreviewState.blockedState.diagnostics.map((diagnostic) => (
+                                    {previewStateForDisplay.blockedState.diagnostics.map((diagnostic) => (
                                         <article
                                             key={diagnostic.id}
                                             className={`forge-report-builder__semantic-diagnostic forge-report-builder__semantic-diagnostic--${diagnostic.severity || "error"}`}
@@ -20335,31 +20380,31 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                         ) : null}
                     </div>
                 ) : null}
-                {authoredRuntimePreviewState.errorState && !hideAuthoredRuntimeSemanticErrorCard ? (
+                {previewStateForDisplay.errorState && !hideAuthoredRuntimeSemanticErrorCard ? (
                     <div>
                         <ReportBuilderResultState
-                            tone={authoredRuntimePreviewState.errorState.tone}
-                            icon={authoredRuntimePreviewState.errorState.icon}
-                            eyebrow={authoredRuntimePreviewState.errorState.eyebrow}
-                            title={authoredRuntimePreviewState.errorState.title}
-                            description={authoredRuntimePreviewState.errorState.description}
-                            actionLabel={authoredRuntimePreviewState.errorState.actionLabel || ""}
-                            onAction={resolveReadinessActionHandler(authoredRuntimePreviewState.errorState.action)}
+                            tone={previewStateForDisplay.errorState.tone}
+                            icon={previewStateForDisplay.errorState.icon}
+                            eyebrow={previewStateForDisplay.errorState.eyebrow}
+                            title={previewStateForDisplay.errorState.title}
+                            description={previewStateForDisplay.errorState.description}
+                            actionLabel={previewStateForDisplay.errorState.actionLabel || ""}
+                            onAction={resolveReadinessActionHandler(previewStateForDisplay.errorState.action)}
                         />
-                        {Array.isArray(authoredRuntimePreviewState.errorState?.diagnostics) && authoredRuntimePreviewState.errorState.diagnostics.length > 0 ? (
+                        {Array.isArray(previewStateForDisplay.errorState?.diagnostics) && previewStateForDisplay.errorState.diagnostics.length > 0 ? (
                             <section className="forge-report-builder__semantic-diagnostics forge-report-builder__semantic-diagnostics--danger" style={{ marginTop: 12 }}>
-                                {authoredRuntimePreviewState.errorState.diagnosticsTitle || authoredRuntimePreviewState.errorState.diagnosticsDescription ? (
+                                {previewStateForDisplay.errorState.diagnosticsTitle || previewStateForDisplay.errorState.diagnosticsDescription ? (
                                     <div className="forge-report-builder__semantic-diagnostics-header">
-                                        {authoredRuntimePreviewState.errorState.diagnosticsTitle ? (
-                                            <div className="forge-report-builder__semantic-diagnostics-title">{authoredRuntimePreviewState.errorState.diagnosticsTitle}</div>
+                                        {previewStateForDisplay.errorState.diagnosticsTitle ? (
+                                            <div className="forge-report-builder__semantic-diagnostics-title">{previewStateForDisplay.errorState.diagnosticsTitle}</div>
                                         ) : null}
-                                        {authoredRuntimePreviewState.errorState.diagnosticsDescription ? (
-                                            <div className="forge-report-builder__semantic-diagnostics-description">{authoredRuntimePreviewState.errorState.diagnosticsDescription}</div>
+                                        {previewStateForDisplay.errorState.diagnosticsDescription ? (
+                                            <div className="forge-report-builder__semantic-diagnostics-description">{previewStateForDisplay.errorState.diagnosticsDescription}</div>
                                         ) : null}
                                     </div>
                                 ) : null}
                                 <div className="forge-report-builder__semantic-diagnostics-list">
-                                    {authoredRuntimePreviewState.errorState.diagnostics.map((diagnostic) => (
+                                    {previewStateForDisplay.errorState.diagnostics.map((diagnostic) => (
                                         <article
                                             key={diagnostic.id}
                                             className={`forge-report-builder__semantic-diagnostic forge-report-builder__semantic-diagnostic--${diagnostic.severity || "error"}`}
@@ -20379,21 +20424,22 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                         ) : null}
                     </div>
                 ) : null}
-                {authoredRuntimePreviewState.canRenderRuntime && authoredRuntimePreviewState.updatingNotice ? (
-                    <ReportBuilderInlineNotice notice={authoredRuntimePreviewState.updatingNotice} />
+                {reportFiltersNeedApply ? <div className="forge-report-builder__filter-pending" role="status">Filter changes are pending. The current result uses previous filters. Apply filters before exporting.</div> : null}
+                {previewStateForDisplay.canRenderRuntime && previewStateForDisplay.updatingNotice ? (
+                    <ReportBuilderInlineNotice notice={previewStateForDisplay.updatingNotice} />
                 ) : null}
                 {(() => {
-                    if (!authoredRuntimePreviewState.canRenderRuntime) {
+                    if (!previewStateForDisplay.canRenderRuntime) {
                         return null;
                     }
                     const runtimeContent = (
                         <ReportRuntime
                             headerActions={reportOptionHeaderActions}
-                            reportSpec={authoredRuntimePreviewState.runtimeConfig.reportSpec}
-                            reportDocument={runtimePreviewArtifact?.document || null}
-                            reportFill={authoredRuntimePreviewState.runtimeConfig.reportFill}
-                            title={runtimePreviewArtifact?.runtimeBlock?.title || ""}
-                            subtitle={runtimePreviewArtifact?.runtimeBlock?.subtitle || ""}
+                            reportSpec={previewStateForDisplay.runtimeConfig.reportSpec}
+                            reportDocument={previewArtifactForDisplay?.document || null}
+                            reportFill={previewStateForDisplay.runtimeConfig.reportFill}
+                            title={previewArtifactForDisplay?.runtimeBlock?.title || ""}
+                            subtitle={previewArtifactForDisplay?.runtimeBlock?.subtitle || ""}
                             locale={locale}
                             hostIntent={runtimePreviewHostIntent}
                             runtimeHandlers={runtimePreviewHandlers}
@@ -20410,7 +20456,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     );
                     return runtimeContent;
                 })()}
-                {authoredRuntimePreviewState.canRenderRuntime && !reportWorkspaceMode && desktopResultHeaderState.quickActions.enabled ? (
+                {previewStateForDisplay.canRenderRuntime && !reportWorkspaceMode && desktopResultHeaderState.quickActions.enabled ? (
                     <div className="forge-report-builder__result-header-actions" style={{ marginBottom: 12 }}>
                         <ReportBuilderChartQuickActions
                             canCreate={desktopResultHeaderState.quickActions.canCreate}
@@ -20499,7 +20545,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     ]);
 
     useEffect(() => {
-        if (embeddedMode || pendingReportWorkspaceRunRef.current) {
+        if (embeddedMode || reportFiltersNeedApply || pendingReportWorkspaceRunRef.current) {
             return;
         }
         const autoRunAction = resolveReportBuilderSurfaceAutoRunAction({
