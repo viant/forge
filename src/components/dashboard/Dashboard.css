@@ -7536,3 +7536,6 @@ button.forge-report-builder__dialog-source-card:focus-visible {
 .forge-report-designer__workspace.is-read-only .forge-report-builder__design-outline > .forge-section-tab-rail-frame,
 .forge-report-designer__workspace.is-read-only .forge-report-builder__design-insertion-hint { display: none; }
 .forge-report-designer__declared-sources { margin: 8px 0 12px; }
+.forge-report-builder__filter-refresh-mode { display: inline-flex; align-items: center; gap: 8px; color: var(--forge-report-text-secondary, #536477); font-size: var(--forge-report-type-small-size, 13px); }
+.forge-report-builder__filter-refresh-mode select { border: 1px solid var(--forge-report-control-border, #d8e1e8); border-radius: 6px; padding: 5px 8px; background: var(--forge-report-control-surface, #fff); color: var(--forge-report-text, #20394b); }
+.forge-report-builder__filter-pending { margin: 8px 0; padding: 8px 12px; border: 1px solid var(--forge-report-status-warning-border, #e2ba69); border-radius: 8px; background: var(--forge-report-status-warning-background, #fff8e8); color: var(--forge-report-status-warning-foreground, #795300); }

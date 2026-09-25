@@ -3,7 +3,7 @@ import { resolveReportDocumentBuilderContext } from "../../reporting/reportDocum
 const clone = (value) => value == null ? value : JSON.parse(JSON.stringify(value));
 const text = (value) => String(value ?? "").trim();
 const isObject = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-const stateFields = ["selectedDimensions", "selectedMeasures", "primaryMeasure", "viewMode", "chartSpec", "orderField", "orderDir", "pageSize", "scopeParams", "reportOptions", "drillMetadata", "calculatedFields", "tableCalculations"];
+const stateFields = ["selectedDimensions", "selectedMeasures", "primaryMeasure", "viewMode", "chartSpec", "orderField", "orderDir", "pageSize", "scopeParams", "reportOptions", "reportFilterRefreshMode", "drillMetadata", "calculatedFields", "tableCalculations"];
 const authoredFields = new Set(["title", "subtitle", "description", "kind", "id", "datasetRef", "markdown", "columns", "chartSpec", "valueField", "valueLabel", "childBlockIds", "sectionIds", "blockIds", "defaultSectionId", "navigationLabel", "content", "runtime", "paramIds", "mode", "placement", "width", "span", "items"]);
 
 export function prepareEmbeddedReport(report, catalog = {}) {

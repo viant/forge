@@ -9,7 +9,7 @@ function effectiveDynamicGroups(groups = {}) {
         (Array.isArray(rows) ? rows : []).filter((row) => Array.isArray(row?.selections) && row.selections.length > 0)
             .map((row) => ({ filterId: row.filterId, enabled: row.enabled !== false,
                 selections: row.selections.map((selection) => selection?.value ?? selection) })),
-    ]));
+    ]).filter(([, rows]) => rows.length > 0));
 }
 
 export function reportFilterValuesChanged(previous = {}, next = {}) {
