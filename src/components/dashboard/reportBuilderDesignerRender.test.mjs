@@ -322,6 +322,8 @@ const html = renderBuilder(state);
 assert.ok(!html.includes("Report Starters"));
 assert.ok(!html.includes("Choose what to build"));
 assert.ok(html.includes("Data Sources"));
+assert.ok(html.includes(">Main</span>"));
+assert.ok(html.includes("Add report tabs"));
 assert.ok(html.includes("Edit data"));
 assert.ok(!html.includes("Load report file"));
 assert.ok(html.includes("Performance Cube"));
@@ -582,3 +584,18 @@ assert.ok(!singleIssuePreviewValidationHtml.includes("Review issues"));
 assert.equal(singleIssuePreviewValidationHtml.split('<span class="bp6-button-text">Fix section</span>').length - 1, 1);
 
 console.log("reportBuilderDesignerRender ✓ keeps authored design trees block-first while preserving primary-result authoring for empty documents");
+
+const tabbedBlocks = [
+  { id: "views", kind: "tabGroupBlock", title: "Report views", sectionIds: ["summary", "details"], defaultSectionId: "details" },
+  { id: "summary", kind: "sectionBlock", title: "Summary" },
+  { id: "summaryText", kind: "markdownBlock", title: "Summary-only primitive", markdown: "Summary" },
+  { id: "details", kind: "sectionBlock", title: "Details" },
+  { id: "detailText", kind: "markdownBlock", title: "Details-only primitive", markdown: "Details" },
+];
+const tabbedHtml = renderBuilder({ ...state, reportDocumentBlocks: tabbedBlocks,
+  reportDocumentLayout: { type: "stack", items: tabbedBlocks.map((block) => ({ blockId: block.id })) } });
+assert.ok(tabbedHtml.includes('aria-label="Report block sections"'));
+assert.ok(tabbedHtml.includes('Edit report tabs'));
+assert.ok(tabbedHtml.includes('Details-only primitive'));
+assert.ok(!tabbedHtml.includes('Summary-only primitive'));
+console.log("reportBuilderDesignerRender ✓ matches report tabs and initially shows only the default tab's primitives");

@@ -1,3 +1,5 @@
+import SectionTabRail from "../SectionTabRail.jsx";
+import { buildReportBuilderDesignSections, resolveDesignSectionInsertion } from "./reportBuilderDesignSections.js";
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button, Dialog, Icon, Menu, MenuDivider, MenuItem, Popover, Tooltip } from "@blueprintjs/core";
 import { useSignals } from "@preact/signals-react/runtime";
@@ -2387,6 +2389,8 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     const [sourceEditorError, setSourceEditorError] = useState("");
     const [designDataActionsMenuOpen, setDesignDataActionsMenuOpen] = useState(false);
     const [designSourceCatalogOpen, setDesignSourceCatalogOpen] = useState(false);
+    const [designSectionId, setDesignSectionId] = useState("");
+    const [pendingDocumentSectionId, setPendingDocumentSectionId] = useState("");
     const [designSourceAddMenuRef, setDesignSourceAddMenuRef] = useState("");
     const [designSourceSearchQuery, setDesignSourceSearchQuery] = useState("");
     const sourceEditorValidation = useMemo(
@@ -4431,11 +4435,16 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     const designDocumentOutlineEntries = useMemo(() => {
         return reportDocumentOutlineEntries.filter((entry) => normalizeString(entry?.kind) !== "primaryBuilder");
     }, [reportDocumentOutlineEntries]);
+    const designSections = useMemo(() => buildReportBuilderDesignSections(authoredDocumentBlocks, designDocumentOutlineEntries), [authoredDocumentBlocks, designDocumentOutlineEntries]);
+    const activeDesignSection = designSections.tabs.find((tab) => tab.id === designSectionId)
+        || designSections.tabs.find((tab) => tab.id === (designSections.group?.defaultSectionId || designSections.group?.content?.defaultSectionId))
+        || designSections.tabs[0] || null;
+    const visibleDesignOutlineEntries = activeDesignSection?.entries || designDocumentOutlineEntries;
     const preferredDocumentOutlineEntries = useMemo(
         () => (designWorkspaceMode
-            ? designDocumentOutlineEntries
+            ? visibleDesignOutlineEntries
             : reportDocumentOutlineEntries),
-        [designDocumentOutlineEntries, designWorkspaceMode, reportDocumentOutlineEntries],
+        [visibleDesignOutlineEntries, designWorkspaceMode, reportDocumentOutlineEntries],
     );
     const effectiveSelectedDocumentOutlineEntryId = useMemo(() => (
         preferredDocumentOutlineEntries.length === 0
@@ -12563,6 +12572,10 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         const seed = kindOrSeed && typeof kindOrSeed === "object" && !Array.isArray(kindOrSeed)
             ? kindOrSeed
             : { kind: kindOrSeed };
+        const sectionInsertion = designWorkspaceMode && !seed?.id
+            ? resolveDesignSectionInsertion(activeDesignSection, options?.insertionAfterId, options?.insertionPlacement) : null;
+        if (sectionInsertion) options = { ...options, ...sectionInsertion };
+        setPendingDocumentSectionId(sectionInsertion?.sectionId || "");
         setChartApplyFeedback(null);
         setEditingDocumentBlockId(String(seed?.id || "").trim());
         setPendingDocumentInsertionAfterId(String(seed?.id || "").trim() ? "" : resolveDefaultReportBuilderInsertionAfterId({
@@ -12583,7 +12596,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             chartState: authoredChartState,
         }));
         setDocumentBlockDialogOpen(true);
-    }, [authoredChartConfig, authoredChartState, authoredCompositeChildBlockOptions, authoredDatasetOptions, authoredDocumentBlocks, authoredFilterBarGroupOptions, authoredKpiSecondaryFieldOptions, authoredKpiValueFieldOptions, authoredScopeParamOptions, authoredTableColumnOptions]);
+    }, [activeDesignSection, designWorkspaceMode, authoredChartConfig, authoredChartState, authoredCompositeChildBlockOptions, authoredDatasetOptions, authoredDocumentBlocks, authoredFilterBarGroupOptions, authoredKpiSecondaryFieldOptions, authoredKpiValueFieldOptions, authoredScopeParamOptions, authoredTableColumnOptions]);
     const openAuthoredChartBlockDialog = React.useCallback((seed = null, options = {}) => {
         const nextDraft = buildReportBuilderDocumentBlockDraft("chartBlock", seed, {
             existingBlocks: authoredDocumentBlocks,
@@ -12594,6 +12607,10 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         if (!nextDraft?.chartSpec) {
             return;
         }
+        const sectionInsertion = designWorkspaceMode && !seed?.id
+            ? resolveDesignSectionInsertion(activeDesignSection, options?.insertionAfterId, options?.insertionPlacement) : null;
+        if (sectionInsertion) options = { ...options, ...sectionInsertion };
+        setPendingDocumentSectionId(sectionInsertion?.sectionId || "");
         setChartApplyFeedback(null);
         setEditingAuthoredChartBlockId(String(seed?.id || "").trim());
         setPendingDocumentInsertionAfterId(String(seed?.id || "").trim() ? "" : resolveDefaultReportBuilderInsertionAfterId({
@@ -12603,7 +12620,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         setPendingDocumentInsertionPlacement(String(seed?.id || "").trim() ? "after" : (normalizeString(options?.insertionPlacement).toLowerCase() === "before" ? "before" : "after"));
         setAuthoredChartBlockDraft(nextDraft);
         setAuthoredChartBlockDialogOpen(true);
-    }, [authoredChartConfig, authoredChartState, authoredDatasetOptions, authoredDocumentBlocks]);
+    }, [activeDesignSection, designWorkspaceMode, authoredChartConfig, authoredChartState, authoredDatasetOptions, authoredDocumentBlocks]);
     const openSourceEditorDialog = React.useCallback((datasetOption = null) => {
         const nextDraft = buildReportBuilderSourceEditorDraft(datasetOption);
         if (!nextDraft) {
@@ -12888,6 +12905,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     const applyDocumentBlockDraft = React.useCallback(() => {
         const result = upsertReportBuilderDocumentBlockState(state, documentBlockDraft, {
             editingId: editingDocumentBlockId,
+            sectionId: pendingDocumentSectionId,
             insertionAfterId: pendingDocumentInsertionAfterId,
             insertionPlacement: pendingDocumentInsertionPlacement,
             valueFieldOptions: documentBlockDraftValueFieldOptions,
@@ -12922,7 +12940,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             autoClearMs: result.created ? 1200 : 800,
         });
         return true;
-    }, [authoredChartConfig, authoredChartFieldOptions, authoredCompositeChildBlockOptions, authoredDocumentBlocks, authoredScopeParamOptions, closeDocumentBlockDialog, documentBlockDraft, documentBlockDraftSecondaryFieldOptions, documentBlockDraftTableColumnOptions, documentBlockDraftValueFieldOptions, editingDocumentBlockId, pendingDocumentInsertionAfterId, pendingDocumentInsertionPlacement, persistExplorationMutation, state]);
+    }, [authoredChartConfig, authoredChartFieldOptions, authoredCompositeChildBlockOptions, authoredDocumentBlocks, authoredScopeParamOptions, closeDocumentBlockDialog, documentBlockDraft, documentBlockDraftSecondaryFieldOptions, documentBlockDraftTableColumnOptions, documentBlockDraftValueFieldOptions, editingDocumentBlockId, pendingDocumentInsertionAfterId, pendingDocumentInsertionPlacement, pendingDocumentSectionId, persistExplorationMutation, state]);
     const closeReportDocumentShellPanels = React.useCallback(() => {
         setDocumentDataViewOpen(false);
         setAuthoredDiagnosticsExpanded(false);
@@ -13380,6 +13398,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
     const applyAuthoredChartBlockDraft = React.useCallback(() => {
         const result = upsertReportBuilderDocumentBlockState(state, authoredChartBlockDraft, {
             editingId: editingAuthoredChartBlockId,
+            sectionId: pendingDocumentSectionId,
             insertionAfterId: pendingDocumentInsertionAfterId,
             insertionPlacement: pendingDocumentInsertionPlacement,
             chartConfig: authoredChartConfig,
@@ -13409,7 +13428,7 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
             autoClearMs: result.created ? 1200 : 800,
         });
         return true;
-    }, [authoredChartBlockDraft, authoredChartConfig, authoredChartDialogFieldOptions, authoredDocumentBlocks, closeAuthoredChartBlockDialog, editingAuthoredChartBlockId, pendingDocumentInsertionAfterId, pendingDocumentInsertionPlacement, persistExplorationMutation, state]);
+    }, [authoredChartBlockDraft, authoredChartConfig, authoredChartDialogFieldOptions, authoredDocumentBlocks, closeAuthoredChartBlockDialog, editingAuthoredChartBlockId, pendingDocumentInsertionAfterId, pendingDocumentInsertionPlacement, pendingDocumentSectionId, persistExplorationMutation, state]);
     const removeDocumentBlock = React.useCallback((blockId = "") => {
         const normalizedBlockId = String(blockId || "").trim();
         if (!normalizedBlockId) {
@@ -18357,10 +18376,31 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
                                     </div>
                                 ) : null}
                             </div>
-                            {designDocumentOutlineEntries.length > 0 ? (
+                            {designSections.tabs.length > 0 ? (
+                                <>
+                                    <div>
+                                        <Button small minimal icon={designSections.group ? "edit" : "add"}
+                                            onClick={() => openDocumentBlockDialog(designSections.group || "tabGroupBlock")}>
+                                            {designSections.group ? "Edit report tabs" : "Add report tabs"}
+                                        </Button>
+                                    </div>
+                                    <SectionTabRail
+                                        items={designSections.tabs}
+                                        selectedId={activeDesignSection?.id || ""}
+                                        ariaLabel="Report block sections"
+                                        onChange={(id) => {
+                                            setDesignSectionId(id);
+                                            const section = designSections.tabs.find((tab) => tab.id === id);
+                                            setSelectedDocumentOutlineEntryId(section?.sectionId || section?.entries[0]?.id || "");
+                                            setPendingDocumentInsertionPlacement("after");
+                                        }}
+                                    />
+                                </>
+                            ) : null}
+                            {visibleDesignOutlineEntries.length > 0 ? (
                                 <>
                                     <div className="forge-report-builder__design-outline-tree">
-                                        {renderOutlineNodes(designDocumentOutlineEntries)}
+                                        {renderOutlineNodes(visibleDesignOutlineEntries)}
                                     </div>
                                 </>
                             ) : (
@@ -18460,6 +18500,9 @@ function ReportBuilderReady({ container: sourceContainer, context }) {
         compactMode,
         currentSemanticBindingViewState,
         designDocumentOutlineEntries,
+        designSections,
+        activeDesignSection,
+        visibleDesignOutlineEntries,
         designWorkspaceFlowState,
         selectedDocumentOutlineBlock,
         selectedDocumentOutlineBlockIndex,

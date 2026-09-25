@@ -3114,6 +3114,7 @@ function buildNextDocumentState(baseState = {}, blocks = [], layout = null) {
 
 export function upsertReportBuilderDocumentBlockState(state = {}, draft = null, {
     editingId = "",
+    sectionId = "",
     insertionAfterId = "",
     insertionPlacement = "after",
     valueFieldOptions = [],
@@ -3372,6 +3373,27 @@ export function upsertReportBuilderDocumentBlockState(state = {}, draft = null, 
         }
     } else {
         nextBlocks.push(normalizedBlock);
+    }
+    // Composite children can be stored outside their owner's section. Keep new
+    // blocks inside the selected tab even when anchored to such a child.
+    const sectionIndex = nextBlocks.findIndex((block) => block.id === sectionId && block.kind === "sectionBlock");
+    if (existingIndex === -1 && sectionIndex >= 0 && !["sectionBlock", "tabGroupBlock"].includes(normalizedKind)) {
+        const insertedIndex = nextBlocks.findIndex((block) => block.id === normalizedBlock.id);
+        const nextSectionIndex = nextBlocks.findIndex((block, index) => index > sectionIndex && block.kind === "sectionBlock");
+        if (insertedIndex <= sectionIndex || (nextSectionIndex >= 0 && insertedIndex >= nextSectionIndex)) {
+            nextBlocks.splice(insertedIndex, 1);
+            if (insertedIndex < nextPrimaryIndex) nextPrimaryIndex -= 1;
+            const ownerIndex = nextBlocks.findIndex((block) => block.id === sectionId);
+            const boundary = nextBlocks.findIndex((block, index) => index > ownerIndex && block.kind === "sectionBlock");
+            const destination = boundary < 0 ? nextBlocks.length : boundary;
+            nextBlocks.splice(destination, 0, normalizedBlock);
+            if (destination < nextPrimaryIndex) nextPrimaryIndex += 1;
+        }
+        const ownerIndex = nextBlocks.findIndex((block) => block.id === sectionId);
+        const owner = nextBlocks[ownerIndex];
+        if (Array.isArray(owner.blockIds) && owner.blockIds.length > 0) {
+            nextBlocks[ownerIndex] = { ...owner, blockIds: [...owner.blockIds, normalizedBlock.id] };
+        }
     }
     const nextState = buildNextDocumentState(
         state,
