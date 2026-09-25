@@ -59,6 +59,8 @@ assert.ok(toneHtml.includes("forge-dashboard-table-cell-visual--tone"));
 assert.ok(toneHtml.includes("forge-dashboard-table-cell-visual--warning"));
 assert.ok(toneHtml.includes("data-visual-kind=\"tone\""));
 assert.ok(toneHtml.includes("Watch"));
+assert.ok(toneHtml.includes("--forge-status-warning-background"));
+assert.ok(toneHtml.includes("--forge-status-warning-foreground"));
 
 const customBadgeHtml = renderToStaticMarkup(
   renderExplicitReportTableCellVisual(

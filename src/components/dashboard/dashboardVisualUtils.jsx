@@ -9,10 +9,26 @@ import { resolveTableCellVisualState } from "./tableCellVisuals.js";
 import { normalizeReportTableLink, resolveReportTableLink } from "../../reporting/reportTableLink.js";
 
 export const toneColors = {
-    info: {background: '#ebf1f5', border: '#ced9e0', text: '#30404d'},
-    warning: {background: '#fff5d6', border: '#f5c542', text: '#8a5d00'},
-    danger: {background: '#fdecea', border: '#db3737', text: '#a82a2a'},
-    success: {background: '#eef8f0', border: '#0f9960', text: '#0a6640'},
+    info: {
+        background: 'var(--forge-status-info-background, #ebf1f5)',
+        border: 'var(--forge-status-info-border, #ced9e0)',
+        text: 'var(--forge-status-info-foreground, #30404d)',
+    },
+    warning: {
+        background: 'var(--forge-status-warning-background, #fff5d6)',
+        border: 'var(--forge-status-warning-border, #f5c542)',
+        text: 'var(--forge-status-warning-foreground, #8a5d00)',
+    },
+    danger: {
+        background: 'var(--forge-status-danger-background, #fdecea)',
+        border: 'var(--forge-status-danger-border, #db3737)',
+        text: 'var(--forge-status-danger-foreground, #a82a2a)',
+    },
+    success: {
+        background: 'var(--forge-status-success-background, #eef8f0)',
+        border: 'var(--forge-status-success-border, #0f9960)',
+        text: 'var(--forge-status-success-foreground, #0a6640)',
+    },
 };
 
 export function titleizeDashboardKey(value = '') {
