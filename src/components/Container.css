@@ -48,6 +48,24 @@
     overscroll-behavior: contain;
 }
 
+/* Content-sized windows must let a tab panel contribute its natural height.
+   Fill-sized windows retain the viewport-scrolling contract above. */
+.form-panel.form-panel--content {
+    flex: 0 0 auto;
+    overflow: visible;
+}
+
+.form-panel--content > .forge-form-panel-tabs:is(.bp4-tabs, .bp5-tabs, .bp6-tabs),
+.forge-form-panel-tabs--content > .forge-form-panel-tabs__panel {
+    flex: 0 0 auto;
+}
+
+.forge-form-panel-tabs--content > .forge-form-panel-tabs__panel {
+    /* Host styles can target individual tab IDs; content sizing must still
+       expose the panel's full height to the window scroll container. */
+    overflow: visible !important;
+}
+
 .forge-form-panel-tabs > .forge-form-panel-tabs__panel[aria-hidden="true"] {
     display: none;
 }

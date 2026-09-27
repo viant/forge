@@ -24,6 +24,7 @@ describe('resolveWindowLayoutContext', () => {
   it('allows metadata to opt a fill-parent window into root scrolling', () => {
     expect(resolveWindowLayoutOverflow({scrollMode: 'self'}, true)).toBe('auto');
     expect(resolveWindowLayoutOverflow({containers: [{id: 'summary'}, {id: 'orders'}]}, true)).toBe('auto');
+    expect(resolveWindowLayoutOverflow({layout: {divider: {visible: true}}, containers: [{id: 'list'}, {id: 'details'}]}, true)).toBe('hidden');
     expect(resolveWindowLayoutOverflow({dashboard: {}, containers: [{id: 'a'}, {id: 'b'}]}, true)).toBe('hidden');
     expect(resolveWindowLayoutOverflow({}, true)).toBe('hidden');
     expect(resolveWindowLayoutOverflow({scrollMode: 'self'}, false)).toBe('visible');

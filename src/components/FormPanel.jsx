@@ -12,7 +12,7 @@ import {isContainerVisible, trackContainerVisibility} from "./visibleWhen.js";
 import {initialBusMessageState, mergeSelectedTab, nextBusMessage, resolveDataSourceFetchMode} from './FormPanelState';
 import SectionTabRail from './SectionTabRail.jsx';
 
-const FormPanel = ({context, container, children, dataSourceFetchMode = 'always'}) => {
+const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourceFetchMode = 'always'}) => {
     useSignals();
     const workspacePresentation = useWorkspacePresentation();
     const containers = container.containers || [];
@@ -102,6 +102,7 @@ const FormPanel = ({context, container, children, dataSourceFetchMode = 'always'
     );
     const tabsClassName = [
         'forge-form-panel-tabs',
+        sizingMode === 'content' ? 'forge-form-panel-tabs--content' : '',
         tabAppearance ? `forge-form-panel-tabs--${tabAppearance}` : '',
         compactTabs ? 'forge-form-panel-tabs--compact' : '',
     ].filter(Boolean).join(' ');
@@ -154,7 +155,7 @@ const FormPanel = ({context, container, children, dataSourceFetchMode = 'always'
         );
     }
     return (
-        <div className="form-panel">
+        <div className={`form-panel${sizingMode === 'content' ? ' form-panel--content' : ''}`}>
             <Tabs id={`form-tabs-${visibleContainers[0]?.id || 'root'}`} className={tabsClassName} selectedTabId={selectedTabId} onChange={handleTabChange} renderActiveTabPanelOnly={mountPolicy ? mountPolicy === 'active' : !keepVisitedTabPanelsMounted} animate={false}>
                 {visibleContainers.map((tab) => (
                     <Tab
