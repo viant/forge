@@ -540,6 +540,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                     <LayoutRenderer
                         context={dsCtx}
                         container={{dataSourceRef: resolvedDataSourceRef, ...dialog.content}}
+                        sizingMode="content"
                     />
                 </div>
             </DialogBody>

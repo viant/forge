@@ -201,7 +201,7 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
         const stableMountPolicy = container.stableTabs?.keepVisitedTabPanelsMounted === true ? 'visited' : container.stableTabs?.renderActiveTabPanelOnly === false ? 'all' : 'active';
         const tabContainer = container.stableTabs ? {...container, tabs: {...container.stableTabs, mountPolicy: stableMountPolicy}} : container;
         formPanel = (<>
-            <FormPanel context={resolveChildContext(effectiveContext, dataSourceRef)} container={tabContainer} isActive={isActive} dataSourceFetchMode={dataSourceFetchMode}></FormPanel>
+            <FormPanel context={resolveChildContext(effectiveContext, dataSourceRef)} container={tabContainer} sizingMode={sizingMode} isActive={isActive} dataSourceFetchMode={dataSourceFetchMode}></FormPanel>
         </>);
     }
 
