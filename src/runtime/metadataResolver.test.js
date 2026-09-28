@@ -376,3 +376,12 @@ const linkMetadata = {
 const resolvedLinkMetadata = resolveMetadataForTarget(linkMetadata, {platform: 'web', formFactor: 'desktop'});
 assert.equal(resolvedLinkMetadata.view.content.items[0].link.target, '_blank');
 assert.equal(resolvedLinkMetadata.view.content.items[0].link.hrefTemplate, 'https://example.test/records/{{id}}');
+
+const formatting = {formattingRules: [
+  {field:'daysRemaining',operator:'between',values:[0,7],target:'cell',className:'warning'},
+  {field:'daysRemaining',operator:'lte',value:5,target:'row',className:'danger'},
+  {field:'pacingIndex',operator:'lt',value:90,target:'column',className:'danger'},
+]};
+for (const platform of ['web','ios','android']) {
+  assert.deepEqual(resolveMetadataForTarget(formatting,{platform}),formatting,'formatting targets survive platform resolution');
+}

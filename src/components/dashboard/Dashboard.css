@@ -7539,3 +7539,25 @@ button.forge-report-builder__dialog-source-card:focus-visible {
 .forge-report-builder__filter-refresh-mode { display: inline-flex; align-items: center; gap: 8px; color: var(--forge-report-text-secondary, #536477); font-size: var(--forge-report-type-small-size, 13px); }
 .forge-report-builder__filter-refresh-mode select { border: 1px solid var(--forge-report-control-border, #d8e1e8); border-radius: 6px; padding: 5px 8px; background: var(--forge-report-control-surface, #fff); color: var(--forge-report-text, #20394b); }
 .forge-report-builder__filter-pending { margin: 8px 0; padding: 8px 12px; border: 1px solid var(--forge-report-status-warning-border, #e2ba69); border-radius: 8px; background: var(--forge-report-status-warning-background, #fff8e8); color: var(--forge-report-status-warning-foreground, #795300); }
+
+/* Shared report panel roles. Workspace CSS owns visual customization. */
+.forge-report-runtime-panel {
+    border: 1px solid var(--forge-report-border, #dbe5ec);
+    border-radius: var(--forge-report-panel-radius, 16px);
+    background: var(--forge-report-panel-background, var(--forge-report-surface, #fff));
+    box-shadow: var(--forge-report-panel-shadow, none);
+    padding: var(--forge-report-panel-padding, 16px);
+    display: flex;
+    flex-direction: column;
+    gap: var(--forge-report-panel-gap, 12px);
+    min-width: 0;
+}
+.forge-report-runtime-panel__header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: var(--forge-report-panel-gap, 12px); }
+.forge-report-runtime-panel__heading { display: flex; flex-direction: column; gap: var(--forge-report-heading-gap, 6px); }
+.forge-report-runtime-panel__title { margin: 0; font-size: var(--forge-report-type-section-size, 15px); line-height: var(--forge-report-type-section-line-height, normal); color: var(--forge-report-text, #182026); }
+.forge-report-runtime-panel__subtitle { margin: 0; font-size: var(--forge-report-type-small-size, 12px); line-height: var(--forge-report-type-small-line-height, 1.5); color: var(--forge-report-text-muted, #5f6b7c); }
+.forge-report-runtime-collection-panel { container-type: inline-size; }
+.forge-report-runtime-collection-grid { display: grid; grid-template-columns: repeat(var(--forge-report-collection-columns, 2), minmax(0, 1fr)); gap: var(--forge-report-panel-gap, 12px); }
+@container (max-width: 600px) {
+    .forge-report-runtime-collection-grid { grid-template-columns: minmax(0, 1fr); }
+}

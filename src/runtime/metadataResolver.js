@@ -21,7 +21,8 @@ function normalizeTargetSpec(spec) {
     if (typeof spec === 'string') {
         const platform = spec.trim();
         if (!platform) return null;
-        if (['_blank', '_self', '_parent', '_top'].includes(platform.toLowerCase())) return null;
+        // Link destinations and table-formatting targets are not platform gates.
+        if (['_blank', '_self', '_parent', '_top', 'row', 'cell', 'column'].includes(platform.toLowerCase())) return null;
         return {
             platforms: [platform],
             excludePlatforms: [],
