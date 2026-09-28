@@ -214,3 +214,19 @@ assert.equal(registeredSnapshot.windows[0].inlineMetadata, undefined, 'registere
 assert.equal(registeredSnapshot.windows[0].inlineMetadataExplicit, false);
 
 resetSignals();
+
+activeWindows.value = [{windowId: 'W1', windowKey: 'list'}];
+getMetadataSignal('W1').value = {
+  dataSource: { all: {}, starred: {} },
+  view: {content: {containers: [{
+    id: 'list', dataSourceRefSelector: 'mode', dataSourceRefs: {all: 'all', starred: 'starred'},
+    table: {toolbar: {items: [{id: 'nameSearch', type: 'quickSearch', properties: {field: 'Name', label: 'Advertiser contains'}}]}},
+  }]}},
+};
+getFormSignal('W1:windowForm').value = {mode: 'starred'};
+const browse = buildUISnapshot({includeMetadata: true});
+assert.deepEqual(browse.windows[0].metadata.view.controls, [{
+  id: 'nameSearch', label: 'Advertiser contains', type: 'quickSearch', scope: 'filter',
+  dataSourceRef: 'starred', bindingPath: null, dataField: 'Name', options: undefined,
+}]);
+console.log('Toolbar quick searches expose their active datasource and filter field');

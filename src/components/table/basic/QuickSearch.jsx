@@ -24,7 +24,7 @@ export default function QuickSearch({context, item, disabled = false}) {
     const value = String(context?.signals?.input?.value?.filter?.[field] ?? '');
     const [draft, setDraft] = useState(value);
     const committed = useRef(value);
-    useLayoutEffect(() => { committed.current = value; setDraft(value); }, [value]);
+    useLayoutEffect(() => { committed.current = value; setDraft(value); if (value) setExpanded(true); }, [value]);
     const commit = next => {
         if (next === committed.current) return;
         committed.current = next;

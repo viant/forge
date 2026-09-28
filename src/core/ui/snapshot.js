@@ -196,20 +196,23 @@ function getWindowMetadataSummary(windowId, options) {
     const reportBuilder = getReportBuilderAuthoringCatalog(content, windowForm);
     const tabs = [];
     const controls = [];
-    const collectTabs = (node) => {
+    const collectTabs = (node, inheritedDataSourceRef = view.dataSourceRef || null) => {
       if (!node || typeof node !== 'object') return;
-      const items = Array.isArray(node.items) ? node.items : [];
+      const selectedRef = node.dataSourceRefSelector ? node.dataSourceRefs?.[windowForm[node.dataSourceRefSelector]] : null;
+      const dataSourceRef = selectedRef || node.dataSourceRef || inheritedDataSourceRef;
+      const items = [...(Array.isArray(node.items) ? node.items : []), ...(Array.isArray(node.table?.toolbar?.items) ? node.table.toolbar.items : [])];
       const containers = Array.isArray(node.containers) ? node.containers : [];
       for (const item of items) {
         const controlId = String(item?.id || '').trim();
         if (!controlId) continue;
         controls.push({
           id: controlId,
-          label: String(item?.label || controlId).trim(),
+          label: String(item?.properties?.label || item?.label || controlId).trim(),
           type: String(item?.type || item?.widget || '').trim() || null,
-          scope: String(item?.scope || '').trim() || null,
+          scope: String(item?.scope || (item?.type === 'quickSearch' ? 'filter' : '')).trim() || null,
+          dataSourceRef,
           bindingPath: String(item?.bindingPath || item?.path || '').trim() || null,
-          dataField: String(item?.dataField || '').trim() || null,
+          dataField: String(item?.dataField || (item?.type === 'quickSearch' ? item?.properties?.field : '') || '').trim() || null,
           options: Array.isArray(item?.options)
             ? item.options.map((option) => ({
                 value: option?.value ?? null,
@@ -230,7 +233,7 @@ function getWindowMetadataSummary(windowId, options) {
         }
       }
       for (const child of containers) {
-        collectTabs(child);
+        collectTabs(child, dataSourceRef);
       }
     };
     collectTabs(content);
