@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { addWindow, activeWindows, selectedTabId, selectedWindowId, getBusSignal, getCollectionSignal, getDashboardFilterSignal, getDashboardSelectionSignal, getFormSignal, getMetadataSignal, getMetricsSignal, getSelectionSignal, getViewSignal } from '../store/signals.js';
+import { addWindow, activeWindows, selectedTabId, selectedWindowId, getBusSignal, getInputSignal, getCollectionSignal, getDashboardFilterSignal, getDashboardSelectionSignal, getFormSignal, getMetadataSignal, getMetricsSignal, getSelectionSignal, getViewSignal } from '../store/signals.js';
 import { runUICommand } from './commands.js';
 import { registerControlTarget, unregisterControlTarget } from './registry.js';
 
@@ -853,3 +853,15 @@ assert.deepEqual(resetDashboardState.filters.region, ['NA']);
 assert.equal(resetDashboardState.selection.entityKey, null);
 
 unregisterControlTarget(regKey);
+
+activeWindows.value = [{windowId: 'browse', windowKey: 'advertiserList'}];
+getMetadataSignal('browse').value = {dataSource: {advertisers: {}}};
+getInputSignal('browseDSadvertisers').value = {filter: {Status: 'Active'}, page: 4};
+await runUICommand({method: 'ui.control.setValue', params: {
+  windowId: 'browse', controlId: 'nameSearch', dataSourceRef: 'advertisers',
+  scope: 'filter', dataField: 'Name', value: 'Woomp',
+}});
+assert.deepEqual(getInputSignal('browseDSadvertisers').peek(), {
+  filter: {Status: 'Active', Name: 'Woomp'}, page: 1, fetch: true,
+});
+console.log('Semantic name filtering preserves other criteria and restarts paging');

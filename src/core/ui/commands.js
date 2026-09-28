@@ -724,6 +724,8 @@ export async function runUICommand(cmd = {}) {
         input.value = {
           ...prev,
           filter: setSelector(filterPrev, fieldKey, value),
+          page: 1,
+          fetch: true,
         };
       } else if (scope === 'windowForm') {
         const windowForm = getFormSignal(`${windowId}:windowForm`);
