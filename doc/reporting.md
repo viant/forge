@@ -1335,3 +1335,55 @@ covered in [Datasource backends](data-source.md#parameterized-inline-fixtures-ag
 
 The host owns chat/workspace placement, maximization, and restoration. A generated
 inline report should not be described as a registered workspace window.
+
+### Embed a live report inside an ordinary window tab
+
+`dashboard.reportRuntime` can bind a workspace-authored `reportSpec` to existing
+window datasource signals. This does not create a report builder, execute SQL,
+or require an Advanced Reporting subscription. Normal Forge fetch/authorization
+and date/parameter invalidation remain responsible for data loading.
+
+```yaml
+kind: dashboard.reportRuntime
+dataSourceRef: advertiser_overview
+dashboard:
+  reportRuntime:
+    presentationMode: report
+    sectionPresentation: stack
+    showContextSummary: false
+    datasetBindings:
+      summary: {selector: '0.summary'}
+      trend: {selector: '0.trend'}
+    reportSpec: $import(report.yaml)
+```
+
+Each binding accepts `dataSourceRef` (defaults to the surrounding datasource),
+`scope: collection|metrics`, and an optional selector. An object becomes one row;
+a missing value becomes an empty dataset. Loading/error states suppress previous
+rows so a pending scope change cannot display the preceding advertiser's values.
+The containing tab should supply a normal `dataStateBoundary` with Retry.
+
+Use `sectionPresentation: stack` for an overview page that shows all report
+sections together; the default remains `tabs`. Compiled chart blocks need both
+the authored `chartSpec` and its native `chartModel`. Ordinary UI tabs, forms and
+window links can surround this embedded report.
+
+Runtime panel appearance is controlled by shared classes and
+`--forge-report-panel-{radius,background,shadow,padding,gap}` tokens in workspace
+styles. Product-specific values belong in the workspace theme, not React styles.
+
+Table blocks support `formattingRules` for conditional cell or row classes. Numeric
+`between` ranges are inclusive; missing/blank numbers never match numeric rules.
+Rules can overlap; use workspace stylesheet ordering to give urgent classes priority.
+
+```yaml
+formattingRules:
+  - field: daysRemaining
+    operator: between
+    values: [0, 7]
+    target: cell
+    className: steward-value-warning
+```
+
+For whole-row highlighting, use `target: row` and a workspace row class such as
+`steward-row-warning`. Keep thresholds in metadata and colors in semantic CSS tokens.

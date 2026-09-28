@@ -11,6 +11,7 @@ import {applyDashboardFiltersToCollection, applyDashboardSelectionToCollection, 
 import {getDashboardFilterSignal, getDashboardSelectionSignal} from "../../core/store/signals.js";
 import {aggregateGeoRows, buildGeoConfig, DEFAULT_GEO_PALETTE, findGeoColorRule, normalizeGeoKey, resolveGeoColor, US_STATE_TILES} from "./geoMapUtils.js";
 import ReportRuntime from "./ReportRuntime.jsx";
+import {resolveBoundReportRuntime} from './reportRuntimeBindings.js';
 import { resolveDashboardReportRuntimeHandlers } from "./dashboardReportRuntimeHandlers.js";
 import DashboardTableContent from "./DashboardTableContent.jsx";
 import { buildTableRuntimeColumns, resolveTableCellVisualState } from "./tableCellVisuals.js";
@@ -1228,21 +1229,29 @@ function getDashboardReportRuntimeConfig(container = {}) {
 }
 
 export function DashboardReportRuntime({container, context}) {
+    useSignals();
     const config = getDashboardReportRuntimeConfig(container);
     const reportSpec = config.reportSpec || EMPTY_REPORT_RUNTIME_SPEC;
+    const bound = resolveBoundReportRuntime(config, context);
     const runtimeHandlers = useMemo(() => resolveDashboardReportRuntimeHandlers({
         context,
         reportSpec,
     }), [context?.handlers?.reportRuntime, context?.handlers?.semanticModel, reportSpec]);
+    if (bound.status !== 'ready') return <div className={`forge-report-binding-state is-${bound.status}`} role={bound.status === 'error' ? 'alert' : 'status'}>
+        {bound.status === 'error' ? 'This overview could not be loaded. Use Refresh to try again.' : 'Loading overview…'}
+    </div>;
     return (
         <ReportRuntime
             reportSpec={reportSpec}
-            reportFill={config.reportFill || {}}
+            reportFill={bound.reportFill}
             title={config.title || container?.title || ""}
             subtitle={config.subtitle || container?.subtitle || ""}
             locale={config.locale || getDashboardLocale(context)}
             hostIntent={config.hostIntent || null}
             runtimeHandlers={runtimeHandlers}
+            presentationMode={config.presentationMode || 'preview'}
+            sectionPresentation={config.sectionPresentation || 'tabs'}
+            showContextSummary={config.showContextSummary !== false}
         />
     );
 }

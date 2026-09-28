@@ -776,19 +776,22 @@ type DashboardCondition struct {
 }
 
 type Dashboard struct {
-	VisibleWhen *DashboardCondition   `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
-	Summary     *DashboardSummary     `json:"summary,omitempty" yaml:"summary,omitempty"`
-	Compare     *DashboardCompare     `json:"compare,omitempty" yaml:"compare,omitempty"`
-	KPITable    *DashboardKPITable    `json:"kpiTable,omitempty" yaml:"kpiTable,omitempty"`
-	Filters     *DashboardFilters     `json:"filters,omitempty" yaml:"filters,omitempty"`
-	Geo         *DashboardGeoMap      `json:"geo,omitempty" yaml:"geo,omitempty"`
-	Timeline    *DashboardTimeline    `json:"timeline,omitempty" yaml:"timeline,omitempty"`
-	Composition *DashboardComposition `json:"composition,omitempty" yaml:"composition,omitempty"`
-	Dimensions  *DashboardDimensions  `json:"dimensions,omitempty" yaml:"dimensions,omitempty"`
-	Messages    *DashboardMessages    `json:"messages,omitempty" yaml:"messages,omitempty"`
-	Status      *DashboardStatus      `json:"status,omitempty" yaml:"status,omitempty"`
-	Feed        *DashboardFeed        `json:"feed,omitempty" yaml:"feed,omitempty"`
-	Report      *DashboardReport      `json:"report,omitempty" yaml:"report,omitempty"`
+	// ReportRuntime embeds an authored report inside an ordinary Forge window.
+	// The report engine validates its spec; dataset bindings reference window sources.
+	ReportRuntime map[string]interface{} `json:"reportRuntime,omitempty" yaml:"reportRuntime,omitempty"`
+	VisibleWhen   *DashboardCondition    `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+	Summary       *DashboardSummary      `json:"summary,omitempty" yaml:"summary,omitempty"`
+	Compare       *DashboardCompare      `json:"compare,omitempty" yaml:"compare,omitempty"`
+	KPITable      *DashboardKPITable     `json:"kpiTable,omitempty" yaml:"kpiTable,omitempty"`
+	Filters       *DashboardFilters      `json:"filters,omitempty" yaml:"filters,omitempty"`
+	Geo           *DashboardGeoMap       `json:"geo,omitempty" yaml:"geo,omitempty"`
+	Timeline      *DashboardTimeline     `json:"timeline,omitempty" yaml:"timeline,omitempty"`
+	Composition   *DashboardComposition  `json:"composition,omitempty" yaml:"composition,omitempty"`
+	Dimensions    *DashboardDimensions   `json:"dimensions,omitempty" yaml:"dimensions,omitempty"`
+	Messages      *DashboardMessages     `json:"messages,omitempty" yaml:"messages,omitempty"`
+	Status        *DashboardStatus       `json:"status,omitempty" yaml:"status,omitempty"`
+	Feed          *DashboardFeed         `json:"feed,omitempty" yaml:"feed,omitempty"`
+	Report        *DashboardReport       `json:"report,omitempty" yaml:"report,omitempty"`
 	// ReportBuilder intentionally remains open-ended so report-builder-specific
 	// metadata can pass through unchanged from YAML/JSON into the Forge
 	// frontend contract, including explicit chart configuration under

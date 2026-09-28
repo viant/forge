@@ -20,10 +20,16 @@ export const ruleMatches = (row, rule) => {
     const expected = rule.value;
     const expectedValues = Array.isArray(rule.values) ? rule.values : (Array.isArray(expected) ? expected : [expected]);
     if (!Array.isArray(rule.values) && expected === undefined) return false;
-    const actualNumber = Number(actual);
+    const actualNumber = actual == null || (typeof actual === 'string' && actual.trim() === '') ? NaN : Number(actual);
     const firstExpectedNumber = Number(expectedValues[0]);
 
     switch (operator) {
+        case "between": {
+            const upper = Number(expectedValues[1]);
+            return expectedValues.length === 2 && Number.isFinite(actualNumber)
+                && Number.isFinite(firstExpectedNumber) && Number.isFinite(upper)
+                && actualNumber >= firstExpectedNumber && actualNumber <= upper;
+        }
         case "=":
         case "eq":
         case "equal":

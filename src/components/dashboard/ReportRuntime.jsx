@@ -205,23 +205,13 @@ function RuntimePanel({ title = "", subtitle = "", children, className = "", sty
   return (
     <section
       className={`forge-report-runtime-panel${className ? ` ${className}` : ""}`}
-      style={{
-        border: "1px solid var(--forge-report-border, #dbe5ec)",
-        borderRadius: 16,
-        background: "linear-gradient(180deg, var(--forge-report-surface, #ffffff) 0%, var(--forge-report-surface-subtle, #fbfdff) 100%)",
-        boxShadow: "0 8px 18px rgba(16, 22, 26, 0.035), 0 1px 2px rgba(16, 22, 26, 0.05)",
-        padding: 16,
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-        ...style,
-      }}
+      style={style}
     >
       {title || subtitle || headerAction ? (
-        <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <span style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {title ? <h3 style={{ margin: 0, fontSize: "var(--forge-report-type-section-size, 15px)", lineHeight: "var(--forge-report-type-section-line-height, normal)", color: "var(--forge-report-text, #182026)" }}>{title}</h3> : null}
-            {subtitle ? <p style={{ margin: 0, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)", color: "var(--forge-report-text-muted, #5f6b7c)" }}>{subtitle}</p> : null}
+        <header className="forge-report-runtime-panel__header">
+          <span className="forge-report-runtime-panel__heading">
+            {title ? <h3 className="forge-report-runtime-panel__title">{title}</h3> : null}
+            {subtitle ? <p className="forge-report-runtime-panel__subtitle">{subtitle}</p> : null}
           </span>
           {headerAction}
         </header>
@@ -1661,11 +1651,8 @@ function CollectionBlock({ block = {}, diagnostics = [], locale = "en-US", onRet
         </div>
       ) : (
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: layout === "list" ? "1fr" : `repeat(${gridColumns}, minmax(0, 1fr))`,
-            gap: 12,
-          }}
+          className="forge-report-runtime-collection-grid"
+          style={{'--forge-report-collection-columns': layout === 'list' ? 1 : gridColumns}}
         >
           {items.map((item, index) => {
             const title = normalizeString(item?.title || `Item ${index + 1}`);
@@ -2840,6 +2827,7 @@ export default function ReportRuntime({
   runtimeHandlers = null,
   hostIntent = null,
   presentationMode = "preview",
+  sectionPresentation = "tabs",
   showContextSummary = true,
   suppressFilterBarBlocks = false,
   suppressFilterBarBlockDatasetRefs = [],
@@ -3481,7 +3469,7 @@ export default function ReportRuntime({
       ) : null}
       <HostIntentPanel hostIntent={hostIntent} runtimeHandlers={runtimeHandlers} />
       <DiagnosticsPanel diagnostics={visibleRuntimeDiagnostics} developerMode={!reportPresentation || showDeveloperDiagnostics} onRetryProviderActions={retryProviderActions} providerActionsLoading={providerActionsLoading} />
-      {runtimeSections.length > 1 || (runtimeTabGroup?.includeUnlistedSections === false && runtimeSections.length > 0) ? (
+      {sectionPresentation !== 'stack' && (runtimeSections.length > 1 || (runtimeTabGroup?.includeUnlistedSections === false && runtimeSections.length > 0)) ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {distinctWorkspaceTitle(runtimeTabGroup?.title, workspacePresentation?.label) ? (
             <div className="forge-report-runtime-section-label" style={{ fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--forge-report-text-muted, #486579)" }}>
