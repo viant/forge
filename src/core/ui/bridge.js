@@ -306,6 +306,8 @@ export function startUIBridgeHTTP(options = {}) {
   let detachAuthRetry = null;
   let readyToPublish = false;
   let startInFlight = null;
+  let snapshotInFlight = null;
+  let snapshotStatusInFlight = false;
   const inflightRPC = new Set();
   const startupReadyEvent = String(options.startupReadyEvent || '').trim();
   const startupReadyTimeoutMs = Math.max(0, Number(options.startupReadyTimeoutMs || 0) || 0);
@@ -337,6 +339,9 @@ export function startUIBridgeHTTP(options = {}) {
     const headers = { 'Content-Type': 'application/json' };
     if (sessionId) headers[sessionHeader] = sessionId;
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const pollTimeout = Number(params?.timeoutMs);
+    const requestTimeoutMs = method === 'ui.poll' ? (Number.isFinite(pollTimeout) && pollTimeout > 0 ? pollTimeout : 20000) + 5000 : 10000;
+    const requestTimer = controller ? setTimeout(() => controller.abort(), requestTimeoutMs) : null;
     registerRPC(controller);
     try {
       const res = await fetch(url, {
@@ -360,11 +365,12 @@ export function startUIBridgeHTTP(options = {}) {
       if (data.error) throw new Error(data.error.message || 'rpc error');
       return data.result;
     } finally {
+      if (requestTimer) clearTimeout(requestTimer);
       unregisterRPC(controller);
     }
   };
 
-  const publishSnapshot = async (publishOptions = {}) => {
+  const publishSnapshotOnce = async (publishOptions = {}) => {
     const strict = publishOptions.strict === true;
     if (!readyToPublish) return false;
     const snap = snapshotBuilder();
@@ -383,8 +389,30 @@ export function startUIBridgeHTTP(options = {}) {
     }
   };
 
+  const publishSnapshot = async (publishOptions = {}) => {
+    if (snapshotInFlight) {
+      try {
+        const accepted = await snapshotInFlight;
+        if (!accepted) {
+          if (publishOptions.strict === true) throw new Error('UI bridge snapshot was not accepted');
+          return false;
+        }
+      } catch (error) {
+        if (publishOptions.strict === true) throw error;
+        return false;
+      }
+      return publishSnapshot(publishOptions);
+    }
+    if (stopped) return false;
+    const pending = publishSnapshotOnce(publishOptions);
+    snapshotInFlight = pending;
+    try { return await pending; }
+    finally { if (snapshotInFlight === pending) snapshotInFlight = null; }
+  };
+
   const checkSnapshotStatus = async () => {
-    if (!readyToPublish || stopped) return false;
+    if (!readyToPublish || stopped || snapshotStatusInFlight) return false;
+    snapshotStatusInFlight = true;
     try {
       const result = await rpc(
         'ui.snapshot.status',
@@ -401,12 +429,13 @@ export function startUIBridgeHTTP(options = {}) {
         resetSessionAndRestart();
       }
       return false;
+    } finally {
+      snapshotStatusInFlight = false;
     }
   };
   activeSnapshotPublisher = async () => {
     if (!readyToPublish) return false;
-    await publishSnapshot();
-    return true;
+    return publishSnapshot();
   };
 
   const bindImmediateSnapshotListeners = () => {
@@ -670,8 +699,7 @@ export function startUIBridgeHTTP(options = {}) {
 
 export async function publishUIBridgeSnapshotNow() {
   if (typeof activeSnapshotPublisher !== 'function') return false;
-  await activeSnapshotPublisher();
-  return true;
+  return (await activeSnapshotPublisher()) === true;
 }
 
 export async function waitForUIBridgeReady(timeoutMs = 1500) {

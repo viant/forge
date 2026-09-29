@@ -245,6 +245,7 @@ import {
     resolveReportRuntimePreviewDatasetResultFreshness,
     useReportRuntimePreviewDatasetPayloads,
 } from "./useReportRuntimePreviewDatasetPayloads.js";
+import ReportLoadingProgress from './ReportLoadingProgress.jsx';
 import {
     hasStoredReportBuilderState,
     loadStoredReportBuilderState,
@@ -20330,8 +20331,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     <ReportBuilderResultState
                         icon={previewStateForDisplay.loadingState.icon}
                         eyebrow={previewStateForDisplay.loadingState.eyebrow}
-                        title={previewStateForDisplay.loadingState.title}
-                        description={previewStateForDisplay.loadingState.description}
+                        title={runtimePreviewDatasetPayloadState.progress ? 'Loading report data' : previewStateForDisplay.loadingState.title}
+                        description={<ReportLoadingProgress progress={runtimePreviewDatasetPayloadState.progress} fallback={previewStateForDisplay.loadingState.description} />}
                         animated={previewStateForDisplay.loadingState.animated}
                     />
                 ) : null}
