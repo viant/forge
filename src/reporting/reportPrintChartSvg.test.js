@@ -43,7 +43,7 @@ const lineWithEmptySeries = buildReportPrintChartSvg({
     series: {
       values: [
         { value: "overall", label: "Overall", color: "#137cbd", type: "line" },
-        { value: "location", label: "Location", color: "#ff7f0e", type: "line" },
+        { value: "location", label: "Location", color: "#b65b05", type: "line" },
       ],
     },
   },
@@ -390,3 +390,23 @@ assert.deepEqual(unsupported.diagnostics, [
 ]);
 
 console.log("reportPrintChartSvg ✓ lowers grouped, direct, and category chart payloads into deterministic SVG output");
+
+const spoColors = {
+  Direct: "var(--steward-spo-direct, #1f77b4)",
+  "Preferred - Primary": "var(--steward-spo-primary, #1a873d)",
+  "Preferred - Secondary": "var(--steward-spo-secondary, #b65b05)",
+  unknown: "var(--steward-spo-unknown, #d62728)",
+};
+for (const names of [
+  ["Direct", "Preferred - Primary", "Preferred - Secondary", "unknown"],
+  ["unknown", "Preferred - Secondary", "Direct", "Preferred - Primary"],
+]) {
+  const result = buildReportPrintChartSvg({
+    chartModel: {type: "donut", series: {palette: ["#000000"], categoryColors: spoColors}},
+    resolvedChart: {kind: "category", type: "donut", rows: names.map((name) => ({name, value: 10}))},
+  });
+  for (const [name, color] of Object.entries({Direct: "#1f77b4", "Preferred - Primary": "#1a873d", "Preferred - Secondary": "#b65b05", unknown: "#d62728"})) {
+    const legend = result.svg.match(new RegExp(`<rect[^>]+fill="([^"]+)"[^>]* />\\s*<text[^>]+>${name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")} —`));
+    assert.equal(legend?.[1], color, `${name} keeps its color when reordered`);
+  }
+}

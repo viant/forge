@@ -3242,3 +3242,11 @@ assert.deepEqual(sanitizedLegacy.chartSpec, legacyExplicitSpec);
 assert.equal("seriesOptions" in sanitizedLegacy.chartSpec, false);
 
 console.log("reportBuilderUtils ✓ request mapping, defaults, and lookup projection");
+
+const coloredSpoSpec = {type: "donut", xField: "siteType", yFields: ["totalSpend"],
+    categoryColors: {Direct: "var(--steward-spo-direct, #1f77b4)"}};
+const coloredSpoContainer = buildExplicitReportBuilderChartContainer(
+    {dataSourceRef: "report_source", collection: []}, expandedSupportedConfig,
+    {selectedDimensions: ["siteType"], selectedMeasures: ["totalSpend"]}, coloredSpoSpec,
+);
+assert.deepEqual(coloredSpoContainer.chart.series.categoryColors, coloredSpoSpec.categoryColors);

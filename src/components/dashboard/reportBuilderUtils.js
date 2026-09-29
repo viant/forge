@@ -491,6 +491,7 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         xField,
         yFields: Array.from(new Set(yFields)),
         ...(seriesField ? { seriesField } : {}),
+        ...(chartSpec.categoryColors && typeof chartSpec.categoryColors === "object" && !Array.isArray(chartSpec.categoryColors) ? {categoryColors: {...chartSpec.categoryColors}} : {}),
         ...(seriesOptions ? { seriesOptions } : {}),
         ...(categoryLabel ? { categoryLabel } : {}),
     };
@@ -2314,6 +2315,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
                         : {}),
                     valueKey: String(yMeasure?.key || yMeasure?.id || "").trim(),
                     palette,
+                    ...(normalized.categoryColors ? {categoryColors: normalized.categoryColors} : {}),
                 },
             },
         };
@@ -2368,6 +2370,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
                         type: seriesType,
                     }],
                     palette,
+                    ...(normalized.categoryColors ? {categoryColors: normalized.categoryColors} : {}),
                 },
             },
         };
@@ -2402,6 +2405,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
             series: {
                 values,
                 palette,
+                ...(normalized.categoryColors ? {categoryColors: normalized.categoryColors} : {}),
             },
         },
     };
