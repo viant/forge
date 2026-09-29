@@ -1,3 +1,4 @@
+import {updateReportDateRangeValue} from '../../reporting/reportDateRangeValue.js';
 import { normalizeReportFilterRefreshMode, reportFilterValuesChanged } from "./reportBuilderFilterRefresh.js";
 import ReportBuilderBlockPreview from "./ReportBuilderBlockPreview.jsx";
 import { captureDesignDocument, designDocumentsEqual, restoreDesignDocument } from "./reportBuilderDesignHistory.js";
@@ -12097,10 +12098,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             runtimePreviewInteraction.setDatasetScopeParamValue({
                 datasetRef: normalizedDatasetRef,
                 paramId: key,
-                value: {
-                    ...current,
-                    [edge]: value || "",
-                },
+                value: updateReportDateRangeValue(current, edge, value),
             });
             return;
         }
@@ -12108,10 +12106,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         const current = getScopeParamValue(currentState, key);
         const previous = current && typeof current === "object" ? current : {};
         persistExplorationMutation({
-            ...setScopeParamValue(currentState, key, {
-                ...previous,
-                [edge]: value || "",
-            }),
+            ...setScopeParamValue(currentState, key, updateReportDateRangeValue(previous, edge, value)),
             page: 1,
         });
     };

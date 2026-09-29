@@ -1241,6 +1241,8 @@ export function DashboardReportRuntime({container, context}) {
         {bound.status === 'error' ? 'This overview could not be loaded. Use Refresh to try again.' : 'Loading overview…'}
     </div>;
     return (
+        <>
+        {bound.unavailableDatasets?.length > 0 ? <div className="forge-report-binding-state is-error" role="alert">Current delivery data is unavailable. Performance for the selected date range remains below.</div> : null}
         <ReportRuntime
             reportSpec={reportSpec}
             reportFill={bound.reportFill}
@@ -1253,6 +1255,7 @@ export function DashboardReportRuntime({container, context}) {
             sectionPresentation={config.sectionPresentation || 'tabs'}
             showContextSummary={config.showContextSummary !== false}
         />
+        </>
     );
 }
 

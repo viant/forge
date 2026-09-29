@@ -7,10 +7,16 @@ export function resolveBoundReportRuntime(config = {}, context = {}) {
     const bindings = config.datasetBindings;
     if (!bindings || !Object.keys(bindings).length) return {reportFill: config.reportFill || {}, status: 'ready'};
     const payloads = {};
+    const unavailableDatasets = [];
     let status = 'ready';
     for (const [datasetId, binding] of Object.entries(bindings)) {
         const source = binding.dataSourceRef ? context.Context?.(binding.dataSourceRef) : context;
         const control = source?.signals?.control?.value || {};
+        if (binding.optional && (!source || control.error || control.loading || control.loaded === false)) {
+            payloads[datasetId] = {rows: []};
+            unavailableDatasets.push(datasetId);
+            continue;
+        }
         if (!source || control.error) status = 'error';
         else if (status !== 'error' && (control.loading || control.loaded === false)) status = 'loading';
         const scope = binding.scope === 'metrics' ? 'metrics' : 'collection';
@@ -20,5 +26,5 @@ export function resolveBoundReportRuntime(config = {}, context = {}) {
     }
     // Never show a prior advertiser/date's rows while its replacement is pending.
     if (status !== 'ready') return {reportFill: null, status};
-    return {reportFill: buildReportFillFromReportSpec(config.reportSpec || {}, payloads), status};
+    return {reportFill: buildReportFillFromReportSpec(config.reportSpec || {}, payloads), status, ...(unavailableDatasets.length ? {unavailableDatasets} : {})};
 }

@@ -16,3 +16,10 @@ assert.deepEqual(resolveBoundReportRuntime(config,source).reportFill.datasets[0]
 assert.equal(resolveBoundReportRuntime({...config,datasetBindings:{summary:{dataSourceRef:'missing'}}},{}).status,'error');
 assert.deepEqual(resolveBoundReportRuntime({reportFill:{blocks:[]}},{}).reportFill,{blocks:[]},'static reports retain their contract');
 console.log('Bound report datasets, refresh isolation, empty/error and static compatibility passed.');
+
+const optional = resolveBoundReportRuntime({
+ ...config,
+ datasetBindings:{summary:{selector:'0.summary'}, delivery:{dataSourceRef:'unavailable', optional:true}},
+}, {...source, Context:() => ({signals:{control:{value:{error:'backend unavailable'}}}})});
+assert.equal(optional.status,'ready');
+assert.deepEqual(optional.unavailableDatasets,['delivery']);

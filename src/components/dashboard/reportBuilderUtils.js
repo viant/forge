@@ -240,7 +240,7 @@ function defaultStaticFilterValue(filter = {}) {
         const seeded = filter.default && typeof filter.default === "object" ? filter.default : {};
         const relative = resolveRelativeDateRangeDefault(seeded);
         if (relative) {
-            return relative;
+            return {...seeded, ...relative};
         }
         return {
             start: seeded.start || "",

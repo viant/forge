@@ -779,6 +779,23 @@ export function ReportBuilderSemanticFieldGroups({
     );
 }
 
+function ReportDateRangeControl({value = {}, onDateRange}) {
+    return <>
+        <div className="forge-report-builder__date-range">
+            <input type="text" aria-label="Start date or relative expression" placeholder="YYYY-MM-DD or 7 days ago"
+                value={value?.startExpression ?? value?.start ?? ''} onChange={(event) => onDateRange('start', event.target.value)} />
+            <span>to</span>
+            <input type="text" aria-label="End date or relative expression" placeholder="YYYY-MM-DD or today"
+                value={value?.endExpression ?? value?.end ?? ''} onChange={(event) => onDateRange('end', event.target.value)} />
+        </div>
+        <div className="forge-report-builder-text-options" role="group" aria-label="Relative date presets">
+            {[['today', 'Today'], ['yesterday', 'Yesterday'], ['last7Days', 'Last 7 days'], ['last30Days', 'Last 30 days']].map(([preset, label]) => (
+                <Button key={preset} small minimal active={value?.preset === preset} onClick={() => onDateRange('preset', preset)}>{label}</Button>
+            ))}
+        </div>
+    </>;
+}
+
 export function ReportBuilderScopeSummary({
     summaryState = null,
     marginTop = 0,
@@ -4894,19 +4911,7 @@ export function InlineStaticFilterControl({
             <div className={rootClassName} title={title}>
                 <div className="forge-report-builder__inline-filter-row">
                     <span className="forge-report-builder__inline-filter-label">{filter.label || filter.id}</span>
-                    <div className="forge-report-builder__date-range forge-report-builder__date-range--inline">
-                        <input
-                            type="date"
-                            value={value?.start || ""}
-                            onChange={(event) => onDateRange("start", event.target.value)}
-                        />
-                        <span>to</span>
-                        <input
-                            type="date"
-                            value={value?.end || ""}
-                            onChange={(event) => onDateRange("end", event.target.value)}
-                        />
-                    </div>
+                    <ReportDateRangeControl value={value} onDateRange={onDateRange} />
                 </div>
                 {description ? <div className="forge-report-builder__inline-filter-description">{description}</div> : null}
                 {semanticNotice ? (
@@ -5010,19 +5015,7 @@ export function StaticFilterSection({
                         {semanticNotice}
                     </div>
                 ) : null}
-                <div className="forge-report-builder__date-range">
-                    <input
-                        type="date"
-                        value={value?.start || ""}
-                        onChange={(event) => onDateRange("start", event.target.value)}
-                    />
-                    <span>to</span>
-                    <input
-                        type="date"
-                        value={value?.end || ""}
-                        onChange={(event) => onDateRange("end", event.target.value)}
-                    />
-                </div>
+                <ReportDateRangeControl value={value} onDateRange={onDateRange} />
             </section>
         );
     }
