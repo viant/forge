@@ -10852,6 +10852,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         runtimePreviewEnabled: runtimePreviewEnabled || authoredRuntimeSurfaceEnabled,
         runtimePreviewArtifact,
         runtimePreviewRowsSource,
+        runtimePreviewDatasetState: runtimePreviewDatasetPayloadState,
         canRunReport,
         readinessReason: readiness.reason,
         readinessAction: readiness.action,
@@ -10872,6 +10873,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         authoredRuntimeSurfaceEnabled,
         runtimePreviewEnabled,
         runtimePreviewRowsSource,
+        runtimePreviewDatasetPayloadState,
     ]);
     const lastAppliedReportPreviewRef = useRef(null);
     if (!reportFiltersNeedApply && authoredRuntimePreviewState?.canRenderRuntime) {

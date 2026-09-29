@@ -2197,3 +2197,28 @@ assert.equal(reportBuilderSource.includes("buildReportBuilderActiveResultErrorDi
 assert.equal(reportBuilderSource.includes("activeResultErrorDiagnostics?.diagnostics"), true);
 
 console.log("reportBuilderResultFrame ✓ active result and empty-state helpers");
+
+// The primary request may settle before the remaining report datasets.
+const pendingDatasetPreview = {
+    runtimePreviewEnabled: true,
+    canRunReport: true,
+    runtimePreviewArtifact: {runtimeBlock: {dashboard: {reportRuntime: {}}}},
+    runtimePreviewRowsSource: {loading: false, rows: []},
+    presentationMode: 'report',
+};
+const pendingDatasetState = buildReportBuilderAuthoredRuntimePreviewState({
+    ...pendingDatasetPreview, runtimePreviewDatasetState: {loading: true},
+});
+assert.ok(pendingDatasetState.loadingState);
+assert.equal(pendingDatasetState.canRenderRuntime, false);
+assert.equal(pendingDatasetState.errorState, null);
+const completedEmptyDatasetState = buildReportBuilderAuthoredRuntimePreviewState({
+    ...pendingDatasetPreview, runtimePreviewDatasetState: {loading: false},
+});
+assert.equal(completedEmptyDatasetState.loadingState, null);
+assert.equal(completedEmptyDatasetState.canRenderRuntime, true);
+const failedDatasetState = buildReportBuilderAuthoredRuntimePreviewState({
+    ...pendingDatasetPreview, runtimePreviewDatasetState: {loading: false, error: new Error('Dataset failed')},
+});
+assert.ok(failedDatasetState.errorState);
+assert.equal(failedDatasetState.canRenderRuntime, false);
