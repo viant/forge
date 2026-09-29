@@ -1,4 +1,5 @@
 import React from "react";
+import {scheduleReportDataset} from './reportDatasetScheduler.js';
 
 import { isDeferredCacheHitEnvelope } from "../../reporting/dataEnvelopeModel.js";
 import {
@@ -75,6 +76,8 @@ export async function fetchReportRuntimePreviewDatasetPayloadResult({
   requestKind = "runtimePreviewDataset",
   fetcherOptions = null,
   shouldContinue = null,
+  onProgress = null,
+  signal = null,
 } = {}) {
   const normalizedDatasets = (Array.isArray(datasets) ? datasets : [])
     .map((dataset) => (
@@ -106,8 +109,17 @@ export async function fetchReportRuntimePreviewDatasetPayloadResult({
       error: null,
     };
   }
+  const progress = {total: normalizedDatasets.length, completed: 0, running: 0, failed: 0};
+  const publishProgress = () => {
+    if (!signal?.aborted && canContinueDatasetPayloadLifecycle(shouldContinue)) onProgress?.({...progress});
+  };
+  publishProgress();
+  const group = Symbol('report datasets');
   const entries = await Promise.all(
-    normalizedDatasets.map(async (dataset) => {
+    normalizedDatasets.map((dataset) => scheduleReportDataset(async () => {
+      if (!canContinueDatasetPayloadLifecycle(shouldContinue)) return [dataset.id, null, false, null, true];
+      progress.running++;
+      publishProgress();
       try {
         const resolvedFetcher = resolveReportBuilderDatasetPreviewFetcher(
           builderContext,
@@ -117,11 +129,13 @@ export async function fetchReportRuntimePreviewDatasetPayloadResult({
             : {},
         );
         if (!resolvedFetcher?.fetcher || typeof resolvedFetcher?.resolveResult !== "function") {
+          progress.failed++;
           return [dataset.id, buildUnavailableDatasetPayload(dataset), true];
         }
         const fetchDatasetBody = () => resolvedFetcher.fetcher({
           parameters: dataset.request,
           requestKind,
+          ...(signal ? {signal} : {}),
         });
         let body = await fetchDatasetBody();
         let recoveryPlan = resolveReportRuntimePreviewFreshnessRecovery({
@@ -152,6 +166,7 @@ export async function fetchReportRuntimePreviewDatasetPayloadResult({
           diagnostics: [],
         }, !isDeferredCacheHitEnvelope(body)];
       } catch (error) {
+        progress.failed++;
         const freshnessError = error?.code === "runtimePreviewFreshnessUnavailable" ? error : null;
         return [
           dataset.id,
@@ -160,8 +175,15 @@ export async function fetchReportRuntimePreviewDatasetPayloadResult({
           freshnessError,
           false,
         ];
+      } finally {
+        progress.running--;
+        progress.completed++;
+        publishProgress();
       }
-    }),
+    }, {signal,group}).catch(error => {
+      if (signal?.aborted || !canContinueDatasetPayloadLifecycle(shouldContinue)) return [dataset.id,null,false,null,true];
+      throw error;
+    })),
   );
   const cancelled = entries.some(([, , , , entryCancelled]) => entryCancelled === true);
   if (cancelled) {
@@ -288,6 +310,8 @@ export async function executeReportRuntimePreviewDatasetPayloadFetchLifecycle({
   getCurrentState = null,
   shouldContinue = null,
   applyState = null,
+  onProgress = null,
+  signal = null,
 } = {}) {
   const result = await fetchReportRuntimePreviewDatasetPayloadResult({
     builderContext,
@@ -295,6 +319,8 @@ export async function executeReportRuntimePreviewDatasetPayloadFetchLifecycle({
     requestKind,
     fetcherOptions,
     shouldContinue,
+    onProgress,
+    signal,
   });
   if (result.cancelled || !canContinueDatasetPayloadLifecycle(shouldContinue)) {
     return { cancelled: true, nextState: null };
@@ -367,6 +393,7 @@ export function useReportRuntimePreviewDatasetPayloads({
   fetcherOptions = null,
 } = {}) {
   const [state, setState] = React.useState(buildIdleReportRuntimePreviewDatasetPayloadState);
+  const [progress, setProgress] = React.useState(null);
   const stateRef = React.useRef(state);
   stateRef.current = state;
   const mountedRef = React.useRef(true);
@@ -414,11 +441,14 @@ export function useReportRuntimePreviewDatasetPayloads({
     const requestGeneration = lifecycleGenerationRef.current + 1;
     lifecycleGenerationRef.current = requestGeneration;
     let cancelled = false;
+    const controller = new AbortController();
+    const startedAt = Date.now();
     setState(buildPendingReportRuntimePreviewDatasetPayloadState({
       requestKey: normalizedRequestKey,
       currentState: stateRef.current,
     }));
     const shouldContinue = () => !cancelled
+      && !controller.signal.aborted
       && mountedRef.current
       && currentRequestKeyRef.current === normalizedRequestKey
       && lifecycleGenerationRef.current === requestGeneration;
@@ -429,6 +459,10 @@ export function useReportRuntimePreviewDatasetPayloads({
       requestKey: normalizedRequestKey,
       getCurrentState: () => stateRef.current,
       shouldContinue,
+      signal: controller.signal,
+      onProgress: (next) => {
+        if (shouldContinue()) setProgress({...next, startedAt});
+      },
       applyState: (nextState) => {
         if (shouldContinue()) {
           setState(nextState);
@@ -437,8 +471,9 @@ export function useReportRuntimePreviewDatasetPayloads({
     });
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [enabled, normalizedRequestKey]);
 
-  return state;
+  return React.useMemo(() => ({...state, progress: state.loading ? progress : null}), [state, progress]);
 }

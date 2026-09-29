@@ -79,10 +79,12 @@ export function resolveReportBuilderDataSourceFetcher(dataSourceContext = null) 
         parameters = {},
         filter = {},
         page = null,
+        signal = null,
     } = {}) => connectorGet({
         filter: filter && typeof filter === "object" && !Array.isArray(filter) ? filter : {},
         page,
         inputParameters: parameters && typeof parameters === "object" && !Array.isArray(parameters) ? parameters : {},
+        ...(signal ? {signal} : {}),
     });
 }
 
@@ -187,10 +189,12 @@ export function resolveReportBuilderDatasetPreviewFetcher(builderContext = null,
             },
             fetcher: async ({
                 parameters = {},
+                signal = null,
             } = {}) => fetchDataSourceByRef({
                 dataSourceRef: normalizedDataset?.dataSourceRef,
                 parameters,
                 builderContext,
+                ...(signal ? {signal} : {}),
                 ...(omitConversationId ? { omitConversationId: true } : {}),
             }),
         };
@@ -222,10 +226,12 @@ export function resolveReportBuilderDatasetPreviewFetcher(builderContext = null,
             },
             fetcher: async ({
                 parameters = {},
+                signal = null,
             } = {}) => fetchDataSourceByRef({
                 dataSourceRef: normalizedDataset?.dataSourceRef,
                 parameters,
                 builderContext,
+                ...(signal ? {signal} : {}),
                 ...(omitConversationId ? { omitConversationId: true } : {}),
             }),
         };
@@ -245,9 +251,11 @@ export function resolveReportBuilderDatasetPreviewFetcher(builderContext = null,
             },
             fetcher: async ({
                 parameters = {},
+                signal = null,
             } = {}) => resolveReportBuilderMCPToolExecutionPayload(await executeRequest({
                 conversationId: executionContext.conversationId,
                 toolName,
+                ...(signal ? {signal} : {}),
                 arguments: parameters && typeof parameters === "object" && !Array.isArray(parameters) ? parameters : {},
                 assistantText: executionContext.assistantText,
                 toolBundles: executionContext.toolBundles,

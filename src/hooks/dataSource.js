@@ -1000,11 +1000,13 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
             filter = {},
             parameters = {},
             page = null,
+            signal = null,
         } = props || {};
         return connector.get({
             filter,
             page,
             inputParameters: parameters,
+            ...(signal ? {signal} : {}),
         });
     };
 
