@@ -1,3 +1,5 @@
+import {resolveReportDateRangeValue} from './reportDateRangeValue.js';
+
 // Pinned scope params (predicate-native pinned filters) keep their live
 // runtime values in report builder block state. This model is the single
 // access path runtime/UI/request code uses to read and write those values,
@@ -45,7 +47,7 @@ export function listScopeParamValues(state) {
 
 export function getScopeParamValue(state, paramId) {
     const id = String(paramId || "").trim();
-    return id ? listScopeParamValues(state)[id] : undefined;
+    return id ? resolveReportDateRangeValue(listScopeParamValues(state)[id]) : undefined;
 }
 
 // Returns a new state object with the pinned scope-param value replaced;
