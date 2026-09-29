@@ -29,6 +29,7 @@ function DataSourceMount({ windowContext, dsKey, initialParams }) {
             if (k === 'filter' || k === 'parameters') {
                 const input = dsContext.signals.input;
                 const prev = input.peek();
+                if (JSON.stringify(prev?.[k] ?? {}) === JSON.stringify(v ?? {})) return;
                 input.value = { ...prev, [k]: v, fetch: k === 'filter' ? true : !!prev.fetch };
                 return;
             }

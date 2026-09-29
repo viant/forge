@@ -881,3 +881,18 @@ await runUICommand({method: 'ui.window.activate', params: {
 assert.equal(activeWindows.peek()[0].workspaceObject.origin.turnId, 'turn-1');
 assert.equal(activeWindows.peek()[0].workspaceObject.lastActivatedBy.turnId, 'turn-2');
 console.log('Workspace activation adopts menu provenance and preserves its original turn');
+
+const filteredListOpen = await runUICommand({method: 'ui.window.open', params: {
+  windowId: 'advertiserList__browse-test', windowKey: 'advertiserList',
+  windowTitle: 'Advertisers', parameters: {},
+  initialFilters: {advertiser_list_performance: {Name: 'Whoop'}},
+}});
+assert.equal(filteredListOpen.windowId, 'advertiserList__browse-test');
+assert.deepEqual(getInputSignal(`${filteredListOpen.windowId}DSadvertiser_list_performance`).peek().filter, {Name: 'Whoop'});
+assert.equal(getInputSignal(`${filteredListOpen.windowId}DSadvertiser_list_performance`).peek().fetch, true);
+await runUICommand({method: 'ui.window.open', params: {
+  windowId: filteredListOpen.windowId, windowKey: 'advertiserList', windowTitle: 'Advertisers',
+  initialFilters: {advertiser_list_performance: {Name: 'Acme'}},
+}});
+assert.deepEqual(getInputSignal(`${filteredListOpen.windowId}DSadvertiser_list_performance`).peek().filter, {Name: 'Acme'});
+console.log('Hosted list opens with its name filter already seeded');
