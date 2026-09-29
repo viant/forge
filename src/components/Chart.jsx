@@ -1,3 +1,4 @@
+import {resolveCategoryColor} from './chartTheme.js';
 import {normalizeChartExtent} from './chartExtent.js';
 import React, {useState, useEffect, useMemo} from "react";
 import {useSignals} from '@preact/signals-react/runtime';
@@ -774,9 +775,9 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         return {
             value: dataKey,
             label: seriesDef?.label || seriesDef?.name || dataKey,
-            color: seriesDef?.color || palette[index % Math.max(palette.length, 1)] || chartSeriesColor(index + 1, "#137cbd"),
+            color: resolveCategoryColor(chart?.series?.categoryColors, dataKey, seriesDef?.color || palette[index % Math.max(palette.length, 1)] || chartSeriesColor(index + 1, "#137cbd")),
         };
-    }), [availableDataKeys, palette, seriesDefinitions]);
+    }), [availableDataKeys, palette, seriesDefinitions, chart]);
 
     const interactiveDatumSelection = typeof onDatumSelect === "function";
     const interactiveLegendSelection = typeof onLegendItemSelect === "function";
@@ -789,7 +790,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             name: dataKey,
             type,
             axis: "left",
-            color: palette[index % Math.max(palette.length, 1)] || chartSeriesColor(index + 1, "#137cbd"),
+            color: resolveCategoryColor(chart?.series?.categoryColors, dataKey, palette[index % Math.max(palette.length, 1)] || chartSeriesColor(index + 1, "#137cbd")),
         }));
     const renderableSeriesDefinitions = selectedSeriesDefinitions.filter((entry) => (
         chartData.some((row) => {
@@ -946,7 +947,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 <Bar key={entry.value} {...commonProps} stackId={entry.stackId} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                     {entry.pointColorMode === "bySign"
                         ? normalizedChartData.map((row, index) => (
-                            <Cell key={`${entry.value}-cell-${index}`} fill={resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color)} />
+                            <Cell key={`${entry.value}-cell-${index}`} fill={resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} />
                         ))
                         : null}
                     {showSeriesDataLabels ? (
@@ -964,7 +965,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         r={embedded || interactiveDatumSelection ? 4 : 3}
                         strokeWidth={1}
                         stroke="var(--forge-chart-surface, #ffffff)"
-                        fill={resolveConditionalSeriesColor(entry, props?.payload?.[entry.value], entry.color)}
+                        fill={resolveCategoryColor(chart?.series?.categoryColors, props?.payload?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, props?.payload?.[entry.value], entry.color))}
                     />
                 ))
                 : false;
@@ -984,7 +985,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     r={embedded || interactiveDatumSelection ? 4 : 3}
                     strokeWidth={1}
                     stroke="var(--forge-chart-surface, #ffffff)"
-                    fill={resolveConditionalSeriesColor(entry, props?.payload?.[entry.value], entry.color)}
+                    fill={resolveCategoryColor(chart?.series?.categoryColors, props?.payload?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, props?.payload?.[entry.value], entry.color))}
                 />
             ))
             : false;
@@ -1140,9 +1141,9 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         {normalizedChartData.map((row, index) => (
                             <Cell
                                 key={`cell-${index}`}
-                                fill={primarySeries.pointColorMode === "bySign"
+                                fill={resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], primarySeries.pointColorMode === "bySign"
                                     ? resolveConditionalSeriesColor(primarySeries, row?.[primarySeries.value], activePalette[index % activePalette.length])
-                                    : activePalette[index % activePalette.length]}
+                                    : activePalette[index % activePalette.length])}
                             />
                         ))}
                     </Bar>
@@ -1160,7 +1161,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         >
                             {entry.pointColorMode === "bySign"
                                 ? normalizedChartData.map((row, index) => (
-                                    <Cell key={`${entry.value}-cell-${index}`} fill={resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color)} />
+                                    <Cell key={`${entry.value}-cell-${index}`} fill={resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} />
                                 ))
                                 : null}
                             {shouldRenderSeriesDataLabels(entry, responsiveChartType, normalizedChartData.length, embedded) ? (
@@ -1205,7 +1206,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 labelLine={!embedded && !compactPie}
             >
                 {pieFilteredData.map((entry, index) => (
-                    <Cell key={buildPieSliceCellKey(entry, index)} fill={piePalette[index % piePalette.length]} />
+                    <Cell key={buildPieSliceCellKey(entry, index)} fill={resolveCategoryColor(chart?.series?.categoryColors, entry.name, piePalette[index % piePalette.length])} />
                 ))}
             </Pie>
             <Tooltip

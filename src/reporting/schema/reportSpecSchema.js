@@ -783,6 +783,7 @@ export const reportSpecSchema = {
           items: { type: "string" },
         },
         seriesField: { type: "string" },
+        categoryColors: {type: "object", additionalProperties: {type: "string"}},
         categoryLabel: { $ref: "#/$defs/presentationTextClamp" },
         seriesOptions: {
           type: "object",

@@ -920,6 +920,7 @@ export const reportFillSchema = {
           items: { type: "string" },
         },
         seriesField: { type: "string" },
+        categoryColors: {type: "object", additionalProperties: {type: "string"}},
         categoryLabel: { $ref: "#/$defs/presentationTextClamp" },
         seriesOptions: {
           type: "object",
@@ -982,6 +983,7 @@ export const reportFillSchema = {
       additionalProperties: false,
       required: ["nameKey", "valueKey", "values", "palette"],
       properties: {
+        categoryColors: {type: "object", additionalProperties: {type: "string"}},
         nameKey: { type: "string" },
         sourceNameKey: { type: "string" },
         displayValueMap: {
@@ -1005,6 +1007,7 @@ export const reportFillSchema = {
       additionalProperties: false,
       required: ["values", "palette"],
       properties: {
+        categoryColors: {type: "object", additionalProperties: {type: "string"}},
         values: {
           type: "array",
           minItems: 1,
@@ -1021,6 +1024,7 @@ export const reportFillSchema = {
       additionalProperties: false,
       required: ["nameKey", "valueKey", "palette"],
       properties: {
+        categoryColors: {type: "object", additionalProperties: {type: "string"}},
         nameKey: { type: "string" },
         sourceNameKey: { type: "string" },
         displayValueMap: {

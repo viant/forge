@@ -136,10 +136,11 @@ type CartesianGrid struct {
 }
 
 type ChartSeries struct {
-	NameKey  string              `json:"nameKey" yaml:"nameKey"`
-	ValueKey string              `json:"valueKey" yaml:"valueKey"`
-	Values   []*ChartSeriesValue `json:"values,omitempty" yaml:"values,omitempty"`
-	Palette  []string            `json:"palette,omitempty" yaml:"palette,omitempty"`
+	CategoryColors map[string]string   `json:"categoryColors,omitempty" yaml:"categoryColors,omitempty"`
+	NameKey        string              `json:"nameKey" yaml:"nameKey"`
+	ValueKey       string              `json:"valueKey" yaml:"valueKey"`
+	Values         []*ChartSeriesValue `json:"values,omitempty" yaml:"values,omitempty"`
+	Palette        []string            `json:"palette,omitempty" yaml:"palette,omitempty"`
 }
 
 type ChartSeriesValue struct {

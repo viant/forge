@@ -1,3 +1,4 @@
+import {resolveCategoryColor} from '../components/chartTheme.js';
 import { compactReportPrintSequence, wrapReportPrintLabel } from "./reportPrintLabels.js";
 import { formatExportNumericValue } from "./reportExportValueFormatter.js";
 import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "./reportChartAnnotations.js";
@@ -87,6 +88,12 @@ function resolveChartPalette(chartModel = {}) {
     : DEFAULT_REPORT_PRINT_CHART_PALETTE;
 }
 
+function printColor(value) {
+  const color = normalizeString(value);
+  const token = /^var\(--[^,()]+,\s*(#[0-9a-fA-F]{3,8})\)$/.exec(color);
+  return token ? token[1] : color;
+}
+
 function resolveCartesianSeriesDescriptors(chartModel = {}, resolvedChart = {}) {
   const chartType = normalizeString(chartModel?.type || resolvedChart?.type).toLowerCase();
   const palette = resolveChartPalette(chartModel);
@@ -103,7 +110,7 @@ function resolveCartesianSeriesDescriptors(chartModel = {}, resolvedChart = {}) 
           key: normalizedKey,
           label: normalizeString(matched?.label || normalizedKey),
           type: normalizeString(matched?.type || chartType) || chartType,
-          color: normalizeString(matched?.color || palette[index % palette.length]) || palette[index % palette.length],
+          color: printColor(matched?.color || palette[index % palette.length]) || palette[index % palette.length],
           format: normalizeString(matched?.format),
           dataLabels: normalizeString(matched?.dataLabels).toLowerCase(),
           pointColorMode: normalizeString(matched?.pointColorMode),
@@ -123,7 +130,7 @@ function resolveCartesianSeriesDescriptors(chartModel = {}, resolvedChart = {}) 
           key: normalizedKey,
           label: normalizedKey,
           type: chartType,
-          color: palette[index % palette.length],
+          color: printColor(resolveCategoryColor(chartModel?.series?.categoryColors, normalizedKey, palette[index % palette.length])),
           format: "",
           dataLabels: "",
           pointColorMode: "",
@@ -722,7 +729,7 @@ function renderCategoryChartSvg({
     const fraction = slice.value / total;
     const angle = fraction * 2 * Math.PI;
     const endAngle = startAngle + angle;
-    const fill = palette[index % palette.length];
+    const fill = printColor(resolveCategoryColor(chartModel?.series?.categoryColors, slice.name, palette[index % palette.length]));
     const outerPath = (() => {
       if (slices.length === 1) {
         return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${escapeXml(fill)}" />`;
@@ -755,7 +762,7 @@ function renderCategoryChartSvg({
   const legendX = size + 20;
   const legendY = 18;
   const legend = slices.map((slice, index) => {
-    const fill = palette[index % palette.length];
+    const fill = printColor(resolveCategoryColor(chartModel?.series?.categoryColors, slice.name, palette[index % palette.length]));
     const pct = ((slice.value / total) * 100).toFixed(0);
     const y = legendY + (index * 20);
     return `
@@ -1089,7 +1096,7 @@ function renderHorizontalBarChartSvg({
       const barWidth = Math.max(1, Math.abs(valueX - baselineX));
       const labelX = value >= 0 ? valueX + 6 : valueX - 6;
       const labelAnchor = value >= 0 ? "start" : "end";
-      const fillColor = resolveSeriesPointColor(series, value, series.color);
+      const fillColor = printColor(resolveCategoryColor(chartModel?.series?.categoryColors, readChartDataValue(row, xAxisKey), resolveSeriesPointColor(series, value, series.color)));
       const valueLabel = shouldRenderReportPrintSeriesDataLabels(series, "horizontal_bar", rows.length)
         ? `<text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(value, series.format))}</text>`
         : "";

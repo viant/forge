@@ -59,3 +59,10 @@ export function resolveChartTypography(element) {
         smallLineHeight: cssPixels(style, '--forge-type-small-line-height', 18),
     };
 }
+
+// Category identity, rather than row position, owns an explicitly assigned color.
+export function resolveCategoryColor(colors, category, fallback) {
+    const key = String(category ?? '').trim().toLowerCase();
+    const entry = Object.entries(colors || {}).find(([name]) => name.trim().toLowerCase() === key);
+    return typeof entry?.[1] === 'string' && entry[1].trim() ? entry[1].trim() : fallback;
+}
