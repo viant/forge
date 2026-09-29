@@ -544,6 +544,16 @@ export async function runUICommand(cmd = {}) {
         ...options,
         windowId: params.windowId || options.windowId,
       });
+      // Seed a declared list search before the hosted window's datasource
+      // effect runs, so opening a filtered list needs only one UI command.
+      if (win?.windowId && params.initialFilters && typeof params.initialFilters === 'object') {
+        for (const [dataSourceRef, filter] of Object.entries(params.initialFilters)) {
+          if (!dataSourceRef || !filter || typeof filter !== 'object' || Array.isArray(filter)) continue;
+          const input = getInputSignal(`${win.windowId}DS${dataSourceRef}`);
+          const previous = input.peek() || {};
+          input.value = {...previous, filter: {...(previous.filter || {}), ...filter}, page: 1, fetch: true};
+        }
+      }
       if (options.workspaceObject && win?.windowId) {
         const workspaceObject = await waitForWorkspaceReady(activeWindows, win.windowId);
         return { windowId: win.windowId, workspaceObject };
