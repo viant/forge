@@ -595,10 +595,10 @@ export async function runUICommand(cmd = {}) {
       if (['opening', 'failed'].includes(w.workspaceObject?.lifecycle?.state)) {
         await waitForWorkspaceReady(activeWindows, windowId);
       }
-      if (params.workspaceObject && w.workspaceObject) {
+      if (params.workspaceObject) {
         activeWindows.value = activeWindows.peek().map((entry) => entry.windowId === windowId ? {...entry,
-          hostOpenState: 'fresh', workspaceObject: {...entry.workspaceObject,
-            lastActivatedBy: params.workspaceObject.lastActivatedBy,
+          hostOpenState: 'fresh', workspaceObject: {...params.workspaceObject,
+            ...(entry.workspaceObject || {}), lastActivatedBy: params.workspaceObject.lastActivatedBy,
           },
         } : entry);
       }

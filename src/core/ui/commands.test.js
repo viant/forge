@@ -865,3 +865,19 @@ assert.deepEqual(getInputSignal('browseDSadvertisers').peek(), {
   filter: {Status: 'Active', Name: 'Woomp'}, page: 1, fetch: true,
 });
 console.log('Semantic name filtering preserves other criteria and restarts paging');
+
+// A menu-created window acquires provenance when an assistant shows it.
+const shownWorkspace = {objectId: 'browse', origin: {turnId: 'turn-1'},
+  lifecycle: {state: 'ready'}, lastActivatedBy: {turnId: 'turn-1'}};
+await runUICommand({method: 'ui.window.activate', params: {
+  windowId: 'browse', workspaceObject: shownWorkspace,
+}});
+assert.deepEqual(activeWindows.peek()[0].workspaceObject, shownWorkspace);
+assert.equal(activeWindows.peek()[0].hostOpenState, 'fresh');
+await runUICommand({method: 'ui.window.activate', params: {
+  windowId: 'browse', workspaceObject: {...shownWorkspace,
+    origin: {turnId: 'turn-2'}, lastActivatedBy: {turnId: 'turn-2'}},
+}});
+assert.equal(activeWindows.peek()[0].workspaceObject.origin.turnId, 'turn-1');
+assert.equal(activeWindows.peek()[0].workspaceObject.lastActivatedBy.turnId, 'turn-2');
+console.log('Workspace activation adopts menu provenance and preserves its original turn');

@@ -299,6 +299,7 @@ export function buildReportBuilderAuthoredRuntimePreviewState({
     runtimePreviewEnabled = false,
     runtimePreviewArtifact = null,
     runtimePreviewRowsSource = {},
+    runtimePreviewDatasetState = {},
     canRunReport = false,
     readinessReason = "",
     readinessAction = "",
@@ -317,8 +318,8 @@ export function buildReportBuilderAuthoredRuntimePreviewState({
     const reportPresentation = normalizedPresentationMode === "report";
     const runtimeConfig = runtimePreviewArtifact?.runtimeBlock?.dashboard?.reportRuntime || null;
     const hasRuntimeRows = resolveRuntimeHasRows(runtimeConfig);
-    const loading = !!runtimePreviewRowsSource?.loading;
-    const error = runtimePreviewRowsSource?.error || null;
+    const loading = !!runtimePreviewRowsSource?.loading || runtimePreviewDatasetState.loading === true;
+    const error = runtimePreviewRowsSource?.error || runtimePreviewDatasetState.error || null;
     const diagnostics = Array.isArray(runtimePreviewArtifactDiagnostics)
         ? runtimePreviewArtifactDiagnostics
         : [];
@@ -402,6 +403,7 @@ export function buildReportBuilderAuthoredRuntimePreviewState({
             : null,
         canRenderRuntime: !!runtimeConfig
             && !isLoadingWithoutRuntimeRows
+            && !(runtimePreviewDatasetState.error && !hasRuntimeRows)
             && (
                 hasRuntimeRows
                 || canRunReport
