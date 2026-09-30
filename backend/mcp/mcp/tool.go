@@ -14,6 +14,12 @@ import (
 //go:embed tools/forgeUISnapshot.md
 var descSnapshot string
 
+//go:embed tools/forgeWindowList.md
+var descWindowList string
+
+//go:embed tools/forgeWindowGet.md
+var descWindowGet string
+
 //go:embed tools/forgeUICommand.md
 var descCommand string
 
@@ -86,6 +92,12 @@ var descFocusGet string
 func registerTools(base *protoserver.DefaultHandler, h *Handler) error {
 	svc := h.service
 	if err := registerTool[service.UISnapshotInput, service.UISnapshotOutput](base.Registry, "forgeUISnapshot", descSnapshot, svc, svc.UISnapshot); err != nil {
+		return err
+	}
+	if err := registerTool[service.WindowListInput, service.WindowListOutput](base.Registry, "forgeWindowList", descWindowList, svc, svc.WindowList); err != nil {
+		return err
+	}
+	if err := registerTool[service.WindowGetInput, service.WindowGetOutput](base.Registry, "forgeWindowGet", descWindowGet, svc, svc.WindowGet); err != nil {
 		return err
 	}
 	if err := registerTool[service.UICommandInput, service.UICommandOutput](base.Registry, "forgeUICommand", descCommand, svc, svc.UICommand); err != nil {
