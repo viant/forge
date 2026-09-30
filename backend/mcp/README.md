@@ -42,6 +42,12 @@ export VITE_FORGE_UI_BRIDGE_ENABLED=true
 ## Tools
 
 - `forgeUISnapshot`: returns latest UI snapshot.
+- `forgeWindowList`: lists active windows for one connected UI client without
+  returning window data.
+- `forgeWindowGet`: returns one active window's semantic snapshot by exact
+  `windowId` in that same client and MCP namespace. Treat it as sensitive when
+  windows contain business data; the embedding host must authorize discovery
+  and retrieval before exposing these tools to an MCP caller.
 - `forgeUICommand`: sends `{method, params}` to the UI and returns `{ok,result,error}`.
 - `forgeUIWait`: blocks until snapshot changes or predicate matches.
 - Typed convenience tools (wrappers over `forgeUICommand`):
