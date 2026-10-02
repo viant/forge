@@ -1,4 +1,4 @@
-# forgeWindowGet
+# forgeActiveWindowGet
 
 Return the existing semantic snapshot for exactly one active Forge window by
 `windowId`. The window ID must appear in the selected connected UI client's

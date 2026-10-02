@@ -1,4 +1,4 @@
-# forgeWindowList
+# forgeActiveWindowList
 
 List active Forge windows in the selected connected UI client. Returns only
 window IDs, keys, titles, presentation flags, and selection state. It does not

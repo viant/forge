@@ -1,0 +1,12 @@
+windowKey: records
+dataSource:
+  records:
+    service:
+      endpoint: /example
+      uri: /v1/records
+      method: GET
+    cardinality: collection
+view:
+  dataSourceRef: records
+  content:
+    id: root
