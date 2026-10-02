@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Forge Dashboard Demo Exports</title>
+  <style>
+    :root {
+      --bg: #f5f8fa;
+      --panel: #ffffff;
+      --border: #d8e1e8;
+      --text: #182026;
+      --muted: #5f6b7c;
+      --primary: #137cbd;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+    }
+    p.lead {
+      margin: 0 0 24px;
+      color: var(--muted);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(16, 22, 26, 0.08);
+    }
+    .card h2 {
+      margin: 0 0 6px;
+      font-size: 18px;
+    }
+    .card p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .card a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .card a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Forge Dashboard Demo Exports</h1>
+    <p class="lead">Self-contained HTML exports generated from the built-in generic dashboard demo variants.</p>
+    <section class="grid">
+      
+        <article class="card">
+          <h2>Performance Dashboard Demo</h2>
+          <p>Marketing/performance dashboard with country drilldown and export.</p>
+          <a href="./performance-dashboard-demo.html" download="performance-dashboard-demo.html">Download HTML</a>
+        </article>
+      
+        <article class="card">
+          <h2>Operations Dashboard Demo</h2>
+          <p>Service health and incident dashboard with severity filtering.</p>
+          <a href="./operations-dashboard-demo.html" download="operations-dashboard-demo.html">Download HTML</a>
+        </article>
+      
+        <article class="card">
+          <h2>Data Quality Dashboard Demo</h2>
+          <p>Quality-focused dashboard with checks, distributions, and remediation notes.</p>
+          <a href="./quality-dashboard-demo.html" download="quality-dashboard-demo.html">Download HTML</a>
+        </article>
+      
+    </section>
+  </main>
+</body>
+</html>

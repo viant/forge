@@ -18,6 +18,7 @@ import (
 )
 
 type Options struct {
+	WindowCatalog   string   `long:"window-catalog" description:"Host-owned YAML catalog of saved window IDs and Forge metadata baseURL"`
 	HTTPAddr        string   `short:"a" long:"addr" description:"HTTP listen address (default: 127.0.0.1:5025; set to 'disabled' to skip HTTP server)"`
 	UIWSPath        string   `long:"ui-ws-path" description:"WebSocket path for Forge UI bridge (default: /forge/ui)"`
 	UIRPCPath       string   `long:"ui-rpc-path" description:"HTTP JSON-RPC path for Forge UI bridge (default: /forge/ui/rpc)"`
@@ -44,28 +45,42 @@ func main() {
 		os.Exit(2)
 	}
 
-	if opts.UITokenRequired && opts.UIToken == "" {
+	if opts.UITokenRequired && opts.UIToken == "" && opts.WindowCatalog == "" {
 		log.Printf("error: --ui-token is required when --ui-token-required=true")
 		os.Exit(2)
 	}
 
+	var catalog forgesvc.WindowDefinitionCatalog
+	if opts.WindowCatalog != "" {
+		loaded, err := forgesvc.LoadWindowCatalog(opts.WindowCatalog)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if loaded.RequiresRoles() {
+			log.Fatal("role-protected windows require an application OAuth permission adapter; standalone catalog mode supports open windows only")
+		}
+		catalog = loaded
+	}
 	svc := forgesvc.NewService(&forgesvc.Config{
-		Token:          opts.UIToken,
-		RequireToken:   opts.UITokenRequired,
-		LocalOnly:      opts.UILocalOnly,
-		AllowedOrigins: opts.UIAllowedOrigin,
-		UseData:        opts.UseData,
+		WindowDefinitions: catalog,
+		Token:             opts.UIToken,
+		RequireToken:      opts.UITokenRequired,
+		LocalOnly:         opts.UILocalOnly,
+		AllowedOrigins:    opts.UIAllowedOrigin,
+		UseData:           opts.UseData,
 	})
 
-	server, err := mcpsrv.New(
+	serverOptions := []mcpsrv.Option{
 		mcpsrv.WithImplementation(schema.Implementation{Name: "forge-mcp", Version: "0.1.0"}),
 		mcpsrv.WithNewHandler(forgemcp.NewHandler(svc)),
 		mcpsrv.WithEndpointAddress(opts.HTTPAddr),
 		mcpsrv.WithRootRedirect(true),
 		mcpsrv.WithStreamableURI("/mcp"),
-		mcpsrv.WithCustomHTTPHandler(opts.UIWSPath, svc.Hub().ServeWS),
-		mcpsrv.WithCustomHTTPHandler(opts.UIRPCPath, svc.Hub().ServeHTTPRPC),
-	)
+	}
+	if opts.UIToken != "" || !opts.UITokenRequired {
+		serverOptions = append(serverOptions, mcpsrv.WithCustomHTTPHandler(opts.UIWSPath, svc.Hub().ServeWS), mcpsrv.WithCustomHTTPHandler(opts.UIRPCPath, svc.Hub().ServeHTTPRPC))
+	}
+	server, err := mcpsrv.New(serverOptions...)
 	if err != nil {
 		log.Fatal(err)
 	}

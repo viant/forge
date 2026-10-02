@@ -2,6 +2,9 @@ package service
 
 // Config configures the Forge UI bridge service.
 type Config struct {
+	// WindowDefinitions is the host-owned catalog of saved Forge definitions.
+	// Its provider must enforce visibility/read policy before returning entries.
+	WindowDefinitions WindowDefinitionCatalog
 	// Token authenticates UI clients (frontend sends it as ui.hello.token).
 	Token string
 

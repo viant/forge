@@ -20,6 +20,12 @@ var descWindowList string
 //go:embed tools/forgeWindowGet.md
 var descWindowGet string
 
+//go:embed tools/uiWindowList.md
+var descDefinitionList string
+
+//go:embed tools/uiWindowGet.md
+var descDefinitionGet string
+
 //go:embed tools/forgeUICommand.md
 var descCommand string
 
@@ -94,11 +100,19 @@ func registerTools(base *protoserver.DefaultHandler, h *Handler) error {
 	if err := registerTool[service.UISnapshotInput, service.UISnapshotOutput](base.Registry, "forgeUISnapshot", descSnapshot, svc, svc.UISnapshot); err != nil {
 		return err
 	}
-	if err := registerTool[service.WindowListInput, service.WindowListOutput](base.Registry, "forgeWindowList", descWindowList, svc, svc.WindowList); err != nil {
+	if err := registerTool[service.WindowListInput, service.WindowListOutput](base.Registry, "forgeActiveWindowList", descWindowList, svc, svc.WindowList); err != nil {
 		return err
 	}
-	if err := registerTool[service.WindowGetInput, service.WindowGetOutput](base.Registry, "forgeWindowGet", descWindowGet, svc, svc.WindowGet); err != nil {
+	if err := registerTool[service.WindowGetInput, service.WindowGetOutput](base.Registry, "forgeActiveWindowGet", descWindowGet, svc, svc.WindowGet); err != nil {
 		return err
+	}
+	if svc.HasWindowDefinitions() {
+		if err := registerTool[service.WindowDefinitionListInput, service.WindowDefinitionListOutput](base.Registry, "window-list", descDefinitionList, svc, svc.WindowDefinitionsList); err != nil {
+			return err
+		}
+		if err := registerTool[service.WindowDefinitionGetInput, service.WindowDefinitionGetOutput](base.Registry, "window-get", descDefinitionGet, svc, svc.WindowDefinitionGet); err != nil {
+			return err
+		}
 	}
 	if err := registerTool[service.UICommandInput, service.UICommandOutput](base.Registry, "forgeUICommand", descCommand, svc, svc.UICommand); err != nil {
 		return err
