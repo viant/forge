@@ -3,6 +3,7 @@ import SwiftUI
 /// Platform-native projection of portable workspace tokens. The host owns
 /// catalogs and selection; Forge owns their use by native controls.
 public struct ForgeThemeAppearance {
+    public var fontFamily: String? = nil
     public var lookupBackground: Color = Color(red: 241/255, green: 248/255, blue: 242/255)
     public var lookupBorder: Color = Color(red: 191/255, green: 215/255, blue: 196/255)
     public var requiredBackground: Color = Color(red: 255/255, green: 243/255, blue: 244/255)
@@ -50,7 +51,7 @@ struct ForgeThemeInputModifier: ViewModifier {
     @ViewBuilder func body(content: Content) -> some View {
         if let appearance {
             content.focused($focused).textFieldStyle(.plain).scrollContentBackground(.hidden)
-                .font(.system(size: appearance.fontSize * fontScale))
+                .font(appearance.fontFamily.map { Font.custom($0, size: appearance.fontSize * fontScale) } ?? .system(size: appearance.fontSize * fontScale))
                 .padding(.horizontal, appearance.paddingInline)
                 .frame(minHeight: max(multiline ? 96 : 44, appearance.controlHeight))
                 .foregroundStyle(enabled ? appearance.controlForeground : appearance.disabledForeground)
@@ -89,7 +90,7 @@ private struct WorkspaceButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var enabled
     @ScaledMetric(relativeTo: .body) private var fontScale = 1.0
     func makeBody(configuration: Configuration) -> some View {
-        configuration.label.font(.system(size: appearance.fontSize * fontScale))
+        configuration.label.font(appearance.fontFamily.map { Font.custom($0, size: appearance.fontSize * fontScale) } ?? .system(size: appearance.fontSize * fontScale))
             .padding(.horizontal, appearance.paddingInline).padding(.vertical, 6)
             .frame(minHeight: max(44, appearance.controlHeight))
             .foregroundStyle(enabled ? appearance.buttonForeground : appearance.disabledForeground)

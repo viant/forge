@@ -13,6 +13,18 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ReportBuilderAuthoredRuntimeTest {
+    @Test fun portableDateRangeStateProjectsWithoutRewritingOriginalAuthorJSON()=kotlinx.coroutines.runBlocking {
+        val scope=kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()+kotlinx.coroutines.Dispatchers.Default)
+        try {
+            val runtime=com.viant.forgeandroid.runtime.ForgeRuntime(emptyMap(),scope);runtime.openWindowInline("W",metadata=com.viant.forgeandroid.runtime.WindowMetadata())
+            val raw=kotlinx.serialization.json.buildJsonObject { put("staticFilters",kotlinx.serialization.json.buildJsonObject { put("dateRange",kotlinx.serialization.json.buildJsonObject { put("kind",JsonPrimitive("dateRange"));put("start",JsonPrimitive(""));put("end",JsonPrimitive(""));put("opaque",JsonPrimitive(true)) }) });put("opaque",kotlinx.serialization.json.buildJsonObject { put("preserved",JsonPrimitive("😀")) }) }
+            runtime.setWindowFormValues("W",mapOf("state" to com.viant.forgeandroid.runtime.JsonUtil.elementToAny(raw)),bumpPrefillRevision=false)
+            val stored=loadStoredStateFromWindowForm(runtime,"W","state")!!
+            assertEquals(StoredStaticFilterValue.DateRangeValue("",""),stored.staticFilters["dateRange"])
+            assertEquals(raw,JsonObject(stored.authoredState))
+            assertEquals(raw,com.viant.forgeandroid.runtime.JsonUtil.anyToElement(runtime.windowContext("W").peekWindowForm()["state"]))
+        } finally { scope.coroutineContext[kotlinx.coroutines.Job]?.cancel() }
+    }
     @Test
     fun builderStateBlocksReplaceDepthLimitedDefinitionBlocks() {
         val resolved = reportBuilderAuthoredDocument(
@@ -38,7 +50,7 @@ class ReportBuilderAuthoredRuntimeTest {
                         )
                     )
                 )
-            )
+            ), "reportBuilder:metricsCubeBuilder"
         )
 
         assertNotNull(resolved)
@@ -49,6 +61,19 @@ class ReportBuilderAuthoredRuntimeTest {
             "totalSpend",
             ((spec["yFields"] as JsonArray).first() as JsonPrimitive).content
         )
+    }
+
+    @Test fun documentUsesOnlySelectedStateAndPreservesRawAuthorExtensions() {
+        val definition = mapOf("title" to "Original", "opaque" to mapOf("unicode" to "😀"), "blocks" to listOf(mapOf("id" to "definition")))
+        val form = mapOf("reportDefinition" to mapOf("documentPatch" to definition),
+            "other" to mapOf("reportDocumentBlocks" to listOf(mapOf("id" to "wrong"))),
+            "selected" to mapOf("reportDocumentBlocks" to listOf(mapOf("id" to "right", "chartSpec" to mapOf("type" to "line")))))
+        val doc = reportBuilderAuthoredDocument(form,"selected")!!
+        assertEquals(JsonPrimitive("right"),(doc["blocks"] as JsonArray).first().let { it as JsonObject }["id"])
+        assertEquals(JsonObject(mapOf("unicode" to JsonPrimitive("😀"))),doc["opaque"])
+        assertTrue("chartModel" !in ((doc["blocks"] as JsonArray).first() as JsonObject))
+        val missing = reportBuilderAuthoredDocument(form,"missing")!!
+        assertEquals(JsonPrimitive("definition"),((missing["blocks"] as JsonArray).first() as JsonObject)["id"])
     }
 
     @Test
@@ -151,7 +176,7 @@ class ReportBuilderAuthoredRuntimeTest {
         )
         assertEquals(mapOf("totalSpend" to true), request["measures"])
         assertEquals(mapOf("eventDate" to true), request["dimensions"])
-        assertEquals(mapOf("orderIds" to listOf(2676237), "From" to "2026-08-03"), request["filters"])
+        assertEquals(com.viant.forgeandroid.runtime.JsonUtil.anyToElement(mapOf("orderIds" to listOf(2676237), "From" to "2026-08-03")), com.viant.forgeandroid.runtime.JsonUtil.anyToElement(request["filters"]))
         assertEquals(366L, request["limit"])
     }
 

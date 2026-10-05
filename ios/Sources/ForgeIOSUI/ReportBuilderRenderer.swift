@@ -18,16 +18,25 @@ public struct ReportBuilderRenderer: View {
     @State private var storedPresets: [StoredReportBuilderChartPreset] = []
     @State private var reportOptions: [String: JSONValue] = [:]
     @State private var staticFilters: [String: ReportBuilderStaticFilterValue] = [:]
+    @State private var preparationMetadataRevision = ""
+    @State private var authoredHookMetadataRevision = ""
+    @State private var initializedInputSignature = ""
+    @State private var authoredHookState: [String: JSONValue] = [:]
+    @State private var authoredHookConfig: JSONValue?
+    @State private var initializationHookError: String?
+    @State private var preparedRequest: PreparedReportRequest?
     @State private var dynamicGroups: [String: [ReportBuilderDynamicRowState]] = [:]
     @State private var dynamicFilterDrafts: [String: String] = [:]
     @State private var availableDialogIDs: Set<String> = []
     @State private var windowActionsCode: String? = nil
     @State private var windowNamespace: String = ""
+    @State private var frozenPersistenceSignature: String?
     @State private var restoredStoredState = false
     @State private var restoredStateKey = ""
     @State private var windowFormValues: [String: JSONValue] = [:]
     @State private var appliedPrefillSignature = ""
     @State private var requestBridgeGeneration = 0
+    @State private var requestedExplicitRefresh = false
     @State private var completedRequestSignature = ""
     @State private var lastAutoAppliedRequestSignature = ""
     @State private var filtersExpanded = true
@@ -67,11 +76,11 @@ public struct ReportBuilderRenderer: View {
         .task(id: hydrationTaskKey) {
             await hydrateInitialStateIfNeeded()
         }
-        .task(id: windowFormTaskKey) {
-            await observeWindowFormUpdates()
-        }
-        .task(id: currentPrefillSignature) {
-            await applyWindowFormPrefillIfNeeded()
+        .task(id: windowFormTaskKey) { await observeWindowFormUpdates() }
+        .task(id: windowFormTaskKey) { await observePreparationMetadata() }
+        .task(id: preparationFormSignature) {
+            guard hydratedForCurrentVariant else { return }
+            requestBridgeGeneration += 1
         }
         .task(id: authoredDocument.map(JSONValue.object)?.jsonSignature ?? "") {
             guard let signature = authoredDocument.map(JSONValue.object)?.jsonSignature,
@@ -126,7 +135,7 @@ public struct ReportBuilderRenderer: View {
     }
 
     private var authoredDocument: [String: JSONValue]? {
-        reportBuilderAuthoredDocument(windowFormValues)
+        reportBuilderAuthoredDocument(windowFormValues, stateKey: builderStateKey)
     }
 
     private var authoredNeedsPrimaryDataset: Bool {
@@ -163,16 +172,19 @@ public struct ReportBuilderRenderer: View {
     }
 
     private var hydrationTaskKey: String {
-        [window?.windowID ?? "", builderStateKey ?? "", effectiveDataSourceRef ?? ""].joined(separator: ":")
+        [window?.windowID ?? "", builderStateKey ?? "", effectiveDataSourceRef ?? "", preparationMetadataRevision, initializationInputSignature].joined(separator: ":")
     }
 
     private var hydratedForCurrentVariant: Bool {
-        restoredStoredState && restoredStateKey == hydrationTaskKey
+        restoredStoredState && restoredStateKey == hydrationTaskKey && appliedPrefillSignature == currentPrefillSignature && initializedInputSignature == initializationInputSignature
     }
 
     private var windowFormTaskKey: String {
         window?.windowID ?? ""
     }
+
+    private var preparationFormSignature: String { reportPreparationFingerprint(.object(reportPreparationAuthorInputs(windowFormValues))) }
+    private var initializationInputSignature: String { reportPreparationFingerprint(.object(reportPreparationInitializationInputs(windowFormValues, stateKey: builderStateKey))) }
 
     private var currentPrefillSignature: String {
         Self.reportBuilderPrefillSignature(windowFormValues)
@@ -281,24 +293,39 @@ public struct ReportBuilderRenderer: View {
         Self.applyStaticFilters(rows: rows, filters: config.staticFilters, state: staticFilters)
     }
 
-    private var requestPayload: [String: JSONValue] {
-        var base = Self.buildRequestPayload(
-            config: config,
-            selectedMeasures: selectedMeasures,
-            selectedDimensions: selectedDimensions,
-            staticFilters: staticFilters,
-            dynamicGroups: dynamicGroups
-        )
+    private var requestPayload: [String: JSONValue] { (try? preparedRequestParts())?.request ?? [:] }
+
+    private func preparedRequestParts(requireInitialIntent: Bool = false) throws -> (request: [String: JSONValue], bindings: [[String: JSONValue]]) {
+        var base = Self.buildRequestPayload(config: config, selectedMeasures: selectedMeasures, selectedDimensions: selectedDimensions, staticFilters: staticFilters, dynamicGroups: dynamicGroups)
         if !effectiveReportOptions.isEmpty { base["options"] = .object(effectiveReportOptions) }
-        let scoped = Self.applyWindowFormPrefill(
-            config: config,
-            request: applyBuildRequestHook(base),
-            windowForm: windowFormValues
-        )
-        return Self.applyChartDataPolicy(
-            config: config,
-            request: scoped
-        )
+        return try Self.prepareReportRequest(base: base, config: config, authoredConfig: authoredHookConfig, state: nativeHookStateValue, windowForm: windowFormValues, moduleCode: windowActionsCode, namespace: windowNamespace, requireInitialIntent: requireInitialIntent)
+    }
+
+    static func prepareReportRequest(base: [String: JSONValue], config: DashboardReportBuilderDef, authoredConfig: JSONValue? = nil, state: JSONValue, windowForm: [String: JSONValue], moduleCode: String?, namespace: String = "", requireInitialIntent: Bool = true) throws -> (request: [String: JSONValue], bindings: [[String: JSONValue]]) {
+        let bound = requireInitialIntent ? applyWindowFormPrefill(config: config, request: base, windowForm: windowForm) : base
+        var resolved = bound
+        if let hook = config.hooks?.buildRequest, !hook.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            guard let moduleCode, !moduleCode.isEmpty else { throw ReportPreparationError(reason: "unsupported-hook") }
+            let typed = (try? JSONEncoder().encode(config)).flatMap { try? JSONDecoder().decode(JSONValue.self, from: $0) } ?? .object([:])
+            let props = JSONValue.object(["request": .object(bound), "state": state, "config": authoredConfig ?? typed])
+            var output: [String: JSONValue]?
+            let candidates = namespace.isEmpty ? [hook] : [hook, hook.hasPrefix(namespace + ".") ? String(hook.dropFirst(namespace.count + 1)) : namespace + "." + hook]
+            for candidate in candidates { if let value = try? ActionHookRuntime.invoke(code: moduleCode, functionName: candidate, props: props), let object = value.objectValue { output = object; break } }
+            guard let output else { throw ReportPreparationError(reason: "unsupported-hook") }
+            resolved = output
+        }
+        resolved = applyChartDataPolicy(config: config, request: resolved)
+        var bindings: [[String: JSONValue]] = []
+        func collect(_ value: JSONValue, path: String) {
+            if let object = value.objectValue { for (key, child) in object { collect(child, path: path.isEmpty ? key : path + "." + key) } }
+            else if value != .null && value != .string("") && value != .array([]) { bindings.append(["path": .string(path), "value": value]) }
+        }
+        if requireInitialIntent {
+            // Bind explicit declared/coerced launch intent before the hook. A
+            // successful hook may clear it only after this intent was acknowledged.
+            collect(.object(applyWindowFormPrefill(config: config, request: [:], windowForm: windowForm)), path: "")
+        }
+        return (resolved, bindings)
     }
 
     private var measuresSection: AnyView {
@@ -583,7 +610,8 @@ public struct ReportBuilderRenderer: View {
                 primaryRows: rows,
                 primaryControl: dataSourceControlState,
                 primaryRequest: requestPayload,
-                runRequestID: windowFormValues["reportRunRequest"]?.objectValue?["id"]?.stringValue
+                runRequestID: windowFormValues["reportRunRequest"]?.objectValue?["id"]?.stringValue,
+                preparedRequest: preparedRequest
             )
         } else if viewMode == "chart", let spec = chartSpec {
             chartView(spec: spec)
@@ -876,6 +904,7 @@ public struct ReportBuilderRenderer: View {
                     .foregroundStyle(feedback.isError ? .red : .secondary)
                 if feedback.isError {
                     Button {
+                        requestedExplicitRefresh = true
                         requestBridgeGeneration += 1
                     } label: {
                         Label("Retry", systemImage: "arrow.clockwise")
@@ -989,20 +1018,41 @@ public struct ReportBuilderRenderer: View {
         let stateKey = hydrationTaskKey
         guard restoredStateKey != stateKey else { return }
         resetReportBuilderStateForHydration()
+        initializationHookError = nil
+        preparedRequest = nil
         defer {
-            refreshStoredPresets()
-            restoredStoredState = true
-            restoredStateKey = stateKey
-            requestBridgeGeneration += 1
+            if !Task.isCancelled, stateKey == hydrationTaskKey {
+                refreshStoredPresets()
+                restoredStoredState = true
+                restoredStateKey = stateKey
+                requestBridgeGeneration += 1
+            }
         }
 
         await refreshAvailableDialogs()
         await refreshWindowFormValues()
+        authoredHookState = builderStateKey.flatMap { Self.resolveNestedValue(windowFormValues, path: $0)?.objectValue } ?? [:]
 
         if let restored = await loadPersistedState() {
             apply(restored: restored)
-            await applyInitializeStateHookIfNeeded(windowForm: windowFormValues)
-            appliedPrefillSignature = currentPrefillSignature
+            if let runtime, let window, let key = builderStateKey,
+               let document = nativeReportSelectedDocument(windowFormValues, stateKey: key),
+               let configuration = authoredHookConfig?.objectValue,
+               await runtime.frozenNativeReportPreparation(windowID: window.windowID, builderRef: resolvedVariant.builderRef, stateKey: key, configuration: configuration, document: document, expectedMetadataRevision: authoredHookMetadataRevision) != nil {
+                frozenPersistenceSignature = persistenceSignature
+                initializedInputSignature = initializationInputSignature
+                appliedPrefillSignature = currentPrefillSignature
+                return
+            }
+            if let runtime, let window, let key = builderStateKey,
+               await runtime.reportInitialIntentAcknowledged(windowID: window.windowID, key: reportInitialIntentKey(builderRef: resolvedVariant.builderRef, stateKey: key, prefillSignature: currentPrefillSignature)) {
+                // A remount restores the edited author state; initialization must
+                // not reapply launch prefill that was already acknowledged.
+                initializedInputSignature = initializationInputSignature
+                appliedPrefillSignature = currentPrefillSignature
+            } else {
+                await applyInitializeStateHookIfNeeded(windowForm: windowFormValues)
+            }
             return
         }
 
@@ -1015,7 +1065,6 @@ public struct ReportBuilderRenderer: View {
             viewMode = config.result?.defaultMode ?? "table"
         }
         await applyInitializeStateHookIfNeeded(windowForm: windowFormValues)
-        appliedPrefillSignature = currentPrefillSignature
     }
 
     @MainActor
@@ -1042,6 +1091,15 @@ public struct ReportBuilderRenderer: View {
     }
 
     @MainActor
+    private func observePreparationMetadata() async {
+        guard let runtime, let window else { return }
+        for await metadata in await runtime.windowMetadataUpdates(id: window.windowID) {
+            if Task.isCancelled { return }
+            preparationMetadataRevision = metadata?.runtimeAuthoring.map(reportPreparationFingerprint) ?? ""
+        }
+    }
+
+    @MainActor
     private func refreshAvailableDialogs() async {
         guard let runtime, let window else {
             availableDialogIDs = []
@@ -1051,53 +1109,49 @@ public struct ReportBuilderRenderer: View {
         }
         let metadata = await runtime.windowMetadata(id: window.windowID)
         availableDialogIDs = Set(metadata?.dialogs.compactMap { $0.id?.trimmingCharacters(in: .whitespacesAndNewlines) } ?? [])
+        authoredHookMetadataRevision = metadata?.runtimeAuthoring.map(reportPreparationFingerprint) ?? ""
         windowActionsCode = metadata?.actions?.code
         windowNamespace = metadata?.namespace?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        authoredHookConfig = await runtime.authoredReportConfig(windowID: window.windowID, containerID: container.id ?? "", builderRef: resolvedVariant.builderRef)
     }
 
     @MainActor
     private func applyInitializeStateHookIfNeeded(windowForm: [String: JSONValue]? = nil) async {
-        guard let hookName = config.hooks?.initializeState?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !hookName.isEmpty,
-              let runtime,
-              let window else {
-            return
-        }
+        guard let runtime, let window else { return }
         let formValue: [String: JSONValue]
-        if let windowForm {
-            formValue = windowForm
-        } else {
-            formValue = await runtime.windowFormJSONValue(windowID: window.windowID)
-        }
+        if let windowForm { formValue = windowForm } else { formValue = await runtime.windowFormJSONValue(windowID: window.windowID) }
+        let inputSignature = reportPreparationFingerprint(.object(reportPreparationInitializationInputs(formValue, stateKey: builderStateKey)))
         await refreshAvailableDialogs()
+        let moduleRevision = authoredHookMetadataRevision
         let fallbackState = currentStoredState()
-        guard let stateValue = Self.reportBuilderHookStateValue(from: fallbackState) else { return }
-        let props = Self.objectValue([
-            "state": stateValue,
-            "windowForm": .object(formValue),
-            "config": Self.jsonValue(from: config)
-        ])
-        guard let result = invokeHook(functionName: hookName, props: props) else {
-            return
+        var output: JSONValue?
+        var issue: String?
+        if let hook = config.hooks?.initializeState, !hook.isEmpty {
+            let stateValue = Self.reportBuilderHookStateValue(from: fallbackState)?.objectValue ?? [:]
+            let props = Self.objectValue(["state": .object(authoredHookState.merging(stateValue, uniquingKeysWith: { _, native in native })), "windowForm": .object(formValue), "config": authoredHookConfig ?? Self.jsonValue(from: config)])
+            do { output = try requiredHook(functionName: hook, props: props) } catch { issue = "unsupported-hook" }
+        } else {
+            let initial = Self.initialStateApplyingDeclaredPrefill(config: config, state: fallbackState, windowForm: formValue)
+            output = Self.reportBuilderHookStateValue(from: initial)
         }
-        let next = Self.reportBuilderState(fromHookResult: result, fallback: fallbackState)
-        apply(restored: next)
+        let currentForm = await runtime.windowFormJSONValue(windowID: window.windowID)
+        let currentMetadata = await runtime.windowMetadata(id: window.windowID)
+        guard !Task.isCancelled,
+              reportPreparationFingerprint(.object(reportPreparationInitializationInputs(currentForm, stateKey: builderStateKey))) == inputSignature,
+              currentMetadata?.runtimeAuthoring.map(reportPreparationFingerprint) == moduleRevision else { return }
+        initializationHookError = issue
+        if let output { authoredHookState = output.objectValue ?? [:]; apply(restored: Self.reportBuilderState(fromHookResult: output, fallback: fallbackState)) }
+        initializedInputSignature = inputSignature
+        appliedPrefillSignature = Self.reportBuilderPrefillSignature(formValue)
     }
 
-    @MainActor
-    private func applyWindowFormPrefillIfNeeded() async {
-        let signature = currentPrefillSignature
-        guard hydratedForCurrentVariant,
-              !signature.isEmpty,
-              signature != appliedPrefillSignature else {
-            return
-        }
-        await applyInitializeStateHookIfNeeded(windowForm: windowFormValues)
-        appliedPrefillSignature = signature
-        requestBridgeGeneration += 1
+    private var nativeHookStateValue: JSONValue {
+        var merged = authoredHookState.merging(Self.reportBuilderHookStateValue(from: currentStoredState())?.objectValue ?? [:], uniquingKeysWith: { _, native in native })
+        if let staticValues = merged["staticFilters"]?.objectValue { merged["scopeParams"] = .object((merged["scopeParams"]?.objectValue ?? [:]).merging(staticValues, uniquingKeysWith: { _, native in native })) }
+        return .object(merged)
     }
 
-    private func applyBuildRequestHook(_ request: [String: JSONValue]) -> [String: JSONValue] {
+    private func applyBuildRequestHook(_ request: [String: JSONValue]) throws -> [String: JSONValue] {
         guard let hookName = config.hooks?.buildRequest?.trimmingCharacters(in: .whitespacesAndNewlines),
               !hookName.isEmpty,
               let requestValue = Self.jsonValue(from: request) else {
@@ -1105,10 +1159,11 @@ public struct ReportBuilderRenderer: View {
         }
         let props = Self.objectValue([
             "request": requestValue,
-            "state": Self.jsonValue(from: currentStoredState()),
-            "config": Self.jsonValue(from: config)
+            "state": nativeHookStateValue,
+            "config": authoredHookConfig ?? Self.jsonValue(from: config)
         ])
-        return invokeHook(functionName: hookName, props: props)?.objectValue ?? request
+        guard let result = try requiredHook(functionName: hookName, props: props).objectValue else { throw ReportPreparationError(reason: "unsupported-hook") }
+        return result
     }
 
     private func lookupDescriptor(
@@ -1127,7 +1182,7 @@ public struct ReportBuilderRenderer: View {
         if let hookName = config.hooks?.resolveLookup?.trimmingCharacters(in: .whitespacesAndNewlines),
            !hookName.isEmpty {
             let props = Self.objectValue([
-                "state": Self.jsonValue(from: currentStoredState()),
+                "state": nativeHookStateValue,
                 "group": .object(["id": .string(groupID)]),
                 "filterDef": Self.jsonValue(from: filter),
                 "rowId": rowID.map(JSONValue.string)
@@ -1149,6 +1204,14 @@ public struct ReportBuilderRenderer: View {
             return nil
         }
         return descriptor
+    }
+
+    private func requiredHook(functionName: String, props: JSONValue) throws -> JSONValue {
+        guard let code = windowActionsCode, !code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw ReportPreparationError(reason: "unsupported-hook") }
+        for candidate in resolveHookFunctionCandidates(functionName) {
+            if let result = try? ActionHookRuntime.invoke(code: code, functionName: candidate, props: props) { return result }
+        }
+        throw ReportPreparationError(reason: "unsupported-hook")
     }
 
     private func invokeHook(functionName: String, props: JSONValue) -> JSONValue? {
@@ -1184,29 +1247,110 @@ public struct ReportBuilderRenderer: View {
     }
 
     private func bridgeRequestToDataSource() async {
+        guard let runtime, let window, hydratedForCurrentVariant else { return }
+        if let baseline = frozenPersistenceSignature, baseline != persistenceSignature {
+            frozenPersistenceSignature = nil
+            await runtime.invalidateNativeReportFrozenAdmission(windowID: window.windowID)
+        }
+        if let key = builderStateKey, let document = nativeReportSelectedDocument(windowFormValues, stateKey: key),
+           let configuration = authoredHookConfig?.objectValue,
+           let frozen = await runtime.publishFrozenNativeReportPreparation(windowID: window.windowID, builderRef: resolvedVariant.builderRef, stateKey: key, configuration: configuration, document: document,
+               initialIntentKey: reportInitialIntentKey(builderRef: resolvedVariant.builderRef, stateKey: key, prefillSignature: currentPrefillSignature), expectedMetadataRevision: authoredHookMetadataRevision) {
+            preparedRequest = frozen
+            rows = []; hasResolvedRows = true; dataSourceControlState = ControlState()
+            return
+        }
+        let binding = hydrationTaskKey + requestSignature + currentPrefillSignature
+        let variant = resolvedVariant
+        let configSnapshot = authoredHookConfig.flatMap { value in (try? JSONEncoder().encode(value)).flatMap { try? JSONDecoder().decode(DashboardReportBuilderDef.self, from: $0) } } ?? config
+        let localForm = windowFormValues
+        let metadataRevision = authoredHookMetadataRevision
+        let hookState = nativeHookStateValue.objectValue ?? [:]
+        guard let stateKey = builderStateKey, let typedState = Self.jsonValue(from: currentStoredState())?.objectValue else { return }
+        let committedState = JSONValue.object(authoredHookState.merging(typedState, uniquingKeysWith: { _, native in native }))
+        var expectedForm = localForm
+        Self.setNestedValue(&expectedForm, path: stateKey, value: committedState)
+        // Capture author inputs before the first suspension. Later UI updates must
+        // never bind an earlier request to a newer document or configuration.
+        let documentSnapshot = reportBuilderAuthoredDocument(expectedForm, stateKey: stateKey)
+        let authorStateSnapshot = reportPreparationValue(expectedForm, path: stateKey)?.objectValue ?? [:]
+        let prefillIdentitySnapshot = nativeReportPrefillIdentity(expectedForm)
+        let authoredConfigurationSnapshot = authoredHookConfig?.objectValue ?? [:]
+        let preparationClock = Date()
+        let preparationCalendar = Calendar.current
+        var issue = initializationHookError
+        var parts: (request: [String: JSONValue], bindings: [[String: JSONValue]])?
+        let intentKey = reportInitialIntentKey(builderRef: variant.builderRef, stateKey: stateKey, prefillSignature: currentPrefillSignature)
+        let intentAcknowledged = await runtime.reportInitialIntentAcknowledged(windowID: window.windowID, key: intentKey)
+        do { parts = try preparedRequestParts(requireInitialIntent: !intentAcknowledged) } catch { issue = "unsupported-hook" }
+        guard !Task.isCancelled, binding == hydrationTaskKey + requestSignature + currentPrefillSignature else { return }
+        let committedIdentity = await runtime.commitReportProducerState(windowID: window.windowID, builderRef: variant.builderRef, stateKey: stateKey, expectedForm: localForm, updatedForm: expectedForm, expectedMetadataRevision: metadataRevision)
+        guard let identity = committedIdentity else { return }
+        if variant.missing || variant.dataSourceRef?.isEmpty != false { issue = "missing-builder" }
+        let bindings = parts?.bindings ?? []
+        var packet = PreparedReportRequest(identity: identity, status: issue == nil ? "ready" : "error", hookStatus: issue == "unsupported-hook" ? "unsupported" : "completed", dataSourceRef: variant.dataSourceRef ?? "", request: parts?.request ?? [:], state: hookState, config: configSnapshot, requiredBindings: bindings, error: issue, preparedAt: preparationClock, preparedCalendar: preparationCalendar)
+        if issue == nil {
+            do {
+                if let reason = packet.validate(current: identity) { throw ReportPreparationError(reason: reason) }
+                for id in documentSnapshot.map(reportBuilderAuthoredDatasetRefs) ?? [] where id != "primary" {
+                    guard let source = configSnapshot.dataSources.first(where: { $0.id == id }) else { throw ReportPreparationError(reason: "missing-request") }
+                    _ = try packet.publishedRequest(source, current: identity)
+                }
+            } catch let error as ReportPreparationError { issue = error.reason }
+            catch { issue = "preparation-error" }
+            if let issue { packet = PreparedReportRequest(identity: identity, status: "error", hookStatus: "completed", dataSourceRef: variant.dataSourceRef ?? "", request: packet.request, state: packet.state, config: configSnapshot, requiredBindings: bindings, error: issue, preparedAt: preparationClock, preparedCalendar: preparationCalendar) }
+        }
+        await runtime.markNativeReportAuthoredPreparation(windowID: window.windowID, identity: documentSnapshot == nil ? nil : packet.identity)
+        let published = await runtime.publishPreparedReportRequest(packet)
+        guard published, !Task.isCancelled else { return }
+        if let issue { preparedRequest = packet; rows = []; hasResolvedRows = true; dataSourceControlState = ControlState(loading: false, error: ReportPreparationError(reason: issue).localizedDescription); return }
+        guard await runtime.acknowledgeReportInitialIntent(packet, key: intentKey) else { return }
+        if let document = documentSnapshot {
+            do {
+                guard let conversationID = await runtime.windowState(id: window.windowID)?.conversationID, !conversationID.isEmpty else { throw ReportPreparationError(reason: "missing-conversation") }
+                let plans = try reportBuilderAuthoredDatasetRefs(document).sorted().map { id -> NativeReportDatasetAdmission in
+                    if id == "primary" { return NativeReportDatasetAdmission(id: id, dataSourceRef: packet.dataSourceRef, request: packet.request) }
+                    guard let source = packet.config.dataSources.first(where: { $0.id == id }) else { throw ReportPreparationError(reason: "missing-request") }
+                    return NativeReportDatasetAdmission(id: id, dataSourceRef: source.dataSourceRef, request: try packet.publishedRequest(source, current: packet.identity))
+                }
+                try await runtime.publishNativeReportAdmission(NativeReportAdmission(preparation: packet, conversationID: conversationID, stateKey: stateKey, document: document, datasets: plans, authoredConfiguration: authoredConfigurationSnapshot, authorState: authorStateSnapshot, prefillIdentity: prefillIdentitySnapshot))
+                preparedRequest = packet
+                rows = []; hasResolvedRows = true; dataSourceControlState = ControlState()
+            } catch {
+                dataSourceControlState = ControlState(loading: false, error: error.localizedDescription)
+            }
+            return
+        }
+        preparedRequest = packet
         guard authoredNeedsPrimaryDataset else {
             rows = []
             hasResolvedRows = true
             dataSourceControlState = ControlState()
             return
         }
-        guard let runtime else { return }
-        guard let window else { return }
         let resolvedDataSourceRef = effectiveDataSourceRef ?? ""
         if resolvedDataSourceRef.isEmpty { return }
         let windowID = window.windowID
-        let payload = requestPayload
+        do { try await runtime.registerPreparedReportPrimaryContext(packet) }
+        catch { dataSourceControlState = ControlState(loading: false, error: error.localizedDescription); return }
+        let source = await runtime.windowMetadata(id: windowID)?.dataSources[resolvedDataSourceRef]
+        let explicitRefresh = requestedExplicitRefresh
+        requestedExplicitRefresh = false
+        guard explicitRefresh || reportBuilderAutomaticFetchAllowed(windowForm: localForm, authoredConfig: authoredHookConfig, dataSourceAutoFetch: source?.autoFetch) else {
+            let snapshot = await runtime.registeredDataSourceSnapshot(windowID: windowID, dataSourceRef: resolvedDataSourceRef)
+            let matching = snapshot?.input.parameters == packet.request
+            rows = matching ? snapshot?.collection ?? [] : []
+            dataSourceControlState = matching ? snapshot?.control ?? ControlState(inactive: true) : ControlState(inactive: true)
+            hasResolvedRows = matching && snapshot?.collection != nil
+            return
+        }
         let signature = requestSignature
         // SwiftUI legitimately restarts the surrounding task while hydration and
         // prefill settle. The datasource request must finish independently of that
         // view-task lifecycle; otherwise URLSession cancels a valid long report.
         let result = await Task.detached(priority: .userInitiated) {
-            await runtime.setDataSourceInputParameters(
-                windowID: windowID,
-                dataSourceRef: resolvedDataSourceRef,
-                parameters: payload,
-                fetch: true
-            )
+            do { try await runtime.fetchPreparedReportDataSource(windowID: windowID, dataSourceRef: resolvedDataSourceRef, expectedIdentity: packet.identity, automatic: !explicitRefresh) }
+            catch { return ([[String: JSONValue]](), ControlState(loading: false, error: error.localizedDescription)) }
             let fetchedRows = await runtime.dataSourceCollection(
                 windowID: windowID,
                 dataSourceRef: resolvedDataSourceRef
@@ -1409,7 +1553,13 @@ public struct ReportBuilderRenderer: View {
 
     private func persistStoredState() async {
         guard let runtime, let window, let stateKey = builderStateKey else { return }
-        guard let encoded = Self.jsonValue(from: currentStoredState()) else { return }
+        if let baseline = frozenPersistenceSignature {
+            if baseline == persistenceSignature { return }
+            frozenPersistenceSignature = nil
+            await runtime.invalidateNativeReportFrozenAdmission(windowID: window.windowID)
+        }
+        guard let typed = Self.jsonValue(from: currentStoredState())?.objectValue else { return }
+        let encoded = JSONValue.object(authoredHookState.merging(typed, uniquingKeysWith: { _, native in native }))
         var payload: [String: JSONValue] = [:]
         Self.setNestedValue(&payload, path: stateKey, value: encoded)
         await runtime.setWindowFormValue(windowID: window.windowID, values: payload)
@@ -1417,6 +1567,7 @@ public struct ReportBuilderRenderer: View {
 
     @MainActor
     private func resetReportBuilderStateForHydration() {
+        frozenPersistenceSignature = nil
         restoredStoredState = false
         rows = []
         selectedMeasures = []
@@ -1543,8 +1694,8 @@ public struct ReportBuilderRenderer: View {
             viewMode: object["viewMode"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
                 ? object["viewMode"]?.stringValue ?? fallback.viewMode
                 : fallback.viewMode,
-            staticFilters: object.keys.contains("staticFilters")
-                ? (staticFilters(fromHookValue: object["staticFilters"]) ?? fallback.staticFilters)
+            staticFilters: object.keys.contains("staticFilters") || object.keys.contains("scopeParams")
+                ? (staticFilters(fromHookValue: object["scopeParams"] ?? object["staticFilters"]) ?? fallback.staticFilters)
                 : fallback.staticFilters,
             dynamicGroups: object.keys.contains("dynamicGroups")
                 ? (decodeJSONValue(object["dynamicGroups"], as: [String: [ReportBuilderDynamicRowState]].self) ?? fallback.dynamicGroups)
@@ -1862,6 +2013,10 @@ public struct ReportBuilderRenderer: View {
         return current
     }
 
+    static func buildBaseRequestForState(config: DashboardReportBuilderDef, state: StoredReportBuilderState) -> [String: JSONValue] {
+        buildRequestPayload(config: config, selectedMeasures: state.selectedMeasures, selectedDimensions: state.selectedDimensions, staticFilters: state.staticFilters.mapValues(\.runtimeValue), dynamicGroups: state.dynamicGroups)
+    }
+
     private static func buildRequestPayload(
         config: DashboardReportBuilderDef,
         selectedMeasures: [String],
@@ -1945,6 +2100,36 @@ public struct ReportBuilderRenderer: View {
             setNestedValue(&request, path: path, value: .array(uniqueDynamicValues(values)))
         }
         return request
+    }
+
+    static func initialStateApplyingDeclaredPrefill(config: DashboardReportBuilderDef, state: StoredReportBuilderState, windowForm: [String: JSONValue]) -> StoredReportBuilderState {
+        let bound = applyWindowFormPrefill(config: config, request: [:], windowForm: windowForm)
+        var statics = state.staticFilters
+        for filter in config.staticFilters {
+            let id = filter.identityKey
+            if (filter.type ?? "").lowercased() == "daterange" {
+                let start = value(at: filter.startParamPath ?? "filters.\(id).start", in: bound)?.stringValue
+                let end = value(at: filter.endParamPath ?? "filters.\(id).end", in: bound)?.stringValue
+                if start != nil || end != nil { statics[id] = .dateRange(start: start ?? "", end: end ?? "") }
+            } else if let raw = value(at: filter.paramPath ?? "filters.\(id)", in: bound) {
+                let values = (raw.arrayValue ?? [raw]).compactMap { $0.stringValue }
+                if !values.isEmpty { statics[id] = .list(values) }
+            }
+        }
+        var groups = state.dynamicGroups
+        for group in config.dynamicFilterGroups {
+            for filter in group.filters {
+                guard let raw = value(at: filter.paramPath ?? "filters.\(filter.identityKey)", in: bound) else { continue }
+                let values = raw.arrayValue ?? [raw]
+                let selections = values.map { ReportBuilderDynamicSelectionState(value: $0, label: $0.stringValue ?? $0.intValue.map(String.init) ?? "") }
+                guard !selections.isEmpty else { continue }
+                var rows = groups[group.identityKey] ?? []
+                rows.removeAll { $0.filterId == filter.identityKey }
+                rows.append(ReportBuilderDynamicRowState(id: "prefill:\(group.identityKey):\(filter.identityKey)", filterId: filter.identityKey, selections: selections))
+                groups[group.identityKey] = rows
+            }
+        }
+        return StoredReportBuilderState(selectedMeasures: state.selectedMeasures, selectedDimensions: state.selectedDimensions, chartSpec: state.chartSpec, viewMode: state.viewMode, staticFilters: statics, dynamicGroups: groups, dynamicFilterDrafts: state.dynamicFilterDrafts, reportOptions: state.reportOptions)
     }
 
     static func applyWindowFormPrefill(

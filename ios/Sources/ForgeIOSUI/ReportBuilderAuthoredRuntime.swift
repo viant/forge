@@ -1,11 +1,11 @@
 import SwiftUI
 import ForgeIOSRuntime
 
-func reportBuilderAuthoredDocument(_ windowForm: [String: JSONValue]) -> [String: JSONValue]? {
+func reportBuilderAuthoredDocument(_ windowForm: [String: JSONValue], stateKey: String? = nil) -> [String: JSONValue]? {
     let definition = windowForm["reportDefinition"]?.objectValue
     let definitionDocument = definition?["documentPatch"]?.objectValue
         ?? definition?["reportDocument"]?.objectValue
-    let stateContainers = windowForm.values.compactMap(\.objectValue)
+    let stateContainers = stateKey.flatMap { reportPreparationValue(windowForm, path: $0)?.objectValue }.map { [$0] } ?? []
     let stateBlocks = stateContainers.compactMap {
         $0["reportDocumentBlocks"]?.arrayValue
     }.first { !$0.isEmpty }
@@ -29,9 +29,20 @@ func reportBuilderAuthoredDocument(_ windowForm: [String: JSONValue]) -> [String
 }
 
 func reportBuilderAuthoredDatasetRefs(_ document: [String: JSONValue]) -> [String] {
-    (document["blocks"]?.arrayValue ?? []).compactMap {
-        nonBlankAuthored($0.objectValue?["datasetRef"]?.stringValue)
+    var seen = Set<String>()
+    var result: [String] = []
+    func collect(_ value: JSONValue) {
+        if let object = value.objectValue {
+            if let ref = nonBlankAuthored(object["datasetRef"]?.stringValue), seen.insert(ref).inserted {
+                result.append(ref)
+            }
+            for key in object.keys.sorted() where key != "datasetRef" { collect(object[key]!) }
+        } else {
+            for child in value.arrayValue ?? [] { collect(child) }
+        }
     }
+    collect(.array(document["blocks"]?.arrayValue ?? []))
+    return result
 }
 
 func reportBuilderPublishedSources(
@@ -204,37 +215,8 @@ private func authoredNumber(_ value: JSONValue?) -> Double? {
     }
 }
 
-func materializeReportBuilderAuthoredDocument(_ document: [String: JSONValue]) -> [String: JSONValue] {
-    var result = document
-    result["blocks"] = .array((document["blocks"]?.arrayValue ?? []).map { value in
-        guard var block = value.objectValue,
-              block["kind"]?.stringValue == "chartBlock",
-              block["chartModel"] == nil,
-              let spec = block["chartSpec"]?.objectValue,
-              let xField = nonBlankAuthored(spec["xField"]?.stringValue) else {
-            return value
-        }
-        let yFields = (spec["yFields"]?.arrayValue ?? []).compactMap { nonBlankAuthored($0.stringValue) }
-        guard !yFields.isEmpty else { return value }
-        let authoredType = spec["type"]?.stringValue?.lowercased() ?? ""
-        let type: String
-        switch authoredType {
-        case "horizontal_bar", "horizontalbar", "column": type = "bar"
-        case "stackedbar": type = "stacked_bar"
-        default: type = authoredType.isEmpty ? "line" : authoredType
-        }
-        block["chartModel"] = .object([
-            "title": spec["title"] ?? block["title"] ?? .null,
-            "type": .string(type),
-            "xAxis": .object(["dataKey": .string(xField)]),
-            "yAxis": .object(["label": spec["yLabel"] ?? .null]),
-            "series": .object(["values": .array(yFields.map { field in
-                .object(["name": .string(field), "value": .string(field)])
-            })])
-        ])
-        return .object(block)
-    })
-    return result
+func materializeReportBuilderAuthoredDocument(_ document: [String: JSONValue], fieldsByDataset: [String: [[String: JSONValue]]] = [:]) -> [String: JSONValue] {
+    ReportChartMaterializer.materialize(document, fieldsByDataset: fieldsByDataset)
 }
 
 func authoredReportLoadErrorMessage(_ error: String) -> String {
@@ -258,9 +240,11 @@ struct ReportBuilderAuthoredResult: View {
     let primaryControl: ControlState
     let primaryRequest: [String: JSONValue]
     let runRequestID: String?
+    let preparedRequest: PreparedReportRequest?
 
     @State private var rowsByID: [String: [[String: JSONValue]]] = [:]
     @State private var controlsByID: [String: ControlState] = [:]
+    @State private var activationWarning: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -268,6 +252,12 @@ struct ReportBuilderAuthoredResult: View {
                 Label(authoredReportLoadErrorMessage(error), systemImage: "exclamationmark.triangle")
                     .font(.footnote)
                     .foregroundStyle(.red)
+            }
+            if let activationWarning {
+                Label(activationWarning, systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                    .accessibilityIdentifier("forge-report-activation-warning")
             }
             if isLoading {
                 HStack(spacing: 8) {
@@ -292,7 +282,7 @@ struct ReportBuilderAuthoredResult: View {
 
     private var allRows: [String: [[String: JSONValue]]] {
         var result = rowsByID
-        if reportBuilderAuthoredDatasetRefs(document).contains("primary") {
+        if reportBuilderAuthoredDatasetRefs(document).contains("primary"), result["primary"] == nil {
             result["primary"] = primaryRows
         }
         return result
@@ -311,7 +301,7 @@ struct ReportBuilderAuthoredResult: View {
     private var visibleError: String? { allControls.compactMap(\.error).first { !$0.isEmpty } }
 
     private var runtimeContainer: ContainerDef? {
-        let prepared = materializeReportBuilderAuthoredDocument(document)
+        let prepared = materializeReportBuilderAuthoredDocument(document, fieldsByDataset: Dictionary(config.dataSources.map { ($0.id, $0.fields) }, uniquingKeysWith: { first, _ in first }))
         let sources = allRows.mapValues { rows in
             rows.map(JSONValue.object)
         }
@@ -337,155 +327,41 @@ struct ReportBuilderAuthoredResult: View {
     }
 
     private var materializationTaskID: String {
-        requestSignature + "::" + (nonBlankAuthored(runRequestID) ?? "auto")
+        requestSignature + "::" + (nonBlankAuthored(runRequestID) ?? "auto") + "::" + (preparedRequest.map { reportPreparationFingerprint($0.identity.stateRevision) } ?? "pending")
     }
 
     @MainActor
     private func loadPublishedDatasets() async {
-        if nonBlankAuthored(runRequestID) == nil {
-            let form = await runtime.windowFormJSONValue(windowID: window.windowID)
-            let cached = reportBuilderPersistedDatasets(form)
-            if !cached.isEmpty {
-                let materialized = Dictionary(uniqueKeysWithValues: cached.map { id, rows in
-                    let fields = declarations.first(where: { $0.id == id })?.fields ?? []
-                    return (id, reportBuilderMaterializeComputedRows(
-                        rows,
-                        fields: fields,
-                        config: config,
-                        requiredFields: reportBuilderAuthoredComputedFields(document: document, datasetID: id, config: config)
-                    ))
-                })
-                rowsByID = materialized
-                controlsByID = Dictionary(uniqueKeysWithValues: materialized.keys.map {
-                    ($0, ControlState(loading: false))
-                })
-                let requestID = form["reportMaterialization"]?.objectValue?["requestId"]?.stringValue
-                    ?? "restored-\(UUID().uuidString)"
-                await publishMaterialization(
-                    requestID: requestID,
-                    status: "completed",
-                    rowsByID: materialized,
-                    errors: []
-                )
-                return
-            }
+        let explicitRequest = nonBlankAuthored(runRequestID)
+        if let cached = await runtime.completedNativeReportDatasets(windowID: window.windowID),
+           !Task.isCancelled, explicitRequest == nil || explicitRequest == cached.requestID,
+           Set(cached.rows.keys).isSuperset(of: reportBuilderAuthoredDatasetRefs(document)) {
+            activationWarning = cached.activationWarning
+            rowsByID = cached.rows
+            controlsByID = Dictionary(uniqueKeysWithValues: cached.rows.keys.map { ($0, ControlState(loading: false)) })
+            return
         }
-        let requestID = nonBlankAuthored(runRequestID) ?? "native-\(UUID().uuidString)"
-        await publishMaterialization(
-            requestID: requestID,
-            status: "running",
-            rowsByID: [:],
-            errors: []
-        )
+        activationWarning = nil
+        guard let requestID = explicitRequest, let packet = preparedRequest else { rowsByID = [:]; controlsByID = [:]; return }
         rowsByID = [:]
-        controlsByID = [:]
-        var loadedRows: [String: [[String: JSONValue]]] = [:]
-        var loadErrors: [String] = []
-        if reportBuilderAuthoredDatasetRefs(document).contains("primary") {
-            loadedRows["primary"] = primaryRows
-            if let error = primaryControl.error, !error.isEmpty {
-                loadErrors.append(error)
+        controlsByID = ["materialization": ControlState(loading: true)]
+        let capturedConfig = config
+        let capturedDocument = document
+        do {
+            let result = try await runtime.materializeNativeReportRun(requestID: requestID) { id, rows in
+                let fields = capturedConfig.dataSources.first { $0.id == id }?.fields ?? []
+                return reportBuilderMaterializeComputedRows(rows, fields: fields, config: capturedConfig, requiredFields: reportBuilderAuthoredComputedFields(document: capturedDocument, datasetID: id, config: capturedConfig))
             }
+            guard !Task.isCancelled, packet.validate(current: await runtime.reportPreparationIdentity(windowID: window.windowID, builderRef: packet.identity.builderRef, stateKey: packet.identity.stateKey)) == nil else { return }
+            activationWarning = result.completed.activationError
+            rowsByID = result.rows
+            controlsByID = Dictionary(uniqueKeysWithValues: result.rows.keys.map { ($0, ControlState(loading: false)) })
+        } catch {
+            if !Task.isCancelled { controlsByID = ["materialization": ControlState(loading: false, error: error.localizedDescription)] }
         }
-        for declaration in declarations {
-            guard !Task.isCancelled else { return }
-            controlsByID[declaration.id] = ControlState(loading: true)
-            let request = reportBuilderPublishedRequest(primaryRequest: primaryRequest, declaration: declaration)
-            let instanceRef = "reportDocument:\(declaration.id)"
-            await runtime.fetchDataSourceInstance(
-                windowID: window.windowID,
-                instanceRef: instanceRef,
-                dataSourceRef: declaration.dataSourceRef,
-                parameters: request
-            )
-            guard !Task.isCancelled else { return }
-            let rows = await runtime.dataSourceCollection(
-                windowID: window.windowID,
-                dataSourceRef: instanceRef
-            )
-            let materializedRows = reportBuilderMaterializeComputedRows(
-                rows,
-                fields: declaration.fields,
-                config: config,
-                requiredFields: reportBuilderAuthoredComputedFields(
-                    document: document,
-                    datasetID: declaration.id,
-                    config: config
-                )
-            )
-            rowsByID[declaration.id] = materializedRows
-            loadedRows[declaration.id] = materializedRows
-            let control = await runtime.dataSourceControl(
-                windowID: window.windowID,
-                dataSourceRef: instanceRef
-            )
-            controlsByID[declaration.id] = control
-            if let error = control.error, !error.isEmpty {
-                loadErrors.append(error)
-            }
-        }
-        await publishMaterialization(
-            requestID: requestID,
-            status: loadErrors.isEmpty ? "completed" : "failed",
-            rowsByID: loadedRows,
-            errors: loadErrors
-        )
     }
 
-    @MainActor
-    private func publishMaterialization(
-        requestID: String,
-        status: String,
-        rowsByID: [String: [[String: JSONValue]]],
-        errors: [String]
-    ) async {
-        let datasets = rowsByID.keys.sorted().map { id in
-            JSONValue.object([
-                "id": .string(id),
-                "dataSourceRef": .string(id),
-                "rows": .array((rowsByID[id] ?? []).map(JSONValue.object))
-            ])
-        }
-        let rowCounts = Dictionary(uniqueKeysWithValues: rowsByID.map { id, rows in
-            (id, JSONValue.number(Double(rows.count)))
-        })
-        var materialization: [String: JSONValue] = [
-            "id": .string(requestID),
-            "requestId": .string(requestID),
-            "status": .string(status),
-            "materialized": .bool(status == "completed"),
-            "datasetRefs": .array(rowsByID.keys.sorted().map(JSONValue.string)),
-            "rowCounts": .object(rowCounts)
-        ]
-        if !errors.isEmpty {
-            materialization["errors"] = .array(errors.map(JSONValue.string))
-        }
-        var values: [String: JSONValue] = [
-            "reportMaterialization": .object(materialization)
-        ]
-        if status != "running" {
-            values["reportStaticDatasets"] = .array(datasets)
-        }
-        await runtime.setWindowFormValue(
-            windowID: window.windowID,
-            values: values,
-            replace: false
-        )
-    }
-}
 
-private func reportBuilderPersistedDatasets(
-    _ form: [String: JSONValue]
-) -> [String: [[String: JSONValue]]] {
-    var result: [String: [[String: JSONValue]]] = [:]
-    for value in form["reportStaticDatasets"]?.arrayValue ?? [] {
-        guard let dataset = value.objectValue,
-              let id = nonBlankAuthored(dataset["id"]?.stringValue ?? dataset["dataSourceRef"]?.stringValue) else {
-            continue
-        }
-        result[id] = (dataset["rows"]?.arrayValue ?? []).compactMap(\.objectValue)
-    }
-    return result
 }
 
 private func reportBuilderRelativeDateRange(

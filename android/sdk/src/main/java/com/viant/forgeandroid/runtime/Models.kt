@@ -291,6 +291,7 @@ data class DashboardDef(
     val report: DashboardReportDef? = null,
     val reportBuilderRef: String? = null,
     val reportBuilders: Map<String, DashboardReportBuilderVariantDef> = emptyMap(),
+    @Serializable(with = PreservingReportBuilderSerializer::class)
     val reportBuilder: DashboardReportBuilderDef? = null,
     val reportRuntime: JsonElement? = null,
     val reportCatalog: DashboardReportCatalogDef? = null,
@@ -344,21 +345,27 @@ data class DashboardReportBuilderDef(
     val groupBy: ReportBuilderGroupByDef? = null,
     val unifiedFamilyRows: Boolean = false,
     val showResultHeader: Boolean? = null,
-    val result: ReportBuilderResultDef? = null
+    val result: ReportBuilderResultDef? = null,
+    @kotlinx.serialization.Transient val authoredConfiguration: JsonObject? = null
 )
 
 @Serializable
 data class ReportBuilderPublishedDataSourceDef(
     val id: String,
     val dataSourceRef: String,
-    val request: JsonObject = JsonObject(emptyMap()),
-    val scope: JsonObject = JsonObject(emptyMap())
+    val request: JsonObject? = null,
+    val scope: JsonObject = JsonObject(emptyMap()),
+    val scopeParamOptions: List<JsonElement> = emptyList(),
+    val source: JsonObject? = null,
+    val capabilities: JsonObject? = null,
+    val resultContract: JsonObject? = null
 )
 
 @Serializable
 data class DashboardReportBuilderVariantDef(
     val label: String? = null,
     val dataSourceRef: String? = null,
+    @Serializable(with = PreservingReportBuilderSerializer::class)
     val reportBuilder: DashboardReportBuilderDef? = null,
     val targetOverrides: Map<String, JsonElement> = emptyMap()
 )
@@ -1465,7 +1472,12 @@ data class InputState(
     val parameters: Map<String, Any?> = emptyMap(),
     val page: Int? = null,
     val fetch: Boolean = false,
-    val refresh: Boolean = false
+    val refresh: Boolean = false,
+    internal val preparedGuard: (() -> Boolean)? = null,
+    internal val preparedWindowForm: Map<String, Any?>? = null,
+    internal val preparedMetadata: WindowMetadata? = null,
+    internal val preparedDispatchId: String? = null,
+    internal val preparedReadPermit: NativeReportReadPermit? = null
 )
 
 data class ControlState(
@@ -1473,7 +1485,8 @@ data class ControlState(
     val error: String? = null,
     val inactive: Boolean = false,
     val resolved: Boolean = false,
-    val warnings: List<String> = emptyList()
+    val warnings: List<String> = emptyList(),
+    val requestId: String? = null
 )
 
 data class DialogState(

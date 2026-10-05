@@ -7,7 +7,8 @@ public enum MetadataResolver {
     ) -> WindowMetadata {
         guard
             let json = try? JSONEncoder().encode(metadata),
-            let raw = try? JSONDecoder().decode(JSONValue.self, from: json),
+            let encodedRaw = try? JSONDecoder().decode(JSONValue.self, from: json),
+            let raw = Optional(metadata.runtimeAuthoring ?? encodedRaw),
             let resolved = resolveValue(raw, for: targetContext),
             let resolvedJSON = try? JSONEncoder().encode(resolved),
             let decoded = try? JSONDecoder().decode(WindowMetadata.self, from: resolvedJSON)

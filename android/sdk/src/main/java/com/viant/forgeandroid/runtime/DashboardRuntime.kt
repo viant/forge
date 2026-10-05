@@ -1225,7 +1225,7 @@ fun dashboardReportRuntimeColumns(values: List<JsonElement>): List<ColumnDef> {
                     ),
                     label = jsonString(value["label"]) ?: id,
                     type = jsonString(value["type"]),
-                    format = jsonString(value["format"]),
+                    format = dashboardReportColumnFormat(value),
                     emptyText = jsonString(value["emptyText"]),
                     width = dashboardReportRuntimeInt(value["width"]),
                     cellVisual = value["cellVisual"] as? JsonObject
@@ -1235,6 +1235,8 @@ fun dashboardReportRuntimeColumns(values: List<JsonElement>): List<ColumnDef> {
         }
     }
 }
+
+fun dashboardReportColumnFormat(column:JsonObject):String? = firstNonBlank(jsonString(column["format"]),jsonString(column["valueFormat"]))
 
 fun dashboardReportRuntimeKpi(content: Map<String, JsonElement>): DashboardReportRuntimeKpiValue {
     val formattedValue = dashboardReportRuntimeFormattedValueText(

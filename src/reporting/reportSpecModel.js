@@ -302,8 +302,8 @@ function buildReportBuilderPublishedDatasetRequest(
     }
     const paramPath = normalizeString(option?.paramPath);
     if (excludedParamIds.has(paramId)) {
-      if (paramPath) {
-        deleteNestedValue(contextPatch, paramPath);
+      for (const excludedPath of [paramPath, option?.startParamPath, option?.endParamPath].map(normalizeString).filter(Boolean)) {
+        deleteNestedValue(contextPatch, excludedPath);
       }
       return;
     }

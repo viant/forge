@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -197,6 +198,11 @@ fun ContainerRenderer(
         return
     }
 
+    DisposableEffect(runtime, window.windowId, container.id, visibilityContext?.dataSourceRef) {
+        val lease = runtime.registerVisibleWindowDependency(window.windowId, visibilityContext?.dataSourceRef)
+        onDispose { runtime.removeVisibleWindowDependency(lease) }
+    }
+
     val dataBoundaryKind = container.dataStateBoundary?.let { boundary ->
         WorkflowPrimitiveRuntime.dataStateBoundaryKind(
             controls = boundaryControls,
@@ -305,8 +311,8 @@ fun ContainerRenderer(
             modifier
                 .fillMaxWidth()
                 .padding(horizontal = if (compact) 3.dp else 8.dp, vertical = if (compact) 3.dp else 6.dp)
-                .background(Color.White, RoundedCornerShape(if (compact) 14.dp else 18.dp))
-                .border(1.dp, Color(0xFFE7ECF3), RoundedCornerShape(if (compact) 14.dp else 18.dp))
+                .background(LocalForgeThemeAppearance.current?.surface ?: Color.White, RoundedCornerShape(if (compact) 14.dp else 18.dp))
+                .border(1.dp, LocalForgeThemeAppearance.current?.controlBorder ?: Color(0xFFE7ECF3), RoundedCornerShape(if (compact) 14.dp else 18.dp))
                 .padding(horizontal = if (compact) 7.dp else 12.dp, vertical = if (compact) 6.dp else 10.dp)
         } else {
             modifier

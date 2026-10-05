@@ -13,6 +13,16 @@ import kotlin.test.assertTrue
 
 class ChartRendererTest {
     @Test
+    fun `cartesian ticks align to point geometry instead of equal label cells`() {
+        assertEquals(listOf(0, 1, 2, 3), chartAxisTickIndices(4, 6))
+        assertEquals(listOf(0, 2, 5, 7), chartAxisTickIndices(8, 4))
+        assertEquals(64f, chartPointX(0, 4, 64f, 364f))
+        assertEquals(164f, chartPointX(1, 4, 64f, 364f))
+        assertEquals(364f, chartPointX(3, 4, 64f, 364f))
+        assertEquals(214f, chartPointX(0, 1, 64f, 364f))
+    }
+
+    @Test
     fun `native chart type normalization matches shared aliases and default`() {
         assertEquals("line", normalizeNativeChartType(null))
         assertEquals("horizontal_bar", normalizeNativeChartType("Horizontal-Bar"))
