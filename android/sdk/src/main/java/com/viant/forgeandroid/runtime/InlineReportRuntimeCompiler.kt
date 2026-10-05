@@ -553,7 +553,7 @@ object InlineReportRuntimeCompiler {
             JsonObject(buildMap {
                 put("key", JsonPrimitive(key))
                 put("label", JsonPrimitive(string(column["label"]) ?: string(column["name"]) ?: humanize(key)))
-                string(column["format"])?.let { put("format", JsonPrimitive(it)) }
+                dashboardReportColumnFormat(column)?.let { put("format", JsonPrimitive(it)) }
                 column["cellVisual"]?.let { put("cellVisual", it) }
             })
         }

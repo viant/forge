@@ -42,7 +42,7 @@ private struct ScopedWorkflowPrimitive: View {
         windowForm = await runtime.windowFormJSONValue(windowID: window.windowID)
         if !ref.isEmpty, form.isEmpty, collection.isEmpty, metrics.isEmpty, container.fetchData != false,
            let source = await runtime.windowMetadata(id: window.windowID)?.dataSources[ref], source.autoFetch != false {
-            await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
+            await runtime.automaticallyRefreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
             form = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: ref)
             collection = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
             metrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: ref)

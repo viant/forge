@@ -733,7 +733,7 @@ private fun CompactTextInputSurface(
         singleLine = true,
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
         modifier = modifier
-            .background(backgroundColor, shape)
+            .background(LocalForgeThemeAppearance.current?.controlBackground ?: backgroundColor, shape)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
             .padding(horizontal = 11.dp, vertical = 9.dp)
     )

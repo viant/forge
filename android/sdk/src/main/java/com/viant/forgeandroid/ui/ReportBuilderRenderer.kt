@@ -51,6 +51,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -95,6 +97,11 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.decodeFromJsonElement
@@ -131,7 +138,8 @@ internal data class StoredReportBuilderState(
     val dynamicFilterValues: Map<String, String> = emptyMap(),
     val dynamicFilterSelections: Map<String, List<ReportBuilderDynamicSelectionState>> = emptyMap(),
     val activeDynamicFilterKeys: List<String> = emptyList(),
-    val reportOptions: Map<String, JsonElement> = emptyMap()
+    val reportOptions: Map<String, JsonElement> = emptyMap(),
+    val authoredState: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -158,7 +166,8 @@ internal data class ReportBuilderStateValues(
     val staticFilters: Map<String, Any?>,
     val dynamicGroups: Map<String, List<ReportBuilderDynamicRowState>>,
     val dynamicFilterDrafts: Map<String, String> = emptyMap(),
-    val reportOptions: Map<String, JsonElement> = emptyMap()
+    val reportOptions: Map<String, JsonElement> = emptyMap(),
+    val authoredState: Map<String, JsonElement> = emptyMap()
 )
 
 @Serializable
@@ -206,7 +215,7 @@ internal fun resolveReportBuilderVariant(
     val builderRef = requestedRef.ifBlank { defaultRef }
     val variant = builderRef.takeIf { it.isNotBlank() }?.let(variants::get)
 
-    if (requestedRef.isNotBlank() && requestedRef != defaultRef && variant == null && variants.isNotEmpty()) {
+    if (requestedRef.isNotBlank() && requestedRef != defaultRef && variant == null) {
         return ResolvedReportBuilderVariant(
             builderRef = requestedRef,
             dataSourceRef = null,
@@ -235,7 +244,7 @@ fun ReportBuilderRenderer(
     val compactPresentation = true
     val windowFormSignal = window.windowFormSignal()
     val windowForm by windowFormSignal.flow.collectAsState(initial = windowFormSignal.peek())
-    val authoredDocument = remember(windowForm) { reportBuilderAuthoredDocument(windowForm) }
+    val inputMetadataSnapshot=window.metadata.peek()
     val variant = remember(container, windowForm) {
         resolveReportBuilderVariant(container, windowForm)
     }
@@ -258,6 +267,10 @@ fun ReportBuilderRenderer(
         ReportBuilderPlaceholder(container, "Missing data source context")
         return
     }
+    DisposableEffect(runtime, window.windowId, variant.builderRef, dataSourceRef) {
+        val lease = runtime.registerVisibleWindowDependency(window.windowId, dataSourceRef)
+        onDispose { runtime.removeVisibleWindowDependency(lease) }
+    }
     val rows by context.collection.flow.collectAsState(initial = emptyList())
     val control by context.control.flow.collectAsState(initial = context.control.peek())
 
@@ -275,6 +288,7 @@ fun ReportBuilderRenderer(
     val builderStateKey = remember(baseBuilderStateKey, variant.builderRef) {
         reportBuilderVariantStateKey(baseBuilderStateKey, variant.builderRef)
     }
+    val authoredDocument = remember(windowForm, builderStateKey) { reportBuilderAuthoredDocument(windowForm, builderStateKey) }
     val presetStorageKey = remember(container.id, variant.builderRef) {
         reportBuilderVariantStateKey(container.id ?: "reportBuilder", variant.builderRef)
     }
@@ -288,9 +302,11 @@ fun ReportBuilderRenderer(
     var staticFilters by remember(config, builderStateKey) {
         mutableStateOf(defaultReportBuilderStaticFilters(config.staticFilters))
     }
+    var authoredState by remember(config, builderStateKey) { mutableStateOf(reportBuilderDefaultAuthorState(config)) }
     var dynamicGroups by remember(config, builderStateKey) { mutableStateOf(emptyMap<String, List<ReportBuilderDynamicRowState>>()) }
     var dynamicFilterDrafts by remember(config, builderStateKey) { mutableStateOf(emptyMap<String, String>()) }
     var restoredStoredState by remember(config, window.windowId, builderStateKey) { mutableStateOf(false) }
+    var frozenRestoredValues by remember(config, window.windowId, builderStateKey) { mutableStateOf<ReportBuilderStateValues?>(null) }
     var appliedPrefillSignature by remember(config, window.windowId, builderStateKey) { mutableStateOf("") }
     var pendingAutoChartRequestSignature by remember(config, window.windowId, builderStateKey) { mutableStateOf("") }
     var lastAutoAppliedChartRequestSignature by remember(config, window.windowId, builderStateKey) { mutableStateOf("") }
@@ -302,7 +318,7 @@ fun ReportBuilderRenderer(
     var lastAutoCollapsedRequestSignature by remember(config, window.windowId, builderStateKey) { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
     val settingsHash = remember(selectedDimensions, selectedMeasures) { buildSettingsHash(selectedDimensions, selectedMeasures) }
-    val stateValues = remember(selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts, reportOptions) {
+    val stateValues = remember(selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts, reportOptions, authoredState) {
         ReportBuilderStateValues(
             selectedMeasures = selectedMeasures,
             selectedDimensions = selectedDimensions,
@@ -311,10 +327,12 @@ fun ReportBuilderRenderer(
             staticFilters = staticFilters,
             dynamicGroups = dynamicGroups,
             dynamicFilterDrafts = dynamicFilterDrafts,
-            reportOptions = effectiveReportOptions
+            reportOptions = effectiveReportOptions,
+            authoredState = authoredState
         )
     }
     fun applyStateValues(values: ReportBuilderStateValues) {
+        authoredState = values.authoredState
         selectedMeasures = values.selectedMeasures
         selectedDimensions = values.selectedDimensions
         chartSpec = values.chartSpec
@@ -327,29 +345,68 @@ fun ReportBuilderRenderer(
     val hookState = remember(config, stateValues) {
         currentReportBuilderHookState(stateValues)
     }
-    var requestPayload by remember { mutableStateOf<Map<String, Any?>>(emptyMap()) }
+    val frozenCandidate = authoredDocument?.let { doc -> runtime.frozenNativeReportAdmission(window.windowId,variant.builderRef.orEmpty(),builderStateKey,
+        config.authoredConfiguration ?: JsonUtil.json.encodeToJsonElement(DashboardReportBuilderDef.serializer(),config).jsonObject,doc) }
+    val trustedFrozen = frozenCandidate?.takeIf { frozenRestoredValues == null || frozenRestoredValues == stateValues }
+    SideEffect { if(frozenCandidate!=null && trustedFrozen==null) runtime.frozenNativeReports.closeWindow(window.windowId) }
+    var preparedReport by remember(window.windowId, builderStateKey, config) { mutableStateOf<com.viant.forgeandroid.runtime.PreparedReportRequest?>(null) }
+    var initializationError by remember(window.windowId, builderStateKey, config) { mutableStateOf<String?>(null) }
+    val formRevision = com.viant.forgeandroid.runtime.reportPreparationFormRevision(windowForm, inputMetadataSnapshot)
+    val stateRevision = com.viant.forgeandroid.runtime.reportPreparationFingerprint(JsonObject(mapOf(
+        "state" to JsonUtil.anyToElement(hookState), "config" to com.viant.forgeandroid.runtime.reportBuilderHookConfiguration(config))))
+    val prefillAcknowledgmentKey = com.viant.forgeandroid.runtime.reportPreparationFingerprint(JsonObject(mapOf(
+        "builderRef" to JsonPrimitive(variant.builderRef.orEmpty()), "stateKey" to JsonPrimitive(builderStateKey),
+        "prefill" to JsonUtil.anyToElement(windowForm["prefill"]),
+        "prefillRevision" to JsonUtil.anyToElement(JsonUtil.asStringMap(windowForm["__forge"])["prefillRevision"] ?: 0))))
+    val prefillAcknowledged = runtime.observeReportPrefill(window.windowId, prefillAcknowledgmentKey, formRevision)
+    val preparationIdentity = com.viant.forgeandroid.runtime.ReportPreparationIdentity(window.windowId, variant.builderRef.orEmpty(), formRevision, stateRevision)
+    val visiblePreparation = trustedFrozen?.admission?.preparation ?: preparedReport?.takeIf { it.identity == preparationIdentity }
+        ?: com.viant.forgeandroid.runtime.PreparedReportRequest(preparationIdentity, if (initializationError == null) "pending" else "error", dataSourceRef,
+            reason = initializationError, hookStatus = if (initializationError == null) "completed" else "unavailable")
+    val primaryGate = com.viant.forgeandroid.runtime.preparedReportPrimaryGate(preparationIdentity, visiblePreparation)
+    val requestPayload = if (primaryGate.status == "ready") JsonUtil.asStringMap(JsonUtil.elementToAny(primaryGate.request ?: JsonNull)) else emptyMap()
+    SideEffect {
+        runtime.publishPreparedReportRequest(visiblePreparation)
+        if (primaryGate.status == "ready" && runtime.reportPreparationIsCurrent(visiblePreparation)) {
+            runtime.acknowledgeReportPrefill(window.windowId, prefillAcknowledgmentKey, visiblePreparation)
+        }
+    }
     var lookupDescriptors by remember(config) { mutableStateOf<Map<String, ReportBuilderLookupDescriptor>>(emptyMap()) }
-    LaunchedEffect(config, selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, hookState, windowForm) {
-        requestPayload = withContext(Dispatchers.Default) {
-            val builderRequest = applyReportBuilderChartDataPolicy(
-                config = config,
-                request = buildReportBuilderRequestPayload(
-                    config = config,
-                    selectedMeasures = selectedMeasures,
-                    selectedDimensions = selectedDimensions,
-                    staticFilters = staticFilters,
-                    dynamicGroups = dynamicGroups,
-                    hookState = hookState,
-                    hookInvoker = { functionName, props ->
-                        invokeReportBuilderWindowHook(
-                            window = window,
-                            functionName = functionName,
-                            props = props
-                        )
-                    }
-                )
-            )
-            mergeReportBuilderPrefillIntoRequest(config, builderRequest, windowForm)
+    LaunchedEffect(preparationIdentity, restoredStoredState, initializationError, appliedPrefillSignature) {
+        if(trustedFrozen!=null) { preparedReport=trustedFrozen.admission.preparation;return@LaunchedEffect }
+        if (!restoredStoredState || initializationError != null) return@LaunchedEffect
+        val initialPrefillRevision = reportBuilderPrefillSignature(windowForm)
+        if (initialPrefillRevision.isNotBlank() && appliedPrefillSignature != initialPrefillRevision) return@LaunchedEffect
+        try {
+            val enforceInitialIntent = !runtime.reportPrefillAcknowledged(window.windowId, prefillAcknowledgmentKey)
+            val required = if (enforceInitialIntent) reportBuilderInitialIntentBindings(config, windowForm) else emptyList()
+            val generationClock = java.time.Instant.now()
+            val generationZone = java.time.ZoneId.systemDefault()
+            val capturedAuthorState=JsonUtil.anyToElement(windowForm[builderStateKey]) as? JsonObject
+            val capturedPrefillIdentity=com.viant.forgeandroid.runtime.nativeReportPrefillIdentity(JsonUtil.anyToElement(windowForm).jsonObject)
+            val capturedMetadata=inputMetadataSnapshot
+            if(variant.builderRef.isNotBlank()) {
+                val selectedConfig=capturedMetadata?.let { com.viant.forgeandroid.runtime.nativeReportMetadataConfiguration(JsonUtil.json.encodeToJsonElement(com.viant.forgeandroid.runtime.WindowMetadata.serializer(),it),variant.builderRef) }
+                val authorConfig=config.authoredConfiguration ?: JsonUtil.json.encodeToJsonElement(DashboardReportBuilderDef.serializer(),config).jsonObject
+                if(selectedConfig?.first!=authorConfig || selectedConfig?.second!=dataSourceRef) {
+                    preparedReport=com.viant.forgeandroid.runtime.PreparedReportRequest(preparationIdentity,"pending",dataSourceRef,reason="stale-metadata")
+                    return@LaunchedEffect
+                }
+            }
+            val request = withContext(Dispatchers.Default) {
+                val built = applyReportBuilderChartDataPolicy(config, buildReportBuilderRequestPayload(
+                    config, selectedMeasures, selectedDimensions, staticFilters, dynamicGroups, hookState,
+                    capturedNow = generationClock, capturedZone = generationZone,
+                    hookInvoker = { name, props -> invokeReportBuilderHook(capturedMetadata, name, props) }))
+                if (config.hooks?.buildRequest.isNullOrBlank() && enforceInitialIntent) mergeReportBuilderPrefillIntoRequest(config, built, windowForm) else built
+            }
+            val ready = com.viant.forgeandroid.runtime.PreparedReportRequest(preparationIdentity, "ready", dataSourceRef,
+                JsonUtil.anyToElement(request).jsonObject, JsonUtil.anyToElement(hookState).jsonObject, required, publishedSources = config.dataSources, capturedTimeMillis = generationClock.toEpochMilli(), capturedZoneId = generationZone.id,capturedAuthorState=capturedAuthorState,capturedPrefillIdentity=capturedPrefillIdentity)
+            val gate = com.viant.forgeandroid.runtime.preparedReportPrimaryGate(preparationIdentity, ready)
+            preparedReport = if (gate.status == "ready") ready else ready.copy(status = "error", reason = gate.reason)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) {
+            preparedReport = com.viant.forgeandroid.runtime.PreparedReportRequest(preparationIdentity, "error", dataSourceRef, reason = "unsupported-binding", hookStatus = "unavailable")
         }
     }
     LaunchedEffect(config, hookState) {
@@ -363,9 +420,9 @@ fun ReportBuilderRenderer(
     }
     val currentPrefillSignature = remember(windowForm) { reportBuilderPrefillSignature(windowForm) }
     val requestSignature = remember(requestPayload) { JsonUtil.anyToElement(requestPayload).toString() }
-    val authoredNeedsPrimaryDataset = remember(authoredDocument) {
-        authoredDocument == null || "primary" in reportBuilderAuthoredDatasetRefs(authoredDocument)
-    }
+    // Authored execution owns its primary read after durable admission.
+    // Frozen completed artifacts never reopen preview queries.
+    val canAutoPreviewPrimary = authoredDocument == null && windowForm["executeOnOpen"] != false
 
     val filteredRows = remember(rows, staticFilters, config.staticFilters) {
         applyStaticFilters(rows, config.staticFilters, staticFilters)
@@ -400,16 +457,19 @@ fun ReportBuilderRenderer(
     LaunchedEffect(config, window.windowId, builderStateKey) {
         if (!restoredStoredState) {
             val restored = loadStoredStateFromWindowForm(runtime, window.windowId, builderStateKey)
+            if(trustedFrozen!=null && restored==null) { initializationError="unsupported-stored-author-state";return@LaunchedEffect }
             val initialValues = restored?.toReportBuilderStateValues(config) ?: stateValues
-            val initialized = withContext(Dispatchers.Default) {
-                applyReportBuilderInitializeStateHook(
+            val initialized = try { withContext(Dispatchers.Default) {
+                if (restored != null && (trustedFrozen!=null || runtime.reportPrefillAcknowledged(window.windowId, prefillAcknowledgmentKey))) initialValues else applyReportBuilderInitializeStateHook(
                     metadata = window.metadata.peek(),
                     config = config,
                     values = initialValues,
                     windowForm = windowForm
                 )
-            }
+            } } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { initializationError = "unsupported-initialization-hook"; return@LaunchedEffect }
             applyStateValues(initialized)
+            if(trustedFrozen!=null) frozenRestoredValues=initialized.copy(reportOptions=ReportBuilderOptions.effective(config.reportOptions,initialized.reportOptions))
             if (currentPrefillSignature.isNotBlank()) {
                 appliedPrefillSignature = currentPrefillSignature
             }
@@ -426,32 +486,33 @@ fun ReportBuilderRenderer(
     }
 
     LaunchedEffect(currentPrefillSignature, restoredStoredState) {
+        if(trustedFrozen!=null) { appliedPrefillSignature=currentPrefillSignature;return@LaunchedEffect }
         if (!restoredStoredState || currentPrefillSignature.isBlank() || appliedPrefillSignature == currentPrefillSignature) {
             return@LaunchedEffect
         }
-        val next = withContext(Dispatchers.Default) {
+        val next = try { withContext(Dispatchers.Default) {
             applyReportBuilderInitializeStateHook(
                 metadata = window.metadata.peek(),
                 config = config,
                 values = stateValues,
                 windowForm = windowForm
             )
-        }
+        } } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (_: Exception) { initializationError = "unsupported-initialization-hook"; return@LaunchedEffect }
         appliedPrefillSignature = currentPrefillSignature
         if (next != stateValues) {
             applyStateValues(next)
         }
     }
 
-    LaunchedEffect(requestPayload, restoredStoredState) {
-        if (restoredStoredState && requestPayload.isNotEmpty() && authoredNeedsPrimaryDataset) {
-            context.setInputParameters(requestPayload, fetch = true)
+    LaunchedEffect(visiblePreparation, restoredStoredState, canAutoPreviewPrimary) {
+        if (restoredStoredState && primaryGate.status == "ready" && canAutoPreviewPrimary && runtime.reportPreparationIsCurrent(visiblePreparation)) {
+            context.setPreparedInputParameters(requestPayload) { runtime.reportPreparationIsCurrent(visiblePreparation) }
         }
     }
-    LaunchedEffect(selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts, reportOptions) {
-        if (!restoredStoredState) {
-            return@LaunchedEffect
-        }
+    val canPersistStateSnapshot=restoredStoredState && (trustedFrozen==null || frozenRestoredValues!=stateValues)
+    LaunchedEffect(selectedMeasures, selectedDimensions, chartSpec, viewMode, staticFilters, dynamicGroups, dynamicFilterDrafts, reportOptions,canPersistStateSnapshot) {
+        if (!canPersistStateSnapshot) return@LaunchedEffect
         persistStoredStateToWindowForm(
             runtime = runtime,
             windowId = window.windowId,
@@ -551,6 +612,7 @@ fun ReportBuilderRenderer(
         compactPresentation = compactPresentation
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (runtime.reportRequestInspectionOnly) Text("Debug request inspection: ${visiblePreparation.status}. Report execution is disabled.", style = MaterialTheme.typography.bodySmall)
             if (!compactPresentation) {
                 ChipSection(
                     title = "Measures",
@@ -796,7 +858,9 @@ fun ReportBuilderRenderer(
                     primaryRows = rows,
                     primaryControl = control,
                     primaryRequest = requestPayload,
-                    runRequestId = JsonUtil.asStringMap(windowForm["reportRunRequest"])["id"]?.toString()
+                    runRequestId = JsonUtil.asStringMap(windowForm["reportRunRequest"])["id"]?.toString(),
+                    preparation = visiblePreparation,
+                    stateKey = builderStateKey
                 )
             } else {
                 ReportBuilderResultView(
@@ -2305,72 +2369,31 @@ internal fun buildReportBuilderRequestPayload(
     staticFilters: Map<String, Any?>,
     dynamicGroups: Map<String, List<ReportBuilderDynamicRowState>>,
     hookState: Map<String, Any?>,
+    capturedNow: java.time.Instant = java.time.Instant.now(),
+    capturedZone: java.time.ZoneId = java.time.ZoneId.systemDefault(),
     hookInvoker: (String, JsonObject) -> Map<String, Any?>?
 ): Map<String, Any?> {
-    val request = linkedMapOf<String, Any?>()
-    val allMeasures = config.measures + config.computedMeasures
-    selectedMeasures.forEach { key ->
-        val measure = allMeasures.firstOrNull { reportBuilderMeasureKey(it) == key } ?: return@forEach
-        val paramPath = measure.paramPath?.trim().orEmpty()
-        if (paramPath.isNotBlank()) {
-            setNestedValue(request, paramPath, true)
-        } else if (measure.compute != null) {
-            measure.dependencies.map { it.trim() }.filter { it.isNotEmpty() }.forEach { dependency ->
-                val dependencyPath = config.measures.firstOrNull { reportBuilderMeasureKey(it) == dependency }?.paramPath?.trim().orEmpty()
-                setNestedValue(request, dependencyPath.ifBlank { "measures.$dependency" }, true)
+    val canonicalState = JsonUtil.anyToElement(hookState).jsonObject.toMutableMap()
+    canonicalState.putIfAbsent("selectedMeasures", JsonUtil.anyToElement(selectedMeasures))
+    canonicalState.putIfAbsent("selectedDimensions", JsonUtil.anyToElement(selectedDimensions))
+    canonicalState.putIfAbsent("staticFilters", JsonUtil.anyToElement(staticFilters))
+    canonicalState.putIfAbsent("dynamicGroups", JsonUtil.anyToElement(dynamicGroups.mapValues { (_, rows) -> rows.map { row ->
+        mapOf("filterId" to row.filterId, "enabled" to row.enabled, "selections" to row.selections.map { mapOf("value" to it.value) })
+    } }))
+    for (scopeKey in listOf("scopeParams", "staticFilters")) {
+        val scope = (canonicalState[scopeKey] as? JsonObject)?.toMutableMap() ?: continue
+        config.staticFilters.filter { it.type.equals("dateRange", ignoreCase = true) }.forEach { filter ->
+            val range = scope[filter.id] as? JsonObject ?: return@forEach
+            if (listOf("preset", "startExpression", "endExpression").any { range.containsKey(it) }) {
+                val resolved = com.viant.forgeandroid.runtime.reportRelativeDates(range, capturedNow, capturedZone)
+                scope[filter.id!!] = JsonObject(mapOf("start" to JsonPrimitive(resolved.first), "end" to JsonPrimitive(resolved.second)))
             }
-        } else {
-            setNestedValue(request, "measures.$key", true)
         }
+        canonicalState[scopeKey] = JsonObject(scope)
     }
-    selectedDimensions.forEach { key ->
-        val dimension = config.dimensions.firstOrNull { reportBuilderDimensionKey(it) == key } ?: return@forEach
-        setNestedValue(request, dimension.paramPath ?: "dimensions.$key", true)
-    }
-    config.staticFilters.forEach { filter ->
-        val key = filter.id ?: return@forEach
-        val value = staticFilters[key] ?: return@forEach
-        val type = (filter.type ?: "").trim().lowercase()
-        if (type == "daterange") {
-            val range = value as? Map<*, *> ?: return@forEach
-            val start = range["start"]?.toString().orEmpty()
-            val end = range["end"]?.toString().orEmpty()
-            if (start.isNotBlank()) {
-                setNestedValue(request, filter.startParamPath ?: "${filter.paramPath ?: "filters.$key"}.start", start)
-            }
-            if (end.isNotBlank()) {
-                setNestedValue(request, filter.endParamPath ?: "${filter.paramPath ?: "filters.$key"}.end", end)
-            }
-            return@forEach
-        }
-        if (value is List<*> && value.isNotEmpty()) {
-            setNestedValue(request, filter.paramPath ?: "filters.$key", value)
-        }
-    }
-    config.dynamicFilterGroups.forEach { group ->
-        val rows = dynamicGroups[group.id].orEmpty()
-        group.filters.forEach filterLoop@ { filter ->
-            val filterKey = filter.id ?: return@filterLoop
-            val requestMapping = (filter.requestMapping ?: "").trim().lowercase()
-            if (requestMapping == "hook") return@filterLoop
-            val values = rows
-                .filter { it.filterId == filterKey && it.enabled }
-                .flatMap { row ->
-                    row.selections.mapNotNull { dynamicSelectionRequestValue(filter, it.value) }
-                }
-            if (values.isEmpty()) return@filterLoop
-            val mapped: Any? = if (filter.multiple == true || filter.emitArray == true) {
-                values
-            } else {
-                values.first()
-            }
-            setNestedValue(request, filter.paramPath ?: "filters.$filterKey", mapped)
-        }
-    }
-    val selectedOptions = (hookState["reportOptions"] as? Map<*, *>)?.entries?.associate { it.key.toString() to JsonUtil.anyToElement(it.value) }.orEmpty()
-    val options = ReportBuilderOptions.effective(config.reportOptions, selectedOptions)
-    if (options.isNotEmpty()) request["options"] = options.mapValues { JsonUtil.elementToAny(it.value) }
-    val baseRequest = request.toMap()
+    val baseRequest = JsonUtil.asStringMap(JsonUtil.elementToAny(
+        com.viant.forgeandroid.runtime.buildCanonicalReportRequestBase(
+            com.viant.forgeandroid.runtime.reportBuilderHookConfiguration(config), JsonObject(canonicalState))))
     val hookName = config.hooks?.buildRequest?.trim().orEmpty()
     if (hookName.isBlank()) {
         return baseRequest
@@ -2380,15 +2403,12 @@ internal fun buildReportBuilderRequestPayload(
         JsonObject(
             mapOf(
                 "request" to JsonUtil.anyToElement(baseRequest),
-                "state" to JsonUtil.anyToElement(hookState),
-                "config" to JsonUtil.json.encodeToJsonElement(
-                    com.viant.forgeandroid.runtime.DashboardReportBuilderDef.serializer(),
-                    config
-                )
+                "state" to JsonObject(canonicalState),
+                "config" to com.viant.forgeandroid.runtime.reportBuilderHookConfiguration(config)
             )
         )
-    ) ?: return baseRequest
-    return if (hookResult.isEmpty()) baseRequest else hookResult
+    ) ?: error("The authored report request hook could not be executed: $hookName")
+    return hookResult
 }
 
 internal fun applyReportBuilderChartDataPolicy(
@@ -2421,10 +2441,10 @@ internal fun mergeReportBuilderPrefillIntoRequest(
         val endPath = filter.endParamPath ?: "${filter.paramPath ?: "filters.${filter.id}"}.end"
         val start = prefill["from"] ?: prefill["From"]
         val end = prefill["to"] ?: prefill["To"]
-        if (resolveNestedValue(next, startPath) == null && start?.toString()?.isNotBlank() == true) {
+        if (reportScopeValueEmpty(resolveNestedValue(next, startPath)) && start?.toString()?.isNotBlank() == true) {
             setNestedValue(next, startPath, start.toString())
         }
-        if (resolveNestedValue(next, endPath) == null && end?.toString()?.isNotBlank() == true) {
+        if (reportScopeValueEmpty(resolveNestedValue(next, endPath)) && end?.toString()?.isNotBlank() == true) {
             setNestedValue(next, endPath, end.toString())
         }
     }
@@ -2434,7 +2454,7 @@ internal fun mergeReportBuilderPrefillIntoRequest(
     config.dynamicFilterGroups.flatMap { it.filters }.forEach { filter ->
         val id = filter.id?.trim().orEmpty()
         val path = filter.paramPath?.trim().orEmpty()
-        if (id.isEmpty() || path.isEmpty() || resolveNestedValue(next, path) != null) return@forEach
+        if (id.isEmpty() || path.isEmpty() || !reportScopeValueEmpty(resolveNestedValue(next, path))) return@forEach
         val singularId = id.removeSuffix("s")
         val raw = sequenceOf(prefill[id], prefill[singularId])
             .plus(scopedPrefill.asSequence().flatMap { scope -> sequenceOf(scope[id], scope[singularId]) })
@@ -2445,12 +2465,39 @@ internal fun mergeReportBuilderPrefillIntoRequest(
                     else -> value.toString().isNotBlank()
                 }
             } ?: return@forEach
-        val values = if (raw is Collection<*>) raw.filterNotNull() else listOf(raw)
+        val values = (if (raw is Collection<*>) raw.filterNotNull() else listOf(raw)).mapNotNull { entry ->
+            val record = entry as? Map<*, *>
+            val selector = filter.valueSelector?.trim()?.takeIf(String::isNotEmpty) ?: "value"
+            val projected = if (record == null) entry else record[selector] ?: record["value"] ?: record["id"] ?: record[singularId]
+            projected?.let { dynamicSelectionRequestValue(filter, JsonUtil.anyToElement(it)) }
+        }
         if (values.isEmpty()) return@forEach
         val mapped: Any? = if (filter.multiple == true || filter.emitArray == true) values else values.first()
         setNestedValue(next, path, mapped)
     }
     return next.toMap()
+}
+
+private fun reportScopeValueEmpty(value: Any?): Boolean = when (value) {
+    null -> true
+    is String -> value.isBlank()
+    is Collection<*> -> value.isEmpty()
+    is Map<*, *> -> value.isEmpty()
+    else -> false
+}
+
+
+internal fun reportBuilderInitialIntentBindings(config: DashboardReportBuilderDef, windowForm: Map<String, Any?>): List<com.viant.forgeandroid.runtime.ReportIntentBinding> {
+    val expected = mergeReportBuilderPrefillIntoRequest(config, emptyMap(), windowForm)
+    val prefill = JsonUtil.asStringMap(windowForm["prefill"])
+    if (prefill.values.any { !reportScopeValueEmpty(it) } && expected.isEmpty()) error("The report configuration cannot bind the submitted intent")
+    val bindings = mutableListOf<com.viant.forgeandroid.runtime.ReportIntentBinding>()
+    fun visit(value: Any?, prefix: String) {
+        if (value is Map<*, *>) value.forEach { (key, child) -> visit(child, if (prefix.isBlank()) key.toString() else "$prefix.$key") }
+        else if (!reportScopeValueEmpty(value)) bindings += com.viant.forgeandroid.runtime.ReportIntentBinding(prefix, JsonUtil.anyToElement(value))
+    }
+    visit(expected, "")
+    return bindings
 }
 
 private fun normalizeDynamicFilterValue(
@@ -2523,22 +2570,50 @@ internal fun applyReportBuilderInitializeStateHook(
     values: ReportBuilderStateValues,
     windowForm: Map<String, Any?>
 ): ReportBuilderStateValues {
+    val prefill = JsonUtil.asStringMap(windowForm["prefill"])
+    val scope = JsonUtil.asStringMap(JsonUtil.elementToAny(values.authoredState["scopeParams"] ?: JsonNull)).toMutableMap()
+    fun prefillValue(paths: JsonElement?): Any? {
+        val candidates = if (paths is JsonArray) paths.toList() else listOfNotNull(paths)
+        return candidates.firstNotNullOfOrNull { path -> (path as? JsonPrimitive)?.content?.let { resolveNestedValue(prefill, it) } }
+    }
+    val rawConfig = com.viant.forgeandroid.runtime.reportBuilderHookConfiguration(config)
+    (rawConfig["predicates"] as? JsonArray)?.forEach { entry ->
+        val predicate = entry as? JsonObject ?: return@forEach
+        val id = (predicate["id"] as? JsonPrimitive)?.content ?: return@forEach
+        val date = (predicate["kind"] as? JsonPrimitive)?.content.equals("dateRange", true)
+        if (!date && predicate["pinned"] != JsonPrimitive(true)) return@forEach
+        val mapping = predicate["prefill"]
+        if (date) {
+            val spec = mapping as? JsonObject ?: return@forEach
+            val start = prefillValue(spec["start"])
+            val end = prefillValue(spec["end"])
+            val whole = prefillValue(spec["path"]) as? Map<*, *>
+            val from = start ?: whole?.get("start") ?: whole?.get("from")
+            val to = end ?: whole?.get("end") ?: whole?.get("to")
+            if (from != null || to != null) {
+                val current = JsonUtil.asStringMap(scope[id])
+                scope[id] = mapOf("start" to (from?.toString() ?: current["start"]?.toString().orEmpty()), "end" to (to?.toString() ?: current["end"]?.toString().orEmpty()))
+            }
+        } else prefillValue((mapping as? JsonObject)?.get("path") ?: mapping)?.let { scope[id] = it }
+    }
+    val seeded = values.copy(authoredState = values.authoredState + ("scopeParams" to JsonUtil.anyToElement(scope)),
+        staticFilters = values.staticFilters + scope)
     val hookName = config.hooks?.initializeState?.trim().orEmpty()
     if (hookName.isBlank()) {
-        return values
+        return seeded
     }
     val result = invokeReportBuilderHook(
         metadata = metadata,
         functionName = hookName,
         props = JsonObject(
             mapOf(
-                "state" to JsonUtil.anyToElement(currentReportBuilderHookState(values)),
-                "config" to JsonUtil.json.encodeToJsonElement(DashboardReportBuilderDef.serializer(), config),
+                "state" to JsonUtil.anyToElement(currentReportBuilderHookState(seeded)),
+                "config" to com.viant.forgeandroid.runtime.reportBuilderHookConfiguration(config),
                 "windowForm" to JsonUtil.anyToElement(windowForm)
             )
         )
-    ) ?: return values
-    return reportBuilderStateValuesFromHookResult(result, values)
+    ) ?: error("The authored report initialization hook could not be executed: $hookName")
+    return reportBuilderStateValuesFromHookResult(result, seeded, config)
 }
 
 internal fun reportBuilderPrefillSignature(windowForm: Map<String, Any?>): String {
@@ -2549,19 +2624,34 @@ internal fun reportBuilderPrefillSignature(windowForm: Map<String, Any?>): Strin
         is String -> raw.trim().toLongOrNull() ?: 0L
         else -> 0L
     }
-    return JsonUtil.json.encodeToString(
-        JsonElement.serializer(),
-        JsonUtil.anyToElement(
-            linkedMapOf(
-                "revision" to revision,
-                "prefill" to prefill
-            )
-        )
-    )
+    return com.viant.forgeandroid.runtime.reportPreparationFingerprint(JsonUtil.anyToElement(
+        linkedMapOf("revision" to revision, "prefill" to prefill)))
 }
 
-private fun currentReportBuilderHookState(values: ReportBuilderStateValues): Map<String, Any?> {
-    return linkedMapOf(
+/** Metadata-defined defaults used by the canonical web state initializer. */
+internal fun reportBuilderDefaultAuthorState(config: DashboardReportBuilderDef): Map<String, JsonElement> {
+    val raw = com.viant.forgeandroid.runtime.reportBuilderHookConfiguration(config)
+    val result = raw["result"] as? JsonObject
+    val request = raw["request"] as? JsonObject
+    val orders = ((result?.get("orderFields") ?: raw["orderFields"]) as? JsonArray).orEmpty().filterIsInstance<JsonObject>()
+    val order = orders.firstOrNull { it["default"] == JsonPrimitive(true) } ?: orders.firstOrNull()
+    return buildJsonObject {
+        put("binding", raw["binding"] ?: JsonNull)
+        put("primaryMeasure", raw["primaryMeasure"] ?: JsonPrimitive(""))
+        put("groupBy", (raw["groupBy"] as? JsonObject)?.get("default") ?: JsonPrimitive(""))
+        put("page", 1)
+        put("pageSize", result?.get("pageSize") ?: request?.get("limit") ?: JsonPrimitive(50))
+        put("orderField", order?.get("value") ?: order?.get("field") ?: JsonPrimitive(""))
+        put("orderDir", order?.get("defaultDirection") ?: JsonPrimitive("desc"))
+        put("scopeParams", JsonObject(emptyMap()))
+        put("localCalculatedFields", raw["localCalculatedFields"] ?: JsonArray(emptyList()))
+        put("localTableCalculations", raw["localTableCalculations"] ?: JsonArray(emptyList()))
+    }
+}
+
+internal fun currentReportBuilderHookState(values: ReportBuilderStateValues): Map<String, Any?> {
+    return values.authoredState.mapValues { JsonUtil.elementToAny(it.value) } + linkedMapOf(
+        "scopeParams" to (JsonUtil.asStringMap(JsonUtil.elementToAny(values.authoredState["scopeParams"] ?: JsonNull)) + values.staticFilters),
         "selectedMeasures" to values.selectedMeasures,
         "selectedDimensions" to values.selectedDimensions,
         "chartSpec" to values.chartSpec?.let {
@@ -2578,14 +2668,23 @@ private fun currentReportBuilderHookState(values: ReportBuilderStateValues): Map
 
 private fun reportBuilderStateValuesFromHookResult(
     result: Map<String, Any?>,
-    fallback: ReportBuilderStateValues
+    fallback: ReportBuilderStateValues,
+    config: DashboardReportBuilderDef
 ): ReportBuilderStateValues {
     val dynamicGroups = if (result.containsKey("dynamicGroups")) {
         decodeDynamicGroups(result["dynamicGroups"], fallback.dynamicGroups)
     } else {
         fallback.dynamicGroups
     }
+    val modernScope = JsonUtil.asStringMap(result["scopeParams"])
+    val scopedStatic = fallback.staticFilters.toMutableMap().apply {
+        config.staticFilters.forEach { filter -> filter.id?.let { id ->
+            if (modernScope.containsKey(id)) put(id, modernScope[id])
+            else if (result.containsKey("scopeParams")) remove(id)
+        } }
+    }
     return fallback.copy(
+        authoredState = fallback.authoredState + result.mapValues { JsonUtil.anyToElement(it.value) },
         reportOptions = if (result.containsKey("reportOptions")) JsonUtil.asStringMap(result["reportOptions"]).mapValues { JsonUtil.anyToElement(it.value) } else fallback.reportOptions,
         selectedMeasures = result.stringListOrNull("selectedMeasures") ?: fallback.selectedMeasures,
         selectedDimensions = result.stringListOrNull("selectedDimensions") ?: fallback.selectedDimensions,
@@ -2598,7 +2697,7 @@ private fun reportBuilderStateValuesFromHookResult(
         staticFilters = if (result.containsKey("staticFilters")) {
             JsonUtil.asStringMap(result["staticFilters"])
         } else {
-            fallback.staticFilters
+            scopedStatic
         },
         dynamicGroups = dynamicGroups,
         dynamicFilterDrafts = if (result.containsKey("dynamicFilterDrafts")) {
@@ -2672,12 +2771,14 @@ internal fun StoredReportBuilderState.toReportBuilderStateValues(
         staticFilters = staticFilters.mapValues { it.value.toRuntimeValue() },
         reportOptions = ReportBuilderOptions.effective(config.reportOptions, reportOptions),
         dynamicGroups = migratedDynamicGroups(config, this),
-        dynamicFilterDrafts = dynamicFilterDrafts
+        dynamicFilterDrafts = dynamicFilterDrafts,
+        authoredState = authoredState
     )
 }
 
 private fun ReportBuilderStateValues.toStoredReportBuilderState(): StoredReportBuilderState {
     return StoredReportBuilderState(
+        authoredState = authoredState,
         reportOptions = reportOptions,
         selectedMeasures = selectedMeasures,
         selectedDimensions = selectedDimensions,
@@ -3046,7 +3147,18 @@ internal fun loadStoredStateFromWindowForm(
 ): StoredReportBuilderState? {
     val stored = resolveNestedValue(runtime.windowFormValue(windowId), stateKey) ?: return null
     return runCatching {
-        Json.decodeFromJsonElement<StoredReportBuilderState>(JsonUtil.anyToElement(stored))
+        val raw = JsonUtil.anyToElement(stored).jsonObject
+        val projected=raw.toMutableMap()
+        (raw["staticFilters"] as? JsonObject)?.let { filters ->
+            projected["staticFilters"]=JsonObject(filters.mapValues { (_,value) ->
+                val objectValue=value as? JsonObject
+                if(objectValue!=null && objectValue["type"]==null && (objectValue["kind"] as? JsonPrimitive)?.content.equals("dateRange",true)) {
+                    JsonUtil.json.encodeToJsonElement(StoredStaticFilterValue.serializer(),StoredStaticFilterValue.DateRangeValue(
+                        (objectValue["start"] as? JsonPrimitive)?.content.orEmpty(),(objectValue["end"] as? JsonPrimitive)?.content.orEmpty()))
+                } else value
+            })
+        }
+        Json { ignoreUnknownKeys = true }.decodeFromJsonElement<StoredReportBuilderState>(JsonObject(projected)).copy(authoredState = raw.filterKeys { it != "authoredState" })
     }.getOrNull()
 }
 
@@ -3061,7 +3173,7 @@ internal fun persistStoredStateToWindowForm(
         payload,
         stateKey,
         JsonUtil.elementToAny(
-            JsonUtil.json.encodeToJsonElement(StoredReportBuilderState.serializer(), state)
+            JsonObject(state.authoredState + JsonUtil.json.encodeToJsonElement(StoredReportBuilderState.serializer(), state).jsonObject.filterKeys { it != "authoredState" })
         )
     )
     runtime.setWindowFormValue(windowId, payload)

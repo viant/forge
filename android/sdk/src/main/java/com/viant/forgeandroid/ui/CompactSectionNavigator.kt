@@ -41,8 +41,9 @@ internal fun CompactSectionNavigator(
     val selectedIndex = entries.indexOfFirst { it.first == selectedId }.coerceAtLeast(0)
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = Color(0xFFF5F8FB),
-        border = BorderStroke(1.dp, ReportTabStripBorderColor),
+        color = LocalForgeThemeAppearance.current?.controlBackground ?: Color(0xFFF5F8FB),
+        contentColor = LocalForgeThemeAppearance.current?.controlForeground ?: MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, LocalForgeThemeAppearance.current?.controlBorder ?: ReportTabStripBorderColor),
         shape = RoundedCornerShape(14.dp)
     ) {
         Row(

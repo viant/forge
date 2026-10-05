@@ -1,0 +1,1932 @@
+{
+  "version": 1,
+  "generatedBy": "src/reporting/reportSpecModel.js buildReportBuilderPublishedDatasetDeclarations",
+  "now": "2026-10-04T12:00:00.000Z",
+  "timeZone": "UTC",
+  "cases": [
+    {
+      "name": "inherit-scoped-primary",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "inherit"
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {
+            "From": "2026-09-27",
+            "To": "2026-10-04",
+            "entityIds": [
+              101
+            ]
+          },
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "pending-initialization-does-not-fetch",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "pending",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {},
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "inherit"
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "pending"
+      }
+    },
+    {
+      "name": "ready-global-is-valid",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {},
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "inherit"
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "missing-bound-intent-is-error",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {},
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "inherit"
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "requiredBindings": [
+        {
+          "path": "filters.entityIds",
+          "value": [
+            101
+          ]
+        }
+      ],
+      "expected": {
+        "status": "error",
+        "reason": "unbound-intent"
+      }
+    },
+    {
+      "name": "changed-bound-intent-is-error",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "entityIds": [
+            999
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "inherit"
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "requiredBindings": [
+        {
+          "path": "filters.entityIds",
+          "value": [
+            101
+          ]
+        }
+      ],
+      "expected": {
+        "status": "error",
+        "reason": "unbound-intent"
+      }
+    },
+    {
+      "name": "variant-switch-stale-preparation",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "alternate-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "inherit"
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "pending",
+        "reason": "stale-preparation"
+      }
+    },
+    {
+      "name": "form-change-stale-preparation",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 3,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "inherit"
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "pending",
+        "reason": "stale-preparation"
+      }
+    },
+    {
+      "name": "declared-hook-unavailable",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "unsupported",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "inherit"
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "error",
+        "reason": "unsupported-hook"
+      }
+    },
+    {
+      "name": "override-local-entity",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "override",
+          "local": {
+            "filters": {
+              "entityIds": [
+                202
+              ]
+            }
+          }
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {
+            "From": "2026-09-27",
+            "To": "2026-10-04",
+            "entityIds": [
+              202
+            ]
+          },
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "append-inherited-entity-wins",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "append",
+          "local": {
+            "filters": {
+              "entityIds": [
+                202
+              ],
+              "region": "west"
+            }
+          }
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {
+            "entityIds": [
+              101
+            ],
+            "region": "west",
+            "From": "2026-09-27",
+            "To": "2026-10-04"
+          },
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "exclude-one-param",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "exclude",
+          "exclude": [
+            "entities"
+          ]
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {
+            "From": "2026-09-27",
+            "To": "2026-10-04"
+          },
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "exclude-all-declared-concrete-paths-global",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "exclude",
+          "exclude": [
+            "entities",
+            "from",
+            "to"
+          ]
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "from",
+            "paramPath": "filters.From"
+          },
+          {
+            "id": "to",
+            "paramPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "exclude-date-range-all-declared-paths",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "exclude",
+          "exclude": [
+            "dateRange"
+          ]
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {
+            "entityIds": [
+              101
+            ]
+          },
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "exclude-date-then-local-replacement",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "exclude",
+          "exclude": [
+            "dateRange"
+          ],
+          "local": {
+            "filters": {
+              "From": "2026-08-01",
+              "To": "2026-08-31"
+            }
+          }
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {
+            "entityIds": [
+              101
+            ],
+            "From": "2026-08-01",
+            "To": "2026-08-31"
+          },
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "exclude-unknown-preserves-scope",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "exclude",
+          "exclude": [
+            "unknown"
+          ]
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {
+            "From": "2026-09-27",
+            "To": "2026-10-04",
+            "entityIds": [
+              101
+            ]
+          },
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "override-relative-today",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "override",
+          "relativeDateRange": {
+            "preset": "today",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {
+            "From": "2026-10-04",
+            "To": "2026-10-04",
+            "entityIds": [
+              101
+            ]
+          },
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "override-relative-last-seven-days",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "override",
+          "relativeDateRange": {
+            "preset": "last7days",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {
+            "From": "2026-09-28",
+            "To": "2026-10-04",
+            "entityIds": [
+              101
+            ]
+          },
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "dataset-scoped-value",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "inherit"
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "datasetScopeParams": {
+        "summary": {
+          "entities": [
+            303
+          ]
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {
+            "From": "2026-09-27",
+            "To": "2026-10-04",
+            "entityIds": [
+              303
+            ]
+          },
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "state-scope-param",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {
+          "entities": [
+            404
+          ]
+        }
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "inherit"
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {
+            "From": "2026-09-27",
+            "To": "2026-10-04",
+            "entityIds": [
+              404
+            ]
+          },
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "different-source-only-declared-scope",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "other-cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "inherit"
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {
+            "entityIds": [
+              101
+            ],
+            "From": "2026-09-27",
+            "To": "2026-10-04"
+          },
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "different-source-no-declared-inheritance",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "other-cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "inherit"
+        },
+        "scopeParamOptions": [],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    },
+    {
+      "name": "missing-request-is-not-inferred-from-fields",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "fields": [
+          {
+            "key": "spend"
+          }
+        ]
+      },
+      "expected": {
+        "status": "error",
+        "reason": "missing-request"
+      }
+    },
+    {
+      "name": "unknown-scope-policy-rejected",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "guess"
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "error",
+        "reason": "invalid-scope-policy"
+      }
+    },
+    {
+      "name": "empty-exclusion-rejected",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {
+        "measures": {
+          "spend": true
+        },
+        "dimensions": {},
+        "filters": {
+          "From": "2026-09-27",
+          "To": "2026-10-04",
+          "entityIds": [
+            101
+          ]
+        },
+        "limit": 1,
+        "offset": 0
+      },
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "exclude",
+          "exclude": []
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "error",
+        "reason": "invalid-scope-policy"
+      }
+    },
+    {
+      "name": "ready-empty-primary-explicit-global",
+      "identity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "preparedIdentity": {
+        "windowId": "window-a",
+        "builderRef": "scoped-builder",
+        "formRevision": 2,
+        "stateRevision": 3
+      },
+      "status": "ready",
+      "hookStatus": "completed",
+      "primaryDataSourceRef": "cube",
+      "primaryRequest": {},
+      "state": {
+        "scopeParams": {}
+      },
+      "source": {
+        "id": "summary",
+        "dataSourceRef": "cube",
+        "scope": {
+          "mode": "inherit"
+        },
+        "scopeParamOptions": [
+          {
+            "id": "entities",
+            "kind": "multiSelect",
+            "paramPath": "filters.entityIds"
+          },
+          {
+            "id": "dateRange",
+            "kind": "dateRange",
+            "startParamPath": "filters.From",
+            "endParamPath": "filters.To"
+          }
+        ],
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      },
+      "expected": {
+        "status": "ready",
+        "request": {
+          "measures": {
+            "spend": true
+          },
+          "dimensions": {},
+          "filters": {},
+          "limit": 1,
+          "offset": 0
+        }
+      }
+    }
+  ]
+}

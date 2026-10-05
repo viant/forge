@@ -1490,6 +1490,7 @@ public struct DashboardRenderer: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
             .background(RoundedRectangle(cornerRadius: 12).fill(tone.background))
+            .foregroundStyle(tone.text)
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(tone.border, lineWidth: 1))
         } else if block.kind == "filterBarBlock", let filterBar = block.filterBar {
             reportRuntimeFilterBarPreview(filterBar)
@@ -1509,22 +1510,28 @@ public struct DashboardRenderer: View {
             .onChange(of: defaultCollapsed) { reportRuntimeCollapsedTables[block.id] = defaultCollapsed }
             .accessibilityIdentifier("forge-report-runtime-table-\(block.id)")
         } else if block.kind == "chartBlock", let chart = block.chart {
-            ChartRenderer(
-                runtime: runtime,
-                window: window,
-                container: ContainerDef(
-                    id: block.id,
-                    title: block.title,
-                    kind: "dashboard.chart",
-                    dataSourceRef: chart.dataSourceRef
-                ),
-                chart: chart.chart,
-                rows: chart.rows,
-                reportRuntimeBlockID: block.id,
-                reportRuntimeActionFields: chart.actionFields,
-                reportRuntimeActionDescriptors: chart.actionDescriptors,
-                onReportRuntimeAction: executeReportRuntimeAction
-            )
+            VStack(alignment: .leading, spacing: 8) {
+                Text(block.title).font(.subheadline.weight(.semibold))
+                if let description = block.content["description"]?.stringValue, !description.isEmpty {
+                    Text(description).font(.caption).foregroundStyle(.secondary)
+                }
+                ChartRenderer(
+                    runtime: runtime,
+                    window: window,
+                    container: ContainerDef(
+                        id: block.id,
+                        title: block.title,
+                        kind: "dashboard.chart",
+                        dataSourceRef: chart.dataSourceRef
+                    ),
+                    chart: chart.chart,
+                    rows: chart.rows,
+                    reportRuntimeBlockID: block.id,
+                    reportRuntimeActionFields: chart.actionFields,
+                    reportRuntimeActionDescriptors: chart.actionDescriptors,
+                    onReportRuntimeAction: executeReportRuntimeAction
+                )
+            }
             .accessibilityIdentifier("forge-report-runtime-chart-\(block.id)")
         } else if block.kind == "geoMapBlock", let geoMap = block.geoMap {
             reportRuntimeGeoMapPreview(block: block, geoMap: geoMap)

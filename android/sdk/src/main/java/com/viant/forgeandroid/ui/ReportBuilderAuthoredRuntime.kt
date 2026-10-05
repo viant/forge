@@ -8,6 +8,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,47 +32,31 @@ import com.viant.forgeandroid.runtime.WindowContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.flow.first
 
-internal fun reportBuilderAuthoredDocument(windowForm: Map<String, Any?>): JsonObject? {
-    fun obj(value: Any?): JsonObject? = JsonUtil.anyToElement(value) as? JsonObject
-    val reportDefinition = obj(windowForm["reportDefinition"])
-    val definitionDocument = obj(reportDefinition?.get("documentPatch"))
-        ?: obj(reportDefinition?.get("reportDocument"))
-    // Conversation window snapshots depth-limit deeply nested reportDefinition
-    // values. The report-builder state carries the same authored blocks one
-    // level closer to the root, preserving chart fields and table columns. Web
-    // restores from that state as well, so prefer it when reopening on Android.
-    val stateBlocks = windowForm.values.asSequence()
-        .mapNotNull(::obj)
-        .mapNotNull { it["reportDocumentBlocks"] as? JsonArray }
-        .firstOrNull { it.isNotEmpty() }
-    val stateDocument = stateBlocks?.let { blocks ->
-        JsonObject((definitionDocument?.toMutableMap() ?: mutableMapOf()).apply {
-            put("blocks", blocks)
-        })
-    }
-    val candidates = listOf(
-        stateDocument,
-        reportDefinition?.get("documentPatch"),
-        reportDefinition?.get("reportDocument"),
-        windowForm["documentPatch"],
-        windowForm["reportDocument"]
-    )
-    return candidates.asSequence()
-        .mapNotNull(::obj)
-        .firstOrNull { (it["blocks"] as? JsonArray)?.isNotEmpty() == true }
-}
+internal fun reportBuilderAuthoredDocument(windowForm: Map<String, Any?>, stateKey: String? = null): JsonObject? =
+    com.viant.forgeandroid.runtime.nativeReportSelectedDocument(JsonUtil.anyToElement(windowForm).jsonObject, stateKey)
 
-internal fun reportBuilderAuthoredDatasetRefs(document: JsonObject): Set<String> =
-    (document["blocks"] as? JsonArray).orEmpty()
-        .mapNotNull { block ->
-            ((block as? JsonObject)?.get("datasetRef") as? JsonPrimitive)?.content
-                ?.trim()?.takeIf { it.isNotEmpty() }
+internal fun reportBuilderAuthoredDatasetRefs(document: JsonObject): Set<String> {
+    val refs = linkedSetOf<String>()
+    fun visit(value: JsonElement) {
+        when (value) {
+            is JsonObject -> {
+                (value["datasetRef"] as? JsonPrimitive)?.content?.trim()?.takeIf(String::isNotEmpty)?.let(refs::add)
+                value.values.forEach(::visit)
+            }
+            is JsonArray -> value.forEach(::visit)
+            else -> Unit
         }
-        .toSet()
+    }
+    visit(document)
+    return refs
+}
 
 internal fun reportBuilderMaterializeComputedRows(
     rows: List<Map<String, Any?>>,
@@ -102,12 +87,7 @@ internal fun reportBuilderPublishedSources(
     config: DashboardReportBuilderDef,
     document: JsonObject
 ): List<ReportBuilderPublishedDataSourceDef> {
-    val referencedInDocumentOrder = (document["blocks"] as? JsonArray).orEmpty()
-        .mapNotNull { block ->
-            ((block as? JsonObject)?.get("datasetRef") as? JsonPrimitive)?.content
-                ?.trim()?.takeIf { it.isNotEmpty() && it != "primary" }
-        }
-        .distinct()
+    val referencedInDocumentOrder = reportBuilderAuthoredDatasetRefs(document).filter { it != "primary" }
     val order = referencedInDocumentOrder.withIndex().associate { it.value to it.index }
     return config.dataSources
         .filter { it.id in order }
@@ -120,31 +100,18 @@ internal fun reportBuilderPublishedSources(
 /** Fetch cheap aggregate cards before detailed chart/table datasets on mobile. */
 internal fun reportBuilderPublishedFetchPriority(source: ReportBuilderPublishedDataSourceDef): Int {
     val request = source.request
-    val dimensions = request["dimensions"] as? JsonObject
-    val limit = (request["limit"] as? JsonPrimitive)?.content?.toIntOrNull()
+    val dimensions = request?.get("dimensions") as? JsonObject
+    val limit = (request?.get("limit") as? JsonPrimitive)?.content?.toIntOrNull()
     return if (dimensions?.isEmpty() == true && limit != null && limit <= 1) 0 else 1
 }
 
 /** Catalog request fields define the dataset shape; active filters remain inherited. */
-internal fun reportBuilderPublishedRequest(
-    primaryRequest: Map<String, Any?>,
-    declaration: ReportBuilderPublishedDataSourceDef
-): Map<String, Any?> {
-    val catalog = JsonUtil.elementToAny(declaration.request) as? Map<*, *> ?: emptyMap<Any?, Any?>()
-    val result = primaryRequest.toMutableMap()
-    catalog.forEach { (rawKey, value) ->
-        val key = rawKey?.toString() ?: return@forEach
-        if (key == "filters") {
-            val inherited = (result[key] as? Map<*, *>)?.entries
-                ?.associate { it.key.toString() to it.value }.orEmpty()
-            val declared = (value as? Map<*, *>)?.entries
-                ?.associate { it.key.toString() to it.value }.orEmpty()
-            result[key] = inherited + declared
-        } else {
-            result[key] = value
-        }
-    }
-    return result
+internal fun reportBuilderPublishedRequest(primaryRequest: Map<String, Any?>, declaration: ReportBuilderPublishedDataSourceDef): Map<String, Any?> {
+    if (primaryRequest.isEmpty()) return emptyMap()
+    val identity = com.viant.forgeandroid.runtime.ReportPreparationIdentity("legacy-helper", "", "", "")
+    val prepared = com.viant.forgeandroid.runtime.PreparedReportRequest(identity, "ready", declaration.dataSourceRef, JsonUtil.anyToElement(primaryRequest).jsonObject)
+    val result = com.viant.forgeandroid.runtime.preparePublishedReportRequest(identity, prepared, declaration)
+    return result.request?.let { JsonUtil.asStringMap(JsonUtil.elementToAny(it)) }.orEmpty()
 }
 
 internal fun materializeReportBuilderAuthoredDocument(document: JsonObject): JsonObject {
@@ -191,16 +158,60 @@ internal fun ReportBuilderAuthoredResult(
     primaryRows: List<Map<String, Any?>>,
     primaryControl: ControlState,
     primaryRequest: Map<String, Any?>,
-    runRequestId: String?
+    runRequestId: String?,
+    preparation: com.viant.forgeandroid.runtime.PreparedReportRequest,
+    stateKey: String
 ) {
     val referencedDatasetRefs = remember(document) { reportBuilderAuthoredDatasetRefs(document) }
-    val persistedRows = reportBuilderPersistedDatasets(window.peekWindowForm(), config)
+    val materializationStatus=JsonUtil.asStringMap(window.peekWindowForm()["reportMaterialization"])["status"]?.toString()
+    val verifiedSavedRows=runtime.verifiedCompletedReportDatasets(window.windowId)
+    val persistedRows = if(materializationStatus=="completed" && verifiedSavedRows==null) emptyMap() else reportBuilderPersistedDatasets(window.peekWindowForm(), config)
     val declarations = remember(config, document) { reportBuilderPublishedSources(config, document) }
     val contexts = declarations.mapNotNull { declaration ->
         window.contextForInstanceOrNull(
             instanceRef = "reportDocument:${declaration.id}",
             dataSourceRef = declaration.dataSourceRef
         )?.let { declaration to it }
+    }
+    val scoped = (preparation.state["reportDatasetScopeParams"] ?: preparation.state["datasetScopeParams"]) as? JsonObject
+    val plans = contexts.map { (declaration, context) ->
+        Triple(declaration, context, com.viant.forgeandroid.runtime.preparePublishedReportRequest(preparation.identity, preparation, declaration, scoped))
+    }
+    val admittedDatasets = plans.mapNotNull { (declaration, _, plan) -> plan.request?.takeIf { plan.status == "ready" }?.let {
+        com.viant.forgeandroid.runtime.NativeReportDatasetAdmission(declaration.id, declaration.dataSourceRef, it)
+    } } + if ("primary" in referencedDatasetRefs) listOf(com.viant.forgeandroid.runtime.NativeReportDatasetAdmission("primary", preparation.dataSourceRef, preparation.primaryRequest)) else emptyList()
+    val rawAuthorState = preparation.capturedAuthorState
+    val admission = com.viant.forgeandroid.runtime.NativeReportAdmission(preparation,
+        runtime.windows.value.firstOrNull { it.windowId == window.windowId }?.conversationId.orEmpty(), stateKey, document, admittedDatasets,
+        config.authoredConfiguration ?: JsonUtil.json.encodeToJsonElement(DashboardReportBuilderDef.serializer(), config).jsonObject,
+        rawAuthorState ?: JsonObject(emptyMap()))
+    val admissionEncodingError=remember(admission,rawAuthorState) {
+        if(preparation.status=="ready" && rawAuthorState!=null) runCatching { com.viant.forgeandroid.runtime.nativeReportAdmissionContext(admission) }.exceptionOrNull()?.message else null
+    }
+    SideEffect {
+        val frozen=runtime.frozenNativeReportAdmission(window.windowId,preparation.identity.builderRef,stateKey,admission.authoredConfiguration,document)
+        if(frozen!=null) {
+            val saved=(JsonUtil.anyToElement(window.peekWindowForm()["reportStaticDatasets"]) as? JsonArray).orEmpty().filterIsInstance<JsonObject>().associateBy { (it["id"] as? JsonPrimitive)?.content }
+            frozen.admission.datasets.forEach { dataset ->
+                val target=if(dataset.id=="primary") window.contextOrNull(dataset.dataSourceRef) else contexts.firstOrNull { it.first.id==dataset.id }?.second
+                val rows=saved[dataset.id]?.get("rows") as? JsonArray
+                if(target!=null && rows!=null) target.hydrateFrozenReportDataset(dataset,rows)
+            }
+            if(frozen.admission.datasets.none { it.id=="primary" }) window.contextOrNull(frozen.admission.preparation.dataSourceRef)?.hydrateFrozenReportPrimaryIdentity(frozen.admission.preparation)
+        }
+    }
+    SideEffect {
+        val failed = plans.firstOrNull { it.third.status == "error" }
+        when {
+            preparation.status != "ready" -> runtime.nativeReportLifecycle.publishStatus(preparation, preparation.status, preparation.reason)
+            !runtime.reportPreparationIsCurrent(preparation) -> runtime.nativeReportLifecycle.publishStatus(preparation,"pending","The report preparation changed before admission publication.")
+            rawAuthorState == null -> runtime.nativeReportLifecycle.publishStatus(preparation, "pending", "The selected report state has not been saved.")
+            admissionEncodingError != null -> runtime.nativeReportLifecycle.publishStatus(preparation,"error","The report admission cannot be preserved: $admissionEncodingError")
+            failed != null -> runtime.nativeReportLifecycle.publishStatus(preparation, "error", failed.third.reason ?: "The declared report dataset request is unsupported.")
+            admittedDatasets.map { it.id }.toSet() != referencedDatasetRefs -> runtime.nativeReportLifecycle.publishStatus(preparation, "error", "The authored report references an unavailable dataset.")
+            plans.all { it.third.status == "ready" } -> runtime.nativeReportLifecycle.publish(admission)
+            else -> runtime.nativeReportLifecycle.publishStatus(preparation, "pending", "Waiting for declared report dataset requests.")
+        }
     }
     val rowsById = linkedMapOf<String, List<Map<String, Any?>>>()
     rowsById.putAll(persistedRows)
@@ -220,52 +231,47 @@ internal fun ReportBuilderAuthoredResult(
     // one expensive cube. Hydrate them in priority order so Android does not
     // stampede the gateway with identical concurrent cube jobs. The first
     // cheap aggregate normally unlocks the KPI overview immediately.
-    LaunchedEffect(primaryRequest, declarations, primaryRows, runRequestId) {
-        val requestId = runRequestId?.trim()?.takeIf(String::isNotEmpty)
-            ?: "native-${java.util.UUID.randomUUID()}"
-        if (runRequestId.isNullOrBlank() && persistedRows.isNotEmpty()) {
-            runtime.publishNativeReportMaterialization(
-                windowId = window.windowId,
-                requestId = requestId,
-                status = "completed",
-                rowsById = persistedRows,
-                errors = emptyList()
-            )
+    LaunchedEffect(preparation.identity, preparation.status, runRequestId) {
+        if (runtime.reportRequestInspectionOnly || runRequestId.isNullOrBlank()) return@LaunchedEffect
+        if (runtime.nativeReportLifecycle.completed(runRequestId) != null) return@LaunchedEffect
+        val requestId = runRequestId.trim()
+        val gate = com.viant.forgeandroid.runtime.preparedReportPrimaryGate(preparation.identity, preparation)
+        if (gate.status == "pending") return@LaunchedEffect
+        val handle = runtime.nativeReportLifecycle.handle(requestId)
+        if (gate.status != "ready" || !runtime.reportPreparationIsCurrent(preparation) || handle == null) {
+            if (gate.status != "pending") runtime.publishNativeReportMaterialization(window.windowId, requestId, "failed", emptyMap(), listOf(gate.reason ?: "Durable report admission is unavailable."))
             return@LaunchedEffect
         }
-        runtime.publishNativeReportMaterialization(
-            windowId = window.windowId,
-            requestId = requestId,
-            status = "running",
-            rowsById = emptyMap(),
-            errors = emptyList()
-        )
-        val loadedRows = linkedMapOf<String, List<Map<String, Any?>>>()
-        val loadErrors = mutableListOf<String>()
-        if ("primary" in referencedDatasetRefs) {
-            loadedRows["primary"] = primaryRows
-            primaryControl.error?.takeIf(String::isNotBlank)?.let(loadErrors::add)
+        fun current() = runtime.reportPreparationIsCurrent(preparation) &&
+            JsonUtil.asStringMap(window.peekWindowForm()["reportRunRequest"])["id"]?.toString() == requestId
+        if (handle.admission != admission || admittedDatasets.map { it.id }.toSet() != referencedDatasetRefs || plans.any { it.third.status != "ready" }) {
+            runtime.publishNativeReportMaterialization(window.windowId, requestId, "failed", emptyMap(), listOf("The authored report does not match its admitted dataset requests."), handle.reportRunId)
+            return@LaunchedEffect
         }
-        contexts.forEach { (declaration, context) ->
-            val request = reportBuilderPublishedRequest(primaryRequest, declaration)
-            if (request.isEmpty()) return@forEach
-            context.setInputParameters(request, fetch = true)
-            context.control.flow.first { it.loading || it.resolved }
-            context.control.flow.first { !it.loading && it.resolved }
-            loadedRows[declaration.id] = reportBuilderMaterializeComputedRows(
-                context.collection.peek(),
-                config
-            )
-            context.control.peek().error?.takeIf(String::isNotBlank)?.let(loadErrors::add)
-        }
-        runtime.publishNativeReportMaterialization(
-            windowId = window.windowId,
-            requestId = requestId,
-            status = if (loadErrors.isEmpty()) "completed" else "failed",
-            rowsById = loadedRows,
-            errors = loadErrors
-        )
+        runtime.nativeReportLifecycle.start(runtime.scope, handle, { current() },
+            load = { dataset ->
+                val context = if (dataset.id == "primary") window.context(preparation.dataSourceRef)
+                    else contexts.firstOrNull { it.first.id == dataset.id }?.second ?: error("The admitted report dataset context is unavailable.")
+                val dispatch = context.setPreparedInputParameters(JsonUtil.asStringMap(JsonUtil.elementToAny(dataset.request)), com.viant.forgeandroid.runtime.NativeReportReadPermit(handle.uiRunRequestId, dataset.id)) { current() }
+                    ?: error("The report admission changed before loading data.")
+                val result = context.awaitPreparedResult(dispatch)
+                check(current()) { "The report admission changed while loading data." }
+                result.error?.takeIf(String::isNotBlank)?.let { error(it) }
+                val actualRows = (JsonUtil.elementToAny(result.rows) as? List<*>).orEmpty().map { JsonUtil.asStringMap(it) }
+                JsonUtil.anyToElement(reportBuilderMaterializeComputedRows(actualRows, config)).jsonArray
+            },
+            onRunning = { runtime.publishNativeReportMaterialization(window.windowId, requestId, "running", emptyMap(), emptyList(), handle.reportRunId) },
+            onCompleted = { completed, filled ->
+                val loadedRows = filled.mapValues { (_, data) -> (JsonUtil.elementToAny(data) as? List<*>).orEmpty().map { JsonUtil.asStringMap(it) } }
+                runtime.publishNativeReportMaterialization(window.windowId, requestId, "completed", loadedRows, emptyList(), completed.reportRunId, completed.contextStatus, completed.active, completed.activationError)
+            },
+            onFailure = { message -> runtime.publishNativeReportMaterialization(window.windowId, requestId, "failed", emptyMap(), listOf(message), handle.reportRunId) })
+
     }
+
+    val activationError = JsonUtil.asStringMap(window.peekWindowForm()["reportMaterialization"])["activationError"]?.toString()?.takeIf(String::isNotBlank)
+    activationError?.let { Text("Report saved. $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+    if(materializationStatus=="completed" && verifiedSavedRows==null) Text("The saved report data could not be verified. Reopen the report to restore it.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
 
     val preparedDocument = remember(document) { materializeReportBuilderAuthoredDocument(document) }
     val artifact = remember(preparedDocument, rowsById.toMap(), primaryRequest, config.reportOptions) {
@@ -290,10 +296,10 @@ internal fun ReportBuilderAuthoredResult(
     val runtimeContainer = remember(artifact.metadata) {
         artifact.metadata.view?.content?.containers?.firstOrNull()
     }
-    val pending = controls.any { it.loading || !it.resolved }
+    val pending = (persistedRows.isEmpty() && preparation.status == "pending") || controls.any { it.loading || !it.resolved }
     val hasMaterializedRows = rowsById.values.any { it.isNotEmpty() }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        val error = controls.firstNotNullOfOrNull { it.error?.takeIf(String::isNotBlank) }
+        val error = (if (persistedRows.isEmpty() && preparation.status == "error") preparation.reason else null) ?: controls.firstNotNullOfOrNull { it.error?.takeIf(String::isNotBlank) }
         if (error != null) {
             Text(
                 text = authoredReportLoadErrorMessage(error),
@@ -308,7 +314,7 @@ internal fun ReportBuilderAuthoredResult(
             ) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 Text(
-                    text = "Loading report data…",
+                    text = if (runRequestId.isNullOrBlank()) "Run the report to load its data." else "Loading report data…",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -317,7 +323,7 @@ internal fun ReportBuilderAuthoredResult(
         // Do not turn an unresolved dataset into a definitive empty KPI/card.
         // Partial output remains useful after an explicit error, while a normal
         // in-flight request gets one honest loading state.
-        if (runtimeContainer != null && (hasMaterializedRows || !pending || error != null)) {
+        if (runtimeContainer != null && !(materializationStatus=="completed" && verifiedSavedRows==null) && (hasMaterializedRows || !pending || error != null)) {
             DashboardReportRuntimeSurface(runtime, window, runtimeContainer, dashboardRoot)
         }
     }
@@ -328,7 +334,11 @@ private fun ForgeRuntime.publishNativeReportMaterialization(
     requestId: String,
     status: String,
     rowsById: Map<String, List<Map<String, Any?>>>,
-    errors: List<String>
+    errors: List<String>,
+    reportRunId: String? = null,
+    contextStatus: String? = null,
+    active: Boolean? = null,
+    activationError: String? = null
 ) {
     val materialization = linkedMapOf<String, Any?>(
         "id" to requestId,
@@ -338,13 +348,19 @@ private fun ForgeRuntime.publishNativeReportMaterialization(
         "datasetRefs" to rowsById.keys.sorted(),
         "rowCounts" to rowsById.mapValues { it.value.size }
     )
+    reportRunId?.let { materialization["reportRunId"] = it }
+    contextStatus?.let { materialization["contextStatus"] = it; materialization["active"] = active }
+    activationError?.let { materialization["activationError"] = it }
     if (errors.isNotEmpty()) materialization["errors"] = errors
     val values = linkedMapOf<String, Any?>("reportMaterialization" to materialization)
     if (status != "running") {
-        values["reportStaticDatasets"] = rowsById.keys.sorted().map { id ->
+        val verified=if(status=="completed") nativeReportLifecycle.completedDatasets(requestId) else null
+        val admitted=nativeReportLifecycle.handle(requestId)?.admission?.datasets?.associateBy { it.id }.orEmpty()
+        values["reportStaticDatasets"] = verified?.let(JsonUtil::elementToAny) ?: rowsById.keys.sorted().map { id ->
             mapOf(
                 "id" to id,
-                "dataSourceRef" to id,
+                "dataSourceRef" to (admitted[id]?.dataSourceRef ?: id),
+                "request" to admitted[id]?.request?.let(JsonUtil::elementToAny),
                 "rows" to rowsById[id].orEmpty()
             )
         }

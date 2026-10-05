@@ -12,6 +12,7 @@ data class ForgeThemeAppearance(
     val focus: Color, val buttonBackground: Color, val buttonForeground: Color,
     val disabledBackground: Color, val disabledForeground: Color, val validationBorder: Color,
     val fontSize: Float, val controlHeight: Float, val radius: Float, val paddingInline: Float,
+    val categoricalPalette: List<Color> = emptyList(),
 )
 val LocalForgeThemeAppearance = staticCompositionLocalOf<ForgeThemeAppearance?> { null }
 

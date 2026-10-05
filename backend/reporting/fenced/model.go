@@ -16,9 +16,10 @@ type Fence struct {
 }
 
 type CompileRequest struct {
-	Content  string  `json:"content,omitempty"`
-	Fences   []Fence `json:"fences,omitempty"`
-	ReportID string  `json:"reportId,omitempty"`
+	Content    string             `json:"content,omitempty"`
+	Fences     []Fence            `json:"fences,omitempty"`
+	ReportID   string             `json:"reportId,omitempty"`
+	Invocation *InvocationBinding `json:"invocation,omitempty"`
 }
 
 type Diagnostic struct {
@@ -48,4 +49,17 @@ type CompileResult struct {
 	ReportFill     json.RawMessage `json:"reportFill,omitempty"`
 	ReportPrint    json.RawMessage `json:"reportPrint,omitempty"`
 	Diagnostics    []Diagnostic    `json:"diagnostics,omitempty"`
+}
+
+// InvocationBinding binds already-materialized rows to their admitted source and
+// requests. Compilation never fetches data or changes these request scopes.
+type InvocationBinding struct {
+	Source     map[string]any   `json:"source"`
+	Parameters map[string]any   `json:"parameters"`
+	Datasets   []DatasetBinding `json:"datasets"`
+}
+type DatasetBinding struct {
+	ID            string          `json:"id"`
+	DataSourceRef string          `json:"dataSourceRef"`
+	Request       json.RawMessage `json:"request"`
 }

@@ -102,9 +102,6 @@ extension ForgeRuntime {
     }
 
     public func windowFormUpdates(windowID: String) async -> AsyncStream<[String: JSONValue]> {
-        let signal = await signals.form(
-            dataSourceID: WindowIdentity(windowID: windowID).windowFormID()
-        )
-        return await signal.stream()
+        return await dataSourceRuntime.formUpdates(dataSourceID: WindowIdentity(windowID: windowID).windowFormID())
     }
 }

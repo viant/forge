@@ -3,6 +3,22 @@ import XCTest
 @testable import ForgeIOSUI
 
 final class ReportBuilderAuthoredRuntimeTests: XCTestCase {
+    func testAuthoredAdmissionCollectsEachSharedDatasetOnceIncludingNestedBlocks() throws {
+        let document = try JSONDecoder().decode([String: JSONValue].self, from: Data(#"{"blocks":[{"id":"spend","kind":"kpiBlock","datasetRef":"summary"},{"id":"bids","kind":"kpiBlock","datasetRef":"summary"},{"id":"section","kind":"sectionBlock","blocks":[{"id":"trend","kind":"chartBlock","datasetRef":"daily"},{"id":"table","kind":"tableBlock","datasetRef":"daily"}]},{"id":"detail","kind":"tableBlock","datasetRef":"summary"}]}"#.utf8))
+        XCTAssertEqual(reportBuilderAuthoredDatasetRefs(document), ["summary", "daily"])
+    }
+
+    func testChartFallbackPreservesPublishedFieldLabelsAndFormats() throws {
+        let source = try JSONDecoder().decode([String: JSONValue].self, from: Data(#"{"blocks":[{"id":"trend","kind":"chartBlock","datasetRef":"daily","chartSpec":{"type":"line","xField":"date","yFields":["amount"]}}]}"#.utf8))
+        let fields: [[String: JSONValue]] = [["key": .string("date"), "label": .string("Date")], ["key": .string("amount"), "label": .string("Amount"), "format": .string("currency")]]
+        let materialized = materializeReportBuilderAuthoredDocument(source, fieldsByDataset: ["daily": fields])
+        let block = try XCTUnwrap(materialized["blocks"]?.arrayValue?.first?.objectValue)
+        let chart = try JSONDecoder().decode(ChartDef.self, from: JSONEncoder().encode(try XCTUnwrap(block["chartModel"])))
+        XCTAssertEqual(chart.seriesDef?.values.first?.label, "Amount")
+        XCTAssertEqual(chart.seriesDef?.values.first?.format, "currency")
+        XCTAssertEqual(chart.yAxis?.format, "currency")
+    }
+
     func testRestoredIntegerFilterSelectionIsCoercedBeforeFetch() throws {
         let filter = try JSONDecoder().decode(
             ReportBuilderDynamicFilterDef.self,
@@ -105,7 +121,7 @@ final class ReportBuilderAuthoredRuntimeTests: XCTestCase {
             ])
         ]
 
-        let document = reportBuilderAuthoredDocument(windowForm)
+        let document = reportBuilderAuthoredDocument(windowForm, stateKey: "reportBuilderState")
 
         XCTAssertEqual(document?["title"], .string("Operations"))
         XCTAssertEqual(document?["blocks"]?.arrayValue?.first?.objectValue?["id"], .string("chart"))
@@ -126,10 +142,22 @@ final class ReportBuilderAuthoredRuntimeTests: XCTestCase {
             ])
         ]
 
-        let document = reportBuilderAuthoredDocument(form)
+        let document = reportBuilderAuthoredDocument(form, stateKey: "reportBuilder:metricsCubeBuilder")
 
         XCTAssertEqual(document?["title"], .string("Order Performance Report"))
         XCTAssertEqual(document?["blocks"]?.arrayValue?.first?.objectValue?["title"], .string("Overview"))
+    }
+
+    func testAuthoredDocumentUsesOnlySelectedStateKey() {
+        let form: [String: JSONValue] = [
+            "reportDefinition": .object(["documentPatch": .object(["title": .string("Preserved header"), "extension": .string("opaque"), "blocks": .array([.object(["id": .string("header")])])])]),
+            "selected": .object(["reportDocumentBlocks": .array([.object(["id": .string("selected-block")])])]),
+            "other": .object(["reportDocumentBlocks": .array([.object(["id": .string("wrong-block")])])])
+        ]
+        let selected = reportBuilderAuthoredDocument(form, stateKey: "selected")
+        XCTAssertEqual(selected?["blocks"]?.arrayValue?.first?.objectValue?["id"], .string("selected-block"))
+        XCTAssertEqual(selected?["extension"], .string("opaque"))
+        XCTAssertEqual(reportBuilderAuthoredDocument(form, stateKey: "missing")?["blocks"]?.arrayValue?.first?.objectValue?["id"], .string("header"))
     }
 
     func testPublishedSourcesFollowDocumentOrderButFetchCheapKPIsFirst() {
@@ -342,7 +370,7 @@ final class ReportBuilderAuthoredRuntimeTests: XCTestCase {
         let result = materializeReportBuilderAuthoredDocument(document)
         let chart = result["blocks"]?.arrayValue?.first?.objectValue?["chartModel"]?.objectValue
 
-        XCTAssertEqual(chart?["type"], .string("bar"))
+        XCTAssertEqual(chart?["type"], .string("horizontal_bar"))
         XCTAssertEqual(chart?["xAxis"]?.objectValue?["dataKey"], .string("channel"))
         XCTAssertEqual(chart?["series"]?.objectValue?["values"]?.arrayValue?.count, 2)
     }

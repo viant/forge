@@ -63,7 +63,7 @@ struct ScheduleEditorRenderer: View {
     @MainActor
     private func observeRows() async {
         rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef)
-        if rows.isEmpty { await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef) }
+        if rows.isEmpty { await runtime.automaticallyRefreshDataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef) }
         rows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef)
         let stream = await runtime.dataSourceCollectionUpdates(windowID: window.windowID, dataSourceRef: dataSourceRef)
         for await next in stream where !dirty { rows = next }

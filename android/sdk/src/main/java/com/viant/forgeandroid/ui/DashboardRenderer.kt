@@ -134,6 +134,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import java.util.Locale
 
 @Composable
@@ -380,14 +381,14 @@ private fun CompactEditableFeedTable(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, Color(0xFFDCE3ED)),
-        color = Color.White
+        border = BorderStroke(1.dp, LocalForgeThemeAppearance.current?.controlBorder ?: Color(0xFFDCE3ED)),
+        color = LocalForgeThemeAppearance.current?.surface ?: Color.White
     ) {
         Column {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFFF3F6FA))
+                    .background(LocalForgeThemeAppearance.current?.controlBackground ?: Color(0xFFF3F6FA))
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -397,16 +398,16 @@ private fun CompactEditableFeedTable(
                         text = column.label ?: field,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF344054),
+                        color = LocalForgeThemeAppearance.current?.text ?: Color(0xFF344054),
                         modifier = Modifier.width(frozenWidth).padding(horizontal = 10.dp)
                     )
                 }
                 Row(modifier = Modifier.weight(1f).horizontalScroll(horizontalState)) {
                     scrollingColumns.forEach { column ->
                         val field = dashboardTableColumnKey(column).orEmpty()
-                        Text(text = column.label ?: field, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = Color(0xFF475467), modifier = Modifier.width(compactEditableColumnWidth(column)).padding(horizontal = 10.dp))
+                        Text(text = column.label ?: field, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = LocalForgeThemeAppearance.current?.text ?: Color(0xFF475467), modifier = Modifier.width(compactEditableColumnWidth(column)).padding(horizontal = 10.dp))
                     }
-                    Text("Actions", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = Color(0xFF475467), modifier = Modifier.width(actionWidth).padding(horizontal = 10.dp))
+                    Text("Actions", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = LocalForgeThemeAppearance.current?.text ?: Color(0xFF475467), modifier = Modifier.width(actionWidth).padding(horizontal = 10.dp))
                 }
             }
             indexedRows.forEach { indexed ->
@@ -417,7 +418,7 @@ private fun CompactEditableFeedTable(
                 ) {
                     frozenColumn?.let { column ->
                         val field = dashboardTableColumnKey(column).orEmpty()
-                        Box(modifier = Modifier.width(frozenWidth).fillMaxHeight().background(Color(0xFFFAFBFC)).padding(horizontal = 6.dp, vertical = 6.dp)) {
+                        Box(modifier = Modifier.width(frozenWidth).fillMaxHeight().background(LocalForgeThemeAppearance.current?.surface ?: Color(0xFFFAFBFC)).padding(horizontal = 6.dp, vertical = 6.dp)) {
                             EditableFeedCell(column = column, value = indexed.value[field], showLabel = false, onChange = { value ->
                                 dispatchEditableFeedPatch(runtime, context, FeedPatchOperation(context.dataSourceRef, "replace", "/collection/${indexed.index}/${escapeFeedPointer(field)}", value))
                             })
@@ -669,7 +670,7 @@ private fun CompactDashboardTextInputSurface(
         singleLine = true,
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
         modifier = modifier
-            .background(backgroundColor, shape)
+            .background(LocalForgeThemeAppearance.current?.controlBackground ?: backgroundColor, shape)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
             .padding(horizontal = 11.dp, vertical = 9.dp),
         decorationBox = { inner ->
@@ -704,7 +705,7 @@ private fun CompactDashboardTextAreaSurface(
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
         modifier = modifier
             .heightIn(min = 40.dp, max = 48.dp)
-            .background(Color.White, shape)
+            .background(LocalForgeThemeAppearance.current?.controlBackground ?: Color.White, shape)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
             .padding(horizontal = 11.dp, vertical = 5.dp),
         decorationBox = { inner ->
@@ -750,8 +751,11 @@ private fun DashboardLookupChips(
     val lookupParameters = remember(lookup, provider, query, window.windowId) {
         buildLookupInputParameters(lookup, provider, query, window)
     }
-    LaunchedEffect(lookupContext, lookupParameters, lookupExpanded) {
-        if (lookupExpanded && lookupContext != null) {
+    val minimumQueryLength = (lookup["minQueryLength"] as? JsonPrimitive)?.intOrNull?.coerceAtLeast(0) ?: 0
+    val queryReady = isLookupQueryReady(query, minimumQueryLength)
+    LaunchedEffect(lookupContext, lookupParameters, lookupExpanded, queryReady) {
+        if (lookupExpanded && lookupContext != null && queryReady) {
+            kotlinx.coroutines.delay(250)
             lookupContext.setInputParameters(lookupParameters)
             lookupContext.fetchCollection()
         }
@@ -796,7 +800,7 @@ private fun DashboardLookupChips(
         val selectionValueField = (lookup["selectionValueField"] as? JsonPrimitive)?.contentOrNull ?: valueField
         val selectedValues = selectedRows.map { it[selectionValueField]?.toString() }.toSet()
         val filtered = lookupRows.filter { row ->
-            query.isNotBlank() && row.values.any { it?.toString()?.contains(query, ignoreCase = true) == true } &&
+            queryReady && query.isNotBlank() && row.values.any { it?.toString()?.contains(query, ignoreCase = true) == true } &&
                 row[valueField]?.toString() !in selectedValues
         }.take(20)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -818,13 +822,18 @@ private fun DashboardLookupChips(
                 )
             }
         }
-        if (query.isNotBlank() && filtered.isEmpty()) {
+        if (!queryReady) {
+            Text("Enter at least $minimumQueryLength characters to search.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else if (query.isNotBlank() && filtered.isEmpty()) {
             Text("No available matches.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         }
     }
     DashboardEditableFeedTable(runtime, context, container)
 }
+
+internal fun isLookupQueryReady(query: String, minimumQueryLength: Int): Boolean =
+    query.trim().length >= minimumQueryLength.coerceAtLeast(0)
 
 private fun buildLookupInputParameters(
     lookup: JsonObject,
@@ -3083,6 +3092,8 @@ private fun DashboardReportRuntimePanel(
     accent: Color? = null,
     content: @Composable () -> Unit
 ) {
+    val neutral = background == Color(0xFFFCFEFF) && border == Color(0xFFDBE5EC)
+    val appearance = LocalForgeThemeAppearance.current
     val panelContent: @Composable () -> Unit = {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp),
@@ -3093,17 +3104,16 @@ private fun DashboardReportRuntimePanel(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF182026)
+                    color = if (neutral) appearance?.text ?: Color(0xFF182026) else Color(0xFF182026)
                 )
             }
             subtitle?.takeIf { it.isNotBlank() }?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = Color(0xFF526A82))
+                Text(it, style = MaterialTheme.typography.bodySmall, color = if (neutral) appearance?.text?.copy(alpha = 0.72f) ?: Color(0xFF526A82) else Color(0xFF526A82))
             }
             content()
         }
     }
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val neutral = background == Color(0xFFFCFEFF) && border == Color(0xFFDBE5EC)
         if (maxWidth < 600.dp && neutral) {
             // On a phone the selected report section is already the containing
             // surface. Neutral blocks become native page sections, avoiding the
@@ -3112,8 +3122,9 @@ private fun DashboardReportRuntimePanel(
         } else {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = background,
-                border = BorderStroke(1.dp, border),
+                color = if (neutral) appearance?.surface ?: background else background,
+                contentColor = if (neutral) appearance?.text ?: MaterialTheme.colorScheme.onSurface else Color(0xFF182026),
+                border = BorderStroke(1.dp, if (neutral) appearance?.controlBorder ?: border else border),
                 shape = RoundedCornerShape(12.dp),
                 shadowElevation = 0.dp,
             ) {

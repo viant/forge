@@ -2,6 +2,37 @@ import XCTest
 @testable import ForgeIOSRuntime
 
 final class InlineReportRuntimeCompilerTests: XCTestCase {
+    func testPortableForecastChartsAndCollectionReachNativePresentation() throws {
+        let source = try JSONDecoder().decode(JSONValue.self, from: Data(#"""
+        {"title":"Forecast","blocks":[
+          {"id":"daily","kind":"chartBlock","datasetRef":"daily","chartSpec":{"type":"line","xField":"date","yFields":["overall","inventory"]}},
+          {"id":"ages","kind":"chartBlock","datasetRef":"ages","chartSpec":{"type":"bar","orientation":"horizontal","xField":"age","yFields":["avails"]}},
+          {"id":"findings","kind":"collectionBlock","datasetRef":"findings","itemTitleField":"finding","rowLimit":2,"bodyTemplate":"**Driver:** ${row.driver}","toneField":"importance","toneRules":[{"value":"High","tone":"danger"}]}
+        ]}
+        """#.utf8))
+        let report = TranscriptCanonicalReport(scope: "message", id: "forecast", grammar: "report-document-v1", status: "committed", source: source, dataSources: [
+            "daily": TranscriptCanonicalData(id: "daily", format: "json", payload: .array([.object(["date": .string("2026-10-04"), "overall": .number(313685105), "inventory": .number(176562768270)])])),
+            "ages": TranscriptCanonicalData(id: "ages", format: "json", payload: .array([.object(["age": .string("18-24"), "avails": .number(7)])])),
+            "findings": TranscriptCanonicalData(id: "findings", format: "json", payload: .array([
+                .object(["finding": .string("Location"), "driver": .string("Metro restriction"), "importance": .string("High")]),
+                .object(["finding": .string("Bid"), "driver": .string("Clearing price"), "importance": .string("Low")]),
+                .object(["finding": .string("Hidden by limit"), "driver": .string("Third")])
+            ]))
+        ])
+        let artifact = try InlineReportRuntimeCompiler.compile(report)
+        let summary = DashboardRuntime.dashboardReportRuntimeSummary(ContainerDef(id: "report", kind: "dashboard.reportRuntime", reportRuntime: .object(["reportFill": artifact.reportFill, "reportSpec": artifact.reportSpec])))
+        let daily = try XCTUnwrap(summary.blocks.first { $0.id == "daily" }?.chart)
+        XCTAssertEqual(daily.rows.first?["overall"], .number(313685105))
+        XCTAssertEqual(daily.chart.series, ["overall", "inventory"])
+        XCTAssertEqual(summary.blocks.first { $0.id == "ages" }?.chart?.chart.type, "horizontal_bar")
+        let items = try XCTUnwrap(summary.blocks.first { $0.id == "findings" }?.content["items"]?.arrayValue)
+        XCTAssertEqual(items.count, 2)
+        XCTAssertEqual(items[0].objectValue?["title"], .string("Location"))
+        XCTAssertEqual(items[0].objectValue?["bodyMarkdown"], .string("**Driver:** Metro restriction"))
+        XCTAssertEqual(items[1].objectValue?["bodyMarkdown"], .string("**Driver:** Clearing price"))
+        XCTAssertEqual(items[0].objectValue?["tone"], .string("danger"))
+    }
+
     func testMaterializesBadgeValuesPreservesKPIFormatAndTableCellVisual() throws {
         let source: JSONValue = .object([
             "title": .string("Parity"),
