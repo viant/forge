@@ -23,6 +23,68 @@ Owned classes: `forge-container`, `forge-container-card`,
 `container-content`, and `fields`. The logical `data-forge-container-id` anchor
 remains available on the content body for framed containers and plain root.
 
+## Semantic section contracts
+
+Prefer the bounded Section contract over adding a product-specific class when
+the requirement describes reusable hierarchy:
+
+```yaml
+id: workArea
+title: Work area
+section:
+  appearance: primary
+  contentInset: flush
+
+containers:
+  - id: details
+    title: Details
+    section: { appearance: quiet }
+```
+
+Supported `section.appearance` values are:
+
+| Value | Semantic role |
+| --- | --- |
+| `primary` | A major bounded work surface that owns its heading and body. |
+| `quiet` | A subordinate subsection that relies on heading, proximity, and a divider instead of another decorative card. |
+
+Values are trimmed and compared case-insensitively. Unsupported or omitted
+values preserve the existing Section output and do not emit an appearance
+attribute. Supported values emit
+`data-forge-section-appearance="primary|quiet"` on the outer Section. Existing
+`section.properties.className` remains available and is not replaced.
+
+`section.contentInset` is a separate bounded layout role. The only supported
+value is `flush`. It marks a Section whose content owns its internal spacing and
+can therefore meet the Section boundary without an additional theme-authored
+body inset. Supported values emit
+`data-forge-section-content-inset="flush"` on the outer Section. Values are
+trimmed and compared case-insensitively. Unsupported or omitted values emit no
+attribute and preserve the existing Section output.
+
+The semantic attributes do not alter default visuals. An opt-in theme selects
+their tokenized surface, spacing, divider, and responsive treatment. This keeps
+legacy and production themes unchanged while allowing a workspace to adopt the
+same component contract deliberately.
+
+Forge consumes optional appearance-specific header tokens after its generic
+section rule, so the role remains stable regardless of stylesheet injection
+order. `--forge-section-primary-header-surface`,
+`--forge-section-primary-header-font-size`, and
+`--forge-section-primary-header-line-height` refine primary headers;
+`--forge-section-quiet-header-surface`,
+`--forge-section-quiet-header-font-size`, and
+`--forge-section-quiet-header-line-height` refine quiet headers. Each falls back
+to the generic section-header role when a theme does not provide it, preserving
+existing visuals. A theme can therefore make a quiet subsection transparent
+without flattening every section header in the workspace.
+
+When quiet sections are direct children of a grid using
+`layout.appearance: divided-sections`, Forge also places
+`data-forge-grid-item-section-appearance="quiet"` on each owned grid-item
+wrapper. Themes can therefore draw peer dividers without `:has()`, child IDs,
+or positional selectors.
+
 Hidden presentation suppresses rendering only through CSS. There is no hidden
 class branch that skips children, datasource registration, or fetching. The
 sizing helper omits inline display on that outer boundary so the core class can

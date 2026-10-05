@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const styles = fs.readFileSync(new URL('./Dashboard.css', import.meta.url), 'utf8');
+const basicStyles = fs.readFileSync(new URL('../table/Basic.css', import.meta.url), 'utf8');
 const component = fs.readFileSync(new URL('./DashboardTableContent.jsx', import.meta.url), 'utf8');
 const theme = fs.readFileSync(new URL('../../packs/blueprint/theme.css', import.meta.url), 'utf8');
 
@@ -38,6 +39,11 @@ assert.ok(styles.includes('var(--forge-dashboard-table-control-border, #d8e2eb)'
 assert.ok(styles.includes('var(--forge-dashboard-table-control-surface, #fbfdff)'));
 assert.ok(styles.includes('var(--forge-dashboard-table-control-text, #263443)'));
 assert.ok(styles.includes('line-height: var(--forge-dashboard-table-small-line-height, normal)'));
+assert.match(styles, /\.forge-dashboard-table th\s*\{[^}]*vertical-align:\s*var\(--forge-table-cell-vertical-align, middle\)/s);
+assert.match(styles, /\.forge-dashboard-table td\s*\{[^}]*vertical-align:\s*var\(--forge-table-cell-vertical-align, top\)/s);
+assert.match(styles, /\.forge-editable-collection__table th\s*\{[^}]*vertical-align:\s*var\(--forge-table-cell-vertical-align, middle\)/s);
+assert.match(styles, /\.forge-editable-collection__table td\s*\{[^}]*vertical-align:\s*var\(--forge-table-cell-vertical-align, top\)/s);
+assert.match(basicStyles, /\.basic-table-wrapper table th,\s*\.basic-table-wrapper table td\s*\{[^}]*vertical-align:\s*var\(--forge-table-cell-vertical-align, top\)/s);
 assert.ok(component.includes("var(--forge-dashboard-table-link, #2367d1)"));
 assert.ok(component.includes("var(--forge-status-danger-foreground, #a82a2a)"));
 

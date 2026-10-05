@@ -24,6 +24,32 @@ selection, sorting, or export. Unused slots are blank rather than striped fake
 records. `rowHeight` fixes row height; use detail views for expanded content.
 `minRows` is clamped to 0–100; fixed row heights to 24–96px (32px by default).
 
+## Vertical cell alignment
+
+Core runtime tables consume one shared component role:
+
+```css
+--forge-table-cell-vertical-align: middle;
+```
+
+The default remains `top` for production compatibility. An opt-in theme can set
+the role once to center headers, editable controls, read-only values, and row
+actions across Basic, dashboard, and editable collection tables. Multiline text
+wraps as one centered block. Responsive card layouts keep their own grid
+alignment, and report-designer canvases are not affected.
+
+Editable collections can opt into authored phone cards with `mobileCards`.
+`titleField` identifies each card, optional `metaField` adds compact context,
+and `fields` preserves the intended display and editing order. Frequency and
+long-text editors keep their desktop input semantics inside phone cards.
+
+Read-only dashboard tables use the same opt-in `mobileCards` contract. Their
+desktop table remains unchanged, while phone layouts show the authored fields
+as label/value rows. Multi-select tables keep a labeled selection checkbox in
+each card so the narrow layout does not remove existing behavior. Omitting
+`mobileCards` preserves the table and its horizontal-scroll behavior at every
+width.
+
 `fillRemainingWidth: true` keeps the table full width while a non-data trailing
 column absorbs unused width. Real column widths are retained. Without that flag,
 `fullWidth: true` forces full width; otherwise a naturally narrow table stays

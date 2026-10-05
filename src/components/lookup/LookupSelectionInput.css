@@ -112,3 +112,98 @@
     border-color: #8fb7a0;
     background: #8fb7a0;
 }
+
+.forge-lookup-selection-input--search .forge-lookup-selection-input__control {
+    width: 100%;
+    height: var(--forge-control-height, 36px);
+    gap: 0;
+    overflow: hidden;
+    border-color: var(--forge-control-border);
+    border-radius: var(--forge-control-radius, 8px);
+    background: var(--forge-control-bg);
+    padding: 0;
+    box-shadow: none;
+}
+
+.forge-lookup-selection-input--search .forge-lookup-selection-input__field {
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border-radius: 0;
+    color: var(--forge-control-text);
+    padding-inline: var(--forge-control-padding-inline, 12px);
+    font: inherit;
+}
+
+.forge-lookup-selection-input--search .forge-lookup-selection-input__field::placeholder {
+    color: var(--forge-text-muted);
+}
+
+.forge-lookup-selection-input--search:focus-within .forge-lookup-selection-input__control {
+    border-color: var(--forge-focus-color);
+    box-shadow: 0 0 0 1px var(--forge-focus-color);
+}
+
+.forge-lookup-selection-input--search.is-invalid .forge-lookup-selection-input__control {
+    border-color: var(--forge-status-danger-border);
+}
+
+.forge-lookup-selection-input--search.is-disabled .forge-lookup-selection-input__control {
+    background: var(--forge-disabled-bg);
+}
+
+.forge-lookup-selection-input--search.is-disabled .forge-lookup-selection-input__field {
+    color: var(--forge-disabled-text);
+}
+
+.forge-lookup-selection-input--search .forge-lookup-selection-input__end-button {
+    align-self: stretch;
+    width: var(--forge-control-height, 36px);
+    min-width: var(--forge-control-height, 36px);
+    height: auto;
+    border: 0;
+    border-left: 1px solid var(--forge-control-border);
+    border-radius: 0;
+    background: transparent;
+    color: var(--forge-text-muted);
+    box-shadow: none;
+}
+
+.forge-lookup-selection-input--search .forge-lookup-selection-input__end-button:not(:disabled):hover {
+    background: var(--forge-selected-background);
+    color: var(--forge-interaction-hover-color);
+}
+
+.forge-lookup-selection-input--search .forge-lookup-selection-input__end-button:focus-visible {
+    position: relative;
+    outline: 2px solid var(--forge-focus-color);
+    outline-offset: -2px;
+}
+
+.forge-lookup-selection-input--search .forge-lookup-selection-input__end-button:disabled {
+    border-color: var(--forge-control-border);
+    background: var(--forge-disabled-bg);
+    color: var(--forge-disabled-text);
+}
+
+@media (max-width: 600px) {
+    .forge-lookup-selection-input--search .forge-lookup-selection-input__control {
+        height: var(--forge-form-mobile-control-height, 44px);
+    }
+
+    .forge-lookup-selection-input--search .forge-lookup-selection-input__end-button {
+        width: var(--forge-form-mobile-control-height, 44px);
+        min-width: var(--forge-form-mobile-control-height, 44px);
+    }
+}
+
+.forge-lookup-selection-input__feedback {
+    color: var(--forge-text-muted);
+    font-size: var(--forge-type-small-size);
+    line-height: var(--forge-type-small-line-height);
+}
+
+.forge-lookup-selection-input__feedback.is-error {
+    color: var(--forge-status-danger-foreground);
+}

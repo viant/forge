@@ -73,6 +73,10 @@ export default function DashboardTableContent({
     const density = container.dashboard?.table?.density || container.density || "comfortable";
     const rowActions = container.dashboard?.table?.rowActions || container.rowActions || [];
     const rowActionDisplayMode = container.dashboard?.table?.rowActionDisplay || container.rowActionDisplay || "compact";
+    const mobileCards = container?.mobileCards?.enabled === true && rowActions.length === 0
+        ? container.mobileCards
+        : null;
+    const mobileFieldKeys = Array.isArray(mobileCards?.fields) ? mobileCards.fields : [];
     const multiSelect = String(context?.dataSource?.selectionMode || container.selectionMode || '').trim().toLowerCase() === 'multi';
     const selectedRows = multiSelect && Array.isArray(selection?.selection) ? selection.selection : [];
     const uniqueFields = (Array.isArray(context?.dataSource?.uniqueKey) ? context.dataSource.uniqueKey : [])
@@ -137,6 +141,15 @@ export default function DashboardTableContent({
         [normalizedColumns, quickFilteredCollection],
     );
     const displayColumns = useMemo(() => withFrozenIdentifierColumn(runtimeColumns), [runtimeColumns]);
+    const mobileTitleColumn = mobileCards
+        ? displayColumns.find((column) => column.key === mobileCards.titleField)
+        : null;
+    const mobileMetaColumn = mobileCards?.metaField
+        ? displayColumns.find((column) => column.key === mobileCards.metaField)
+        : null;
+    const mobileCardColumns = mobileCards
+        ? mobileFieldKeys.map((key) => displayColumns.find((column) => column.key === key)).filter(Boolean)
+        : [];
     const tableLayout = useMemo(() => buildDashboardTableLayout(displayColumns, {
         multiSelect,
         hasRowActions: rowActions.length > 0,
@@ -237,10 +250,10 @@ export default function DashboardTableContent({
             {sortedRows.length > 0 ? (
                 <>
                 {tableLayout.horizontallyScrollable ? (
-                    <div className="forge-dashboard-table-scroll-hint">Scroll horizontally to view all columns</div>
+                    <div className={`forge-dashboard-table-scroll-hint${mobileCards ? ' forge-dashboard-table-scroll-hint--mobile-cards' : ''}`}>Scroll horizontally to view all columns</div>
                 ) : null}
                 <div
-                    className="forge-dashboard-table-wrap"
+                    className={`forge-dashboard-table-wrap${mobileCards ? ' forge-dashboard-table-wrap--mobile-cards' : ''}`}
                     role={tableLayout.horizontallyScrollable ? "region" : undefined}
                     aria-label={tableLayout.horizontallyScrollable ? "Scrollable data table" : undefined}
                     tabIndex={tableLayout.horizontallyScrollable ? 0 : undefined}
@@ -412,6 +425,63 @@ export default function DashboardTableContent({
                         </tbody>
                     </table>
                 </div>
+                {mobileCards ? (
+                    <div className="forge-dashboard-table-cards">
+                        {sortedRows.map((row, index) => {
+                            const titleValue = resolveDashboardTableColumnValue(row, mobileTitleColumn, {preferDisplay: true});
+                            const titleLabel = String(titleValue ?? `Row ${index + 1}`);
+                            return (
+                                <section className="forge-dashboard-table-card" key={`mobile-${index}`}>
+                                    <header className="forge-dashboard-table-card__header">
+                                        {multiSelect ? (
+                                            <label className="forge-dashboard-table-card__title">
+                                                <input
+                                                    type="checkbox"
+                                                    aria-label={`Select ${titleLabel}`}
+                                                    checked={rowSelected(row)}
+                                                    onChange={() => selectionHandlers.toggleSelection?.({row, rowIndex: index})}
+                                                />
+                                                <strong>{renderDashboardTableCell(titleValue, row, mobileTitleColumn, locale, context)}</strong>
+                                            </label>
+                                        ) : (
+                                            <span className="forge-dashboard-table-card__title">
+                                                <strong>{renderDashboardTableCell(titleValue, row, mobileTitleColumn, locale, context)}</strong>
+                                            </span>
+                                        )}
+                                        {mobileMetaColumn ? (
+                                            <span className="forge-dashboard-table-card__meta">
+                                                {mobileCards.metaLabel ? `${mobileCards.metaLabel}: ` : ''}
+                                                {renderDashboardTableCell(
+                                                    resolveDashboardTableColumnValue(row, mobileMetaColumn, {preferDisplay: true}),
+                                                    row,
+                                                    mobileMetaColumn,
+                                                    locale,
+                                                    context,
+                                                )}
+                                            </span>
+                                        ) : null}
+                                    </header>
+                                    {mobileCardColumns.length > 0 ? (
+                                        <dl className="forge-dashboard-table-card__fields">
+                                            {mobileCardColumns.map((column) => (
+                                                <div className="forge-dashboard-table-card__field" key={column.key}>
+                                                    <dt>{column.label || column.key}</dt>
+                                                    <dd>{renderDashboardTableCell(
+                                                        resolveDashboardTableColumnValue(row, column, {preferDisplay: true}),
+                                                        row,
+                                                        column,
+                                                        locale,
+                                                        context,
+                                                    )}</dd>
+                                                </div>
+                                            ))}
+                                        </dl>
+                                    ) : null}
+                                </section>
+                            );
+                        })}
+                    </div>
+                ) : null}
                 </>
             ) : null}
             {pagingEnabled && pageCount > 1 ? (

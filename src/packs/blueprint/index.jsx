@@ -58,10 +58,31 @@ import {resolveNumericInputMinorStepSize} from './numericInputSteps.js';
 
 /* ------------------------ Widget implementation ----------------------- */
 
-function TextInput({ value = '', onChange, readOnly, ...rest }) {
+const mergeClassNames = (...classNames) => classNames.filter(Boolean).join(' ') || undefined;
+
+const isFieldTrackControl = (value) => value === true || value === 'true';
+
+const resolveFieldTrackFill = (fieldTrackControl, fill) => (
+    isFieldTrackControl(fieldTrackControl) && fill === undefined ? true : fill
+);
+
+const defaultSelectItemPredicate = (query, item, _index, exactMatch = false) => {
+    const normalizedQuery = String(query || '').trim().toLocaleLowerCase();
+    if (!normalizedQuery) return true;
+    const candidates = [item?.label, item?.value, item?.secondary]
+        .filter((candidate) => candidate !== undefined && candidate !== null)
+        .map((candidate) => String(candidate).toLocaleLowerCase());
+    return exactMatch
+        ? candidates.some((candidate) => candidate === normalizedQuery)
+        : candidates.some((candidate) => candidate.includes(normalizedQuery));
+};
+
+function TextInput({ value = '', onChange, readOnly, fill, ...rest }) {
+    const resolvedFill = resolveFieldTrackFill(rest['data-forge-field-track-control'], fill);
     return (
         <InputGroup
             {...rest}
+            fill={resolvedFill}
             value={value}
             onChange={(e) => onChange?.(e.target.value)}
             readOnly={readOnly}
@@ -69,10 +90,37 @@ function TextInput({ value = '', onChange, readOnly, ...rest }) {
     );
 }
 
-function BooleanPill({value = false, onChange, readOnly, disabled, item, ariaLabel, 'aria-label': ariaLabelProp, ...rest}) {
+function BooleanPill({
+    value = false,
+    onChange,
+    readOnly,
+    disabled,
+    item,
+    ariaLabel,
+    'aria-label': ariaLabelProp,
+    'aria-labelledby': ariaLabelledBy,
+    'aria-describedby': ariaDescribedBy,
+    'aria-required': ariaRequired,
+    'aria-invalid': ariaInvalid,
+    'data-forge-widget': forgeWidget,
+    'data-forge-control-id': forgeControlId,
+    'data-forge-part': forgePart,
+    'data-forge-field-track-control': fieldTrackControl,
+    id,
+    title,
+}) {
     const checked = !!value;
     return (
-        <button id={rest.id} title={rest.title} type="button" role="switch" aria-checked={checked} aria-label={ariaLabel || ariaLabelProp || item?.label || item?.name || 'Boolean value'}
+        <button id={id} title={title} type="button" role="switch" aria-checked={checked}
+            aria-label={ariaLabel || ariaLabelProp || item?.label || item?.name || 'Boolean value'}
+            aria-labelledby={fieldTrackControl ? ariaLabelledBy : undefined}
+            aria-describedby={fieldTrackControl ? ariaDescribedBy : undefined}
+            aria-required={fieldTrackControl ? ariaRequired : undefined}
+            aria-invalid={fieldTrackControl ? ariaInvalid : undefined}
+            data-forge-widget={fieldTrackControl ? forgeWidget : undefined}
+            data-forge-control-id={fieldTrackControl ? forgeControlId : undefined}
+            data-forge-part={fieldTrackControl ? forgePart : undefined}
+            data-forge-field-track-control={fieldTrackControl}
             className={`forge-boolean-pill${checked ? ' is-on' : ''}`}
             disabled={readOnly || disabled} onClick={() => onChange?.(!checked)}>
             <span className="forge-boolean-pill__track"><span className="forge-boolean-pill__thumb"/></span>
@@ -381,12 +429,18 @@ export function registerPack() {
     /* -------------------- Number / Numeric input ------------------- */
     registerWidget(
         'number',
-        ({ value = '', onValueChange, readOnly, nullable = false, min, stepSize, minorStepSize, ...rest }) => {
+        ({ value = '', onValueChange, readOnly, nullable = false, min, stepSize, minorStepSize, fill, buttonPosition, className, ...rest }) => {
             const empty = nullable && (value === '' || value === null || value === undefined);
             const resolvedMinorStepSize = resolveNumericInputMinorStepSize(stepSize, minorStepSize);
+            const fieldTrackControl = isFieldTrackControl(rest['data-forge-field-track-control']);
             return (
                 <NumericInput
                     {...rest}
+                    className={fieldTrackControl
+                        ? mergeClassNames('forge-field-track-number', className)
+                        : className}
+                    fill={resolveFieldTrackFill(fieldTrackControl, fill)}
+                    buttonPosition={fieldTrackControl && buttonPosition === undefined ? 'none' : buttonPosition}
                     value={empty ? '' : (value ?? '')}
                     min={nullable ? undefined : min}
                     onValueChange={(valueAsNumber, valueAsString) => {
@@ -544,30 +598,167 @@ export function registerPack() {
     /* -------------------- Select / Dropdown ------------------------- */
     registerWidget(
         'select',
-        function BPSelect({ value, onChange, readOnly, options = [], context, fill = false, id, 'aria-label': ariaLabel, ...rest }) {
+        function BPSelect({
+            value,
+            onChange,
+            readOnly,
+            disabled,
+            options = [],
+            context,
+            fill,
+            filterable,
+            itemListPredicate,
+            itemPredicate,
+            itemRenderer,
+            noResults,
+            inputProps,
+            menuProps,
+            popoverContentProps,
+            popoverProps,
+            popoverTargetProps,
+            placeholder,
+            id,
+            'aria-label': ariaLabel,
+            'aria-labelledby': ariaLabelledBy,
+            'aria-describedby': ariaDescribedBy,
+            'aria-required': ariaRequired,
+            'aria-invalid': ariaInvalid,
+            'data-forge-widget': forgeWidget,
+            'data-forge-control-id': forgeControlId,
+            'data-forge-part': forgePart,
+            'data-forge-field-track-control': fieldTrackControl,
+            ...rest
+        }) {
             const visibleOptions = permittedOptions(options, context);
             const selected = visibleOptions.find((o) => String(o.value) === String(value));
+            const isFieldTrack = isFieldTrackControl(fieldTrackControl);
+            const resolvedFill = resolveFieldTrackFill(isFieldTrack, fill);
+            const resolvedFilterable = filterable === undefined
+                ? (isFieldTrack && visibleOptions.length >= 10)
+                : filterable;
+            const unavailable = readOnly || disabled;
+            const selectRest = isFieldTrack ? rest : {
+                ...rest,
+                ...(ariaLabelledBy !== undefined ? {'aria-labelledby': ariaLabelledBy} : {}),
+                ...(ariaDescribedBy !== undefined ? {'aria-describedby': ariaDescribedBy} : {}),
+                ...(ariaRequired !== undefined ? {'aria-required': ariaRequired} : {}),
+                ...(ariaInvalid !== undefined ? {'aria-invalid': ariaInvalid} : {}),
+                ...(forgeWidget !== undefined ? {'data-forge-widget': forgeWidget} : {}),
+                ...(forgeControlId !== undefined ? {'data-forge-control-id': forgeControlId} : {}),
+                ...(forgePart !== undefined ? {'data-forge-part': forgePart} : {}),
+            };
+            const defaultPopoverProps = {minimal: true, matchTargetWidth: true, placement: 'bottom-start'};
+            const resolvedPopoverProps = isFieldTrack ? {
+                ...defaultPopoverProps,
+                ...popoverProps,
+                popoverClassName: mergeClassNames(
+                    'forge-field-track-select-popover',
+                    popoverProps?.popoverClassName,
+                ),
+                portalClassName: mergeClassNames(
+                    'forge-field-track-select-portal',
+                    popoverProps?.portalClassName,
+                ),
+            } : (popoverProps === undefined ? defaultPopoverProps : popoverProps);
+            const resolvedPopoverTargetProps = isFieldTrack ? {
+                ...popoverTargetProps,
+                className: mergeClassNames(
+                    'forge-field-track-select-target',
+                    popoverTargetProps?.className,
+                ),
+            } : popoverTargetProps;
+            const resolvedMenuProps = isFieldTrack ? {
+                ...menuProps,
+                className: mergeClassNames(
+                    'forge-field-track-select-menu',
+                    menuProps?.className,
+                ),
+            } : menuProps;
+            const resolvedInputProps = isFieldTrack ? {
+                ...inputProps,
+                className: mergeClassNames(
+                    'forge-field-track-select-search',
+                    inputProps?.className,
+                ),
+                'aria-label': inputProps?.['aria-label'] || `Search ${ariaLabel || rest.item?.label || 'options'}`,
+            } : inputProps;
+            const resolvedItemPredicate = isFieldTrack
+                && resolvedFilterable
+                && itemPredicate === undefined
+                && itemListPredicate === undefined
+                ? defaultSelectItemPredicate
+                : itemPredicate;
+            const defaultItemRenderer = (item, {handleClick, modifiers}) => (
+                <MenuItem
+                    key={item.value}
+                    text={item.label}
+                    htmlTitle={item.tooltip || undefined}
+                    active={modifiers.active}
+                    disabled={isSelectOptionDisabled(item)}
+                    onClick={isSelectOptionDisabled(item) ? undefined : handleClick}
+                />
+            );
+            const fieldTrackItemRenderer = (item, {handleClick, handleFocus, id: itemId, modifiers, ref}) => (
+                <MenuItem
+                    key={item.value}
+                    ref={ref}
+                    id={itemId}
+                    className="forge-field-track-select-option"
+                    text={item.label}
+                    htmlTitle={item.tooltip || undefined}
+                    active={modifiers.active}
+                    disabled={isSelectOptionDisabled(item)}
+                    roleStructure="listoption"
+                    selected={String(item.value) === String(value)}
+                    onFocus={handleFocus}
+                    onClick={isSelectOptionDisabled(item) ? undefined : handleClick}
+                />
+            );
+            const resolvedNoResults = isFieldTrack && resolvedFilterable && noResults === undefined ? (
+                <MenuItem
+                    className="forge-field-track-select-option forge-field-track-select-empty"
+                    disabled
+                    roleStructure="listoption"
+                    text="No matching options"
+                />
+            ) : noResults;
             return (
                 <Select
+                    {...selectRest}
                     items={visibleOptions}
-                    fill={fill}
-                    itemRenderer={(item, { handleClick, modifiers }) => (
-                        <MenuItem
-                            key={item.value}
-                            text={item.label}
-                            htmlTitle={item.tooltip || undefined}
-                            active={modifiers.active}
-                            disabled={isSelectOptionDisabled(item)}
-                            onClick={isSelectOptionDisabled(item) ? undefined : handleClick}
-                        />
-                    )}
-                    filterable={false}
-                    disabled={readOnly}
-                    popoverProps={{ minimal: true, matchTargetWidth: true, placement: 'bottom-start' }}
-                    {...rest}
+                    fill={resolvedFill}
+                    itemRenderer={isFieldTrack ? fieldTrackItemRenderer : (itemRenderer || defaultItemRenderer)}
+                    filterable={resolvedFilterable}
+                    itemListPredicate={itemListPredicate}
+                    itemPredicate={resolvedItemPredicate}
+                    noResults={resolvedNoResults}
+                    disabled={unavailable}
+                    inputProps={resolvedInputProps}
+                    menuProps={resolvedMenuProps}
+                    popoverContentProps={popoverContentProps}
+                    popoverProps={resolvedPopoverProps}
+                    popoverTargetProps={resolvedPopoverTargetProps}
+                    placeholder={placeholder}
                     onItemSelect={(item) => commitSelectOption(item, onChange)}
                 >
-                    <Button id={id} aria-label={ariaLabel} fill={fill} text={selected?.label || rest.placeholder || 'Select…'} rightIcon="caret-down" disabled={readOnly} />
+                    <Button
+                        id={id}
+                        aria-label={ariaLabel}
+                        aria-labelledby={fieldTrackControl ? ariaLabelledBy : undefined}
+                        aria-describedby={fieldTrackControl ? ariaDescribedBy : undefined}
+                        aria-required={fieldTrackControl ? ariaRequired : undefined}
+                        aria-invalid={fieldTrackControl ? ariaInvalid : undefined}
+                        data-forge-widget={fieldTrackControl ? forgeWidget : undefined}
+                        data-forge-control-id={fieldTrackControl ? forgeControlId : undefined}
+                        data-forge-part={fieldTrackControl ? forgePart : undefined}
+                        data-forge-field-track-control={fieldTrackControl}
+                        fill={resolvedFill}
+                        alignText={isFieldTrack ? 'start' : undefined}
+                        ellipsizeText={isFieldTrack || undefined}
+                        text={selected?.label || placeholder || 'Select…'}
+                        rightIcon="caret-down"
+                        disabled={unavailable}
+                    />
                 </Select>
             );
         },
@@ -834,12 +1025,18 @@ export function registerPack() {
     /* -------------------- Currency ---------------------------------- */
     registerWidget(
         'currency',
-        ({ value = '', onValueChange, readOnly, currency = 'USD', nullable = false, min, stepSize, minorStepSize, majorStepSize, ...rest }) => {
+        ({ value = '', onValueChange, readOnly, currency = 'USD', nullable = false, min, stepSize, minorStepSize, majorStepSize, fill, buttonPosition, className, ...rest }) => {
             const empty = nullable && (value === '' || value === null || value === undefined);
             const resolvedMinorStepSize = resolveNumericInputMinorStepSize(stepSize, minorStepSize);
+            const fieldTrackControl = isFieldTrackControl(rest['data-forge-field-track-control']);
             return (
                 <NumericInput
                     {...rest}
+                    className={fieldTrackControl
+                        ? mergeClassNames('forge-field-track-number', className)
+                        : className}
+                    fill={resolveFieldTrackFill(fieldTrackControl, fill)}
+                    buttonPosition={fieldTrackControl && buttonPosition === undefined ? 'none' : buttonPosition}
                     value={empty ? '' : (value ?? '')}
                     min={nullable ? undefined : min}
                     onValueChange={(valueAsNumber, valueAsString) => {
@@ -918,11 +1115,28 @@ export function registerPack() {
     /* -------------------- Date range ------------------------------- */
     registerWidget(
         'dateRange',
-        ({ value, onChange, readOnly, disabled, item }) => {
+        ({
+            value,
+            onChange,
+            readOnly,
+            disabled,
+            item,
+            id,
+            'aria-label': ariaLabel,
+            'aria-labelledby': ariaLabelledBy,
+            'aria-describedby': ariaDescribedBy,
+            'aria-required': ariaRequired,
+            'aria-invalid': ariaInvalid,
+            'data-forge-widget': forgeWidget,
+            'data-forge-control-id': forgeControlId,
+            'data-forge-part': forgePart,
+            'data-forge-field-track-control': fieldTrackControl,
+        }) => {
             const range = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
             const start = String(range.start || '');
             const end = String(range.end || '');
             const invalid = !!start && !!end && start > end;
+            const exposedInvalid = invalid || (fieldTrackControl ? ariaInvalid : false) || undefined;
             const inputStyle = {
                 minWidth: 0,
                 width: '100%',
@@ -930,9 +1144,20 @@ export function registerPack() {
             };
             return (
                 <div
+                    id={fieldTrackControl && id ? `${id}-group` : undefined}
                     role="group"
-                    aria-label={item?.label || item?.name || 'Date range'}
-                    aria-invalid={invalid || undefined}
+                    aria-label={fieldTrackControl
+                        ? (ariaLabelledBy ? undefined : (ariaLabel || item?.label || item?.name || 'Date range'))
+                        : (item?.label || item?.name || 'Date range')}
+                    aria-labelledby={fieldTrackControl ? ariaLabelledBy : undefined}
+                    aria-describedby={fieldTrackControl ? ariaDescribedBy : undefined}
+                    aria-required={fieldTrackControl ? ariaRequired : undefined}
+                    aria-invalid={exposedInvalid}
+                    aria-disabled={fieldTrackControl ? ((readOnly || disabled) || undefined) : undefined}
+                    data-forge-widget={fieldTrackControl ? forgeWidget : undefined}
+                    data-forge-control-id={fieldTrackControl ? forgeControlId : undefined}
+                    data-forge-part={fieldTrackControl ? forgePart : undefined}
+                    data-forge-field-track-control={fieldTrackControl}
                     className={`forge-date-range-input${invalid ? ' is-invalid' : ''}`}
                     style={{
                         display: 'grid',
@@ -948,9 +1173,13 @@ export function registerPack() {
                     title={invalid ? 'Start date must be on or before end date.' : undefined}
                 >
                     <input
+                        id={fieldTrackControl ? id : undefined}
                         className="bp6-input"
                         type="date"
                         aria-label="Start date"
+                        aria-describedby={fieldTrackControl ? ariaDescribedBy : undefined}
+                        aria-required={fieldTrackControl ? ariaRequired : undefined}
+                        aria-invalid={fieldTrackControl ? exposedInvalid : undefined}
                         value={start}
                         max={end || undefined}
                         readOnly={readOnly}
@@ -960,9 +1189,13 @@ export function registerPack() {
                     />
                     <span aria-hidden="true" style={{ color: '#64748b', fontWeight: 600 }}>to</span>
                     <input
+                        id={fieldTrackControl && id ? `${id}-end` : undefined}
                         className="bp6-input"
                         type="date"
                         aria-label="End date"
+                        aria-describedby={fieldTrackControl ? ariaDescribedBy : undefined}
+                        aria-required={fieldTrackControl ? ariaRequired : undefined}
+                        aria-invalid={fieldTrackControl ? exposedInvalid : undefined}
                         value={end}
                         min={start || undefined}
                         readOnly={readOnly}

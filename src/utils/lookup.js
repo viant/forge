@@ -1,5 +1,4 @@
-import { mapParameters } from './parameterMapper.js';
-import { resolveSelector } from './selector.js';
+import { resolveSelector, setSelector } from './selector.js';
 import { getLogger } from './logger.js';
 
 // Open a lookup dialog defined in item.lookup and apply outputs when user picks
@@ -26,7 +25,7 @@ export function normalizeLookupInputs(inputs = [], targetDataSource = '') {
     }));
 }
 
-function normalizeLookupOutputs(outputs = []) {
+export function normalizeLookupOutputs(outputs = []) {
     return outputs.map((p) => ({
         ...p,
         from: p.from || ':output',
@@ -34,50 +33,227 @@ function normalizeLookupOutputs(outputs = []) {
     }));
 }
 
-function unwrapLookupRecord(record) {
-    if (!record || typeof record !== 'object') return record;
-    if (record.selected) return record.selected;
+export function unwrapLookupRecord(record) {
+    if (record == null || record?.cancelled === true || record?.canceled === true) return null;
+    if (Array.isArray(record)) return unwrapLookupRecord(record[0]);
+    if (typeof record !== 'object') return record;
+    if (Object.prototype.hasOwnProperty.call(record, 'selected')) {
+        return unwrapLookupRecord(record.selected);
+    }
     if (Array.isArray(record.selection) && record.selection.length > 0) {
         const first = record.selection[0];
-        return first?.selected || first;
+        return unwrapLookupRecord(first);
     }
+    if (Object.prototype.hasOwnProperty.call(record, 'row')) return unwrapLookupRecord(record.row);
     return record;
+}
+
+export class LookupUnavailableError extends Error {
+    constructor(message = 'Lookup selection is unavailable in this workspace.') {
+        super(message);
+        this.name = 'LookupUnavailableError';
+        this.code = 'LOOKUP_UNAVAILABLE';
+    }
+}
+
+function isAbortError(error) {
+    return error?.name === 'AbortError' || error?.code === 'ABORT_ERR';
+}
+
+export function buildLookupRequest({ item, context, value, signal } = {}) {
+    const source = item?.lookup || {};
+    const dataSourceRef = String(source.dataSourceRef || source.dataSource || '').trim();
+    const inputs = Array.isArray(source.inputs)
+        ? normalizeLookupInputs(source.inputs, dataSourceRef)
+        : (source.inputs && typeof source.inputs === 'object' ? {...source.inputs} : []);
+    const outputs = normalizeLookupOutputs(Array.isArray(source.outputs) ? source.outputs : []);
+    return {
+        lookup: {
+            ...source,
+            ...(dataSourceRef ? { dataSource: dataSourceRef, dataSourceRef } : {}),
+            inputs,
+            outputs,
+        },
+        item,
+        value,
+        inputs,
+        outputs,
+        signal,
+        context,
+    };
+}
+
+/**
+ * Ask the active host to select a lookup row. Hosts return the untouched row,
+ * while Forge owns unwrapping legacy dialog envelopes and cancellation.
+ */
+export async function requestLookupSelection({ item, context, value, signal } = {}) {
+    if (!item?.lookup) return null;
+    if (signal?.aborted) return null;
+
+    const request = buildLookupRequest({ item, context, value, signal });
+    const { lookup } = request;
+    const lookupOpen = context?.handlers?.lookup?.open;
+    let result;
+
+    try {
+        if (typeof lookupOpen === 'function') {
+            result = await lookupOpen(request);
+        } else if (lookup.dialogId && typeof context?.handlers?.window?.openDialog === 'function') {
+            const parameters = Array.isArray(lookup.inputs) ? lookup.inputs : [];
+            result = await context.handlers.window.openDialog({
+                execution: {
+                    args: [lookup.dialogId, {
+                        awaitResult: true,
+                        multiple: false,
+                        parameters,
+                        signal,
+                    }],
+                    parameters,
+                },
+                context,
+            });
+        } else if (lookup.windowId && typeof context?.handlers?.window?.openWindow === 'function') {
+            const parameters = Array.isArray(lookup.inputs) ? lookup.inputs : [];
+            const options = {
+                awaitResult: true,
+                parameters,
+                modal: true,
+                signal,
+            };
+            for (const key of ['size', 'width', 'height', 'footer']) {
+                if (lookup[key] !== undefined) options[key] = lookup[key];
+            }
+            result = await context.handlers.window.openWindow({
+                execution: {
+                    args: [lookup.windowId, lookup.title || '', '', false, options],
+                    parameters,
+                },
+                context,
+            });
+        } else {
+            throw new LookupUnavailableError();
+        }
+    } catch (error) {
+        if (signal?.aborted || isAbortError(error)) return null;
+        throw error;
+    }
+
+    if (signal?.aborted) return null;
+    return unwrapLookupRecord(result);
+}
+
+function outputSelectors(output = {}) {
+    const source = String(output.location || output.selector || output.name || '').trim();
+    const target = String(output.name || output.target || output.location || '').trim();
+    return { source, target };
+}
+
+export function mergeLookupPatch(values = {}, patch = {}) {
+    if (!patch || typeof patch !== 'object') return { ...(values || {}) };
+    let merged = { ...(values || {}) };
+    const visit = (object, prefix = '') => {
+        Object.entries(object || {}).forEach(([key, next]) => {
+            const path = prefix ? `${prefix}.${key}` : key;
+            if (next && typeof next === 'object' && !Array.isArray(next)) visit(next, path);
+            else merged = setSelector(merged, path, next);
+        });
+    };
+    visit(patch);
+    return merged;
+}
+
+/** Map raw row selectors to form selectors without mutating either object. */
+export function mapLookupSelection({ item, outputs = item?.lookup?.outputs || [], record } = {}) {
+    const selected = unwrapLookupRecord(record);
+    if (!selected || typeof selected !== 'object') return {};
+
+    let patch = {};
+    const normalized = normalizeLookupOutputs(Array.isArray(outputs) ? outputs : []);
+    normalized.forEach((output) => {
+        if (output.to !== ':form') return;
+        const { source, target } = outputSelectors(output);
+        if (!source || !target) return;
+        const next = resolveSelector(selected, source);
+        if (next !== undefined) patch = setSelector(patch, target, next);
+    });
+
+    if (normalized.length === 0) {
+        const fieldKey = String(item?.dataField || item?.bindingPath || item?.name || item?.id || '').trim();
+        const valueSelector = String(item?.lookup?.valueField || fieldKey).trim();
+        const next = resolveSelector(selected, valueSelector);
+        if (fieldKey && next !== undefined) patch = setSelector(patch, fieldKey, next);
+    }
+    return patch;
+}
+
+export function writeLookupFormValues({ context, values } = {}) {
+    const handlers = context?.handlers?.dataSource;
+    if (typeof handlers?.setEditedFormData === 'function') {
+        handlers.setEditedFormData({ values });
+        return true;
+    }
+    if (typeof handlers?.setFormData === 'function') {
+        handlers.setFormData({ values });
+        return true;
+    }
+    const formSignal = context?.signals?.form;
+    if (formSignal) {
+        formSignal.value = values;
+        return true;
+    }
+    return false;
+}
+
+function lookupDisplayValue(item, record, patch) {
+    const selector = String(item?.lookup?.display || '').trim();
+    if (!selector) return undefined;
+    if (!selector.includes('${')) return resolveSelector(record, selector);
+    const merged = mergeLookupPatch(record, patch);
+    return selector.replace(/\$\{([^}]+)\}/g, (_, path) => {
+        const next = resolveSelector(merged, String(path).trim());
+        return next == null ? '' : String(next);
+    }).trim();
 }
 
 export function applyLookupSelection({ item, context, adapter, outputs = [], record }) {
     const formSignal = context?.signals?.form;
-    if (!formSignal) {
+    const dataSourceHandlers = context?.handlers?.dataSource;
+    const currentForm = dataSourceHandlers?.getFormData?.() || formSignal?.peek?.();
+    if (!currentForm || typeof currentForm !== 'object') {
         try { console.error('[lookup] form signal not found in context', { fieldId: item?.id }); } catch (_) {}
         return null;
     }
 
     const normalizedOutputs = normalizeLookupOutputs(outputs);
-    const formObj = { ...formSignal.peek() };
+    const patch = mapLookupSelection({ item, outputs: normalizedOutputs, record });
+    let formObj = mergeLookupPatch(currentForm, patch);
     log.debug('form (before)', formObj);
 
-    const formParams = normalizedOutputs.filter((p) => p.to === ':form');
-    mapParameters(formParams, record, formObj);
-
     const fieldKey = item?.dataField || item?.bindingPath || item?.id;
-    const displaySelector = String(item?.lookup?.display || '').trim();
-    if (displaySelector) {
-        const rawDisplay = resolveSelector(record, displaySelector);
-        if (rawDisplay !== undefined && rawDisplay !== null) {
-            formObj[fieldKey] = Array.isArray(rawDisplay) ? rawDisplay.join(' / ') : rawDisplay;
+    const rawDisplay = lookupDisplayValue(item, record, patch);
+    const fieldReceivesMappedValue = normalizedOutputs.some((output) => {
+        const {target} = outputSelectors(output);
+        return output.to === ':form' && target === fieldKey;
+    });
+    if (!fieldReceivesMappedValue && rawDisplay !== undefined && rawDisplay !== null) {
+        const display = Array.isArray(rawDisplay) ? rawDisplay.join(' / ') : rawDisplay;
+        if (fieldKey) {
+            formObj = setSelector(formObj, fieldKey, display);
         }
     }
 
-    let selfVal = formObj[fieldKey];
-    if (selfVal === undefined && fieldKey !== item.id) selfVal = formObj[item.id];
+    let selfVal = resolveSelector(formObj, fieldKey);
+    if (selfVal === undefined && fieldKey !== item.id) selfVal = resolveSelector(formObj, item.id);
     if (selfVal === undefined) {
-        const firstOut = formParams[0] || normalizedOutputs[0];
+        const firstOut = normalizedOutputs.find((entry) => entry.to === ':form') || normalizedOutputs[0];
         if (firstOut) {
             try {
-                const loc = firstOut.location || firstOut.name;
-                if (loc) {
-                    const fallback = resolveSelector(record, loc);
+                const { source } = outputSelectors(firstOut);
+                if (source) {
+                    const fallback = resolveSelector(record, source);
                     if (fallback !== undefined) {
-                        formObj[fieldKey] = fallback;
+                        formObj = setSelector(formObj, fieldKey, fallback);
                         selfVal = fallback;
                     }
                 }
@@ -87,11 +263,14 @@ export function applyLookupSelection({ item, context, adapter, outputs = [], rec
     log.debug('mapped', { selfVal, fieldId: item?.id, formObj });
     if (selfVal !== undefined) {
         log.debug('adapter.set', { fieldId: item?.id, value: selfVal });
-        adapter.set(selfVal);
+        adapter?.set?.(selfVal);
     }
 
     log.debug('form (after)', formObj);
-    formSignal.value = formObj;
+    if (!writeLookupFormValues({ context, values: formObj })) {
+        try { console.error('[lookup] form writer not found in context', { fieldId: item?.id }); } catch (_) {}
+        return null;
+    }
     const applied = { form: formObj, value: selfVal };
     const callback = Array.isArray(item?.on) ? item.on.find((entry) => entry?.event === 'onLookup') : null;
     if (callback?.handler && typeof context?.lookupHandler === 'function') {
@@ -132,50 +311,22 @@ export async function resolveLookupValue({ item, value }) {
     return rows[0];
 }
 
-export async function openLookup({ item, context, adapter, value }) {
+export async function openLookup({ item, context, adapter, value, signal }) {
     if (!item?.lookup) return;
-
-    let { dialogId, windowId, title, inputs = [], outputs = [], size, width, height, footer } = item.lookup;
-
-    log.debug('open', { fieldId: item?.id, dialogId, windowId, title, seed: value });
-
-    // ------------------------------------------------------------------
-    // 1. Apply defaults to Parameter objects so users can omit boilerplate
-    //    • inputs: default from=:form  to=:query
-    //    • outputs: default from=:output to=:form
-    // ------------------------------------------------------------------
-
-    inputs = normalizeLookupInputs(inputs, item.lookup.dataSource);
-    outputs = normalizeLookupOutputs(outputs);
-    // Prefer dialogId when provided; fallback to windowId for regular window
-    if (!dialogId && !windowId) {
-        console.error('lookup requires dialogId or windowId');
-        return;
-    }
-
-    // Build parameter definitions for inbound mapping
-    const paramDefs = [...inputs];
-
-    let record = null;
-    if (dialogId) {
-        // Route to dialog: await result and pass parameter definitions so
-        // openDialog resolves args for cycle-safe fetch on open.
-        const execArgs = [dialogId, { awaitResult: true, parameters: paramDefs }];
-        record = await context.handlers.window.openDialog({ execution: { args: execArgs, parameters: paramDefs }, context });
-    } else {
-        // Route to regular window opened as a modal-style floating overlay.
-        // openWindow will resolve inbound inputs and seed DS parameters.
-        const opts = { awaitResult: true, parameters: paramDefs, modal: true };
-        if (size) opts.size = size;
-        if (width) opts.width = width;
-        if (height) opts.height = height;
-        if (footer) opts.footer = footer;
-        const execArgs = [windowId, title || '', '', false, opts];
-        record = await context.handlers.window.openWindow({ execution: { args: execArgs, parameters: paramDefs }, context });
-    }
-
-    log.debug('result (raw)', record);
-    const selected = unwrapLookupRecord(record);
-    if (!selected) return;
-    applyLookupSelection({ item, context, adapter, outputs, record: selected });
+    log.debug('open', {
+        fieldId: item?.id,
+        dialogId: item.lookup.dialogId,
+        windowId: item.lookup.windowId,
+        seed: value,
+    });
+    const selected = await requestLookupSelection({ item, context, value, signal });
+    log.debug('result', selected);
+    if (!selected) return null;
+    return applyLookupSelection({
+        item,
+        context,
+        adapter,
+        outputs: item.lookup.outputs || [],
+        record: selected,
+    });
 }
