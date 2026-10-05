@@ -1,0 +1,165 @@
+.forge-lookup-picker {
+    --forge-lookup-picker-surface: var(--forge-surface);
+    --forge-lookup-picker-subtle-surface: var(--forge-surface-subtle);
+    --forge-lookup-picker-text: var(--forge-text);
+    --forge-lookup-picker-muted-text: var(--forge-text-muted);
+    --forge-lookup-picker-border: var(--forge-border-color);
+    --forge-lookup-picker-hover-surface: var(--forge-selected-background);
+    --forge-lookup-picker-focus: var(--forge-focus-color);
+    --forge-lookup-picker-radius: var(--forge-control-radius);
+    --forge-lookup-picker-space-1: 4px;
+    --forge-lookup-picker-space-2: 8px;
+    --forge-lookup-picker-space-3: 12px;
+    --forge-lookup-picker-space-4: 16px;
+    width: min(680px, calc(100vw - (2 * var(--forge-lookup-picker-space-4))));
+    background: var(--forge-lookup-picker-surface);
+    color: var(--forge-lookup-picker-text);
+}
+
+.forge-lookup-picker .bp6-dialog-body {
+    display: grid;
+    gap: var(--forge-lookup-picker-space-3);
+    min-height: 280px;
+}
+
+.forge-lookup-picker__results {
+    min-width: 0;
+    min-height: 220px;
+    color: var(--forge-lookup-picker-text);
+}
+
+.forge-lookup-picker__state {
+    display: flex;
+    min-height: 220px;
+    align-items: center;
+    justify-content: center;
+    gap: var(--forge-lookup-picker-space-2);
+    color: var(--forge-lookup-picker-muted-text);
+}
+
+.forge-lookup-picker__columns,
+.forge-lookup-picker__cells {
+    display: grid;
+    gap: var(--forge-lookup-picker-space-3);
+    min-width: 0;
+}
+
+.forge-lookup-picker__columns {
+    padding: var(--forge-lookup-picker-space-2) var(--forge-lookup-picker-space-3);
+    border-block-end: 1px solid var(--forge-lookup-picker-border);
+    background: var(--forge-lookup-picker-subtle-surface);
+    color: var(--forge-lookup-picker-muted-text);
+    font-size: var(--forge-type-caption-size);
+    line-height: var(--forge-type-caption-line-height);
+    font-weight: 600;
+}
+
+.forge-lookup-picker__list {
+    max-height: min(52vh, 420px);
+    overflow: auto;
+    border: 1px solid var(--forge-lookup-picker-border);
+    border-radius: var(--forge-lookup-picker-radius);
+    background: var(--forge-lookup-picker-surface);
+    scrollbar-color: var(--forge-border-strong) var(--forge-lookup-picker-subtle-surface);
+}
+
+.forge-lookup-picker__columns + .forge-lookup-picker__list {
+    border-block-start: 0;
+    border-start-start-radius: 0;
+    border-start-end-radius: 0;
+}
+
+.forge-lookup-picker__row {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    border-block-end: 1px solid var(--forge-lookup-picker-border);
+    background: var(--forge-lookup-picker-surface);
+    color: var(--forge-lookup-picker-text);
+    padding: var(--forge-lookup-picker-space-3);
+    text-align: start;
+    cursor: pointer;
+    font: inherit;
+}
+
+.forge-lookup-picker__row:last-child {
+    border-block-end: 0;
+}
+
+.forge-lookup-picker__row:hover {
+    background: var(--forge-lookup-picker-hover-surface);
+}
+
+.forge-lookup-picker__row:focus-visible {
+    position: relative;
+    z-index: 1;
+    outline: 2px solid var(--forge-lookup-picker-focus);
+    outline-offset: -2px;
+}
+
+.forge-lookup-picker__row:disabled {
+    background: var(--forge-disabled-bg);
+    color: var(--forge-disabled-text);
+    cursor: not-allowed;
+}
+
+.forge-lookup-picker__cells > span,
+.forge-lookup-picker__row-copy > * {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.forge-lookup-picker__row-copy {
+    display: grid;
+    gap: var(--forge-lookup-picker-space-1);
+    min-width: 0;
+}
+
+.forge-lookup-picker__row-copy strong {
+    font-size: var(--forge-type-body-size);
+    line-height: var(--forge-type-body-line-height);
+    font-weight: 600;
+}
+
+.forge-lookup-picker__row-copy span {
+    color: var(--forge-lookup-picker-muted-text);
+    font-size: var(--forge-type-small-size);
+    line-height: var(--forge-type-small-line-height);
+}
+
+.forge-lookup-picker__limit {
+    margin: var(--forge-lookup-picker-space-2) 0 0;
+    color: var(--forge-lookup-picker-muted-text);
+    font-size: var(--forge-type-small-size);
+    line-height: var(--forge-type-small-line-height);
+}
+
+@media (max-width: 560px) {
+    .forge-lookup-picker {
+        width: calc(100vw - (2 * var(--forge-lookup-picker-space-2)));
+        margin: var(--forge-lookup-picker-space-2);
+    }
+
+    .forge-lookup-picker__columns {
+        display: none;
+    }
+
+    .forge-lookup-picker__columns + .forge-lookup-picker__list {
+        border-block-start: 1px solid var(--forge-lookup-picker-border);
+        border-start-start-radius: var(--forge-lookup-picker-radius);
+        border-start-end-radius: var(--forge-lookup-picker-radius);
+    }
+
+    .forge-lookup-picker__cells {
+        grid-template-columns: 1fr !important;
+    }
+
+    .forge-lookup-picker__cells > span:not(:first-child) {
+        color: var(--forge-lookup-picker-muted-text);
+        font-size: var(--forge-type-small-size);
+        line-height: var(--forge-type-small-line-height);
+    }
+}

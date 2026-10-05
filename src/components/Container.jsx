@@ -49,7 +49,13 @@ import { findDashboardFilterSignal, findDashboardSelectionSignal, getDashboardSe
 import {getViewSignal} from '../core/index.js';
 import {isDashboardRootContainer, isSemanticDashboardBlock, shouldSkipGenericNonVisualEarlyReturn} from "./containerSemantics.js";
 import {isContainerVisible, resolveChildContext, trackContainerVisibility} from "./visibleWhen.js";
-import {mergeSectionOpenState, resolveSectionOpenState, resolveSectionProperties} from './containerChrome.js';
+import {
+    mergeSectionOpenState,
+    resolveSectionOpenState,
+    resolveSectionProperties,
+    sectionAppearanceAttributes,
+    sectionContentInsetAttributes,
+} from './containerChrome.js';
 import AccessibleSection from './AccessibleSection.jsx';
 import {resolveDynamicDataSourceRef} from '../runtime/dataSourceRef.js';
 import {isPureBoundLabelSection} from './containerEmptyState.js';
@@ -87,7 +93,7 @@ const wrapContainerChrome = (container, content, suppressTitle = false, sectionP
             ...(sectionProperties.style || {}),
         };
         wrapped = (
-            <SectionComponent {...(suppressTitle ? {} : {title: container.title || ''})} {...sectionProperties} data-forge-part="container-section" className={containerSurfaceClass(container, 'section', sectionProperties.className)} style={sectionStyle}>
+            <SectionComponent {...(suppressTitle ? {} : {title: container.title || ''})} {...sectionProperties} {...sectionAppearanceAttributes(container.section)} {...sectionContentInsetAttributes(container.section)} data-forge-part="container-section" className={containerSurfaceClass(container, 'section', sectionProperties.className)} style={sectionStyle}>
                 {wrapped}
             </SectionComponent>
         );
@@ -506,9 +512,10 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
                     entries={containers.map((entry) => ({...entry, hideLabel: true}))}
                     baseDataSourceRef={dataSourceRef}
                     style={style}
-                    renderEntry={({entry, context: subCtx, css}) => (
+                    renderEntry={({entry, context: subCtx, css, layoutItemProps}) => (
                         <div
                             key={`${entry.id}-container`}
+                            {...layoutItemProps}
                             style={{
                                 ...css.ctrl,
                                 display: 'flex',

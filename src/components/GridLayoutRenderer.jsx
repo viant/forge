@@ -2,7 +2,11 @@ import React, { useMemo } from 'react';
 import './GridLayoutRenderer.css';
 import {useSignals} from '@preact/signals-react/runtime';
 import ControlRenderer from './ControlRenderer.jsx';
+import {resolveGridAlignment} from './gridLayoutAlignment.js';
+import {gridLayoutAttributes, gridLayoutItemAttributes} from './gridLayoutAppearance.js';
 import {evaluatePlainVisibleWhen, trackVisibleWhen} from './visibleWhen.js';
+
+export {resolveGridAlignment} from './gridLayoutAlignment.js';
 
 // GridLayoutRenderer – coordinate-free auto-placement grid with colspan/rowspan
 // Supports label-cells in two symmetric modes: left (default) and top.
@@ -116,7 +120,7 @@ function buildContainerStyle(layout, rows) {
     const columns = layout?.columns || 1;
     const labels = layout?.labels || {};
     const labelMode = (labels.mode || 'left');
-    const align = labels.align || (labelMode === 'left' ? 'baseline' : (labelMode === 'top' ? 'start' : 'start'));
+    const align = resolveGridAlignment(labels, labelMode);
     const spacing = resolveGridSpacing(layout, labelMode);
 
     const style = {
@@ -177,6 +181,8 @@ export default function GridLayoutRenderer({
     items,
     entries,
     renderEntry,
+    renderControl,
+    controlWrapperMode = 'none',
     handlers = {},
     state,
     baseDataSourceRef,
@@ -184,9 +190,12 @@ export default function GridLayoutRenderer({
 }) {
     useSignals();
     const layout = container?.layout || {};
+    const isFieldTracks = String(layout?.appearance || '').trim().toLowerCase() === 'field-tracks';
     const columns = layout?.columns || 1;
     const labels = layout?.labels || {};
     const labelMode = (labels.mode || 'left');
+    const alignment = resolveGridAlignment(labels, labelMode);
+    const cellAlignment = resolveGridAlignment(labels, labelMode, 'cell');
     const controlGap = labels?.controlGap !== undefined ? Number(labels.controlGap) : 8;
     const gridSpacing = resolveGridSpacing(layout, labelMode);
     const labelStyle = { ...(labels.style || labels.labelStyle || {}) };
@@ -215,7 +224,9 @@ export default function GridLayoutRenderer({
     const gridClassName = [container?.className, collapseClass].filter(Boolean).join(' ') || undefined;
 
     return (
-        <div className={gridClassName} style={containerStyle}>
+        <div {...gridLayoutAttributes(layout)} className={gridClassName} style={containerStyle}
+            data-forge-label-mode={labelMode}
+            data-forge-label-alignment={alignment}>
             {placements.map(({ item, r, c, w, h }) => {
                 const dsRef = item.dataSourceRef || baseDataSourceRef;
                 const subCtx = typeof context?.Context === 'function' ? context.Context(dsRef) : context;
@@ -235,6 +246,7 @@ export default function GridLayoutRenderer({
                                 handlers,
                                 state,
                                 container,
+                                layoutItemProps: gridLayoutItemAttributes(item),
                             })}
                         </React.Fragment>
                     );
@@ -244,9 +256,11 @@ export default function GridLayoutRenderer({
                 const labelNode = hasLabel ? (
                     <label className="forge-grid-label" data-forge-part="label"
                         key={`${item.id || item.name}-label`}
+                        id={isFieldTracks && (item.id || item.name) ? `${item.id || item.name}-label` : undefined}
                         htmlFor={item.id || undefined}
                         title={item.tooltip || undefined}
-                        style={{ display: 'flex', alignItems: (labels.align || (labelMode === 'left' ? 'baseline' : 'center')), ...labelStyle, ...css.label }}
+                        data-forge-field-id={isFieldTracks ? (item.id || item.name || undefined) : undefined}
+                        style={{ display: 'flex', alignItems: cellAlignment, ...labelStyle, ...css.label }}
                     >
                         <span>{item.label}</span>
                         {(item.required || item?.properties?.required) ? <span aria-hidden="true">&nbsp;*</span> : null}
@@ -254,7 +268,7 @@ export default function GridLayoutRenderer({
                 ) : null;
 
                 // Control cell
-                const controlItem = hasLabel ? { ...item, wrapper: 'none' } : item;
+                const controlItem = hasLabel ? { ...item, wrapper: controlWrapperMode } : item;
                 const required = !!(item?.required || item?.properties?.required);
                 const requiredEditable = required && !item?.readOnly && !item?.disabled;
                 const ev = handlers[item.id]?.events || {};
@@ -263,25 +277,41 @@ export default function GridLayoutRenderer({
                     <div
                         key={`${item.id || item.name}-control`}
                         className={['forge-grid-control-cell', requiredEditable ? 'forge-required-input' : ''].filter(Boolean).join(' ')}
+                        data-forge-part={isFieldTracks ? 'control' : undefined}
+                        data-forge-field-id={isFieldTracks ? (item.id || item.name || undefined) : undefined}
                         data-forge-control-id={item.id || undefined}
                         style={{
                             display: 'flex',
-                            alignItems: (labels.align || (labelMode === 'left' ? 'baseline' : 'center')),
+                            alignItems: cellAlignment,
                             marginLeft: (labelMode === 'left' ? controlGap : 0),
                             paddingBottom: gridSpacing.controlPaddingBottom || 0,
                             boxSizing: 'border-box',
                             ...css.ctrl,
                         }}
                     >
-                        <ControlRenderer
-                            key={`${item.id || item.name}`}
-                            item={controlItem}
-                            context={subCtx}
-                            container={container}
-                            events={ev}
-                            stateEvents={st}
-                            state={state}
-                        />
+                        {(() => {
+                            const rendered = typeof renderControl === 'function'
+                                ? renderControl({
+                                    item: controlItem,
+                                    sourceItem: item,
+                                    context: subCtx,
+                                    container,
+                                    events: ev,
+                                    stateEvents: st,
+                                    state,
+                                })
+                                : undefined;
+                            if (rendered !== undefined) return rendered;
+                            return <ControlRenderer
+                                key={`${item.id || item.name}`}
+                                item={controlItem}
+                                context={subCtx}
+                                container={container}
+                                events={ev}
+                                stateEvents={st}
+                                state={state}
+                            />;
+                        })()}
                     </div>
                 );
 

@@ -37,4 +37,54 @@ describe('ControlWrapper', () => {
         expect(html).toContain('tabindex="0"');
         expect(html).toContain('aria-label="Save. Disabled until sparse updates are safe."');
     });
+
+    it('renders control-only anatomy without duplicating a grid-owned label', () => {
+        const html = renderToStaticMarkup(
+            <ControlWrapper
+                item={{
+                    id: 'objective',
+                    label: 'Objective',
+                    wrapper: 'control-only',
+                    required: true,
+                    helperText: 'Choose one campaign objective.',
+                }}
+                container={{layout: {kind: 'grid', appearance: 'field-tracks'}}}
+                context={{}}
+            >
+                <input />
+            </ControlWrapper>,
+        );
+
+        expect(html).toContain('class="forge-control-track-content"');
+        expect(html).toContain('data-forge-control-id="objective"');
+        expect(html).toContain('<input id="objective"');
+        expect(html).toContain('aria-required="true"');
+        expect(html).toContain('aria-describedby=');
+        expect(html).toContain('data-forge-part="helper-text"');
+        expect(html).toContain('Choose one campaign objective.');
+        expect(html).not.toContain('<label');
+    });
+
+    it('connects control-only validation feedback to the control semantics', () => {
+        const html = renderToStaticMarkup(
+            <ControlWrapper
+                item={{
+                    id: 'advertiserId',
+                    wrapper: 'control-only',
+                    validationError: 'Choose an advertiser.',
+                }}
+                container={{layout: {kind: 'grid', appearance: 'field-tracks'}}}
+                context={{}}
+            >
+                <input />
+            </ControlWrapper>,
+        );
+
+        expect(html).toContain('<input id="advertiserId"');
+        expect(html).toContain('aria-describedby=');
+        expect(html).toContain('aria-invalid="true"');
+        expect(html).toContain('data-forge-part="validation-message"');
+        expect(html).toContain('role="alert"');
+        expect(html).toContain('Choose an advertiser.');
+    });
 });

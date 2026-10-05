@@ -6,7 +6,7 @@ const currency = source.match(/registerWidget\(\s*'currency',[\s\S]*?registerEve
 
 assert.ok(currency, 'currency widget contract should exist');
 assert.match(currency, /\(\{ value = '', onValueChange, readOnly/);
-assert.match(currency, /stepSize, minorStepSize, majorStepSize, \.\.\.rest/);
+assert.match(currency, /stepSize, minorStepSize, majorStepSize, fill, buttonPosition, className, \.\.\.rest/);
 assert.match(currency, /resolveNumericInputMinorStepSize\(stepSize, minorStepSize\)/);
 assert.match(currency, /stepSize=\{stepSize\}/);
 assert.match(currency, /minorStepSize=\{resolvedMinorStepSize\}/);

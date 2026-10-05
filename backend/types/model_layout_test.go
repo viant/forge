@@ -25,6 +25,82 @@ func TestLayoutPreservesResponsiveCollapseAt(t *testing.T) {
 	}
 }
 
+func TestLayoutPreservesLabelAlignment(t *testing.T) {
+	var container Container
+	if err := yaml.Unmarshal([]byte("layout:\n  kind: grid\n  columns: 1\n  labels:\n    mode: left\n    align: baseline\n"), &container); err != nil {
+		t.Fatal(err)
+	}
+	if container.Layout == nil || container.Layout.Labels == nil || container.Layout.Labels.Align != "baseline" {
+		t.Fatalf("label alignment was not preserved: %#v", container.Layout)
+	}
+	payload, err := json.Marshal(container)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(payload), `"align":"baseline"`) {
+		t.Fatalf("label alignment missing from JSON: %s", payload)
+	}
+}
+
+func TestLayoutPreservesAppearance(t *testing.T) {
+	var container Container
+	if err := yaml.Unmarshal([]byte("layout:\n  kind: grid\n  appearance: divided-sections\n  columns: 2\n"), &container); err != nil {
+		t.Fatal(err)
+	}
+	if container.Layout == nil || container.Layout.Appearance != "divided-sections" {
+		t.Fatalf("layout appearance was not preserved: %#v", container.Layout)
+	}
+	payload, err := json.Marshal(container)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(payload), `"appearance":"divided-sections"`) {
+		t.Fatalf("layout appearance missing from JSON: %s", payload)
+	}
+}
+
+func TestSchemaBasedFormPreservesFieldTracksLayout(t *testing.T) {
+	var container Container
+	if err := yaml.Unmarshal([]byte(`
+schemaBasedForm:
+  id: campaign
+  layout:
+    kind: grid
+    appearance: field-tracks
+    columns: 2
+    collapseAt: phone
+    labels:
+      mode: top
+      align: start
+`), &container); err != nil {
+		t.Fatal(err)
+	}
+	form := container.SchemaBasedForm
+	if form == nil || form.Layout == nil {
+		t.Fatalf("schema form layout was not preserved: %#v", form)
+	}
+	if form.Layout.Kind != "grid" || form.Layout.Appearance != "field-tracks" || form.Layout.Columns != 2 {
+		t.Fatalf("schema form field-tracks layout was not preserved: %#v", form.Layout)
+	}
+	if form.Layout.CollapseAt != "phone" || form.Layout.Labels == nil || form.Layout.Labels.Mode != "top" || form.Layout.Labels.Align != "start" {
+		t.Fatalf("schema form responsive label contract was not preserved: %#v", form.Layout)
+	}
+	payload, err := json.Marshal(container)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fragment := range []string{
+		`"appearance":"field-tracks"`,
+		`"collapseAt":"phone"`,
+		`"mode":"top"`,
+		`"align":"start"`,
+	} {
+		if !strings.Contains(string(payload), fragment) {
+			t.Fatalf("schema form layout field %s missing from JSON: %s", fragment, payload)
+		}
+	}
+}
+
 func TestLayoutPreservesDisabledItemStretch(t *testing.T) {
 	var container Container
 	if err := yaml.Unmarshal([]byte("layout:\n  kind: grid\n  columns: 3\n  itemStretch: false\n"), &container); err != nil {

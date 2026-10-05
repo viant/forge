@@ -52,5 +52,34 @@ for (const expected of [
 ]) assert.ok(markup.includes(expected), `missing rendered mobile editable-table contract: ${expected}`);
 assert.equal((markup.match(/required=""/g) || []).length, 6, 'required fields must be marked in both desktop and mobile render trees');
 
-console.log('dashboard editable table mobile cards render ✓');
+const frequencyRows = [{Channel: 'CTV', 'Freq Cap': '3 per 1 hour', Reason: 'Protect reach.'}];
+const frequencyContext = {
+    Context: () => ({
+        signals: {collection: {value: frequencyRows, peek: () => frequencyRows}},
+        handlers: {dataSource: {peekFullCollection: () => frequencyRows, peekCollection: () => frequencyRows, setCollection: () => true}},
+    }),
+};
+const frequencyMarkup = renderToStaticMarkup(<DashboardEditableTable container={{
+    dataSourceRef: 'frequency',
+    allowAdd: false,
+    allowRemove: false,
+    quickFilter: false,
+    mobileCards: {enabled: true, titleField: 'Channel', fields: ['Freq Cap', 'Reason']},
+    columns: [
+        {key: 'Channel', label: 'Media', editor: false},
+        {key: 'Freq Cap', label: 'Frequency cap', editor: {type: 'frequency', units: ['hour', 'day', 'week']}},
+        {key: 'Reason', label: 'Rationale', editor: {type: 'text'}},
+    ],
+}} context={frequencyContext}/>);
+for (const expected of [
+    'Frequency cap count row 1',
+    'Frequency cap interval row 1',
+    'Frequency cap unit row 1',
+    'aria-label="Rationale row 1"',
+    'value="3"',
+    'value="hour"',
+    '>Protect reach.</textarea>',
+]) assert.ok(frequencyMarkup.includes(expected), `missing mobile editor contract: ${expected}`);
+assert.doesNotMatch(frequencyMarkup, /<header class="forge-editable-collection__card-header"><strong>CTV<\/strong><span>/, 'optional mobile-card metadata must not render an empty label');
 
+console.log('dashboard editable table mobile cards render ✓');
