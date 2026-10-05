@@ -314,6 +314,7 @@ type View struct {
 
 type Layout struct {
 	Kind          string   `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Appearance    string   `json:"appearance,omitempty" yaml:"appearance,omitempty"`
 	Orientation   string   `json:"orientation" yaml:"orientation"`
 	Rows          int      `json:"rows" yaml:"rows"`
 	Columns       int      `json:"columns,omitempty" yaml:"columns,omitempty"`
@@ -338,7 +339,7 @@ type Labels struct {
 	Mode       string                 `json:"mode,omitempty" yaml:"mode,omitempty"`             // "left" | "top" | "none"
 	Width      string                 `json:"width,omitempty" yaml:"width,omitempty"`           // only used for Mode "left"
 	Height     string                 `json:"height,omitempty" yaml:"height,omitempty"`         // only used for Mode "top"
-	Align      string                 `json:"align,omitempty" yaml:"align,omitempty"`           // optional label/control alignment
+	Align      string                 `json:"align,omitempty" yaml:"align,omitempty"`           // "baseline" | "center" | "start"; applies to the grid, label cells, and control cells
 	ControlGap int                    `json:"controlGap,omitempty" yaml:"controlGap,omitempty"` // gap between label and control in Mode "left"
 	RowHeight  string                 `json:"rowHeight,omitempty" yaml:"rowHeight,omitempty"`   // grid auto-row height
 	Style      map[string]interface{} `json:"style,omitempty" yaml:"style,omitempty"`           // label cell/widget style
@@ -1461,6 +1462,8 @@ type SettingsConfig struct {
 
 type Section struct {
 	Collapsible  bool                   `json:"collapsible" yaml:"collapsible"`
+	Appearance   string                 `json:"appearance,omitempty" yaml:"appearance,omitempty"`
+	ContentInset string                 `json:"contentInset,omitempty" yaml:"contentInset,omitempty"`
 	PersistState bool                   `json:"persistState,omitempty" yaml:"persistState,omitempty"`
 	StateKey     string                 `json:"stateKey,omitempty" yaml:"stateKey,omitempty"`
 	Properties   map[string]interface{} `json:"properties,omitempty" yaml:"properties,omitempty"`

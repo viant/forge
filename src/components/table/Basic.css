@@ -15,6 +15,11 @@
     background: var(--forge-table-surface, #fff);
 }
 
+.basic-table-wrapper table th,
+.basic-table-wrapper table td {
+    vertical-align: var(--forge-table-cell-vertical-align, top);
+}
+
 .basic-table-filterbar {
     display: flex; flex: 0 0 auto; flex-wrap: wrap; align-items: center; gap: 8px;
     min-height: 40px; padding: 6px 8px; border-bottom: 1px solid var(--forge-table-border, #d7dce2);

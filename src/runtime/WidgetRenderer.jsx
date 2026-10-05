@@ -246,7 +246,10 @@ export default function WidgetRenderer({
 
     // ------------------------------------------------------------------
     // Stable styling targets for the initial theme-supported widget family.
-    if (['text', 'password', 'number', 'textarea', 'button'].includes(widgetKey)) {
+    const legacyThemeWidget = ['text', 'password', 'number', 'textarea', 'button'].includes(widgetKey);
+    const fieldTrackThemeWidget = item?.wrapper === 'control-only'
+        && ['select', 'dateRange', 'booleanPill'].includes(widgetKey);
+    if (legacyThemeWidget || fieldTrackThemeWidget) {
         widgetProps['data-forge-widget'] = widgetKey;
         widgetProps['data-forge-control-id'] = item?.id || undefined;
         widgetProps['data-forge-part'] = widgetKey === 'button' ? 'button' : 'input';
@@ -324,8 +327,8 @@ export default function WidgetRenderer({
     } else if (requiredState) {
         widgetProps['aria-invalid'] = false;
     }
-    const itemWithError = validationMsg || requiredState
-        ? { ...item, validationError: validationMsg || undefined, requiredState }
+    const itemWithError = validationMsg || item?.validationError || requiredState
+        ? { ...item, validationError: validationMsg || item?.validationError || undefined, requiredState }
         : item;
 
     if (validationMsg) {
