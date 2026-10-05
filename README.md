@@ -191,7 +191,7 @@ dependencies {
 }
 ~~~
 
-Build and test through the host's configured Gradle wrapper. The repository's standalone Android wrapper does not include its wrapper JAR, and its settings also reference a sample module that is not tracked. The host-module integration is the usable path for this checkout. [Android module notes](android/README.md) describe the SDK organization.
+Build and test the integrated module through the host's configured Gradle wrapper.
 
 Platform definitions and widgets should be validated on their intended device; a shared metadata contract does not imply identical behavior for every component.
 
