@@ -24,11 +24,24 @@ export default function ControlWrapper({ item, container, context, framework = '
     const controlId = children?.props?.id || item?.id || generatedId;
     const helperId = `${generatedId}-help`;
     const helperText = item?.validationError || item?.helperText || item?.description;
+    const controlOnly = item?.wrapper === 'control-only';
     const bypassHelper = item?.wrapper === 'none' || (framework === 'blueprint' && item?.isStandalone);
     const hasHelper = bypassHelper ? !!item?.validationError : !!helperText;
     const child = React.isValidElement(children) ? React.cloneElement(children, {
         id: controlId,
         'aria-describedby': [children.props['aria-describedby'], hasHelper ? helperId : null].filter(Boolean).join(' ') || undefined,
+        ...(controlOnly && (item?.required || item?.properties?.required)
+            ? {'aria-required': children.props['aria-required'] ?? true}
+            : {}),
+        ...(controlOnly && (item?.validationError || item?.requiredState === 'invalid' || item?.requiredState === 'missing')
+            ? {'aria-invalid': children.props['aria-invalid'] ?? true}
+            : {}),
+        ...(controlOnly && item?.id && item?.label
+            ? {'aria-labelledby': children.props['aria-labelledby'] ?? `${item.id}-label`}
+            : {}),
+        ...(controlOnly
+            ? {'data-forge-field-track-control': children.props['data-forge-field-track-control'] ?? 'true'}
+            : {}),
     }) : children;
 
     const wrapperRef = useRef(null);
@@ -97,6 +110,21 @@ export default function ControlWrapper({ item, container, context, framework = '
             <div className="forge-control-validation-message" id={helperId}
                 data-forge-part="validation-message" role="alert">{item.validationError}</div>
         </div>;
+    }
+
+    if (controlOnly) {
+        return (
+            <div
+                className={["forge-control-track-content", readOnly ? "is-readonly" : "", disabled ? "is-disabled" : ""].filter(Boolean).join(" ")}
+                ref={wrapperRef}
+                data-forge-control-id={item?.id || undefined}
+                {...accessibilityProps}
+            >
+                {child}
+                {hasHelper && <div id={helperId} data-forge-part={item?.validationError ? 'validation-message' : 'helper-text'}
+                    role={item?.validationError ? 'alert' : undefined}>{helperText}</div>}
+            </div>
+        );
     }
 
     if (custom) {

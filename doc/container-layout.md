@@ -27,6 +27,16 @@ nested card/section body. Splitter cells retain their bounded sizing contract.
 Fill requires an ancestor that actually allocates space; it does not mean
 100% height plus the size of sibling headers and toolbars.
 
+## Section hierarchy hooks
+
+`section.appearance: primary|quiet`, `section.contentInset: flush`, and
+`layout.appearance: divided-sections` provide bounded, product-agnostic
+hierarchy hooks. They emit semantic data attributes but deliberately add no
+default styling, so existing workspaces remain visually unchanged. Opt-in
+themes can apply their own token values without relying on container IDs or
+generated DOM relationships. See [container-css-classes.md](container-css-classes.md)
+and [grid-layout.md](grid-layout.md) for the complete contract.
+
 Supported layout diagnostics include `data-forge-sizing` and
 `data-forge-scroll` on the container body, and the owned
 `forge-window-manager-tabs__panel` / `forge-form-panel-tabs__panel` classes.

@@ -135,6 +135,50 @@ section:
 	}
 }
 
+func TestContainerSectionYAMLRetainsAppearance(t *testing.T) {
+	source := []byte(`
+id: plan
+section:
+  appearance: primary
+`)
+	container := &Container{}
+	if err := yaml.Unmarshal(source, container); err != nil {
+		t.Fatal(err)
+	}
+	if container.Section == nil || container.Section.Appearance != "primary" {
+		t.Fatalf("section appearance was not retained: %#v", container.Section)
+	}
+	payload, err := json.Marshal(container)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(payload), `"appearance":"primary"`) {
+		t.Fatalf("section appearance was not emitted: %s", payload)
+	}
+}
+
+func TestContainerSectionYAMLRetainsContentInset(t *testing.T) {
+	source := []byte(`
+id: plan
+section:
+  contentInset: flush
+`)
+	container := &Container{}
+	if err := yaml.Unmarshal(source, container); err != nil {
+		t.Fatal(err)
+	}
+	if container.Section == nil || container.Section.ContentInset != "flush" {
+		t.Fatalf("section content inset was not retained: %#v", container.Section)
+	}
+	payload, err := json.Marshal(container)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(payload), `"contentInset":"flush"`) {
+		t.Fatalf("section content inset was not emitted: %s", payload)
+	}
+}
+
 func TestContainerTabsYAMLRetainsCompactSectionAppearance(t *testing.T) {
 	source := []byte(`
 id: advertiserNavigation

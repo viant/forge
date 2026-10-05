@@ -314,10 +314,24 @@
     box-shadow: var(--forge-section-header-shadow);
     color: var(--forge-section-header-text);
 }
+.agently-workspace[data-forge-theme] [data-forge-part="container-section"][data-forge-section-appearance="primary"] > .bp6-section-header {
+    background: var(--forge-section-primary-header-surface, var(--forge-section-header-surface));
+}
+.agently-workspace[data-forge-theme] [data-forge-part="container-section"][data-forge-section-appearance="quiet"] > .bp6-section-header {
+    background: var(--forge-section-quiet-header-surface, var(--forge-section-header-surface));
+}
 .agently-workspace[data-forge-theme] [data-forge-part="container-section"] > .bp6-section-header .bp6-heading {
     color: inherit;
     font-size: var(--forge-section-header-font-size);
     line-height: var(--forge-section-header-line-height);
+}
+.agently-workspace[data-forge-theme] [data-forge-part="container-section"][data-forge-section-appearance="primary"] > .bp6-section-header .bp6-heading {
+    font-size: var(--forge-section-primary-header-font-size, var(--forge-section-header-font-size));
+    line-height: var(--forge-section-primary-header-line-height, var(--forge-section-header-line-height));
+}
+.agently-workspace[data-forge-theme] [data-forge-part="container-section"][data-forge-section-appearance="quiet"] > .bp6-section-header .bp6-heading {
+    font-size: var(--forge-section-quiet-header-font-size, var(--forge-section-header-font-size));
+    line-height: var(--forge-section-quiet-header-line-height, var(--forge-section-header-line-height));
 }
 .agently-workspace[data-forge-theme][data-forge-color-mode="dark"] {
     --forge-lookup-bg: #213c32;

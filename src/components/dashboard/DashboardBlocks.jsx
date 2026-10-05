@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useSignalEffect} from '@preact/signals-react';
 import {useSignals} from '@preact/signals-react/runtime';
 import {Icon} from '@blueprintjs/core';
@@ -1451,6 +1451,17 @@ export function DashboardEditableTable({container, context, embedded = false}) {
         const next = {...frequencyParts(currentRows()[rowIndex]?.[column.key]), [part]: nextValue};
         updateCell(rowIndex, column.key, next.count ? `${next.count} per ${next.interval || 1} ${next.unit || 'day'}` : '');
     };
+    const frequencyControl = (rowIndex, column, value) => {
+        const parts = frequencyParts(value);
+        return <div className="forge-frequency-editor">
+            <input aria-label={`${column.label || column.key} count row ${rowIndex + 1}`} type="number" min="1" value={parts.count} placeholder="—" onChange={(event) => setFrequencyPart(rowIndex, column, 'count', event.target.value)}/>
+            <span>per</span>
+            <input aria-label={`${column.label || column.key} interval row ${rowIndex + 1}`} type="number" min="1" value={parts.interval} onChange={(event) => setFrequencyPart(rowIndex, column, 'interval', event.target.value)}/>
+            <select aria-label={`${column.label || column.key} unit row ${rowIndex + 1}`} value={parts.unit} onChange={(event) => setFrequencyPart(rowIndex, column, 'unit', event.target.value)}>
+                {(column?.editor?.units || ['hour', 'day', 'week']).map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+            </select>
+        </div>;
+    };
     const editableCellStyle = (row, column) => {
         const visual = resolveTableCellVisualState(row, column);
         if (!visual || !['dataBar', 'progressBar', 'sparkBar'].includes(visual.kind)) return undefined;
@@ -1463,6 +1474,7 @@ export function DashboardEditableTable({container, context, embedded = false}) {
         const editorDisabled = !!(editor?.disabledWhen && evaluatePlainVisibleWhen(editor.disabledWhen, context, row));
         const value = row?.[column?.key] ?? '';
         if (!editor) return <span>{formatDashboardValue(value, column?.format, getDashboardLocale(context))}</span>;
+        if (editor.type === 'frequency') return frequencyControl(rowIndex, column, value);
         if (editor.type === 'select') return (
             <select aria-label={`${column.cardLabel || column.label || column.key} row ${rowIndex + 1}`} value={value} disabled={editorDisabled}
                 onChange={(event) => updateCell(rowIndex, column.key, event.target.value)}>
@@ -1471,6 +1483,11 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                     return <option key={normalized.value} value={normalized.value}>{normalized.label}</option>;
                 })}
             </select>
+        );
+        if (/rationale|reason|description/i.test(`${column.key} ${column.label || ''}`)) return (
+            <textarea aria-label={`${column.cardLabel || column.label || column.key} row ${rowIndex + 1}`}
+                rows={2} disabled={editorDisabled} value={value} placeholder={editor.placeholder || ''}
+                onChange={(event) => updateCell(rowIndex, column.key, event.target.value)}/>
         );
         return (
             <input aria-label={`${column.cardLabel || column.label || column.key} row ${rowIndex + 1}`}
@@ -1508,17 +1525,7 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                                         return (
                                             <td key={column.key} className={[column.frozen ? 'forge-table-frozen-identifier' : '', column.required === true ? 'is-required' : ''].filter(Boolean).join(' ') || undefined} style={column.frozen ? {'--forge-frozen-column-width': `${column.resolvedCompactWidth}px`} : undefined}>
                                                 {!editor ? <span>{formatDashboardValue(value, column.format, getDashboardLocale(context))}</span>
-                                                    : editor.type === 'frequency' ? (() => {
-                                                        const parts = frequencyParts(value);
-                                                        return <div className="forge-frequency-editor">
-                                                            <input aria-label={`${column.label || column.key} count row ${rowIndex + 1}`} type="number" min="1" value={parts.count} placeholder="—" onChange={(event) => setFrequencyPart(rowIndex, column, 'count', event.target.value)}/>
-                                                            <span>per</span>
-                                                            <input aria-label={`${column.label || column.key} interval row ${rowIndex + 1}`} type="number" min="1" value={parts.interval} onChange={(event) => setFrequencyPart(rowIndex, column, 'interval', event.target.value)}/>
-                                                            <select aria-label={`${column.label || column.key} unit row ${rowIndex + 1}`} value={parts.unit} onChange={(event) => setFrequencyPart(rowIndex, column, 'unit', event.target.value)}>
-                                                                {(editor.units || ['hour', 'day', 'week']).map((unit) => <option key={unit} value={unit}>{unit}</option>)}
-                                                            </select>
-                                                        </div>;
-                                                    })()
+                                                    : editor.type === 'frequency' ? frequencyControl(rowIndex, column, value)
                                                     : editor.type === 'select' ? (
                                                         <select aria-label={`${column.label || column.key} row ${rowIndex + 1}`} value={value} disabled={editorDisabled}
                                                             onChange={(event) => updateCell(rowIndex, column.key, event.target.value)}>
@@ -1579,7 +1586,7 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                         return <section className="forge-editable-collection__card" key={`mobile-${rowIndex}`}>
                             <header className="forge-editable-collection__card-header">
                                 <strong>{formatDashboardValue(row?.[mobileCards.titleField], titleColumn?.format, getDashboardLocale(context))}</strong>
-                                <span>{mobileCards.metaLabel ? `${mobileCards.metaLabel}: ` : ''}{formatDashboardValue(row?.[mobileCards.metaField], mobileCards.metaFormat || metaColumn?.format, getDashboardLocale(context))}</span>
+                                {mobileCards.metaField ? <span>{mobileCards.metaLabel ? `${mobileCards.metaLabel}: ` : ''}{formatDashboardValue(row?.[mobileCards.metaField], mobileCards.metaFormat || metaColumn?.format, getDashboardLocale(context))}</span> : null}
                             </header>
                             <div className="forge-editable-collection__card-fields">
                                 {cardColumns.map((column) => {
@@ -1671,18 +1678,27 @@ export function DashboardLookupChips({container, context}) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [revision, setRevision] = useState(0);
+    const requestAbortRef = useRef(null);
+    const cancelRequest = () => {
+        const controller = requestAbortRef.current;
+        requestAbortRef.current = null;
+        controller?.abort();
+    };
     const currentRows = () => dataSource?.peekFullCollection?.() || dataSource?.peekCollection?.() || [];
     const rows = currentRows();
     const reactiveSelection = dataSourceContext?.signals?.selection?.value?.selection;
     const selectedCount = Array.isArray(reactiveSelection) ? reactiveSelection.length : rows.length;
     const valueField = String(config.valueField || 'value');
     const labelField = String(config.labelField || 'label');
+    const isSearchMode = config.interactionMode === 'search';
     const showSelectionChips = String(config.selectionPresentation || 'chips').toLowerCase() !== 'table';
     const selections = showSelectionChips ? (Array.isArray(rows) ? rows : []).map((row) => ({
         value: valueAtPath(row, config.selectionValueField || 'id'),
         label: valueAtPath(row, config.selectionLabelField || 'name') || valueAtPath(row, config.selectionValueField || 'id'),
     })) : [];
     const activeProvider = providers.find((provider) => String(provider?.id || '') === providerId) || providers[0] || {};
+    const minimumQueryLength = Math.max(0, Number(config.minQueryLength || 0));
+    const resultLimit = Math.max(1, Number(config.resultLimit || 12));
     const mapResult = (row) => {
         const mapped = mapLookupRow(row, config.resultMapping || {id: valueField, name: labelField});
         if (activeProvider?.id && config.providerField) mapped[config.providerField] = activeProvider.id;
@@ -1698,20 +1714,23 @@ export function DashboardLookupChips({container, context}) {
         });
     };
 
-    const search = async () => {
-        const minimumQueryLength = Number(config.minQueryLength || 0);
+    const search = async (manual = false) => {
         if (minimumQueryLength > 0 && String(query || '').trim().length < minimumQueryLength) {
+            cancelRequest();
             setResults([]);
-            setError(`Enter at least ${minimumQueryLength} characters to search.`);
+            setLoading(false);
+            setError(manual || !isSearchMode ? `Enter at least ${minimumQueryLength} characters to search.` : '');
             return;
         }
         if (Array.isArray(config.options)) {
+            cancelRequest();
             const normalizedQuery = String(query || '').trim().toLowerCase();
             const existingKeys = new Set(rows.map((row) => String(valueAtPath(row, config.selectionValueField || 'id') ?? '')));
             const found = config.options.map((option) => option && typeof option === 'object' ? option : {label: option, value: option})
                 .filter((option) => !existingKeys.has(String(option.value ?? '')))
                 .filter((option) => !normalizedQuery || String(option.label || option.value || '').toLowerCase().includes(normalizedQuery));
             setError('');
+            setLoading(false);
             setResults(found);
             return;
         }
@@ -1719,8 +1738,12 @@ export function DashboardLookupChips({container, context}) {
             setError('Lookup service is unavailable.');
             return;
         }
+        cancelRequest();
+        const controller = new AbortController();
+        requestAbortRef.current = controller;
         setLoading(true);
         setError('');
+        if (isSearchMode) setResults([]);
         try {
             const found = await lookupService.search({
                 dataSourceRef: config.dataSourceRef,
@@ -1729,23 +1752,50 @@ export function DashboardLookupChips({container, context}) {
                 inputs: {...(config.inputs || {}), ...(activeProvider.inputs || {})},
                 inputBindings: config.inputBindings || {},
                 timeoutMs: config.timeoutMs,
+                signal: controller.signal,
             });
+            if (controller.signal.aborted || requestAbortRef.current !== controller) return;
             setResults(omitSelectedResults(found));
         } catch (searchError) {
+            if (controller.signal.aborted || requestAbortRef.current !== controller) return;
             setResults([]);
             setError(String(searchError?.message || searchError || 'Lookup failed.'));
         } finally {
-            setLoading(false);
+            if (requestAbortRef.current === controller) {
+                requestAbortRef.current = null;
+                setLoading(false);
+            }
         }
     };
 
     useEffect(() => {
-        if (!query.trim() || config.searchAsYouType === false) return undefined;
-        const timeout = setTimeout(search, Number(config.debounceMs || 250));
-        return () => clearTimeout(timeout);
+        const trimmedQuery = query.trim();
+        if (!trimmedQuery || trimmedQuery.length < minimumQueryLength) {
+            cancelRequest();
+            setLoading(false);
+            setError('');
+            if (isSearchMode && drillStack.length === 0) setResults([]);
+            return undefined;
+        }
+        if (config.searchAsYouType === false) {
+            cancelRequest();
+            setLoading(false);
+            if (isSearchMode) {
+                setError('');
+                setResults([]);
+            }
+            return undefined;
+        }
+        const timeout = setTimeout(() => search(false), Number(config.debounceMs || 250));
+        return () => {
+            clearTimeout(timeout);
+            cancelRequest();
+        };
     // The provider is intentionally part of the lookup query identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [query, providerId]);
+
+    useEffect(() => () => cancelRequest(), []);
 
     const addResult = (row) => {
         const latestRows = currentRows();
@@ -1763,6 +1813,9 @@ export function DashboardLookupChips({container, context}) {
     const drillInto = async (row) => {
         const drill = config.drill && typeof config.drill === 'object' ? config.drill : null;
         if (!drill?.dataSourceRef) return;
+        cancelRequest();
+        const controller = new AbortController();
+        requestAbortRef.current = controller;
         const rawNodeValue = valueAtPath(row, drill.valueField || valueField);
         const typedNodeValue = drill.valueType === 'number' ? Number(rawNodeValue) : rawNodeValue;
         const nodeValue = drill.wrapArray ? [typedNodeValue] : typedNodeValue;
@@ -1779,18 +1832,26 @@ export function DashboardLookupChips({container, context}) {
                 dataSourceRef: drill.dataSourceRef,
                 inputs,
                 inputBindings: config.inputBindings || {},
+                signal: controller.signal,
             });
+            if (controller.signal.aborted || requestAbortRef.current !== controller) return;
             setDrillStack((stack) => [...stack, {row, results}]);
             setResults(Array.isArray(children) ? children : []);
             setQuery('');
         } catch (drillError) {
+            if (controller.signal.aborted || requestAbortRef.current !== controller) return;
             setError(String(drillError?.message || drillError || 'Could not load children.'));
         } finally {
-            setLoading(false);
+            if (requestAbortRef.current === controller) {
+                requestAbortRef.current = null;
+                setLoading(false);
+            }
         }
     };
 
     const drillBack = () => {
+        cancelRequest();
+        setLoading(false);
         setDrillStack((stack) => {
             const previous = stack[stack.length - 1];
             if (previous) setResults(previous.results || []);
@@ -1818,16 +1879,20 @@ export function DashboardLookupChips({container, context}) {
                     selections={selections}
                     inputValue={query}
                     placeholder={config.placeholder || 'Search and add'}
-                    browseLabel={loading ? 'Searching' : (config.browseLabel || 'Search')}
+                    browseLabel={config.browseLabel || 'Search'}
+                    interactionMode={config.interactionMode}
                     allowManualEntry
-                    disabled={loading}
+                    disabled={config.disabled === true || (!isSearchMode && loading)}
+                    busy={isSearchMode && loading}
+                    error={isSearchMode ? error : ''}
+                    aria-label={config.inputLabel || config.placeholder || 'Search and add'}
                     onInputChange={setQuery}
-                    onInputCommit={search}
-                    onBrowse={search}
+                    onInputCommit={() => search(true)}
+                    onBrowse={() => search(true)}
                     onRemoveSelection={removeSelection}
                 />
-                {!showSelectionChips ? <div className="forge-dashboard-lookup-chips__count">{selectedCount} selected {selectedCount === 1 ? 'item' : 'items'}</div> : null}
-                {error ? <div className="forge-dashboard-lookup-chips__error" role="alert">{error}</div> : null}
+                {!showSelectionChips ? <div className="forge-dashboard-lookup-chips__count" aria-live="polite">{selectedCount} selected {selectedCount === 1 ? 'item' : 'items'}</div> : null}
+                {!isSearchMode && error ? <div className="forge-dashboard-lookup-chips__error" role="alert">{error}</div> : null}
                 {drillStack.length > 0 ? (
                     <div className="forge-dashboard-lookup-chips__breadcrumb">
                         <button type="button" onClick={drillBack}><Icon icon="chevron-left" size={14}/>Back</button>
@@ -1835,14 +1900,14 @@ export function DashboardLookupChips({container, context}) {
                     </div>
                 ) : null}
                 {results.length > 0 ? (
-                    <div className="forge-dashboard-lookup-chips__results" role="listbox" aria-label={config.resultsLabel || 'Lookup results'}>
-                        {results.slice(0, Number(config.resultLimit || 12)).map((row, index) => {
+                    <div className="forge-dashboard-lookup-chips__results" role="list" aria-label={config.resultsLabel || 'Lookup results'}>
+                        {results.slice(0, resultLimit).map((row, index) => {
                             const activeLabelField = drillStack.length > 0 ? (config.drill?.resultLabelField || labelField) : labelField;
                             const activeValueField = drillStack.length > 0 ? (config.drill?.resultValueField || valueField) : valueField;
                             const resultLabel = lookupRowLabel(row, activeLabelField) || displayLookupValue(valueAtPath(row, activeValueField));
                             const canDrill = !!config.drill?.dataSourceRef && drillStack.length < Number(config.drill?.maxDepth || 1);
                             return (
-                            <div className="forge-dashboard-lookup-chips__result" key={`${valueAtPath(row, activeValueField) ?? index}`} role="option">
+                            <div className="forge-dashboard-lookup-chips__result" key={`${valueAtPath(row, activeValueField) ?? index}`} role="listitem">
                                 {!(config.drill?.rootOnlyAdd && drillStack.length > 0) ? (
                                     <button className="forge-dashboard-lookup-chips__result-add" type="button" onClick={() => addResult(row)}>
                                         <Icon icon="plus" size={14}/>
@@ -1858,7 +1923,8 @@ export function DashboardLookupChips({container, context}) {
                         );})}
                     </div>
                 ) : null}
-                {!loading && !error && query.trim() && results.length === 0 ? <div className="forge-dashboard-lookup-chips__empty">No matching options.</div> : null}
+                {isSearchMode && results.length > resultLimit ? <div className="forge-dashboard-lookup-chips__count" role="status">Showing the first {resultLimit} of {results.length} options.</div> : null}
+                {!loading && !error && query.trim() && query.trim().length >= minimumQueryLength && results.length === 0 ? <div className="forge-dashboard-lookup-chips__empty">No matching options.</div> : null}
                 {Array.isArray(container.columns) && container.columns.length > 0 ? (
                     <div className="forge-dashboard-lookup-chips__selection">
                         {container?.editableRows === true ? (

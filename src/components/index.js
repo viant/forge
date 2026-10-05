@@ -17,6 +17,7 @@ export { default as AvatarIcon } from './AvatarIcon.jsx';
 export { default as Terminal } from './Terminal.jsx';
 export { default as CompactFeedList } from './feed/CompactFeedList.jsx';
 export { default as LookupSelectionInput } from './lookup/LookupSelectionInput.jsx';
+export { default as LookupPickerDialog } from './lookup/LookupPickerDialog.jsx';
 export {
     marshalResource,
     prepareResourcePayload,
