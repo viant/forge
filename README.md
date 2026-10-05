@@ -1,432 +1,233 @@
 # Forge
 
-Forge is an open-source framework for building modern web applications.  
-It features a **React-based frontend** and a **Go backend**, offering flexibility and scalability for dynamic, interactive applications.
-Forge has been **built with LLMs**, leveraging AI-powered capabilities to enhance development and functionality.
+Forge is a data-driven UI layer for building interactive applications from structured definitions. It turns window metadata, schemas, bound data, and report documents into forms, tables, charts, editors, conversations, and workspaces.
 
+Definitions describe what to display and how controls interact. Runtime contexts connect those controls to data and actions. Web and native renderers provide the presentation, while the host application supplies services, authentication, authorization, and persistence.
 
-## Table of Contents
+## Why use Forge?
 
-- [Introduction](#introduction)
-- [Features](#features)
-- [Architecture](#architecture)
-- [Installation](#installation)
-    - [Prerequisites](#prerequisites)
-    - [Frontend Setup](#frontend-setup)
-    - [Backend Setup](#backend-setup)
-- [Usage](#usage)
-    - [Running the Application](#running-the-application)
-    - [Available Components](#available-components)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgments](#acknowledgments)
-# Documentation
-- [Parameter passing between windows](doc/window-parameter-passing.md)
-- [Widgets and form controls](doc/widgets.md)
-- [Widgets reference](doc/widgets.md)
-
-## Introduction
-
-Forge aims to simplify the development of web applications by providing a structured approach that integrates both frontend and backend development. With reusable components and services, developers can focus on building features rather than setting up configurations.
-
-## Features
-
-- **Modular React Components**: Reusable components such as `LayoutRenderer`, `Container`, `FileBrowser`, and `Editor` for building dynamic user interfaces.
-- **State Management with Signals**: Utilizes `@preact/signals-react` for efficient state management and reactivity.
-- **Window and Dialog Management**: Handle multiple windows and dialogs within the application using `WindowManager` and `ViewDialog`.
-- **Data Handling and Services**: Backend services in Go for handling data operations, including file browsing, navigation, and metadata loading.
-- **Dynamic Form and Table Rendering**: Render forms and tables dynamically based on configurations.
-- **Chart Integration**: Supports data visualization with chart components.
-- **File System Integration**: Access and manipulate files using the backend file service.
+- **Describe an interface alongside its data.** YAML or JSON metadata declares controls, schemas, layouts, datasource references, and actions. Reusable fragments keep related screens consistent.
+- **Present data in useful forms.** Structured reports, Markdown, forms, and collections let users inspect results, compare records, and edit declared fields.
+- **Keep work visible in a workspace.** Windows, tabs, dialogs, split panels, and nested containers support several related views while preserving navigation and view state.
+- **Share state across controls.** Datasource form, selection, collection, input, and loading/error state connect filters, tables, forms, and actions.
+- **Separate presentation from execution.** Hosts provide connectors and callbacks. A rendered button, discovered source, or proposed report does not grant permission to execute an operation.
+- **Adapt presentation to the client.** React web components, SwiftUI renderers, and Android Compose renderers consume structured definitions with platform-aware layout and capabilities.
 
 ## Architecture
 
-Forge is divided into two main parts:
+| Layer | Responsibility |
+| --- | --- |
+| Definitions | Window and container metadata, schemas, datasource contracts, actions, report documents, and target-specific presentation |
+| Runtime | Contexts, reactive state, bindings, widget classification, window lifecycle, and UI command dispatch |
+| Renderers | Web components and native views for controls, layouts, visualizations, and report content |
+| Host integration | Authorized data requests, action handlers, stored state, report execution, and artifact delivery |
+| Go services | Metadata loading and imports, file-service integrations, report compilation/rendering, and an optional MCP UI bridge |
 
-- **Frontend**: Built with React and utilizes modern JavaScript features along with libraries like Blueprint.js for UI components.
-- **Backend**: Built with Go (Golang), providing APIs and services to the frontend. It uses the `viant/afs` library for abstract file system interactions.
+The host supplies definitions and data through Forge's loading and connector boundaries. The runtime resolves widget types and bindings, tracks form and collection state, and routes interactions to declared handlers. Renderers display that state and expose updates back to the runtime. This keeps the same presentation reusable across applications with different services and business rules.
 
-### Multi-Platform Metadata
+The principal source areas are:
 
-Forge should be treated as the canonical owner of the target-aware metadata
-contract used by its generic metadata-driven UI/runtime. Forge is not an
-agentic dependency; host applications can reuse the same target
-shape outside Forge when they need consistent client identity elsewhere.
+| Directory | What to explore |
+| --- | --- |
+| `src/core/` | Contexts, signals, workspace presentation, UI snapshots, registry, and commands |
+| `src/runtime/` | Widget and wrapper registries, classification, and binding adapters |
+| `src/components/` | Windows, layouts, forms, tables, charts, chat, and workflow components |
+| `src/reporting/` | Report documents, specifications, resolved datasets, and print models |
+| `backend/` | Go metadata, file, reporting, and MCP services |
+| `ios/` | `ForgeIOSRuntime` and `ForgeIOSUI` Swift packages |
+| `android/sdk/` | Forge Android runtime and Compose UI library |
 
-#### Shared target context
+## Interface capabilities
 
-Use one shared target-context shape across:
+### Metadata and widgets
 
-- metadata/window requests
-- runtime metadata resolution
-- any application-level context that intentionally chooses to mirror the same
-  client identity contract
+Definitions can compose containers, controls, schema-based forms, and reusable imported fragments. Widget registries, classifiers, and state/event adapters allow applications to add controls or customize their behavior.
 
-Recommended shape:
+The web component exports include `WindowManager`, `LayoutRenderer`, `Container`, `ControlRenderer`, `FormRenderer`, `BasicTable`, `Editor`, `FileBrowser`, and `Chat`. Workflow primitives cover commands, collections, resource forms, uploads, schedules, and review-oriented interactions.
+
+Read [widgets](doc/widgets.md), [widget extension APIs](doc/widget-runtime.md), and [workflow primitives](doc/workflow-primitives.md).
+
+### Definition loading and resource models
+
+The Go metadata service reads YAML through an abstract filesystem, resolves recursive imports, and decodes the effective definition. Window loading supports a directory with `main.yaml` or a single named YAML file, along with a sibling JavaScript action asset. Target-aware resolution lets hosts supply shared definitions and platform-specific branches.
+
+A typical host-owned definition tree can be organized as:
+
+~~~text
+window/
+  records/
+    main.yaml
+    main.js
+  shared/
+    record-form.yaml
+~~~
+
+Fragments may select a named subtree and receive scoped parameters:
+
+~~~yaml
+containers:
+  - '$import(../shared/record-form.yaml:card, {"prefix":"record","readOnly":false})'
+~~~
+
+Inside a fragment, `$param(name)` reads the supplied value. Exact scalar substitutions preserve YAML types; embedded substitutions build names and selectors. Hosts choose the metadata base location and expose only the definitions appropriate to their application.
+
+Schemas describe the client resource shape. Resource models map that shape to reader and writer contracts, including nested objects and collections. This supports a canonical form even when a service reads and writes different envelopes. Validation and declared marshalling keep fields, identities, and command inputs explicit.
+
+See [resource models and marshalling](doc/workflow-primitives.md#resource-models-and-typed-marshalling) and [window parameters](doc/window-parameter-passing.md).
+
+### Windows, layout, and appearance
+
+Window management provides activation, tabs, dialogs, and parameter passing. Layout metadata controls nested panels, grid spans, content sizing, and scrolling. Hosts can adapt definitions using a target context such as:
 
 ```json
 {
-  "platform": "web|android|ios",
-  "formFactor": "desktop|tablet|phone",
-  "surface": "browser|app",
-  "capabilities": ["markdown", "chart", "upload", "code", "diff"]
+  "platform": "android",
+  "formFactor": "phone",
+  "surface": "app",
+  "capabilities": ["markdown", "chart", "attachments"]
 }
 ```
 
-Rules:
+Themes and color modes are separate choices. Semantic tokens, workspace CSS on the web, and platform font settings let applications retain their visual identity. Native renderers use supported platform properties and tokens; arbitrary browser CSS is not a native styling mechanism.
 
-- do not create different shapes for metadata calls vs any app-level reuse of
-  the same client identity contract
-- Forge owns the field names and matching semantics
-- apps and SDKs should reuse the same structure
+Start with [container layout](doc/container-layout.md), [grid layout](doc/grid-layout.md), [window parameters](doc/window-parameter-passing.md), and [workspace styles](doc/workspace-styles.md).
 
-Current vocabulary in use:
+### Datasources and actions
 
-- `markdown`: rich markdown rendering
-- `chart`: chart/data visualization rendering
-- `upload`: browser file upload support
-- `code`: code-oriented rendering/edit affordances on web
-- `diff`: diff rendering on web
-- `attachments`: attachment-aware mobile composer/runtime support
-- `camera`: camera capture support on mobile
-- `voice`: voice input/capture support on mobile
+A datasource context separates the collection being displayed from the form being edited, selected records, query inputs, and request state. Controls use handlers to update those states or request a fetch. Connectors and action callbacks supply application behavior.
 
-These are additive platform capabilities, not a replacement for the primary
-branching axes of `platform` and `formFactor`.
+This makes interactions such as selecting a table row, editing its form, changing a filter, or running a declared command part of a consistent state model. Hosts remain responsible for validating inputs and authorizing every request. Permission metadata helps shape the interface and must be paired with server-side authorization.
 
-#### Metadata branching
+See [datasource lifecycle](doc/data-source.md), [table behavior](doc/table-behavior.md), and [permission metadata](doc/permission-metadata.md).
 
-Platform-specific UI should use explicit metadata branches instead of deleting or
-overriding shared web windows.
+### Reports and visual results
 
-Recommended structure:
+Forge renders report documents as structured blocks, including Markdown, KPI values, charts, tables, filters, and composed sections. The reporting model distinguishes the authored document, its compiled specification, resolved datasets, and print presentation.
 
-```text
-metadata/window/<window-key>/
-  shared/
-  web/
-  android/
-    phone/
-    tablet/
-  ios/
-    phone/
-    tablet/
+`ReportDesigner` provides a controlled authoring surface. Applications can supply field catalogs and source providers, retain draft changes, and implement preview, run, and save callbacks. `ReportRuntime` renders the resulting content. Hosts own source execution, revisions, durable run identity, authorization, and artifact storage.
+
+Inline content and progressive report updates can share the application's conversation or appear in a dedicated workspace. Chat and feed components are presentation surfaces; the host supplies their messages and activity state.
+
+Read [reporting](doc/reporting.md), [designer embedding](doc/report-designer-embedding.md), [table formatting](doc/table-formatting.md), and the [durable report-run host adapter](doc/report-builder-report-run-host-adapter.md).
+
+### UI inspection and commands
+
+The UI registry and bridge expose structured snapshots and operations for windows, controls, filters, selection, focus, and dialogs. Applications can use these APIs for automation and custom integrations while keeping the same UI behavior used by people.
+
+The optional Go MCP server can expose a configured catalog of saved window definitions or bridge to a running UI. Catalog reads return definitions rather than executing their datasources. The embedding application decides which definitions and operations a caller may access.
+
+The optional bridge and catalog service are configured by the host; datasource and permission contracts are covered in [datasource lifecycle](doc/data-source.md) and [permission metadata](doc/permission-metadata.md).
+
+## Getting started
+
+### Web library and previews
+
+Use a supported Node.js environment with npm. From the repository root:
+
+```sh
+git clone https://github.com/viant/forge.git
+cd forge
+npm install
+npm run dev
 ```
 
-Resolution order:
+`npm run dev` starts Vite. For the report-builder preview, use:
 
-1. exact platform + form factor
-2. platform
-3. shared
-4. legacy fallback during migration only
-
-#### Backend responsibility
-
-Forge backend window loading should resolve the target branch before loading
-`main.yaml`.
-
-Forge backend `$import(...)` should also become target-aware so relative imports
-search in this order:
-
-1. current target branch
-2. platform branch
-3. shared branch
-4. legacy relative path fallback
-
-Without this, platform folder branches are brittle because target-specific
-`main.yaml` files can still import the wrong child metadata.
-
-#### Parameterized imports
-
-Metadata fragments can be instantiated with a scoped parameter map. Quote the
-directive when the inline map contains YAML punctuation:
-
-```yaml
-containers:
-  - '$import(shared/targeting.yaml:card, {"prefix":"advertiser","dataSourceRef":"advertiser_defaults","readOnly":false})'
+```sh
+npm run dev:report-builder-preview
 ```
 
-The imported fragment reads parameters with `$param(name)`:
+Open `http://127.0.0.1:5175/report-builder-preview.html` for that preview. Its fixtures demonstrate rendering and interaction; connect your own services through a host application.
 
-```yaml
-card:
-  id: $param(prefix)Targeting
-  dataSourceRef: $param(dataSourceRef)
-  readOnly: $param(readOnly)
+The package exposes entry points such as `forge/components`, `forge/core`, `forge/hooks`, `forge/actions`, `forge/reporting`, and `forge/report-designer`. A controlled designer can be embedded in an existing React application:
+
+```jsx
+import ReportDesigner from 'forge/report-designer';
+
+<ReportDesigner
+  report={reportDocument}
+  datasets={fieldCatalog}
+  expectedRevision={revision}
+  onChange={(candidate) => retainDraft(candidate)}
+  onPreview={({ report, signal }) => previewReport(report, signal)}
+  onSave={({ report, expectedRevision, signal }) =>
+    saveReport(report, expectedRevision, signal)}
+/>
 ```
 
-An exact `$param(name)` scalar preserves the supplied YAML type, including maps,
-lists, booleans, and numbers. Embedded occurrences interpolate scalar values into
-text, which supports IDs, handler names, selectors, data fields, and state keys.
-Nested imports inherit the current scope and may override selected values without
-changing sibling scopes. Missing parameters, malformed maps, and attempts to
-interpolate a map or list into text fail loading with an explicit error. Existing
-`$import(path.yaml)` and `$import(path.yaml:key)` directives remain compatible.
+Those callbacks belong to the host application. Follow the [embedding guide](doc/report-designer-embedding.md) for their return contracts and conflict/cancellation behavior.
 
-## Installation
+Build and run the repository's web checks with:
 
-### Prerequisites
+```sh
+npm run build
+npm test
+```
 
-- **Node.js** (version 14.x or higher)
-- **npm** (version 6.x or higher) or **Yarn** (version 1.x or higher)
-- **Go** (version 1.16 or higher)
-- **Git**
+Additional package scripts cover widget contracts, reporting, workflow primitives, workspace themes, and browser previews.
 
-### Frontend Setup
+### Native libraries
 
-1. **Clone the Repository**
+The iOS package provides `ForgeIOSRuntime` and `ForgeIOSUI`, targeting iOS 17 or later. Integrate the local Swift package into your host application; it supplies rendering and runtime behavior rather than a complete authenticated app shell.
 
-   ```bash
-   git clone https://github.com/yourusername/forge.git
-   ```
+```sh
+cd ios
+swift build
+swift test
+```
 
-2. **Navigate to the Frontend Directory**
+The Android library uses Compose, Java 17, and a minimum Android SDK level of 26. Integrate android/sdk as a library module in a host Gradle project whose Android and Kotlin plugins match the SDK:
 
-   ```bash
-   cd forge/src
-   ```
+~~~kotlin
+// Host settings.gradle.kts; adjust the relative path to your Forge checkout.
+include(":forge-sdk")
+project(":forge-sdk").projectDir = file("../forge/android/sdk")
+~~~
 
-3. **Install Dependencies**
+~~~kotlin
+// Host app/build.gradle.kts
+dependencies {
+    implementation(project(":forge-sdk"))
+}
+~~~
 
-   Using npm:
+Build and test through the host's configured Gradle wrapper. The repository's standalone Android wrapper does not include its wrapper JAR, and its settings also reference a sample module that is not tracked. The host-module integration is the usable path for this checkout. [Android module notes](android/README.md) describe the SDK organization.
 
-   ```bash
-   npm install
-   ```
+Platform definitions and widgets should be validated on their intended device; a shared metadata contract does not imply identical behavior for every component.
 
-   Or using Yarn:
+### Go services and MCP
 
-   ```bash
-   yarn install
-   ```
+The Go module declares Go 1.25.1. Download dependencies and test the Go packages from the repository root:
 
-4. **Start the Development Server**
+```sh
+go mod download
+go test ./backend/...
+```
 
-   Using npm:
+A standalone catalog-backed MCP server can use the included neutral example:
 
-   ```bash
-   npm start
-   ```
+```sh
+go run ./backend/mcp/cmd/forge-mcp \
+  --addr 127.0.0.1:5025 \
+  --window-catalog ./backend/mcp/examples/catalog.yaml
+```
 
-   Or using Yarn:
+The host must configure access before enabling a live UI bridge or embedding the service in an authenticated application.
 
-   ```bash
-   yarn start
-   ```
+## Documentation path
 
-   The application should now be running at `http://localhost:3000`.
+For a first integration, read these guides in order:
 
-### Backend Setup
+1. [Widgets and controls](doc/widgets.md) — choose the UI vocabulary.
+2. [Datasource lifecycle](doc/data-source.md) — understand form, selection, collection, and request state.
+3. [Container layout](doc/container-layout.md) and [grid layout](doc/grid-layout.md) — define sizing and scrolling.
+4. [Window parameter passing](doc/window-parameter-passing.md) — connect related views.
+5. [Workspace appearance](doc/workspace-styles.md) and [CSS classes](doc/container-css-classes.md) — customize presentation.
+6. [Workflow primitives](doc/workflow-primitives.md) and [permissions](doc/permission-metadata.md) — wire application actions.
+7. [Reporting](doc/reporting.md) and [designer embedding](doc/report-designer-embedding.md) — present and author structured results.
 
-1. **Navigate to the Backend Directory**
-
-   ```bash
-   cd forge/backend
-   ```
-
-2. **Install Go Modules**
-
-   ```bash
-   go mod download
-   ```
-
-3. **Run the Backend Server**
-
-   ```bash
-   go run main.go
-   ```
-
-   The backend server should now be running, typically at `http://localhost:8080`.
-
-## Usage
-
-### Running the Application
-
-With both the frontend and backend servers running, you can access the application in your web browser at `http://localhost:3000`.
-
-### Available Components
-
-- **Window Manager (`WindowManager.jsx`)**: Manages multiple windows or views within the application.
-- **Container (`Container.jsx`)**: Handles layouts and rendering of various UI components.
-- **File Browser (`FileBrowser.jsx`)**: Allows users to navigate and manage files within the application.
-- **Editor (`Editor.jsx`)**: Provides a code or text editor with syntax highlighting using `CodeMirror`.
-- **Table Panel (`TablePanel.jsx`)**: Displays data in table format with features like sorting, filtering, and pagination.
-- **Control Renderer (`ControlRenderer.jsx`)**: Dynamically renders form controls based on configuration.
-- **Chart (`Chart.jsx`)**: Visualizes data using chart components.
-- **Layout Renderer (`LayoutRenderer.jsx`)**: Builds complex nested page layouts declared in metadata.
-- **Splitter (`Splitter.jsx`)**: Adds resizable split-pane layouts.
-
-Grid layout (new)
-- Containers can opt into a coordinate-free grid with colspan/rowspan by setting `layout.kind: "grid"` and `layout.columns`.
-- Labels default to separate cells on the left; change via `layout.labels.mode`.
-- See `docs/grid-layout.md` for usage and examples.
-- **Form Renderer (`FormRenderer.jsx`)**: Auto-generates forms from JSON-Schema or UI metadata.
-- **Tree Multi-Select (`TreeMultiSelect.jsx`)**: Hierarchical multi-select control.
-- **Avatar Icon (`AvatarIcon.jsx`)**: Lightweight Phosphor-icon wrapper used by Chat.
-- **Dialog and Modal Components (`ViewDialog.jsx`)**: Manages dialogs and modals within the application.
-- **Chat (`Chat.jsx`)**: High-level chat UI with message feed, composer and *dynamic avatar icons* (see below).
-
-#### Dynamic avatar icons in Chat
-
-`Chat` renders an avatar next to every message.  Starting with Forge 1.1 you
-can fully control which icon is shown.
-
-1. **Per-message override** – set `iconName` on the message object.
-
-   ```js
-   handlers.dataSource.setFormData({
-     role: 'assistant',
-     iconName: 'Crown',   // <- any icon name from @phosphor-icons/react
-     content: 'Welcome back, your Majesty!',
-   });
-   ```
-
-2. **Per-chat mapping** – pass a static map or function via the `avatarIcons`
-   prop:
-
-   ```jsx
-   <Chat
-     avatarIcons={{
-       user: 'UserCircle',
-       assistant: 'Smiley',
-       tool: 'UserGear',
-     }}
-   />
-
-   // or
-   const pickIcon = (msg) =>
-     msg.role === 'assistant' && msg.metadata?.vip ? 'Crown' : 'Smiley';
-
-   <Chat avatarIcons={pickIcon} />
-   ```
-
-3. **App-wide default** – set once during bootstrap:
-
-   ```js
-  context.handlers.chat.avatarIcons = { user: 'User', assistant: 'Student' };
-  ```
-
-4. **YAML screen descriptor** – declare in the container metadata:
-
-   ```yaml
-   chat:
-     avatarIcons:
-       user: UserCircle
-       assistant: Student
-       tool: SealCheck
-
-   # or dynamic
-  chat:
-    avatarIconsFn: |
-      (msg) => msg.role === 'assistant' && msg.meta?.admin ? 'Crown' : 'Smiley'
-  ```
-
-Icons are provided by the
-[`@phosphor-icons/react`](https://www.npmjs.com/package/@phosphor-icons/react)
-package.  Browse the full catalogue at <https://phosphoricons.com/> and use
-the component name (e.g. `SmileyWink`, `UserGear`) as the icon string.
-
-#### Terminate Button Visibility
-
-`Chat` includes a circular action button that toggles between Send and Terminate. Visibility of the Terminate state can be controlled declaratively via `abortVisible` or statically via `showAbort`.
-
-- Precedence (highest → lowest):
-  - `showAbort` prop override
-  - `chat.abortVisible { selector, when }` (data-bound)
-  - `chat.showAbort` (static on/off)
-  - `loading` (auto fallback)
-
-- Data-bound visibility (recommended):
-
-  ```yaml
-  chat:
-    abortVisible:
-      selector: "job.status"           # resolved from form data
-      when: ["queued", "running"]     # show Terminate while async job is in these states
-    # Optional: read from another DataSource
-    # abortVisible:
-    #   dataSourceRef: otherDS
-    #   selector: "job.status"
-    #   when: ["queued", "running"]
-  ```
-
-  - Selector source: the chat’s bound DataSource form (`context.signals.form`) by default.
-    Use `abortVisible.dataSourceRef` to read from another DataSource.
-  - `when` semantics:
-    - omitted → Terminate shows when the selector value is truthy.
-    - scalar → Terminate shows when `selector === when`.
-    - array  → Terminate shows when `selector` is in `when`.
-
-- Typical flow:
-  - onSubmit handler starts async work and sets form data (e.g., `job.status = "running"`).
-  - A poller updates the form when done/failed (e.g., `job.status = "done"`), which hides Terminate.
-  - onAbort handler cancels and flips the form field to a non-matching value (e.g., `"aborted"`).
-
-### Backend Services
-
-- **File Service (`file/service.go`)**: Provides file system operations like listing directories and downloading files.
-- **Metadata Service (`meta/service.go`)**: Loads and resolves metadata with support for YAML files and `$import` directives.
-- **Navigation Handler (`handlers/navigation.go`)**: Fetches navigation data for building menus or navigation trees.
-- **Window Handler (`handlers/meta.go`)**: Loads window data and configurations.
+For individual components, consult [table behavior](doc/table-behavior.md), [table formatting](doc/table-formatting.md), [chat composer](doc/chat-composer.md), and [file browser](doc/file-browser.md).
 
 ## Contributing
 
-We welcome contributions from the community. To contribute:
-
-1. **Fork the Repository**
-
-   Click the "Fork" button on the repository page to create a copy under your GitHub account.
-
-2. **Create a Branch**
-
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-3. **Make Your Changes**
-
-   Edit the code to add new features or fix bugs.
-
-4. **Commit Your Changes**
-
-   ```bash
-   git commit -am "Add new feature"
-   ```
-
-5. **Push to Your Fork**
-
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-6. **Submit a Pull Request**
-
-   Go to the original repository and click on "New Pull Request" to submit your changes for review.
-
-Please ensure your code follows the existing code style and includes appropriate comments and documentation.
-
-## License
-
-This project is licensed under the Apache2 License.
-
-
-## Acknowledgments
-
-- **Library Author:** Adrian Witas
-- **Viant AFS**: For the abstract file system used in the backend services.
-- **Blueprint.js**: For the UI components used in the frontend.
-- **CodeMirror**: For providing the editor component with syntax highlighting.
-
-## Configuration and usage guides
-
-- [Table layout, navigation, quick search, export, and preferences](doc/table-behavior.md)
-- [Row/cell formatting and links](doc/table-formatting.md)
-- [Workspace styles, theme selection, and final CSS overrides](doc/workspace-styles.md)
-- [Metadata CSS classes](doc/container-css-classes.md)
-- [Chat composer, webcam capture, and starter-task agent selection](doc/chat-composer.md)
-- [Inline and hosted reporting](doc/reporting.md#inline-report-transactions)
-- [Datasource configuration and parameterized fixtures](doc/data-source.md)
-- [Window parameters](doc/window-parameter-passing.md)
-
-These guides distinguish Forge renderer behavior from host-specific configuration.
-They are usage documentation, not an app-wide native/web parity guarantee.
+Keep generic rendering and interaction behavior in Forge, with application policy and business operations in host integrations. Changes to metadata or bindings should include representative definitions and focused checks for affected renderers. For visual changes, inspect the result on the intended surface as well as running the relevant package tests.
