@@ -3930,6 +3930,14 @@ final class ForgeIOSTests: XCTestCase {
                     kind: "chartBlock",
                     title: "Trend",
                     diagnostics: [chartDiagnostic, rowsDatasetDiagnostic],
+                    content: [
+                        "chartSpec": .object(["xField": .string("name")]),
+                        "chartModel": .object([
+                            "type": .string("bar"),
+                            "xAxis": .object(["dataKey": .string("name")]),
+                            "series": .object(["values": .array([.object(["name": .string("Value"), "value": .string("value")])])])
+                        ])
+                    ],
                     chart: DashboardReportRuntimeChartValue(
                         dataSourceRef: "rows",
                         chart: ChartDef(
@@ -3996,7 +4004,7 @@ final class ForgeIOSTests: XCTestCase {
             subtitle: nil,
             blockCount: 1,
             blocks: [
-                DashboardReportRuntimeBlockSummary(id: "chart", kind: "chartBlock", title: "Trend")
+                DashboardReportRuntimeBlockSummary(id: "chart", kind: "chartBlock", title: "Trend", content: ["key": .string("chart"), "type": .string("chartBlock"), "label": .string("Trend")])
             ]
         ))
     }
