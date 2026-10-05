@@ -1,3 +1,26 @@
+const SECTION_APPEARANCES = new Set(['primary', 'quiet']);
+const SECTION_CONTENT_INSETS = new Set(['flush']);
+
+export function resolveSectionAppearance(section = {}) {
+    const candidate = String(section?.appearance || '').trim().toLowerCase();
+    return SECTION_APPEARANCES.has(candidate) ? candidate : '';
+}
+
+export function sectionAppearanceAttributes(section = {}) {
+    const appearance = resolveSectionAppearance(section);
+    return appearance ? {'data-forge-section-appearance': appearance} : {};
+}
+
+export function resolveSectionContentInset(section = {}) {
+    const candidate = String(section?.contentInset || '').trim().toLowerCase();
+    return SECTION_CONTENT_INSETS.has(candidate) ? candidate : '';
+}
+
+export function sectionContentInsetAttributes(section = {}) {
+    const contentInset = resolveSectionContentInset(section);
+    return contentInset ? {'data-forge-section-content-inset': contentInset} : {};
+}
+
 export function resolveSectionProperties(section = {}) {
     const properties = {...(section?.properties || {})};
     properties.collapsible = section?.collapsible === true || properties.collapsible === true;
