@@ -170,6 +170,16 @@ function validateNode(schema = {}, value, path = "$", rootSchema = schema) {
     }
   }
 
+  // JSON Schema string lengths count Unicode code points, not UTF-16 units.
+  if (typeof value === "string" && Number.isInteger(normalizedSchema.minLength)
+      && Array.from(value).length < normalizedSchema.minLength) {
+    errors.push({
+      path,
+      code: "minLength",
+      message: `Expected at least ${normalizedSchema.minLength} character(s).`,
+    });
+  }
+
   if ((effectiveType === "number" || effectiveType === "integer") && Number.isFinite(Number(normalizedSchema.minimum))) {
     if (Number(value) < Number(normalizedSchema.minimum)) {
       errors.push({
