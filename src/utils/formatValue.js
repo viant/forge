@@ -46,7 +46,9 @@ export const formatDisplayValue = (value, format, locale = 'en-US', options = {}
                     year: 'numeric',
                     month: 'short',
                     day: 'numeric',
-                    ...(timeZone ? {timeZone} : {}),
+                    // A date has calendar-day semantics. Browser-local defaults
+                    // must not shift a UTC-encoded SQL date to the preceding day.
+                    timeZone: timeZone || 'UTC',
                 }).format(date);
             }
             return new Intl.DateTimeFormat(locale, {
