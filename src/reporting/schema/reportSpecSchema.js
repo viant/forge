@@ -20,6 +20,7 @@ export const reportSpecSchema = {
     kind: { const: "reportSpec" },
     source: { $ref: "#/$defs/source" },
     title: { type: "string" },
+    subtitle: { type: "string" },
     theme: { $ref: "#/$defs/reportTheme" },
     binding: { $ref: "#/$defs/binding" },
     semanticSummary: { $ref: "#/$defs/semanticSummary" },
@@ -165,7 +166,7 @@ export const reportSpecSchema = {
       required: ["blockId"],
       properties: {
         blockId: { type: "string" },
-        size: { enum: ["half"] },
+        size: { enum: ["full", "half", "quarter", "third", "two-thirds", "1/4", "1/3", "twothirds", "2/3"] },
         span: { type: "integer", minimum: 1, maximum: 12 },
       },
     },
@@ -880,6 +881,36 @@ export const reportSpecSchema = {
         },
       },
     },
+    chartSeriesNativeValue: {
+      type: "object",
+      additionalProperties: false,
+      required: ["value", "label", "type"],
+      properties: {
+        value: { type: "string" },
+        label: { type: "string" },
+        color: { type: "string" },
+        format: { type: "string" },
+        type: { type: "string" },
+        axis: { enum: ["left", "right"] },
+        stackId: { type: "string" },
+        dataLabels: { enum: ["auto", "always", "none"] },
+        pointColorMode: { enum: ["series", "bySign"] },
+      },
+    },
+    chartSeriesNativeDirect: {
+      type: "object",
+      additionalProperties: false,
+      required: ["valueKey", "values"],
+      properties: {
+        valueKey: { type: "string", minLength: 1 },
+        values: {
+          type: "array",
+          minItems: 1,
+          items: { $ref: "#/$defs/chartSeriesNativeValue" },
+        },
+        palette: { type: "array", items: { type: "string" } },
+      },
+    },
     chartSeriesCategory: {
       type: "object",
       additionalProperties: false,
@@ -993,6 +1024,7 @@ export const reportSpecSchema = {
           anyOf: [
             { $ref: "#/$defs/chartSeriesGrouped" },
             { $ref: "#/$defs/chartSeriesDirect" },
+            { $ref: "#/$defs/chartSeriesNativeDirect" },
             { $ref: "#/$defs/chartSeriesCategory" },
           ],
         },
@@ -1060,6 +1092,12 @@ export const reportSpecSchema = {
       },
     },
     badgeItem: {
+      anyOf: [
+        { $ref: "#/$defs/badgeIdentifiedItem" },
+        { $ref: "#/$defs/badgeFieldBoundItem" },
+      ],
+    },
+    badgeIdentifiedItem: {
       type: "object",
       additionalProperties: false,
       required: ["id"],
@@ -1068,6 +1106,29 @@ export const reportSpecSchema = {
         label: { type: "string" },
         value: { $ref: "#/$defs/jsonValue" },
         valueField: { type: "string" },
+        format: { type: "string" },
+        displayKey: { type: "string" },
+        displayValueMap: {
+          type: "object",
+          additionalProperties: { $ref: "#/$defs/jsonValue" },
+        },
+        labelMode: { enum: ["field", "manual"] },
+        rules: {
+          type: "array",
+          items: { $ref: "#/$defs/badgeRule" },
+        },
+        tone: { type: "string" },
+      },
+    },
+    badgeFieldBoundItem: {
+      type: "object",
+      additionalProperties: false,
+      required: ["valueField", "label"],
+      properties: {
+        id: { type: "string" },
+        label: { type: "string", minLength: 1 },
+        value: { $ref: "#/$defs/jsonValue" },
+        valueField: { type: "string", minLength: 1 },
         format: { type: "string" },
         displayKey: { type: "string" },
         displayValueMap: {
