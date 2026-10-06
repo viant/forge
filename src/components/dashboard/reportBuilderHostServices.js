@@ -10,6 +10,22 @@ function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
+// This adapter speaks the Agently Core report-run service contract.
+function validateReportRunCommandLink(input, run) {
+    if (Object.hasOwn(input.requestedParams || {}, "_agentlyForecastCommand")) throw new Error("Report command metadata is server-owned.");
+    if (input.reportAdmissionRef == null) return {};
+    const canonical = value => Array.isArray(value) ? value.map(canonical) : isPlainObject(value)
+        ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
+    const params = run?.requestedParams;
+    const key = "_agentlyForecastCommand";
+    const link = { version: 1, ref: input.reportAdmissionRef, requestId: input.uiRunRequestId };
+    if (!isPlainObject(params) || JSON.stringify(canonical(params[key])) !== JSON.stringify(canonical(link))
+        || JSON.stringify(canonical(Object.fromEntries(Object.entries(params).filter(([name]) => name !== key)))) !== JSON.stringify(canonical(input.requestedParams))) {
+        throw new Error("The report service did not preserve the admitted command identity and request.");
+    }
+    return { reportAdmissionRef: input.reportAdmissionRef };
+}
+
 export const REPORT_STORE_CHANGED_EVENT = "forge:report-store-changed";
 
 function notifyReportStoreChanged(detail = {}) {
@@ -96,6 +112,7 @@ const REPORT_RUN_BEGIN_FIELDS = [
     "requestedParams",
     "effectiveParams",
     "uiRunRequestId",
+    "reportAdmissionRef",
 ];
 const REPORT_RUN_COMPLETE_FIELDS = [
     "reportRunId",
@@ -288,7 +305,17 @@ function createReportRunHandlers({
         return requireRunResult(result, { reportRunId, status: expectedStatus });
     };
     return {
+        async getRun(input = {}) {
+            const reportRunId = normalizeString(input.reportRunId);
+            const conversationId = normalizeString(input.conversationId);
+            if (!reportRunId || !conversationId) throw new Error("reportRunId and conversationId are required.");
+            const result = await request(`/${encodeURIComponent(reportRunId)}?conversationId=${encodeURIComponent(conversationId)}`, {}, {method:"GET"});
+            const run = requireRunResult(result,{reportRunId,status:"completed"});
+            if (normalizeString(run.conversationId) !== conversationId) throw new Error("The report-run service returned a foreign conversation.");
+            return run;
+        },
         async begin(input = {}) {
+            if (Object.hasOwn(input.requestedParams || {}, "_agentlyForecastCommand")) throw new Error("Report command metadata is server-owned.");
             try {
                 const result = await request("/begin", selectRequestFields(input, REPORT_RUN_BEGIN_FIELDS));
                 if (!isPlainObject(result)) {
@@ -300,7 +327,7 @@ function createReportRunHandlers({
                         conversationId: normalizeString(input?.conversationId),
                     });
                 }
-                return { ...result, enabled: true, run };
+                return { ...result, enabled: true, run, ...validateReportRunCommandLink(input, run) };
             } catch (error) {
                 if (isUnmountedRouteError(error)) {
                     return { enabled: false };
@@ -598,7 +625,7 @@ function isCompleteReportSharedArtifactsGroup(group = null) {
 }
 
 function isCompleteReportRunsGroup(group = null) {
-    return hasFunctions(group, ["begin", "complete", "fail", "activate", "getContext", "adopt"]);
+    return hasFunctions(group, ["begin", "complete", "fail", "activate", "getContext", "getRun", "adopt"]);
 }
 
 export function buildReportBuilderHostServices({
@@ -634,6 +661,10 @@ export function buildReportBuilderHostServices({
         auth,
         prepareRequest,
         endpointName,
+    });
+    synthesizedReportRuns.compile = ({ conversationId: scope = conversationId, ...input } = {}) => executeTool({
+        baseURL, auth, prepareRequest, endpointName, conversationId: scope,
+        toolName: "reporting:compile_fenced_report", args: cloneValue(input),
     });
     return {
         ...existing,

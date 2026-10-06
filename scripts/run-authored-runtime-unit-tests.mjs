@@ -8,6 +8,7 @@ const repoRoot = path.resolve(__dirname, "..");
 const viteNodePath = path.join(repoRoot, "node_modules", "vite-node", "vite-node.mjs");
 
 const runtimeUnitTests = [
+  "src/reporting/schema/reportNativeArtifactCompatibility.test.js",
   "scripts/run-report-builder-preview-scenarios-static.test.mjs",
   "scripts/report-builder-preview-scenarios.test.mjs",
   "scripts/report-builder-preview-scenario-builders.test.mjs",
@@ -254,6 +255,8 @@ const runtimeUnitTests = [
   "src/reporting/reportSpecModel.test.js",
   "src/reporting/reportBuilderDrillMetadata.test.js",
   "src/reporting/reportRuntimeBlock.test.js",
+  "src/components/dashboard/reportBuilderRunCommandReceipt.test.js",
+  "src/components/dashboard/reportBuilderRunCommandHostServices.test.js",
   "src/reporting/runtimeFilterBindingModel.test.js",
   "src/reporting/reportRuntimeHostIntent.test.js",
   "src/reporting/reportRuntimeRefinementFilter.test.js",

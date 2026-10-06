@@ -33,6 +33,42 @@ function buildReportRunCorrelation({
     };
 }
 
+export function resolveReportRunCommandIdentity(input = {}) {
+    const hasId = Object.hasOwn(input, "requestId"), hasRef = Object.hasOwn(input, "reportAdmissionRef");
+    if (!hasId && !hasRef) return null;
+    if (!hasId || !hasRef || typeof input.requestId !== "string"
+        || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.requestId)
+        || typeof input.reportAdmissionRef !== "string" || !input.reportAdmissionRef.trim()) {
+        throw new Error("A requestId UUID and nonempty reportAdmissionRef must be supplied together.");
+    }
+    return Object.freeze({ requestId: input.requestId, reportAdmissionRef: input.reportAdmissionRef });
+}
+function sameCommandIdentity(left, right) {
+    return (left?.requestId || null) === (right?.requestId || null)
+        && (left?.reportAdmissionRef ?? null) === (right?.reportAdmissionRef ?? null);
+}
+export function isLinkedReportRunReplay(existing, snapshot) {
+    const command = snapshot?.metadata?.commandIdentity;
+    const previous = existing?.commandIdentity || existing?.invocation?.metadata?.commandIdentity;
+    if (!command || previous?.requestId !== command.requestId) return false;
+    const requestFingerprint = existing?.invocation?.requestFingerprint || existing?.requestFingerprint;
+    const materializationFingerprint = existing?.invocation?.materializationFingerprint || existing?.materializationFingerprint;
+    if (!sameCommandIdentity(previous, command)
+        || requestFingerprint !== snapshot.requestFingerprint
+        || materializationFingerprint !== snapshot.materializationFingerprint) throw new Error("Report request identity conflict.");
+    return true;
+}
+function semanticJSON(value) {
+    if (Array.isArray(value)) return value.map(semanticJSON);
+    if (isPlainObject(value)) return Object.fromEntries(Object.keys(value).sort().map(key => [key, semanticJSON(value[key])]));
+    return value;
+}
+function assertLinkedReportBeginResult(beginResult, snapshot, command) {
+    if (beginResult?.reportAdmissionRef !== command.reportAdmissionRef) {
+        throw new Error("The report host did not validate the admitted command reference.");
+    }
+}
+
 export const REPORT_RUN_SUPERSEDED_CODE = "browser_run_superseded";
 export const REPORT_RUN_SUPERSEDED_MESSAGE = "Durable browser report run was superseded by a newer builder request or report materialization before terminal settlement.";
 
@@ -159,6 +195,7 @@ export function buildCancelledReportRunResult({
 }
 
 export function createPendingReportRunExecution({
+    commandIdentity = null,
     origin = "manual",
     requestFingerprint = "",
     materializationFingerprint = "",
@@ -171,6 +208,7 @@ export function createPendingReportRunExecution({
         origin: normalizeString(origin).toLowerCase() || "manual",
         requestFingerprint: normalizeString(requestFingerprint),
         materializationFingerprint: normalizeString(materializationFingerprint),
+        commandIdentity: commandIdentity ? freezeValue(cloneValue(commandIdentity)) : null,
         promise,
         resolve: resolvePendingRun,
         started: false,
@@ -179,6 +217,7 @@ export function createPendingReportRunExecution({
 }
 
 export function resolvePendingReportRunExecutionAction(pendingRun = null, {
+    commandIdentity = null,
     origin = "manual",
     requestFingerprint = "",
     materializationFingerprint = "",
@@ -186,6 +225,9 @@ export function resolvePendingReportRunExecutionAction(pendingRun = null, {
     if (!pendingRun?.promise || pendingRun.settled === true) {
         return "none";
     }
+    if (pendingRun.commandIdentity?.requestId && pendingRun.commandIdentity.requestId === commandIdentity?.requestId
+        && !sameCommandIdentity(pendingRun.commandIdentity, commandIdentity)) return "reject";
+    if (!sameCommandIdentity(pendingRun.commandIdentity, commandIdentity)) return "supersede";
     const pendingOrigin = normalizeString(pendingRun.origin).toLowerCase() || "manual";
     const requestedOrigin = normalizeString(origin).toLowerCase() || "manual";
     if (pendingOrigin !== requestedOrigin) {
@@ -685,6 +727,7 @@ export function buildReportRunBeginDeduplicationKey(snapshot = null, {
     }
     return JSON.stringify({
         identity,
+        ...((snapshot?.invocation?.metadata?.commandIdentity || snapshot?.metadata?.commandIdentity) ? { commandIdentity: snapshot?.invocation?.metadata?.commandIdentity || snapshot?.metadata?.commandIdentity } : {}),
         invocationFingerprint,
     });
 }
@@ -1228,7 +1271,14 @@ export function bindReportRunInvocation(run = null, snapshot = null) {
             terminalMaterializationFingerprint: normalizeString(
                 snapshot?.terminalMaterializationFingerprint,
             ),
-            metadata: cloneValue(snapshot.metadata),
+            metadata: cloneValue(run.reportAdmissionRef != null && run.invocation?.metadata?.commandIdentity
+                ? { ...snapshot.metadata, commandIdentity: run.invocation.metadata.commandIdentity } : snapshot.metadata),
+            ...(run.reportAdmissionRef != null ? {
+                materialization: cloneValue(run.invocation?.materialization || {
+                    reportDocument: snapshot.materialization?.reportDocument,
+                    reportSpec: snapshot.materialization?.reportSpec,
+                }),
+            } : {}),
         }),
     };
 }
@@ -1983,6 +2033,7 @@ export async function beginAndDispatchReportRun(snapshot, {
     if (!begun?.ok) {
         return begun;
     }
+    if (snapshot?.metadata?.commandIdentity && begun.started === false) return { ...begun, dispatchAction: "skip", dispatchResult: null };
     if (typeof resolvePostBeginDispatch !== "function") {
         return { ...begun, dispatchResult: dispatch(snapshot) };
     }
@@ -2057,9 +2108,11 @@ export function buildReportRunBeginInput({
     presetId = "",
     requestedParams = null,
     effectiveParams = null,
+    reportAdmissionRef = null,
 } = {}) {
     return {
         uiRunRequestId: normalizeString(uiRunRequestId),
+        ...(reportAdmissionRef != null ? { reportAdmissionRef } : {}),
         ...buildReportRunCorrelation({ conversationId, turnId, windowId }),
         origin: normalizeString(origin).toLowerCase() || "manual",
         ...(normalizeString(builderRef) ? { builderRef: normalizeString(builderRef) } : {}),
@@ -2085,6 +2138,7 @@ export function normalizeReportRunBeginResult(result = null) {
     return {
         enabled: true,
         reportRun: cloneValue(run),
+        ...(result?.reportAdmissionRef != null ? { reportAdmissionRef: result.reportAdmissionRef } : {}),
         reportRunId,
         revision,
         contextRevision: Number(result?.context?.revision || 0) || 0,
@@ -2097,6 +2151,8 @@ export function bindDurableReportRunBeginResult(beginResult = null, snapshot = n
     if (beginResult?.enabled !== true) {
         throw new Error("An enabled durable report-run Begin result is required.");
     }
+    const command = snapshot?.metadata?.commandIdentity;
+    if (command) assertLinkedReportBeginResult(beginResult, snapshot, command);
     const invocationContext = snapshot?.metadata?.event?.context || {};
     const invocationOrigin = normalizeString(snapshot?.metadata?.origin).toLowerCase() || "manual";
     return bindReportRunInvocation({
@@ -2109,6 +2165,7 @@ export function bindDurableReportRunBeginResult(beginResult = null, snapshot = n
         windowId: normalizeString(invocationContext.windowId),
         origin: invocationOrigin,
         uiRunRequestId: normalizeString(uiRunRequestId),
+        ...(command ? { reportAdmissionRef: command.reportAdmissionRef } : {}),
         durable: true,
         durableCapability: "enabled",
         status: "running",
@@ -2469,6 +2526,38 @@ export function coordinateCompletedReportRunConversation({
     return promise;
 }
 
+export function buildLinkedReportRunCompileInput(activeRun, reportExportRequest) {
+    const materialization = activeRun?.invocation?.materialization;
+    const document = materialization?.reportDocument;
+    const spec = materialization?.reportSpec;
+    const datasets = spec?.datasets;
+    const fills = reportExportRequest?.reportFill?.datasets;
+    if (!isPlainObject(document) || !isPlainObject(spec?.source) || !isPlainObject(spec?.parameters)
+        || !Array.isArray(datasets) || !Array.isArray(fills) || !activeRun?.uiRunRequestId || !activeRun?.reportAdmissionRef) {
+        throw new Error("Linked report execution requires its immutable authored document and admitted datasets.");
+    }
+    const ids = new Set();
+    const admitted = datasets.map(dataset => {
+        if (!dataset?.id || ids.has(dataset.id) || !dataset.dataSourceRef || !isPlainObject(dataset.request)) throw new Error("Invalid admitted report dataset identity.");
+        ids.add(dataset.id);
+        return { id: dataset.id, dataSourceRef: dataset.dataSourceRef, request: cloneValue(dataset.request) };
+    });
+    if (fills.length !== admitted.length) throw new Error("Filled report datasets do not match the admitted datasets.");
+    let sequence = 1;
+    const fences = [{ kind: "forge-report", payload: { ...cloneValue(document), version: 1, scope: "message", id: activeRun.uiRunRequestId, sequence, mode: "start", grammar: "report-document-v1" } }];
+    for (const dataset of admitted) {
+        const matches = fills.filter(fill => fill?.id === dataset.id);
+        const authored = Array.isArray(document.datasets) ? document.datasets.filter(item => item?.id === dataset.id) : [];
+        if (matches.length !== 1 || matches[0].dataSourceRef !== dataset.dataSourceRef
+            || JSON.stringify(semanticJSON(matches[0].request)) !== JSON.stringify(semanticJSON(dataset.request)) || !Array.isArray(matches[0].rows)) throw new Error("Filled report dataset scope does not match its admission.");
+        if (authored.length !== 1 || !isPlainObject(authored[0].sourceBindings)) throw new Error("Linked report dataset " + dataset.id + " is missing trusted source bindings in the captured authored document.");
+        fences.push({ kind: "forge-data", payload: { version: 2, scope: "message", id: dataset.id, reportRef: activeRun.uiRunRequestId, sequence: ++sequence, format: "json", mode: "replace", data: cloneValue(matches[0].rows), sourceBindings: cloneValue(authored[0].sourceBindings) } });
+    }
+    fences.push({ kind: "forge-report", payload: { version: 1, scope: "message", id: activeRun.uiRunRequestId, sequence: ++sequence, mode: "commit" } });
+    return freezeValue({ reportId: activeRun.uiRunRequestId, reportAdmissionRef: activeRun.reportAdmissionRef, conversationId: activeRun.conversationId,
+        fences, invocation: { source: cloneValue(spec.source), parameters: cloneValue(spec.parameters), datasets: admitted } });
+}
+
 export async function completeAndActivateReportRun(handler, activeRun, reportExportRequest, {
     shouldActivate = () => true,
     trustedConversationId = activeRun?.conversationId,
@@ -2480,7 +2569,14 @@ export async function completeAndActivateReportRun(handler, activeRun, reportExp
     if (typeof handler?.complete !== "function") {
         throw new Error("Report-run completion is unavailable.");
     }
-    const completed = await handler.complete(buildReportRunCompleteInput(activeRun, reportExportRequest));
+    let terminalRequest = reportExportRequest;
+    if (activeRun.reportAdmissionRef != null) {
+        if (typeof handler.compile !== "function") throw new Error("Linked report execution requires an authoritative host compiler.");
+        const compiled = await handler.compile(buildLinkedReportRunCompileInput(activeRun, reportExportRequest));
+        if (!isPlainObject(compiled?.reportSpec) || !isPlainObject(compiled?.reportFill) || !isPlainObject(compiled?.reportPrint)) throw new Error("The host compiler omitted report artifacts.");
+        terminalRequest = compiled;
+    }
+    const completed = await handler.complete(buildReportRunCompleteInput(activeRun, terminalRequest));
     const completedRevision = Number(completed?.revision || 0);
     if (normalizeString(completed?.reportRunId) !== normalizeString(activeRun.reportRunId)
         || normalizeString(completed?.status).toLowerCase() !== "completed"
@@ -2498,6 +2594,21 @@ export async function completeAndActivateReportRun(handler, activeRun, reportExp
     return reconciliation.run;
 }
 
+export function reportRunFailureText(error) {
+    const seen = new Set();
+    const read = (value) => {
+        if (typeof value === "string") return value.trim();
+        if (!value || typeof value !== "object" || seen.has(value) || seen.size >= 64) return "";
+        seen.add(value);
+        for (const key of ["message", "error", "detail", "cause"]) {
+            const text = read(value[key]);
+            if (text) return text;
+        }
+        return "";
+    };
+    return read(error) || "Browser report run failed.";
+}
+
 export async function failDurableReportRun(handler, activeRun, error = null) {
     if (!activeRun?.durable || typeof handler?.fail !== "function") {
         return activeRun;
@@ -2507,7 +2618,7 @@ export async function failDurableReportRun(handler, activeRun, error = null) {
         ...buildReportRunCorrelation(activeRun),
         expectedRevision: Number(activeRun.revision || 0),
         failureCode: normalizeString(error?.code) || "browser_run_failed",
-        failureText: normalizeString(error?.message || error) || "Browser report run failed.",
+        failureText: reportRunFailureText(error),
     });
     if (normalizeString(failed?.reportRunId) !== normalizeString(activeRun.reportRunId)
         || normalizeString(failed?.status).toLowerCase() !== "failed") {
