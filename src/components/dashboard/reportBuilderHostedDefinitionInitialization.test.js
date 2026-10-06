@@ -51,7 +51,7 @@ assert.equal(resolveReportBuilderDefinitionInitialization({
 const source = fs.readFileSync(new URL("./ReportBuilder.jsx", import.meta.url), "utf8");
 assert.match(source, /definitionContext\?\.handlers\?\.dataSource\?\.fetchCollection/);
 assert.match(source, /if \(!definitionInitialization\.ready\)[\s\S]*ReportBuilderDefinitionStatus/);
-assert.match(source, /return <ReportBuilderReady container=\{sourceContainer\} context=\{context\} \/>/);
+assert.match(source, /return <ReportBuilderFrozenAdapter container=\{sourceContainer\} context=\{context\} \/>/);
 assert.ok(source.indexOf("definitionInitialization.ready") < source.indexOf("function ReportBuilderReady"), "definition gate must precede the existing compile/run component");
 
 console.log("reportBuilder hosted definition initialization ✓ fetch-before-compile, loading, identity, empty, and error gates");

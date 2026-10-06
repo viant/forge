@@ -8,6 +8,7 @@ import {
 const calls = [];
 const originalFetch = global.fetch;
 let returnFailedStatus = false;
+let foreignRun = false;
 
 global.fetch = async (url, init = {}) => {
   calls.push({
@@ -22,6 +23,7 @@ global.fetch = async (url, init = {}) => {
     status: returnFailedStatus && isStatusRequest ? 409 : 200,
     statusText: returnFailedStatus && isStatusRequest ? "Conflict" : "OK",
     async text() {
+      if (String(url).includes("/api/report-runs/verified%2Frun?")) return JSON.stringify({reportRunId:"verified/run",conversationId:foreignRun?"foreign":"conv one",ownerId:"owner",status:"completed",revision:2});
       if (String(url).includes("reporting%3Asubmit_export")) {
         return JSON.stringify({ result: JSON.stringify({ jobId: "job-1", status: "queued" }) });
       }
@@ -149,6 +151,13 @@ assert.equal(explicit.reportExport.submitRequest, explicitSubmit);
 assert.equal(typeof explicit.reportExport.getStatus, "function");
 assert.equal(typeof explicit.reportExport.getArtifact, "function");
 
+const savedRun = await synthesized.reportRuns.getRun({reportRunId:"verified/run",conversationId:"conv one"});
+assert.equal(savedRun.status,"completed");
+assert.equal(calls.at(-1).method,"GET");
+assert.ok(calls.at(-1).url.endsWith("/api/report-runs/verified%2Frun?conversationId=conv%20one"));
+foreignRun=true;
+await assert.rejects(()=>synthesized.reportRuns.getRun({reportRunId:"verified/run",conversationId:"conv one"}),/foreign conversation/);
+foreignRun=false;
 const fetchCallCountBeforeCompleteExplicit = calls.length;
 const completeExplicitServices = {
   reportExport: {
@@ -182,6 +191,7 @@ const completeExplicitServices = {
     fail: async () => ({ ok: true }),
     activate: async () => ({ ok: true }),
     getContext: async () => ({ enabled: false, context: null }),
+    getRun: async () => ({reportRunId:"run",conversationId:"conv",status:"completed",revision:1}),
     adopt: async () => ({ enabled: false }),
   },
 };

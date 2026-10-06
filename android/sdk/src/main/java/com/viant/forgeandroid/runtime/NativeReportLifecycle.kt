@@ -21,10 +21,14 @@ data class NativeReportAdmissionStatus(val identity: ReportPreparationIdentity, 
 data class NativeReportReadPermit(val uiRunRequestId: String, val datasetId: String)
 data class PreparedReportFetchResult(val rows: JsonArray, val metrics: JsonObject, val error: String? = null)
 data class NativeReportDatasetAdmission(val id: String, val dataSourceRef: String, val request: JsonObject)
-data class NativeReportRunHandle(val reportRunId: String, val revision: Long, val uiRunRequestId: String, val admission: NativeReportAdmission, val contextRevision: Long = 0, val ownerId: String? = null)
+data class NativeReportRunHandle(val reportRunId: String, val revision: Long, val uiRunRequestId: String, val admission: NativeReportAdmission, val contextRevision: Long = 0, val ownerId: String? = null, val reportAdmissionRef: String? = null)
 data class NativeReportCompletedRun(val reportRunId: String, val revision: Long, val contextStatus: String = "active", val active: Boolean? = true, val activationError: String? = null,val verifiedDatasets:JsonArray?=null)
 interface NativeReportLifecycleHandler {
     suspend fun begin(admission: NativeReportAdmission, uiRunRequestId: String, origin: String): NativeReportRunHandle
+    suspend fun begin(admission: NativeReportAdmission, uiRunRequestId: String, origin: String, reportAdmissionRef: String?): NativeReportRunHandle {
+        check(reportAdmissionRef == null) { "Report admission reference is unsupported." }
+        return begin(admission, uiRunRequestId, origin)
+    }
     suspend fun complete(handle: NativeReportRunHandle, rows: JsonObject, current: () -> Boolean): NativeReportCompletedRun
     suspend fun fail(handle: NativeReportRunHandle, code: String, text: String)
 }
@@ -33,6 +37,7 @@ interface NativeReportLifecycleHandler {
 class NativeReportLifecycle {
     private val preparationStatuses = ConcurrentHashMap<String, NativeReportAdmissionStatus>()
     private val admissions = ConcurrentHashMap<String, NativeReportAdmission>()
+    private val requestAdmissionRefs = ConcurrentHashMap<String, List<String>>()
     private val runs = ConcurrentHashMap<String, CompletableDeferred<NativeReportRunHandle>>()
     private val runWindows = ConcurrentHashMap<String, String>()
     private val issued = ConcurrentHashMap<String, NativeReportRunHandle>()
@@ -64,17 +69,23 @@ class NativeReportLifecycle {
     fun handle(uiRunRequestId: String) = issued[uiRunRequestId]
     fun completed(uiRunRequestId: String) = completed[uiRunRequestId]
     fun completedDatasets(uiRunRequestId:String)=completedDatasets[uiRunRequestId]
-    suspend fun begin(windowId: String, uiRunRequestId: String, origin: String, expected: PreparedReportRequest, current: (PreparedReportRequest) -> Boolean): NativeReportRunHandle {
+    suspend fun begin(windowId: String, uiRunRequestId: String, origin: String, expected: PreparedReportRequest, current: (PreparedReportRequest) -> Boolean): NativeReportRunHandle =
+        begin(windowId, uiRunRequestId, origin, expected, null, current)
+
+    suspend fun begin(windowId: String, uiRunRequestId: String, origin: String, expected: PreparedReportRequest, reportAdmissionRef: String?, current: (PreparedReportRequest) -> Boolean): NativeReportRunHandle {
         val host = checkNotNull(handler) { "Durable native report persistence is unavailable." }
         val admission = checkNotNull(admission(windowId)) { status(expected)?.reason ?: "The authored report admission is not ready." }
         check(admission.preparation == expected && current(admission.preparation)) { "The authored report admission is stale." }
         validateNativeReportAdmission(admission)
         val (result, owner) = mutex.withLock {
+            val reference = reportAdmissionRef?.let { listOf(it) } ?: emptyList()
+            requestAdmissionRefs[uiRunRequestId]?.let { check(it == reference) { "Report request identity conflict." } }
+            requestAdmissionRefs[uiRunRequestId] = reference
             runs[uiRunRequestId]?.let { it to false } ?: CompletableDeferred<NativeReportRunHandle>().also { runs[uiRunRequestId] = it }.let { it to true }
         }
         if (owner) try {
             runWindows[uiRunRequestId] = windowId
-            val handle = host.begin(admission, uiRunRequestId, origin)
+            val handle = host.begin(admission, uiRunRequestId, origin, reportAdmissionRef)
             if (!current(admission.preparation)) {
                 host.fail(handle, "stale_preparation", "Report preparation changed before data loading.")
                 error("The authored report admission became stale.")
@@ -82,7 +93,7 @@ class NativeReportLifecycle {
             issued[uiRunRequestId] = handle
             result.complete(handle)
         } catch (error: Throwable) { result.completeExceptionally(error) }
-        return result.await().also { check(it.admission == admission && current(it.admission.preparation)) { "The admitted report request no longer matches the current report." } }
+        return result.await().also { check(it.reportAdmissionRef == reportAdmissionRef && it.uiRunRequestId == uiRunRequestId && it.admission == admission && current(it.admission.preparation)) { "The admitted report request no longer matches the current report." } }
     }
     suspend fun complete(handle: NativeReportRunHandle, rows: JsonObject, current: (PreparedReportRequest) -> Boolean): NativeReportCompletedRun {
         check(current(handle.admission.preparation)) { "The admitted report request is stale." }

@@ -16,10 +16,22 @@ class NativeReportLifecycleTest {
         override suspend fun begin(admission: NativeReportAdmission, uiRunRequestId: String, origin: String): NativeReportRunHandle {
             events += "begin"; return NativeReportRunHandle("durable", 1, uiRunRequestId, admission)
         }
+        override suspend fun begin(admission: NativeReportAdmission, uiRunRequestId: String, origin: String, reportAdmissionRef: String?): NativeReportRunHandle =
+            begin(admission, uiRunRequestId, origin).copy(reportAdmissionRef = reportAdmissionRef)
         override suspend fun complete(handle: NativeReportRunHandle, rows: JsonObject, current: () -> Boolean): NativeReportCompletedRun {
             assertTrue(current()); events += "persist"; return NativeReportCompletedRun("durable", 2)
         }
         override suspend fun fail(handle: NativeReportRunHandle, code: String, text: String) { events += "fail" }
+    }
+    @Test fun opaqueAdmissionReferenceParticipatesInReplayIdentity() = runBlocking {
+        val lifecycle=NativeReportLifecycle();val events=mutableListOf<String>();lifecycle.register(host(events))
+        val admitted=admission();lifecycle.publish(admitted)
+        val handle=lifecycle.begin("W","stable-id","prompt",admitted.preparation," ref "){true}
+        assertEquals("stable-id",handle.uiRunRequestId);assertEquals(" ref ",handle.reportAdmissionRef)
+        assertSame(handle,lifecycle.begin("W","stable-id","prompt",admitted.preparation," ref "){true})
+        assertTrue(runCatching{lifecycle.begin("W","stable-id","prompt",admitted.preparation,"other"){true}}.isFailure)
+        assertTrue(runCatching{lifecycle.begin("W","stable-id","prompt",admitted.preparation){true}}.isFailure)
+        assertEquals(listOf("begin"),events)
     }
     @Test fun nestedRepeatedReferencesRemainUniqueByLogicalIdentity() {
         val document = buildJsonObject { put("blocks", JsonArray(listOf(

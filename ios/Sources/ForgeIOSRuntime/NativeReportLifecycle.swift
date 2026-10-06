@@ -45,12 +45,13 @@ public struct NativeReportRunHandle: Sendable {
     public let reportRunID: String
     public let revision: Int64
     public let uiRunRequestID: String
+    public let reportAdmissionRef: String?
     public let admission: NativeReportAdmission
     public let ownerID: String
     public let expectedContextRevision: Int64
-    public init(reportRunID: String, revision: Int64, uiRunRequestID: String, admission: NativeReportAdmission, ownerID: String = "", expectedContextRevision: Int64 = 0) {
+    public init(reportRunID: String, revision: Int64, uiRunRequestID: String, admission: NativeReportAdmission, ownerID: String = "", expectedContextRevision: Int64 = 0, reportAdmissionRef: String? = nil) {
         self.reportRunID = reportRunID; self.revision = revision; self.uiRunRequestID = uiRunRequestID; self.admission = admission
-        self.ownerID = ownerID; self.expectedContextRevision = expectedContextRevision
+        self.ownerID = ownerID; self.expectedContextRevision = expectedContextRevision; self.reportAdmissionRef = reportAdmissionRef
     }
 }
 public struct NativeReportCompletedRun: Sendable {
@@ -74,8 +75,16 @@ public struct NativeReportCompletionUncertainError: Error, LocalizedError, Senda
 }
 public protocol NativeReportLifecycleHandler: Sendable {
     func begin(admission: NativeReportAdmission, uiRunRequestID: String, origin: String) async throws -> NativeReportRunHandle
+    func begin(admission: NativeReportAdmission, uiRunRequestID: String, origin: String, reportAdmissionRef: String?) async throws -> NativeReportRunHandle
     func complete(handle: NativeReportRunHandle, rows: [String: [[String: JSONValue]]], current: @escaping @Sendable () async -> Bool) async throws -> NativeReportCompletedRun
     func fail(handle: NativeReportRunHandle, code: String, text: String) async throws
+}
+
+public extension NativeReportLifecycleHandler {
+    func begin(admission: NativeReportAdmission, uiRunRequestID: String, origin: String, reportAdmissionRef: String?) async throws -> NativeReportRunHandle {
+        guard reportAdmissionRef == nil else { throw ReportPreparationError(reason: "report-admission-reference-unsupported") }
+        return try await begin(admission: admission, uiRunRequestID: uiRunRequestID, origin: origin)
+    }
 }
 
 extension ForgeRuntime {
@@ -98,7 +107,7 @@ extension ForgeRuntime {
         guard packet.identity == admission.preparation.identity, packet.request == admission.preparation.request else { return false }
         return await frozenPublishedAdmissionIsCurrent(admission)
     }
-    public func beginNativeReportRun(windowID: String, requestID: String, origin: String) async throws -> NativeReportRunHandle {
+    public func beginNativeReportRun(windowID: String, requestID: String, origin: String, reportAdmissionRef: String? = nil) async throws -> NativeReportRunHandle {
         let generation = nativeReportAccountGeneration
         let deadline = Date().addingTimeInterval(5)
         while Date() < deadline {
@@ -110,7 +119,7 @@ extension ForgeRuntime {
         frozenNativeReportAdmissions.removeValue(forKey: windowID)
         nativeReportActiveRequestGenerations[windowID] = generation
         nativeReportActiveRequestIDs[windowID] = requestID
-        let handle = try await nativeReportLifecycle.begin(windowID: windowID, requestID: requestID, origin: origin) { admission in
+        let handle = try await nativeReportLifecycle.begin(windowID: windowID, requestID: requestID, origin: origin, reportAdmissionRef: reportAdmissionRef) { admission in
             await self.nativeReportRequestIsCurrent(admission, requestID: requestID)
         }
         guard await nativeReportRequestIsCurrent(handle.admission, requestID: requestID), generation == nativeReportAccountGeneration else { throw ReportPreparationError(reason: "stale-report-account") }
@@ -180,6 +189,7 @@ public actor NativeReportLifecycle {
     private var handler: (any NativeReportLifecycleHandler)?
     private var admissions: [String: NativeReportAdmission] = [:]
     private var beginnings: [String: Task<NativeReportRunHandle, Error>] = [:]
+    private var requestAdmissionRefs: [String: [String]] = [:]
     private var requestSignatures: [String: String] = [:]
     private var handles: [String: NativeReportRunHandle] = [:]
     private var completionSignatures: [String: String] = [:]
@@ -190,29 +200,32 @@ public actor NativeReportLifecycle {
         epoch += 1
         beginnings.values.forEach { $0.cancel() }
         completions.values.forEach { $0.cancel() }
-        admissions.removeAll(); beginnings.removeAll(); requestSignatures.removeAll()
+        admissions.removeAll(); beginnings.removeAll(); requestSignatures.removeAll(); requestAdmissionRefs.removeAll()
         handles.removeAll(); completionSignatures.removeAll(); completions.removeAll()
     }
     public func publish(_ admission: NativeReportAdmission) { admissions[admission.preparation.identity.windowId] = admission }
     public func admission(windowID: String) -> NativeReportAdmission? { admissions[windowID] }
     public func handle(requestID: String) -> NativeReportRunHandle? { handles[requestID] }
-    public func begin(windowID: String, requestID: String, origin: String, current: @escaping @Sendable (NativeReportAdmission) async -> Bool) async throws -> NativeReportRunHandle {
+    public func begin(windowID: String, requestID: String, origin: String, reportAdmissionRef: String? = nil, current: @escaping @Sendable (NativeReportAdmission) async -> Bool) async throws -> NativeReportRunHandle {
         let initialEpoch = epoch
         guard let handler else { throw ReportPreparationError(reason: "durable-report-persistence-unavailable") }
         guard let admission = admissions[windowID] else { throw ReportPreparationError(reason: "authored-report-admission-pending") }
         guard !requestID.isEmpty, admission.preparation.validate(current: admission.preparation.identity) == nil, await current(admission) else { throw ReportPreparationError(reason: "stale-preparation") }
         guard initialEpoch == epoch else { throw ReportPreparationError(reason: "stale-report-account") }
         if let signature = requestSignatures[requestID], signature != admission.signature { throw ReportPreparationError(reason: "report-request-identity-conflict") }
+        let reference = reportAdmissionRef.map { [$0] } ?? []
+        if let previous = requestAdmissionRefs[requestID], previous != reference { throw ReportPreparationError(reason: "report-request-identity-conflict") }
         let task: Task<NativeReportRunHandle, Error>
         if let existing = beginnings[requestID] { task = existing }
         else {
             requestSignatures[requestID] = admission.signature
-            task = Task { try await handler.begin(admission: admission, uiRunRequestID: requestID, origin: origin) }
+            requestAdmissionRefs[requestID] = reference
+            task = Task { try await handler.begin(admission: admission, uiRunRequestID: requestID, origin: origin, reportAdmissionRef: reportAdmissionRef) }
             beginnings[requestID] = task
         }
         let handle = try await task.value
         guard initialEpoch == epoch else { throw ReportPreparationError(reason: "stale-report-account") }
-        guard handle.admission.signature == admission.signature, await current(admission) else {
+        guard handle.reportAdmissionRef == reportAdmissionRef, handle.uiRunRequestID == requestID, handle.admission.signature == admission.signature, await current(admission) else {
             try await handler.fail(handle: handle, code: "stale_preparation", text: "Report preparation changed before data loading.")
             throw ReportPreparationError(reason: "stale-preparation")
         }
@@ -220,7 +233,7 @@ public actor NativeReportLifecycle {
         return handle
     }
     public func complete(handle: NativeReportRunHandle, rows: [String: [[String: JSONValue]]], current: @escaping @Sendable () async -> Bool) async throws -> NativeReportCompletedRun {
-        guard let handler, handles[handle.uiRunRequestID]?.admission.signature == handle.admission.signature, handles[handle.uiRunRequestID]?.reportRunID == handle.reportRunID, Set(rows.keys) == Set(handle.admission.datasets.map(\.id)), await current() else { throw ReportPreparationError(reason: "stale-preparation") }
+        guard let handler, handles[handle.uiRunRequestID]?.admission.signature == handle.admission.signature, handles[handle.uiRunRequestID]?.reportRunID == handle.reportRunID, handles[handle.uiRunRequestID]?.reportAdmissionRef == handle.reportAdmissionRef, Set(rows.keys) == Set(handle.admission.datasets.map(\.id)), await current() else { throw ReportPreparationError(reason: "stale-preparation") }
         let signature = nativeReportLocalDigest(.object(rows.mapValues { .array($0.map(JSONValue.object)) }))
         if let previous = completionSignatures[handle.uiRunRequestID], previous != signature { throw ReportPreparationError(reason: "report-result-identity-conflict") }
         if let task = completions[handle.uiRunRequestID] { return try await task.value }

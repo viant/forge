@@ -2,6 +2,19 @@ import XCTest
 @testable import ForgeIOSRuntime
 
 final class NativeReportLifecycleTests: XCTestCase {
+    func testOpaqueAdmissionReferenceParticipatesInReplayIdentity() async throws {
+        let lifecycle = NativeReportLifecycle(), recorder = RuntimeLifecycleRecorder()
+        let identity = PreparedReportIdentity(windowId: "W", builderRef: "builder", formRevision: .number(1), stateRevision: .number(1))
+        let request: [String: JSONValue] = ["filters": .object([:])]
+        let packet = PreparedReportRequest(identity: identity, status: "ready", hookStatus: "completed", dataSourceRef: "cube", request: request)
+        await lifecycle.register(recorder)
+        await lifecycle.publish(.init(preparation: packet, conversationID: "conversation", stateKey: "state", document: ["blocks": .array([])], datasets: [.init(id: "primary", dataSourceRef: "cube", request: request)]))
+        let handle = try await lifecycle.begin(windowID: "W", requestID: "stable-id", origin: "prompt", reportAdmissionRef: " ref ") { _ in true }
+        let replay = try await lifecycle.begin(windowID: "W", requestID: "stable-id", origin: "prompt", reportAdmissionRef: " ref ") { _ in true }
+        XCTAssertEqual(handle.uiRunRequestID, "stable-id"); XCTAssertEqual(handle.reportAdmissionRef, " ref "); XCTAssertEqual(replay.reportRunID,handle.reportRunID)
+        do { _ = try await lifecycle.begin(windowID: "W", requestID: "stable-id", origin: "prompt", reportAdmissionRef: "other") { _ in true }; XCTFail("Changed ref must conflict") } catch {}
+        let events = await recorder.events; XCTAssertEqual(events.filter { $0 == "begin" }.count,1)
+    }
     func testSavedArtifactsRemainCompletedWhenActivationIsSupersededOrUnconfirmed() async throws {
         for contextStatus in ["superseded", "unconfirmed"] {
             let runtime = ForgeRuntime()
@@ -164,6 +177,10 @@ private actor RuntimeLifecycleRecorder: NativeReportLifecycleHandler {
     func begin(admission: NativeReportAdmission, uiRunRequestID: String, origin: String) async throws -> NativeReportRunHandle {
         events.append("begin")
         return NativeReportRunHandle(reportRunID: "durable", revision: 1, uiRunRequestID: uiRunRequestID, admission: admission)
+    }
+    func begin(admission: NativeReportAdmission, uiRunRequestID: String, origin: String, reportAdmissionRef: String?) async throws -> NativeReportRunHandle {
+        let handle = try await begin(admission: admission, uiRunRequestID: uiRunRequestID, origin: origin)
+        return .init(reportRunID: handle.reportRunID, revision: handle.revision, uiRunRequestID: handle.uiRunRequestID, admission: admission, reportAdmissionRef: reportAdmissionRef)
     }
     func complete(handle: NativeReportRunHandle, rows: [String: [[String: JSONValue]]], current: @escaping @Sendable () async -> Bool) async throws -> NativeReportCompletedRun {
         events.append("complete")

@@ -1,3 +1,4 @@
+import {reportRestoreSnapshot, reportRestoreSnapshotKey, reportRestoreEqual, loadFrozenReportRestore} from "./reportBuilderFrozenRestore.js";
 import {updateReportDateRangeValue} from '../../reporting/reportDateRangeValue.js';
 import { normalizeReportFilterRefreshMode, reportFilterValuesChanged } from "./reportBuilderFilterRefresh.js";
 import ReportBuilderBlockPreview from "./ReportBuilderBlockPreview.jsx";
@@ -518,6 +519,8 @@ import {
     matchesReportRunSettlementApplicationCurrency,
     matchesReportRunSettlementCurrency,
     newUIRunRequestId,
+    resolveReportRunCommandIdentity,
+    isLinkedReportRunReplay,
     normalizeReportRunBeginResult,
     resolveAuthoredRuntimeSettlementDecision,
     resolveAuthoredRuntimeSettlementReadiness,
@@ -1955,10 +1958,56 @@ function ReportBuilderDefinitionAdapter({ container: sourceContainer, context })
     if (!definitionInitialization.ready) {
         return <ReportBuilderDefinitionStatus status={definitionInitialization.status} message={definitionInitialization.message} />;
     }
-    return <ReportBuilderReady container={sourceContainer} context={context} />;
+    return <ReportBuilderFrozenAdapter container={sourceContainer} context={context} />;
 }
 
-function ReportBuilderReady({ container: sourceContainer, context, embedded = null }) {
+function captureReportBuilderRestoreSnapshot(sourceContainer, context, observedForm) {
+    const rootForm = observedForm || context?.signals?.windowForm?.peek?.() || context?.signals?.windowForm?.value || {};
+    const variant = resolveReportBuilderVariant(sourceContainer, rootForm);
+    const container = {...sourceContainer, ...(variant.dataSourceRef ? {dataSourceRef: variant.dataSourceRef} : {}), dashboard: {...sourceContainer?.dashboard, reportBuilderRef: variant.builderRef, reportBuilder: variant.reportBuilder}};
+    const builderContext = container.dataSourceRef && typeof context?.Context === "function" ? context.Context(container.dataSourceRef) : context;
+    const form = builderContext?.signals?.windowForm?.peek?.() || rootForm;
+    return {handler: builderContext?.handlers?.reportRuns, snapshot: reportRestoreSnapshot({form, configuration: variant.reportBuilder,
+        conversationId: String(builderContext?.identity?.conversationId || builderContext?.conversationId || builderContext?.windowState?.conversationId || container?.conversationId || "").trim(),
+        windowId: String(builderContext?.identity?.windowId || container?.windowId || "").trim(),
+        builderRef: variant.builderRef, stateKey: resolveReportBuilderVariantStateKey(container,variant),
+        primaryDataSourceRef: variant.dataSourceRef || container.dataSourceRef})};
+}
+
+function ReportBuilderFrozenAdapter({container: sourceContainer, context}) {
+    useSignals();
+    // Subscribe to authored form changes; async admission checks additionally
+    // inspect peek() directly so React scheduling cannot admit a stale form.
+    const observedForm = context?.signals?.windowForm?.value;
+    const {handler,snapshot} = captureReportBuilderRestoreSnapshot(sourceContainer,context,observedForm);
+    const snapshotKey = reportRestoreSnapshotKey(snapshot);
+    const [scopeTick,setScopeTick] = useState(0);
+    const [bypassKey,setBypassKey] = useState(null);
+    const [restoration,setRestoration] = useState(null);
+    const scope = handler?.getRestoreScope?.() || "";
+    const identity = JSON.stringify([snapshot.conversationId,snapshot.windowId,snapshot.builderRef,snapshot.stateKey]);
+    const key = identity + "::" + scope;
+    const bypass = bypassKey === key;
+    const eligible = !bypass && !!snapshot.document && !!snapshot.conversationId && !!snapshot.windowId
+        && typeof handler?.readCompletedRestore === "function" && typeof handler?.getRestoreScope === "function";
+    useEffect(() => handler?.subscribeRestoreScope?.(() => {setScopeTick(value=>value+1);setBypassKey(null);}), [handler]);
+    useEffect(() => {
+        if (!eligible || (restoration?.key === key && restoration?.scopeTick === scopeTick && restoration?.handler === handler)) return;
+        let cancelled = false;
+        loadFrozenReportRestore({handler,snapshot,currentSnapshotKey:()=>reportRestoreSnapshotKey(captureReportBuilderRestoreSnapshot(sourceContainer,context).snapshot)})
+            .then(result => {if(!cancelled) setRestoration({...result,key:identity+"::"+handler.getRestoreScope(),scopeTick,handler});})
+            .catch(error => {if(!cancelled) setRestoration({key:identity+"::"+handler.getRestoreScope(),scopeTick,handler,frozen:null,modern:true,error:String(error?.message || error)});});
+        return () => {cancelled=true;};
+    }, [eligible,handler,key,identity,scopeTick]);
+    const checked = restoration?.key === key && restoration?.scopeTick === scopeTick && restoration?.handler === handler;
+    if (eligible && !checked) return <ReportBuilderDefinitionStatus status="loading" message="Restoring saved report…" />;
+    const frozen = !bypass && checked && restoration.frozen?.snapshotKey === snapshotKey ? restoration.frozen : null;
+    return <ReportBuilderReady container={sourceContainer} context={context} frozenRestore={frozen}
+        restoreChecked={checked} restoreBlocked={!bypass && checked && restoration.modern && !frozen}
+        onDiscardFrozen={() => setBypassKey(key)} />;
+}
+
+function ReportBuilderReady({ container: sourceContainer, context, embedded = null, frozenRestore = null, restoreChecked = false, restoreBlocked = false, onDiscardFrozen = null }) {
     const embeddedMode = !!embedded;
     const supportedEmbeddedBlockKinds = new Set(["markdownBlock", "chartBlock", "tableBlock", "kpiBlock", "collectionBlock", "sectionBlock", "compositeBlock", "tabGroupBlock", "stepperBlock", "infoPanelBlock", "calloutBlock", "kanbanBlock", "timelineBlock", "badgesBlock", "geoMapBlock", "filterBarBlock", "refinementBarBlock"]);
     const canAuthorBlockKind = React.useCallback((kind) => {
@@ -2135,8 +2184,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         [embeddedMode, legacyStateStorageScopes, stateStorageScope],
     );
     const effectivePersistedState = useMemo(() => {
-        return resolveEffectiveReportBuilderState(persistedStateOverride || persistedState, locallyStoredState);
-    }, [locallyStoredState, persistedState, persistedStateOverride]);
+        return frozenRestore?.authorState || resolveEffectiveReportBuilderState(persistedStateOverride || persistedState, locallyStoredState);
+    }, [frozenRestore, locallyStoredState, persistedState, persistedStateOverride]);
     const hydratedReportDocumentSession = useMemo(
         () => resolveReportBuilderHydratedDocumentSessionFromState(effectivePersistedState),
         [effectivePersistedState],
@@ -2884,6 +2933,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         skipExplorationHistory = false,
     } = {}) => {
         const normalized = sanitizeReportBuilderState(effectiveConfig, next);
+        if (frozenRestore) {
+            if (reportRestoreEqual(normalized, sanitizeReportBuilderState(effectiveConfig, currentBuilderStateRef.current || state))) return;
+            onDiscardFrozen?.();
+        }
         const currentBuilderState = currentBuilderStateRef.current || state;
         if (normalizeReportFilterRefreshMode(currentBuilderState.reportFilterRefreshMode || effectiveConfig.filterRefreshMode) === "apply"
             && reportFilterValuesChanged(currentBuilderState, normalized)) {
@@ -2923,7 +2976,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             replace: true,
             bumpPrefillRevision: false,
         });
-    }, [builderContext, config, legacyStateStorageScopes, replaceWindowFormBuilderState, stateKey, stateStorageScope, windowFormSignal, embedded, embeddedMode]);
+    }, [builderContext, config, legacyStateStorageScopes, replaceWindowFormBuilderState, stateKey, stateStorageScope, windowFormSignal, embedded, embeddedMode, frozenRestore, onDiscardFrozen]);
     const persistState = React.useCallback((next, options = {}) => (
         persistStateWithConfig(next, config, options)
     ), [config, persistStateWithConfig]);
@@ -3332,8 +3385,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         resolveReportBuilderLookupDescriptor(builderContext, config, state, group, filterDef, rowId)
     ), [builderContext, config, state]);
     const currentRequest = useMemo(
-        () => applyReportBuilderRequestHook(builderContext, semanticDisplayConfig, state, buildReportBuilderRequest(semanticDisplayConfig, state)),
-        [builderContext, semanticDisplayConfig, state],
+        () => frozenRestore?.request || applyReportBuilderRequestHook(builderContext, semanticDisplayConfig, state, buildReportBuilderRequest(semanticDisplayConfig, state)),
+        [frozenRestore, builderContext, semanticDisplayConfig, state],
     );
     const currentRequestFingerprint = useMemo(
         () => JSON.stringify(currentRequest),
@@ -3342,8 +3395,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const currentRequestFingerprintValueRef = useRef(currentRequestFingerprint);
     currentRequestFingerprintValueRef.current = currentRequestFingerprint;
     const currentRequestShouldFetch = useMemo(
-        () => !reportFiltersNeedApply && config.request?.autoFetch !== false && resolveStateReadiness(state).canRun,
-        [config.request?.autoFetch, reportFiltersNeedApply, resolveStateReadiness, state],
+        () => !frozenRestore && !restoreBlocked && !reportFiltersNeedApply && config.request?.autoFetch !== false && resolveStateReadiness(state).canRun,
+        [frozenRestore, restoreBlocked, config.request?.autoFetch, reportFiltersNeedApply, resolveStateReadiness, state],
     );
     const currentRequestDispatchFingerprint = useMemo(
         () => `${currentRequestFingerprint}::${currentRequestShouldFetch ? "fetch" : "hold"}`,
@@ -3363,7 +3416,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             || null,
         resetKey: currentRequestFingerprint,
     });
-    const hasCompletedCurrentRun = canRunReport
+    const hasCompletedCurrentRun = !!frozenRestore || canRunReport
         && !loading
         && !error
         && lastManualRunFingerprintRef.current !== ""
@@ -3452,6 +3505,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         && (canRunReport || readiness.reason === "semantic" || authoredStaticDatasetsConfigured);
 
     useEffect(() => {
+        if (frozenRestore) return;
         const jobs = buildLookupHydrationJobs(builderContext, config, state, resolveLookup);
         const fingerprint = JSON.stringify(jobs.map((job) => ({
             groupId: job.groupId,
@@ -3479,9 +3533,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         return () => {
             cancelled = true;
         };
-    }, [builderContext, config, persistState, resolveLookup, state]);
+    }, [builderContext, config, persistState, resolveLookup, state, frozenRestore]);
 
     useEffect(() => {
+        if (frozenRestore) { seededDefaultsRef.current = true; return; }
         if (seededDefaultsRef.current) {
             return;
         }
@@ -3510,9 +3565,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 bumpPrefillRevision: false,
             });
         }
-    }, [builderContext, config, effectivePersistedState, replaceWindowFormBuilderState, stateKey, windowFormSignal, windowFormValue]);
+    }, [builderContext, config, effectivePersistedState, replaceWindowFormBuilderState, stateKey, windowFormSignal, windowFormValue, frozenRestore]);
 
     useEffect(() => {
+        if (frozenRestore) return;
         if (!shouldHydrateStoredReportBuilderWindowState(persistedState, locallyStoredState)) {
             return;
         }
@@ -3526,9 +3582,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             return;
         }
         persistState(normalizedState);
-    }, [config, locallyStoredState, persistState, persistedState, state]);
+    }, [config, locallyStoredState, persistState, persistedState, state, frozenRestore]);
 
     useEffect(() => {
+        if (frozenRestore) { appliedPrefillSignatureRef.current = currentPrefillSignature; return; }
         if (!currentPrefillSignature || appliedPrefillSignatureRef.current === currentPrefillSignature) {
             return;
         }
@@ -3557,9 +3614,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             return;
         }
         persistState(next);
-    }, [builderContext, config, currentPrefillSignature, hostedReportActivationCurrent, persistState, state, windowFormValue]);
+    }, [builderContext, config, currentPrefillSignature, hostedReportActivationCurrent, persistState, state, windowFormValue, frozenRestore]);
 
     useEffect(() => {
+        if (frozenRestore) { appliedReportDefinitionSignatureRef.current = currentReportDefinitionSignature; setCommittedReportDefinitionSignature(currentReportDefinitionSignature); return; }
         if (
             !currentReportDefinitionSignature
             || appliedReportDefinitionSignatureRef.current === currentReportDefinitionSignature
@@ -3589,7 +3647,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         persistState,
         state,
         windowFormValue,
-    ]);
+     frozenRestore]);
 
     useEffect(() => {
         if (!currentRequestFingerprint || requestFingerprintRef.current === currentRequestDispatchFingerprint) {
@@ -8214,7 +8272,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         );
     };
 
-    const captureRunDispatchSnapshot = React.useCallback((nextState, { origin = "manual" } = {}) => {
+    const captureRunDispatchSnapshot = React.useCallback((nextState, { origin = "manual", commandIdentity = null } = {}) => {
         const request = applyReportBuilderRequestHook(
             builderContext,
             semanticDisplayConfig,
@@ -8235,6 +8293,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             terminalMaterializationFresh:
                 dispatchMaterialization?.terminalMaterializationFresh === true,
             metadata: {
+                ...(commandIdentity ? { commandIdentity } : {}),
                 origin: String(origin || "manual").trim().toLowerCase() || "manual",
                 builderRef: resolveReportRunBuilderRef({
                     activeBuilderVariant,
@@ -8334,6 +8393,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         origin = "manual",
         invocationSnapshot,
     } = {}) => {
+        if (frozenRestore) onDiscardFrozen?.();
         if (!reportBuilderMountedRef.current) {
             return Promise.resolve(buildCancelledReportRunResult());
         }
@@ -8352,7 +8412,15 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         if (!invocationSnapshot || !requestFingerprint || !materializationFingerprint) {
             return Promise.resolve({ ok: false, error: "A report run request snapshot is required." });
         }
+        const commandIdentity = invocationMetadata.commandIdentity;
+        if (commandIdentity && (!durableRunEligible || typeof reportRunHandler?.compile !== "function")) {
+            return Promise.reject(new Error("Linked report execution requires durable admission and an authoritative host compiler."));
+        }
         const activeRun = activeRunEventRef.current;
+        isLinkedReportRunReplay(beginRunPromiseRef.current, invocationSnapshot);
+        if (isLinkedReportRunReplay(activeRun, invocationSnapshot) && ["running", "completed"].includes(activeRun.status)) {
+            return Promise.resolve({ ok: true, runId: activeRun.runId, durable: true, started: false });
+        }
         const activeRunOrigin = String(
             activeRun?.invocation?.metadata?.origin
             || activeRun?.origin
@@ -8408,7 +8476,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         }
         const generation = runInvocationGenerationRef.current + 1;
         runInvocationGenerationRef.current = generation;
-        const uiRunRequestId = newUIRunRequestId();
+        const uiRunRequestId = commandIdentity?.requestId || newUIRunRequestId();
         const beginMarker = {};
         const promise = (async () => {
             await Promise.resolve();
@@ -8445,6 +8513,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 if (durableRunEligible) {
                     const beginResponse = await reportRunHandler.begin(buildReportRunBeginInput({
                         uiRunRequestId,
+                        ...(commandIdentity ? { reportAdmissionRef: commandIdentity.reportAdmissionRef } : {}),
                         conversationId: invocationEventContext.conversationId,
                         turnId: invocationEventContext.turnId,
                         windowId: invocationEventContext.windowId,
@@ -8465,6 +8534,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                             { uiRunRequestId },
                         );
                     }
+                    if (commandIdentity && !beginResult.enabled) throw new Error("Linked report admission is unavailable.");
                     if (beginResult.enabled) {
                         nextRun = bindDurableReportRunBeginResult(
                             beginResult,
@@ -8563,11 +8633,14 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         })();
         beginRunPromiseRef.current = {
             key: pendingBeginDeduplicationKey,
+            commandIdentity,
+            requestFingerprint,
+            materializationFingerprint,
             marker: beginMarker,
             promise,
         };
         return promise;
-    }, [emitRunLifecycleEvent, reportRunHandler, reportRunPendingBeginScopeKey]);
+    }, [emitRunLifecycleEvent, reportRunHandler, reportRunPendingBeginScopeKey, frozenRestore, onDiscardFrozen]);
 
     const executeCapturedReportRun = React.useCallback((invocationSnapshot, origin = "manual") => (
         beginAndDispatchReportRun(invocationSnapshot, {
@@ -8583,7 +8656,9 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         })
     ), [beginReportRunLifecycle, dispatchReportRequestSnapshot]);
 
-    const runReport = React.useCallback(({ origin = "manual" } = {}) => {
+    const runReport = React.useCallback((input = {}) => {
+        const { origin = "manual" } = input;
+        const commandIdentity = resolveReportRunCommandIdentity(input);
         const currentState = currentBuilderStateRef.current || state;
         const existingPendingRun = pendingReportWorkspaceRunRef.current;
         const supersedePendingRun = () => {
@@ -8598,6 +8673,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             materializationFingerprint = "",
         ) => {
             const pendingRun = createPendingReportRunExecution({
+                commandIdentity,
                 origin,
                 requestFingerprint,
                 materializationFingerprint,
@@ -8615,7 +8691,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             setFiltersDrawerOpen(false);
         };
         if (designWorkspaceMode) {
-            const designPendingAction = resolvePendingReportRunExecutionAction(existingPendingRun, { origin });
+            const designPendingAction = resolvePendingReportRunExecutionAction(existingPendingRun, { origin, commandIdentity });
+            if (designPendingAction === "reject") throw new Error("Report request identity conflict.");
             if (designPendingAction === "reuse") {
                 return existingPendingRun.promise;
             }
@@ -8627,12 +8704,14 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             setWorkspaceMode("report");
             return pendingRunPromise;
         }
-        const invocationSnapshot = captureRunDispatchSnapshot(currentState, { origin });
+        const invocationSnapshot = captureRunDispatchSnapshot(currentState, { origin, commandIdentity });
         const pendingAction = resolvePendingReportRunExecutionAction(existingPendingRun, {
+            commandIdentity,
             origin,
             requestFingerprint: invocationSnapshot.requestFingerprint,
             materializationFingerprint: invocationSnapshot.materializationFingerprint,
         });
+        if (pendingAction === "reject") throw new Error("Report request identity conflict.");
         if (pendingAction === "reuse") {
             return existingPendingRun.promise;
         }
@@ -8656,7 +8735,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         }
         const invocationSnapshot = captureRunDispatchSnapshot(
             currentBuilderStateRef.current || state,
-            { origin: pendingRun.origin },
+            { origin: pendingRun.origin, commandIdentity: pendingRun.commandIdentity },
         );
         if (pendingRun.requestFingerprint
             && pendingRun.requestFingerprint !== invocationSnapshot.requestFingerprint) {
@@ -9845,6 +9924,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     }), [activeTablePreset?.title, canRunReport, canShowResults, error, loading, modifiedTablePreset?.title, readiness.message, readiness.reason, showingChartView, state.chartSpec, totalActiveFilterCount]);
 
     useEffect(() => {
+        if (frozenRestore || restoreBlocked) return;
         const deferForPrefill = shouldDeferReportBuilderRequestForPrefill({
             currentPrefillSignature,
             appliedPrefillSignature: appliedPrefillSignatureRef.current,
@@ -9927,7 +10007,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 }
             });
         return undefined;
-    }, [builderContext, chartDataPolicy.mode, chartQueryFingerprint, chartQueryRequest, chartQueryRequestKey, currentPrefillSignature, manualRunSequence, showingChartView]);
+    }, [builderContext, chartDataPolicy.mode, chartQueryFingerprint, chartQueryRequest, chartQueryRequestKey, currentPrefillSignature, manualRunSequence, showingChartView, frozenRestore, restoreBlocked]);
     const compiledRuntimePreviewModel = useMemo(() => {
         return buildReportBuilderRuntimePreviewModel({
             container,
@@ -10082,15 +10162,15 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         [runtimePreviewPrimaryDataset],
     );
     const runtimePreviewRequest = useMemo(
-        () => (runtimePreviewCanonicalRequest
+        () => (frozenRestore?.request || (runtimePreviewCanonicalRequest
             ? applyReportBuilderRequestHook(
                 builderContext,
                 displayConfig,
                 state,
                 runtimePreviewCanonicalRequest,
             )
-            : null),
-        [builderContext, displayConfig, runtimePreviewCanonicalRequest, state],
+            : null)),
+        [frozenRestore, builderContext, displayConfig, runtimePreviewCanonicalRequest, state],
     );
     const runtimePreviewPrimaryFetcher = useMemo(
         () => resolveReportBuilderDatasetPreviewFetcher(builderContext, runtimePreviewPrimaryDataset, {
@@ -10133,8 +10213,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         request,
         rows,
     }), [builderContext, displayConfig]);
-    const runtimePreviewRowsState = useReportRuntimePreviewRows({
-        enabled: !embeddedMode && !reportFiltersNeedApply && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
+    const fetchedRuntimePreviewRowsState = useReportRuntimePreviewRows({
+        enabled: !frozenRestore && !restoreBlocked && !embeddedMode && !reportFiltersNeedApply && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
             && !hostedReportActivationPending
             && hostedReportStarterReady
             && !shouldDeferReportBuilderRequestForPrefill({
@@ -10154,7 +10234,9 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         unavailableErrorMessage: "Runtime preview fetch is unavailable for this data source.",
         hydrateRows: hydrateRuntimePreviewRows,
     });
+    const runtimePreviewRowsState = frozenRestore ? {...fetchedRuntimePreviewRowsState, rows:frozenRestore.payloads.primary?.rows || [], hasMore:false, error:null, loading:false, requestKey:runtimePreviewRequestKey, freshResultRequestKey:runtimePreviewRequestKey} : fetchedRuntimePreviewRowsState;
     const runtimePreviewPublishedDatasets = useMemo(() => {
+        if (frozenRestore) return frozenRestore.datasets.map(dataset => ({...dataset, completedRequest:dataset.request}));
         const datasets = Array.isArray(authoredRuntimePreviewModel?.reportSpec?.datasets)
             ? authoredRuntimePreviewModel.reportSpec.datasets
             : [];
@@ -10190,13 +10272,13 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 };
             })
             .filter((dataset) => dataset.id && dataset.dataSourceRef && dataset.request);
-    }, [authoredDatasetOptionIndex, authoredRuntimePreviewModel?.reportSpec?.datasets, authoredRuntimePreviewModel?.staticDatasetPayloads, builderContext, displayConfig, state]);
+    }, [frozenRestore, authoredDatasetOptionIndex, authoredRuntimePreviewModel?.reportSpec?.datasets, authoredRuntimePreviewModel?.staticDatasetPayloads, builderContext, displayConfig, state]);
     const runtimePreviewPublishedDatasetsRequestKey = useMemo(() => JSON.stringify({
         previewRequestKey: runtimePreviewRequestKey,
         datasets: runtimePreviewPublishedDatasets,
     }), [runtimePreviewPublishedDatasets, runtimePreviewRequestKey]);
-    const runtimePreviewDatasetPayloadState = useReportRuntimePreviewDatasetPayloads({
-        enabled: !embeddedMode && !reportFiltersNeedApply && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
+    const fetchedRuntimePreviewDatasetPayloadState = useReportRuntimePreviewDatasetPayloads({
+        enabled: !frozenRestore && !restoreBlocked && !embeddedMode && !reportFiltersNeedApply && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
             && !hostedReportActivationPending
             && hostedReportStarterReady
             && !shouldDeferReportBuilderRequestForPrefill({
@@ -10210,6 +10292,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             preferDataSourceRoute: true,
         },
     });
+    const runtimePreviewDatasetPayloadState = frozenRestore ? {...fetchedRuntimePreviewDatasetPayloadState, payloads:frozenRestore.payloads, loading:false, error:null, requestKey:runtimePreviewPublishedDatasetsRequestKey, freshResultRequestKey:runtimePreviewPublishedDatasetsRequestKey, freshDatasetIds:frozenRestore.datasets.map(dataset=>dataset.id)} : fetchedRuntimePreviewDatasetPayloadState;
     const runtimePreviewRowsSource = resolveReportBuilderRuntimePreviewRowsSource({
         currentRequestFingerprint,
         requestDispatchFingerprint: requestFingerprintRef.current,
@@ -10244,6 +10327,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         [runtimePreviewDatasetPayloadState, runtimePreviewPrimaryDataset?.id, runtimePreviewPublishedDatasetsRequestKey],
     );
     const runtimePreviewArtifact = useMemo(() => {
+        if (frozenRestore) return frozenRestore.artifact;
         if (!authoredRuntimePreviewModel) {
             return null;
         }
@@ -10276,7 +10360,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 || (reportWorkspaceMode ? "" : "Compiled from the current builder state using the generic Forge runtime contract."),
             hostIntent: runtimePreviewHostIntent,
         });
-    }, [authoredDocumentBlockDiagnostics, authoredRuntimePreviewModel, container, displayConfig, reportWorkspaceMode, runtimePreviewDatasetPayloadState.payloads, runtimePreviewArtifactDiagnostics, runtimePreviewConfig?.subtitle, runtimePreviewConfig?.title, runtimePreviewDetailDiagnostic, runtimePreviewHostIntent, runtimePreviewPrimaryDatasetPayload?.diagnostics, runtimePreviewPrimaryDatasetPayload?.hasMore, runtimePreviewPrimaryDatasetPayload?.rows, runtimePreviewRowsSource.error, runtimePreviewRowsSource.hasMore, runtimePreviewRowsSource.rows, state]);
+    }, [frozenRestore, authoredDocumentBlockDiagnostics, authoredRuntimePreviewModel, container, displayConfig, reportWorkspaceMode, runtimePreviewDatasetPayloadState.payloads, runtimePreviewArtifactDiagnostics, runtimePreviewConfig?.subtitle, runtimePreviewConfig?.title, runtimePreviewDetailDiagnostic, runtimePreviewHostIntent, runtimePreviewPrimaryDatasetPayload?.diagnostics, runtimePreviewPrimaryDatasetPayload?.hasMore, runtimePreviewPrimaryDatasetPayload?.rows, runtimePreviewRowsSource.error, runtimePreviewRowsSource.hasMore, runtimePreviewRowsSource.rows, state]);
     const runtimeExportMetadata = useMemo(() => ({
         ...(reportOptionDefinitions.length ? { reportOptions: reportOptionDefinitions } : {}),
         conversationId: String(container?.conversationId || builderContext?.conversationId || builderContext?.windowState?.conversationId || "").trim(),
@@ -10848,7 +10932,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         readinessIssueKind: readiness.issueKind,
         semanticDiagnosticsNotice,
     }), [canRunReport, readiness.action, readiness.issueKind, readiness.message, readiness.reason, semanticDiagnosticsNotice]);
-    const authoredRuntimePreviewState = useMemo(() => buildReportBuilderAuthoredRuntimePreviewState({
+    const authoredRuntimePreviewState = useMemo(() => frozenRestore ? {canRenderRuntime:true, runtimeConfig:frozenRestore.artifact.runtimeBlock.dashboard.reportRuntime, loadingState:null, updatingNotice:null} : buildReportBuilderAuthoredRuntimePreviewState({
         runtimePreviewEnabled: runtimePreviewEnabled || authoredRuntimeSurfaceEnabled,
         runtimePreviewArtifact,
         runtimePreviewRowsSource,
@@ -10862,6 +10946,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         runtimePreviewErrorDescription: renderReportBuilderError(runtimePreviewRowsSource.error),
         presentationMode: reportWorkspaceMode ? "report" : "preview",
     }), [
+        frozenRestore,
         canRunReport,
         readiness.action,
         readiness.issueKind,
@@ -14235,11 +14320,12 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 hasCompletedRun: !!hasCompletedCurrentRun || currentReportDatasetMaterialization?.status === "completed",
                 materialization: cloneReportBuilderValue(currentReportDatasetMaterialization),
             }),
-            run: async () => {
+            run: async (input = {}) => {
                 if (!canRunReport) {
                     return { ok: false, error: "The current report is not ready to run." };
                 }
-                const begun = await runReport({ origin: "prompt" });
+                const commandIdentity = resolveReportRunCommandIdentity(input);
+                const begun = await runReport({ origin: "prompt", ...(commandIdentity || {}) });
                 if (!begun?.ok) {
                     return begun;
                 }
@@ -14249,6 +14335,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                         reportRunId: normalizeString(begun.runId),
                         durable: true,
                     } : {}),
+                    ...(commandIdentity ? { materializationId: commandIdentity.requestId } : {}),
                     windowId,
                     reportId: normalizeString(activeReportEventId),
                     reportName: normalizeString(activeReportEventName),
@@ -20500,6 +20587,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         const authoredBlockCount = Array.isArray(state?.reportDocumentBlocks)
             ? state.reportDocumentBlocks.length
             : 0;
+        if (restoreChecked || frozenRestore || restoreBlocked) return;
         const decision = resolveHostedReportRestoreRehydration({
             hostAction: hostedExecuteOnOpenHostAction,
             activationReady: hostedReportActivationCurrent,
@@ -20544,9 +20632,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         showAuthoredReportSurface,
         state,
         state?.reportDocumentBlocks,
-    ]);
+     frozenRestore, restoreBlocked, restoreChecked]);
 
     useEffect(() => {
+        if (frozenRestore || restoreBlocked) return;
         if (embeddedMode || reportFiltersNeedApply || pendingReportWorkspaceRunRef.current) {
             return;
         }
@@ -20626,9 +20715,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         reportWorkspaceMode,
         showAuthoredReportSurface,
         state,
-    ]);
+     frozenRestore, restoreBlocked]);
 
     useEffect(() => {
+        if (frozenRestore || restoreBlocked) return;
         if (!hostedExecuteOnOpen) {
             return;
         }
@@ -20756,9 +20846,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         showAuthoredReportSurface,
         state,
         state?.reportDocumentBlocks,
-    ]);
+     frozenRestore, restoreBlocked]);
 
     useEffect(() => {
+        if (frozenRestore || restoreBlocked) return;
         if (hostedExportOnComplete !== "pdf" && hostedExportOnComplete !== "xlsx") {
             return;
         }
@@ -20835,7 +20926,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         runtimePreviewDatasetPayloadState.loading,
         triggerDraftExport,
         triggerDraftXlsxExport,
-    ]);
+     frozenRestore, restoreBlocked]);
 
     return (
         <div className={[
@@ -20851,6 +20942,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         ].filter(Boolean).join(" ")}
         ref={builderRootRef}
         style={builderRootStyle}
+        data-report-restoration={frozenRestore ? "completed" : restoreBlocked ? "rejected" : "none"}
+        data-report-restored-run={frozenRestore?.run?.reportRunId || undefined}
         data-report-builder-state={reportBuilderStateMarker}
         data-report-builder-view-mode={String(state.viewMode || "").trim() || "table"}
         data-report-builder-chart-title={String(state.chartSpec?.title || "").trim()}
