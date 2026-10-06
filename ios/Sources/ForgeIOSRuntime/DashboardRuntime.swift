@@ -884,7 +884,7 @@ public enum DashboardRuntime {
                 kind: kind,
                 title: title,
                 diagnostics: blockDiagnostics,
-                content: kind == "tableBlock" ? content.filter { ["collapsible", "defaultCollapsed"].contains($0.key) } : (presentationKinds.contains(kind) || kind == "kpiBlock" ? content : [:]),
+                content: kind == "tableBlock" ? content.filter { ["collapsible", "defaultCollapsed"].contains($0.key) } : (presentationKinds.contains(kind) || kind == "kpiBlock" || kind == "chartBlock" ? content : [:]),
                 runtime: block["runtime"]?.objectValue ?? [:],
                 markdown: markdown,
                 kpi: kpi,
@@ -1671,7 +1671,7 @@ public enum DashboardRuntime {
                     key: nonBlank(object["key"]?.stringValue),
                     label: nonBlank(object["label"]?.stringValue) ?? id,
                     type: nonBlank(object["type"]?.stringValue),
-                    format: nonBlank(object["format"]?.stringValue),
+                    format: nonBlank(object["format"]?.stringValue) ?? nonBlank(object["valueFormat"]?.stringValue),
                     emptyText: nonBlank(object["emptyText"]?.stringValue),
                     cellVisual: object["cellVisual"]
                 )

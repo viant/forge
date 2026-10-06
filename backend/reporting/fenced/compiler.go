@@ -41,7 +41,7 @@ func Compile(request *CompileRequest) (*CompileResult, error) {
 	if result.Assembly.Grammar != "report-document-v1" {
 		return result, fmt.Errorf("backend fenced compilation currently requires report-document-v1, got %q", result.Assembly.Grammar)
 	}
-	document, spec, fill, printArtifact, diagnostics, err := lowerAssembly(result.Assembly)
+	document, spec, fill, printArtifact, diagnostics, err := lowerAssembly(result.Assembly, request.Invocation)
 	result.Diagnostics = append(result.Diagnostics, diagnostics...)
 	if err != nil {
 		return result, err
@@ -53,7 +53,7 @@ func Compile(request *CompileRequest) (*CompileResult, error) {
 	return result, nil
 }
 
-func lowerAssembly(assembly *Assembly) (json.RawMessage, json.RawMessage, json.RawMessage, json.RawMessage, []Diagnostic, error) {
+func lowerAssembly(assembly *Assembly, invocation *InvocationBinding) (json.RawMessage, json.RawMessage, json.RawMessage, json.RawMessage, []Diagnostic, error) {
 	title := textValue(assembly.Source["title"])
 	if title == "" {
 		title = assembly.ID
@@ -67,15 +67,21 @@ func lowerAssembly(assembly *Assembly) (json.RawMessage, json.RawMessage, json.R
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
+	layoutSizes := sourceLayoutSizes(assembly.Source)
 	normalizeSpecBlocks(blocks)
-	datasets, fillDatasets, err := buildDatasets(assembly)
+	if err := validateInvocationBinding(assembly, invocation); err != nil {
+		return nil, nil, nil, nil, nil, err
+	}
+	if invocation != nil {
+		source = invocation.Source
+	}
+	datasets, fillDatasets, err := buildDatasets(assembly, invocation)
 	if err != nil {
 		return nil, nil, nil, nil, nil, err
 	}
 	normalizeBlockDatasetRefs(blocks, primaryDataSourceRef(assembly))
 	blockOrder := make([]string, 0, len(blocks))
 	items := make([]any, 0, len(blocks))
-	layoutSizes := sourceLayoutSizes(assembly.Source)
 	for _, block := range blocks {
 		id := textValue(block["id"])
 		blockOrder = append(blockOrder, id)
@@ -90,6 +96,9 @@ func lowerAssembly(assembly *Assembly) (json.RawMessage, json.RawMessage, json.R
 		"parameters":   map[string]any{"viewMode": "table", "groupBy": "", "pageSize": 100, "orderField": "", "orderDir": "asc"},
 		"layoutIntent": map[string]any{"kind": "single", "resultPanePosition": "left", "blockOrder": blockOrder, "items": items},
 		"refinements":  []any{}, "calculatedFields": []any{}, "datasets": datasets, "blocks": blocks,
+	}
+	if invocation != nil {
+		specObject["parameters"] = invocation.Parameters
 	}
 	if theme, ok := assembly.Source["theme"].(map[string]any); ok {
 		specObject["theme"] = theme
@@ -130,12 +139,25 @@ func lowerAssembly(assembly *Assembly) (json.RawMessage, json.RawMessage, json.R
 
 func sourceLayoutSizes(source map[string]any) map[string]string {
 	result := map[string]string{}
+	if blocks, ok := source["blocks"].([]any); ok {
+		for _, raw := range blocks {
+			if block, ok := raw.(map[string]any); ok {
+				if size := textValue(block["size"]); size != "" {
+					result[textValue(block["id"])] = size
+				}
+			}
+		}
+	}
 	layout, _ := source["layout"].(map[string]any)
 	rawItems, _ := layout["items"].([]any)
 	for _, rawItem := range rawItems {
 		item, _ := rawItem.(map[string]any)
 		blockID := textValue(item["blockId"])
 		if blockID == "" {
+			continue
+		}
+		if size := textValue(item["size"]); size != "" {
+			result[blockID] = size
 			continue
 		}
 		value := item["span"]
@@ -185,6 +207,8 @@ func normalizeBlocks(value any) ([]map[string]any, error) {
 
 func normalizeSpecBlocks(blocks []map[string]any) {
 	for _, block := range blocks {
+		// Authored size belongs to canonical layoutIntent.items, not block schemas.
+		delete(block, "size")
 		id, kind := textValue(block["id"]), textValue(block["kind"])
 		title := textValue(block["title"])
 		if title == "" && kind != "tabGroupBlock" {
@@ -276,7 +300,7 @@ func normalizeBlockDatasetRefs(blocks []map[string]any, fallback string) {
 	}
 }
 
-func buildDatasets(assembly *Assembly) ([]any, []any, error) {
+func buildDatasets(assembly *Assembly, invocation *InvocationBinding) ([]any, []any, error) {
 	ids := make([]string, 0, len(assembly.DataSources))
 	for id := range assembly.DataSources {
 		ids = append(ids, id)
@@ -308,17 +332,32 @@ func buildDatasets(assembly *Assembly) ([]any, []any, error) {
 		}
 		limit, offset, rowCount := max(1, len(rows)), 0, len(rows)
 		request := map[string]any{"kind": "staticJson", "format": "json", "rowCount": rowCount, "columnKeys": keys, "limit": limit, "offset": offset}
-		specDatasets = append(specDatasets, map[string]any{"id": id, "dataSourceRef": id, "request": request})
-		requestForHash := cloneMap(request)
-		if len(keys) == 0 {
-			// RequestPayload intentionally omits an empty columnKeys slice while
-			// hashing, even though the decoded static request retains the required
-			// non-nil empty slice for validation.
-			delete(requestForHash, "columnKeys")
+		dataSourceRef := id
+		var requestValue any = request
+		if invocation != nil {
+			for _, binding := range invocation.Datasets {
+				if binding.ID == id {
+					dataSourceRef = binding.DataSourceRef
+					requestValue = binding.Request
+					break
+				}
+			}
 		}
-		requestRaw, _ := json.Marshal(requestForHash)
+		specDatasets = append(specDatasets, map[string]any{"id": id, "dataSourceRef": dataSourceRef, "request": requestValue})
+		requestRaw, _ := json.Marshal(requestValue)
+		if invocation != nil {
+			// Hash through the canonical request model, exactly as reportFill
+			// validation does, while retaining the original admitted JSON above.
+			var canonical reportspec.RequestPayload
+			decoder := json.NewDecoder(bytes.NewReader(requestRaw))
+			decoder.DisallowUnknownFields()
+			if err := decoder.Decode(&canonical); err != nil {
+				return nil, nil, fmt.Errorf("dataset %q request: %w", id, err)
+			}
+			requestRaw, _ = json.Marshal(canonical)
+		}
 		fillDatasets = append(fillDatasets, map[string]any{
-			"id": id, "dataSourceRef": id, "request": request,
+			"id": id, "dataSourceRef": dataSourceRef, "request": requestValue,
 			"provenance": map[string]any{"requestHash": hashStableJSON(requestRaw), "rowCount": len(rows), "truncated": false, "hasMore": false, "diagnostics": []any{}},
 			"rows":       rows,
 		})
@@ -328,10 +367,15 @@ func buildDatasets(assembly *Assembly) ([]any, []any, error) {
 
 func buildFillBlocks(blocks []map[string]any, datasets []any) []any {
 	rowsByID := map[string][]map[string]any{}
+	filtersByID := map[string]map[string]any{}
 	for _, item := range datasets {
 		dataset := item.(map[string]any)
 		rows, _ := dataset["rows"].([]map[string]any)
 		rowsByID[textValue(dataset["id"])] = rows
+		raw, _ := json.Marshal(dataset["request"])
+		var request map[string]any
+		_ = json.Unmarshal(raw, &request)
+		filtersByID[textValue(dataset["id"])], _ = request["filters"].(map[string]any)
 	}
 	result := make([]any, 0, len(blocks))
 	blockByID := map[string]map[string]any{}
@@ -362,6 +406,28 @@ func buildFillBlocks(blocks []map[string]any, datasets []any) []any {
 		kind, ref := textValue(block["kind"]), textValue(block["datasetRef"])
 		rows := rowsByID[ref]
 		switch kind {
+		case "filterBarBlock":
+			filters := filtersByID[ref]
+			keys := stringSlice(block["paramIds"])
+			if len(keys) == 0 {
+				for key := range filters {
+					keys = append(keys, key)
+				}
+				sort.Strings(keys)
+			}
+			params := make([]any, 0, len(keys))
+			for _, key := range keys {
+				if value, ok := filters[key]; ok {
+					params = append(params, map[string]any{"id": key, "label": humanize(key), "value": value})
+				}
+			}
+			content := map[string]any{"title": block["title"], "params": params}
+			for _, key := range []string{"mode", "placement", "groupOrder", "visibleGroups", "collapsedGroups"} {
+				if value, ok := block[key]; ok {
+					content[key] = value
+				}
+			}
+			block["content"] = content
 		case "tableBlock":
 			columns := normalizeColumns(block["columns"])
 			block["columns"] = columns
@@ -995,6 +1061,17 @@ func buildPrint(title, subtitle string, source map[string]any, specRaw, fillRaw 
 			y += panelHeight + 12
 		default:
 			body := textValue(block["markdown"])
+			if kind == "filterBarBlock" {
+				content, _ := block["content"].(map[string]any)
+				params, _ := content["params"].([]any)
+				lines := make([]string, 0, len(params))
+				for _, raw := range params {
+					param, _ := raw.(map[string]any)
+					encoded, _ := json.Marshal(param["value"])
+					lines = append(lines, textValue(param["label"])+": "+string(encoded))
+				}
+				body = strings.Join(lines, "\n")
+			}
 			if body == "" {
 				body = textValue(block["body"])
 			}

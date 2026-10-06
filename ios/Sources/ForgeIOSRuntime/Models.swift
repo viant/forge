@@ -1,6 +1,8 @@
 import Foundation
 
 public struct WindowMetadata: Codable, Sendable {
+    /// In-memory authored input for portable hooks; never an encoded metadata field.
+    public var runtimeAuthoring: JSONValue?
     public let namespace: String?
     public let view: ViewDef?
     public let dialogs: [DialogDef]
@@ -48,6 +50,7 @@ public struct WindowMetadata: Codable, Sendable {
         schemas: [String: ResourceSchemaDef] = [:],
         resourceModels: [String: ResourceModelDef] = [:]
     ) {
+        self.runtimeAuthoring = nil
         self.namespace = namespace
         self.view = view
         self.dialogs = dialogs
@@ -63,6 +66,7 @@ public struct WindowMetadata: Codable, Sendable {
     }
 
     public init(from decoder: Decoder) throws {
+        runtimeAuthoring = try? JSONValue(from: decoder)
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let legacyContainer = try decoder.container(keyedBy: LegacyCodingKeys.self)
         namespace = try container.decodeIfPresent(String.self, forKey: .namespace)
@@ -1792,24 +1796,34 @@ public struct ReportBuilderPublishedDataSourceDef: Codable, Sendable, Equatable 
     public let id: String
     public let dataSourceRef: String
     public let request: [String: JSONValue]
+    public let hasDeclaredRequest: Bool
     public let scope: [String: JSONValue]
     public let fields: [[String: JSONValue]]
     public let scopeParams: [[String: JSONValue]]
+    public let scopeParamOptions: [[String: JSONValue]]
+    public let source: [String: JSONValue]
+    public let capabilities: [String: JSONValue]
+    public let resultContract: [String: JSONValue]
 
     public init(
         id: String,
         dataSourceRef: String,
-        request: [String: JSONValue] = [:],
+        request: [String: JSONValue]? = nil,
         scope: [String: JSONValue] = [:],
         fields: [[String: JSONValue]] = [],
-        scopeParams: [[String: JSONValue]] = []
+        scopeParams: [[String: JSONValue]] = [],
+        scopeParamOptions: [[String: JSONValue]] = [],
+        source: [String: JSONValue] = [:], capabilities: [String: JSONValue] = [:], resultContract: [String: JSONValue] = [:]
     ) {
         self.id = id
         self.dataSourceRef = dataSourceRef
-        self.request = request
+        self.request = request ?? [:]
+        self.hasDeclaredRequest = request != nil
         self.scope = scope
         self.fields = fields
         self.scopeParams = scopeParams
+        self.scopeParamOptions = scopeParamOptions
+        self.source = source; self.capabilities = capabilities; self.resultContract = resultContract
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -1818,18 +1832,33 @@ public struct ReportBuilderPublishedDataSourceDef: Codable, Sendable, Equatable 
         case request
         case scope
         case fields
-        case scopeParams
+        case scopeParams, scopeParamOptions, source, capabilities, resultContract
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
         dataSourceRef = try container.decode(String.self, forKey: .dataSourceRef)
-        request = try container.decodeIfPresent([String: JSONValue].self, forKey: .request) ?? [:]
+        let declaredRequest = try container.decodeIfPresent([String: JSONValue].self, forKey: .request)
+        request = declaredRequest ?? [:]
+        hasDeclaredRequest = declaredRequest != nil
         scope = try container.decodeIfPresent([String: JSONValue].self, forKey: .scope) ?? [:]
         fields = try container.decodeIfPresent([[String: JSONValue]].self, forKey: .fields) ?? []
         scopeParams = try container.decodeIfPresent([[String: JSONValue]].self, forKey: .scopeParams) ?? []
+        scopeParamOptions = try container.decodeIfPresent([[String: JSONValue]].self, forKey: .scopeParamOptions) ?? []
+        source = try container.decodeIfPresent([String: JSONValue].self, forKey: .source) ?? [:]
+        capabilities = try container.decodeIfPresent([String: JSONValue].self, forKey: .capabilities) ?? [:]
+        resultContract = try container.decodeIfPresent([String: JSONValue].self, forKey: .resultContract) ?? [:]
     }
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id); try container.encode(dataSourceRef, forKey: .dataSourceRef)
+        if hasDeclaredRequest { try container.encode(request, forKey: .request) }
+        try container.encode(scope, forKey: .scope); try container.encode(fields, forKey: .fields)
+        try container.encode(scopeParams, forKey: .scopeParams); try container.encode(scopeParamOptions, forKey: .scopeParamOptions)
+        try container.encode(source, forKey: .source); try container.encode(capabilities, forKey: .capabilities); try container.encode(resultContract, forKey: .resultContract)
+    }
+
 }
 
 public struct DashboardReportBuilderVariantDef: Codable, Sendable {

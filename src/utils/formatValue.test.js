@@ -5,6 +5,10 @@ const formatted = formatDisplayValue('2026-08-27T22:33:00Z', 'dateTime24', 'en-U
 assert.match(formatted, /Aug 27, 2026/);
 assert.match(formatted, /15:33/);
 assert.doesNotMatch(formatted, /AM|PM/);
+assert.equal(formatDisplayValue('2026-09-28T00:00:00Z', 'date'), 'Sep 28, 2026');
+assert.equal(formatDisplayValue('2026-09-28', 'date'), 'Sep 28, 2026');
+// An explicitly requested timezone continues to format an instant in that zone.
+assert.equal(formatDisplayValue('2026-09-28T00:00:00Z', 'date', 'en-US', {timeZone: 'America/Los_Angeles'}), 'Sep 27, 2026');
 assert.equal(formatDisplayValue(0.123, 'percentFraction'), '12.3%');
 assert.equal(formatDisplayValue(0.1234, 'percentFraction2'), '12.34%');
 assert.equal(formatDisplayValue(12.5, 'currency2', 'en-US', {currency: 'EUR'}), '€12.50');

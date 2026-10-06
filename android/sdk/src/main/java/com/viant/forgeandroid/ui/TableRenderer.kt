@@ -134,7 +134,7 @@ fun TableRenderer(
 
     LaunchedEffect(rowsOverride) {
         if (rowsOverride == null) {
-            context.fetchCollection()
+            context.fetchCollectionAutomatically()
         }
     }
 

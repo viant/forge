@@ -428,7 +428,7 @@ public struct ContainerRenderer: View {
                boundaryForms[ref]?.isEmpty != false,
                boundaryMetrics[ref]?.isEmpty != false,
                boundaryControls[ref]?.loading != true {
-                await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
+                await runtime.automaticallyRefreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
                 boundaryCollections[ref] = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
                 boundaryForms[ref] = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: ref)
                 boundaryMetrics[ref] = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: ref)

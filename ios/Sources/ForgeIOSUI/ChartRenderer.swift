@@ -281,6 +281,16 @@ public struct ChartRenderer: View {
                 }
             }
             .chartForegroundStyleScale(domain: seriesKeys, range: seriesColors)
+            .chartLegend(position: .bottom, alignment: .leading) {
+                HStack(spacing: 12) {
+                    ForEach(seriesDisplays) { series in
+                        HStack(spacing: 5) {
+                            Circle().fill(series.color).frame(width: 8, height: 8)
+                            Text(series.label).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
             .chartXAxis {
                 if ["horizontal_bar", "funnel_bar"].contains(type) {
                     AxisMarks(position: .bottom) {
@@ -746,7 +756,7 @@ public struct ChartRenderer: View {
             return
         }
         Task {
-            await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+            await runtime.automaticallyRefreshDataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
         }
     }
 
@@ -831,7 +841,7 @@ public struct ChartRenderer: View {
             return
         }
         Task(priority: .userInitiated) {
-            await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+            await runtime.automaticallyRefreshDataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
         }
     }
 

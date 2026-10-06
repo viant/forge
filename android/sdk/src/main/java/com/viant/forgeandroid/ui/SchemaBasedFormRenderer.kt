@@ -93,6 +93,7 @@ internal fun schemaBasedFormItems(
                         label = option
                     )
                 },
+                lookup = field.lookup,
                 properties = mapOfLookup(field.lookup)
             )
         }
@@ -143,6 +144,7 @@ internal fun schemaBasedFormItems(
                         }
                     )
                 },
+                lookup = lookup,
                 properties = property + mapOfLookup(lookup)
             )
         }

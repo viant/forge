@@ -32,6 +32,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
@@ -111,7 +113,7 @@ fun ChartRenderer(
     emptyMessage: String = "No chart data",
     showDataFallback: Boolean = true
 ) {
-    val prepared = prepareChartData(rows, chart)
+    val prepared = prepareChartData(rows, chart, LocalForgeThemeAppearance.current?.categoricalPalette.orEmpty())
     val type = chartType(chart)
     var selection by remember(prepared, type) { mutableStateOf<ChartSelection?>(null) }
     val supportsSeriesSelection = prepared.series.size > 1 && type != "pie" && type != "donut"
@@ -184,7 +186,7 @@ fun ChartRenderer(
                         return@Column
                     }
                 }
-                Text("Select at least one measure", style = MaterialTheme.typography.bodyMedium, color = ChartMutedText)
+                Text("Select at least one measure", style = MaterialTheme.typography.bodyMedium, color = LocalForgeThemeAppearance.current?.text?.copy(alpha = 0.72f) ?: ChartMutedText)
                 return@Column
             }
             if (activePrepared.points.isEmpty()) {
@@ -482,7 +484,7 @@ private fun HorizontalBarChart(
                         verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(value.label, style = MaterialTheme.typography.labelSmall, color = ChartMutedText)
+                            Text(value.label, style = MaterialTheme.typography.labelSmall, color = LocalForgeThemeAppearance.current?.text?.copy(alpha = 0.72f) ?: ChartMutedText)
                             Text(formatChartValue(value.value), style = MaterialTheme.typography.labelSmall)
                         }
                         Box(
@@ -511,7 +513,7 @@ private fun VerticalBarChart(
             Modifier
                 .fillMaxWidth()
                 .height(height)
-                .background(ChartCanvasColor, RoundedCornerShape(14.dp))
+                .background(LocalForgeThemeAppearance.current?.controlBackground ?: ChartCanvasColor, RoundedCornerShape(14.dp))
                 .padding(12.dp)
                 .pointerInput(prepared, stacked) {
                     detectTapGestures { tap ->
@@ -593,7 +595,7 @@ private fun MultiSeriesCartesianChart(
                 modifier = Modifier
                 .weight(1f)
                 .height(chartHeight)
-                .background(ChartCanvasColor, RoundedCornerShape(14.dp))
+                .background(LocalForgeThemeAppearance.current?.controlBackground ?: ChartCanvasColor, RoundedCornerShape(14.dp))
                 .padding(12.dp)
                 .pointerInput(prepared, type) {
                     detectTapGestures { tap ->
@@ -619,7 +621,7 @@ private fun MultiSeriesCartesianChart(
                 val seriesMaximum = prepared.maximumForSeries(series.key)
                 val seriesPoints = prepared.points.mapIndexed { index, point ->
                     val value = point.values.firstOrNull { it.key == series.key }?.value ?: 0.0
-                    val x = (width / max(prepared.points.size - 1, 1)) * index
+                    val x = chartPointX(index, prepared.points.size, 0f, width)
                     val y = height - (height * (value / seriesMaximum).toFloat().coerceIn(0f, 1f))
                     Offset(x, y)
                 }
@@ -654,16 +656,27 @@ private fun MultiSeriesCartesianChart(
                 ChartYAxisLabels(prepared, axis, chartHeight, TextAlign.Start)
             }
         }
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = if (axes.size > 1) 52.dp else 26.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            sampledChartAxisLabels(prepared.points.map { it.label }, maximumAxisLabels).forEach { label ->
-                Text(
-                    text = formatChartAxisLabel(label, xTickFormat),
+        val tickIndices = chartAxisTickIndices(prepared.points.size, maximumAxisLabels)
+        Layout(modifier = Modifier.fillMaxWidth(), content = {
+            tickIndices.forEach { index ->
+                Text(text = formatChartAxisLabel(prepared.points[index].label, xTickFormat),
                     style = MaterialTheme.typography.labelSmall,
-                    color = ChartMutedText,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                    color = LocalForgeThemeAppearance.current?.text?.copy(alpha = 0.72f) ?: ChartMutedText,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }) { measurables, constraints ->
+            // Match the actual canvas: 52 dp per displayed y axis and 12 dp
+            // canvas padding. Ticks retain their source point index when sampled.
+            val width = constraints.maxWidth
+            val plotStart = (52.dp + 12.dp).toPx()
+            val plotEnd = width - (if (axes.size > 1) 52.dp + 12.dp else 12.dp).toPx()
+            val tickWidth = ((plotEnd - plotStart) / max(tickIndices.size - 1, 1)).toInt().coerceAtLeast(1)
+            val children = measurables.map { it.measure(Constraints(maxWidth = min(width, tickWidth))) }
+            layout(width, children.maxOfOrNull { it.height } ?: 0) {
+                children.forEachIndexed { index, child ->
+                    val center = chartPointX(tickIndices[index], prepared.points.size, plotStart, plotEnd)
+                    child.placeRelative((center - child.width / 2f).toInt().coerceIn(0, max(width - child.width, 0)), 0)
+                }
             }
         }
         if (prepared.series.size <= 1) {
@@ -689,7 +702,7 @@ private fun ChartYAxisLabels(
             Text(
                 text = formatDashboardValue(value, format),
                 style = MaterialTheme.typography.labelSmall,
-                color = ChartMutedText,
+                color = LocalForgeThemeAppearance.current?.text?.copy(alpha = 0.72f) ?: ChartMutedText,
                 textAlign = textAlign,
                 maxLines = 1,
                 modifier = Modifier.fillMaxWidth()
@@ -838,7 +851,7 @@ private fun PieChart(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(chartHeight)
-                .background(ChartCanvasColor, RoundedCornerShape(14.dp))
+                .background(LocalForgeThemeAppearance.current?.controlBackground ?: ChartCanvasColor, RoundedCornerShape(14.dp))
                 .padding(12.dp)
                 .pointerInput(slices, donut) {
                     detectTapGestures { tap ->
@@ -881,7 +894,7 @@ private fun PieChart(
                     Text(
                         text = slice.valueLabel,
                         style = MaterialTheme.typography.labelSmall,
-                        color = ChartMutedText
+                        color = LocalForgeThemeAppearance.current?.text?.copy(alpha = 0.72f) ?: ChartMutedText
                     )
                 }
             }
@@ -938,7 +951,7 @@ private fun ChartDataFallback(
             Text(
                 text = "Chart data",
                 style = MaterialTheme.typography.labelMedium,
-                color = ChartMutedText,
+                color = LocalForgeThemeAppearance.current?.text?.copy(alpha = 0.72f) ?: ChartMutedText,
                 fontWeight = FontWeight.SemiBold
             )
             if (collapsedByDefault) {
@@ -963,7 +976,7 @@ private fun ChartDataFallback(
                     Text(
                         text = row.seriesLabel,
                         style = MaterialTheme.typography.bodySmall,
-                        color = ChartMutedText,
+                        color = LocalForgeThemeAppearance.current?.text?.copy(alpha = 0.72f) ?: ChartMutedText,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -980,7 +993,7 @@ private fun ChartDataFallback(
                 Text(
                     text = "+$remaining more",
                     style = MaterialTheme.typography.labelSmall,
-                    color = ChartMutedText,
+                    color = LocalForgeThemeAppearance.current?.text?.copy(alpha = 0.72f) ?: ChartMutedText,
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -1059,8 +1072,8 @@ internal data class ChartSelection(
     }
 }
 
-internal fun prepareChartData(rows: List<Map<String, Any?>>, chart: ChartDef): PreparedChartData {
-    val seriesDefs = resolveSeriesDefinitions(chart)
+internal fun prepareChartData(rows: List<Map<String, Any?>>, chart: ChartDef, themePalette: List<Color> = emptyList()): PreparedChartData {
+    val seriesDefs = resolveSeriesDefinitions(chart, themePalette)
     val labelKey = chart.series?.nameKey?.takeIf { it.isNotBlank() }
         ?: chart.xKey?.takeIf { it.isNotBlank() }
         ?: chart.nameKey?.takeIf { it.isNotBlank() }
@@ -1101,9 +1114,19 @@ internal fun prepareChartData(rows: List<Map<String, Any?>>, chart: ChartDef): P
         series = seriesDefs,
         maxValue = maxValue.coerceAtLeast(1.0),
         maxValuesByAxis = chartAxisMaximums(points, seriesDefs),
-        slicePalette = (chart.series?.palette.takeUnless { it.isNullOrEmpty() } ?: DefaultChartPalette).map(::parseChartColor)
+        slicePalette = (chart.series?.palette.takeUnless { it.isNullOrEmpty() } ?: DefaultChartPalette).map { parseChartColor(it, themePalette) }
     )
 }
+
+internal fun chartAxisTickIndices(pointCount: Int, maximum: Int): List<Int> {
+    if (pointCount <= 0) return emptyList()
+    if (maximum <= 0 || pointCount <= maximum) return (0 until pointCount).toList()
+    if (maximum == 1) return listOf(0)
+    return (0 until maximum).map { kotlin.math.round(it.toDouble() * (pointCount - 1) / (maximum - 1)).toInt() }.distinct()
+}
+
+internal fun chartPointX(index: Int, pointCount: Int, start: Float, end: Float): Float =
+    if (pointCount <= 1) (start + end) / 2f else start + (end - start) * index / (pointCount - 1)
 
 internal fun sampledChartAxisLabels(labels: List<String>, maximum: Int): List<String> {
     val orderedLabels = labels
@@ -1265,7 +1288,7 @@ private fun chartAxisMaximums(
     }?.coerceAtLeast(1.0) ?: 1.0
 }
 
-private fun resolveSeriesDefinitions(chart: ChartDef): List<ChartSeriesDisplay> {
+private fun resolveSeriesDefinitions(chart: ChartDef, themePalette: List<Color> = emptyList()): List<ChartSeriesDisplay> {
     val rawSeries = chart.series
     val palette = if (rawSeries?.palette.isNullOrEmpty()) DefaultChartPalette else rawSeries?.palette.orEmpty()
     val explicitValues = rawSeries?.values.orEmpty()
@@ -1285,7 +1308,7 @@ private fun resolveSeriesDefinitions(chart: ChartDef): List<ChartSeriesDisplay> 
             label = item.label?.takeIf { it.isNotBlank() }
                 ?: item.name?.takeIf { it.isNotBlank() }
                 ?: key,
-            color = parseChartColor(item.color?.takeIf { it.isNotBlank() } ?: palette.getOrNull(index % palette.size)),
+            color = parseChartColor(item.color?.takeIf { it.isNotBlank() } ?: palette.getOrNull(index % palette.size), themePalette),
             type = explicitType ?: if (composed && index == 0) "area" else "line",
             axis = explicitAxis ?: if (composed && candidates.size > 1) "series:$key" else "default",
             format = item.format
@@ -1365,8 +1388,14 @@ internal fun findPieSelection(
     return null
 }
 
-internal fun parseChartColor(value: String?): Color {
-    val raw = value?.trim().orEmpty()
+internal fun parseChartColor(value: String?, themePalette: List<Color> = emptyList()): Color {
+    val input = value?.trim().orEmpty()
+    val token = Regex("^var\\(--forge-data-categorical-([1-8]),\\s*(#[a-fA-F0-9]{6})\\)$").matchEntire(input)
+    if (token != null) {
+        themePalette.getOrNull(token.groupValues[1].toInt() - 1)?.let { return it }
+        return parseChartColor(token.groupValues[2])
+    }
+    val raw = input
     if (raw.isBlank()) {
         return Color(0xFF2563EB)
     }

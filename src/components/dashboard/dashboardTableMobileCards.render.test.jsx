@@ -33,18 +33,21 @@ const container = {
 const markup = renderToStaticMarkup(
     <DashboardTableContent container={container} context={context}/>,
 );
+const renderedClasses = new Set([...markup.matchAll(/class="([^"]*)"/g)].flatMap((match) => match[1].split(/\s+/)));
+for (const className of ["forge-dashboard-table", "forge-dashboard-table-cards", "forge-dashboard-table-card"]) {
+    assert.ok(renderedClasses.has(className), `missing read-only dashboard mobile-card class: ${className}`);
+}
+// Text formatters may wrap values in spans; preserve the surrounding card structure.
+const textMarkup = markup.replace(/<span\b[^>]*>([^<]*)<\/span>/g, "$1");
 for (const expected of [
     'forge-dashboard-table-wrap--mobile-cards',
-    'class="forge-dashboard-table"',
-    'class="forge-dashboard-table-cards"',
-    'class="forge-dashboard-table-card"',
     'aria-label="Select California"',
     'checked=""',
     '<strong>California</strong>',
     'Code: CA',
     '<dt>Rationale</dt>',
     '<dd>National campaign priority.</dd>',
-]) assert.ok(markup.includes(expected), `missing read-only dashboard mobile-card contract: ${expected}`);
+]) assert.ok(textMarkup.includes(expected), `missing read-only dashboard mobile-card contract: ${expected}`);
 
 const styles = fs.readFileSync(new URL('./Dashboard.css', import.meta.url), 'utf8');
 assert.match(styles, /\.forge-dashboard-table-cards\s*\{\s*display:\s*none/);

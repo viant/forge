@@ -86,7 +86,7 @@ struct TreeEditorRenderer: View {
     @MainActor
     private func observeNodes() async {
         nodes = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef)
-        if nodes.isEmpty { await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef) }
+        if nodes.isEmpty { await runtime.automaticallyRefreshDataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef) }
         nodes = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: dataSourceRef)
         hydrateTreeState()
         let stream = await runtime.dataSourceCollectionUpdates(windowID: window.windowID, dataSourceRef: dataSourceRef)

@@ -88,7 +88,7 @@ public enum InlineReportRuntimeCompiler {
 
         let blocks = grammar == "dashboard-v1"
             ? adaptDashboardBlocks(source["blocks"]?.arrayValue ?? [])
-            : (source["blocks"]?.arrayValue ?? [])
+            : (ReportChartMaterializer.materialize(source)["blocks"]?.arrayValue ?? [])
         let title = nonEmpty(source["title"]?.stringValue) ?? humanize(report.id)
         let subtitle = nonEmpty(source["subtitle"]?.stringValue)
         let datasetDeclarations = sourceDeclarations(source).map(JSONValue.object)
@@ -394,6 +394,32 @@ public enum InlineReportRuntimeCompiler {
             })
             content["rowCount"] = .number(Double(datasets[datasetRef]?.count ?? 0))
         }
+        if kind == "collectionBlock", let datasetRef = nonEmpty(object["datasetRef"]?.stringValue), datasets[datasetRef] != nil {
+            let rows = datasets[datasetRef]?.compactMap(\.objectValue) ?? []
+            let rowLimit: Int
+            if case .number(let value) = object["rowLimit"], value.isFinite, value >= 1 {
+                rowLimit = Int(min(value.rounded(.towardZero), Double(max(1, rows.count))))
+            } else { rowLimit = 6 }
+            let titleField = nonEmpty(object["itemTitleField"]?.stringValue)
+            let template = object["bodyTemplate"]?.stringValue ?? ""
+            content["items"] = .array(rows.prefix(rowLimit).enumerated().map { index, row in
+                var scopedDatasets = datasets
+                scopedDatasets[datasetRef] = [.object(row)]
+                var item: [String: JSONValue] = [
+                    "index": .number(Double(index)),
+                    "title": titleField.flatMap { row[$0] } ?? .string("Item"),
+                    "bodyMarkdown": .string(resolveReportTemplate(template, datasetRef: datasetRef, datasets: scopedDatasets))
+                ]
+                if let field = object["toneField"]?.stringValue, let value = row[field] {
+                    let rule = object["toneRules"]?.arrayValue?.compactMap(\.objectValue).first { $0["value"] == value }
+                    item["toneValue"] = value
+                    item["tone"] = rule?["tone"]
+                    item["toneLabel"] = rule?["label"]
+                }
+                return .object(item)
+            })
+            content["rowCount"] = .number(Double(rows.count))
+        }
         if kind == "timelineBlock" {
             let datasetRef = object["datasetRef"]?.stringValue ?? ""
             let rows = datasets[datasetRef]?.compactMap(\.objectValue) ?? []
@@ -643,7 +669,7 @@ public enum InlineReportRuntimeCompiler {
                 "key": .string(key),
                 "label": .string(column["label"]?.stringValue ?? column["name"]?.stringValue ?? humanize(key))
             ]
-            if let format = nonEmpty(column["format"]?.stringValue) { result["format"] = .string(format) }
+            if let format = nonEmpty(column["format"]?.stringValue) ?? nonEmpty(column["valueFormat"]?.stringValue) { result["format"] = .string(format) }
             if let visual = column["cellVisual"] { result["cellVisual"] = visual }
             return .object(result)
         }

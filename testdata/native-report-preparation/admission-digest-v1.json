@@ -1,0 +1,70 @@
+{
+  "profile": "agently-json-binary64-v1",
+  "cases": [
+    {
+      "name": "null",
+      "json": "null",
+      "sha256": "2e46e35eb773d3c568c86bbc232032aa1c0780f8cf7da592c871462b3b7ff98d"
+    },
+    {
+      "name": "boolean-array",
+      "json": "[true,false,null]",
+      "sha256": "be565b649a141fecb664ecc81ec1b82f7babb303801458e2fba2e2238f64085f"
+    },
+    {
+      "name": "one-integer",
+      "json": "1",
+      "sha256": "2f3c2df9ab885a4040f33d7e685432c9f32468467cef2e6639775051605cf598"
+    },
+    {
+      "name": "one-decimal",
+      "json": "1.0",
+      "sha256": "2f3c2df9ab885a4040f33d7e685432c9f32468467cef2e6639775051605cf598"
+    },
+    {
+      "name": "positive-zero",
+      "json": "0",
+      "sha256": "705beca5b936128bdd8713ab5ccabcb27b4df9198f49343c27e3bd508839186c"
+    },
+    {
+      "name": "negative-zero",
+      "json": "-0.0",
+      "sha256": "705beca5b936128bdd8713ab5ccabcb27b4df9198f49343c27e3bd508839186c"
+    },
+    {
+      "name": "slash-emoji",
+      "json": "{\"url\":\"https://example.com/a/b\",\"text\":\"😀 / <>&\"}",
+      "sha256": "c43661c66f40efada0b7344c6fe54407cdb0dfe7756f13796cfcd05b0d47ee78"
+    },
+    {
+      "name": "combining-decomposed",
+      "json": "\"e\\u0301\"",
+      "sha256": "5f9e26850d81f7beffd8b6b7faefa7f602346c699de4befb4deff9a408f737a6"
+    },
+    {
+      "name": "combining-composed",
+      "json": "\"\\u00e9\"",
+      "sha256": "508dd46c7e03e4338cd01aa90b33009f0beec7499f5d4894e259eb6410267451"
+    },
+    {
+      "name": "utf8-key-order",
+      "json": "{\"😀\":2,\"\\uE000\":1,\"a\":0}",
+      "sha256": "83a762295386b63088ca720db410cb6a8c6671a7e07edb61b734ee826f26ef7c"
+    },
+    {
+      "name": "nested-unsorted",
+      "json": "{\"z\":[{\"b\":1.25,\"a\":\"line\\nzero\\u0000\"},[],{}],\"a\":{\"v\":null,\"key\":true}}",
+      "sha256": "e5394498cda04269b21981aa427b2c836558f07ccb951ff6802cd3a24ac9d2ca"
+    },
+    {
+      "name": "safe-integer-boundary",
+      "json": "9007199254740991",
+      "sha256": "fa5476be34e588fa45b005e17507d7c30966f4a636b1b9271ee32f3c806af1fb"
+    },
+    {
+      "name": "unsafe-integer",
+      "json": "9007199254740992",
+      "error": "unsupported-number"
+    }
+  ]
+}

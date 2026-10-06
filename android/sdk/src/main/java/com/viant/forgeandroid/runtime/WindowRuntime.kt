@@ -106,7 +106,8 @@ class WindowContext(
     val metadata: Signal<WindowMetadata?>,
     internal val signals: SignalRegistry,
     private val dataSourceRuntime: DataSourceRuntime,
-    val parameters: Map<String, Any?> = emptyMap()
+    val parameters: Map<String, Any?> = emptyMap(),
+    private val requestWindowForm: Map<String, Any?>? = null
 ) {
     val identity = WindowIdentity(windowId)
 
@@ -130,9 +131,10 @@ class WindowContext(
         return signals.dialog("${windowId}Dialog$dialogId")
     }
 
-    fun peekWindowForm(): Map<String, Any?> {
-        return signals.form(identity.windowFormId()).peek()
-    }
+    fun peekWindowForm(): Map<String, Any?> = requestWindowForm ?: signals.form(identity.windowFormId()).peek()
+
+    internal fun captureRequest(form: Map<String, Any?>, meta: WindowMetadata?): WindowContext =
+        WindowContext(windowId, Signal(meta), signals, dataSourceRuntime, parameters, form)
 
     fun windowFormSignal(): Signal<Map<String, Any?>> {
         return signals.form(identity.windowFormId())

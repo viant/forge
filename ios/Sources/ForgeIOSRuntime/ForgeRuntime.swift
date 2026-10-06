@@ -95,6 +95,21 @@ public actor ForgeRuntime {
     }
 
     public private(set) var windows: [WindowState] = []
+    var preparedReportRequests: [String: PreparedReportRequest] = [:]
+    var preparedPrimaryFetches: [String: PreparedPrimaryFetch] = [:]
+    var acknowledgedReportInitialIntents: [String: String] = [:]
+    var nativeReportAccountGeneration = 0
+    var frozenNativeReportPublishedSignatures: [String: String] = [:]
+    var frozenNativeReportAdmissions: [String: NativeReportFrozenAdmission] = [:]
+    var completedNativeReportCaches: [String: NativeReportCompletedCache] = [:]
+    public let nativeReportLifecycle = NativeReportLifecycle()
+    var nativeReportActiveRequestIDs: [String: String] = [:]
+    var nativeReportActiveRequestGenerations: [String: Int] = [:]
+    var nativeReportMaterializations: [String: Task<NativeReportMaterializedRun, Error>] = [:]
+    var nativeReportDatasetResults: [String: DataSourceFetchResult] = [:]
+    var nativeReportDispatches: [String: NativeReportDatasetDispatch] = [:]
+    var nativeReportAuthoredPreparations: [String: PreparedReportIdentity] = [:]
+    public func markNativeReportAuthoredPreparation(windowID: String, identity: PreparedReportIdentity?) { nativeReportAuthoredPreparations[windowID] = identity }
     public nonisolated let targetContext: ForgeTargetContext
     let signals: SignalRegistry
     let dataSourceRuntime: DataSourceRuntime
@@ -262,6 +277,11 @@ public actor ForgeRuntime {
     }
 
     public func closeWindow(id: String) {
+        frozenNativeReportAdmissions.removeValue(forKey: id)
+        frozenNativeReportPublishedSignatures.removeValue(forKey: id)
+        completedNativeReportCaches.removeValue(forKey: id)
+        preparedPrimaryFetches.removeValue(forKey: id)?.task.cancel()
+        acknowledgedReportInitialIntents.removeValue(forKey: id)
         windows.removeAll { $0.id == id }
         Task {
             await signals.removeWindow(windowID: id)
@@ -505,8 +525,18 @@ public actor ForgeRuntime {
         windowID: String,
         instanceRef: String,
         dataSourceRef: String,
-        parameters: [String: JSONValue]
+        parameters: [String: JSONValue],
+        nativeCompletionID: String? = nil
     ) async {
+        let preparationFence: PreparedReportFetchFence
+        do { preparationFence = try await validatedReportFetchFence(windowID: windowID, dataSourceRef: dataSourceRef, instanceRef: instanceRef, parameters: parameters, nativeCompletionID: nativeCompletionID) }
+        catch {
+            let id = WindowIdentity(windowID: windowID).dataSourceID(ref: instanceRef)
+            let control = ControlState(loading: false, error: error.localizedDescription)
+            await dataSourceRuntime.setControl(dataSourceID: id, control: control)
+            await (await signals.control(dataSourceID: id)).set(control)
+            return
+        }
         let metadataSignal = await signals.metadata(windowID: windowID)
         guard let metadata = await metadataSignal.peek() else { return }
         guard let dataSource = metadata.dataSources[dataSourceRef] else {
@@ -532,6 +562,7 @@ public actor ForgeRuntime {
             return
         }
         do {
+            guard await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return }
             let result = try await dataSourceLoader(
                 DataSourceFetchRequest(
                     windowID: windowID,
@@ -542,8 +573,10 @@ public actor ForgeRuntime {
                     conversationID: windows.first { $0.id == windowID }?.conversationID
                 )
             )
-            guard dataSourceFetchGenerations[dataSourceID] == generation else { return }
+            guard dataSourceFetchGenerations[dataSourceID] == generation, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return }
+            if result == nil && nativeCompletionID != nil { throw ReportPreparationError(reason: "missing-dataset-response") }
             let rows = applyCollectionHook(metadata: metadata, rows: try unmarshalResourceRows(result?.rows ?? [], dataSource: dataSource, metadata: metadata))
+            if let nativeCompletionID { nativeReportDatasetResults[nativeCompletionID] = DataSourceFetchResult(rows: rows, metrics: result?.metrics ?? [:]) }
             let control = ControlState()
             await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: rows)
             await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: result?.metrics ?? [:])
@@ -552,7 +585,7 @@ public actor ForgeRuntime {
             await (await signals.metrics(dataSourceID: dataSourceID)).set(result?.metrics ?? [:])
             await (await signals.control(dataSourceID: dataSourceID)).set(control)
         } catch {
-            guard dataSourceFetchGenerations[dataSourceID] == generation else { return }
+            guard dataSourceFetchGenerations[dataSourceID] == generation, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return }
             let control = Task.isCancelled || isForgeCancellationError(error)
                 ? ControlState()
                 : ControlState(error: error.localizedDescription)
@@ -615,6 +648,14 @@ public actor ForgeRuntime {
         }
         let dataSourceID = WindowIdentity(windowID: windowID).dataSourceID(ref: dataSourceRef)
         let input = await dataSourceRuntime.input(dataSourceID: dataSourceID)
+        let preparationFence: PreparedReportFetchFence
+        do { preparationFence = try await validatedReportFetchFence(windowID: windowID, dataSourceRef: dataSourceRef, parameters: input.parameters) }
+        catch {
+            let control = ControlState(loading: false, error: error.localizedDescription)
+            await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: control)
+            await (await signals.control(dataSourceID: dataSourceID)).set(control)
+            return
+        }
         let fetchGeneration = (dataSourceFetchGenerations[dataSourceID] ?? 0) &+ 1
         dataSourceFetchGenerations[dataSourceID] = fetchGeneration
 
@@ -624,6 +665,7 @@ public actor ForgeRuntime {
             let loadingSignal = await signals.control(dataSourceID: dataSourceID)
             await loadingSignal.set(loadingControl)
             do {
+                guard await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return }
                 if let result = try await dataSourceLoader(
                     DataSourceFetchRequest(
                         windowID: windowID,
@@ -642,7 +684,7 @@ public actor ForgeRuntime {
                         conversationID: windows.first { $0.id == windowID }?.conversationID
                     )
                 ) {
-                    guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration else {
+                    guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else {
                         return
                     }
                     let baseRows = applyCollectionHook(metadata: metadata, rows: try unmarshalResourceRows(result.rows, dataSource: dataSource, metadata: metadata))
@@ -650,7 +692,7 @@ public actor ForgeRuntime {
                         windowID: windowID, dataSourceRef: dataSourceRef, metadata: metadata,
                         rows: baseRows, generation: fetchGeneration, path: lifecyclePath + [dataSourceRef]
                     )
-                    guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, !Task.isCancelled else { return }
+                    guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return }
                     await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows)
                     await dataSourceRuntime.setMetrics(dataSourceID: dataSourceID, values: result.metrics)
                     await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: ControlState())
@@ -704,7 +746,7 @@ public actor ForgeRuntime {
                     }
                     return
                 }
-                guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration else {
+                guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else {
                     return
                 }
                 print("ForgeRuntime datasource load failed for \(dataSourceRef): \(error)")
@@ -723,6 +765,12 @@ public actor ForgeRuntime {
             }
         }
 
+        if preparationFence.required {
+            let control = ControlState(loading: false, error: "A prepared report requires its native datasource loader. No request was sent.")
+            await dataSourceRuntime.setControl(dataSourceID: dataSourceID, control: control)
+            await (await signals.control(dataSourceID: dataSourceID)).set(control)
+            return
+        }
         let resolvedPath = dataSource.service?.uri ?? dataSource.uri
         guard let path = resolvedPath, !path.isEmpty else { return }
         let resolvedMethod = dataSource.service?.method ?? dataSource.method ?? "GET"
@@ -755,13 +803,13 @@ public actor ForgeRuntime {
             additionalHeaders: additionalHeaders,
             session: session
         )
-        guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, !Task.isCancelled else { return }
+        guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return }
         let fetchedRows = await dataSourceRuntime.collection(dataSourceID: dataSourceID)
         let hookedRows = await applyDataSourceFetchHooks(
             windowID: windowID, dataSourceRef: dataSourceRef, metadata: metadata,
             rows: fetchedRows, generation: fetchGeneration, path: lifecyclePath + [dataSourceRef]
         )
-        guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, !Task.isCancelled else { return }
+        guard dataSourceFetchGenerations[dataSourceID] == fetchGeneration, await reportFetchFenceIsCurrent(preparationFence, windowID: windowID) else { return }
         await dataSourceRuntime.setCollection(dataSourceID: dataSourceID, rows: hookedRows)
         if dataSource.autoSelect != false,
            let first = hookedRows.first,

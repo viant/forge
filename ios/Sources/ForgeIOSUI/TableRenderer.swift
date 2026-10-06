@@ -389,7 +389,7 @@ public struct TableRenderer: View {
             usesProvidedRows: providedRows != nil,
             rowsAreEmpty: rows.isEmpty
         ) {
-            await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
+            await runtime.automaticallyRefreshDataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
             let fetchedRows = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: resolvedDataSourceRef)
             if !fetchedRows.isEmpty {
                 rows = fetchedRows

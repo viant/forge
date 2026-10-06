@@ -36,7 +36,7 @@ struct DerivedDataSourceRenderer: View {
             sources[ref] = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
             controls[ref] = await runtime.dataSourceControl(windowID: window.windowID, dataSourceRef: ref)
             if sources[ref]?.isEmpty != false && controls[ref]?.loading != true {
-                await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
+                await runtime.automaticallyRefreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
                 sources[ref] = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
                 controls[ref] = await runtime.dataSourceControl(windowID: window.windowID, dataSourceRef: ref)
             }

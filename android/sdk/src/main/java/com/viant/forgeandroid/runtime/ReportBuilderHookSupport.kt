@@ -31,9 +31,7 @@ internal fun invokeReportBuilderHook(
         val result = runBlocking { ActionHookRuntime.invoke(code, candidate, props) } ?: continue
         val resolved = JsonUtil.elementToAny(result)
         val asMap = JsonUtil.asStringMap(resolved)
-        if (asMap.isNotEmpty()) {
-            return asMap
-        }
+        if (resolved is Map<*, *>) return asMap
     }
     return null
 }

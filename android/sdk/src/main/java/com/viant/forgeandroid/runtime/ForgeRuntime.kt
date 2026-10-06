@@ -16,7 +16,10 @@ class ForgeRuntime(
     endpoints: Map<String, EndpointConfig>,
     val scope: CoroutineScope,
     val targetContext: ForgeTargetContext = ForgeTargetContext(platform = "android"),
-    private val windowMetadataBaseUri: String = "forge/window"
+    private val windowMetadataBaseUri: String = "forge/window",
+    val reportRequestInspectionOnly: Boolean = false,
+    private val reportInspectionObserver: ((PreparedReportRequest) -> Unit)? = null,
+    private val frozenReportInspectionObserver:((String,String)->Unit)?=null
 ) {
     data class FilePreviewContent(val current: String = "", val previous: String = "", val diff: String = "")
     data class DataSourceFetchRequest(
@@ -40,7 +43,10 @@ class ForgeRuntime(
     private val endpointRegistry = EndpointRegistry(endpoints)
     private val restClient = RestClient(endpointRegistry)
     private val signals = SignalRegistry()
-    private val dataSourceRuntime = DataSourceRuntime(signals, restClient, scope)
+    val nativeReportLifecycle = NativeReportLifecycle()
+    private val dataSourceRuntime = DataSourceRuntime(signals, restClient, scope, reportRequestInspectionOnly) { context, input ->
+        nativeReportLifecycle.canRead(context, input) { reportPreparationIsCurrent(it) }
+    }
     private val windowRuntime = WindowRuntime(signals, dataSourceRuntime)
     private val parameterResolver = ParameterResolver()
     val mutationCommands = MutationCommandRuntime()
@@ -203,7 +209,116 @@ class ForgeRuntime(
         return state
     }
 
+    private val visibleSourceLeases = java.util.concurrent.ConcurrentHashMap<String, Pair<String, String?>>()
+    fun registerVisibleWindowDependency(windowId: String, dataSourceRef: String? = null): String {
+        val token = java.util.UUID.randomUUID().toString()
+        visibleSourceLeases[token] = windowId to dataSourceRef
+        return token
+    }
+    fun removeVisibleWindowDependency(token: String) { visibleSourceLeases.remove(token) }
+    fun visibleWindowDataSourceRefs(windowId: String): List<String>? {
+        val leases = visibleSourceLeases.values.filter { it.first == windowId }
+        if (leases.isEmpty()) return null
+        return leases.mapNotNull { it.second }.distinct()
+    }
+
+    fun registeredWindowDataSources(windowId: String) = dataSourceRuntime.registeredWindowContexts(windowId)
+
+    private data class ReportPrefillAcknowledgment(val key: String, val acknowledged: Boolean)
+    private val reportPrefills = java.util.concurrent.ConcurrentHashMap<String, ReportPrefillAcknowledgment>()
+    val frozenNativeReports = NativeReportFrozenAdmissions(frozenReportInspectionObserver)
+    val completedDatasetProofs=NativeReportCompletedDatasetProofs { frozenNativeReports.accountBinding() }
+    fun bindNativeReportAccount(accountKey:String?) {
+        val previous=frozenNativeReports.accountBinding()
+        frozenNativeReports.bindAccount(accountKey)
+        if(previous!=frozenNativeReports.accountBinding()) {
+            completedDatasetProofs.clear()
+            reportPrefills.clear();reportPreparations.clear()
+            windows.value.forEach { nativeReportLifecycle.closeWindow(it.windowId) }
+        }
+    }
+    fun verifiedCompletedReportDatasets(windowId:String):JsonArray? {
+        val form=JsonUtil.anyToElement(windowContext(windowId).peekWindowForm()) as? JsonObject ?: return null
+        val metadata=metadataSignal(windowId).peek()
+        val conversationId=windowState(windowId)?.conversationId.orEmpty()
+        val mat=form["reportMaterialization"] as? JsonObject ?: return null
+        if(mat["status"]!=JsonPrimitive("completed")) return null
+        val requestId=(mat["requestId"] as? JsonPrimitive)?.content.orEmpty()
+        val handle=nativeReportLifecycle.handle(requestId)
+        val completed=nativeReportLifecycle.completed(requestId)
+        val owned=nativeReportLifecycle.completedDatasets(requestId)
+        if(handle!=null && completed!=null && owned!=null && handle.admission.conversationId==conversationId && mat["reportRunId"]==JsonPrimitive(completed.reportRunId) &&
+            form["reportStaticDatasets"]==owned && reportPreparationFormRevision(JsonUtil.asStringMap(JsonUtil.elementToAny(form)),metadata)==handle.admission.preparation.identity.formRevision) return owned
+        val builder=(form["reportBuilderRef"] as? JsonPrimitive)?.content.orEmpty()
+        val selected=metadata?.let { nativeReportMetadataConfiguration(JsonUtil.json.encodeToJsonElement(WindowMetadata.serializer(),it),builder) }
+        if(selected!=null && frozenNativeReports.containsWindow(windowId)) {
+            val stateKey=frozenNativeReports.stateKey(windowId) ?: return null
+            val doc=nativeReportSelectedDocument(form,stateKey) ?: return null
+            frozenNativeReportAdmission(windowId,builder,stateKey,selected.first,doc)?.let { return it.savedDatasets }
+        }
+        return completedDatasetProofs.verified(windowId,conversationId,form,metadata)
+    }
+    fun frozenNativeReportAdmission(windowId:String,builderRef:String,stateKey:String,configuration:JsonObject,document:JsonObject):NativeReportFrozenAdmission? {
+        val capturedForm=JsonUtil.anyToElement(windowContext(windowId).peekWindowForm()) as? JsonObject ?: return null
+        val capturedMetadata=metadataSignal(windowId).peek()
+        val currentConfig=capturedMetadata?.let { nativeReportMetadataConfiguration(JsonUtil.json.encodeToJsonElement(WindowMetadata.serializer(),it),builderRef) }
+        if(currentConfig?.first!=configuration) { frozenReportInspectionObserver?.invoke(windowId,"frozen-current-metadata-configuration-mismatch");frozenNativeReports.closeWindow(windowId);return null }
+        val value=frozenNativeReports.current(windowId,windowState(windowId)?.conversationId.orEmpty(),capturedForm,configuration,document)
+            ?.takeIf { it.admission.preparation.identity.builderRef==builderRef && it.admission.stateKey==stateKey } ?: return null
+        if(currentConfig?.second!=value.admission.preparation.dataSourceRef) { frozenReportInspectionObserver?.invoke(windowId,"frozen-current-metadata-source-mismatch");frozenNativeReports.closeWindow(windowId);return null }
+        val identity=value.admission.preparation.identity.copy(
+            formRevision=reportPreparationFormRevision(JsonUtil.asStringMap(JsonUtil.elementToAny(capturedForm)),capturedMetadata),
+            stateRevision=reportPreparationFingerprint(JsonObject(mapOf("authorState" to value.admission.authorState,"policyState" to value.admission.preparation.state,"configuration" to configuration))))
+        return value.copy(admission=value.admission.copy(preparation=value.admission.preparation.copy(identity=identity,capturedAuthorState=value.admission.authorState,capturedPrefillIdentity=value.admission.prefillIdentity)))
+    }
+    fun observeReportPrefill(windowId: String, key: String, formRevision: String): Boolean {
+        if (reportPreparationFormRevision(windowContext(windowId).peekWindowForm(), metadataSignal(windowId).peek()) != formRevision) return false
+        return reportPrefills.compute(windowId) { _, previous ->
+            if (previous?.key == key) previous else ReportPrefillAcknowledgment(key, false)
+        }?.acknowledged == true
+    }
+    fun reportPrefillAcknowledged(windowId: String, key: String): Boolean = reportPrefills[windowId]?.let { it.key == key && it.acknowledged } == true
+    fun acknowledgeReportPrefill(windowId: String, key: String, prepared: PreparedReportRequest) {
+        if (!reportPreparationIsCurrent(prepared)) return
+        reportPrefills.computeIfPresent(windowId) { _, previous -> if (previous.key == key) previous.copy(acknowledged = true) else previous }
+    }
+
+    private val reportPreparations = java.util.concurrent.ConcurrentHashMap<String, PreparedReportRequest>()
+
+    fun publishPreparedReportRequest(prepared: PreparedReportRequest):Boolean {
+        fun currentInput():Boolean {
+            if(windowState(prepared.identity.windowId)==null) return false
+            val form=windowContext(prepared.identity.windowId).peekWindowForm()
+            val ref=form["reportBuilderRef"]?.toString()?.trim().orEmpty()
+            return prepared.identity.formRevision==reportPreparationFormRevision(form,metadataSignal(prepared.identity.windowId).peek()) && (ref.isEmpty() || ref==prepared.identity.builderRef)
+        }
+        if(!currentInput()) return false
+        val previous = reportPreparations.put(prepared.identity.windowId, prepared)
+        if(!currentInput()) { reportPreparations.remove(prepared.identity.windowId,prepared);return false }
+        if (previous != prepared) reportInspectionObserver?.invoke(prepared)
+        return true
+    }
+    fun preparedReportRequest(windowId: String): PreparedReportRequest? {
+        val prepared = reportPreparations[windowId] ?: return null
+        val metadata = metadataSignal(windowId).peek()
+        val form = windowContext(windowId).peekWindowForm()
+        val ref = form["reportBuilderRef"]?.toString()?.trim().orEmpty()
+        if (prepared.identity.formRevision != reportPreparationFormRevision(form, metadata) || (ref.isNotEmpty() && ref != prepared.identity.builderRef)) {
+            return prepared.copy(status = "pending", reason = "stale-preparation")
+        }
+        return prepared
+    }
+    fun reportPreparationIsCurrent(prepared: PreparedReportRequest): Boolean = preparedReportRequest(prepared.identity.windowId)?.let {
+        it == prepared && it.status == "ready"
+    } == true
+
     fun closeWindow(windowId: String) {
+        completedDatasetProofs.closeWindow(windowId)
+        frozenNativeReports.closeWindow(windowId)
+        reportPrefills.remove(windowId)
+        nativeReportLifecycle.closeWindow(windowId)
+        reportPreparations.remove(windowId)
+        visibleSourceLeases.entries.removeIf { it.value.first == windowId }
         clearPendingWindow(windowId)
         windowRuntime.closeWindow(windowId)
     }
