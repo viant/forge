@@ -1,5 +1,6 @@
 package com.viant.forgeandroid.runtime
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -9,6 +10,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.net.URLEncoder
@@ -17,7 +20,9 @@ import java.nio.charset.StandardCharsets
 class DataSourceRuntime(
     private val signals: SignalRegistry,
     private val restClient: RestClient,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val reportRequestInspectionOnly: Boolean = false,
+    private val authorizeReportRead: ((DataSourceContext, InputState) -> Boolean)? = null
 ) {
     data class LoaderResult(
         val rows: List<Map<String, Any?>> = emptyList(),
@@ -27,7 +32,11 @@ class DataSourceRuntime(
         val rowIndex: Int? = null
     )
 
+    private data class PreparedCompletion(val windowId: String, val instanceRef: String, val result: CompletableDeferred<PreparedReportFetchResult>)
+    private val preparedCompletions = java.util.concurrent.ConcurrentHashMap<String, PreparedCompletion>()
     private val jobs = mutableMapOf<String, Job>()
+    private val registeredContexts = java.util.concurrent.ConcurrentHashMap<String, Pair<String, DataSourceContext>>()
+    fun registeredWindowContexts(windowId: String): Map<String, DataSourceContext> = registeredContexts.values.filter { it.second.window.windowId == windowId }.associate { it.first to it.second }
     private val parameterResolver = ParameterResolver()
     private var executor: ((ExecutionDef, DataSourceContext, Map<String, Any?>) -> Unit)? = null
     private var collectionLoader: (suspend (DataSourceContext) -> LoaderResult?)? = null
@@ -94,14 +103,26 @@ class DataSourceRuntime(
             control = signals.control(dsId),
             metrics = signals.metrics(dsId),
             eventDispatcher = { execution, args -> executor?.invoke(execution, this, args) },
-            selectionHook = { row, rowIndex -> applySelectionHook(this, row, rowIndex) }
+            selectionHook = { row, rowIndex -> applySelectionHook(this, row, rowIndex) },
+            instanceRef = instanceRef,
+            preparedAuthorization = { proposed ->
+                val owned = window.metadata.peek()?.let { dataSourceRef in reportOwnedDataSourceRefs(it) } == true
+                !owned || authorizeReportRead?.invoke(registeredContexts[dsId]?.second ?: error("The datasource is not registered."), proposed) != false
+            },
+            preparedRegister = { id -> preparedCompletions[id] = PreparedCompletion(window.windowId, instanceRef, CompletableDeferred()) },
+            preparedAwait = { id ->
+                val completion = checkNotNull(preparedCompletions[id]) { "The prepared report dispatch is unavailable." }
+                check(completion.windowId == window.windowId && completion.instanceRef == instanceRef) { "The prepared report dispatch belongs to another datasource." }
+                try { completion.result.await() } finally { preparedCompletions.remove(id, completion) }
+            }
         )
+        registeredContexts[dsId] = instanceRef to ctx
         if (!jobs.containsKey(dsId)) {
             applyInitialParameters(ctx)
             jobs[dsId] = scope.launch(Dispatchers.IO) {
                 ctx.input.flow.collectLatest { input ->
                     if (input.fetch) {
-                        fetchCollection(ctx)
+                        fetchCollection(ctx, requestedInput = input)
                     }
                 }
             }
@@ -110,20 +131,35 @@ class DataSourceRuntime(
     }
 
     fun detachWindow(windowId: String) {
+        preparedCompletions.entries.filter { it.value.windowId == windowId }.forEach { (id, completion) ->
+            preparedCompletions.remove(id, completion); completion.result.cancel(CancellationException("Report window closed."))
+        }
+        registeredContexts.entries.removeIf { it.value.second.window.windowId == windowId }
         jobs.keys.filter { it.startsWith(windowId) }.forEach { key ->
             jobs.remove(key)?.cancel()
         }
     }
 
-    private suspend fun fetchCollection(ctx: DataSourceContext, lifecyclePath: List<String> = emptyList()) {
+    private suspend fun fetchCollection(live: DataSourceContext, lifecyclePath: List<String> = emptyList(), requestedInput: InputState = live.input.peek()) {
+        val ctx = live.captureRequest(requestedInput)
         val currentPath = lifecyclePath + ctx.dataSourceRef
-        ctx.control.set(ctx.control.peek().copy(loading = true, error = null, resolved = false))
+        val commitGuard = requestedInput.preparedGuard
+        val reportOwned = live.window.metadata.peek()?.let { live.dataSourceRef in reportOwnedDataSourceRefs(it) } == true
+        if (reportOwned && reportRequestInspectionOnly) { failPrepared(ctx, "Debug report inspection is active."); return }
+        fun canCommit() = (!reportOwned || commitGuard != null) && commitGuard?.invoke() != false &&
+            (commitGuard == null || live.input.peek().preparedDispatchId == requestedInput.preparedDispatchId) &&
+            (!reportOwned || authorizeReportRead?.invoke(live, requestedInput) != false)
+        if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+        ctx.control.set(ctx.control.peek().copy(loading = true, error = null, resolved = false, requestId = requestedInput.preparedDispatchId))
 
         try {
             val loaderResult = collectionLoader?.invoke(ctx)
             if (loaderResult != null) {
+                currentCoroutineContext().ensureActive()
+                if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
                 val data = applyNamedFetchHooks(ctx, applyCollectionHook(ctx, applyResourceModel(ctx, loaderResult.rows)), currentPath)
                 currentCoroutineContext().ensureActive()
+                if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
                 ctx.collection.set(data)
                 if (loaderResult.form != null) {
                     ctx.form.set(loaderResult.form)
@@ -134,6 +170,8 @@ class DataSourceRuntime(
                         loaderResult.selection,
                         loaderResult.rowIndex ?: -1
                     )
+                    currentCoroutineContext().ensureActive()
+                    if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
                     ctx.selection.set(
                         SelectionState(
                             selected = preparedSelection,
@@ -144,32 +182,40 @@ class DataSourceRuntime(
                         ctx.form.set(preparedSelection)
                     }
                 } else if (ctx.dataSource.autoSelect != false && data.isNotEmpty() && ctx.peekSelection().selected == null) {
-                    ctx.toggleSelection(data.first(), 0)
+                    ctx.toggleSelection(data.first(), 0, commitGuard = { canCommit() })
                 }
+                currentCoroutineContext().ensureActive()
+                if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
                 ctx.metrics.set(loaderResult.metrics)
                 trigger(ctx, "onFetch", mapOf("collection" to data), currentPath)
                 trigger(ctx, "onSuccess", mapOf("collection" to data), currentPath)
-                finishFetch(ctx)
+                if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+                finishFetch(ctx, rows = data, metrics = loaderResult.metrics)
                 return
             }
 
             val endpoint = ctx.dataSource.service?.endpoint
             val request = buildRequest(ctx) ?: run {
-                finishFetch(ctx)
+                finishFetch(ctx, error = if (reportOwned) "The report datasource has no physical loader." else null)
                 return
             }
 
             val response = executeRequest(endpoint, request)
+            currentCoroutineContext().ensureActive()
+            if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
             val data = applyNamedFetchHooks(ctx, applyCollectionHook(
                 ctx,
                 applyResourceModel(ctx, normalizeCollection(response, ctx.dataSource.selectors?.data))
             ), currentPath)
             currentCoroutineContext().ensureActive()
             val dataInfo = normalizeDataInfo(response, ctx.dataSource.selectors?.dataInfo)
+            if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
             ctx.collection.set(data)
             if (ctx.dataSource.autoSelect != false && data.isNotEmpty() && ctx.peekSelection().selected == null) {
-                ctx.toggleSelection(data.first(), 0)
+                ctx.toggleSelection(data.first(), 0, commitGuard = { canCommit() })
             }
+            currentCoroutineContext().ensureActive()
+            if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
             if (dataInfo.isNotEmpty()) {
                 ctx.metrics.set(dataInfo)
             } else {
@@ -177,11 +223,15 @@ class DataSourceRuntime(
             }
             trigger(ctx, "onFetch", mapOf("collection" to data, "response" to response), currentPath)
             trigger(ctx, "onSuccess", mapOf("collection" to data, "response" to response), currentPath)
-            finishFetch(ctx)
+            if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
+            finishFetch(ctx, rows = data, metrics = if (dataInfo.isNotEmpty()) dataInfo else extractPagingMetrics(response, ctx.dataSource))
         } catch (e: CancellationException) {
+            failPrepared(ctx, "The prepared report query was cancelled.")
             throw e
         } catch (e: Exception) {
+            if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
             trigger(ctx, "onError", mapOf("error" to (e.message ?: "Unknown error")), currentPath)
+            if (!canCommit()) { failPrepared(ctx, "The prepared report dispatch is stale or unauthorized."); return }
             finishFetch(ctx, error = e.message)
         }
     }
@@ -197,8 +247,13 @@ class DataSourceRuntime(
         }
     }
 
-    private fun finishFetch(ctx: DataSourceContext, error: String? = null) {
+    private fun failPrepared(ctx: DataSourceContext, message: String) {
+        ctx.input.peek().preparedDispatchId?.let { preparedCompletions[it]?.result?.completeExceptionally(IllegalStateException(message)) }
+    }
+
+    private fun finishFetch(ctx: DataSourceContext, error: String? = null, rows: List<Map<String, Any?>> = emptyList(), metrics: Map<String, Any?> = emptyMap()) {
         ctx.control.set(ctx.control.peek().copy(loading = false, error = error, resolved = true))
+        ctx.input.peek().preparedDispatchId?.let { id -> preparedCompletions[id]?.result?.complete(PreparedReportFetchResult(JsonUtil.anyToElement(rows).jsonArray, JsonUtil.anyToElement(metrics).jsonObject, error)) }
         ctx.input.set(ctx.input.peek().copy(fetch = false, refresh = false))
     }
 
@@ -743,7 +798,11 @@ class DataSourceContext(
     val control: Signal<ControlState>,
     val metrics: Signal<Map<String, Any?>>,
     private val eventDispatcher: DataSourceContext.(ExecutionDef, Map<String, Any?>) -> Unit = { _, _ -> },
-    private val selectionHook: suspend DataSourceContext.(Map<String, Any?>, Int) -> Map<String, Any?> = { row, _ -> row }
+    private val selectionHook: suspend DataSourceContext.(Map<String, Any?>, Int) -> Map<String, Any?> = { row, _ -> row },
+    val instanceRef: String = dataSourceRef,
+    private val preparedAuthorization: (InputState) -> Boolean = { true },
+    private val preparedRegister: (String) -> Unit = {},
+    private val preparedAwait: suspend (String) -> PreparedReportFetchResult = { error("Prepared report completion is unavailable.") }
 ) {
     fun peekForm(): Map<String, Any?> = form.peek()
     fun setForm(values: Map<String, Any?>) = form.set(values)
@@ -786,16 +845,23 @@ class DataSourceContext(
     fun setFilterValue(key: String, value: Any?) {
         val next = input.peek().filter.toMutableMap()
         next[key] = value
-        input.set(input.peek().copy(filter = next))
+        input.set(input.peek().copy(filter = next, preparedGuard = null, preparedWindowForm = null, preparedMetadata = null, preparedDispatchId = null, preparedReadPermit = null))
     }
 
     fun fetchCollection() {
         val current = input.peek()
         input.set(current.copy(fetch = true, refresh = !current.refresh))
     }
+    fun fetchCollectionAutomatically():Boolean {
+        if(dataSource.autoFetch==false) return false
+        fetchCollection();return true
+    }
 
-    suspend fun toggleSelection(row: Map<String, Any?>, rowIndex: Int, selectionModeOverride: String? = null) {
+    suspend fun toggleSelection(row: Map<String, Any?>, rowIndex: Int, selectionModeOverride: String? = null, commitGuard: (() -> Boolean)? = null) {
+        if (commitGuard?.invoke() == false) return
         val preparedRow = selectionHook(row, rowIndex)
+        currentCoroutineContext().ensureActive()
+        if (commitGuard?.invoke() == false) return
         val mode = selectionModeOverride?.takeIf { it.isNotBlank() } ?: dataSource.selectionMode ?: "single"
         if (mode == "multi") {
             val current = selection.peek().selection.toMutableList()
@@ -824,10 +890,62 @@ class DataSourceContext(
     }
 
     fun setFilter(filter: Map<String, Any?>) {
-        input.set(input.peek().copy(filter = filter, fetch = true))
+        input.set(input.peek().copy(filter = filter, fetch = true, preparedGuard = null, preparedWindowForm = null, preparedMetadata = null, preparedDispatchId = null, preparedReadPermit = null))
+    }
+
+    internal fun captureRequest(snapshot: InputState): DataSourceContext = DataSourceContext(
+        window.captureRequest(snapshot.preparedWindowForm ?: window.peekWindowForm(), snapshot.preparedMetadata ?: window.metadata.peek()),
+        dataSourceRef, dataSource, collection, form, selection, Signal(snapshot), control, metrics, eventDispatcher, selectionHook, instanceRef, preparedAuthorization, preparedRegister, preparedAwait)
+
+    fun setPreparedInputParameters(parameters: Map<String, Any?>, permit: NativeReportReadPermit? = null, commitGuard: () -> Boolean): String? {
+        if (!commitGuard()) return null
+        return setInputParametersValue(parameters, fetch = true, commitGuard = commitGuard, permit = permit)
+    }
+    suspend fun awaitPreparedResult(dispatchId: String): PreparedReportFetchResult = preparedAwait(dispatchId)
+
+    /** Hydrate only an already verified frozen dataset; this never schedules physical IO. */
+    fun hydrateFrozenReportDataset(dataset:NativeReportDatasetAdmission,rows:JsonArray):Boolean {
+        val windowForm=JsonUtil.anyToElement(window.peekWindowForm()) as? JsonObject ?: return false
+        if(windowForm["executeOnOpen"]!=JsonPrimitive(false) || (windowForm["reportMaterialization"] as? JsonObject)?.get("status")!=JsonPrimitive("completed")) return false
+        val expectedInstance=if(dataset.id=="primary") dataset.dataSourceRef else "reportDocument:${dataset.id}"
+        if(instanceRef!=expectedInstance || dataSourceRef!=dataset.dataSourceRef) return false
+        val matches=(windowForm["reportStaticDatasets"] as? JsonArray).orEmpty().filterIsInstance<JsonObject>().filter { it["id"]==JsonPrimitive(dataset.id) }
+        val saved=matches.singleOrNull() ?: return false
+        if(saved["dataSourceRef"]!=JsonPrimitive(dataset.dataSourceRef) || saved["request"]!=dataset.request || saved["rows"]!=rows) return false
+        val parameters=JsonUtil.asStringMap(JsonUtil.elementToAny(dataset.request))
+        val frozenInput=InputState(filter=JsonUtil.asStringMap(parameters["filters"]),parameters=parameters)
+        if(input.peek()!=frozenInput) input.set(frozenInput)
+        val values=rows.map { JsonUtil.asStringMap(JsonUtil.elementToAny(it)) }
+        if(collection.peek()!=values) collection.set(values)
+        val resolved=control.peek().copy(loading=false,error=null,resolved=true)
+        if(control.peek()!=resolved) control.set(resolved)
+        val frozenMetrics=mapOf("rowCount" to values.size,"frozen" to true)
+        if(metrics.peek()!=frozenMetrics) metrics.set(frozenMetrics)
+        return true
+    }
+
+    /** A report can preserve primary query identity without storing a primary dataset. */
+    fun hydrateFrozenReportPrimaryIdentity(prepared:PreparedReportRequest):Boolean {
+        val windowForm=JsonUtil.anyToElement(window.peekWindowForm()) as? JsonObject ?: return false
+        if(instanceRef!=dataSourceRef || dataSourceRef!=prepared.dataSourceRef || windowForm["executeOnOpen"]!=JsonPrimitive(false) ||
+            (windowForm["reportMaterialization"] as? JsonObject)?.get("status")!=JsonPrimitive("completed")) return false
+        if((windowForm["reportStaticDatasets"] as? JsonArray).orEmpty().any { (it as? JsonObject)?.get("id")==JsonPrimitive("primary") }) return false
+        val parameters=JsonUtil.asStringMap(JsonUtil.elementToAny(prepared.primaryRequest))
+        val frozenInput=InputState(filter=JsonUtil.asStringMap(parameters["filters"]),parameters=parameters)
+        if(input.peek()!=frozenInput) input.set(frozenInput)
+        if(collection.peek().isNotEmpty()) collection.set(emptyList())
+        val unresolved=ControlState(resolved=false)
+        if(control.peek()!=unresolved) control.set(unresolved)
+        val frozenMetrics=mapOf("frozen" to true,"dataStored" to false)
+        if(metrics.peek()!=frozenMetrics) metrics.set(frozenMetrics)
+        return true
     }
 
     fun setInputParameters(parameters: Map<String, Any?>, fetch: Boolean = false) {
+        setInputParametersValue(parameters, fetch)
+    }
+
+    private fun setInputParametersValue(parameters: Map<String, Any?>, fetch: Boolean = false, commitGuard: (() -> Boolean)? = null, permit: NativeReportReadPermit? = null): String? {
         val current = input.peek()
         val inputPayload = JsonUtil.asStringMap(parameters["input"])
         val query = JsonUtil.asStringMap(inputPayload["query"])
@@ -836,7 +954,15 @@ class DataSourceContext(
         } else {
             current.filter
         }
-        input.set(current.copy(parameters = parameters, filter = nextFilter, fetch = fetch || current.fetch))
+        val next = current.copy(parameters = JsonUtil.asStringMap(JsonUtil.elementToAny(JsonUtil.anyToElement(parameters))), filter = nextFilter, fetch = fetch || current.fetch,
+            preparedGuard = commitGuard,
+            preparedWindowForm = if (commitGuard == null) null else JsonUtil.asStringMap(JsonUtil.elementToAny(JsonUtil.anyToElement(window.peekWindowForm()))),
+            preparedMetadata = if (commitGuard == null) null else window.metadata.peek(),
+            preparedDispatchId = if (commitGuard == null) null else java.util.UUID.randomUUID().toString(), preparedReadPermit = permit)
+        if (commitGuard != null && !preparedAuthorization(next)) return null
+        if (permit != null) next.preparedDispatchId?.let(preparedRegister)
+        input.set(next)
+        return next.preparedDispatchId
     }
 
     fun setMetrics(key: String, value: Any?) {
@@ -846,7 +972,7 @@ class DataSourceContext(
     }
 
     fun setPage(page: Int?) {
-        input.set(input.peek().copy(page = page, fetch = true))
+        input.set(input.peek().copy(page = page, fetch = true, preparedGuard = null, preparedWindowForm = null, preparedMetadata = null, preparedDispatchId = null, preparedReadPermit = null))
     }
 
     private fun trigger(event: String, args: Map<String, Any?> = emptyMap()) {

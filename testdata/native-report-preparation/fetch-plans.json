@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "cases": [
+    {"name":"no-ref-visible-only","activeRefs":["visible"],"registryRefs":["visible","dialogLookup","unused"],"reportRefs":[],"preparedRefs":[],"expected":{"status":"ready","targets":["visible"]}},
+    {"name":"no-ref-report-not-ready","activeRefs":["report"],"registryRefs":["report","dialogLookup"],"reportRefs":["report"],"preparedRefs":[],"expected":{"status":"pending","targets":[]}},
+    {"name":"explicit-report-not-ready","requestedRef":"report","activeRefs":["report"],"registryRefs":["report","lookup"],"reportRefs":["report"],"preparedRefs":[],"expected":{"status":"pending","targets":[]}},
+    {"name":"explicit-report-current-preparation","requestedRef":"report","activeRefs":["report"],"registryRefs":["report","lookup"],"reportRefs":["report"],"preparedRefs":["report"],"expected":{"status":"ready","targets":["report"]}},
+    {"name":"explicit-lookup-is-not-auto-fetch","requestedRef":"lookup","activeRefs":["visible"],"registryRefs":["visible","lookup"],"autoFetch":{"lookup":false},"reportRefs":[],"preparedRefs":[],"expected":{"status":"ready","targets":["lookup"]}},
+    {"name":"unknown-explicit-ref","requestedRef":"unknown","activeRefs":["visible"],"registryRefs":["visible"],"reportRefs":[],"preparedRefs":[],"expected":{"status":"error","targets":[]}},
+    {"name":"validate-whole-plan-before-effects","activeRefs":["visible","report"],"registryRefs":["visible","report","lookup"],"reportRefs":["report"],"preparedRefs":[],"expected":{"status":"pending","targets":[]}},
+    {"name":"ready-report-no-registry-broadcast","activeRefs":["report"],"registryRefs":["report","lookup","unused"],"reportRefs":["report"],"preparedRefs":["report"],"expected":{"status":"ready","targets":["report"]}}
+  ]
+}

@@ -111,8 +111,35 @@ export function canUseInlineMetadataFallback(inlineMetadata) {
     return !!inlineMetadata && !isProtectedWindowMetadata(inlineMetadata);
 }
 
+export function windowMetadataFetchKey(window = {}, targetContext = null) {
+    const canonical = (value) => {
+        if (Array.isArray(value)) return value.map(canonical);
+        if (!value || typeof value !== 'object') return value;
+        if (typeof value.toJSON === 'function') return canonical(value.toJSON());
+        return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
+    };
+    return JSON.stringify(canonical({
+        windowId: window.windowId || window.id,
+        windowKey: window.windowKey,
+        conversationId: window.conversationId,
+        parameters: window.parameters,
+        resource: window.resource,
+        targetContext,
+    }));
+}
+
+export function withWindowPermissionDeadline(work, timeoutMs = 15000) {
+    const duration = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 15000;
+    let timer;
+    const deadline = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(Object.assign(new Error('Permission check timed out'), {status: 504})), duration);
+    });
+    return Promise.race([Promise.resolve().then(work), deadline]).finally(() => clearTimeout(timer));
+}
+
 export function formatWindowMetadataError(error) {
     if (!error) return '';
+    if (Number(error.status) === 504) return 'Permission check timed out. Please try again.';
     if (Number(error.status) === 403) {
         return 'Access denied. You do not have permission to open this resource.';
     }
@@ -1107,9 +1134,12 @@ function WindowContentRuntime({window, isInTab = false}) {
         setMetadataSignalHandle(createdSignal);
     }, [windowId]);
 
-    // Fetch metadata once per windowId
+    const metadataFetchKey = windowMetadataFetchKey({...window, windowId, windowKey: baseKey}, targetContext);
+
+    // Fetch again only when the resource scope or authentication changes.
     useEffect(() => {
         let cancelled = false;
+        let expired = false;
         if (!metadataSignalHandle) {
             return () => { cancelled = true; };
         }
@@ -1143,9 +1173,9 @@ function WindowContentRuntime({window, isInTab = false}) {
             }
         }
 
-        connector.get({})
+        withWindowPermissionDeadline(() => connector.get({})
             .then(async (resp) => {
-                if (cancelled) return;
+                if (cancelled || expired) return;
                 setFetchError(null);
                 const completeMetadata = resolveWindowMetadataForTarget(resp.data, targetContext);
                 fetchedProtectedMetadata = isProtectedWindowMetadata(completeMetadata);
@@ -1157,7 +1187,7 @@ function WindowContentRuntime({window, isInTab = false}) {
                     conversationId: window?.conversationId || '',
                     targetContext,
                 });
-                if (cancelled) return;
+                if (cancelled || expired) return;
                 const resolvedMetadata = compilePermissionAppliedMetadata(permissionAppliedMetadata, targetContext, window?.parameters || {});
                 if (!resolvedMetadata) {
                     throw Object.assign(new Error('Resource not found or access denied'), {status: 403});
@@ -1169,8 +1199,9 @@ function WindowContentRuntime({window, isInTab = false}) {
                     __targetKey: targetKey,
                     __provisionalInline: false,
                 };
-            })
+            }))
             .catch((err) => {
+                if (Number(err?.status) === 504) expired = true;
                 if (!cancelled) {
                     const protectedRequest = fetchedProtectedMetadata || isProtectedWindowMetadata(existingMetadata) || isProtectedWindowMetadata(window?.inlineMetadata);
                     if (!hasInlineFallback || protectedRequest || Number(err?.status) === 401 || Number(err?.status) === 403) {
@@ -1187,7 +1218,7 @@ function WindowContentRuntime({window, isInTab = false}) {
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [windowId, baseKey, metadataSignalHandle, targetContext, window?.parameters, window?.resource, window?.conversationId]);
+    }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey]);
 
     useEffect(() => {
         const metadata = metadataSignalHandle?.value;

@@ -97,9 +97,13 @@ private fun WindowContentBody(
     val view = metadata.view
     val containers = view?.content?.containers ?: emptyList()
     val context = runtime.windowContext(windowId)
+    DisposableEffect(runtime, windowId) {
+        val lease = runtime.registerVisibleWindowDependency(windowId)
+        onDispose { runtime.removeVisibleWindowDependency(lease) }
+    }
     val defaultDataSourceContext = remember(windowId, metadata) {
         val dataSourceRef = containers.firstOrNull { !it.dataSourceRef.isNullOrBlank() }?.dataSourceRef
-            ?: metadata.dataSources.keys.firstOrNull()
+            ?: metadata.dataSources.keys.singleOrNull()
         dataSourceRef?.takeIf { it.isNotBlank() }?.let(context::contextOrNull)
     }
     val inheritedDataSourceRef = defaultDataSourceContext?.dataSourceRef

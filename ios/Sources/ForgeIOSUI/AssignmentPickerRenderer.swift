@@ -93,8 +93,8 @@ struct AssignmentPickerRenderer: View {
     private func observeCollections() async {
         available = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: spec.availableDataSourceRef)
         assigned = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: spec.assignedDataSourceRef)
-        if available.isEmpty { await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: spec.availableDataSourceRef) }
-        if assigned.isEmpty { await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: spec.assignedDataSourceRef) }
+        if available.isEmpty { await runtime.automaticallyRefreshDataSourceCollection(windowID: window.windowID, dataSourceRef: spec.availableDataSourceRef) }
+        if assigned.isEmpty { await runtime.automaticallyRefreshDataSourceCollection(windowID: window.windowID, dataSourceRef: spec.assignedDataSourceRef) }
         available = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: spec.availableDataSourceRef)
         assigned = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: spec.assignedDataSourceRef)
         await withTaskGroup(of: Void.self) { group in

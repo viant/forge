@@ -8,6 +8,8 @@ public actor DataSourceRuntime {
     private var controlValues: [String: ControlState] = [:]
     private var metricsValues: [String: [String: JSONValue]] = [:]
 
+    private var formObservers: [String: [UUID: AsyncStream<[String: JSONValue]>.Continuation]] = [:]
+
     public init() {}
 
     // MARK: - Accessors
@@ -26,7 +28,32 @@ public actor DataSourceRuntime {
 
     public func setForm(dataSourceID: String, values: [String: JSONValue]) {
         formValues[dataSourceID] = values
+        for observer in formObservers[dataSourceID]?.values ?? [:].values { observer.yield(values) }
     }
+
+    public func compareAndSetReportForm(dataSourceID: String, expected: [String: JSONValue], updated: [String: JSONValue]) -> Bool {
+        commitReportFormSnapshot(dataSourceID: dataSourceID, expected: expected, updated: updated) != nil
+    }
+
+    public func commitReportFormSnapshot(dataSourceID: String, expected: [String: JSONValue], updated: [String: JSONValue]) -> [String: JSONValue]? {
+        let current = formValues[dataSourceID] ?? [:]
+        guard reportPreparationAuthorInputs(current) == reportPreparationAuthorInputs(expected) else { return nil }
+        var next = current
+        for (key, value) in reportPreparationAuthorInputs(updated) { next[key] = value }
+        if next != current { setForm(dataSourceID: dataSourceID, values: next) }
+        return next
+    }
+
+    public func formUpdates(dataSourceID: String) -> AsyncStream<[String: JSONValue]> {
+        let id = UUID()
+        return AsyncStream { continuation in
+            formObservers[dataSourceID, default: [:]][id] = continuation
+            continuation.yield(formValues[dataSourceID] ?? [:])
+            continuation.onTermination = { _ in Task { await self.removeFormObserver(dataSourceID: dataSourceID, id: id) } }
+        }
+    }
+
+    private func removeFormObserver(dataSourceID: String, id: UUID) { formObservers[dataSourceID]?[id] = nil }
 
     public func selection(dataSourceID: String) -> SelectionState {
         selectionValues[dataSourceID] ?? SelectionState()
@@ -67,6 +94,24 @@ public actor DataSourceRuntime {
 
     public func metrics(dataSourceID: String) -> [String: JSONValue] {
         metricsValues[dataSourceID] ?? [:]
+    }
+
+    /// Staging report inputs registers a real, unresolved context without IO.
+    /// Changed inputs must not be paired with rows from an older request.
+    public func registerReportInput(dataSourceID: String, parameters: [String: JSONValue]) -> Bool {
+        if inputValues[dataSourceID]?.parameters == parameters { return false }
+        inputValues[dataSourceID] = InputState(parameters: parameters)
+        collectionValues.removeValue(forKey: dataSourceID)
+        formValues.removeValue(forKey: dataSourceID)
+        metricsValues.removeValue(forKey: dataSourceID)
+        selectionValues.removeValue(forKey: dataSourceID)
+        controlValues[dataSourceID] = ControlState(inactive: true)
+        return true
+    }
+
+    public func registeredSnapshot(dataSourceID: String) -> RegisteredDataSourceSnapshot? {
+        guard inputValues[dataSourceID] != nil || collectionValues[dataSourceID] != nil || formValues[dataSourceID] != nil || controlValues[dataSourceID] != nil else { return nil }
+        return RegisteredDataSourceSnapshot(input: inputValues[dataSourceID] ?? InputState(), control: controlValues[dataSourceID] ?? ControlState(), form: formValues[dataSourceID] ?? [:], selection: selectionValues[dataSourceID] ?? SelectionState(), collection: collectionValues[dataSourceID], metrics: metricsValues[dataSourceID] ?? [:])
     }
 
     public func setMetrics(dataSourceID: String, values: [String: JSONValue]) {

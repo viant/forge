@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+    reportRunFailureText,
     bindReportRunInvocation,
     bindReportRunTerminalMaterialization,
     beginAndDispatchReportRun,
@@ -1591,3 +1592,18 @@ assert.equal(completedExecutorCount, 0);
 assert.equal(completedPendingSettlementRef.current, null);
 
 console.log("reportBuilderRunPersistence ✓ exact artifacts, durable identity/correlation, activation, waiting, and stale protection");
+
+// Preserve the RPC rejection carried by a failed dataset result, without
+// replacing it with JavaScript's generic object coercion or dumping row data.
+assert.equal(reportRunFailureText({error: {message: 'unknown MCP argument "semanticSelection"'}}), 'unknown MCP argument "semanticSelection"');
+assert.equal(reportRunFailureText(new Error('Request timed out')), 'Request timed out');
+const circularFailure = {data: [{privateRecord: 'not an error message'}]};
+circularFailure.cause = circularFailure;
+assert.equal(reportRunFailureText(circularFailure), 'Browser report run failed.');
+let recordedFailure;
+await failDurableReportRun({fail: async (input) => {
+    recordedFailure = input;
+    return {reportRunId: 'failure-proof', status: 'failed', revision: 2};
+}}, {durable: true, reportRunId: 'failure-proof', revision: 1}, {error: 'code: -32602, unknown MCP argument "semanticSelection"'});
+assert.equal(recordedFailure.failureText, 'code: -32602, unknown MCP argument "semanticSelection"');
+assert.equal(recordedFailure.expectedRevision, 1);

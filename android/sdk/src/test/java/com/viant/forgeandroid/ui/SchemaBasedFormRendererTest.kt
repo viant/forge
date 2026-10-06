@@ -133,6 +133,7 @@ class SchemaBasedFormRendererTest {
         assertEquals("entity_id", items[0].dataField)
         assertEquals("lookup", items[0].type)
         assertNotNull(items[0].properties["lookup"])
+        assertNotNull(items[0].lookup)
     }
 
     @Test
@@ -164,6 +165,7 @@ class SchemaBasedFormRendererTest {
         assertEquals("entity_id", items[0].dataField)
         assertEquals("lookup", items[0].type)
         assertNotNull(items[0].properties["lookup"])
+        assertNotNull(items[0].lookup)
     }
 
     @Test

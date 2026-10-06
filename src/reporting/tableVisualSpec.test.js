@@ -403,3 +403,17 @@ assert.deepEqual(normalizeReportDocumentTableBlock({
 });
 
 console.log("tableVisualSpec ✓ normalizes authored table visual contracts");
+
+// Reader compatibility retains persisted source and applies the existing units.
+{
+  const original = { key: "ctr", valueFormat: "percentFraction" };
+  const column = normalizeReportTableBlockColumn(original);
+  assert.equal(column.format, "percentFraction");
+  assert.deepEqual(original, { key: "ctr", valueFormat: "percentFraction" });
+  assert.equal(normalizeReportTableBlockColumn({ key: "ctr", format: "number2", valueFormat: "percentFraction" }).format, "number2");
+  assert.equal(normalizeReportTableBlockColumn({ key: "ctr", format: "  ", valueFormat: "percentFraction2" }).format, "percentFraction2");
+  const { formatDisplayValue } = await import("../utils/formatValue.js");
+  assert.equal(formatDisplayValue(0.0008, column.format), "0.1%");
+  assert.equal(formatDisplayValue(0.000392287, column.format), "0.0%");
+  assert.equal(formatDisplayValue(0.0008, "percentFraction2"), "0.08%");
+}

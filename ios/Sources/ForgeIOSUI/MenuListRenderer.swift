@@ -714,7 +714,7 @@ public struct MenuListRenderer: View {
             var metrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: ref)
             var collection = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
             if container.fetchData != false && form.isEmpty && metrics.isEmpty {
-                await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
+                await runtime.automaticallyRefreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
                 form = await runtime.formJSONValue(windowID: window.windowID, dataSourceRef: ref)
                 metrics = await runtime.dataSourceMetrics(windowID: window.windowID, dataSourceRef: ref)
                 collection = await runtime.dataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
@@ -784,7 +784,7 @@ public struct MenuListRenderer: View {
                 continue
             }
             Task(priority: .userInitiated) {
-                await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
+                await runtime.automaticallyRefreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
             }
         }
     }
@@ -805,7 +805,7 @@ public struct MenuListRenderer: View {
                 continue
             }
             Task(priority: .userInitiated) {
-                await runtime.refreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
+                await runtime.automaticallyRefreshDataSourceCollection(windowID: window.windowID, dataSourceRef: ref)
             }
         }
     }

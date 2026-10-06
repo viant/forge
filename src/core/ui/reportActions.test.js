@@ -85,3 +85,12 @@ await assert.rejects(
 );
 
 console.log("reportActions ✓ dispatches typed report lifecycle actions");
+
+
+// UI command input reaches the registered report handler unchanged.
+const linkedParams = { windowId: "linked-window", requestId: "12345678-1234-1234-1234-123456789ABC", reportAdmissionRef: " opaque/ref " };
+const unregisterLinked = registerReportWindowActions("linked-window", {
+  run: input => { assert.deepEqual(input, linkedParams); return { ok: true, materializationId: input.requestId }; },
+});
+assert.equal((await runUICommand({ method: "ui.report.run", params: linkedParams })).materializationId, linkedParams.requestId);
+unregisterLinked();

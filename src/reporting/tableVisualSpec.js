@@ -115,7 +115,9 @@ export function normalizeReportTableBlockColumn(column = {}) {
       : {}),
     ...(normalizeString(column.kind) ? { kind: normalizeString(column.kind) } : {}),
     ...(normalizeString(column.label) ? { label: normalizeString(column.label) } : {}),
-    ...(normalizeString(column.format) ? { format: normalizeString(column.format) } : {}),
+    ...((normalizeString(column.format) || normalizeString(column.valueFormat))
+      ? { format: normalizeString(column.format) || normalizeString(column.valueFormat) }
+      : {}),
     ...(normalizeString(column.align) ? { align: normalizeString(column.align) } : {}),
     ...(column?.runtimeFilterable === true ? { runtimeFilterable: true } : {}),
     ...(link ? { link } : {}),
