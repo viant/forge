@@ -1255,3 +1255,26 @@ func loadReportFillFromPerformanceFixtureBytes(t *testing.T, variant string) []b
 		return nil
 	}
 }
+
+func TestOfficialAuthoredFillPreservesPublishedDatasetMetadata(t *testing.T) {
+	raw, err := os.ReadFile("testdata/steward-forecast-executed.json")
+	require.NoError(t, err)
+	report, err := DecodeJSON(raw)
+	require.NoError(t, err)
+	require.Len(t, report.Datasets, 9)
+	require.NotNil(t, report.Datasets[1].Scope)
+	require.Equal(t, "inherit", report.Datasets[1].Scope.Mode)
+	require.NotNil(t, report.Datasets[1].Capabilities)
+	require.NotNil(t, report.Datasets[1].Capabilities.BackendRefetch)
+	require.True(t, *report.Datasets[1].Capabilities.BackendRefetch)
+	found := false
+	for _, block := range report.Blocks {
+		if block.Kind == "markdownBlock" && block.DatasetRef != "" {
+			require.Equal(t, block.DatasetRef, block.MarkdownContent.DatasetRef)
+			found = true
+		}
+	}
+	require.True(t, found)
+	report.Datasets[1].Request.Filters["injected"] = true
+	require.ErrorContains(t, report.Validate(), "request changed after decoding")
+}
