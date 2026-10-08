@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"sort"
 	"strings"
 	"unicode/utf16"
@@ -44,6 +45,11 @@ type Diagnostic struct {
 }
 
 type Dataset struct {
+	Scope          *DatasetScope        `json:"scope,omitempty"`
+	Capabilities   *DatasetCapabilities `json:"capabilities,omitempty"`
+	Source         *DatasetSource       `json:"source,omitempty"`
+	ResultContract json.RawMessage      `json:"resultContract,omitempty"`
+
 	ID            string                    `json:"id"`
 	DataSourceRef string                    `json:"dataSourceRef"`
 	Request       reportspec.RequestPayload `json:"request"`
@@ -51,6 +57,46 @@ type Dataset struct {
 	Rows          []map[string]any          `json:"rows"`
 
 	requestPayload json.RawMessage
+}
+
+type DatasetScope struct {
+	Mode              string                    `json:"mode,omitempty"`
+	InheritContext    *bool                     `json:"inheritContext,omitempty"`
+	Local             map[string]any            `json:"local,omitempty"`
+	Exclude           []string                  `json:"exclude,omitempty"`
+	RelativeDateRange *DatasetRelativeDateRange `json:"relativeDateRange,omitempty"`
+}
+type DatasetRelativeDateRange struct {
+	Preset          string `json:"preset,omitempty"`
+	StartExpression string `json:"startExpression,omitempty"`
+	EndExpression   string `json:"endExpression,omitempty"`
+	Format          string `json:"format,omitempty"`
+	StartParamPath  string `json:"startParamPath"`
+	EndParamPath    string `json:"endParamPath"`
+}
+type DatasetCapabilities struct {
+	BackendRefetch  *bool             `json:"backendRefetch,omitempty"`
+	Export          *bool             `json:"export,omitempty"`
+	FieldCatalog    *bool             `json:"fieldCatalog,omitempty"`
+	Preview         *bool             `json:"preview,omitempty"`
+	ScopeParams     *bool             `json:"scopeParams,omitempty"`
+	SemanticBinding *bool             `json:"semanticBinding,omitempty"`
+	LiveFilters     *bool             `json:"liveFilters,omitempty"`
+	Drill           *bool             `json:"drill,omitempty"`
+	LookupHydration *bool             `json:"lookupHydration,omitempty"`
+	RequestModel    map[string]string `json:"requestModel,omitempty"`
+}
+type DatasetSource struct {
+	Kind          string `json:"kind,omitempty"`
+	Server        string `json:"server,omitempty"`
+	Service       string `json:"service,omitempty"`
+	Tool          string `json:"tool,omitempty"`
+	ToolName      string `json:"toolName,omitempty"`
+	Profile       string `json:"profile,omitempty"`
+	ContractRef   string `json:"contractRef,omitempty"`
+	URI           string `json:"uri,omitempty"`
+	Method        string `json:"method,omitempty"`
+	DataSourceRef string `json:"dataSourceRef,omitempty"`
 }
 
 type Provenance struct {
@@ -217,18 +263,19 @@ type GeoContent struct {
 }
 
 type ResolvedGeo struct {
-	Shape        string              `json:"shape"`
-	KeyField     string              `json:"keyField"`
-	LabelField   string              `json:"labelField"`
-	MetricKey    string              `json:"metricKey"`
-	MetricLabel  string              `json:"metricLabel"`
-	Format       string              `json:"format"`
-	Aggregate    string              `json:"aggregate"`
-	Regions      []ResolvedGeoRegion `json:"regions"`
-	Ranking      []ResolvedGeoRegion `json:"ranking"`
-	ActiveRegion *ResolvedGeoRegion  `json:"activeRegion"`
-	Summary      *ResolvedGeoSummary `json:"summary"`
-	Legend       *ResolvedGeoLegend  `json:"legend"`
+	labelFieldPresent bool
+	Shape             string              `json:"shape"`
+	KeyField          string              `json:"keyField"`
+	LabelField        string              `json:"labelField"`
+	MetricKey         string              `json:"metricKey"`
+	MetricLabel       string              `json:"metricLabel"`
+	Format            string              `json:"format"`
+	Aggregate         string              `json:"aggregate"`
+	Regions           []ResolvedGeoRegion `json:"regions"`
+	Ranking           []ResolvedGeoRegion `json:"ranking"`
+	ActiveRegion      *ResolvedGeoRegion  `json:"activeRegion"`
+	Summary           *ResolvedGeoSummary `json:"summary"`
+	Legend            *ResolvedGeoLegend  `json:"legend"`
 }
 
 type ResolvedGeoRegion struct {
@@ -444,8 +491,9 @@ type RefinementBarContent struct {
 }
 
 type MarkdownContent struct {
-	Title    string `json:"title"`
-	Markdown string `json:"markdown"`
+	DatasetRef string `json:"datasetRef,omitempty"`
+	Title      string `json:"title"`
+	Markdown   string `json:"markdown"`
 }
 
 type rawReportFill struct {
@@ -463,6 +511,11 @@ type rawReportFill struct {
 }
 
 type rawDataset struct {
+	Scope          *DatasetScope        `json:"scope,omitempty"`
+	Capabilities   *DatasetCapabilities `json:"capabilities,omitempty"`
+	Source         *DatasetSource       `json:"source,omitempty"`
+	ResultContract json.RawMessage      `json:"resultContract,omitempty"`
+
 	ID            string           `json:"id"`
 	DataSourceRef string           `json:"dataSourceRef"`
 	Request       json.RawMessage  `json:"request"`
@@ -559,11 +612,12 @@ type rawRefinementBarBlock struct {
 }
 
 type rawMarkdownBlock struct {
-	ID       string          `json:"id"`
-	Kind     string          `json:"kind"`
-	Title    string          `json:"title,omitempty"`
-	Markdown string          `json:"markdown,omitempty"`
-	Content  MarkdownContent `json:"content"`
+	ID         string          `json:"id"`
+	Kind       string          `json:"kind"`
+	Title      string          `json:"title,omitempty"`
+	Markdown   string          `json:"markdown,omitempty"`
+	Content    MarkdownContent `json:"content"`
+	DatasetRef string          `json:"datasetRef,omitempty"`
 }
 
 type rawGeoMapBlock struct {
@@ -716,6 +770,7 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 			return nil, err
 		}
 		fill.Datasets = append(fill.Datasets, Dataset{
+			Scope: dataset.Scope, Capabilities: dataset.Capabilities, Source: dataset.Source, ResultContract: dataset.ResultContract,
 			ID:             dataset.ID,
 			DataSourceRef:  dataset.DataSourceRef,
 			Request:        request,
@@ -1015,6 +1070,7 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				Kind:            markdownBlock.Kind,
 				Title:           markdownBlock.Title,
 				Markdown:        markdownBlock.Markdown,
+				DatasetRef:      markdownBlock.DatasetRef,
 				MarkdownContent: &markdownBlock.Content,
 			})
 		case "geoMapBlock":
@@ -1633,7 +1689,7 @@ func (r *ReportFill) Validate() error {
 			if strings.TrimSpace(block.GeoContent.ResolvedGeo.KeyField) == "" {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.keyField is required for geoMapBlock", index)
 			}
-			if strings.TrimSpace(block.GeoContent.ResolvedGeo.LabelField) == "" {
+			if strings.TrimSpace(block.GeoContent.ResolvedGeo.LabelField) == "" && !block.GeoContent.ResolvedGeo.labelFieldPresent {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.labelField is required for geoMapBlock", index)
 			}
 			if strings.TrimSpace(block.GeoContent.ResolvedGeo.MetricKey) == "" {
@@ -1853,6 +1909,17 @@ func writeCanonicalJSON(buffer *bytes.Buffer, value any) error {
 }
 
 func computeRequestHash(dataset Dataset) (string, error) {
+	if len(dataset.requestPayload) > 0 {
+		original, err := decodeRequestPayload(dataset.requestPayload, 0)
+		if err != nil {
+			return "", err
+		}
+		if !reflect.DeepEqual(original, dataset.Request) {
+			return "", fmt.Errorf("reportFill dataset request changed after decoding")
+		}
+		// Preserve explicit empty objects in the official request fingerprint.
+		return computeJSONFNV1aHash(dataset.requestPayload)
+	}
 	return computeJSONFNV1aHash(dataset.Request)
 }
 

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "kind": "reportSpec",
+  "source": {"kind": "dashboard.reportBuilder", "containerId": "report", "stateKey": "report", "dataSourceRef": "records"},
+  "title": "Published native report",
+  "parameters": {"viewMode": "table", "pageSize": 50, "orderDir": "asc"},
+  "layoutIntent": {"kind": "stack", "resultPanePosition": "main", "blockOrder": ["results"]},
+  "refinements": [],
+  "calculatedFields": [],
+  "datasets": [{"id": "primary", "dataSourceRef": "records", "request": {"limit": 50, "offset": 0}}],
+  "blocks": [{"id": "results", "kind": "tableBlock", "datasetRef": "primary", "columns": [{"key": "count", "label": "Count"}]}]
+}

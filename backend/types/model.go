@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	identity "github.com/viant/agently-core/protocol/resource"
 )
 
 // TargetSpec declares where a metadata node applies.
@@ -224,6 +226,9 @@ type QuickFilterSpec struct {
 }
 
 type Window struct {
+	ResourceTarget        *WindowTarget                     `json:"resourceTarget,omitempty" yaml:"-"`
+	ResourceDependencies  map[string]string                 `json:"resourceDependencies,omitempty" yaml:"resourceDependencies,omitempty"`
+	Resource              *identity.ResolvedResource        `json:"resource,omitempty" yaml:"resource,omitempty"`
 	Ns                    []string                          `json:"ns,omitempty" yaml:"ns,omitempty"`
 	WindowKey             string                            `json:"windowKey,omitempty" yaml:"windowKey,omitempty"`
 	ChipName              string                            `json:"chipName,omitempty" yaml:"chipName,omitempty"`
@@ -251,6 +256,7 @@ type Window struct {
 // window's datasource contexts may be created. Policy is resolved server-side; Forge
 // only carries and evaluates the resulting authorization snapshot.
 type AuthorizationSpec struct {
+	SchemaVersion               int                        `json:"schemaVersion,omitempty" yaml:"schemaVersion,omitempty"`
 	DataSourceRef               string                     `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 	Scope                       string                     `json:"scope,omitempty" yaml:"scope,omitempty"`
 	ResourceType                string                     `json:"resourceType,omitempty" yaml:"resourceType,omitempty"`

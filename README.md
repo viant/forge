@@ -21,7 +21,7 @@ Definitions describe what to display and how controls interact. Runtime contexts
 | Runtime | Contexts, reactive state, bindings, widget classification, window lifecycle, and UI command dispatch |
 | Renderers | Web components and native views for controls, layouts, visualizations, and report content |
 | Host integration | Authorized data requests, action handlers, stored state, report execution, and artifact delivery |
-| Go services | Metadata loading and imports, file-service integrations, report compilation/rendering, and an optional MCP UI bridge |
+| Go services | Metadata loading and imports, file-service integrations, report compilation/rendering |
 
 The host supplies definitions and data through Forge's loading and connector boundaries. The runtime resolves widget types and bindings, tracks form and collection state, and routes interactions to declared handlers. Renderers display that state and expose updates back to the runtime. This keeps the same presentation reusable across applications with different services and business rules.
 
@@ -33,7 +33,7 @@ The principal source areas are:
 | `src/runtime/` | Widget and wrapper registries, classification, and binding adapters |
 | `src/components/` | Windows, layouts, forms, tables, charts, chat, and workflow components |
 | `src/reporting/` | Report documents, specifications, resolved datasets, and print models |
-| `backend/` | Go metadata, file, reporting, and MCP services |
+| `backend/` | Go metadata, file, and reporting services |
 | `ios/` | `ForgeIOSRuntime` and `ForgeIOSUI` Swift packages |
 | `android/sdk/` | Forge Android runtime and Compose UI library |
 
@@ -114,7 +114,7 @@ Read [reporting](doc/reporting.md), [designer embedding](doc/report-designer-emb
 
 The UI registry and bridge expose structured snapshots and operations for windows, controls, filters, selection, focus, and dialogs. Applications can use these APIs for automation and custom integrations while keeping the same UI behavior used by people.
 
-The optional Go MCP server can expose a configured catalog of saved window definitions or bridge to a running UI. Catalog reads return definitions rather than executing their datasources. The embedding application decides which definitions and operations a caller may access.
+Agently Core owns MCP discovery, provider delivery, and the UI bridge. Forge supplies the renderer and UI command interfaces; the embedding application owns source execution and authorization.
 
 The optional bridge and catalog service are configured by the host; datasource and permission contracts are covered in [datasource lifecycle](doc/data-source.md) and [permission metadata](doc/permission-metadata.md).
 
@@ -195,24 +195,16 @@ Build and test the integrated module through the host's configured Gradle wrappe
 
 Platform definitions and widgets should be validated on their intended device; a shared metadata contract does not imply identical behavior for every component.
 
-### Go services and MCP
+### Go rendering services
 
-The Go module declares Go 1.25.1. Download dependencies and test the Go packages from the repository root:
+The Go module declares Go 1.25.8. Download dependencies and test the Go packages from the repository root:
 
 ```sh
 go mod download
 go test ./backend/...
 ```
 
-A standalone catalog-backed MCP server can use the included neutral example:
-
-```sh
-go run ./backend/mcp/cmd/forge-mcp \
-  --addr 127.0.0.1:5025 \
-  --window-catalog ./backend/mcp/examples/catalog.yaml
-```
-
-The host must configure access before enabling a live UI bridge or embedding the service in an authenticated application.
+MCP providers and the UI bridge are implemented by Agently Core. YAML catalog authoring and import are owned by AI Studio.
 
 ## Documentation path
 

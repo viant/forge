@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	identity "github.com/viant/agently-core/protocol/resource"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -181,6 +182,7 @@ func newRegistry(root string) *Registry {
 		presetsByID:   map[string]*Asset{},
 		fragmentsByID: map[string]*Asset{},
 		groupsByID:    map[string]*Asset{},
+		reportsByURI:  map[string]*Asset{}, reportAliasConflicts: map[string]bool{},
 	}
 }
 
@@ -203,7 +205,7 @@ func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
 		return nil, []Diagnostic{{Code: "assetDecodeFailed", Message: err.Error(), SourcePath: relativePath}}
 	}
 	kind := stringValue(raw["kind"])
-	if kind != KindBuilder && kind != KindPreset && kind != KindFragment && kind != KindGroup && kind != legacyBuilderKind {
+	if kind != KindBuilder && kind != KindPreset && kind != KindReport && kind != KindFragment && kind != KindGroup && kind != legacyBuilderKind {
 		return nil, nil
 	}
 	id := stringValue(raw["id"])
@@ -212,6 +214,7 @@ func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
 		return nil, []Diagnostic{diagnosticAt("assetIDRequired", "reporting asset id is required", relativePath, "$.id", idNode)}
 	}
 	asset := &Asset{
+		ResourceURI: stringValue(raw["resourceUri"]), Namespace: stringValue(raw["namespace"]), Name: firstString(raw, "name", "id"), OwnerID: stringValue(raw["ownerId"]),
 		Kind:                    kind,
 		ID:                      id,
 		BuilderRef:              stringValue(raw["builderRef"]),
@@ -414,7 +417,7 @@ func validateAsset(asset *Asset, rootNode *yaml.Node) []Diagnostic {
 			"data source",
 		)...)
 	}
-	if asset.Kind == KindPreset {
+	if asset.Kind == KindPreset || asset.Kind == KindReport {
 		if strings.TrimSpace(asset.BuilderRef) == "" {
 			diagnostics = append(diagnostics, diagnosticAt(
 				"presetBuilderRefRequired",
@@ -537,12 +540,37 @@ func (r *Registry) add(asset *Asset) []Diagnostic {
 	if asset == nil {
 		return nil
 	}
+	if asset.Kind == KindReport {
+		uri := asset.ResourceURI
+		if uri == "" {
+			uri = "report://" + asset.Namespace + "/" + asset.Name
+		}
+		parsed, err := identity.ParseResourceURI(uri)
+		if err != nil || parsed.Kind != "report" {
+			return []Diagnostic{{Code: "reportResourceIdentityInvalid", Message: "report requires canonical resourceUri or namespace/name", SourcePath: asset.SourcePath}}
+		}
+		if r.reportsByURI[uri] != nil {
+			return []Diagnostic{{Code: "reportResourceIdentityDuplicate", Message: "duplicate report namespace/name: " + uri, SourcePath: asset.SourcePath}}
+		}
+		asset.ResourceURI, asset.Namespace, asset.Name = uri, parsed.Namespace, parsed.Name
+		r.reportsByURI[uri] = asset
+		alias := normalizeID(asset.ID)
+		if r.presetsByID[alias] != nil || r.reportAliasConflicts[alias] {
+			delete(r.presetsByID, alias)
+			r.reportAliasConflicts[alias] = true
+		} else {
+			r.presetsByID[alias] = asset
+		}
+		r.Presets = append(r.Presets, asset)
+		r.Reports = append(r.Reports, asset)
+		return nil
+	}
 	key := normalizeID(asset.ID)
 	var index map[string]*Asset
 	switch asset.Kind {
 	case KindBuilder:
 		index = r.buildersByID
-	case KindPreset:
+	case KindPreset, KindReport:
 		index = r.presetsByID
 	case KindFragment:
 		index = r.fragmentsByID
@@ -563,8 +591,9 @@ func (r *Registry) add(asset *Asset) []Diagnostic {
 	switch asset.Kind {
 	case KindBuilder:
 		r.Builders = append(r.Builders, asset)
-	case KindPreset:
+	case KindPreset, KindReport:
 		r.Presets = append(r.Presets, asset)
+		r.Reports = append(r.Reports, asset)
 	case KindFragment:
 		r.Fragments = append(r.Fragments, asset)
 	case KindGroup:
