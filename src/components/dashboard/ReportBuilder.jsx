@@ -168,6 +168,7 @@ import {
     resolveHostedReportSource,
     resolveHostedReportStarterId,
     resolveHostedReportWorkspaceMode,
+    beginHostedReportActivation,
 } from "./reportBuilderHostedReportActivation.js";
 import {
     applySavedReportRunOverride,
@@ -14853,11 +14854,12 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             return undefined;
         }
         const requestIdentity = normalizeString(request.artifactId || request.reportId);
-        if (hostedReportActivationKeyRef.current === requestIdentity) {
+        const attempt = beginHostedReportActivation(hostedReportActivationKeyRef, requestIdentity, hostedActivationScopeOverrideSignature);
+        if (!attempt) {
             return undefined;
         }
         if (typeof reportStoreHandler?.getReport !== "function") {
-            hostedReportActivationKeyRef.current = requestIdentity;
+            attempt.cancel();
             setHostedReportActivationState({
                 reportId: requestIdentity,
                 status: "error",
@@ -14865,12 +14867,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             });
             return undefined;
         }
-        hostedReportActivationKeyRef.current = requestIdentity;
         setHostedReportActivationState({ reportId: requestIdentity, status: "loading" });
-        let cancelled = false;
-        Promise.resolve(reportStoreHandler.getReport(request))
+        Promise.resolve().then(() => reportStoreHandler.getReport(request))
             .then((result) => {
-                if (cancelled) {
+                if (!attempt.isCurrent()) {
                     return;
                 }
                 if (result && typeof result === "object" && !Array.isArray(result)) {
@@ -14894,21 +14894,21 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 hostedRunInitializationTransitionKeyRef.current = "";
                 hostedRunInitializationAttemptRef.current = null;
                 hostedRunInitializationOwnedRunIdRef.current = "";
+                attempt.settle();
                 setHostedReportActivationState({ reportId: requestIdentity, status: "ready" });
             })
             .catch((error) => {
-                if (cancelled) {
+                if (!attempt.isCurrent()) {
                     return;
                 }
+                attempt.settle();
                 setHostedReportActivationState({
                     reportId: requestIdentity,
                     status: "error",
                     message: normalizeString(error?.message || error) || `Saved report ${requestIdentity} could not be loaded.`,
                 });
             });
-        return () => {
-            cancelled = true;
-        };
+        return attempt.cancel;
     }, [hostedActivationScopeOverrideSignature, hostedReportArtifactId, hostedReportId, hostedReportSource.kind, reportStoreHandler]);
     useEffect(() => {
         if (
