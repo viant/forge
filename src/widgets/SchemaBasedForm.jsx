@@ -1,3 +1,5 @@
+import SchemaFormChoices from './SchemaFormChoices.jsx';
+import {validateSchemaFormFields} from './schemaFormValidation.js';
 // SchemaBasedForm.jsx – renders a form based on either an explicit list of
 // fields or a minimal JSON-schema (object with properties).
 
@@ -183,16 +185,7 @@ const SchemaBasedForm = (props) => {
     };
 
     const basicValidate = () => {
-        const err = {};
-        derivedFields.forEach((f) => {
-            const v = values[f.name];
-            if (f.required && (v === undefined || v === '' || v === null)) {
-                err[f.name] = 'Required';
-            }
-            if (f.enum && v && !f.enum.includes(v)) {
-                err[f.name] = 'Invalid value';
-            }
-        });
+        const err = validateSchemaFormFields(derivedFields, values);
         setErrors(err);
         return Object.keys(err).length === 0;
     };
@@ -294,6 +287,10 @@ const SchemaBasedForm = (props) => {
                     style={style}
                     controlWrapperMode="control-only"
                     renderControl={({item, sourceItem, context: fieldContext, container: fieldContainer}) => {
+                        if (sourceItem.widget === 'checkboxGroup') return <SchemaFormChoices field={sourceItem} value={formValues?.[sourceItem.name]} onChange={(value) => {
+                            if (scope === 'form') writeLookupFormValues({context: renderContext, values: {...formValues, [sourceItem.name]: value}});
+                            else handleChangeDirect(sourceItem.name, value);
+                        }} disabled={props.disabled} error={errors[sourceItem.name]} />;
                         if (sourceItem.widget !== 'lookup' || !sourceItem.lookup) return undefined;
                         const rawValue = formValues?.[sourceItem.name];
                         const displayTemplate = String(sourceItem.lookup.display || '').trim();
@@ -360,6 +357,15 @@ const SchemaBasedForm = (props) => {
         >
             {derivedFields.map((field) => {
                 const colSpan = field.columnSpan || (field.type === 'textarea' ? 2 : 1);
+                if (field.widget === 'checkboxGroup') {
+                    const formValues = scope === 'form' ? (renderContext?.handlers?.dataSource?.getFormData?.() || {}) : values;
+                    return <div key={field.name} style={{gridColumn: '1 / -1'}}>
+                        <SchemaFormChoices field={field} value={formValues[field.name]} onChange={(value) => {
+                            if (scope === 'form') writeLookupFormValues({context: renderContext, values: {...formValues, [field.name]: value}});
+                            else handleChangeDirect(field.name, value);
+                        }} disabled={props.disabled} error={errors[field.name]} />
+                    </div>;
+                }
                 if (field.widget === 'lookup' && field.lookup) {
                     const formValues = scope === 'form'
                         ? (renderContext?.handlers?.dataSource?.getFormData?.() || {})
