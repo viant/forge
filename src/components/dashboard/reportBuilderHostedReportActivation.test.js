@@ -12,7 +12,39 @@ import {
     resolveHostedReportSource,
     resolveHostedReportStarterId,
     resolveHostedReportWorkspaceMode,
+    beginHostedReportActivation,
 } from "./reportBuilderHostedReportActivation.js";
+
+// Prefill can arrive while the saved report request is in flight. Cleanup
+// must permit a replacement request and prevent the old one from activating.
+{
+    const holder = {current: ""};
+    const activations = [];
+    let resolveFirst;
+    const firstResult = new Promise(resolve => { resolveFirst = resolve; });
+    const first = beginHostedReportActivation(holder, "saved-report", "dates-only");
+    const firstCompletion = firstResult.then(value => {
+        if (first.isCurrent()) {
+            activations.push(value);
+            first.settle();
+        }
+    });
+    first.cancel();
+    const replacement = beginHostedReportActivation(holder, "saved-report", "dates-and-campaign");
+    assert.ok(replacement, "cancelled initial load must not block prefilled activation");
+    assert.equal(replacement.isCurrent(), true);
+    activations.push("requested campaign");
+    replacement.settle();
+    resolveFirst("stale saved scope");
+    await firstCompletion;
+    assert.deepEqual(activations, ["requested campaign"]);
+    replacement.cancel();
+    assert.equal(beginHostedReportActivation(holder, "saved-report", "dates-and-campaign"), null);
+    const changed = beginHostedReportActivation(holder, "saved-report", "new campaign");
+    assert.ok(changed, "same report with a different scope must activate");
+    changed.cancel();
+    assert.ok(beginHostedReportActivation(holder, "saved-report", "new campaign"), "interrupted same-scope request must retry");
+}
 import { buildReportBuilderImportedResponseActivation } from "./reportBuilderImportedActivation.js";
 import { resolveHostedExecuteOnOpen } from "./reportBuilderHooks.js";
 import { resolveReportBuilderSurfaceAutoRunAction } from "./reportBuilderSurfaceAutoRun.js";
