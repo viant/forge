@@ -171,6 +171,7 @@ import {
 } from "./reportBuilderHostedReportActivation.js";
 import {
     applySavedReportRunOverride,
+    resolveSavedReportRunScope,
 } from "./reportBuilderRunOverrides.js";
 import {
     buildReportBuilderAuthoredCapabilityViewModel,
@@ -2663,17 +2664,14 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         windowFormValue?.runOverride,
     ].find((candidate) => candidate && typeof candidate === "object" && !Array.isArray(candidate))
         || ((hostedRunFrom || hostedRunTo || hostedRunOrderIds) ? {} : null);
-    const hostedRunOverride = hostedRunOverrideCandidate ? {
+    const hostedRunOverride = resolveSavedReportRunScope(windowFormValue?.prefill, hostedRunOverrideCandidate ? {
         ...hostedRunOverrideCandidate,
         ...(hostedRunFrom ? { from: hostedRunFrom } : {}),
         ...(hostedRunTo ? { to: hostedRunTo } : {}),
         ...(hostedRunOrderIds ? { orderIds: hostedRunOrderIds } : {}),
-    } : null;
+    } : null);
     const hostedRunOverrideSignature = hostedRunOverride ? JSON.stringify(hostedRunOverride) : "";
-    const hostedActivationScopeOverride = hostedRunOverride
-        || (windowFormValue?.prefill && typeof windowFormValue.prefill === "object" && !Array.isArray(windowFormValue.prefill)
-            ? windowFormValue.prefill
-            : null);
+    const hostedActivationScopeOverride = hostedRunOverride;
     const hostedActivationScopeOverrideSignature = hostedActivationScopeOverride
         ? JSON.stringify(hostedActivationScopeOverride)
         : "";

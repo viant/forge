@@ -151,10 +151,15 @@ export function resolveReportBuilderReopenCompatibility(source = {}, builderIden
     if (!sourceDataSourceRef && target.dataSourceRef) {
         mismatches.push("missing data source");
     }
-    if (sourceContainerId && (!target.containerId || sourceContainerId !== target.containerId)) {
+    const declaredAlias = (Array.isArray(builderIdentity.sourceAliases) ? builderIdentity.sourceAliases : []).some(alias =>
+        alias?.kind === sourceKind && alias?.containerId === sourceContainerId
+        && alias?.stateKey === sourceStateKey && alias?.dataSourceRef === sourceDataSourceRef
+        && sourceDataSourceRef === target.dataSourceRef
+    );
+    if (!declaredAlias && sourceContainerId && (!target.containerId || sourceContainerId !== target.containerId)) {
         mismatches.push(`container ${sourceContainerId}`);
     }
-    if (sourceStateKey && !stateKeysAreCompatible(sourceStateKey, target.stateKey, {
+    if (!declaredAlias && sourceStateKey && !stateKeysAreCompatible(sourceStateKey, target.stateKey, {
         sourceContainerId,
         targetContainerId: target.containerId,
     })) {

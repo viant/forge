@@ -1,3 +1,4 @@
+import { resolveDeclaredReportBuilderSourceAliases } from "./reportBuilderVariantModel.js";
 import {
     buildReportBuilderChartFields,
     mergeReportBuilderState,
@@ -550,10 +551,14 @@ export function buildHydratedReportBuilderDocument(getResponse = null, {
     const source = sourceBlock?.source && typeof sourceBlock.source === "object" && !Array.isArray(sourceBlock.source)
         ? cloneValue(sourceBlock.source)
         : {};
-    const compatibility = resolveReportBuilderReopenCompatibility(source, {
+    const compatibilityIdentity = {
         containerId: normalizeString(builderIdentity?.containerId || container?.id),
         stateKey: normalizeString(builderIdentity?.stateKey || container?.stateKey || container?.id || "reportBuilder"),
         dataSourceRef: normalizeString(builderIdentity?.dataSourceRef || container?.dataSourceRef),
+    };
+    const compatibility = resolveReportBuilderReopenCompatibility(source, {
+        ...compatibilityIdentity,
+        sourceAliases: resolveDeclaredReportBuilderSourceAliases(container, compatibilityIdentity),
     });
     if (!compatibility.compatible) {
         return {
