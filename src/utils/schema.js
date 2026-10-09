@@ -87,6 +87,9 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
         if (widget === 'text-area') widget = 'textarea';
         if (widget === 'key-value-editor') widget = 'object';
 
+        // Finite array choices retain their constraints even with a tags hint.
+        if (p.type === 'array' && Array.isArray(p.items?.enum) && p.items.enum.length > 0 && !p.lookup && (!widget || widget === 'tags' || widget === 'checkboxGroup')) widget = 'checkboxGroup';
+
         // ------------------------------------------------------------------
         // Default widget inference
         // ------------------------------------------------------------------
@@ -157,6 +160,10 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
             label,
             type: p.type,
             enum: p.enum,
+            itemEnum: p.type === 'array' ? p.items?.enum : undefined,
+            minItems: p.minItems,
+            maxItems: p.maxItems,
+            uniqueItems: p.uniqueItems,
             format: p.format,
             required: Array.isArray(schema.required) && schema.required.includes(k),
             readOnly: p.readOnly === true,
@@ -171,9 +178,9 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
                 p['x-ui-col-span'] ??
                 undefined,
             // Convert enum -> options array for select-like widgets
-            options: Array.isArray(p.enum)
-                ? p.enum.map((v, index) => {
-                    const labels = p['x-ui-enum-labels'];
+            options: Array.isArray(p.type === 'array' ? p.items?.enum : p.enum)
+                ? (p.type === 'array' ? p.items.enum : p.enum).map((v, index) => {
+                    const labels = p['x-ui-enum-labels'] || p.items?.['x-ui-enum-labels'];
                     const optionLabel = Array.isArray(labels) ? labels[index] : (labels && typeof labels === 'object' ? labels[v] : undefined);
                     return { value: v, label: optionLabel == null ? String(v) : String(optionLabel) };
                 })
