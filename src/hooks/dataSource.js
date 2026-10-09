@@ -16,10 +16,10 @@ function isPlainObject(value) {
 }
 
 export function buildFetchCollectionSignal(current = {}, props = {}) {
-    const {filter = {}, cache = null, invocationId = null, bindingGeneration = null} = props || {};
+    const {filter = {}, replaceFilter = false, cache = null, invocationId = null, bindingGeneration = null} = props || {};
     return {
         ...(current || {}),
-        filter: {...((current || {}).filter || {}), ...filter},
+        filter: replaceFilter ? {...filter} : {...((current || {}).filter || {}), ...filter},
         fetch: true,
         cache,
         invocationId,
