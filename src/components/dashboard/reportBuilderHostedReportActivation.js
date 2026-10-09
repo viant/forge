@@ -9,6 +9,24 @@ function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
 }
 
+export function beginHostedReportActivation(holder, requestIdentity, scopeSignature = "") {
+    const key = JSON.stringify([requestIdentity, scopeSignature]);
+    if (holder.current === key) return null;
+    holder.current = key;
+    let cancelled = false;
+    let settled = false;
+    return {
+        isCurrent: () => !cancelled && holder.current === key,
+        settle: () => { settled = true; },
+        cancel: () => {
+            cancelled = true;
+            // An interrupted request has not activated anything. A subsequent
+            // effect must be able to retry it, even when its identity is equal.
+            if (!settled && holder.current === key) holder.current = "";
+        },
+    };
+}
+
 function normalizeVersion(value = 0) {
     const version = Math.trunc(Number(value));
     return Number.isSafeInteger(version) && version > 0 ? version : 1;
