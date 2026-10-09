@@ -16,6 +16,9 @@ const WindowReferencesFormat = "window.references"
 // WindowTarget is presentation input, never an identity or an entitlement.
 type WindowTarget struct {
 	SelectionToken string `json:"selectionToken,omitempty"`
+	// ExecutionProof is runtime-only original provider provenance. The host
+	// target MAC covers it; it never grants ACL or renews either lease.
+	ExecutionProof *primitive.ExecutionProof `json:"executionProof,omitempty"`
 	// DependencyPins are runtime-only exact child authority snapshots. The
 	// target proof signs them; authored target declarations must omit them.
 	DependencyPins map[string]identity.ResolvedResource `json:"dependencyPins,omitempty"`
@@ -28,6 +31,15 @@ type WindowTarget struct {
 func (t WindowTarget) Normalize() (WindowTarget, error) {
 	if len(t.SelectionToken) > 256 || strings.TrimSpace(t.SelectionToken) != t.SelectionToken {
 		return WindowTarget{}, fmt.Errorf("invalid window selection token")
+	}
+	if t.ExecutionProof != nil {
+		proof := *t.ExecutionProof
+		uri, err := identity.ParseResourceURI(proof.Resource.URI)
+		if err != nil || uri.Kind != "window" || !proof.Resource.ResourceCandidate.Valid() || proof.Resource.ProviderIdentity == "" || proof.Resource.AuthorityBinding == "" || proof.Resource.ValidUntil.IsZero() || proof.Binding == "" || len(proof.Binding) > 512 || proof.Token == "" || len(proof.Token) > 4096 {
+			return WindowTarget{}, fmt.Errorf("invalid provider execution proof")
+		}
+		proof.Resource.ValidUntil = proof.Resource.ValidUntil.UTC()
+		t.ExecutionProof = &proof
 	}
 	for _, value := range []string{t.Platform, t.FormFactor, t.Surface} {
 		if strings.TrimSpace(value) != value || len(value) > 64 || strings.ContainsAny(value, "/\\:\x00?#*") {
@@ -90,7 +102,9 @@ func SameWindowTarget(a, b *WindowTarget) bool {
 	right, e2 := right.Normalize()
 	leftPins, _ := json.Marshal(left.DependencyPins)
 	rightPins, _ := json.Marshal(right.DependencyPins)
-	return e1 == nil && e2 == nil && string(leftPins) == string(rightPins) && left.SelectionToken == right.SelectionToken && left.Platform == right.Platform && left.FormFactor == right.FormFactor && left.Surface == right.Surface && slices.Equal(left.Capabilities, right.Capabilities)
+	leftProof, _ := json.Marshal(left.ExecutionProof)
+	rightProof, _ := json.Marshal(right.ExecutionProof)
+	return e1 == nil && e2 == nil && string(leftPins) == string(rightPins) && string(leftProof) == string(rightProof) && left.SelectionToken == right.SelectionToken && left.Platform == right.Platform && left.FormFactor == right.FormFactor && left.Surface == right.Surface && slices.Equal(left.Capabilities, right.Capabilities)
 }
 
 type WindowTargetBinding struct {
@@ -117,7 +131,7 @@ func (e *WindowResourceEnvelope) Validate() error {
 	seen, used := map[string]bool{}, map[string]bool{}
 	for _, binding := range e.Targets {
 		target, err := binding.Target.Normalize()
-		if err != nil || len(target.Capabilities) > 0 || target.SelectionToken != "" || len(target.DependencyPins) > 0 {
+		if err != nil || len(target.Capabilities) > 0 || target.SelectionToken != "" || len(target.DependencyPins) > 0 || target.ExecutionProof != nil {
 			return fmt.Errorf("invalid declared target")
 		}
 		key := target.ProfileKey()
@@ -201,6 +215,7 @@ func selectWindowResource(raw json.RawMessage, requested *WindowTarget, referenc
 	if header.Format == "" {
 		presentation := normalized
 		presentation.SelectionToken = ""
+		presentation.ExecutionProof = nil
 		if !SameWindowTarget(&presentation, nil) {
 			return nil, fmt.Errorf("historical window supports default target only")
 		}

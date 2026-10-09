@@ -8,8 +8,8 @@ require (
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/stretchr/testify v1.11.1
 	github.com/viant/afs v1.30.1-0.20260914155934-90e95d483861
-	github.com/viant/agently-core/protocol/primitive v0.0.0-20261008215101-289626f8ba08
-	github.com/viant/agently-core/protocol/resource v0.0.0-20261008214809-31759347c5b7
+	github.com/viant/agently-core/protocol/primitive v0.0.0-20261009053852-916a91954e26
+	github.com/viant/agently-core/protocol/resource v0.0.0-20261008223520-8ba096a165a0
 	github.com/xuri/excelize/v2 v2.10.0
 	golang.org/x/image v0.33.0
 	gopkg.in/yaml.v3 v3.0.1
