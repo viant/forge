@@ -16,6 +16,9 @@ import (
 )
 
 type Options struct {
+	// Optional host-owned confined filesystem hooks; defaults preserve native semantics.
+	ReadFile      func(string) ([]byte, error)
+	WalkDir       func(string, fs.WalkDirFunc) error
 	WorkspaceRoot string
 	ReportingRoot string
 }
@@ -124,7 +127,15 @@ func Discover(ctx context.Context, options Options) (*Registry, error) {
 	}
 
 	paths := make([]string, 0)
-	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+	walk := options.WalkDir
+	if walk == nil {
+		walk = filepath.WalkDir
+	}
+	read := options.ReadFile
+	if read == nil {
+		read = os.ReadFile
+	}
+	err = walk(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -150,7 +161,7 @@ func Discover(ctx context.Context, options Options) (*Registry, error) {
 
 	diagnostics := make([]Diagnostic, 0)
 	for _, path := range paths {
-		assets, fileDiagnostics := loadAssets(options.WorkspaceRoot, path)
+		assets, fileDiagnostics := loadAssetsWithReader(options.WorkspaceRoot, path, read)
 		diagnostics = append(diagnostics, fileDiagnostics...)
 		for _, asset := range assets {
 			diagnostics = append(diagnostics, result.add(asset)...)
@@ -187,12 +198,15 @@ func newRegistry(root string) *Registry {
 }
 
 func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
+	return loadAssetsWithReader(workspaceRoot, filename, os.ReadFile)
+}
+func loadAssetsWithReader(workspaceRoot, filename string, read func(string) ([]byte, error)) ([]*Asset, []Diagnostic) {
 	relativePath, err := filepath.Rel(workspaceRoot, filename)
 	if err != nil {
 		relativePath = filename
 	}
 	relativePath = filepath.ToSlash(relativePath)
-	data, err := os.ReadFile(filename)
+	data, err := read(filename)
 	if err != nil {
 		return nil, []Diagnostic{{Code: "assetReadFailed", Message: err.Error(), SourcePath: relativePath}}
 	}
@@ -233,7 +247,7 @@ func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
 		YAMLPath:                "$",
 		Raw:                     raw,
 	}
-	profileDiagnostics := loadPresentationProfiles(workspaceRoot, filename, asset, documentContent(&node))
+	profileDiagnostics := loadPresentationProfilesWithReader(workspaceRoot, filename, asset, documentContent(&node), read)
 	catalogDiagnostics := make([]Diagnostic, 0)
 	if asset.Kind == KindGroup && asset.CatalogRef != "" {
 		normalizedRef, catalogPath, resolveErr := ResolveAssetReference(workspaceRoot, filename, asset.CatalogRef)
@@ -268,6 +282,9 @@ func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
 }
 
 func loadPresentationProfiles(workspaceRoot, assetFilename string, asset *Asset, rootNode *yaml.Node) []Diagnostic {
+	return loadPresentationProfilesWithReader(workspaceRoot, assetFilename, asset, rootNode, os.ReadFile)
+}
+func loadPresentationProfilesWithReader(workspaceRoot, assetFilename string, asset *Asset, rootNode *yaml.Node, read func(string) ([]byte, error)) []Diagnostic {
 	if asset == nil || asset.Kind != KindBuilder {
 		return nil
 	}
@@ -293,7 +310,7 @@ func loadPresentationProfiles(workspaceRoot, assetFilename string, asset *Asset,
 			diagnostics = append(diagnostics, diagnosticAt("presentationProfileRefInvalid", err.Error(), asset.SourcePath, entryPath, mappingValue(rootNode, "presentationProfileRefs")))
 			continue
 		}
-		data, readErr := os.ReadFile(resolvedPath)
+		data, readErr := read(resolvedPath)
 		if readErr != nil {
 			diagnostics = append(diagnostics, Diagnostic{Code: "presentationProfileReadFailed", Message: readErr.Error(), SourcePath: asset.SourcePath, YAMLPath: entryPath})
 			continue
