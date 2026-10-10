@@ -261,8 +261,8 @@ describe('resolveDataSourceOptions', () => {
       optionLabelField: 'caption',
       optionValueField: 'caption',
     }, context)).toEqual([
-      { value: 'Category A', label: 'Category A' },
-      { value: 'Category B', label: 'Category B' },
+      { value: 'Category A', label: 'Category A', disabled: false },
+      { value: 'Category B', label: 'Category B', disabled: false },
     ]);
   });
 
@@ -281,7 +281,7 @@ describe('resolveDataSourceOptions', () => {
       optionValueField: 'caption',
       optionSecondaryField: 'id',
     }, context)).toEqual([
-      { value: 'Category B', label: 'Category B (2)', secondary: 2 },
+      { value: 'Category B', label: 'Category B (2)', secondary: 2, disabled: false },
     ]);
   });
 
@@ -303,7 +303,7 @@ describe('resolveDataSourceOptions', () => {
       optionLabelField: 'label',
       optionValueField: 'value',
       optionFilter: { field: 'group', source: 'form', selector: 'group' },
-    }, context)).toEqual([{ value: 'age:5', label: '18-24' }]);
+    }, context)).toEqual([{ value: 'age:5', label: '18-24', disabled: false }]);
   });
 
 });
