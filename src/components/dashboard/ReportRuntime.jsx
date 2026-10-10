@@ -1368,8 +1368,25 @@ function renderRuntimeMarkdownInline(value = "") {
 
 function RuntimeMarkdownBody({ markdown = "" }) {
   const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
+  let codeEnd = -1;
   const renderedLines = lines
     .map((line, index) => {
+      if (index <= codeEnd) return null;
+      const fence = line.match(/^ {0,3}(`{3,}|~{3,})([^\r\n]*)$/);
+      if (fence && (fence[1][0] !== "`" || !fence[2].includes("`"))) {
+        const marker = fence[1][0];
+        const close = new RegExp(`^ {0,3}${marker}{${fence[1].length},}\\s*$`);
+        let end = index + 1;
+        while (end < lines.length && !close.test(lines[end])) end++;
+        codeEnd = end;
+        // React escapes the literal payload. Code must not pass through inline
+        // Markdown processing or lose selector spacing, line breaks or symbols.
+        return (
+          <pre key={index} style={{ margin: 0, padding: "10px 12px", maxWidth: "100%", overflowX: "auto", whiteSpace: "pre-wrap", overflowWrap: "anywhere", background: "var(--forge-report-surface-subtle, #eef3f8)", borderRadius: 8 }}>
+            <code>{lines.slice(index + 1, end).join("\n")}</code>
+          </pre>
+        );
+      }
       const trimmed = normalizeString(line);
       if (!trimmed) {
         return null;
