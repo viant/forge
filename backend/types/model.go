@@ -1682,7 +1682,7 @@ type Selectors struct {
 }
 
 type PagingConfig struct {
-	// Mode opts into explicit upstream page/offset semantics; empty retains legacy behavior.
+	// Mode opts into explicit upstream page/offset/cursor semantics; empty retains legacy behavior.
 	Mode              string             `json:"mode,omitempty" yaml:"mode,omitempty"`
 	Size              int                `json:"size" yaml:"size"`
 	Enabled           bool               `json:"enabled" yaml:"enabled"`
@@ -1697,6 +1697,8 @@ type PagingParameters struct {
 }
 
 type DataInfoSelectors struct {
+	NextCursor string `json:"nextCursor,omitempty" yaml:"nextCursor,omitempty"`
+	HasMore    string `json:"hasMore,omitempty" yaml:"hasMore,omitempty"`
 	PageCount  string `json:"pageCount,omitempty" yaml:"pageCount,omitempty"`
 	TotalCount string `json:"totalCount,omitempty" yaml:"totalCount,omitempty"`
 }

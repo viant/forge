@@ -22,6 +22,7 @@ import {
 } from "../hooks/index.js";
 
 import {useRef} from "react";
+import {createCursorPagingSession} from "../hooks/paging.js";
 
 
 export {hasResolvedDependencies};
@@ -68,6 +69,7 @@ export default function DataSource({context}) {
     const log = getLogger('ds');
     try { log.debug('[mount]', { ds: context?.identity?.dataSourceRef }); } catch (_) {}
     const prevFilterRef = useRef({});
+    const cursorSessionRef = useRef(null);
     const prevQuerySig = useRef('');
     const lastResolvedParametersRef = useRef({});
     const mountedRef = useRef(true);
@@ -497,6 +499,17 @@ export default function DataSource({context}) {
                 previousFilter: prevFilterRef.current,
                 pagingEnabled,
             });
+            const cursorMode = pagingEnabled && String(paging?.mode || '').trim().toLowerCase() === 'cursor';
+            if (cursorMode && !cursorSessionRef.current) cursorSessionRef.current = createCursorPagingSession();
+            if (!cursorMode) cursorSessionRef.current = null;
+            const cursorRequest = cursorMode ? cursorSessionRef.current.begin(page, {
+                filter, parameters, sort, dataSource, windowId: identity?.windowId,
+                dataSourceId: identity?.dataSourceId, target: context?.services?.__connectorRuntime?.targetContext,
+                parent: context?.metadata?.resource || context?.services?.__connectorRuntime?.parentResource,
+                selectedTarget: context?.metadata?.resourceTarget,
+                resource: context?.resource, resourceTarget: context?.resourceTarget,
+            }) : null;
+            if (cursorRequest) page = cursorRequest.page;
             prevFilterRef.current = snapshotFilter(filter);
 
             // 2) Merge into filter
@@ -507,6 +520,7 @@ export default function DataSource({context}) {
             const payload = await connector.get({
                 filter: finalFilter,
                 page,
+                ...(cursorRequest ? {cursor: cursorRequest.cursor} : {}),
                 inputParameters: {...(parameters || {}), ...(sort?.length ? {sort} : {})},
                 cache,
                 invocationId,
@@ -530,6 +544,10 @@ export default function DataSource({context}) {
             }
 
             let {records, info, stats} = extractData(selectors, paging, payload);
+            if (cursorRequest) {
+                info = cursorSessionRef.current.finish(cursorRequest, info);
+                if (!info) return;
+            }
             const deferredCacheHit = isDeferredCacheHitEnvelope(payload);
             if (deferredCacheHit && records.length === 0) {
                 const previousRecords = Array.isArray(collection.peek()) ? collection.peek() : [];
@@ -565,10 +583,12 @@ export default function DataSource({context}) {
                 });
             } catch (_) {
             }
-            collectionInfo.value = withFetchedPageInfo(info, page, pagingEnabled, {
+            collectionInfo.value = cursorRequest ? {...info, returnedCount: records.length, pageSize: paging?.size} : withFetchedPageInfo(info, page, pagingEnabled, {
                 returnedCount: records.length,
                 pageSize: paging?.size,
                 openEnded: paging?.openEnded === true,
+                mode: paging?.mode,
+                hasMoreSelector: paging?.dataInfoSelectors?.hasMore,
             });
             metrics.value = stats;
             control.value = { ...control.peek(), loaded: true, error: null, stale: false };

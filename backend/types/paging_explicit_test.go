@@ -14,7 +14,7 @@ func TestOptionalPagingAndValueColumnPreserveLegacySerialization(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(string(raw), "mode") || strings.Contains(string(raw), "valueColumn") {
+		if strings.Contains(string(raw), "mode") || strings.Contains(string(raw), "valueColumn") || strings.Contains(string(raw), "nextCursor") || strings.Contains(string(raw), "hasMore") {
 			t.Fatalf("optional configuration changed legacy wire shape: %s", raw)
 		}
 	}
