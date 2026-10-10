@@ -1673,6 +1673,7 @@ type UniqueKey struct {
 }
 
 type Selectors struct {
+	DataFallbacks []string `json:"dataFallbacks,omitempty" yaml:"dataFallbacks,omitempty"`
 	// ValueColumn explicitly projects scalar values into named rows.
 	ValueColumn string `json:"valueColumn,omitempty" yaml:"valueColumn,omitempty"`
 	Data        string `json:"data,omitempty" yaml:"data,omitempty"`
