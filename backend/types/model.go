@@ -227,10 +227,13 @@ type QuickFilterSpec struct {
 }
 
 type Window struct {
-	ResourceTarget        *WindowTarget                     `json:"resourceTarget,omitempty" yaml:"-"`
-	ResourceDependencies  map[string]string                 `json:"resourceDependencies,omitempty" yaml:"resourceDependencies,omitempty"`
-	Resource              *identity.ResolvedResource        `json:"resource,omitempty" yaml:"resource,omitempty"`
-	Ns                    []string                          `json:"ns,omitempty" yaml:"ns,omitempty"`
+	ResourceTarget       *WindowTarget              `json:"resourceTarget,omitempty" yaml:"-"`
+	ResourceDependencies map[string]string          `json:"resourceDependencies,omitempty" yaml:"resourceDependencies,omitempty"`
+	Resource             *identity.ResolvedResource `json:"resource,omitempty" yaml:"resource,omitempty"`
+	Ns                   []string                   `json:"ns,omitempty" yaml:"ns,omitempty"`
+	// Parameters retains authored window input declarations, including types,
+	// bindings and defaults, without converting them into datasource parameters.
+	Parameters            []map[string]interface{}          `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 	WindowKey             string                            `json:"windowKey,omitempty" yaml:"windowKey,omitempty"`
 	ChipName              string                            `json:"chipName,omitempty" yaml:"chipName,omitempty"`
 	ChipIcon              string                            `json:"chipIcon,omitempty" yaml:"chipIcon,omitempty"`
