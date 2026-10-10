@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	primitive "github.com/viant/agently-core/protocol/primitive"
 	identity "github.com/viant/agently-core/protocol/resource"
 )
 
@@ -491,9 +492,15 @@ type UnitedSize struct {
 	Unit string `json:"unit,omitempty" yaml:"unit,omitempty"`
 }
 
+type MCPAppSpec struct {
+	AssetClosure *primitive.MCPAppClosure `json:"assetClosure,omitempty" yaml:"assetClosure,omitempty"`
+	ResourceURI  string                   `json:"resourceURI" yaml:"resourceURI"`
+}
+
 type Container struct {
-	ID                 string `json:"id" yaml:"id"`
-	ClassName          string `json:"className,omitempty" yaml:"className,omitempty"`
+	MCPApp             *MCPAppSpec `json:"mcpApp,omitempty" yaml:"mcpApp,omitempty"`
+	ID                 string      `json:"id" yaml:"id"`
+	ClassName          string      `json:"className,omitempty" yaml:"className,omitempty"`
 	Binding            `yaml:",inline"`
 	Target             *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
 	TargetOverrides    map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
