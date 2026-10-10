@@ -360,7 +360,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                         log.debug('deferred fetch', { filter, args });
                         dsHandlers?.setInactive?.(false);
                         if (refreshOnOpen) {
-                            dsHandlers?.fetchCollection?.({filter, cache: {bypassCache: true}});
+                            dsHandlers?.fetchCollection?.({filter, replaceFilter: true, cache: {bypassCache: true}});
                         } else {
                             dsHandlers?.setFilter?.({ filter });
                         }
