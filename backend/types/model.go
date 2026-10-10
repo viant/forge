@@ -1673,13 +1673,17 @@ type UniqueKey struct {
 }
 
 type Selectors struct {
-	Data     string `json:"data,omitempty" yaml:"data,omitempty"`
-	Scope    string `json:"scope,omitempty" yaml:"scope,omitempty"`
-	DataInfo string `json:"dataInfo,omitempty" yaml:"dataInfo,omitempty"`
-	Metrics  string `json:"metrics,omitempty" yaml:"metrics,omitempty"`
+	// ValueColumn explicitly projects scalar values into named rows.
+	ValueColumn string `json:"valueColumn,omitempty" yaml:"valueColumn,omitempty"`
+	Data        string `json:"data,omitempty" yaml:"data,omitempty"`
+	Scope       string `json:"scope,omitempty" yaml:"scope,omitempty"`
+	DataInfo    string `json:"dataInfo,omitempty" yaml:"dataInfo,omitempty"`
+	Metrics     string `json:"metrics,omitempty" yaml:"metrics,omitempty"`
 }
 
 type PagingConfig struct {
+	// Mode opts into explicit upstream page/offset semantics; empty retains legacy behavior.
+	Mode              string             `json:"mode,omitempty" yaml:"mode,omitempty"`
 	Size              int                `json:"size" yaml:"size"`
 	Enabled           bool               `json:"enabled" yaml:"enabled"`
 	OpenEnded         bool               `json:"openEnded,omitempty" yaml:"openEnded,omitempty"`
