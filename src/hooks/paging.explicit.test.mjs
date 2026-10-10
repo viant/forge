@@ -8,5 +8,5 @@ assert.equal(resolvePagingValues(3,{...configured,mode:''}).pageValue,3);
 assert.equal(resolvePagingValues(3,{enabled:true,size:2,parameters:{page:'Offset',size:'Limit'}}).pageValue,4);
 assert.deepEqual(withPagingInputs({term:'plain'},resolvePagingValues(3,null)),{term:'plain'});
 assert.deepEqual(withPagingInputs({term:'plain'},resolvePagingValues(3,{enabled:false,mode:'offset'})),{term:'plain'});
-assert.throws(()=>resolvePagingValues(1,{enabled:true,mode:'cursor'}),/Unsupported paging mode/);
+assert.throws(()=>resolvePagingValues(1,{enabled:true,mode:'cursor'}),/authored token/);
 console.log('explicit offset and unchanged legacy/missing/disabled paging passed');

@@ -1,3 +1,4 @@
+import {createTransportConnector} from './connectorTransport.js';
 import {useSetting} from "../core/index.js";
 import { getLogger } from "../utils/logger.js";
 import { appendTargetContextQuery } from "../runtime/targetContext.js";
@@ -35,6 +36,7 @@ function logCallerStack(name , maxFrames = 5) {
 }
 
 export function createDataConnector(dataSource, runtime = {}) {
+    if (runtime.transport !== undefined) return createTransportConnector(dataSource, runtime);
     const {
         endpoints = {},
         targetContext = {},
@@ -269,7 +271,7 @@ export function createDataConnector(dataSource, runtime = {}) {
     /**
      * GET method
      */
-    async function get({filter = {}, page, inputParameters = {}, cache = null, invocationId = null, signal = null}) {
+    async function get({filter = {}, page, cursor, inputParameters = {}, cache = null, invocationId = null, signal = null}) {
         try {
             let {method, url, headers} = getUrlAndHeaders();
             let queryParams = new URLSearchParams();
@@ -277,13 +279,16 @@ export function createDataConnector(dataSource, runtime = {}) {
             const isDatasourceFetchRoute = /\/v1\/api\/datasources\/[^/]+\/fetch$/.test(url);
             const pagingValues = String(dataSource?.paginationMode || '').toLowerCase() === 'client'
                 ? null
-                : resolvePagingValues(page, paging);
+                : resolvePagingValues(page, paging, cursor);
             const effectiveInputParameters = requestMethod === 'GET'
-                ? { ...(inputParameters || {}) }
+                ? (pagingValues?.cursor
+                    ? Object.fromEntries(Object.entries(inputParameters || {}).filter(([key]) => key !== pagingValues.pageParamName && key !== pagingValues.sizeParamName))
+                    : { ...(inputParameters || {}) })
                 : withPagingInputs(inputParameters, pagingValues);
             // Merge filter into query string
             if (requestMethod === 'GET') {
                 Object.entries(filter).forEach(([key, val]) => {
+                    if (pagingValues?.cursor && (key === pagingValues.pageParamName || key === pagingValues.sizeParamName)) return;
                     if (val != null) queryParams.append(key, val);
                 });
             }
@@ -291,7 +296,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             // Handle paging
             if (requestMethod === 'GET' && pagingValues) {
                 const { pageParamName, sizeParamName, pageValue, sizeValue } = pagingValues;
-                queryParams.append(pageParamName, pageValue);
+                if (pageValue !== undefined) queryParams.append(pageParamName, pageValue);
                 if (sizeValue != null) {
                     queryParams.append(sizeParamName, sizeValue);
                 }
@@ -525,6 +530,7 @@ function useDataConnector(dataSource) {
         endpoints,
         targetContext,
         auth,
+        transport: services.dataConnectorTransport,
         prepareRequest: typeof services?.prepareDataConnectorRequest === 'function'
             ? services.prepareDataConnectorRequest
             : undefined,

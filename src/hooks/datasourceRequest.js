@@ -1,6 +1,7 @@
 import { withPagingInputs } from "./paging.js";
 
 export function buildDatasourceFetchInputs({ inputParameters = {}, filter = {}, pagingValues = null } = {}) {
+    if (pagingValues?.cursor) return withPagingInputs({...inputParameters, ...(filter || {})}, pagingValues);
     return {
         ...withPagingInputs(inputParameters, pagingValues),
         ...(filter || {}),

@@ -22,6 +22,7 @@ const PaginationBar = ({
     const [totalPages, setTotalPages] = useState(null);
     const [recordCount, setRecordCount] = useState(null);
     const [hasMore, setHasMore] = useState(null);
+    const [hasMoreExplicit, setHasMoreExplicit] = useState(false);
     const [inactive, setInactive] = useState(false);
     const [initialLoading, setInitialLoading] = useState(false);
     const handlers = context.handlers;
@@ -44,6 +45,7 @@ const PaginationBar = ({
         setTotalPages(nextState.totalPages);
         setRecordCount(nextState.recordCount);
         setHasMore(nextState.hasMore);
+        setHasMoreExplicit(nextState.hasMoreExplicit === true);
         setCurrentPage(nextState.currentPage);
         setInitialLoading(nextState.initialLoading);
     });
@@ -94,8 +96,8 @@ const PaginationBar = ({
 
     const busy = context?.signals?.control?.value?.loading === true;
     const canGoPrevious = pagingEnabled && !busy && !inactive && currentPage > 1;
-    const canGoNext = pagingEnabled && !busy && canNavigateNext({inactive, initialLoading, currentPage, totalPages, recordCount, hasMore});
-    const canGoLast = pagingEnabled && !busy && !inactive && totalPages != null && currentPage < totalPages;
+    const canGoNext = pagingEnabled && !busy && canNavigateNext({inactive, initialLoading, currentPage, totalPages, recordCount, hasMore, hasMoreExplicit});
+    const canGoLast = pagingEnabled && !busy && !inactive && (!hasMoreExplicit || hasMore === true) && totalPages != null && currentPage < totalPages;
     const statusLabel = paginationStatusLabel({initialLoading, currentPage, totalPages});
 
     return (
