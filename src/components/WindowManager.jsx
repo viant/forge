@@ -18,7 +18,7 @@ import WindowControls from './WindowControls';
 import './WindowManager.css';
 import { resolveTabWindows, resolveVisibleTabId } from './windowManagerState.js';
 
-const WindowManager = ({renderWindowContent, isTabVisible}) => {
+const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false}) => {
     useSignals();
     const windows = activeWindows.value || [];
     const tabId = selectedTabId.value || null;
@@ -71,7 +71,7 @@ const WindowManager = ({renderWindowContent, isTabVisible}) => {
     }, [windows]);
 
     // Separate windows into tabbed and floating
-    const tabWindows = resolveTabWindows(windows).filter((win) => (
+    const tabWindows = resolveTabWindows(windows, {includeHosted}).filter((win) => (
         typeof isTabVisible !== 'function' || isTabVisible(win) !== false
     ));
     const floatingWindows = windows.filter(
