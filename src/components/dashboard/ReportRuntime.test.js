@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { InlineStaticFilterControl } from "./reportBuilderComponents.jsx";
 import { WorkspacePresentationProvider } from "../../core/context/WorkspacePresentation.jsx";
 
 import ReportRuntime, {
@@ -1627,7 +1628,17 @@ const editableScopeFilterHtml = renderToStaticMarkup(
 assert.ok(editableScopeFilterHtml.includes(">Filters<"));
 assert.ok(!editableScopeFilterHtml.includes("Filters (baseline)"));
 assert.ok(editableScopeFilterHtml.includes("Change these baseline report filters here."));
-assert.ok(editableScopeFilterHtml.includes('type="date"'));
+assert.match(editableScopeFilterHtml, /<input\b[^>]*type="text"[^>]*aria-label="Start date or relative expression"[^>]*value="2026-05-01"/);
+assert.match(editableScopeFilterHtml, /<input\b[^>]*type="text"[^>]*aria-label="End date or relative expression"[^>]*value="2026-05-07"/);
+assert.ok(editableScopeFilterHtml.includes('aria-label="Relative date presets"'));
+for (const label of ["Today", "Yesterday", "Last 7 days", "Last 30 days"]) assert.ok(editableScopeFilterHtml.includes(label));
+const relativeDateControlHtml = renderToStaticMarkup(React.createElement(InlineStaticFilterControl, {
+  filter: {id:"reportingWindow", type:"dateRange",label:"Reporting window"},
+  value: {start:"2026-05-01",end:"2026-05-07",startExpression:"7 days ago",endExpression:"today"},
+  onDateRange() {},
+}));
+assert.match(relativeDateControlHtml, /aria-label="Start date or relative expression"[^>]*value="7 days ago"/);
+assert.match(relativeDateControlHtml, /aria-label="End date or relative expression"[^>]*value="today"/);
 assert.ok(editableScopeFilterHtml.includes("Display"));
 assert.ok(editableScopeFilterHtml.includes("CTV"));
 
