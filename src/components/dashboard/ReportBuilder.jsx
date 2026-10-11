@@ -1,3 +1,5 @@
+import ReportResourceRuntime from "./ReportResourceRuntime.jsx";
+import {hostedReportResource} from "./reportBuilderResourceLifecycle.js";
 import {reportRestoreSnapshot, reportRestoreSnapshotKey, reportRestoreEqual, loadFrozenReportRestore} from "./reportBuilderFrozenRestore.js";
 import {updateReportDateRangeValue} from '../../reporting/reportDateRangeValue.js';
 import { normalizeReportFilterRefreshMode, reportFilterValuesChanged } from "./reportBuilderFilterRefresh.js";
@@ -8,6 +10,16 @@ import ReportBuilderTabActions from "./ReportBuilderTabActions.jsx";
 import { addReportBuilderTabState, removeReportBuilderTabState } from "./reportBuilderDocumentBlocks.js";
 import SectionTabRail from "../SectionTabRail.jsx";
 import { buildReportBuilderDesignSections, resolveDesignSectionInsertion } from "./reportBuilderDesignSections.js";
+import {
+    dispatchReportBuilderDatasourceRequest,
+    reportBuilderRequestMatchesExecutedScope,
+    reportBuilderCursorNavigationFingerprint,
+    shouldFetchReportBuilderRequest,
+    reportBuilderDispatchFingerprint,
+    matchesReportBuilderDatasourceDispatch,
+    applyReportBuilderResolvedCursorPage,
+} from "./reportBuilderDatasourceDispatch.js";
+import ReportBuilderManualRunControl from "./ReportBuilderManualRunControl.jsx";
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button, Dialog, Icon, Menu, MenuDivider, MenuItem, Popover, Tooltip } from "@blueprintjs/core";
 import { useSignals } from "@preact/signals-react/runtime";
@@ -1902,6 +1914,7 @@ function ReportOptionHeader({ anchor, setMountedHeaders, children }) {
 const DEFAULT_REPORT_BUILDER_HOST_ADAPTER = Object.freeze({ mode: "dashboard" });
 
 export default function ReportBuilder({ container: sourceContainer, context, hostAdapter = DEFAULT_REPORT_BUILDER_HOST_ADAPTER }) {
+    if (hostedReportResource(sourceContainer)) return <ReportResourceRuntime container={sourceContainer} context={context}/>;
     if (hostAdapter?.mode === "controlled") {
         return <ReportBuilderReady container={sourceContainer} context={context} embedded={hostAdapter} />;
     }
@@ -2594,6 +2607,11 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const [filtersDrawerOpen, setFiltersDrawerOpen] = useState(false);
     const [reportFilterRailOpen, setReportFilterRailOpen] = useState(false);
     const [manualRunSequence, setManualRunSequence] = useState(0);
+    const [cursorNavigationRequestFingerprint, setCursorNavigationRequestFingerprint] = useState("");
+    const [cursorPageSettlementSequence, setCursorPageSettlementSequence] = useState(0);
+    const cursorPageContextRef = useRef(null);
+    const cursorCompletedInfoRef = useRef(null);
+    const cursorDispatchedPageRef = useRef(null);
     const [pendingScrollRowId, setPendingScrollRowId] = useState("");
     const builderRootRef = useRef(null);
     const leftRailRef = useRef(null);
@@ -3394,12 +3412,18 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const currentRequestFingerprintValueRef = useRef(currentRequestFingerprint);
     currentRequestFingerprintValueRef.current = currentRequestFingerprint;
     const currentRequestShouldFetch = useMemo(
-        () => !frozenRestore && !restoreBlocked && !reportFiltersNeedApply && config.request?.autoFetch !== false && resolveStateReadiness(state).canRun,
-        [frozenRestore, restoreBlocked, config.request?.autoFetch, reportFiltersNeedApply, resolveStateReadiness, state],
+        () => shouldFetchReportBuilderRequest({
+            autoFetch: config.request?.autoFetch,
+            canRun: resolveStateReadiness(state).canRun,
+            blocked: !!frozenRestore || restoreBlocked || reportFiltersNeedApply,
+            fingerprint: currentRequestFingerprint,
+            navigationFingerprint: cursorNavigationRequestFingerprint,
+        }),
+        [frozenRestore, restoreBlocked, config.request?.autoFetch, reportFiltersNeedApply, resolveStateReadiness, state, currentRequestFingerprint, cursorNavigationRequestFingerprint],
     );
     const currentRequestDispatchFingerprint = useMemo(
-        () => `${currentRequestFingerprint}::${currentRequestShouldFetch ? "fetch" : "hold"}`,
-        [currentRequestFingerprint, currentRequestShouldFetch],
+        () => reportBuilderDispatchFingerprint(currentRequestFingerprint, currentRequestShouldFetch, builderContext?.dataSource?.paging, state.page),
+        [currentRequestFingerprint, currentRequestShouldFetch, builderContext?.dataSource?.paging, state.page],
     );
     const persistedRuntimePreviewInteractionSnapshot = useMemo(
         () => resolveReportBuilderPersistedRuntimePreviewInteraction(state),
@@ -3419,7 +3443,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         && !loading
         && !error
         && lastManualRunFingerprintRef.current !== ""
-        && lastManualRunFingerprintRef.current === currentRequestFingerprint;
+        && reportBuilderRequestMatchesExecutedScope(currentRequest, lastManualRunFingerprintRef.current, builderContext?.dataSource?.paging);
     const runtimePreviewRefinements = runtimePreviewInteraction.refinements;
     const runtimePreviewDrillTransitions = runtimePreviewInteraction.drillTransitions;
     const runtimePreviewInteractionSnapshot = useMemo(
@@ -3649,7 +3673,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
      frozenRestore]);
 
     useEffect(() => {
-        if (!currentRequestFingerprint || requestFingerprintRef.current === currentRequestDispatchFingerprint) {
+        if (!currentRequestFingerprint || matchesReportBuilderDatasourceDispatch({
+            fingerprint: currentRequestDispatchFingerprint, previousFingerprint: requestFingerprintRef.current,
+            paging: builderContext?.dataSource?.paging, page: state.page, previousPage: cursorDispatchedPageRef.current,
+        })) {
             return;
         }
         if (shouldDeferReportBuilderRequestForPrefill({
@@ -3668,20 +3695,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             return;
         }
         requestFingerprintRef.current = currentRequestDispatchFingerprint;
-        const inputSignal = builderContext?.signals?.input;
-        if (inputSignal) {
-            const previous = inputSignal.peek?.() || {};
-            inputSignal.value = {
-                ...previous,
-                parameters: currentRequest,
-                fetch: currentRequestShouldFetch,
-            };
-            return;
-        }
-        builderContext?.handlers?.dataSource?.setInputParameters?.(currentRequest);
-        if (currentRequestShouldFetch) {
-            builderContext?.handlers?.dataSource?.fetchCollection?.();
-        }
+        cursorDispatchedPageRef.current = state.page;
+        dispatchReportBuilderDatasourceRequest(builderContext, currentRequest, currentRequestShouldFetch, state.page);
     }, [builderContext, currentPrefillSignature, currentRequest, currentRequestDispatchFingerprint, currentRequestFingerprint, currentRequestShouldFetch, hostedReportActivationCurrent, hostedReportStarterId, state]);
 
     useEffect(() => {
@@ -7699,6 +7714,13 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 </div>
             ) : null}
             <div className="forge-report-builder__compact-summary-actions">
+                <ReportBuilderManualRunControl
+                    manualRequired={config.request?.autoFetch === false}
+                    canRun={canRunReport}
+                    busy={loading}
+                    readOnly={!!frozenRestore || restoreBlocked}
+                    onRun={runReport}
+                />
                 {hasFilterDrawerContent && authoredPrimaryFilterBarPlacement !== "hidden" ? (
                     <Button
                         small
@@ -8294,6 +8316,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             metadata: {
                 ...(commandIdentity ? { commandIdentity } : {}),
                 origin: String(origin || "manual").trim().toLowerCase() || "manual",
+                datasourcePage: nextState.page,
                 builderRef: resolveReportRunBuilderRef({
                     activeBuilderVariant,
                     config,
@@ -8327,25 +8350,13 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         const fingerprint = snapshot.requestFingerprint || snapshot.fingerprint;
         const shouldFetch = (!reportFiltersNeedApply || (forceFetch && markManual))
             && nextReadiness.canRun && (forceFetch || config.request?.autoFetch !== false);
-        requestFingerprintRef.current = `${fingerprint}::${shouldFetch ? "fetch" : "hold"}`;
+        requestFingerprintRef.current = reportBuilderDispatchFingerprint(fingerprint, shouldFetch, builderContext?.dataSource?.paging, snapshot.metadata?.datasourcePage);
+        cursorDispatchedPageRef.current = snapshot.metadata?.datasourcePage;
         if (markManual) {
             lastManualRunFingerprintRef.current = fingerprint;
             setManualRunSequence((current) => current + 1);
         }
-        const inputSignal = builderContext?.signals?.input;
-        if (inputSignal) {
-            const previous = inputSignal.peek?.() || {};
-            inputSignal.value = {
-                ...previous,
-                parameters: request,
-                fetch: shouldFetch,
-            };
-            return { request, fingerprint, readiness: nextReadiness, shouldFetch };
-        }
-        builderContext?.handlers?.dataSource?.setInputParameters?.(request);
-        if (shouldFetch) {
-            builderContext?.handlers?.dataSource?.fetchCollection?.();
-        }
+        dispatchReportBuilderDatasourceRequest(builderContext, request, shouldFetch, snapshot.metadata?.datasourcePage);
         return { request, fingerprint, readiness: nextReadiness, shouldFetch };
     }, [builderContext, config.request?.autoFetch, embeddedMode, reportFiltersNeedApply]);
 
@@ -8888,6 +8899,9 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     return activeRunEventRef.current;
                 }
                 activeRunEventRef.current = settled;
+                if (builderContext?.dataSource?.paging?.mode === "cursor") {
+                    setCursorPageSettlementSequence(value => value + 1);
+                }
                 const completedRunReference = resolveCompletedReportRunReference(settled);
                 setCompletedDurableRunSignal(completedRunReference ? {
                     runId: settled.runId,
@@ -12122,6 +12136,28 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             : nextState;
         persistState(nextPersistedState, { skipExplorationHistory: true });
     }, [persistState]);
+    useEffect(() => {
+        const initial = cursorPageContextRef.current !== builderContext;
+        if (!initial && cursorCompletedInfoRef.current === collectionInfo) return;
+        const page = applyReportBuilderResolvedCursorPage({
+            context: builderContext, state: currentBuilderStateRef.current || state,
+            info: collectionInfo, request: currentRequest, loading, error,
+            frozen: !!frozenRestore || restoreBlocked,
+            pendingRun: !!pendingReportWorkspaceRunRef.current || activeRunEventRef.current?.status === "running",
+            initial, shouldFetch: currentRequestShouldFetch,
+            buildRequest: nextState => applyReportBuilderRequestHook(builderContext, semanticDisplayConfig, nextState,
+                buildReportBuilderRequest(semanticDisplayConfig, nextState)),
+            markDispatch: fingerprint => { requestFingerprintRef.current = fingerprint; },
+            markPage: page => { cursorDispatchedPageRef.current = page; },
+            persist: persistPassiveViewState,
+        });
+        if (page != null) {
+            cursorPageContextRef.current = builderContext;
+            cursorCompletedInfoRef.current = collectionInfo;
+        }
+    }, [builderContext, collectionInfo, currentRequest, currentRequestShouldFetch, loading, error,
+        frozenRestore, restoreBlocked, state, semanticDisplayConfig, persistPassiveViewState, cursorPageSettlementSequence]);
+
     const toggleStaticFilter = (filter, optionValue) => {
         const key = resolveScopeParamId(filter);
         if (!key) return;
@@ -19951,10 +19987,16 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
 
     const goToPage = (page) => {
         const currentState = currentBuilderStateRef.current || state;
-        persistPassiveViewState({
-            ...currentState,
-            page: Math.max(1, Number(page) || 1),
-        });
+        const nextState = {...currentState, page: Math.max(1, Number(page) || 1)};
+        const nextRequest = applyReportBuilderRequestHook(builderContext, semanticDisplayConfig, nextState,
+            buildReportBuilderRequest(semanticDisplayConfig, nextState));
+        setCursorNavigationRequestFingerprint(reportBuilderCursorNavigationFingerprint({
+            paging: builderContext?.dataSource?.paging,
+            request: nextRequest,
+            executedFingerprint: lastManualRunFingerprintRef.current,
+            blocked: !!frozenRestore || restoreBlocked || reportFiltersNeedApply || loading || !!error,
+        }));
+        persistPassiveViewState(nextState);
     };
 
     const addRow = (group) => {

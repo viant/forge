@@ -27,7 +27,7 @@ import {
 } from "../hooks/index.js";
 
 import {useRef} from "react";
-import {createCursorPagingSession} from "../hooks/paging.js";
+import {createCursorPagingSession, cursorPagingAssociation, markCompletedCursorAssociation} from "../hooks/paging.js";
 
 
 export {hasResolvedDependencies};
@@ -518,13 +518,7 @@ export default function DataSource({context}) {
             const cursorMode = pagingEnabled && String(paging?.mode || '').trim().toLowerCase() === 'cursor';
             if (cursorMode && !cursorSessionRef.current) cursorSessionRef.current = createCursorPagingSession();
             if (!cursorMode) cursorSessionRef.current = null;
-            const cursorRequest = cursorMode ? cursorSessionRef.current.begin(page, {
-                filter, parameters, sort, dataSource, windowId: identity?.windowId,
-                dataSourceId: identity?.dataSourceId, target: context?.services?.__connectorRuntime?.targetContext,
-                parent: context?.metadata?.resource || context?.services?.__connectorRuntime?.parentResource,
-                selectedTarget: context?.metadata?.resourceTarget,
-                resource: context?.resource, resourceTarget: context?.resourceTarget,
-            }) : null;
+            const cursorRequest = cursorMode ? cursorSessionRef.current.begin(page, cursorPagingAssociation(context, {filter, parameters, sort})) : null;
             if (cursorRequest) page = cursorRequest.page;
             prevFilterRef.current = snapshotFilter(filter);
 
@@ -600,7 +594,7 @@ export default function DataSource({context}) {
                 });
             } catch (_) {
             }
-            collectionInfo.value = cursorRequest ? {...info, returnedCount: records.length, pageSize: paging?.size} : withFetchedPageInfo(info, page, pagingEnabled, {
+            collectionInfo.value = cursorRequest ? markCompletedCursorAssociation({...info, returnedCount: records.length, pageSize: paging?.size}, cursorRequest.signature) : withFetchedPageInfo(info, page, pagingEnabled, {
                 returnedCount: records.length,
                 pageSize: paging?.size,
                 openEnded: paging?.openEnded === true,
