@@ -48,12 +48,40 @@ export function withPagingInputs(inputParameters, pagingValues) {
 }
 
 
+const completedCursorAssociation = Symbol("completed datasource cursor association");
+
+function stableCursorAssociation(value) {
+    return JSON.stringify(value, (_, item) => item && typeof item === "object" && !Array.isArray(item)
+        ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
+}
+
+export function cursorPagingAssociation(context, {filter = {}, parameters, sort = []} = {}) {
+    return {
+        filter, parameters, sort, dataSource: context?.dataSource,
+        windowId: context?.identity?.windowId, dataSourceId: context?.identity?.dataSourceId,
+        target: context?.services?.__connectorRuntime?.targetContext,
+        parent: context?.metadata?.resource || context?.services?.__connectorRuntime?.parentResource,
+        selectedTarget: context?.metadata?.resourceTarget,
+        resource: context?.resource, resourceTarget: context?.resourceTarget,
+    };
+}
+
+// This non-serialized marker correlates a completed result with its request.
+// It stores no continuation token and grants no permission or reusable result.
+export function markCompletedCursorAssociation(info, signature) {
+    Object.defineProperty(info, completedCursorAssociation, {value: signature});
+    return info;
+}
+
+export function matchesCompletedCursorAssociation(info, association) {
+    return !!info && info[completedCursorAssociation] === stableCursorAssociation(association);
+}
+
 // A session belongs to one mounted datasource. Its association includes every
 // input and selected window/target; continuation tokens never cross that key.
 export function createCursorPagingSession() {
     let signature = null, tokens = [undefined], version = 0;
-    const stable = value => JSON.stringify(value, (_, item) => item && typeof item === 'object' && !Array.isArray(item)
-        ? Object.fromEntries(Object.keys(item).sort().map(key => [key, item[key]])) : item);
+    const stable = stableCursorAssociation;
     return {
         begin(page, association) {
             const next = stable(association);
