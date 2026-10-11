@@ -16,6 +16,7 @@ const windows = [
 
 const tabs = resolveTabWindows(windows);
 assert.deepEqual(tabs.map((entry) => entry.windowId), ['chat/new', 'schedule']);
+assert.deepEqual(resolveTabWindows(windows,{includeHosted:true}).map(entry=>entry.windowId), ['chat/new','order_1','schedule','runs_bottom']);
 assert.equal(resolveVisibleTabId(tabs, 'schedule'), 'schedule');
 assert.equal(resolveVisibleTabId(tabs, 'order_1'), 'chat/new');
 assert.equal(resolveVisibleTabId([], 'order_1'), null);

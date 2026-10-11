@@ -4,8 +4,8 @@ export function isHostedRegionWindow(win) {
   return presentation === 'hosted' && (region === 'chat.top' || region === 'chat.bottom');
 }
 
-export function resolveTabWindows(windows = []) {
-  return (Array.isArray(windows) ? windows : []).filter((win) => win.inTab !== false && !isHostedRegionWindow(win));
+export function resolveTabWindows(windows = [], {includeHosted = false} = {}) {
+  return (Array.isArray(windows) ? windows : []).filter((win) => win.inTab !== false && (includeHosted || !isHostedRegionWindow(win)));
 }
 
 export function resolveVisibleTabId(tabWindows = [], selectedTabId = null) {
