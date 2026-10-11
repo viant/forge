@@ -40,7 +40,8 @@ import { mergeWindowFormValues } from '../hooks/dataSource.js';
 import {applyParameterCodec} from '../hooks/parameters.js';
 import {injectActions} from '../actions';
 import { resolveMetadataForTarget } from '../runtime/metadataResolver.js';
-import {compilePermittedView, normalizeAuthorizationSnapshot, resolveAuthorizationResourceID, authorizationSnapshotLeaseMs} from '../runtime/permittedView.js';
+import {canonicalSelectionBinding} from '../runtime/canonicalDelivery.js';
+import {compileDeliveryHintView, compilePermittedView, normalizeAuthorizationSnapshot, resolveAuthorizationResourceID, authorizationSnapshotLeaseMs} from '../runtime/permittedView.js';
 import { applyDataSourceParameterCodecs, resolveParameters } from '../hooks/parameters.js';
 import { resolveSelector } from '../utils/selector.js';
 import { evaluatePlainVisibleWhen } from './visibleWhen.js';
@@ -90,7 +91,20 @@ function collectInitialWindowFormItemValues(node, initial) {
     }
 }
 
-export function compileWindowAuthorizationMetadata(metadata, parameters = {}) {
+export function compileWindowAuthorizationMetadata(metadata, parameters = {}, selectionBinding = null) {
+    if (canonicalSelectionBinding({selectionBinding})) {
+        const snapshot = metadata?.authorizationSnapshot || {};
+        const spec = metadata?.authorization;
+        let hints = snapshot;
+        if (spec) {
+            const selector = String(spec?.resource?.id?.selector || '').trim();
+            const selected = selector ? resolveSelector(parameters || {}, selector) : null;
+            const resourceID = resolveAuthorizationResourceID(spec.schemaVersion, selected, snapshot);
+            hints = normalizeAuthorizationSnapshot(snapshot,
+                String(spec?.resource?.type || spec?.resourceType || '').trim(), resourceID.valid ? resourceID.id : null);
+        }
+        return {...compileDeliveryHintView(metadata, hints), authorizationSnapshot: metadata?.authorizationSnapshot ? hints : undefined, selectionBinding};
+    }
     const snapshot = metadata?.authorizationSnapshot;
     if (!metadata?.authorization) return snapshot && authorizationSnapshotLeaseMs(snapshot) <= 0 ? null : metadata;
     if (!snapshot || typeof snapshot !== 'object') return null;
@@ -113,7 +127,7 @@ export function compileWindowAuthorizationMetadata(metadata, parameters = {}) {
 }
 
 export function isProtectedWindowMetadata(metadata) {
-    return !!metadata && (!!metadata.authorization || !!metadata.authorizationSnapshot);
+    return !!metadata && (!!metadata.authorization || !!metadata.authorizationSnapshot || !!canonicalSelectionBinding(metadata));
 }
 
 export function canUseInlineMetadataFallback(inlineMetadata) {
@@ -136,6 +150,7 @@ export function windowMetadataFetchKey(window = {}, targetContext = null) {
         parameters: window.parameters,
         resource: window.resource,
         targetContext,
+        selectionBinding: canonicalSelectionBinding(window),
     }));
 }
 
@@ -238,9 +253,9 @@ export function resolveWindowMetadataForTarget(metadata, targetContext = {}) {
     return resolveMetadataForTarget(metadata, targetContext) || metadata;
 }
 
-export function compilePermissionAppliedMetadata(metadata, targetContext = {}, parameters = {}) {
+export function compilePermissionAppliedMetadata(metadata, targetContext = {}, parameters = {}, selectionBinding = null) {
     const targetResolved = resolveWindowMetadataForTarget(metadata, targetContext);
-    return compileWindowAuthorizationMetadata(targetResolved, parameters);
+    return compileWindowAuthorizationMetadata(targetResolved, parameters, selectionBinding);
 }
 
 export function resolveWindowRootContainer(content = null, parameters = {}) {
@@ -1173,6 +1188,23 @@ function WindowContentRuntime({window, isInTab = false}) {
             clearProtectedWindowState(windowId);
         }
 
+        const admittedBinding = canonicalSelectionBinding(window);
+        if (admittedBinding && window?.inlineMetadata?.view) {
+            // Direct canonical OPEN carries the complete admitted definition.
+            // Dynamic variants need not have a second registered metadata route.
+            try {
+                const admittedMetadata = compilePermissionAppliedMetadata(window.inlineMetadata,
+                    targetContext, window?.parameters || {}, admittedBinding);
+                injectActions(admittedMetadata);
+                metadataSignalHandle.value = {...admittedMetadata, __windowKey: baseKey,
+                    __targetKey: targetKey, __provisionalInline: false};
+            } catch (error) {
+                setFetchError(error);
+            }
+            setLoading(false);
+            return () => { cancelled = true; };
+        }
+
         let hasInlineFallback = false;
         let fetchedProtectedMetadata = false;
         if (window && canUseInlineMetadataFallback(window.inlineMetadata)) {
@@ -1197,7 +1229,10 @@ function WindowContentRuntime({window, isInTab = false}) {
                 setFetchError(null);
                 const completeMetadata = resolveWindowMetadataForTarget(resp.data, targetContext);
                 fetchedProtectedMetadata = isProtectedWindowMetadata(completeMetadata);
-                const permissionAppliedMetadata = await applyWindowPermissionMetadata(completeMetadata, {
+                // A signed delivery is emitted only after host OPEN admission. Its
+                // snapshot is a rendering hint, not a data-operation preflight.
+                const selectionBinding = canonicalSelectionBinding(window);
+                const permissionAppliedMetadata = selectionBinding ? completeMetadata : await applyWindowPermissionMetadata(completeMetadata, {
                     services,
                     windowKey: baseKey,
                     resource: window?.resource || window?.parameters || {},
@@ -1206,7 +1241,7 @@ function WindowContentRuntime({window, isInTab = false}) {
                     targetContext,
                 });
                 if (cancelled || expired) return;
-                const resolvedMetadata = compilePermissionAppliedMetadata(permissionAppliedMetadata, targetContext, window?.parameters || {});
+                const resolvedMetadata = compilePermissionAppliedMetadata(permissionAppliedMetadata, targetContext, window?.parameters || {}, selectionBinding);
                 if (!resolvedMetadata) {
                     throw Object.assign(new Error('Resource not found or access denied'), {status: 403});
                 }
@@ -1249,7 +1284,7 @@ function WindowContentRuntime({window, isInTab = false}) {
 
     useEffect(() => {
         const snapshot = metadataSignalHandle?.value?.authorizationSnapshot;
-        if (!snapshot) return;
+        if (!snapshot || canonicalSelectionBinding(window)) return;
         let timer;
         const expire = () => {
             if (metadataSignalHandle?.peek?.()?.authorizationSnapshot !== snapshot) return;
@@ -1268,7 +1303,7 @@ function WindowContentRuntime({window, isInTab = false}) {
         };
         schedule();
         return () => clearTimeout(timer);
-    }, [windowId, metadataSignalHandle?.value?.authorizationSnapshot]);
+    }, [windowId, metadataSignalHandle?.value?.authorizationSnapshot, canonicalSelectionBinding(window)]);
 
     const metadata = metadataSignalHandle?.peek?.();
     const protectedDenial = protectedWindowDenials.value[windowId];

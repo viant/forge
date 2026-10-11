@@ -175,6 +175,17 @@ export function compilePermittedView(metadata, authorization, {requireRead = fal
   return {metadata: compiled, authorization, dataSourceRefs: refs, denied: false, diagnostics: []};
 }
 
+// Delivery hints affect rendered controls only. They must neither admit data
+// operations nor remove datasource definitions used by independently authorized MCPs.
+export function compileDeliveryHintView(metadata, authorization = {}) {
+  validateGuards(metadata?.view);
+  validateGuards(metadata?.dialogs);
+  return {...metadata,
+    view: compileNode(clone(metadata?.view), authorization),
+    ...(metadata?.dialogs ? {dialogs: compileNode(clone(metadata.dialogs), authorization)} : {}),
+  };
+}
+
 export function normalizeAuthorizationSnapshot(response, resourceType = '', resourceId = null) {
   const resources = response?.resources && typeof response.resources === 'object' ? response.resources : {};
   const normalizedResource = response?.resource;

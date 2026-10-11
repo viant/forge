@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {dispatchMutationCommand, executeCommand, getCommandState, mergeCommandParameters, resetCommandState, resolveCommandConfirmation, resolveIndeterminateCommand} from './commandExecutor.js';
+import {dispatchMutationCommand, executeCommand, getCommandState, mergeCommandParameters, resetCommandState, commandValidationPasses, resolveCommandConfirmation, resolveIndeterminateCommand} from './commandExecutor.js';
 import {clearProtectedWindowState, getCollectionSignal, getControlSignal, getMetadataSignal, primeWindowSignals} from '../../core/store/signals.js';
 
 const mutableSignal = (initial) => {
@@ -309,3 +309,50 @@ assert.deepEqual(protectedCollection.value, []);
 assert.equal(getCommandState(protectedContext, protectedCommand).guarded, false);
 
 console.log('canonical command executor contract passed');
+
+// A false business hint cannot authorize/deny canonical data writes; local
+// authored form validation still runs and the writer transport stays singular.
+const canonicalControl = mutableSignal({loading:false,error:null});
+let canonicalWrites=0,canonicalParameters;
+const originalMutationArgs=Object.freeze({id:'9007199254740993',value:'original'});
+const canonicalTarget={
+  signals:{control:canonicalControl},
+  handlers:{dataSource:{
+    setInputParameters(value){canonicalParameters=value;},
+    fetchCollection(){canonicalWrites++;canonicalControl.value={loading:true,error:null};queueMicrotask(()=>{canonicalControl.value={loading:false,error:null};});},
+  }},
+};
+const canonicalContext={identity:{canonicalDelivery:true},authorization:{resource:{capabilities:{write:false}}},signals:{windowForm:mutableSignal({ready:false})},Context:()=>canonicalTarget};
+const businessValidation={source:'authorization',field:'resource.capabilities.write',equals:true};
+assert.equal((await executeCommand(canonicalContext,{dataSourceRef:'canonical',validateWhen:businessValidation},originalMutationArgs)).status,'succeeded');
+assert.equal(canonicalWrites,1);
+assert.deepEqual(canonicalParameters,originalMutationArgs);
+assert.equal((await executeCommand(canonicalContext,{commandId:'mixed',dataSourceRef:'canonical',validateWhen:{all:[businessValidation,{source:'windowForm',field:'ready',equals:true}]}})).status,'invalid');
+assert.equal(canonicalWrites,1);
+assert.equal(dispatchMutationCommand(canonicalContext,{commandId:'direct',dataSourceRef:'canonical',validateWhen:{not:businessValidation}}),true);
+await Promise.resolve();await Promise.resolve();
+assert.equal(canonicalWrites,2);
+console.log('canonical command validation delegates business authorization to data MCP ✓');
+
+const fidelityContext={identity:{canonicalDelivery:true},authorization:{resource:{id:'original',parent:{id:'parent-a'},capabilities:{write:false}},principal:{roles:[],features:[]}},signals:{windowForm:mutableSignal({ready:true})}};
+const resourceGuard={source:'authorization',field:'resource.id',equals:'changed'};
+const parentGuard={source:'authorization',field:'resource.parent.id',equals:'parent-b'};
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:resourceGuard}),false);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:parentGuard}),false);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{all:[businessValidation,resourceGuard]}}),false);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{not:{source:'authorization',field:'resource.id',equals:'original'}}}),false);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{not:businessValidation}}),true);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{source:'authorization',field:'principal.roles',contains:'admin'}}),true);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{source:'authorization',field:'principal.features',contains:'write'}}),true);
+console.log('canonical identity and parent validation remains mandatory ✓');
+
+const localFalse={source:'windowForm',field:'ready',equals:false};
+const localTrue={source:'windowForm',field:'ready',equals:true};
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{any:[businessValidation,localFalse]}}),false);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{any:[businessValidation,localTrue]}}),true);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{not:{all:[businessValidation,localTrue]}}}),false);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{not:{any:[businessValidation,localFalse]}}}),true);
+for(const [field,value] of [['resource.id','different'],['resource.parent.id','different'],['actor.subject','different'],['selection.id','different'],['authorizationVersion','different']]) {
+  assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{any:[businessValidation,{source:'authorization',field,equals:value}]}}),false,`${field} remains a validation constraint`);
+}
+console.log('canonical mixed all/any/not retains local and fidelity validation ✓');

@@ -1,3 +1,4 @@
+import {withoutAuthorizationValidationHints} from '../../runtime/canonicalDelivery.js';
 import {resolveParameters} from '../../hooks/parameters.js';
 import {resolveSelector} from '../../utils/selector.js';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
@@ -228,7 +229,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   let target = null;
   try {
     const resolved = resolveParameters(command.parameters || [], context) || {};
-    if (command.validateWhen && !evaluatePlainVisibleWhen(command.validateWhen, context)) {
+    if (!commandValidationPasses(context, command)) {
       const error = new Error(command.invalidMessage || 'This action is not currently valid.');
       publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error, message: error.message, writerStatus: 'not_invoked'});
       notifyLifecycle(lifecycle, 'onRejected', {status: 'invalid', error});
@@ -326,13 +327,19 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   }
 }
 
+export function commandValidationPasses(context, command = {}) {
+  const condition = context?.identity?.canonicalDelivery === true
+    ? withoutAuthorizationValidationHints(command.validateWhen) : command.validateWhen;
+  return !condition || evaluatePlainVisibleWhen(condition, context);
+}
+
 export function dispatchMutationCommand(context, command = {}, extras = {}, lifecycle = {}) {
   if (!command.dataSourceRef || getCommandState(context, command).guarded) return false;
   if ((command.confirm || command.confirmSelection) && typeof lifecycle.confirm !== 'function') {
     void executeCommand(context, command, extras, lifecycle);
     return false;
   }
-  if (command.validateWhen && !evaluatePlainVisibleWhen(command.validateWhen, context)) return false;
+  if (!commandValidationPasses(context, command)) return false;
   void executeCommand(context, command, extras, lifecycle);
   return true;
 }

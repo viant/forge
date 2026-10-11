@@ -12,7 +12,7 @@ import {arrayEquals} from "../utils/equal.js";
 import { getLogger } from "../utils/logger.js";
 import equal from 'fast-deep-equal';
 import { mapParameters } from '../utils/parameterMapper.js';
-import {isDatasetScopedDenial, isWindowAuthorizationFailure} from '../components/dataSourceAuthorization.js';
+import {isDataSourceLocalDenial, isWindowAuthorizationFailure} from '../components/dataSourceAuthorization.js';
 import { normalizeDataSourceError } from '../utils/dataSourceError.js';
 import {beginDataSourceRequest, settleDataSourceRequest} from '../components/dataSourceRequestLifecycle.js';
 
@@ -698,8 +698,8 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
             return true;
         } catch (err) {
             if (!authorizationIsCurrent()) return false;
-            if (isDatasetScopedDenial(err)) { clearDeniedDataSourceState(identity.dataSourceId, err); return false; }
-            if (identity?.protectedWindow && isWindowAuthorizationFailure(err)) {
+            if (isDataSourceLocalDenial(err, {identity})) { clearDeniedDataSourceState(identity.dataSourceId, err); return false; }
+            if (identity?.protectedWindow && isWindowAuthorizationFailure(err, {identity})) {
                 denyProtectedWindow(identity.windowId, Number(err.status));
                 return false;
             }
@@ -1026,8 +1026,8 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
             return result;
         } catch(error) {
             if(current()) {
-                if(isDatasetScopedDenial(error)) clearDeniedDataSourceState(identity.dataSourceId,error);
-                else if(identity?.protectedWindow && isWindowAuthorizationFailure(error)) denyProtectedWindow(identity.windowId,Number(error.status));
+                if(isDataSourceLocalDenial(error, {identity})) clearDeniedDataSourceState(identity.dataSourceId,error);
+                else if(identity?.protectedWindow && isWindowAuthorizationFailure(error, {identity})) denyProtectedWindow(identity.windowId,Number(error.status));
             }
             throw error;
         }
