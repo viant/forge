@@ -839,7 +839,9 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
         : parameters;
     const hash = Object.keys(identityParameters).length > 0 ? generateIntHash(identityParameters) : ''
     const baseWindowId = hash ? `${windowKey}_${hash}` : windowKey;
-    const scopedBaseWindowId = computeHostedConversationScopedWindowId(baseWindowId, options);
+    const hostedBaseWindowId = computeHostedConversationScopedWindowId(baseWindowId, options);
+    const windowScopeId = String(options.windowScopeId || "").trim();
+    const scopedBaseWindowId = windowScopeId ? `${hostedBaseWindowId}__scope:${windowScopeId}` : hostedBaseWindowId;
 
     // Support explicitly opening a new instance even if a window with the same
     // key/parameters already exists. When requested, compute a unique ID and
@@ -853,7 +855,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
     const existingWindow = forceNewInstance
         ? undefined
         : activeWindows.value.find((win) => win.windowId === windowId)
-            || resolveHostedRegionReplacementWindow(activeWindows.value, parentKey, inTab, options);
+            || resolveHostedRegionReplacementWindow(activeWindows.value.filter(win => String(win.windowScopeId || "") === windowScopeId), parentKey, inTab, options);
     let result = existingWindow
     if (!existingWindow) {
         // Optionally auto-index title for a nicer UX when multiple instances
@@ -865,6 +867,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
             windowTitle: computedTitle,
             windowId,
             hostOpenState,
+            windowScopeId: windowScopeId || undefined,
             conversationId: String(options.conversationId || '').trim() || undefined,
             parentKey,
             windowKey,
@@ -929,6 +932,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
             windowId,
             windowTitle: computedTitle,
             hostOpenState,
+            windowScopeId: windowScopeId || undefined,
             conversationId: nextConversationId,
             parentKey,
             windowKey,

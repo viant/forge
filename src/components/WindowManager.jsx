@@ -18,9 +18,10 @@ import WindowControls from './WindowControls';
 import './WindowManager.css';
 import { resolveTabWindows, resolveVisibleTabId } from './windowManagerState.js';
 
-const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false}) => {
+const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false, windowFilter, onCloseWindow}) => {
     useSignals();
-    const windows = activeWindows.value || [];
+    const closeWindow = typeof onCloseWindow === "function" ? onCloseWindow : removeWindow;
+    const windows = (activeWindows.value || []).filter(win => typeof windowFilter !== "function" || windowFilter(win) !== false);
     const tabId = selectedTabId.value || null;
     const containerRef = useRef(null);
     const [contentHosts,setContentHosts] = useState({});
@@ -31,7 +32,7 @@ const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false
     // Sync global app status into the focused window whenever focus changes
     useEffect(() => {
         const winId = selectedWindowId.value;
-        if (!winId) return;
+        if (!winId || !windows.some(win => win.windowId === winId)) return;
         const winStatus = getWindowStatusSignal(winId);
         winStatus.value = appStatusSignal.peek();
     }, [selectedWindowId.value]);
@@ -60,10 +61,10 @@ const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false
     useEffect(() => {
         const onKeyDown = (e) => {
             if (e.key === 'Escape') {
-                const floats = activeWindows.value.filter(w => w.inTab === false && !w.isMinimized);
+                const floats = windows.filter(w => w.inTab === false && !w.isMinimized);
                 if (floats.length === 0) return;
                 const top = floats.reduce((a, b) => (a.zIndex || 0) >= (b.zIndex || 0) ? a : b);
-                if (top && top.windowId) removeWindow(top.windowId);
+                if (top && top.windowId) closeWindow(top.windowId);
             }
         };
         window.addEventListener('keydown', onKeyDown);
@@ -88,7 +89,7 @@ const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false
 
     const handleTabClose = (windowId, e) => {
         e.stopPropagation();
-        removeWindow(windowId);
+        closeWindow(windowId);
     };
 
     const minimizeWindow = (windowId) => {
@@ -332,7 +333,7 @@ const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false
                                 <WindowControls
                                     onClose={(e) => {
                                         e.stopPropagation();
-                                        removeWindow(win.windowId);
+                                        closeWindow(win.windowId);
                                     }}
                                     onMinimize={(e) => {
                                         e.stopPropagation();
