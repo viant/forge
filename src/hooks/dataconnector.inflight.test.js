@@ -156,3 +156,14 @@ describe('createDataConnector', () => {
         expect(handleUnauthorized).toHaveBeenCalledOnce();
     });
 });
+
+it('preserves the server dataset denial code/scope and leaves it recoverable',async()=>{
+ global.fetch=vi.fn(async()=>new Response(JSON.stringify({error:'Datasource access denied. Adjust the filter or retry.',code:'datasource_denied',scope:'dataset'}),{status:403,statusText:'Forbidden',headers:{'Content-Type':'application/json'}}));
+ const connector=createDataConnector({service:{URL:'/v1/api/datasources/rows/fetch'}});
+ await expect(connector.get({})).rejects.toMatchObject({status:403,code:'datasource_denied',scope:'dataset',isUnauthorized:false});
+});
+it('does not turn an untyped403 or401 into a dataset marker',async()=>{
+ global.fetch=vi.fn(async()=>new Response(JSON.stringify({error:'denied'}),{status:403,statusText:'Forbidden'}));
+ const connector=createDataConnector({service:{URL:'/v1/api/datasources/rows/fetch'}});
+ await expect(connector.get({})).rejects.toMatchObject({status:403,isUnauthorized:true});
+});

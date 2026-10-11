@@ -3,6 +3,18 @@ import { describe, expect, it } from 'vitest';
 import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, isProtectedWindowMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowRootContainer, reuseShallowEqualRuntimeObject, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
 import { resolveDataSourceOptions } from '../runtime/WidgetRenderer.jsx';
 
+describe('local datasource parent placeholder', () => {
+  it('does not mount the undeclared underscore parent of a local shell datasource', () => {
+    const metadata = {dataSource: {settings: {dataSourceRef: '_'}}, view: {content: {dataSourceRef: 'settings'}}};
+    expect(resolveRequiredDataSourceRefs(metadata, 'settings')).toEqual(['settings']);
+    metadata.dataSource.settings.dataSourceRef = 'missingBusinessParent';
+    expect(resolveRequiredDataSourceRefs(metadata, 'settings')).toEqual(['settings', 'missingBusinessParent']);
+    metadata.dataSource.settings.dataSourceRef = '_';
+    metadata.dataSource._ = {};
+    expect(resolveRequiredDataSourceRefs(metadata, 'settings')).toEqual(['settings', '_']);
+  });
+});
+
 describe('applyWindowPermissionMetadata', () => {
   it('passes the complete tree and one concrete resource to the dedicated service', async () => {
     const completeMetadata = {authorization: {scope: 'resource'}, view: {content: {id: 'root'}}};
@@ -559,5 +571,16 @@ describe('shouldResetWindowDashboardState', () => {
     expect(shouldResetWindowDashboardState('window-1:dashboard-1', 'window-1', 'dashboard-2')).toBe(true);
     expect(shouldResetWindowDashboardState('', '', 'dashboard-1')).toBe(false);
     expect(shouldResetWindowDashboardState('', 'window-1', '')).toBe(false);
+  });
+});
+
+
+describe('invalid protected metadata', () => {
+  it('rejects an expired compiled snapshot even after the authorization specification was stripped', () => {
+    expect(compilePermissionAppliedMetadata({authorizationSnapshot:{expiresAt:'2000-01-01T00:00:00Z'},view:{content:{id:'expired'}}})).toBeNull();
+  });
+  it('preserves a typed403 denial when an authorization guard is malformed', () => {
+    const metadata = {authorization:{scope:'window'}, authorizationSnapshot:{authorizationVersion:'v1',expiresAt:'2999-01-01T00:00:00Z'},view:{content:{visibleWhen:{source:'authorization',field:'canRead',unsupported:true}}}};
+    expect(() => compilePermissionAppliedMetadata(metadata)).toThrow(expect.objectContaining({status:403,code:'WINDOW_AUTHORIZATION_INVALID'}));
   });
 });

@@ -116,8 +116,12 @@ export function createDataConnector(dataSource, runtime = {}) {
 
     async function makeRequestError(resp, prefix = 'Request error') {
         let detail = '';
+        let code = '';
+        let scope = '';
         try {
-            detail = summarizeErrorPayload(await resp.clone().text());
+            const raw = await resp.clone().text();
+            detail = summarizeErrorPayload(raw);
+            try { const payload=JSON.parse(raw); if(typeof payload?.code==='string')code=payload.code; if(typeof payload?.scope==='string')scope=payload.scope; } catch (_) {}
         } catch (_) {
             // Best-effort only; preserve the status-based error when the body
             // cannot be read.
@@ -128,7 +132,9 @@ export function createDataConnector(dataSource, runtime = {}) {
         const error = new Error(message);
         error.status = resp.status;
         error.statusText = resp.statusText;
-        error.isUnauthorized = resp.status === 401 || resp.status === 403;
+        if(code)error.code=code;
+        if(scope)error.scope=scope;
+        error.isUnauthorized = !(resp.status===403 && code==='datasource_denied' && scope==='dataset') && (resp.status === 401 || resp.status === 403);
         error.authRequired = String(resp.headers?.get?.('X-Agently-Auth-Required') || '').toLowerCase() === 'true';
         if (detail) {
             error.detail = detail;
