@@ -1,0 +1,395 @@
+[
+  {
+    "name": "primary-old-casing-wins",
+    "selectors": {
+      "data": "data.0.iSpotBrandOptions",
+      "dataFallbacks": [
+        "data.0.isPotBrandOptions",
+        "backup"
+      ]
+    },
+    "payload": {
+      "data": [
+        {
+          "iSpotBrandOptions": [
+            {
+              "name": "old-option"
+            }
+          ],
+          "isPotBrandOptions": [
+            {
+              "name": "native-option"
+            }
+          ]
+        }
+      ]
+    },
+    "expectedRows": [
+      {
+        "name": "old-option"
+      }
+    ]
+  },
+  {
+    "name": "new-native-casing-fallback",
+    "selectors": {
+      "data": "data.0.iSpotBrandOptions",
+      "dataFallbacks": [
+        "data.0.isPotBrandOptions",
+        "backup"
+      ]
+    },
+    "payload": {
+      "data": [
+        {
+          "isPotBrandOptions": [
+            {
+              "name": "native-option"
+            }
+          ]
+        }
+      ]
+    },
+    "expectedRows": [
+      {
+        "name": "native-option"
+      }
+    ]
+  },
+  {
+    "name": "present-primary-null",
+    "selectors": {
+      "data": "data.0.iSpotBrandOptions",
+      "dataFallbacks": [
+        "data.0.isPotBrandOptions",
+        "backup"
+      ]
+    },
+    "payload": {
+      "data": [
+        {
+          "iSpotBrandOptions": null,
+          "isPotBrandOptions": [
+            {
+              "name": "native-option"
+            }
+          ]
+        }
+      ],
+      "backup": [
+        {
+          "name": "old-option"
+        }
+      ]
+    },
+    "expectedRows": []
+  },
+  {
+    "name": "present-primary-empty",
+    "selectors": {
+      "data": "data.0.iSpotBrandOptions",
+      "dataFallbacks": [
+        "data.0.isPotBrandOptions",
+        "backup"
+      ]
+    },
+    "payload": {
+      "data": [
+        {
+          "iSpotBrandOptions": [],
+          "isPotBrandOptions": [
+            {
+              "name": "native-option"
+            }
+          ]
+        }
+      ],
+      "backup": [
+        {
+          "name": "old-option"
+        }
+      ]
+    },
+    "expectedRows": []
+  },
+  {
+    "name": "present-primary-false",
+    "selectors": {
+      "data": "data.0.iSpotBrandOptions",
+      "dataFallbacks": [
+        "data.0.isPotBrandOptions",
+        "backup"
+      ]
+    },
+    "payload": {
+      "data": [
+        {
+          "iSpotBrandOptions": false,
+          "isPotBrandOptions": [
+            {
+              "name": "native-option"
+            }
+          ]
+        }
+      ],
+      "backup": [
+        {
+          "name": "old-option"
+        }
+      ]
+    },
+    "expectedRows": []
+  },
+  {
+    "name": "present-primary-zero",
+    "selectors": {
+      "data": "data.0.iSpotBrandOptions",
+      "dataFallbacks": [
+        "data.0.isPotBrandOptions",
+        "backup"
+      ]
+    },
+    "payload": {
+      "data": [
+        {
+          "iSpotBrandOptions": 0,
+          "isPotBrandOptions": [
+            {
+              "name": "native-option"
+            }
+          ]
+        }
+      ],
+      "backup": [
+        {
+          "name": "old-option"
+        }
+      ]
+    },
+    "expectedRows": []
+  },
+  {
+    "name": "declared-fallback-order",
+    "selectors": {
+      "data": "data.0.iSpotBrandOptions",
+      "dataFallbacks": [
+        "data.0.isPotBrandOptions",
+        "backup"
+      ]
+    },
+    "payload": {
+      "data": [
+        {
+          "isPotBrandOptions": [
+            {
+              "name": "native-option"
+            }
+          ]
+        }
+      ],
+      "backup": [
+        {
+          "name": "old-option"
+        }
+      ]
+    },
+    "expectedRows": [
+      {
+        "name": "native-option"
+      }
+    ]
+  },
+  {
+    "name": "next-declared-fallback",
+    "selectors": {
+      "data": "data.0.iSpotBrandOptions",
+      "dataFallbacks": [
+        "data.0.isPotBrandOptions",
+        "backup"
+      ]
+    },
+    "payload": {
+      "data": [
+        {}
+      ],
+      "backup": [
+        {
+          "name": "old-option"
+        }
+      ]
+    },
+    "expectedRows": [
+      {
+        "name": "old-option"
+      }
+    ]
+  },
+  {
+    "name": "present-null-first-fallback-stops",
+    "selectors": {
+      "data": "data.0.iSpotBrandOptions",
+      "dataFallbacks": [
+        "data.0.isPotBrandOptions",
+        "backup"
+      ]
+    },
+    "payload": {
+      "data": [
+        {
+          "isPotBrandOptions": null
+        }
+      ],
+      "backup": [
+        {
+          "name": "old-option"
+        }
+      ]
+    },
+    "expectedRows": []
+  },
+  {
+    "name": "missing-all-does-not-select-envelope",
+    "selectors": {
+      "data": "data.0.iSpotBrandOptions",
+      "dataFallbacks": [
+        "data.0.isPotBrandOptions",
+        "backup"
+      ]
+    },
+    "payload": {
+      "data": [
+        {
+          "other": [
+            {
+              "name": "native-option"
+            }
+          ]
+        }
+      ]
+    },
+    "expectedRows": []
+  },
+  {
+    "name": "bracket-index-path",
+    "selectors": {
+      "data": "data[0].iSpotBrandOptions",
+      "dataFallbacks": [
+        "data[0].isPotBrandOptions"
+      ]
+    },
+    "payload": {
+      "data": [
+        {
+          "isPotBrandOptions": [
+            {
+              "name": "native-option"
+            }
+          ]
+        }
+      ]
+    },
+    "expectedRows": [
+      {
+        "name": "native-option"
+      }
+    ]
+  },
+  {
+    "name": "numeric-index-with-leading-zero",
+    "selectors": {
+      "data": "data[01].iSpotBrandOptions",
+      "dataFallbacks": [
+        "data[01].isPotBrandOptions"
+      ]
+    },
+    "payload": {
+      "data": [
+        {},
+        {
+          "isPotBrandOptions": [
+            {
+              "name": "native-option"
+            }
+          ]
+        }
+      ]
+    },
+    "expectedRows": [
+      {
+        "name": "native-option"
+      }
+    ]
+  },
+  {
+    "name": "out-of-range-index-is-absent",
+    "selectors": {
+      "data": "data[9].iSpotBrandOptions",
+      "dataFallbacks": [
+        "data[9].isPotBrandOptions",
+        "backup"
+      ]
+    },
+    "payload": {
+      "data": [
+        {}
+      ],
+      "backup": [
+        {
+          "name": "old-option"
+        }
+      ]
+    },
+    "expectedRows": [
+      {
+        "name": "old-option"
+      }
+    ]
+  },
+  {
+    "name": "null-parent-path-is-absent",
+    "selectors": {
+      "data": "data.0.iSpotBrandOptions",
+      "dataFallbacks": [
+        "data.0.isPotBrandOptions",
+        "backup"
+      ]
+    },
+    "payload": {
+      "data": [
+        null
+      ],
+      "backup": [
+        {
+          "name": "old-option"
+        }
+      ]
+    },
+    "expectedRows": [
+      {
+        "name": "old-option"
+      }
+    ]
+  },
+  {
+    "name": "case-sensitive-without-explicit-alternative",
+    "selectors": {
+      "data": "data.0.iSpotBrandOptions",
+      "dataFallbacks": [
+        "data.0.isPotBrandOptions",
+        "backup"
+      ]
+    },
+    "payload": {
+      "data": [
+        {
+          "ISPOTBRANDOPTIONS": [
+            {
+              "name": "native-option"
+            }
+          ]
+        }
+      ]
+    },
+    "expectedRows": []
+  }
+]
