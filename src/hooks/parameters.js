@@ -1,4 +1,4 @@
-import {resolveSelector, setSelector} from "../utils/selector.js";
+import {resolveSelector, setSelector, assertSafeAssignmentPath, assertSafeAssignmentKeys} from "../utils/selector.js";
 
 export function applyParameterCodec(value, codec) {
     const rawName = typeof codec === 'string' ? codec : codec?.name;
@@ -16,6 +16,11 @@ export function applyParameterCodec(value, codec) {
     }
 
     switch (name) {
+        case 'json': {
+            const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+            assertSafeAssignmentKeys(parsed);
+            return parsed;
+        }
         case 'int':
         case 'integer': {
             if (typeof value === 'number') return Number.isInteger(value) ? value : value;
@@ -88,6 +93,10 @@ function assignResolvedField(target, fieldName, nextValue) {
 }
 
 export function resolveParameters(parameterDefinitions = [], context) {
+    for (const parameter of parameterDefinitions) {
+        assertSafeAssignmentPath(parameter?.name);
+        assertSafeAssignmentPath(parameter?.to);
+    }
     // New-style rows: have explicit `from` and `to` with a ':' separator.
     const isCompactedFormat = (p) => typeof p.from === 'string' && typeof p.to === 'string' && p.from.includes(':') && p.to.includes(':');
 
@@ -165,6 +174,7 @@ export function resolveParameters(parameterDefinitions = [], context) {
                 const targetObj = dstStore === 'input' ? dsRes.input : (dsRes.input[dstStore] = dsRes.input[dstStore] || {});
 
                 if (dstPath === '...') {
+                    assertSafeAssignmentKeys(srcVal);
                     Object.assign(targetObj, srcVal);
                 } else if (dstPath.startsWith('[]')) {
                     const k = dstPath.substring(2);
@@ -245,6 +255,7 @@ export function resolveParameters(parameterDefinitions = [], context) {
             param.codec,
         );
         if(name === "...") {
+            assertSafeAssignmentKeys(value);
             if (toDataSource) {
                 resolved[toDataSource] = {...value};
             } else if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -497,8 +508,16 @@ function resolveFromDataSource(context, location, scope = 'form') {
             fieldPath = location;
         }
     } else {
-        dataSourceRef = location.substring(0, dotIndex);
-        fieldPath = location.substring(dotIndex + 1);
+        const possibleDataSourceRef = location.substring(0, dotIndex);
+        if (context.dataSources?.[possibleDataSourceRef]) {
+            dataSourceRef = possibleDataSourceRef;
+            fieldPath = location.substring(dotIndex + 1);
+        } else {
+            // A nested store path such as parameters.Items belongs to the
+            // current datasource unless its prefix names an attached source.
+            dataSourceRef = context.identity.dataSourceRef;
+            fieldPath = location;
+        }
     }
 
     const dsCtx = context.Context(dataSourceRef);
