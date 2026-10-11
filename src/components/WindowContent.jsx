@@ -1102,7 +1102,7 @@ export default function WindowContent(props) {
     return <ForgeThemeBoundary windowKey={props.window?.windowKey}><WindowContentRuntime {...props} /></ForgeThemeBoundary>;
 }
 
-function WindowContentRuntime({window, isInTab = false}) {
+function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}) {
     useSignals();
     const {windowKey, windowId} = window;
     const baseKey = windowKey.split('?')[0];
@@ -1189,11 +1189,12 @@ function WindowContentRuntime({window, isInTab = false}) {
         }
 
         const admittedBinding = canonicalSelectionBinding(window);
-        if (admittedBinding && window?.inlineMetadata?.view) {
-            // Direct canonical OPEN carries the complete admitted definition.
-            // Dynamic variants need not have a second registered metadata route.
+        const deliveredMetadata = selectedMetadata?.view ? selectedMetadata : admittedBinding && window?.inlineMetadata?.view ? window.inlineMetadata : null;
+        if (deliveredMetadata) {
+            // A completed selected GET may deliver a generic or signed definition.
+            // This rendering input is not an authorization grant for data calls.
             try {
-                const admittedMetadata = compilePermissionAppliedMetadata(window.inlineMetadata,
+                const admittedMetadata = compilePermissionAppliedMetadata(deliveredMetadata,
                     targetContext, window?.parameters || {}, admittedBinding);
                 injectActions(admittedMetadata);
                 metadataSignalHandle.value = {...admittedMetadata, __windowKey: baseKey,
@@ -1272,7 +1273,7 @@ function WindowContentRuntime({window, isInTab = false}) {
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey, auth]);
+    }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey, auth, selectedMetadata]);
 
     useEffect(() => {
         const metadata = metadataSignalHandle?.value;
