@@ -227,6 +227,8 @@ type QuickFilterSpec struct {
 }
 
 type Window struct {
+	// SelectionBinding is emitted only after trusted OPEN admission.
+	SelectionBinding     *identity.SelectionBinding `json:"selectionBinding,omitempty" yaml:"-"`
 	ResourceTarget       *WindowTarget              `json:"resourceTarget,omitempty" yaml:"-"`
 	ResourceDependencies map[string]string          `json:"resourceDependencies,omitempty" yaml:"resourceDependencies,omitempty"`
 	Resource             *identity.ResolvedResource `json:"resource,omitempty" yaml:"resource,omitempty"`

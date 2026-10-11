@@ -166,7 +166,7 @@ func (e *WindowResourceEnvelope) Validate() error {
 				return fmt.Errorf("unmaterialized datasource reference")
 			}
 		}
-		if v.Window == nil || v.Window.View.Content == nil || v.Window.Resource != nil || v.Window.ResourceTarget != nil || len(v.DataSources) != len(v.Window.DataSource) || len(v.Window.ResourceDependencies) != len(v.Window.DataSource) {
+		if v.Window == nil || v.Window.View.Content == nil || v.Window.Resource != nil || v.Window.ResourceTarget != nil || v.Window.SelectionBinding != nil || len(v.DataSources) != len(v.Window.DataSource) || len(v.Window.ResourceDependencies) != len(v.Window.DataSource) {
 			return fmt.Errorf("invalid complete window variant")
 		}
 		if err := ValidateResourceModelStructure(v.Window); err != nil {
@@ -222,7 +222,7 @@ func selectWindowResource(raw json.RawMessage, requested *WindowTarget, referenc
 			return nil, fmt.Errorf("historical window supports default target only")
 		}
 		var window Window
-		if decodeWindowResourceJSON(raw, &window) != nil || window.View.Content == nil {
+		if decodeWindowResourceJSON(raw, &window) != nil || window.View.Content == nil || window.SelectionBinding != nil {
 			return nil, fmt.Errorf("invalid historical window")
 		}
 		return &WindowResourceVariant{Window: &window, Fingerprint: identity.ContentFingerprint(raw)}, nil

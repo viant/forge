@@ -87,6 +87,11 @@ func WindowDescriptorFingerprint(raw json.RawMessage) (string, error) {
 }
 func WindowVariantFingerprint(variant WindowResourceVariant) (string, error) {
 	copy := variant
+	if variant.Window != nil {
+		window := *variant.Window
+		window.SelectionBinding = nil
+		copy.Window = &window
+	}
 	copy.DataSources = make(map[string]json.RawMessage, len(variant.DataSources))
 	for id, raw := range variant.DataSources {
 		canonical, err := CanonicalWindowDescriptor(raw)
