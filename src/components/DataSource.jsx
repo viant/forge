@@ -10,10 +10,15 @@ import {hasResolvedDependencies} from "./dataSourceDependencies.js";
 import {bindingFinalizationAction, isCurrentBindingGeneration} from "./primitives/bindingGeneration.js";
 import {resourceModelRefForDataSource, unmarshalResourceCollection} from "./primitives/resourceModel.js";
 import {settleDataSourceRequest} from './dataSourceRequestLifecycle.js';
+import {isProtectedUpstreamDenial, isDatasetScopedDenial} from './dataSourceAuthorization.js';
 import {shouldDispatchSelectionEvent} from './selectionEventModel.js';
 import {reconcileFetchForMetadataReadiness} from './dataSourceMetadataReadiness.js';
 import {
     findSelectionSignal,
+    protectedWindowEpoch,
+    protectedDataSourceEpoch,
+    clearDeniedDataSourceState,
+    denyProtectedWindow,
 
 } from "../core/index.js";
 
@@ -311,6 +316,9 @@ export default function DataSource({context}) {
 
 
     async function refreshRecords() {
+        const authorizationEpoch = protectedWindowEpoch(identity?.windowId);
+        const datasetEpoch = protectedDataSourceEpoch(identity?.dataSourceId);
+        const authorizationIsCurrent = () => protectedWindowEpoch(identity?.windowId) === authorizationEpoch && protectedDataSourceEpoch(identity?.dataSourceId) === datasetEpoch;
         const inputVal = input.value || {};
         let {refreshFilter, parameters} = inputVal || {};
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, refreshFilter, dataSource.requiredAnyParameters)
@@ -346,7 +354,7 @@ export default function DataSource({context}) {
             const payload = await connector.get({
                 filter: finalFilter
             })
-            if (!mountedRef.current) return;
+            if (!mountedRef.current || !authorizationIsCurrent()) return;
             control.value = {...control.peek(), loaded: true, error: null, stale: false};
 
 
@@ -414,7 +422,12 @@ export default function DataSource({context}) {
             } catch (_) {
             }
         } catch (err) {
-            if (!mountedRef.current) return;
+            if (!mountedRef.current || !authorizationIsCurrent()) return;
+            if (isDatasetScopedDenial(err)) { clearDeniedDataSourceState(identity.dataSourceId, err); return; }
+            if (isProtectedUpstreamDenial(context, err)) {
+                denyProtectedWindow(identity.windowId, Number(err.status));
+                return;
+            }
             setError(err);
             try {
                 if (events.onError && events.onError.isDefined()) {
@@ -424,7 +437,7 @@ export default function DataSource({context}) {
             } catch (_) {
             }
         } finally {
-            if (mountedRef.current) setLoading(false);
+            if (mountedRef.current && authorizationIsCurrent()) setLoading(false);
         }
     }
 
@@ -436,6 +449,9 @@ export default function DataSource({context}) {
      *  - Then calls postFetchHook
      */
     async function doFetchRecords() {
+        const authorizationEpoch = protectedWindowEpoch(identity?.windowId);
+        const datasetEpoch = protectedDataSourceEpoch(identity?.dataSourceId);
+        const authorizationIsCurrent = () => protectedWindowEpoch(identity?.windowId) === authorizationEpoch && protectedDataSourceEpoch(identity?.dataSourceId) === datasetEpoch;
         try {
             log.debug('[doFetchRecords] start', {ds: context?.identity?.dataSourceRef, ts: Date.now()});
         } catch (_) {
@@ -525,6 +541,7 @@ export default function DataSource({context}) {
                 cache,
                 invocationId,
             });
+            if (!authorizationIsCurrent()) return;
             if (!mountedRef.current) {
                 settleDataSourceRequest(requestDataSourceId, requestId, new Error('Datasource unmounted before request completion.'));
                 return;
@@ -655,6 +672,7 @@ export default function DataSource({context}) {
             }
             settleDataSourceRequest(requestDataSourceId, requestId, null, payload);
         } catch (err) {
+            if (!authorizationIsCurrent()) return;
             if (!mountedRef.current) {
                 settleDataSourceRequest(requestDataSourceId, requestId, err);
                 return;
@@ -662,6 +680,11 @@ export default function DataSource({context}) {
             settleDataSourceRequest(requestDataSourceId, requestId, err);
             if (!isCurrentBindingGeneration(input.peek()?.bindingGeneration, bindingGeneration)) {
                 try { log.debug('[doFetchRecords] ignored stale binding error', {ds: context?.identity?.dataSourceRef, bindingGeneration}); } catch (_) {}
+                return;
+            }
+            if (isDatasetScopedDenial(err)) { clearDeniedDataSourceState(identity.dataSourceId, err); return; }
+            if (isProtectedUpstreamDenial(context, err)) {
+                denyProtectedWindow(identity.windowId, Number(err.status));
                 return;
             }
             log.warn('doFetchRecords error', err)
@@ -676,6 +699,7 @@ export default function DataSource({context}) {
             } catch (_) {
             }
         } finally {
+            if (!authorizationIsCurrent()) return;
             const bindingIsCurrent = isCurrentBindingGeneration(input.peek()?.bindingGeneration, bindingGeneration);
             const nextInput = input.peek() || {};
             const finalization = bindingFinalizationAction(bindingIsCurrent, !!(nextInput.fetch || nextInput.refresh));

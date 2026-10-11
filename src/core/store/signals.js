@@ -3,6 +3,7 @@ import {signal} from '@preact/signals-react';
 import {generateIntHash} from "../../utils/hash.js";
 import { injectActions } from '../../actions/action.js';
 import {clearWindowContext} from '../context/registry.js';
+import {invalidateWindowDataSourceRequests, invalidateDataSourceRequests} from '../../components/dataSourceRequestLifecycle.js';
 // Create per-key signals for metadata and data
 
 
@@ -106,11 +107,31 @@ export const controlSignals = signal({});
 
 
 export const metadataSignals = signal({});
+export const protectedWindowDenials = signal({});
+const signalOwners = new Map();
+
+const registerSignalOwner = (windowId, key) => {
+    const owner = String(windowId || '').trim();
+    if (!owner || !key) return;
+    const owners = signalOwners.get(key) || new Set();
+    owners.add(owner);
+    signalOwners.set(key, owners);
+};
+
+const matchesWindowSignalKey = (key, id) => key === id || key.startsWith(`${id}DS`) || key.startsWith(`${id}Dialog`) || key.startsWith(`${id}:`);
+
+const windowOwnsSignalKey = (key, windowId, knownWindowIds) => {
+    const explicit = signalOwners.get(key);
+    if (explicit) return explicit.has(windowId);
+    if (!matchesWindowSignalKey(key, windowId)) return false;
+    return !knownWindowIds.some(other => other !== windowId && other.length > windowId.length && matchesWindowSignalKey(key, other));
+};
 
 
 
 // Get or create metadata signal for a unique window key
 export const getMetadataSignal = (windowId) => {
+    registerSignalOwner(windowId, windowId);
     if (!metadataSignals.value[windowId]) {
         const newSignal = signal(null);
         metadataSignals.value = {
@@ -324,6 +345,9 @@ export const primeWindowSignals = (windowId, metadata = null) => {
     const id = String(windowId || '').trim();
     if (!id || !metadata || typeof metadata !== 'object') return;
 
+    registerSignalOwner(id, id);
+    registerSignalOwner(id, `${id}:windowForm`);
+
     getBusSignal(id);
     getControlSignal(id);
     getFormSignal(`${id}:windowForm`);
@@ -335,6 +359,7 @@ export const primeWindowSignals = (windowId, metadata = null) => {
         : {};
     for (const [dataSourceRef, dataSource] of Object.entries(dataSources)) {
         const sourceId = `${id}DS${dataSourceRef}`;
+        registerSignalOwner(id, sourceId);
         getInputSignal(sourceId);
         getControlSignal(sourceId);
         getFormSignal(sourceId);
@@ -355,8 +380,76 @@ export const primeWindowSignals = (windowId, metadata = null) => {
     for (const dialog of dialogs) {
         const dialogId = String(dialog?.id || '').trim();
         if (!dialogId) continue;
+        registerSignalOwner(id, `${id}Dialog${dialogId}`);
         getDialogSignal(`${id}Dialog${dialogId}`);
     }
+};
+
+// Drop protected results and drafts in place when the verified context or
+// snapshot lease changes. Keep signal objects registered so the same window can
+// complete a fresh preflight without retaining data from the old context.
+const protectedWindowEpochs = new Map();
+let nextProtectedWindowEpoch = 0;
+
+export const protectedWindowEpoch = (windowId) => protectedWindowEpochs.get(String(windowId || '').trim()) || 0;
+
+export const clearProtectedWindowState = (windowId) => {
+    const id = String(windowId || '').trim();
+    if (!id) return;
+    protectedWindowEpochs.set(id, ++nextProtectedWindowEpoch);
+    invalidateWindowDataSourceRequests(id);
+    const knownWindowIds = Object.keys(metadataSignals.peek());
+    const belongs = key => windowOwnsSignalKey(key, id, knownWindowIds);
+    const reset = (registry, value) => {
+        for (const [key, entry] of Object.entries(registry.peek())) {
+            if (belongs(key)) entry.value = typeof value === 'function' ? value() : value;
+        }
+    };
+    reset(metadataSignals, null);
+    reset(dataSignals, () => []);
+    reset(inputSignals, () => ({fetch: false, refresh: false}));
+    reset(controlSignals, () => ({loading: false, error: null}));
+    reset(formSignals, () => ({}));
+    reset(viewSignals, () => ({}));
+    reset(selectionSignals, () => ({selected: null, rowIndex: -1, selection: []}));
+    reset(collectionInfoSignals, () => ({}));
+    reset(metricsSignals, () => ({}));
+    reset(messageSignals, () => []);
+    reset(dialogSignals, () => []);
+    reset(formStatusSignals, () => ({dirty: false, version: 0}));
+    reset(busSignals, () => []);
+    reset(dashboardFilterSignals, () => ({}));
+    reset(dashboardSelectionSignals, () => ({}));
+};
+
+// Scoped denial keeps window identity, filters and other authorized datasets.
+// The independent epoch prevents stale completions from restoring denied data.
+const protectedDataSourceEpochs = new Map();
+export const protectedDataSourceEpoch = sourceId => protectedDataSourceEpochs.get(String(sourceId||'')) || 0;
+export const clearDeniedDataSourceState = (sourceId,error) => {
+ const id=String(sourceId||'').trim();if(!id)return;
+ protectedDataSourceEpochs.set(id,protectedDataSourceEpoch(id)+1);
+ invalidateDataSourceRequests(id);
+ const reset=(registry,value)=>{const entry=registry.peek()[id];if(entry)entry.value=value;};
+ reset(dataSignals,[]);reset(formSignals,{});reset(selectionSignals,{selected:null,rowIndex:-1,selection:[]});
+ reset(collectionInfoSignals,{});reset(metricsSignals,{});reset(messageSignals,[]);reset(formStatusSignals,{dirty:false,version:0});reset(busSignals,[]);
+ const input=inputSignals.peek()[id];if(input)input.value={...input.peek(),fetch:false,refresh:false,invocationId:null,cache:null};
+ reset(controlSignals,{loading:false,error});
+};
+
+export const denyProtectedWindow = (windowId, status = 403) => {
+    const id = String(windowId || '').trim();
+    if (!id) return;
+    clearProtectedWindowState(id);
+    protectedWindowDenials.value = {...protectedWindowDenials.peek(), [id]: {status: status === 401 ? 401 : 403}};
+};
+
+export const clearProtectedWindowDenial = (windowId) => {
+    const id = String(windowId || '').trim();
+    if (!id || !protectedWindowDenials.peek()[id]) return;
+    const next = {...protectedWindowDenials.peek()};
+    delete next[id];
+    protectedWindowDenials.value = next;
 };
 
 
@@ -364,84 +457,27 @@ export const primeWindowSignals = (windowId, metadata = null) => {
 
 // Remove signals for a unique window key
 export const removeSignalsForKey = (windowId) => {
-    //console.log("removing signals for key", windowId);
-    const newMetadataSignals = {...metadataSignals.value};
-    delete newMetadataSignals[windowId];
-    metadataSignals.value = newMetadataSignals;
-
-    const newDataSignals = {...dataSignals.value};
-    const newDataControlSignals = {...controlSignals.value};
-    const newDataInputSignals = {...inputSignals.value};
-    const newViewSignals = {...viewSignals.value};
-    const newSelectionSignals = {...selectionSignals.value};
-    const newCollectionInfoSignals = {...collectionInfoSignals.value};
-    const newMetricsSignals = {...metricsSignals.value};
-    const newFormSignals = {...formSignals.value};
-    const newMessageSignals = {...messageSignals.value};
-    const newDialogSignals = {...dialogSignals.value};
-    const newFormStatusSignals = {...formStatusSignals.value};
-
-    const newBusSignals = {...busSignals.value};
-    const newDashboardFilterSignals = {...dashboardFilterSignals.value};
-    const newDashboardSelectionSignals = {...dashboardSelectionSignals.value};
-
-
-    for (const key in newDataSignals) {
-        if (key.startsWith(windowId)) {
-            delete newDataSignals[key];
-            delete newDataControlSignals[key];
-            delete newDataInputSignals[key];
-            delete newViewSignals[key];
-            delete newSelectionSignals[key];
-            delete newCollectionInfoSignals[key];
-            delete newMetricsSignals[key];
-            delete newFormSignals[key];
-            delete newMessageSignals[key];
-            delete newDialogSignals[key];
-            delete newFormStatusSignals[key];
-        }
+    const id = String(windowId || '').trim();
+    if (!id) return;
+    // Keep the epoch monotonic across close/reopen with the same window ID.
+    protectedWindowEpochs.set(id, ++nextProtectedWindowEpoch);
+    invalidateWindowDataSourceRequests(id);
+    clearProtectedWindowDenial(id);
+    const knownWindowIds = Object.keys(metadataSignals.peek());
+    const belongs = key => windowOwnsSignalKey(key, id, knownWindowIds);
+    const remove = registry => {
+        const next = {...registry.peek()};
+        for (const key of Object.keys(next)) if (belongs(key)) delete next[key];
+        registry.value = next;
+    };
+    for (const registry of [metadataSignals, dataSignals, controlSignals, inputSignals,
+        viewSignals, selectionSignals, collectionInfoSignals, metricsSignals,
+        formSignals, messageSignals, dialogSignals, formStatusSignals, busSignals,
+        dashboardFilterSignals, dashboardSelectionSignals]) remove(registry);
+    for (const [key, owners] of signalOwners) {
+        owners.delete(id);
+        if (owners.size === 0) signalOwners.delete(key);
     }
-
-    // Window-level signals do not necessarily have a datasource collection
-    // entry, so clear them independently from the datasource-key loop above.
-    delete newDataControlSignals[windowId];
-    delete newViewSignals[windowId];
-    delete newFormSignals[`${windowId}:windowForm`];
-    delete newMessageSignals[windowId];
-    for (const key in newDialogSignals) {
-        if (key.startsWith(`${windowId}Dialog`)) {
-            delete newDialogSignals[key];
-        }
-    }
-
-    // Remove bus signal for this window (exact match, not startsWith)
-    delete newBusSignals[windowId];
-    for (const key in newDashboardFilterSignals) {
-        if (key.startsWith(`${windowId}:`)) {
-            delete newDashboardFilterSignals[key];
-        }
-    }
-    for (const key in newDashboardSelectionSignals) {
-        if (key.startsWith(`${windowId}:`)) {
-            delete newDashboardSelectionSignals[key];
-        }
-    }
-
-
-    dataSignals.value = newDataSignals;
-    controlSignals.value = newDataControlSignals;
-    inputSignals.value = newDataInputSignals;
-    viewSignals.value = newViewSignals;
-    selectionSignals.value = newSelectionSignals;
-    collectionInfoSignals.value = newCollectionInfoSignals;
-    metricsSignals.value = newMetricsSignals;
-    formSignals.value = newFormSignals;
-    messageSignals.value = newMessageSignals;
-    dialogSignals.value = newDialogSignals;
-    formStatusSignals.value = newFormStatusSignals;
-    busSignals.value = newBusSignals;
-    dashboardFilterSignals.value = newDashboardFilterSignals;
-    dashboardSelectionSignals.value = newDashboardSelectionSignals;
 };
 
 

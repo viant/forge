@@ -3,6 +3,8 @@ import {
   compilePermittedView,
   normalizeAuthorizationSnapshot,
   reduceAuthorizationCondition,
+  resolveAuthorizationResourceID,
+  authorizationSnapshotLeaseMs,
 } from './permittedView.js';
 
 const response = {
@@ -43,5 +45,22 @@ const missingAuth = compilePermittedView({view: {content: {id: 'root', container
   {id: 'protected', visibleWhen: {source: 'authorization', field: 'resource.capabilities.write', equals: true}},
 ]}}}, null);
 assert.deepEqual(missingAuth.metadata.view.content.containers, []);
+
+for (const guard of ['visibleWhen', 'hiddenWhen', 'disabledWhen', 'readOnlyWhen']) {
+  const malformed = {view: {content: {id: 'root', containers: [{id: 'item', [guard]: {source: 'authorization', field: 'principal.roles', greaterThan: 1}}]}}};
+  assert.throws(() => compilePermittedView(malformed, authorization), /unknown authorization operator/);
+}
+const dynamic = {view: {content: {id: 'root', containers: [{id: 'item', hiddenWhen: {source: 'windowForm', field: 'status', equals: 'hidden'}}]}}};
+assert.deepEqual(compilePermittedView(dynamic, authorization).metadata.view.content.containers[0].hiddenWhen, dynamic.view.content.containers[0].hiddenWhen);
+
+const largeID = '9007199254740993';
+assert.deepEqual(resolveAuthorizationResourceID(2, largeID, {schemaVersion: 2}), {valid: true, id: largeID});
+assert.equal(resolveAuthorizationResourceID(2, Number(largeID), {schemaVersion: 2}).valid, false);
+assert.equal(resolveAuthorizationResourceID(2, largeID, {}).valid, false);
+assert.deepEqual(resolveAuthorizationResourceID(1, 42, {}), {valid: true, id: 42});
+assert.equal(resolveAuthorizationResourceID(1, Number(largeID), {}).valid, false);
+assert.equal(authorizationSnapshotLeaseMs({expiresAt: '2026-01-01T00:00:10Z'}, Date.parse('2026-01-01T00:00:00Z')), 10000);
+assert.equal(authorizationSnapshotLeaseMs({expiresAt: '2026-01-01T00:00:00Z'}, Date.parse('2026-01-01T00:00:10Z')), 0);
+assert.equal(authorizationSnapshotLeaseMs({}), 0);
 
 console.log('permitted view compiler ✓');

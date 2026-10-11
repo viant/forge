@@ -19,6 +19,9 @@ import {
     findFormSignal,
     findMetricsSignal,
     primeWindowSignals,
+    clearProtectedWindowState,
+    clearProtectedWindowDenial,
+    protectedWindowDenials,
     removeWindow,
 } from '../core';
 
@@ -37,13 +40,14 @@ import { mergeWindowFormValues } from '../hooks/dataSource.js';
 import {applyParameterCodec} from '../hooks/parameters.js';
 import {injectActions} from '../actions';
 import { resolveMetadataForTarget } from '../runtime/metadataResolver.js';
-import {compilePermittedView, normalizeAuthorizationSnapshot} from '../runtime/permittedView.js';
+import {compilePermittedView, normalizeAuthorizationSnapshot, resolveAuthorizationResourceID, authorizationSnapshotLeaseMs} from '../runtime/permittedView.js';
 import { applyDataSourceParameterCodecs, resolveParameters } from '../hooks/parameters.js';
 import { resolveSelector } from '../utils/selector.js';
 import { evaluatePlainVisibleWhen } from './visibleWhen.js';
 import { getLogger } from '../utils/logger.js';
 import { runWindowLifecycleHandlers } from './windowLifecycle.js';
 import { buildReportBuilderHostServices } from './dashboard/reportBuilderHostServices.js';
+import { windowMetadataEndpoint } from './windowMetadataEndpoint.js';
 
 export function reuseShallowEqualRuntimeObject(previous = null, candidate = null) {
     if (!previous || !candidate || typeof previous !== 'object' || typeof candidate !== 'object') {
@@ -87,16 +91,23 @@ function collectInitialWindowFormItemValues(node, initial) {
 }
 
 export function compileWindowAuthorizationMetadata(metadata, parameters = {}) {
-    if (!metadata?.authorization) return metadata;
     const snapshot = metadata?.authorizationSnapshot;
+    if (!metadata?.authorization) return snapshot && authorizationSnapshotLeaseMs(snapshot) <= 0 ? null : metadata;
     if (!snapshot || typeof snapshot !== 'object') return null;
+    if (authorizationSnapshotLeaseMs(snapshot) <= 0) return null;
     const spec = metadata.authorization || {};
     const resourceType = String(spec?.resource?.type || spec?.resourceType || '').trim();
     const selector = String(spec?.resource?.id?.selector || '').trim();
     const selected = selector ? resolveSelector(parameters || {}, selector) : null;
-    const resourceId = selected == null || selected === '' ? null : Number(selected);
-    const authorization = normalizeAuthorizationSnapshot(snapshot, resourceType, Number.isFinite(resourceId) ? resourceId : null);
-    const result = compilePermittedView(metadata, authorization, {requireRead: String(spec.scope || '').toLowerCase() === 'resource'});
+    const resourceID = resolveAuthorizationResourceID(spec.schemaVersion, selected, snapshot);
+    if (!resourceID.valid) return null;
+    const authorization = normalizeAuthorizationSnapshot(snapshot, resourceType, resourceID.id);
+    let result;
+    try {
+        result = compilePermittedView(metadata, authorization, {requireRead: String(spec.scope || '').toLowerCase() === 'resource'});
+    } catch (cause) {
+        throw Object.assign(new Error('Window authorization metadata is invalid'), {status: 403, code: 'WINDOW_AUTHORIZATION_INVALID', cause});
+    }
     if (result.denied || !result.metadata) return null;
     return {...result.metadata, authorizationSnapshot: authorization};
 }
@@ -139,6 +150,7 @@ export function withWindowPermissionDeadline(work, timeoutMs = 15000) {
 
 export function formatWindowMetadataError(error) {
     if (!error) return '';
+    if (error.code === 'WINDOW_AUTHORIZATION_EXPIRED' || error.code === 'PREVIEW_AUTHORIZATION_EXPIRED') return 'Permissions expired. Refresh permission checks or reopen this window.';
     if (Number(error.status) === 504) return 'Permission check timed out. Please try again.';
     if (Number(error.status) === 403) {
         return 'Access denied. You do not have permission to open this resource.';
@@ -358,6 +370,9 @@ function expandRequiredDataSourceRefs(metadata, refs) {
     while (queue.length > 0) {
         const ref = queue.shift();
         const parentRef = String(all?.[ref]?.dataSourceRef || '').trim();
+        // `_` is the authored local-datasource placeholder, not a parent to
+        // mount. Preserve an explicitly declared source with that name.
+        if (parentRef === '_' && !Object.prototype.hasOwnProperty.call(all, parentRef)) continue;
         if (parentRef && !result.has(parentRef)) {
             result.add(parentRef);
             queue.push(parentRef);
@@ -1044,6 +1059,7 @@ function WindowContentInner({window, metadata, services}) {
                 overflow: shouldFillParent ? 'hidden' : 'visible',
             }}
         >
+            {!defaultDataSourceRef && context.signals ? <MessageBus context={context} /> : null}
             {renderDataSources()}
             {renderDialogs()}
             <WindowLayout
@@ -1118,10 +1134,11 @@ function WindowContentRuntime({window, isInTab = false}) {
             endpoints,
             targetContext,
             auth,
+            transport: services.dataConnectorTransport,
             prepareRequest: prepareConnectorRequest,
         },
     }), [reportBuilderServices, runtimeWindow, endpoints, targetContext, auth, prepareConnectorRequest]);
-    const config  = {service: {...service, uri: `${service.uri}/${baseKey}`, includeTargetContext: true}};
+    const config  = {service: {...service, uri: windowMetadataEndpoint(service.uri, baseKey), includeTargetContext: true}};
     const connector = useDataConnector(config);
 
     useEffect(() => {
@@ -1151,8 +1168,9 @@ function WindowContentRuntime({window, isInTab = false}) {
         setSignalsReady(false);
         setLoading(true);
         setFetchError(null);
+        clearProtectedWindowDenial(windowId);
         if (isProtectedWindowMetadata(existingMetadata)) {
-            metadataSignalHandle.value = null;
+            clearProtectedWindowState(windowId);
         }
 
         let hasInlineFallback = false;
@@ -1193,12 +1211,13 @@ function WindowContentRuntime({window, isInTab = false}) {
                     throw Object.assign(new Error('Resource not found or access denied'), {status: 403});
                 }
                 injectActions(resolvedMetadata);
-                metadataSignalHandle.value = {
+                const heldMetadata = {
                     ...resolvedMetadata,
                     __windowKey: baseKey,
                     __targetKey: targetKey,
                     __provisionalInline: false,
                 };
+                metadataSignalHandle.value = heldMetadata;
             }))
             .catch((err) => {
                 if (Number(err?.status) === 504) expired = true;
@@ -1218,7 +1237,7 @@ function WindowContentRuntime({window, isInTab = false}) {
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey]);
+    }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey, auth]);
 
     useEffect(() => {
         const metadata = metadataSignalHandle?.value;
@@ -1228,9 +1247,32 @@ function WindowContentRuntime({window, isInTab = false}) {
         setSignalsReady(true);
     }, [windowId, metadataSignalHandle?.value, resolvedServices, window]);
 
-    const metadata = metadataSignalHandle?.peek?.();
+    useEffect(() => {
+        const snapshot = metadataSignalHandle?.value?.authorizationSnapshot;
+        if (!snapshot) return;
+        let timer;
+        const expire = () => {
+            if (metadataSignalHandle?.peek?.()?.authorizationSnapshot !== snapshot) return;
+            clearProtectedWindowState(windowId);
+            setSignalsReady(false);
+            const error = Object.assign(new Error('Authorization expired'), {status: 403, code: 'WINDOW_AUTHORIZATION_EXPIRED'});
+            setFetchError(error);
+        };
+        const schedule = () => {
+            const lease = authorizationSnapshotLeaseMs(snapshot);
+            if (lease <= 0) { expire(); return; }
+            timer = setTimeout(() => {
+                if (authorizationSnapshotLeaseMs(snapshot) <= 0) expire();
+                else schedule();
+            }, Math.min(lease, 2147483647));
+        };
+        schedule();
+        return () => clearTimeout(timer);
+    }, [windowId, metadataSignalHandle?.value?.authorizationSnapshot]);
 
-    const displayState = resolveWindowMetadataDisplayState({loading, signalsReady, metadata, fetchError});
+    const metadata = metadataSignalHandle?.peek?.();
+    const protectedDenial = protectedWindowDenials.value[windowId];
+    const displayState = resolveWindowMetadataDisplayState({loading, signalsReady: protectedDenial ? false : signalsReady, metadata, fetchError: protectedDenial || fetchError});
 
     // Keep the service runtime referentially stable while the effective
     // window, metadata authorization, and host services are unchanged.
@@ -1285,7 +1327,7 @@ function WindowContentRuntime({window, isInTab = false}) {
                     lineHeight: 1.4,
                 }}
             >
-                {formatWindowMetadataError(fetchError)}
+                {formatWindowMetadataError(protectedDenial || fetchError)}
             </div>
         );
     }

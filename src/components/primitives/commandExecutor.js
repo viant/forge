@@ -4,6 +4,7 @@ import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import {applyPrimitiveState, mutationCommandTargetParameters, reconcileEditableCollection} from './editableCollectionModel.js';
 import {prepareResourcePayload} from './resourceModel.js';
 import {formatDataSourceError} from '../../utils/dataSourceError.js';
+import {protectedWindowEpoch} from '../../core/store/signals.js';
 
 const commandStates = new WeakMap();
 const transportStates = new WeakMap();
@@ -117,8 +118,9 @@ function awaitWriter(target, invoke, timeoutMs) {
   });
 }
 
-async function synchronizeUI(context, target, command, writerResponse = null) {
+async function synchronizeUI(context, target, command, writerResponse = null, authorizationIsCurrent = () => true) {
   const warnings = [];
+  if (!authorizationIsCurrent()) return [{stage: 'authorization', error: new Error('Authorization context changed before UI synchronization.')}];
   if (command.reconcile) {
     const spec = command.reconcile;
     try {
@@ -126,21 +128,24 @@ async function synchronizeUI(context, target, command, writerResponse = null) {
       if (String(spec.mode || '').toLowerCase() === 'refetch') {
         const result = destination?.handlers?.dataSource?.fetchCollection?.({cache: {bypassCache: true}});
         if (result?.then) await result;
+        if (!authorizationIsCurrent()) return [...warnings, {stage: 'authorization', error: new Error('Authorization context changed before UI synchronization.')}];
       } else {
         const current = destination?.signals?.collection?.peek?.() || destination?.signals?.collection?.value || [];
         const response = writerResponse ?? target?.signals?.collection?.peek?.() ?? target?.signals?.collection?.value ?? [];
         const path = spec.resultPath || spec.rowsPath;
         const selected = path ? resolveSelector(response, path) : response;
-        if (destination?.signals?.collection) destination.signals.collection.value = reconcileEditableCollection(current, selected, spec);
+        if (authorizationIsCurrent() && destination?.signals?.collection) destination.signals.collection.value = reconcileEditableCollection(current, selected, spec);
       }
     } catch (error) { warnings.push({stage: 'reconcile', error}); }
   }
   for (const refresh of command.refresh || []) {
+    if (!authorizationIsCurrent()) return [...warnings, {stage: 'authorization', error: new Error('Authorization context changed before UI synchronization.')}];
     try {
       const dataContext = context?.Context?.(refresh.dataSourceRef);
       if (refresh.clearSelection === true) dataContext?.handlers?.dataSource?.resetSelection?.();
       const result = dataContext?.handlers?.dataSource?.fetchCollection?.(refresh.bypassCache ? {cache: {bypassCache: true}} : {});
       if (result?.then) await result;
+      if (!authorizationIsCurrent()) return [...warnings, {stage: 'authorization', error: new Error('Authorization context changed before UI synchronization.')}];
     } catch (error) { warnings.push({stage: 'refresh', dataSourceRef: refresh.dataSourceRef, error}); }
   }
   return warnings;
@@ -205,6 +210,16 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
   const targetRef = String(command.dataSourceRef || '').trim();
   const key = commandGuardKey(command);
   if (!targetRef || !key || getCommandState(context, command).guarded) return {accepted: false, status: 'suppressed'};
+  const protectedWindow = context?.identity?.protectedWindow === true;
+  const windowId = context?.identity?.windowId;
+  const authorizationEpoch = protectedWindow ? protectedWindowEpoch(windowId) : null;
+  const authorizationIsCurrent = () => !protectedWindow || protectedWindowEpoch(windowId) === authorizationEpoch;
+  const superseded = (accepted, invocationId = '') => {
+    const error = new Error('Authorization context changed before command completion.');
+    error.code = 'request_superseded';
+    publish(context, key, {phase: 'failed', guarded: false, pending: false, retryAllowed: true, error, message: 'Authorization context changed. Reopen this window.', writerStatus: accepted ? 'failed' : 'not_invoked', syncStatus: 'not_started'});
+    return {accepted, status: 'failed', error, invocationId};
+  };
   publish(context, key, {phase: 'validating', guarded: true, pending: false, retryAllowed: false, error: null, message: 'Validating…', writerStatus: 'not_invoked', syncStatus: 'not_started'});
   let id = '';
   let writerInvoked = false;
@@ -235,6 +250,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
         return {accepted: false, status: 'cancelled'};
       }
     }
+    if (!authorizationIsCurrent()) return superseded(false);
     target = context?.Context?.(targetRef);
     if (!target?.handlers?.dataSource?.setInputParameters || !target?.handlers?.dataSource?.fetchCollection) throw new Error(`Command datasource is unavailable: ${targetRef}`);
     if (!acquireTransport(target, key)) {
@@ -251,6 +267,11 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       writerInvoked = true;
       return target.handlers.dataSource.fetchCollection({cache: {bypassCache: true}, invocationId: id});
     }, Math.max(1000, Number(command.timeoutMs) || 30000));
+    if (!authorizationIsCurrent()) {
+      releaseTransport(target, key);
+      transportAcquired = false;
+      return superseded(writerInvoked, id);
+    }
     if (writer.status === 'failed') {
       releaseTransport(target, key);
       transportAcquired = false;
@@ -281,15 +302,17 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     releaseTransport(target, key);
     transportAcquired = false;
     publish(context, key, {phase: 'synchronizing', guarded: true, pending: false, retryAllowed: false, error: null, message: 'Refreshing…', writerStatus: 'succeeded', syncStatus: 'pending'});
-    try { warnings.push(...await synchronizeUI(context, target, command, writerResponse)); } catch (error) { warnings.push({stage: 'synchronize', error}); }
+    try { warnings.push(...await synchronizeUI(context, target, command, writerResponse, authorizationIsCurrent)); } catch (error) { warnings.push({stage: 'synchronize', error}); }
+    if (!authorizationIsCurrent()) return superseded(writerInvoked, id);
     const syncStatus = warnings.length ? 'partial_failure' : 'succeeded';
     const message = warnings.length ? 'Saved. Some related data could not be refreshed.' : 'Completed';
     publish(context, key, {phase: 'succeeded', guarded: false, pending: false, retryAllowed: true, error: null, message, writerStatus: 'succeeded', syncStatus, warnings});
     notifyLifecycle(lifecycle, 'onSettled', {status: 'succeeded', warnings, invocationId: id});
     return {accepted: true, status: 'succeeded', warnings, invocationId: id};
   } catch (error) {
-    console.error(`Forge mutation command failed commandId=${key} dataSourceRef=${targetRef} writerInvoked=${writerInvoked}: ${error?.stack || error}`);
     if (transportAcquired && target) releaseTransport(target, key);
+    if (!authorizationIsCurrent()) return superseded(writerInvoked, id);
+    console.error(`Forge mutation command failed commandId=${key} dataSourceRef=${targetRef} writerInvoked=${writerInvoked}: ${error?.stack || error}`);
     if (writerSucceeded) {
       const warnings = [{stage: 'post_write', error}];
       publish(context, key, {phase: 'succeeded', guarded: false, pending: false, retryAllowed: true, error: null, message: 'Saved. Some related data could not be refreshed.', writerStatus: 'succeeded', syncStatus: 'partial_failure', warnings});

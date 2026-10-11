@@ -1,20 +1,23 @@
+import {isDatasetScopedDenial} from '../components/dataSourceAuthorization.js';
 export function normalizeDataSourceError(error) {
     if (!error) {
         return null;
     }
     if (error.__forgeDataSourceError === true) {
         const display = String(error.displayMessage || error.message || 'Unable to load data. Please retry.').trim() || 'Unable to load data. Please retry.';
-        return {...error, displayMessage: resolveDisplayMessage(Number(error.status) || undefined, display)};
+        return {...error, isUnauthorized: isDatasetScopedDenial(error) ? false : error.isUnauthorized, displayMessage: isDatasetScopedDenial(error) ? 'This data source denied the request. Adjust the filters or retry.' : resolveDisplayMessage(Number(error.status) || undefined, display)};
     }
     const status = Number.isFinite(Number(error?.status)) ? Number(error.status) : undefined;
     const statusText = String(error?.statusText || '').trim() || undefined;
     const message = resolveErrorMessage(error, status, statusText);
-    const displayMessage = resolveDisplayMessage(status, message);
+    const displayMessage = isDatasetScopedDenial(error) ? 'This data source denied the request. Adjust the filters or retry.' : resolveDisplayMessage(status, message);
     return {
         __forgeDataSourceError: true,
         status,
         statusText,
-        isUnauthorized: Boolean(error?.isUnauthorized) || status === 401 || status === 403,
+        code: typeof error?.code==='string' ? error.code : undefined,
+        scope: typeof error?.scope==='string' ? error.scope : undefined,
+        isUnauthorized: isDatasetScopedDenial(error) ? false : Boolean(error?.isUnauthorized) || status === 401 || status === 403,
         message,
         displayMessage,
         raw: error,

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {dispatchMutationCommand, executeCommand, getCommandState, mergeCommandParameters, resetCommandState, resolveCommandConfirmation, resolveIndeterminateCommand} from './commandExecutor.js';
+import {clearProtectedWindowState, getCollectionSignal, getControlSignal, getMetadataSignal, primeWindowSignals} from '../../core/store/signals.js';
 
 const mutableSignal = (initial) => {
   let value = initial;
@@ -284,5 +285,27 @@ assert.deepEqual(mergeCommandParameters(
   {Mutation: {recordId: 101, trace: 'base'}, Header: 'keep'},
   {Mutation: {operation: 'assign', relatedItemIds: [11]}},
 ), {Mutation: {recordId: 101, trace: 'base', operation: 'assign', relatedItemIds: [11]}, Header: 'keep'});
+
+const protectedWindowId = 'protected-command';
+primeWindowSignals(protectedWindowId, {dataSource: {patch: {}}});
+getMetadataSignal(protectedWindowId).value = {authorizationSnapshot: {authorizationVersion: 'v1'}};
+const protectedControl = getControlSignal(`${protectedWindowId}DSpatch`);
+const protectedCollection = getCollectionSignal(`${protectedWindowId}DSpatch`);
+protectedCollection.value = [{secret: 'old-account'}];
+let completeProtectedWriter;
+const protectedTarget = {signals: {control: protectedControl, collection: protectedCollection}, handlers: {dataSource: {setInputParameters() {}, fetchCollection() {
+  protectedControl.value = {loading: true, error: null};
+  return new Promise(resolve => { completeProtectedWriter = resolve; });
+}}}};
+const protectedContext = {identity: {windowId: protectedWindowId, protectedWindow: true}, Context: () => protectedTarget};
+const protectedCommand = {dataSourceRef: 'patch'};
+const pendingProtectedCommand = executeCommand(protectedContext, protectedCommand);
+clearProtectedWindowState(protectedWindowId);
+completeProtectedWriter({ok: true});
+const superseded = await pendingProtectedCommand;
+assert.equal(superseded.status, 'failed');
+assert.equal(superseded.error.code, 'request_superseded');
+assert.deepEqual(protectedCollection.value, []);
+assert.equal(getCommandState(protectedContext, protectedCommand).guarded, false);
 
 console.log('canonical command executor contract passed');
