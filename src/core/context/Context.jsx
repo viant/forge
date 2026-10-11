@@ -1,3 +1,4 @@
+import {canonicalSelectionBinding} from '../../runtime/canonicalDelivery.js';
 import {useDataSourceHandlers} from "../../hooks/index.js";
 import {
     getControlSignal,
@@ -142,7 +143,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
     };
     return {
 
-        identity: {windowId, getDataSourceId, dataSourceRef, getDialogId, protectedWindow: !!(metadata?.authorization || metadata?.authorizationSnapshot), ...(actorRef ? { actorRef } : {})},
+        identity: {windowId, getDataSourceId, dataSourceRef, getDialogId, protectedWindow: !!(metadata?.authorization || metadata?.authorizationSnapshot || canonicalSelectionBinding(metadata)), canonicalDelivery: !!canonicalSelectionBinding(metadata), ...(actorRef ? { actorRef } : {})},
         windowState: services?.windowState || null,
         authorization: services?.authorization || null,
         resources: {},

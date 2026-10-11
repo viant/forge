@@ -10,7 +10,7 @@ import {hasResolvedDependencies} from "./dataSourceDependencies.js";
 import {bindingFinalizationAction, isCurrentBindingGeneration} from "./primitives/bindingGeneration.js";
 import {resourceModelRefForDataSource, unmarshalResourceCollection} from "./primitives/resourceModel.js";
 import {settleDataSourceRequest} from './dataSourceRequestLifecycle.js';
-import {isProtectedUpstreamDenial, isDatasetScopedDenial} from './dataSourceAuthorization.js';
+import {isProtectedUpstreamDenial, isDataSourceLocalDenial} from './dataSourceAuthorization.js';
 import {shouldDispatchSelectionEvent} from './selectionEventModel.js';
 import {reconcileFetchForMetadataReadiness} from './dataSourceMetadataReadiness.js';
 import {
@@ -423,7 +423,7 @@ export default function DataSource({context}) {
             }
         } catch (err) {
             if (!mountedRef.current || !authorizationIsCurrent()) return;
-            if (isDatasetScopedDenial(err)) { clearDeniedDataSourceState(identity.dataSourceId, err); return; }
+            if (isDataSourceLocalDenial(err, context)) { clearDeniedDataSourceState(identity.dataSourceId, err); return; }
             if (isProtectedUpstreamDenial(context, err)) {
                 denyProtectedWindow(identity.windowId, Number(err.status));
                 return;
@@ -682,7 +682,7 @@ export default function DataSource({context}) {
                 try { log.debug('[doFetchRecords] ignored stale binding error', {ds: context?.identity?.dataSourceRef, bindingGeneration}); } catch (_) {}
                 return;
             }
-            if (isDatasetScopedDenial(err)) { clearDeniedDataSourceState(identity.dataSourceId, err); return; }
+            if (isDataSourceLocalDenial(err, context)) { clearDeniedDataSourceState(identity.dataSourceId, err); return; }
             if (isProtectedUpstreamDenial(context, err)) {
                 denyProtectedWindow(identity.windowId, Number(err.status));
                 return;

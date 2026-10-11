@@ -16,3 +16,9 @@ assert.equal(isProtectedUpstreamDenial(protectedContext,{status:409,code:'confli
 for (const scope of [undefined, 'window', 'other']) {
  assert.equal(isProtectedUpstreamDenial(protectedContext, {status:403,code:'datasource_denied',scope}),true);
 }
+
+assert.equal(isProtectedUpstreamDenial({identity:{windowId:'bound',protectedWindow:true,canonicalDelivery:true},metadata:{}},{status:403,code:'resource_denied',scope:'window'}),true);
+
+assert.equal(isProtectedUpstreamDenial({identity:{windowId:'bound',protectedWindow:true,canonicalDelivery:true},metadata:{}},{status:403,message:'datasource_denied'}),false);
+
+assert.equal(isProtectedUpstreamDenial({identity:{windowId:'bound',protectedWindow:true,canonicalDelivery:true},metadata:{}},{status:403,code:'datasource_denied',scope:'window'}),false);

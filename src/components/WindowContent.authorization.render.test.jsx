@@ -2,7 +2,7 @@ import React, {act} from 'react';
 import {JSDOM} from 'jsdom';
 import {createRoot} from 'react-dom/client';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import WindowContent from './WindowContent.jsx';
+import WindowContent, {compileWindowAuthorizationMetadata} from './WindowContent.jsx';
 import {SettingProvider} from '../core/context/Setting.jsx';
 import {getWindowContext} from '../core/context/registry.js';
 import {registerContainerRenderer} from '../runtime/containerRendererRegistry.js';
@@ -36,7 +36,7 @@ function mount(services, window = {windowId, windowKey: 'mcp://opaque/window'}) 
 function definition(withRows = false) {
   return {authorization: {scope: 'window'}, authorizationSnapshot: {authorizationVersion:'v1', expiresAt:'2026-10-10T12:00:10Z', principal:{id:'actor-a'}},
     dataSource: withRows ? {rows:{service:{uri:'mcp://opaque/rows'}, selectionMode:'none'}} : {},
-    view:{content:{id:'authorized-root',kind:'test.authorized', ...(withRows ? {dataSourceRef:'rows',fetchData:true} : {})}}};
+    view:{content:{id:'authorized-root',kind:'test.authorized', ...(withRows ? {dataSourceRef:'rows'} : {})}}};
 }
 describe('mounted protected window absolute lease', () => {
   it('expires the mounted renderer without renewing or modifying its old metadata', async () => {
@@ -124,4 +124,106 @@ describe('mounted protected window absolute lease', () => {
     });
   }
 
+});
+
+const binding = (instanceId = 'delivery-a') => ({actor:{issuer:'issuer',subject:'actor-a',tenantId:'tenant',accountId:'account'},instanceId,parametersDigest:'digest',token:'signed-server-token'});
+const boundWindow = (selectionBinding = binding()) => ({windowId,windowKey:'mcp://opaque/window',parameters:{entityId:'9007199254740993'},selectionBinding});
+describe('canonical delivered window uses display hints only', () => {
+  it('consumes complete signed direct OPEN metadata without a second metadata lookup',async()=>{
+    let metadataRequests=0,permissions=0;
+    const services={applyPermission:async()=>{permissions++;throw new Error('repeat permission');},dataConnectorTransport:async request=>{
+      if(request.dataSourceRef==='rows') return {data:[{id:1,secret:'direct-admitted'}]};
+      metadataRequests++;throw new Error('dynamic metadata lookup unavailable');
+    }};
+    const inlineMetadata={...definition(true),selectionBinding:binding()};
+    const opened={windowId,windowKey:'dynamic-canonical-variant',parameters:{entityId:'9007199254740993'},inlineMetadata};
+    await mount(services,opened);await flush();
+    expect(element.querySelector('[data-authorized-renderer]')).not.toBeNull();
+    expect(getCollectionSignal(`${windowId}DSrows`).peek()).toEqual([{id:1,secret:'direct-admitted'}]);
+    expect(metadataRequests).toBe(0);expect(permissions).toBe(0);
+    expect(getMetadataSignal(windowId).peek().selectionBinding).toBe(inlineMetadata.selectionBinding);
+  });
+  it('uses normalized trusted hints only for widget display and preserves independently authorized sources',()=>{
+    const metadata={authorization:{schemaVersion:2,scope:'resource',resource:{type:'entity',id:{selector:'entityId'}}},
+      authorizationSnapshot:{schemaVersion:2,expiresAt:'2000-01-01T00:00:00Z',resources:{'9007199254740993':{id:'9007199254740993',capabilities:{read:false,write:false}}}},
+      dataSource:{visible:{id:'visible'},hidden:{id:'hidden'}},
+      view:{content:{id:'root',items:[{id:'hidden',dataSourceRef:'hidden',visibleWhen:{source:'authorization',field:'resource.capabilities.read',equals:true}},{id:'visible',dataSourceRef:'visible'}]}}};
+    const result=compileWindowAuthorizationMetadata(metadata,{entityId:'9007199254740993'},binding());
+    expect(result.view.content.items.map(item=>item.id)).toEqual(['visible']);
+    expect(result.dataSource).toBe(metadata.dataSource);
+    expect(result.authorizationSnapshot.resource.id).toBe('9007199254740993');
+    expect(metadata.view.content.items).toHaveLength(2);
+  });
+  it('keeps mounted real datasources across hint expiry without permission preflight or renewal', async () => {
+    let completeRows, metadataRequests=0, permissions=0;
+    const services={applyPermission:async () => {permissions++;throw new Error('Unexpected UI data preflight');},
+      dataConnectorTransport:async request => {
+        if(request.dataSourceRef==='rows') return new Promise(resolve=>{completeRows=resolve;});
+        metadataRequests++;
+        const metadata=definition(true);
+        metadata.authorization.scope='resource';
+        metadata.authorizationSnapshot.resource={capabilities:{read:false,write:false}};
+        return {data:metadata};
+      }};
+    const opened=boundWindow();
+    await mount(services,opened);await flush();
+    expect(completeRows).toBeTypeOf('function');
+    const held=getMetadataSignal(windowId).peek();
+    expect(held.selectionBinding).toBe(opened.selectionBinding);
+    expect(latestRendererContext.identity.canonicalDelivery).toBe(true);
+    const expiry=held.authorizationSnapshot.expiresAt;
+    await act(async()=>vi.advanceTimersByTime(11000));await flush();
+    await act(async()=>completeRows({data:[{id:1,secret:'after-hint-expiry'}]}));await flush();
+    expect(getCollectionSignal(`${windowId}DSrows`).peek()).toEqual([{id:1,secret:'after-hint-expiry'}]);
+    expect(element.querySelector('[data-authorized-renderer]')).not.toBeNull();
+    expect(held.authorizationSnapshot.expiresAt).toBe(expiry);
+    expect(metadataRequests).toBe(1);expect(permissions).toBe(0);
+  });
+  for(const change of ['selection','actor']) {
+  it(`rejects stale data completion after ${change} changes, including authnil windows`, async()=>{
+    let completeOldRows, requests=0;
+    const services={dataConnectorTransport:async request=>{
+      if(request.dataSourceRef==='rows') {
+        requests++;
+        return requests===1 ? new Promise(resolve=>{completeOldRows=resolve;}) : {data:[{id:2,secret:'new-delivery'}]};
+      }
+      const metadata=definition(true);delete metadata.authorization;delete metadata.authorizationSnapshot;
+      return {data:metadata};
+    }};
+    await mount(services,boundWindow());await flush();
+    expect(completeOldRows).toBeTypeOf('function');
+    const nextBinding=binding(change==='selection' ? 'delivery-b' : 'delivery-a');
+    if(change==='actor') nextBinding.actor.subject='actor-b';
+    await mount(services,boundWindow(nextBinding));await flush();
+    expect(getCollectionSignal(`${windowId}DSrows`).peek()).toEqual([{id:2,secret:'new-delivery'}]);
+    await act(async()=>completeOldRows({data:[{id:1,secret:'stale-delivery'}]}));await flush();
+    expect(getCollectionSignal(`${windowId}DSrows`).peek()).toEqual([{id:2,secret:'new-delivery'}]);
+  });
+  }
+});
+
+describe('canonical managing MCP denials on authnil window',()=>{
+  for(const failure of [
+    {status:403,code:'datasource_denied',scope:'dataset'},
+    {status:403,message:'resource revision denied'},
+    {status:403,code:'resource_denied',scope:'window'},
+    {status:401,authRequired:true},
+  ]) {
+    it(`clears the correct scope for ${failure.code || failure.status}`,async()=>{
+      let denied=false;
+      const error=Object.assign(new Error('authoritative MCP denial'),failure);
+      const services={dataConnectorTransport:async request=>{
+        if(request.dataSourceRef!=='rows') {const metadata=definition(true);delete metadata.authorization;delete metadata.authorizationSnapshot;return {data:metadata};}
+        if(denied) throw error;
+        return {data:[{id:1,secret:'previous-result'}]};
+      }};
+      await mount(services,boundWindow());await flush();
+      expect(getCollectionSignal(`${windowId}DSrows`).peek()).toEqual([{id:1,secret:'previous-result'}]);
+      denied=true;
+      await act(async()=>{await expect(getWindowContext(windowId).Context('rows').handlers.dataSource.fetchRecords()).rejects.toBe(error);});await flush();
+      expect(getCollectionSignal(`${windowId}DSrows`).peek()).toEqual([]);
+      if(failure.scope==='dataset' || (failure.status===403 && !failure.scope)) expect(element.querySelector('[data-authorized-renderer]')).not.toBeNull();
+      else {expect(element.querySelector('[data-authorized-renderer]')).toBeNull();expect(getMetadataSignal(windowId).peek()).toBeNull();}
+    });
+  }
 });
