@@ -613,11 +613,11 @@ type DashboardEditableTableAddRow struct {
 func (c *Container) UnmarshalJSON(data []byte) error {
 	type alias Container
 	var decoded alias
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := decodeWindowResourceJSON(data, &decoded); err != nil {
 		return err
 	}
 	var compact dashboardCompactAliases
-	if err := json.Unmarshal(data, &compact); err != nil {
+	if err := decodeWindowResourceJSON(data, &compact); err != nil {
 		return err
 	}
 	*c = Container(decoded)
