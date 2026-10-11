@@ -1,8 +1,10 @@
 package types
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"slices"
 	"strings"
 
@@ -220,7 +222,7 @@ func selectWindowResource(raw json.RawMessage, requested *WindowTarget, referenc
 			return nil, fmt.Errorf("historical window supports default target only")
 		}
 		var window Window
-		if json.Unmarshal(raw, &window) != nil || window.View.Content == nil {
+		if decodeWindowResourceJSON(raw, &window) != nil || window.View.Content == nil {
 			return nil, fmt.Errorf("invalid historical window")
 		}
 		return &WindowResourceVariant{Window: &window, Fingerprint: identity.ContentFingerprint(raw)}, nil
@@ -232,7 +234,7 @@ func selectWindowResource(raw json.RawMessage, requested *WindowTarget, referenc
 		return nil, fmt.Errorf("window references require an installed dependency verifier")
 	}
 	var envelope WindowResourceEnvelope
-	if json.Unmarshal(raw, &envelope) != nil {
+	if decodeWindowResourceJSON(raw, &envelope) != nil {
 		return nil, fmt.Errorf("invalid window bundle")
 	}
 	if err := envelope.Validate(); err != nil {
@@ -247,4 +249,18 @@ func selectWindowResource(raw json.RawMessage, requested *WindowTarget, referenc
 		}
 	}
 	return nil, fmt.Errorf("unsupported window target")
+}
+
+// decodeWindowResourceJSON preserves authored numbers in interface-valued
+// defaults and options while retaining complete JSON document validation.
+func decodeWindowResourceJSON(raw []byte, destination any) error {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	if err := decoder.Decode(destination); err != nil {
+		return err
+	}
+	if decoder.Decode(new(any)) != io.EOF {
+		return fmt.Errorf("trailing window data")
+	}
+	return nil
 }
