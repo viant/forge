@@ -290,6 +290,7 @@ export function buildWorkspaceNavigationTrail(currentWindow = null, target = nul
 }
 
 export function useWindowHandlers(windowId) {
+    const windowScopeAtCreation = activeWindows.peek().find(entry => entry.windowId === windowId)?.windowScopeId;
 
     const inTab = true;
     const getDialogId = (id) => `${windowId}Dialog${id}`;
@@ -375,6 +376,10 @@ export function useWindowHandlers(windowId) {
         const size = sizeOpt || ((widthOpt || heightOpt) ? { width: widthOpt, height: heightOpt } : undefined);
         const effectiveInTab = modal ? false : inTabOverride;
 
+        const activeOwnerWindow = activeWindows.peek().find(entry => entry.windowId === windowId);
+        const ownerWindow = activeOwnerWindow || props.context?.windowState || getWindowContext(windowId)?.windowState;
+        // A late callback from a disposed scoped owner cannot recreate leaked windows.
+        if ((windowScopeAtCreation || ownerWindow?.windowScopeId) && !activeOwnerWindow) return undefined;
         const winObj = addWindow(
             windowTitle,
             options.parentKey !== undefined ? options.parentKey : windowId,
@@ -383,6 +388,7 @@ export function useWindowHandlers(windowId) {
             effectiveInTab,
             initialParameters,
             {
+                windowScopeId: ownerWindow?.windowScopeId,
                 modal,
                 size,
                 footer: options.footer,
