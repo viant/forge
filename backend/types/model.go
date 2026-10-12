@@ -227,6 +227,8 @@ type QuickFilterSpec struct {
 }
 
 type Window struct {
+	// Title is the original authored display title; namespace is routing metadata.
+	Title string `json:"title,omitempty" yaml:"title,omitempty"`
 	// SelectionBinding is emitted only after trusted OPEN admission.
 	SelectionBinding     *identity.SelectionBinding `json:"selectionBinding,omitempty" yaml:"-"`
 	ResourceTarget       *WindowTarget              `json:"resourceTarget,omitempty" yaml:"-"`
