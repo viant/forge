@@ -120,6 +120,9 @@ type WindowResourceVariant struct {
 	DataSourceResources map[string]primitive.DataSourceReference `json:"dataSourceResources,omitempty"`
 }
 type WindowResourceEnvelope struct {
+	// ViewMetadata retains the original authored view descriptor as owning-window
+	// metadata. It grants no identity, permissions, or execution authority.
+	ViewMetadata  json.RawMessage                  `json:"viewMetadata,omitempty"`
 	SchemaVersion int                              `json:"schemaVersion"`
 	Format        string                           `json:"format"`
 	Targets       []WindowTargetBinding            `json:"targets"`

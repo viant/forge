@@ -3,6 +3,7 @@ import { runUICommand } from './commands.js';
 import { restoreWindowsFromSnapshot } from '../store/signals.js';
 
 let activeSnapshotPublisher = null;
+let activeHTTPTransportContext = null;
 const UI_BRIDGE_CLIENT_STORAGE_KEY = 'forge.uiBridge.clientId';
 let seededUIBridgeClientId = '';
 let activeBridgeReadyState = null;
@@ -298,6 +299,8 @@ export function startUIBridgeHTTP(options = {}) {
   let snapshotStatusTimer = null;
   let lastSnapshotText = '';
   let sessionId = null;
+  const transportContext = () => !stopped && readyToPublish && sessionId ? { url, clientId, sessionHeader, sessionId } : null;
+  activeHTTPTransportContext = transportContext;
   let lastEventId = null;
   let streamAbort = null;
   let detachListeners = null;
@@ -675,6 +678,8 @@ export function startUIBridgeHTTP(options = {}) {
   function stop() {
     if (stopped) return;
     stopped = true;
+    if (activeHTTPTransportContext === transportContext) activeHTTPTransportContext = null;
+    sessionId = null;
     try { detachListeners?.(); } catch (_) {}
     detachListeners = null;
     try { detachLifecycle?.(); } catch (_) {}
@@ -720,4 +725,9 @@ export async function waitForUIBridgeReady(timeoutMs = 1500) {
     promise.then((value) => !!value).catch(() => false),
     new Promise((resolve) => setTimeout(() => resolve(false), timeout)),
   ]);
+}
+
+// Returns only the current negotiated bridge transport, never identity grants.
+export function getActiveUIBridgeTransportContext() {
+  return activeHTTPTransportContext?.() || null;
 }
