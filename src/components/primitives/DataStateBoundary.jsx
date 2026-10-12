@@ -10,7 +10,8 @@ export default function DataStateBoundary({sizingMode = 'fill', container, conte
   useSignals();
   const spec = container.dataStateBoundary;
   if (!spec) return <>{children}</>;
-  const renderEmptyContent = spec.renderEmptyContent === true;
+  const renderEmptyContent = spec.renderEmptyContent === true
+    || (spec.renderEmptyContent !== false && !!container?.table);
   const contexts = (spec.dataSourceRefs?.length ? spec.dataSourceRefs : [container.dataSourceRef]).filter(Boolean).map((ref) => context.Context?.(ref) || context);
   const states = contexts.map((entry) => entry?.signals?.control?.value || {});
   const collections = contexts.map((entry) => {
