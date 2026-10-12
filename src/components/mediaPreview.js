@@ -1,12 +1,12 @@
-const safeUrl = (value) => {
+const safeUrl = (value, trustedBlob = false) => {
     const url = String(value || '').trim();
-    return /^https:\/\//i.test(url) ? url : '';
+    return /^https?:\/\//i.test(url) || (trustedBlob && /^blob:/i.test(url)) ? url : '';
 };
 
-export const normalizeMediaPreview = (value = {}) => {
+export const normalizeMediaPreview = (value = {}, {trustedBlob = false} = {}) => {
     const candidate = value && typeof value === 'object' ? value : {url: value};
     const kind = String(candidate.kind || '').trim().toLowerCase();
-    const url = safeUrl(candidate.url);
+    const url = safeUrl(candidate.url, trustedBlob);
     const supported = ['image', 'audio', 'video'].includes(kind) && !!url;
     return {
         kind: supported ? kind : 'unsupported',

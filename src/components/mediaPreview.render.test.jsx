@@ -1,0 +1,11 @@
+import React from 'react';
+import {act,create} from 'react-test-renderer';
+import assert from 'node:assert/strict';
+import MediaPreview from './MediaPreview.jsx';
+let view;await act(async()=>{view=create(<MediaPreview value={{kind:'image',url:'http://127.0.0.1:29865/creative-preview-qa.png',alt:'Synthetic QA banner'}}/>);});
+assert.equal(view.root.findByType('img').props.src,'http://127.0.0.1:29865/creative-preview-qa.png');assert.equal(view.root.findByType('img').props.alt,'Synthetic QA banner');
+await act(async()=>view.root.findByType('img').props.onError());assert.ok(view.root.findAllByType('span').some(n=>n.children.join('')==='Preview failed to load.'));assert.equal(view.root.findByType('a').props.href,'http://127.0.0.1:29865/creative-preview-qa.png');
+await act(async()=>view.update(<MediaPreview value={{kind:'image',url:'https://example.invalid/new.png'}}/>));assert.equal(view.root.findByType('img').props.src,'https://example.invalid/new.png');
+await act(async()=>view.update(<MediaPreview value={{kind:'image',url:'javascript:alert(1)'}}/>));assert.equal(view.root.findAllByType('img').length,0);assert.equal(view.root.findAllByType('a').length,0);
+await act(async()=>view.update(<MediaPreview value={{kind:'audio',url:'http://127.0.0.1/audio.mp3'}}/>));assert.equal(view.root.findByType('audio').props.controls,true);
+await act(async()=>view.unmount());console.log('MediaPreview renders original HTTP media, keeps failed-load fallback/recovery, and rejects executable URLs.');

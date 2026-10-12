@@ -7,6 +7,8 @@ assert.equal(shouldFetchDataSourceOnMount({fetchData: true, fetchOnce: true, con
 assert.equal(shouldFetchDataSourceOnMount({fetchData: true, fetchOnce: true, control: {loaded: false, error: {message: 'failed'}}}), false);
 assert.equal(shouldFetchDataSourceOnMount({fetchData: true, fetchOnce: false, control: {loaded: true}}), true);
 assert.equal(shouldFetchDataSourceOnMount({fetchData: true, fetchOnce: false, control: {loaded: false, error: {message: 'failed'}}}), true);
+const datasetDenial = {status: 403, code: 'datasource_denied', scope: 'dataset'};
+assert.equal(shouldFetchDataSourceOnMount({fetchData: true, fetchOnce: false, control: {loaded: false, error: datasetDenial}}), false);
 assert.equal(shouldFetchDataSourceOnMount({fetchData: true, fetchOnce: true, control: {loaded: false}}), true);
 
 console.log('data source fetcher mount state passed');

@@ -63,6 +63,10 @@ const context = {
 assert.equal(resourceModelRefForDataSource({...context, identity: {dataSourceRef: 'record_read'}}), 'record');
 assert.equal(resourceModelRefForDataSource({...context, identity: {dataSourceRef: 'record_read'}}, 'explicit'), 'explicit');
 const ambiguousContext = {metadata: {resourceModels: {...metadata.resourceModels, duplicate: {...metadata.resourceModels.record}}}, identity: {dataSourceRef: 'record_read'}};
+assert.equal(resourceModelRefForDataSource(ambiguousContext),'record');
+ambiguousContext.metadata.resourceModels.duplicate={...metadata.resourceModels.record,hooks:{...metadata.resourceModels.record.hooks,beforeMarshal:'different.write'}};
+assert.equal(resourceModelRefForDataSource(ambiguousContext),'record');
+ambiguousContext.metadata.resourceModels.duplicate={...metadata.resourceModels.record,hooks:{...metadata.resourceModels.record.hooks,beforeUnmarshal:'different.read'}};
 assert.throws(() => resourceModelRefForDataSource(ambiguousContext), /multiple resource models/);
 
 const read = unmarshalResource({recordId: '7', displayName: ' Alpha ', threshold: '3', active: 1, secret: 'read only', childRows: [{childId: '11', amount: '25.5', label: 'one'}, {childId: '12', amount: 30, label: 'two'}]}, context, 'record');

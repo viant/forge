@@ -1,5 +1,13 @@
 import {resolveSelector, setSelector} from "../utils/selector.js";
 
+// Context caches are keyed by datasource and selection mode. Resolve authored
+// prefixes against the declared graph, not the cache's implementation keys.
+function hasDataSourceReference(context, reference) {
+    return Object.hasOwn(context?.metadata?.dataSource || {}, reference)
+        || Object.hasOwn(context?.dataSources || {}, reference)
+        || Object.hasOwn(context?.dataSources || {}, `${reference}::default`);
+}
+
 export function applyParameterCodec(value, codec) {
     const rawName = typeof codec === 'string' ? codec : codec?.name;
     const name = String(rawName || '').trim().toLowerCase();
@@ -326,7 +334,7 @@ function resolveLegacyLocationContext(context, location) {
     const dotIndex = rawLocation.indexOf('.');
     if (dotIndex > 0) {
         const possibleDataSourceRef = rawLocation.substring(0, dotIndex);
-        if (context.dataSources?.[possibleDataSourceRef]) {
+        if (hasDataSourceReference(context, possibleDataSourceRef)) {
             return {
                 sourceContext: context.Context(possibleDataSourceRef),
                 sourcePath: rawLocation.substring(dotIndex + 1),
@@ -354,7 +362,7 @@ function resolveFromLegacyDataSource(context, location) {
     }
 
     // Some older metadata points at a data-source ref directly.
-    if (sourcePath && context.dataSources?.[sourcePath]) {
+    if (sourcePath && hasDataSourceReference(context, sourcePath)) {
         const dataSourceContext = context.Context(sourcePath);
         return dataSourceContext?.handlers?.dataSource?.peekSelection?.()?.selected
             ?? dataSourceContext?.handlers?.dataSource?.peekFormData?.()
@@ -379,7 +387,7 @@ function resolveFromSelection(context, location) {
     } else {
         // There is a dot => split out the possible dataSourceRef
         const possibleDataSourceRef = location.substring(0, dotIndex);
-        if (context.dataSources[possibleDataSourceRef]) {
+        if (hasDataSourceReference(context, possibleDataSourceRef)) {
             dataSourceRef = possibleDataSourceRef;
             fieldPath = location.substring(dotIndex + 1);
         } else {
@@ -424,7 +432,7 @@ function resolveFromValuesForm(context, location) {
     } else {
         // There is a dot => split out the possible dataSourceRef
         const possibleDataSourceRef = location.substring(0, dotIndex);
-        if (context.dataSources[possibleDataSourceRef]) {
+        if (hasDataSourceReference(context, possibleDataSourceRef)) {
             dataSourceRef = possibleDataSourceRef;
             fieldPath = location.substring(dotIndex + 1);
         } else {
@@ -489,7 +497,7 @@ function resolveFromDataSource(context, location, scope = 'form') {
 
     const dotIndex = location.indexOf('.');
     if (dotIndex === -1) {
-        if (context.dataSources?.[location]) {
+        if (hasDataSourceReference(context, location)) {
             dataSourceRef = location;
             fieldPath = '';
         } else {
@@ -497,8 +505,16 @@ function resolveFromDataSource(context, location, scope = 'form') {
             fieldPath = location;
         }
     } else {
-        dataSourceRef = location.substring(0, dotIndex);
-        fieldPath = location.substring(dotIndex + 1);
+        const possibleDataSourceRef = location.substring(0, dotIndex);
+        if (hasDataSourceReference(context, possibleDataSourceRef)) {
+            dataSourceRef = possibleDataSourceRef;
+            fieldPath = location.substring(dotIndex + 1);
+        } else {
+            // Nested store paths belong to the current source unless their
+            // prefix names a datasource in the declared graph.
+            dataSourceRef = context.identity.dataSourceRef;
+            fieldPath = location;
+        }
     }
 
     const dsCtx = context.Context(dataSourceRef);
