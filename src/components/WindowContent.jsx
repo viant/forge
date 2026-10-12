@@ -137,6 +137,12 @@ export function withWindowPermissionDeadline(work, timeoutMs = 15000) {
     return Promise.race([Promise.resolve().then(work), deadline]).finally(() => clearTimeout(timer));
 }
 
+export function isTransientWindowMetadataError(error) {
+    if (!error || error.isUnauthorized || [401, 403].includes(Number(error.status))) return false;
+    return [500, 502, 503, 504].includes(Number(error.status))
+        || (error.status == null && error.name === 'TypeError');
+}
+
 export function formatWindowMetadataError(error) {
     if (!error) return '';
     if (Number(error.status) === 504) return 'Permission check timed out. Please try again.';
@@ -1085,6 +1091,19 @@ function WindowContentRuntime({window, isInTab = false}) {
     const [metadataSignalHandle, setMetadataSignalHandle] = useState(() => findMetadataSignal(windowId));
     const [loading, setLoading] = useState(() => !(metadataSignalHandle?.peek?.()));
     const [fetchError, setFetchError] = useState(null);
+    const [metadataRetryVersion, setMetadataRetryVersion] = useState(0);
+    const retryableError = useRef(null);
+    retryableError.current = loading ? null : fetchError;
+    useEffect(() => {
+        const retry = () => {
+            if (!isTransientWindowMetadataError(retryableError.current)) return;
+            retryableError.current = null;
+            setFetchError(null);
+            setMetadataRetryVersion((version) => version + 1);
+        };
+        globalThis.addEventListener?.('forge:retry-window-metadata', retry);
+        return () => globalThis.removeEventListener?.('forge:retry-window-metadata', retry);
+    }, []);
     const [signalsReady, setSignalsReady] = useState(() => !!(metadataSignalHandle?.peek?.()));
 
     // Settings & connector
@@ -1218,7 +1237,7 @@ function WindowContentRuntime({window, isInTab = false}) {
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey]);
+    }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey, metadataRetryVersion]);
 
     useEffect(() => {
         const metadata = metadataSignalHandle?.value;

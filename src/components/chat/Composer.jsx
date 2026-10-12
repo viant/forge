@@ -929,6 +929,7 @@ export default function Composer({
 		                        onClick={() => {
 		                            lastManualAgentRef.current = val;
 		                            onChange?.(val);
+		                            close(false);
 		                        }}
 		                    />
 		                );
@@ -1231,6 +1232,7 @@ export default function Composer({
                 onFocus={openHistoryOnFocus}
                 onBlur={closeHistory}
                 data-testid="chat-composer-input"
+                aria-label="Message"
                 className={className}
                 placeholder="Type your message…"
                 disabled={disabled}
@@ -1252,6 +1254,7 @@ export default function Composer({
                 onFocus={openHistoryOnFocus}
                 onBlur={closeHistory}
                 data-testid="chat-composer-input"
+                aria-label="Message"
                 className={className}
                 style={style}
                 disabled={disabled}
@@ -1276,6 +1279,7 @@ export default function Composer({
 	            active={String(agentValue || '') === 'auto'}
 	            data-testid="chat-composer-agent"
 	            aria-label="Agent"
+	            aria-expanded={agentOpen}
 	            title={`Agent: ${currentAgentLabel}`}
 	            className="composer-icon-btn composer-icon-btn--agent composer-icon-btn--labelText"
 	            icon={<UserCircle size={20} weight="duotone" />}
