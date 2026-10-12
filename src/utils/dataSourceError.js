@@ -4,16 +4,17 @@ export function normalizeDataSourceError(error) {
     }
     if (error.__forgeDataSourceError === true) {
         const display = String(error.displayMessage || error.message || 'Unable to load data. Please retry.').trim() || 'Unable to load data. Please retry.';
-        return {...error, displayMessage: resolveDisplayMessage(Number(error.status) || undefined, display)};
+        return {...error, displayMessage: resolveDisplayMessage(Number(error.status) || undefined, String(error.message || display), error.code)};
     }
     const status = Number.isFinite(Number(error?.status)) ? Number(error.status) : undefined;
     const statusText = String(error?.statusText || '').trim() || undefined;
     const message = resolveErrorMessage(error, status, statusText);
-    const displayMessage = resolveDisplayMessage(status, message);
+    const displayMessage = resolveDisplayMessage(status, message, error.code);
     return {
         __forgeDataSourceError: true,
         status,
         statusText,
+        code: typeof error?.code === 'string' ? error.code : undefined,
         isUnauthorized: Boolean(error?.isUnauthorized) || status === 401 || status === 403,
         message,
         displayMessage,
@@ -50,12 +51,15 @@ function resolveErrorMessage(error, status, statusText) {
     return !text || text === '[object Object]' ? 'Unable to load data. Please retry.' : text;
 }
 
-function resolveDisplayMessage(status, message) {
+function resolveDisplayMessage(status, message, code) {
     if (status === 401) {
         return 'Authentication required. Please sign in to continue.';
     }
     if (status === 403) {
         return 'Access denied. You do not have permission to load this data.';
+    }
+    if (code === 'business_validation') {
+        return message;
     }
     if (status === 408 || status === 504 || /(?:timed?\s*out|timeout)/i.test(message)) {
         return 'The request timed out. Retry in a moment.';

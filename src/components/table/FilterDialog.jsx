@@ -46,6 +46,11 @@ const FilterDialog = ({
         onClose();
     };
 
+    const handleClearFilters = () => {
+        onApplyFilters({ ...selectedSet, filter: {} });
+        onClose();
+    };
+
     return (
         <Dialog
             isOpen={isOpen}
@@ -128,6 +133,7 @@ const FilterDialog = ({
             <DialogFooter
                 actions={[
                     <Button key="cancel" text="Cancel" onClick={onClose} />,
+                    <Button key="clear" text="Clear filters" onClick={handleClearFilters} />,
                     <Button key="ok" intent="primary" text="OK" onClick={handleApplyFilters} />,
                 ]}
             />

@@ -913,3 +913,22 @@
 .forge-table-cell-stack.is-inline-badge { flex-direction: row; align-items: center; height: 100%; }
 .forge-table-cell-stack.is-inline-badge > .forge-table-cell-stack__primary { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
 .forge-table-cell-stack.is-inline-badge > .forge-table-cell-badge { flex: none; padding: 0; background: transparent; }
+
+.forge-table-image-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    max-width: 100%;
+}
+.forge-table-image-label img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    flex: 0 0 auto;
+}
+.forge-table-image-label__text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

@@ -37,7 +37,7 @@ export default function TextLookup(props) {
     const intent = item?.lookup?.intent || item?.intent || rest?.intent;
     const rightElement = React.useMemo(() => (
         <Button icon="search" minimal onClick={handleOpen} aria-label="Open lookup" disabled={readOnly || rest.disabled} data-forge-part="button" />
-    ), [handleOpen]);
+    ), [handleOpen, readOnly, rest.disabled]);
 
     return (
         <InputGroup
