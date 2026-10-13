@@ -437,7 +437,12 @@ export function startUIBridgeHTTP(options = {}) {
     }
   };
   activeSnapshotPublisher = async () => {
-    if (!readyToPublish) return false;
+    if (stopped) return false;
+    // Chat submission can arrive while ui.hello is still in flight, or after
+    // a failed startup. Join/retry that handshake before declaring the local
+    // conversation snapshot published.
+    if (!readyToPublish) await ensureStarted();
+    if (!readyToPublish || stopped) return false;
     return publishSnapshot();
   };
 
