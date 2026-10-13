@@ -1457,16 +1457,17 @@ type TableCellBadge struct {
 
 // TemplateItem represents a single template item with an ID and an operator.
 type TemplateItem struct {
-	ID          string   `json:"id" yaml:"id"`
-	Field       string   `json:"field,omitempty" yaml:"field,omitempty"`
-	DataField   string   `json:"dataField,omitempty" yaml:"dataField,omitempty"`
-	Label       string   `json:"label,omitempty" yaml:"label,omitempty"`
-	OptionLabel string   `json:"optionLabel,omitempty" yaml:"optionLabel,omitempty"`
-	Placeholder string   `json:"placeholder,omitempty" yaml:"placeholder,omitempty"`
-	Operator    string   `json:"operator" yaml:"operator"`
-	Type        string   `json:"type,omitempty" yaml:"type,omitempty"`
-	Width       int      `json:"width,omitempty" yaml:"width,omitempty"`
-	Options     []Option `json:"options,omitempty" yaml:"options,omitempty"`
+	ID          string                 `json:"id" yaml:"id"`
+	Field       string                 `json:"field,omitempty" yaml:"field,omitempty"`
+	DataField   string                 `json:"dataField,omitempty" yaml:"dataField,omitempty"`
+	Label       string                 `json:"label,omitempty" yaml:"label,omitempty"`
+	OptionLabel string                 `json:"optionLabel,omitempty" yaml:"optionLabel,omitempty"`
+	Placeholder string                 `json:"placeholder,omitempty" yaml:"placeholder,omitempty"`
+	Operator    string                 `json:"operator" yaml:"operator"`
+	Type        string                 `json:"type,omitempty" yaml:"type,omitempty"`
+	Width       int                    `json:"width,omitempty" yaml:"width,omitempty"`
+	Options     []Option               `json:"options,omitempty" yaml:"options,omitempty"`
+	VisibleWhen map[string]interface{} `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
 }
 
 // Filter represents a filter with a name, a default indicator, and a template.
