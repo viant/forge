@@ -10,7 +10,8 @@ export default function DataStateBoundary({sizingMode = 'fill', container, conte
   useSignals();
   const spec = container.dataStateBoundary;
   if (!spec) return <>{children}</>;
-  const renderEmptyContent = spec.renderEmptyContent === true;
+  const renderEmptyContent = spec.renderEmptyContent === true
+    || (spec.renderEmptyContent !== false && !!container?.table);
   const contexts = (spec.dataSourceRefs?.length ? spec.dataSourceRefs : [container.dataSourceRef]).filter(Boolean).map((ref) => context.Context?.(ref) || context);
   const states = contexts.map((entry) => entry?.signals?.control?.value || {});
   const collections = contexts.map((entry) => {
@@ -36,11 +37,16 @@ export default function DataStateBoundary({sizingMode = 'fill', container, conte
   };
   if (state.kind === 'loading' && !tableOwnsLoading) return <div className="forge-data-state" data-forge-primitive="dataStateBoundary"><Spinner size={24}/><span>{spec.loadingMessage || 'Loading…'}</span></div>;
   if (state.kind === 'error' && spec.suppressErrorWhen && evaluatePlainVisibleWhen(spec.suppressErrorWhen, context)) return null;
-  if (state.kind === 'error') return <div className="forge-data-error" role="alert" data-forge-primitive="dataStateBoundary">
+  if (state.kind === 'error') {
+    const errorContent=<div className="forge-data-error" role="alert" data-forge-primitive="dataStateBoundary">
     <Icon icon="error" aria-hidden="true"/>
     <div><strong>Unable to load data</strong><div>{String(spec.errorMessage || '').trim() || formatDataSourceError(state.errors[0]) || 'Please retry. If the problem continues, check the connection.'}</div></div>
     {errorAction ? <Button minimal icon={errorAction.icon || 'refresh'} onClick={retryError} aria-label={errorAction.label || 'Retry'} title={errorAction.label || 'Retry'}/> : null}
-  </div>;
+    </div>;
+    // The table suppresses rows on error and retains its filter/refresh toolbar.
+    // Unmounting it here prevents users from correcting a failed filter.
+    return container.table ? <>{errorContent}{children}</> : errorContent;
+  }
   if (state.kind === 'empty' && !renderEmptyContent) return <NonIdealState icon="search" title={spec.emptyMessage || 'No data'}/>;
   if (state.kind === 'stale_empty' && !renderEmptyContent) return <div style={containerSizingStyle(container,sizingMode,{chrome:true})} data-forge-primitive="dataStateBoundary"><Callout intent="warning">{spec.staleMessage || 'Cached data may be stale.'}</Callout><NonIdealState icon="search" title={spec.emptyMessage || 'No data'}/></div>;
   return <div style={containerSizingStyle(container,sizingMode,{chrome:true})} data-forge-primitive="dataStateBoundary" aria-busy={tableOwnsLoading || undefined}>{(state.kind === 'partial' || state.kind === 'stale' || state.kind === 'stale_empty') ? <Callout intent="warning">{(state.kind === 'stale' || state.kind === 'stale_empty') ? spec.staleMessage || 'Showing cached data.' : 'Some data is unavailable.'}</Callout> : null}{children}</div>;

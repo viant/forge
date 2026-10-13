@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useMemo} from 'react';
+import React, {useEffect, useRef, useMemo, useState} from 'react';
 import {Dialog, DialogBody, DialogFooter, Button, Classes, InputGroup} from '@blueprintjs/core';
 import LayoutRenderer from './LayoutRenderer';
 import DataSource from './DataSource.jsx';
@@ -14,7 +14,33 @@ import {consumeDialogFocusRevision, dialogFreshFormSeed, shouldRefreshDialogData
 import MutationCommand from './primitives/MutationCommand.jsx';
 import DisabledActionShell from './DisabledActionShell.jsx';
 
-export function ViewDialogFooterAction({action, context, disabled = false, onClose, onInvoke}) {
+export function ViewDialogFooterAction({action, context, disabled = false, onClose, onInvoke, invokeBeforeClose = false}) {
+    const [invoking, setInvoking] = useState(false);
+    const invocationPending = useRef(false);
+    const activate = (event) => {
+        if (disabled || invocationPending.current) return false;
+        if (action?.close !== true) return onInvoke?.(event);
+        if (!invokeBeforeClose) return onClose?.();
+        invocationPending.current = true;
+        const complete = (result) => {
+            if (result !== false && result !== null) onClose?.();
+            return result;
+        };
+        const release = () => { invocationPending.current = false; setInvoking(false); };
+        try {
+            const result = onInvoke?.(event);
+            if (result && typeof result.then === 'function') {
+                setInvoking(true);
+                return Promise.resolve(result).then(complete, () => false).finally(release);
+            }
+            const outcome = complete(result);
+            release();
+            return outcome;
+        } catch (_) {
+            release();
+            return false;
+        }
+    };
     if (action?.mutationCommand) {
         return <MutationCommand
             command={{...action.mutationCommand, commandId: action.mutationCommand.commandId || action.id, label: action.label || action.id, icon: action.icon || action.mutationCommand.icon, hideLabel: action.hideLabel === true, intent: action.intent || action.mutationCommand.intent, tooltip: action.tooltip || action.mutationCommand.tooltip}}
@@ -24,9 +50,10 @@ export function ViewDialogFooterAction({action, context, disabled = false, onClo
     }
     const button = <Button
         intent={action?.intent}
-        disabled={disabled}
+        disabled={disabled || invoking}
+        loading={invoking}
         title={action?.tooltip || action?.label || action?.id}
-        onClick={(event) => action?.close === true ? onClose?.() : onInvoke?.(event)}
+        onClick={activate}
     >{action?.label}</Button>;
     return disabled && action?.tooltip ? (
         <DisabledActionShell reason={action.tooltip} label={action?.label || action?.id || 'Action'}>
@@ -553,6 +580,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                             context={dsCtx}
                             disabled={dialogActionDisabled(action)}
                             onClose={handleClose}
+                            invokeBeforeClose={events.actions?.[action.id]?.onClick?.isDefined?.() === true}
                             onInvoke={(e) => {
                                 const handler = events.actions[action.id]
                                 if (handler?.onClick) {

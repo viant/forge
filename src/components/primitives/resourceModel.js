@@ -87,7 +87,15 @@ export function resourceModelRefForDataSource(context, explicitRef = '') {
   const matches = Object.entries(context?.metadata?.resourceModels || {})
     .filter(([, model]) => String(model?.read?.dataSourceRef || '').trim() === dataSourceRef)
     .map(([name]) => name);
-  if (matches.length > 1) throw new Error(`Datasource ${dataSourceRef} has multiple resource models: ${matches.join(', ')}`);
+  if (matches.length > 1) {
+    const models = context.metadata.resourceModels;
+    const stable = value => JSON.stringify(value, (_key, entry) => entry && typeof entry === 'object' && !Array.isArray(entry) ? Object.fromEntries(Object.keys(entry).sort().map(key => [key, entry[key]])) : entry);
+    const readContract = name => {
+      const model = models[name];
+      return stable({schemaRef:model.schemaRef,read:model.read,fields:model.fields,hooks:{beforeUnmarshal:model.hooks?.beforeUnmarshal,afterUnmarshal:model.hooks?.afterUnmarshal}});
+    };
+    if (!matches.every(name => readContract(name) === readContract(matches[0]))) throw new Error(`Datasource ${dataSourceRef} has multiple resource models: ${matches.join(', ')}`);
+  }
   return matches[0] || '';
 }
 

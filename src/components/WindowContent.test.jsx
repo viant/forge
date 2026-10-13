@@ -488,6 +488,15 @@ describe('shouldPrimeDataSourceFetch', () => {
     expect(shouldPrimeDataSourceFetch({}, {fetch: true}, [], false, {loaded: false, loading: false, error})).toBe(true);
     expect(shouldPrimeDataSourceFetch({}, {fetch: false}, [], true, {loaded: false, loading: false, error})).toBe(true);
   });
+  it('holds a terminal dataset denial until an explicit fetch is requested', () => {
+    const denial = {status: 403, code: 'datasource_denied', scope: 'dataset'};
+    expect(shouldPrimeDataSourceFetch({}, {fetch: false}, [], true, {error: denial})).toBe(false);
+    expect(shouldPrimeDataSourceFetch({}, {fetch: true}, [], true, {error: denial})).toBe(true);
+  });
+  it('does not treat resource or window denials as terminal dataset denials', () => {
+    const error = {status: 403, code: 'resource_denied', scope: 'window'};
+    expect(shouldPrimeDataSourceFetch({}, {fetch: false}, [], true, {error})).toBe(true);
+  });
   it('does not auto-fetch empty user-driven datasources', () => {
     expect(
       shouldPrimeDataSourceFetch({ autoFetch: false }, { parameters: {} }, [], true),

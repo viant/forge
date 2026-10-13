@@ -478,7 +478,7 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
     const renderContainerToolbar = () => {
         const tb = container.toolbar;
         if (!tb) return null;
-        let tbContext = effectiveContext;
+        let tbContext = resolveChildContext(effectiveContext, dataSourceRef);
         if (tb.dataSourceRef) {
             tbContext = resolveChildContext(effectiveContext, tb.dataSourceRef);
         }

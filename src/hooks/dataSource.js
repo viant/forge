@@ -32,6 +32,15 @@ export function buildFetchCollectionSignal(current = {}, props = {}) {
     };
 }
 
+export function buildSetFilterSignal(current = {}, filter = {}, filterMode) {
+    return {
+        ...current,
+        page: 1,
+        filter,
+        fetch: filterMode !== 'client',
+    };
+}
+
 const WINDOW_FORM_META_KEY = "__forge";
 const WINDOW_FORM_REPLACE_KEY = "$replace";
 const WINDOW_FORM_REPLACE_VALUE_KEY = "value";
@@ -764,12 +773,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
 
 
     const setFilter = ({filter = {}}) => {
-        const value  = {
-        ...input.value,
-                filter: filter,
-                fetch: dataSource?.filterMode !== 'client',
-        }
-        input.value = value
+        input.value = buildSetFilterSignal(input.value, filter, dataSource?.filterMode);
     };
 
     // Update filter values without triggering a remote fetch but still

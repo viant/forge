@@ -14,21 +14,24 @@ export function updateQuickSearch(context, field, value) {
     });
 }
 
-export default function QuickSearch({context, item, disabled = false}) {
+export default function QuickSearch({context, item, disabled = false, onCommit}) {
     useSignals();
-    const field = String(item?.properties?.field || '').trim();
+    const field = String(item?.dataField || item?.properties?.field || '').trim();
+    const windowFormBinding = item?.scope === 'windowForm';
     const label = item?.properties?.label || 'Name contains';
     const trigger = item?.properties?.requestTrigger === 'change' ? 'change' : 'blur';
     const [expanded, setExpanded] = useState(false);
     const input = useRef(null), button = useRef(null);
-    const value = String(context?.signals?.input?.value?.filter?.[field] ?? '');
+    const value = String((windowFormBinding ? context?.signals?.windowForm?.value?.[field] : context?.signals?.input?.value?.filter?.[field]) ?? '');
     const [draft, setDraft] = useState(value);
     const committed = useRef(value);
     useLayoutEffect(() => { committed.current = value; setDraft(value); if (value) setExpanded(true); }, [value]);
     const commit = next => {
         if (next === committed.current) return;
         committed.current = next;
-        updateQuickSearch(context, field, next);
+        if (windowFormBinding && context?.signals?.windowForm) context.signals.windowForm.value = {...context.signals.windowForm.peek(), [field]: next};
+        if (typeof onCommit === 'function') onCommit({target: {value: next}});
+        else updateQuickSearch(context, field, next);
     };
     useLayoutEffect(() => { if (expanded) input.current?.focus(); }, [expanded]);
     if (!field) return null;

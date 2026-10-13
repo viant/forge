@@ -41,6 +41,12 @@ const createContext = (calls) => {
                 return true;
             };
         }
+        if (id === 'dataSource.openFilter') {
+            return () => {
+                calls.push(id);
+                return true;
+            };
+        }
         if (id === 'form.changed') {
             return () => {
                 calls.push(`${id}:${context.signals.form.value.minimum}`);
@@ -65,6 +71,24 @@ const createContext = (calls) => {
     });
     if (!handlers || Object.keys(handlers.actions).length !== 0) {
         console.error('declarative dialog mutation actions must not require legacy on handlers');
+        process.exitCode = 1;
+    }
+}
+
+{
+    const calls = [];
+    const context = createContext(calls);
+    const result = useToolbarControlEvents(context, [
+        {id: 'filter'},
+        {id: 'filterList'},
+    ]);
+
+    result.filter.events.onClick({type: 'click'});
+    result.filterList.events.onClick({type: 'click'});
+
+    const openCalls = calls.filter((id) => id === 'dataSource.openFilter').length;
+    if (openCalls !== 2) {
+        console.error(`expected both filter toolbar aliases to open the filter dialog, got ${openCalls}`);
         process.exitCode = 1;
     }
 }
