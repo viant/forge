@@ -396,3 +396,31 @@ assert.equal(
 );
 
 console.log('Context ✓ preserves selectionMode overrides for dataSource handlers');
+
+// Real Context uses mode-qualified cache keys. Authored datasource prefixes
+// must resolve against declarations even before the default context is cached.
+const {resolveParameters: resolveCachedParameters} = await import('../../hooks/parameters.js');
+const parameterCacheRoot = Context('W_ctx_parameter_prefix', {
+  actions: {import: () => ({})}, view: {},
+  dataSource: {current: {selectors: {}}, detail: {selectors: {}, selectionMode: 'single'}},
+}, 'current', {});
+parameterCacheRoot.init();
+const parameterCurrent = parameterCacheRoot.Context('current');
+const parameterDetail = parameterCacheRoot.Context('detail', {selectionMode: 'multi'});
+parameterCurrent.signals.input.value = {parameters: {Items: [{id: 7}]}};
+parameterDetail.signals.input.value = {args: {Id: [42]}, filter: {state: 'active'}};
+parameterDetail.signals.form.value = {name: 'Synthetic detail'};
+parameterDetail.signals.selection.value = {selected: {id: 42}, rowIndex: 0};
+parameterDetail.signals.metrics.value = {total: 2};
+assert.equal(parameterCacheRoot.dataSources.detail, undefined);
+assert.ok(parameterCacheRoot.dataSources['detail::multi']);
+assert.deepEqual(resolveCachedParameters([
+  {name: 'Id', in: 'input', location: 'detail.args.Id', codec: {name: 'int[]'}},
+  {name: 'name', in: 'form', location: 'detail.name'},
+  {name: 'selectedId', in: 'selection', location: 'detail.id'},
+  {name: 'total', in: 'metrics', location: 'detail.total'},
+  {name: 'state', in: 'filter', location: 'detail.state'},
+  {name: 'Items', in: 'input', location: 'parameters.Items'},
+], parameterCurrent), {Id: [42], name: 'Synthetic detail', selectedId: 42, total: 2, state: 'active', Items: [{id: 7}]});
+parameterCacheRoot.dispose();
+console.log('parameter prefixes resolve from the declared graph with mode-qualified Context caches');

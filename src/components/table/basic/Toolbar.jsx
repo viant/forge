@@ -269,7 +269,7 @@ const Toolbar = ({
         if (!toolbarItemShouldRender(item, context, isVisible)) return null;
         const isReadonly = stateEvents?.onReadonly ? stateEvents.onReadonly() : false;
         if (item.type === 'quickSearch') {
-            return <QuickSearch key={item.id} context={context} item={item} disabled={item.disabled === true || disabled}/>;
+            return <QuickSearch key={item.id} context={context} item={item} disabled={item.disabled === true || disabled} onCommit={events.onChange}/>;
         }
         if (item.id === 'refresh' && !item.on?.length) {
             return <RefreshAction key={item.id} context={context} item={item} disabled={toolbarItemShouldDisable(item,context,isReadonly) || disabled}/>;

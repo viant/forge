@@ -1,3 +1,5 @@
+import EditableTextCell from "./EditableTextCell.jsx";
+import ImageLabelCell from "./ImageLabelCell.jsx";
 import React, {useEffect, useRef, useState} from "react";
 import {Button, Icon} from "@blueprintjs/core";
 import ProgressBar from "../../control/ProgressBar.jsx";
@@ -78,7 +80,8 @@ const TableCell = ({
     if (stateEvents.onReadonly) {
         try {
             if (stateEvents.onReadonly()) {
-                cellProps.disabled = true;
+                if (col.type === "editableText") cellProps.readOnly = true;
+                else cellProps.disabled = true;
             }
         } catch (_) { /* ignore */ }
     }
@@ -121,6 +124,12 @@ const TableCell = ({
 
     let cellContent = null;
     switch (type) {
+        case "editableText":
+            cellContent = <EditableTextCell {...cellProps} value={value} label={`${col.name || col.id} ${cellSelection.row?.id ?? cellSelection.rowIndex ?? ""}`.trim()} readOnly={cellProps.readOnly === true} onChange={events.onChange}/>;
+            break;
+        case "image":
+            cellContent = <ImageLabelCell value={value} emptyText={col.emptyText}/>;
+            break;
         case "icon":
             cellContent = <Icon
                 icon={value}

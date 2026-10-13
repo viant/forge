@@ -163,6 +163,12 @@ export function withWindowPermissionDeadline(work, timeoutMs = 15000) {
     return Promise.race([Promise.resolve().then(work), deadline]).finally(() => clearTimeout(timer));
 }
 
+export function isTransientWindowMetadataError(error) {
+    if (!error || error.isUnauthorized || [401, 403].includes(Number(error.status))) return false;
+    return [500, 502, 503, 504].includes(Number(error.status))
+        || (error.status == null && error.name === 'TypeError');
+}
+
 export function formatWindowMetadataError(error) {
     if (!error) return '';
     if (error.code === 'WINDOW_AUTHORIZATION_EXPIRED' || error.code === 'PREVIEW_AUTHORIZATION_EXPIRED') return 'Permissions expired. Refresh permission checks or reopen this window.';
@@ -191,7 +197,11 @@ export async function applyWindowPermissionMetadata(completeMetadata, {
     conversationId = '',
     targetContext = null,
 } = {}) {
-    if (!completeMetadata?.authorization) return completeMetadata;
+    // Canonical windows require original OPEN admission even without a business
+    // authorization declaration. Managing MCP still owns datasource operations.
+    const canonicalWindow = typeof completeMetadata?.resource?.uri === 'string'
+        && completeMetadata.resource.uri.startsWith('window://');
+    if (!completeMetadata?.authorization && !canonicalWindow) return completeMetadata;
     if (typeof services?.applyPermission !== 'function') {
         throw Object.assign(new Error('Permission service is unavailable'), {status: 503});
     }
@@ -424,6 +434,11 @@ export function shouldPrimeDataSourceFetch(dataSource = {}, prevInput = {}, coll
     if (prevInput.fetch) return true;
     const autoFetchEnabled = dataSource?.autoFetch !== false;
     if (!autoFetchEnabled) return false;
+    // A terminal dataset-scope 403 stays visible until explicit fetch intent.
+    // Window/resource denial handling remains in its existing authorization path.
+    if (Number(control?.error?.status) === 403
+        && control?.error?.code === 'datasource_denied'
+        && control?.error?.scope === 'dataset') return false;
     if (paramsChanged) return true;
     if (control?.error) return false;
     const hasCollection = Array.isArray(collection) && collection.length > 0;
@@ -1116,6 +1131,19 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
     const [metadataSignalHandle, setMetadataSignalHandle] = useState(() => findMetadataSignal(windowId));
     const [loading, setLoading] = useState(() => !(metadataSignalHandle?.peek?.()));
     const [fetchError, setFetchError] = useState(null);
+    const [metadataRetryVersion, setMetadataRetryVersion] = useState(0);
+    const retryableError = useRef(null);
+    retryableError.current = loading ? null : fetchError;
+    useEffect(() => {
+        const retry = () => {
+            if (!isTransientWindowMetadataError(retryableError.current)) return;
+            retryableError.current = null;
+            setFetchError(null);
+            setMetadataRetryVersion((version) => version + 1);
+        };
+        globalThis.addEventListener?.('forge:retry-window-metadata', retry);
+        return () => globalThis.removeEventListener?.('forge:retry-window-metadata', retry);
+    }, []);
     const [signalsReady, setSignalsReady] = useState(() => !!(metadataSignalHandle?.peek?.()));
 
     // Settings & connector
@@ -1273,7 +1301,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey, auth, selectedMetadata]);
+    }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey, auth, selectedMetadata, metadataRetryVersion]);
 
     useEffect(() => {
         const metadata = metadataSignalHandle?.value;

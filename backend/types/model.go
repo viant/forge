@@ -1503,6 +1503,8 @@ type Binding struct {
 	MutationMode          string            `json:"mutationMode,omitempty" yaml:"mutationMode,omitempty"`
 }
 type Item struct {
+	EmptyText                    string `json:"emptyText,omitempty" yaml:"emptyText,omitempty"`
+	Accept                       string `json:"accept,omitempty" yaml:"accept,omitempty"`
 	ID                           string `json:"id" yaml:"id"`
 	Binding                      `yaml:",inline"`
 	Target                       *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`

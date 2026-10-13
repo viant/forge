@@ -568,7 +568,7 @@ export const useToolbarControlEvents = (context, items = []) => {
             indexExecution(context, on, handlers, message);
         } else {
             // Default event handlers for some items
-            if (item.id === "filterList") {
+            if (item.id === "filterList" || item.id === "filter") {
                 handlers.onClick.push({id: "dataSource.openFilter"});
             } else if (item.id === "refresh") {
                 handlers.onClick.push({id: "dataSource.fetchCollection"});

@@ -150,3 +150,14 @@ Implementation references: [sizing](../src/components/table/tableSizing.js),
 [toolbar](../src/components/table/basic/Toolbar.jsx),
 [quick search](../src/components/table/basic/QuickSearch.jsx),
 [preferences](../src/core/preferences/tablePreferences.js).
+
+## Image and label columns
+
+A table column with `type: image` displays a neutral `{src, label}` value, where
+`src` is the provider image URL and `label` is its display name. A plain string
+value is also accepted as an image URL. Desktop tables and responsive cards
+use the same renderer. Images load lazily; missing or failed images preserve
+the label (or the column's `emptyText` when no label exists). The renderer
+retries when a later value supplies a different image URL. Provider-specific
+logo selection and fallback assets belong in the resource's portable data
+preparation, rather than in Forge.
