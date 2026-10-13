@@ -21,7 +21,11 @@ type ReportEnvelope struct {
 	SchemaVersion       int                                      `json:"schemaVersion"`
 	Format              string                                   `json:"format,omitempty"`
 	SourceFormat        string                                   `json:"sourceFormat,omitempty"`
-	ReportDocument      json.RawMessage                          `json:"reportDocument"`
+	ReportDocument      json.RawMessage                          `json:"reportDocument,omitempty"`
+	ReportFill          json.RawMessage                          `json:"reportFill,omitempty"`
+	ReportPrint         json.RawMessage                          `json:"reportPrint,omitempty"`
+	CompileState        json.RawMessage                          `json:"compileState,omitempty"`
+	Metadata            json.RawMessage                          `json:"metadata,omitempty"`
 	ReportSpec          json.RawMessage                          `json:"reportSpec,omitempty"`
 	BuilderRef          string                                   `json:"builderRef,omitempty"`
 	BuilderDefinition   json.RawMessage                          `json:"builderDefinition,omitempty"`
