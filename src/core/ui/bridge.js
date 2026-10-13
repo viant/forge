@@ -305,8 +305,15 @@ export function startUIBridgeHTTP(options = {}) {
   let detachOwner = null;
   let detachAuthRetry = null;
   let readyToPublish = false;
+  let readyToPoll = false;
+  let generation = 0;
   let startInFlight = null;
+  let startGeneration = null;
+  let pollInFlight = null;
+  let cancelPollSleep = null;
+  let detachStartupWait = null;
   let snapshotInFlight = null;
+  let snapshotGeneration = null;
   let snapshotStatusInFlight = false;
   const inflightRPC = new Set();
   const startupReadyEvent = String(options.startupReadyEvent || '').trim();
@@ -329,7 +336,13 @@ export function startUIBridgeHTTP(options = {}) {
     inflightRPC.clear();
   };
 
-  const rpc = async (method, params, id) => {
+  const current = (scope) => !stopped && scope === generation;
+  const requireCurrent = (scope) => {
+    if (!current(scope)) throw new Error('UI bridge session changed');
+  };
+
+  const rpc = async (method, params, id, scope = generation) => {
+    requireCurrent(scope);
     const body = {
       jsonrpc: '2.0',
       id: id ?? null,
@@ -350,6 +363,10 @@ export function startUIBridgeHTTP(options = {}) {
         body: JSON.stringify(body),
         signal: controller?.signal,
       });
+      if (!current(scope)) {
+        await res.body?.cancel().catch(() => {});
+        requireCurrent(scope);
+      }
       const nextSession = res.headers.get(sessionHeader);
       if (nextSession) sessionId = nextSession;
       if (res.status === 202 || res.status === 204) return null;
@@ -359,6 +376,7 @@ export function startUIBridgeHTTP(options = {}) {
         throw err;
       }
       const text = await res.text();
+      requireCurrent(scope);
       if (!text) return null;
       const data = safeParseJSON(text);
       if (!data) throw new Error('invalid jsonrpc response');
@@ -370,14 +388,15 @@ export function startUIBridgeHTTP(options = {}) {
     }
   };
 
-  const publishSnapshotOnce = async (publishOptions = {}) => {
+  const publishSnapshotOnce = async (publishOptions = {}, scope = generation) => {
     const strict = publishOptions.strict === true;
-    if (!readyToPublish) return false;
+    if (!readyToPublish || !current(scope)) return false;
     const snap = snapshotBuilder();
     const text = snapshotFingerprint(snap);
     if (text === lastSnapshotText) return true;
     try {
-      const result = await rpc('ui.snapshot', { clientId, data: snap }, `snapshot_${Date.now()}_${Math.floor(Math.random() * 1e6)}`);
+      const result = await rpc('ui.snapshot', { clientId, data: snap }, `snapshot_${Date.now()}_${Math.floor(Math.random() * 1e6)}`, scope);
+      requireCurrent(scope);
       if (strict && result == null) {
         throw new Error('UI bridge snapshot was not accepted');
       }
@@ -389,43 +408,51 @@ export function startUIBridgeHTTP(options = {}) {
     }
   };
 
-  const publishSnapshot = async (publishOptions = {}) => {
+  const publishSnapshot = async (publishOptions = {}, scope = generation) => {
+    if (!current(scope)) return false;
     if (snapshotInFlight) {
+      const heldGeneration = snapshotGeneration;
+      let accepted, failure;
       try {
-        const accepted = await snapshotInFlight;
-        if (!accepted) {
-          if (publishOptions.strict === true) throw new Error('UI bridge snapshot was not accepted');
-          return false;
-        }
+        accepted = await snapshotInFlight;
       } catch (error) {
-        if (publishOptions.strict === true) throw error;
+        failure = error;
+      }
+      if (!current(scope)) return false;
+      // Drain a retired publication, then publish the new scope's snapshot.
+      if (heldGeneration !== scope) return publishSnapshot(publishOptions, scope);
+      if (failure || !accepted) {
+        if (publishOptions.strict === true) throw failure || new Error('UI bridge snapshot was not accepted');
         return false;
       }
-      return publishSnapshot(publishOptions);
+      return publishSnapshot(publishOptions, scope);
     }
-    if (stopped) return false;
-    const pending = publishSnapshotOnce(publishOptions);
+    const pending = publishSnapshotOnce(publishOptions, scope);
     snapshotInFlight = pending;
+    snapshotGeneration = scope;
     try { return await pending; }
     finally { if (snapshotInFlight === pending) snapshotInFlight = null; }
   };
 
   const checkSnapshotStatus = async () => {
     if (!readyToPublish || stopped || snapshotStatusInFlight) return false;
+    const scope = generation;
     snapshotStatusInFlight = true;
     try {
       const result = await rpc(
         'ui.snapshot.status',
         { clientId },
         `snapshot_status_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+        scope,
       );
+      requireCurrent(scope);
       if (result?.connected !== false) return true;
       // The backend may have restarted while this browser retained an unchanged
       // semantic snapshot. Reset only transport dedupe and republish once.
       lastSnapshotText = '';
-      return await publishSnapshot({ strict: true });
+      return await publishSnapshot({ strict: true }, scope);
     } catch (err) {
-      if (isMissingSessionError(err)) {
+      if (current(scope) && isMissingSessionError(err)) {
         resetSessionAndRestart();
       }
       return false;
@@ -507,25 +534,40 @@ export function startUIBridgeHTTP(options = {}) {
         settled = true;
         if (timer) clearTimeout(timer);
         window.removeEventListener(startupReadyEvent, onReady);
+        if (detachStartupWait === finish) detachStartupWait = null;
         resolve();
       };
       const onReady = () => finish();
       window.addEventListener(startupReadyEvent, onReady, { once: true });
+      detachStartupWait = finish;
       if (startupReadyTimeoutMs > 0) {
         timer = setTimeout(finish, startupReadyTimeoutMs);
       }
     });
   };
 
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const sleep = (ms) => new Promise((resolve) => {
+    const finish = () => {
+      clearTimeout(timer);
+      if (cancelPollSleep === finish) cancelPollSleep = null;
+      resolve();
+    };
+    const timer = setTimeout(finish, ms);
+    cancelPollSleep = finish;
+    if (stopped) finish();
+  });
 
   const scheduleAuthRetry = () => {
     if (typeof window === 'undefined' || stopped || detachAuthRetry) return;
+    const scope = generation;
     const onAuthorized = () => {
       try { detachAuthRetry?.(); } catch (_) {}
       detachAuthRetry = null;
-      if (stopped) return;
-      void start();
+      // Authorization can arrive while the failed startup is still settling.
+      // Retry through the same owner after that startup releases its slot.
+      void Promise.resolve(startInFlight).then(() => {
+        if (current(scope) && !readyToPublish) return ensureStarted();
+      });
     };
     authReadyEvents.forEach((eventName) => window.addEventListener(eventName, onAuthorized, { once: true }));
     detachAuthRetry = () => {
@@ -534,18 +576,27 @@ export function startUIBridgeHTTP(options = {}) {
   };
 
   const resetSessionAndRestart = () => {
+    if (stopped) return;
+    generation++;
     sessionId = null;
     readyToPublish = false;
+    readyToPoll = false;
     lastSnapshotText = '';
+    abortInflightRPC();
     try { detachListeners?.(); } catch (_) {}
     detachListeners = null;
     try { detachLifecycle?.(); } catch (_) {}
     detachLifecycle = null;
+    try { detachOwner?.(); } catch (_) {}
+    detachOwner = null;
+    try { detachStartupWait?.(); } catch (_) {}
+    detachStartupWait = null;
+    try { detachAuthRetry?.(); } catch (_) {}
+    detachAuthRetry = null;
     if (snapshotTimer) clearInterval(snapshotTimer);
     snapshotTimer = null;
     if (snapshotStatusTimer) clearInterval(snapshotStatusTimer);
     snapshotStatusTimer = null;
-    if (stopped) return;
     void ensureStarted();
   };
 
@@ -556,7 +607,8 @@ export function startUIBridgeHTTP(options = {}) {
     return params;
   };
 
-  const handleMessage = async (msg) => {
+  const handleMessage = async (msg, scope = generation) => {
+    requireCurrent(scope);
     if (!msg || typeof msg !== 'object') return;
     const method = msg.method || msg.type;
     if (method !== 'ui.command') return;
@@ -564,12 +616,14 @@ export function startUIBridgeHTTP(options = {}) {
     if (!payload || !payload.method || !payload.id) return;
     try {
       const result = await runUICommand({ method: payload.method, params: payload.params || {} });
+      requireCurrent(scope);
       if (options.snapshotAfterCommand !== false) {
-        await publishSnapshot({ strict: true });
+        await publishSnapshot({ strict: true }, scope);
       }
-      await rpc('ui.response', { id: payload.id, ok: true, result }, `response_${payload.id}`);
+      await rpc('ui.response', { id: payload.id, ok: true, result }, `response_${payload.id}`, scope);
     } catch (e) {
-      await rpc('ui.response', { id: payload.id, ok: false, error: String(e?.message || e) }, `response_${payload.id}`);
+      if (!current(scope)) return;
+      await rpc('ui.response', { id: payload.id, ok: false, error: String(e?.message || e) }, `response_${payload.id}`, scope);
     }
   };
 
@@ -595,7 +649,7 @@ export function startUIBridgeHTTP(options = {}) {
 
   const pollLoop = async () => {
     while (!stopped) {
-      if (!sessionId) {
+      if (!sessionId || !readyToPoll) {
         await sleep(200);
         continue;
       }
@@ -603,18 +657,20 @@ export function startUIBridgeHTTP(options = {}) {
         await sleep(reconnectDelayMs);
         continue;
       }
+      const scope = generation;
       try {
         const msg = await rpc('ui.poll', {
           clientId,
           timeoutMs: Math.max(1000, Math.min(20000, snapshotIntervalMs * 4)),
-        }, `poll_${Date.now()}_${Math.floor(Math.random() * 1e6)}`);
+        }, `poll_${Date.now()}_${Math.floor(Math.random() * 1e6)}`, scope);
         if (msg) {
-          await handleMessage(msg);
+          await handleMessage(msg, scope);
         }
       } catch (err) {
-        if (isMissingSessionError(err)) {
+        if (current(scope) && isMissingSessionError(err)) {
           resetSessionAndRestart();
         }
+        if (stopped) return;
         await sleep(reconnectDelayMs);
       }
       streamAbort = null;
@@ -624,9 +680,16 @@ export function startUIBridgeHTTP(options = {}) {
     }
   };
 
-  const restoreSnapshot = async () => {
+  const ensurePolling = () => {
+    if (pollInFlight || stopped) return;
+    // Recovery replaces the session, never the owner of this polling lane.
+    pollInFlight = pollLoop().finally(() => { pollInFlight = null; });
+  };
+
+  const restoreSnapshot = async (scope) => {
     try {
-      const result = await rpc('ui.snapshot.get', { clientId }, `snapshot_get_${Date.now()}_${Math.floor(Math.random() * 1e6)}`);
+      const result = await rpc('ui.snapshot.get', { clientId }, `snapshot_get_${Date.now()}_${Math.floor(Math.random() * 1e6)}`, scope);
+      requireCurrent(scope);
       const snapshot = result?.snapshot;
       if (snapshot && typeof snapshot === 'object') {
         restoreWindowsFromSnapshot(snapshot);
@@ -635,21 +698,26 @@ export function startUIBridgeHTTP(options = {}) {
     } catch (_) {}
   };
 
-  const start = async () => {
+  const start = async (scope) => {
     try {
-      await rpc('ui.hello', { clientId, token: options.token || undefined }, 1);
-      await restoreSnapshot();
+      await rpc('ui.hello', { clientId, token: options.token || undefined }, 1, scope);
+      await restoreSnapshot(scope);
+      requireCurrent(scope);
       await waitForStartupReady();
+      requireCurrent(scope);
       readyToPublish = true;
-      await publishSnapshot();
+      await publishSnapshot({}, scope);
+      requireCurrent(scope);
       settleBridgeReadyState(true);
       snapshotTimer = setInterval(publishSnapshot, snapshotIntervalMs);
       snapshotStatusTimer = setInterval(checkSnapshotStatus, snapshotStatusIntervalMs);
       detachListeners = bindImmediateSnapshotListeners();
       detachLifecycle = bindLifecycleListeners(stop);
       detachOwner = bindOwnerListeners();
-      pollLoop();
+      readyToPoll = true;
+      ensurePolling();
     } catch (err) {
+      if (!current(scope)) return;
       settleBridgeReadyState(false);
       if (isUnauthorizedError(err)) {
         readyToPublish = false;
@@ -662,8 +730,14 @@ export function startUIBridgeHTTP(options = {}) {
   };
 
   const ensureStarted = () => {
-    if (startInFlight) return startInFlight;
-    startInFlight = start().finally(() => {
+    if (stopped) return Promise.resolve();
+    const scope = generation;
+    if (startInFlight) {
+      if (startGeneration === scope) return startInFlight;
+      return startInFlight.then(() => { if (current(scope)) return ensureStarted(); });
+    }
+    startGeneration = scope;
+    startInFlight = start(scope).finally(() => {
       startInFlight = null;
     });
     return startInFlight;
@@ -675,6 +749,7 @@ export function startUIBridgeHTTP(options = {}) {
   function stop() {
     if (stopped) return;
     stopped = true;
+    generation++;
     try { detachListeners?.(); } catch (_) {}
     detachListeners = null;
     try { detachLifecycle?.(); } catch (_) {}
@@ -683,9 +758,13 @@ export function startUIBridgeHTTP(options = {}) {
     detachOwner = null;
     try { detachAuthRetry?.(); } catch (_) {}
     detachAuthRetry = null;
+    try { detachStartupWait?.(); } catch (_) {}
+    detachStartupWait = null;
     if (activeSnapshotPublisher) activeSnapshotPublisher = null;
     settleBridgeReadyState(false);
     readyToPublish = false;
+    readyToPoll = false;
+    cancelPollSleep?.();
     abortInflightRPC();
     try { streamAbort?.abort(); } catch (_) {}
     if (snapshotTimer) clearInterval(snapshotTimer);
