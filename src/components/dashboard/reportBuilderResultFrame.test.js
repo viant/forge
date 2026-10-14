@@ -2078,6 +2078,21 @@ assert.deepEqual(drillRefreshLoadingWithRetainedRowsReportPreviewState.updatingN
     message: "Updating this report with the latest results…",
 });
 
+const drillRefreshWithDatasetProgress = buildReportBuilderAuthoredRuntimePreviewState({
+    runtimePreviewEnabled: true,
+    runtimePreviewArtifact: drillRefreshRetainedRowsDatasets,
+    runtimePreviewDatasetState: {
+        loading: true,
+        progress: {completed: 3, total: 8},
+    },
+    canRunReport: true,
+    presentationMode: "report",
+});
+assert.deepEqual(drillRefreshWithDatasetProgress.updatingNotice, {
+    level: "info",
+    message: "Updating this report with the latest results… 3 of 8 data views ready.",
+});
+
 const drillRefreshSettledWithRetainedRowsPreviewState = buildReportBuilderAuthoredRuntimePreviewState({
     runtimePreviewEnabled: true,
     runtimePreviewArtifact: drillRefreshRetainedRowsDatasets,
