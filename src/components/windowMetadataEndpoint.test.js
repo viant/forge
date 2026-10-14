@@ -13,3 +13,6 @@ for (const key of ['window://example/StudioRecords', 'window://example/folder/ne
 assert.equal(windowMetadataEndpoint('/window/', 'chat/new'), '/window/chat%2Fnew');
 assert.equal(windowMetadataEndpoint('/window', 'window://example/space name'), '/window/window%3A%2F%2Fexample%2Fspace%20name');
 console.log('window metadata endpoint path encoding passed');
+const scoped = new URL(windowMetadataEndpoint('/window', 'window://external/picker', {resourceRef:{uri:'window://external/picker',revision:'working'},providerIdentity:'source'}),'http://fixture.local');
+assert.deepEqual(JSON.parse(scoped.searchParams.get('resourceRef')),{uri:'window://external/picker',revision:'working'});
+assert.equal(scoped.searchParams.get('providerIdentity'),'source');

@@ -585,11 +585,28 @@ describe('shouldResetWindowDashboardState', () => {
 
 
 describe('invalid protected metadata', () => {
-  it('rejects an expired compiled snapshot even after the authorization specification was stripped', () => {
-    expect(compilePermissionAppliedMetadata({authorizationSnapshot:{expiresAt:'2000-01-01T00:00:00Z'},view:{content:{id:'expired'}}})).toBeNull();
+  it('keeps owner metadata open when presentation snapshot expires', () => {
+    expect(compilePermissionAppliedMetadata({authorizationSnapshot:{expiresAt:'2000-01-01T00:00:00Z'},view:{content:{id:'expired'}}}).view.content.id).toBe('expired');
   });
-  it('preserves a typed403 denial when an authorization guard is malformed', () => {
+  it('rejects malformed presentation guard syntax', () => {
     const metadata = {authorization:{scope:'window'}, authorizationSnapshot:{authorizationVersion:'v1',expiresAt:'2999-01-01T00:00:00Z'},view:{content:{visibleWhen:{source:'authorization',field:'canRead',unsupported:true}}}};
-    expect(() => compilePermissionAppliedMetadata(metadata)).toThrow(expect.objectContaining({status:403,code:'WINDOW_AUTHORIZATION_INVALID'}));
+    expect(() => compilePermissionAppliedMetadata(metadata)).toThrow();
+  });
+});
+
+describe('owner metadata with presentation-only conditions', () => {
+  it('renders resource-scoped metadata without a selected resource or read grant', () => {
+    const metadata = {authorization: {scope: 'resource', resource: {type: 'advertiser', id: {source: 'resource', selector: 'Id'}}}, dataSource: {owner: {service: {endpoint: 'owning-mcp'}, parameters: {Id: 42}}}, view: {content: {id: 'owner-frame', containers: [
+      {id: 'editor', visibleWhen: {source: 'authorization', field: 'principal.roles', contains: 'editor'}},
+      {id: 'history', visibleWhen: {source: 'authorization', field: 'principal.features', contains: 'history'}},
+      {id: 'plain'},
+    ]}}};
+    const first = compilePermissionAppliedMetadata({...metadata, authorizationSnapshot: {principal: {roles: ['editor'], features: []}, resources: {}}});
+    expect(first.view.content.id).toBe('owner-frame');
+    expect(first.view.content.containers.map(item => item.id)).toEqual(['editor', 'plain']);
+    expect(first.dataSource).toEqual(metadata.dataSource);
+    const next = compilePermissionAppliedMetadata({...metadata, authorizationSnapshot: {principal: {roles: [], features: ['history']}, resources: {}}});
+    expect(next.view.content.containers.map(item => item.id)).toEqual(['history', 'plain']);
+    expect(next.dataSource).toEqual(metadata.dataSource);
   });
 });

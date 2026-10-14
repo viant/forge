@@ -880,6 +880,10 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
             inTab,
             parameters,
             identityParameters: identityParameterNames,
+            resourceRef: options.resourceRef ? {...options.resourceRef} : undefined,
+            providerIdentity: options.providerIdentity,
+            pickerDialogId: options.pickerDialogId,
+            pickerParameters: options.pickerParameters,
             isModal: !!options.modal,
         };
         if (options.inlineMetadata) {
@@ -952,6 +956,10 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
             inTab,
             parameters,
             identityParameters: identityParameterNames,
+            resourceRef: options.resourceRef ? {...options.resourceRef} : undefined,
+            providerIdentity: options.providerIdentity,
+            pickerDialogId: options.pickerDialogId,
+            pickerParameters: options.pickerParameters,
             isModal: !!options.modal,
         };
         if (options.inlineMetadata !== undefined) {

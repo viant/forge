@@ -28,7 +28,7 @@ func NewWindowTargetHMAC(key []byte) (*WindowTargetHMAC, error) {
 	return &WindowTargetHMAC{key: append([]byte(nil), key...)}, nil
 }
 func (s *WindowTargetHMAC) Sign(ctx context.Context, pin identity.ResolvedResource, target WindowTarget, variant string) (string, error) {
-	if s == nil || len(s.key) < 32 || ctx == nil || ctx.Err() != nil || !pin.ValidUntil.After(time.Now()) || pin.URI == "" || pin.AuthorityBinding == "" || variant == "" {
+	if s == nil || len(s.key) < 32 || ctx == nil || ctx.Err() != nil || !identity.MetadataExpiryValid(pin.ValidUntil, time.Now()) || pin.URI == "" || variant == "" {
 		return "", identity.ErrResourceDenied
 	}
 	target.SelectionToken = ""

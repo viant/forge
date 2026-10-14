@@ -33,6 +33,7 @@ import DataSource from './DataSource.jsx';
 import MessageBus from './MessageBus.jsx';
 import WindowLayout from './WindowLayout.jsx';
 import ViewDialog from './ViewDialog.jsx';
+import {openWindowPickerDialog} from './windowPickerDialog.js';
 import DataSourceContainer from './WindowContentDataSourceContainer.jsx';
 
 import useDataConnector from '../hooks/dataconnector.js';
@@ -41,7 +42,7 @@ import {applyParameterCodec} from '../hooks/parameters.js';
 import {injectActions} from '../actions';
 import { resolveMetadataForTarget } from '../runtime/metadataResolver.js';
 import {canonicalSelectionBinding} from '../runtime/canonicalDelivery.js';
-import {compileDeliveryHintView, compilePermittedView, normalizeAuthorizationSnapshot, resolveAuthorizationResourceID, authorizationSnapshotLeaseMs} from '../runtime/permittedView.js';
+import {compileDeliveryHintView, normalizeAuthorizationSnapshot} from '../runtime/permittedView.js';
 import { applyDataSourceParameterCodecs, resolveParameters } from '../hooks/parameters.js';
 import { resolveSelector } from '../utils/selector.js';
 import { evaluatePlainVisibleWhen } from './visibleWhen.js';
@@ -92,38 +93,14 @@ function collectInitialWindowFormItemValues(node, initial) {
 }
 
 export function compileWindowAuthorizationMetadata(metadata, parameters = {}, selectionBinding = null) {
-    if (canonicalSelectionBinding({selectionBinding})) {
-        const snapshot = metadata?.authorizationSnapshot || {};
-        const spec = metadata?.authorization;
-        let hints = snapshot;
-        if (spec) {
-            const selector = String(spec?.resource?.id?.selector || '').trim();
-            const selected = selector ? resolveSelector(parameters || {}, selector) : null;
-            const resourceID = resolveAuthorizationResourceID(spec.schemaVersion, selected, snapshot);
-            hints = normalizeAuthorizationSnapshot(snapshot,
-                String(spec?.resource?.type || spec?.resourceType || '').trim(), resourceID.valid ? resourceID.id : null);
-        }
-        return {...compileDeliveryHintView(metadata, hints), authorizationSnapshot: metadata?.authorizationSnapshot ? hints : undefined, selectionBinding};
-    }
+    // The managing MCP owns resource access. The browser projects only supplied
+    // principal roles/exposures and never requests an entity read capability.
     const snapshot = metadata?.authorizationSnapshot;
-    if (!metadata?.authorization) return snapshot && authorizationSnapshotLeaseMs(snapshot) <= 0 ? null : metadata;
-    if (!snapshot || typeof snapshot !== 'object') return null;
-    if (authorizationSnapshotLeaseMs(snapshot) <= 0) return null;
-    const spec = metadata.authorization || {};
-    const resourceType = String(spec?.resource?.type || spec?.resourceType || '').trim();
-    const selector = String(spec?.resource?.id?.selector || '').trim();
-    const selected = selector ? resolveSelector(parameters || {}, selector) : null;
-    const resourceID = resolveAuthorizationResourceID(spec.schemaVersion, selected, snapshot);
-    if (!resourceID.valid) return null;
-    const authorization = normalizeAuthorizationSnapshot(snapshot, resourceType, resourceID.id);
-    let result;
-    try {
-        result = compilePermittedView(metadata, authorization, {requireRead: String(spec.scope || '').toLowerCase() === 'resource'});
-    } catch (cause) {
-        throw Object.assign(new Error('Window authorization metadata is invalid'), {status: 403, code: 'WINDOW_AUTHORIZATION_INVALID', cause});
-    }
-    if (result.denied || !result.metadata) return null;
-    return {...result.metadata, authorizationSnapshot: authorization};
+    const hints = snapshot ? normalizeAuthorizationSnapshot(snapshot) : {};
+    return {...compileDeliveryHintView(metadata, hints),
+        authorizationSnapshot: snapshot ? hints : undefined,
+        ...(canonicalSelectionBinding({selectionBinding}) ? {selectionBinding} : {}),
+    };
 }
 
 export function isProtectedWindowMetadata(metadata) {
@@ -678,6 +655,17 @@ function WindowContentInner({window, metadata, services}) {
         };
     }, [windowId, context]);
 
+    const openedPickerRef = useRef(false);
+    useEffect(() => {
+        if (!context || !window?.pickerDialogId || openedPickerRef.current) return;
+        openedPickerRef.current = true;
+        openWindowPickerDialog(window, metadata, context).catch(error => {
+            console.error('Window picker failed', error);
+            context.handlers?.window?.closeWindow?.();
+        });
+    }, [context, metadata, window]);
+
+
     useEffect(() => {
         const currentSignature = JSON.stringify(liveWindowForm);
         const mergedSignature = JSON.stringify(windowFormSnapshot);
@@ -1092,7 +1080,7 @@ function WindowContentInner({window, metadata, services}) {
             {!defaultDataSourceRef && context.signals ? <MessageBus context={context} /> : null}
             {renderDataSources()}
             {renderDialogs()}
-            <WindowLayout
+            {!window.pickerDialogId && <WindowLayout
                 title={`${windowKey.toUpperCase()}${windowData ? ` (${windowData})` : ''}`}
                 context={context}
                 contentOverride={rootContainer}
@@ -1101,8 +1089,8 @@ function WindowContentInner({window, metadata, services}) {
                 }}
                 isInTab={window.isInTab}
                 fillParent={shouldFillParent}
-            />
-            {showWindowSelectionFooter(window) ? <FloatingFooter /> : null}
+            />}
+            {!window.pickerDialogId && showWindowSelectionFooter(window) ? <FloatingFooter /> : null}
         </div>
     );
 }
@@ -1181,7 +1169,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             prepareRequest: prepareConnectorRequest,
         },
     }), [reportBuilderServices, runtimeWindow, endpoints, targetContext, auth, prepareConnectorRequest]);
-    const config  = {service: {...service, uri: windowMetadataEndpoint(service.uri, baseKey), includeTargetContext: true}};
+    const config  = {service: {...service, uri: windowMetadataEndpoint(service.uri, baseKey, runtimeWindow), includeTargetContext: true}};
     const connector = useDataConnector(config);
 
     useEffect(() => {
@@ -1310,29 +1298,6 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
         primeWindowSignals(windowId, metadata);
         setSignalsReady(true);
     }, [windowId, metadataSignalHandle?.value, resolvedServices, window]);
-
-    useEffect(() => {
-        const snapshot = metadataSignalHandle?.value?.authorizationSnapshot;
-        if (!snapshot || canonicalSelectionBinding(window)) return;
-        let timer;
-        const expire = () => {
-            if (metadataSignalHandle?.peek?.()?.authorizationSnapshot !== snapshot) return;
-            clearProtectedWindowState(windowId);
-            setSignalsReady(false);
-            const error = Object.assign(new Error('Authorization expired'), {status: 403, code: 'WINDOW_AUTHORIZATION_EXPIRED'});
-            setFetchError(error);
-        };
-        const schedule = () => {
-            const lease = authorizationSnapshotLeaseMs(snapshot);
-            if (lease <= 0) { expire(); return; }
-            timer = setTimeout(() => {
-                if (authorizationSnapshotLeaseMs(snapshot) <= 0) expire();
-                else schedule();
-            }, Math.min(lease, 2147483647));
-        };
-        schedule();
-        return () => clearTimeout(timer);
-    }, [windowId, metadataSignalHandle?.value?.authorizationSnapshot, canonicalSelectionBinding(window)]);
 
     const metadata = metadataSignalHandle?.peek?.();
     const protectedDenial = protectedWindowDenials.value[windowId];

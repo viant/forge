@@ -175,6 +175,7 @@ type NavigationItem struct {
 
 // Dialog represents a dialog with a title, content, actions, and on events.
 type Dialog struct {
+	SelectionMode   string                            `json:"selectionMode,omitempty" yaml:"selectionMode,omitempty"`
 	Id              string                            `json:"id" yaml:"id"`
 	Title           string                            `json:"title" yaml:"title"`
 	DataSourceRef   string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
@@ -191,6 +192,7 @@ type Dialog struct {
 // DialogProperties holds optional flags that tweak dialog UI behavior.
 // Example: properties.searchable: false hides the quick-search input in the dialog header.
 type DialogProperties struct {
+	ResolveInput     string                   `json:"resolveInput,omitempty" yaml:"resolveInput,omitempty"`
 	Searchable       *bool                    `json:"searchable,omitempty" yaml:"searchable,omitempty"`
 	ClassName        string                   `json:"className,omitempty" yaml:"className,omitempty"`
 	BodyClassName    string                   `json:"bodyClassName,omitempty" yaml:"bodyClassName,omitempty"`
@@ -1571,6 +1573,9 @@ type Item struct {
 // selected record fields back to the caller form.
 
 type Lookup struct {
+	DataSourceResource *identity.ResourceRef `json:"dataSourceResource,omitempty" yaml:"dataSourceResource,omitempty"`
+	PickerResource     *identity.ResourceRef `json:"pickerResource,omitempty" yaml:"pickerResource,omitempty"`
+	ProviderIdentity   string                `json:"providerIdentity,omitempty" yaml:"providerIdentity,omitempty"`
 	// RequestTrigger controls typed-value resolution: blur (default) or change.
 	RequestTrigger string `json:"requestTrigger,omitempty" yaml:"requestTrigger,omitempty"`
 	// Either DialogId (preferred) or WindowId can be provided. When DialogId

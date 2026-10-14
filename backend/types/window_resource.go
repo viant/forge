@@ -69,7 +69,7 @@ func (t WindowTarget) Normalize() (WindowTarget, error) {
 		pins := make(map[string]identity.ResolvedResource, len(t.DependencyPins))
 		for id, pin := range t.DependencyPins {
 			uri, e := identity.ParseResourceURI(pin.URI)
-			if id == "" || strings.TrimSpace(id) != id || len(id) > 256 || e != nil || uri.Kind != "datasource" || !pin.ResourceCandidate.Valid() || pin.ProviderIdentity == "" || strings.TrimSpace(pin.ProviderIdentity) != pin.ProviderIdentity || pin.AuthorityBinding == "" || pin.ValidUntil.IsZero() {
+			if id == "" || strings.TrimSpace(id) != id || len(id) > 256 || e != nil || uri.Kind != "datasource" || !pin.ResourceCandidate.Valid() || pin.ProviderIdentity == "" || strings.TrimSpace(pin.ProviderIdentity) != pin.ProviderIdentity {
 				return WindowTarget{}, fmt.Errorf("invalid dependency pin")
 			}
 			pin.ValidUntil = pin.ValidUntil.UTC()
