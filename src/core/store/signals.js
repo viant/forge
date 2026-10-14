@@ -805,10 +805,12 @@ const resolveHostedRegionReplacementWindow = (windows, parentKey, inTab, options
     const presentation = normalizeHostedRegionKey(options.presentation);
     const region = normalizeHostedRegionKey(options.region);
     const explicitParentKey = String(options.parentKey || parentKey || '').trim();
+    const sourceWindowId = String(options.replaceHostedWindowId || '').trim();
     if (options.replaceHostedRegion !== true) return null;
     if (!conversationId || !presentation || !region) return null;
     return (Array.isArray(windows) ? windows : []).find((win) => {
         if (!win) return false;
+        if (sourceWindowId && String(win.windowId || '').trim() !== sourceWindowId) return false;
         if ((win.inTab === false) !== (inTab === false)) return false;
         if (String(win.conversationId || '').trim() !== conversationId) return false;
         if (normalizeHostedRegionKey(win.presentation) !== presentation) return false;
