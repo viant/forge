@@ -7,12 +7,19 @@ import {SettingProvider} from '../core/context/Setting.jsx';
 import {getWindowContext} from '../core/context/registry.js';
 import {registerContainerRenderer} from '../runtime/containerRendererRegistry.js';
 import {getCollectionSignal, getMetadataSignal, removeSignalsForKey} from '../core/store/signals.js';
+import QuickFilterInputs from './table/basic/QuickFilterInputs.jsx';
 
 let latestRendererContext;
 registerContainerRenderer('test.authorized', ({context}) => {
   latestRendererContext=context;
   return <div data-authorized-renderer>{context.identity.windowId}</div>;
 });
+registerContainerRenderer('test.dataset-denial', ({context}) => (
+  <div data-dataset-denial-renderer>
+    <QuickFilterInputs context={context}/>
+    <div role="alert">{context.signals.control.value.error?.message || ''}</div>
+  </div>
+));
 const windowId = 'mounted-authorized';
 const target = {actorRef: 'actor-a', platform: 'web', formFactor: 'desktop'};
 const dom = new JSDOM('<!doctype html><html><body></body></html>', {url:'http://localhost/'});
@@ -39,35 +46,25 @@ function definition(withRows = false) {
     view:{content:{id:'authorized-root',kind:'test.authorized', ...(withRows ? {dataSourceRef:'rows'} : {})}}};
 }
 describe('mounted protected window absolute lease', () => {
-  it('expires the mounted renderer without renewing or modifying its old metadata', async () => {
-    let metadataRequests=0, permissions=0;
-    const services={authorizationRefresh:{mode:'seamless'}, applyPermission:async ({completeMetadata}) => {permissions++;return completeMetadata;},
-      dataConnectorTransport:async () => {metadataRequests++;return {data:definition()};}};
-    await mount(services); await flush();
-    expect(element.querySelector('[data-authorized-renderer]')).not.toBeNull();
-    const oldMetadata=getMetadataSignal(windowId).peek();
-    expect(latestRendererContext.metadata).toBe(oldMetadata);
-    expect(latestRendererContext.identity.protectedWindow).toBe(true);
-    const oldExpiry=oldMetadata.authorizationSnapshot.expiresAt;
-    await act(async () => vi.advanceTimersByTime(10000)); await flush();
-    expect(element.querySelector('[data-authorized-renderer]')).toBeNull();
-    expect(element.textContent).toContain('Permissions expired');
-    expect(getMetadataSignal(windowId).peek()).toBeNull();
-    expect(oldMetadata.authorizationSnapshot.expiresAt).toBe(oldExpiry);
-    expect(metadataRequests).toBe(1); expect(permissions).toBe(1);
-  });
-  it('cannot restore expired datasource rows after a slow response', async () => {
-    let completeRows;
-    const services={applyPermission:async ({completeMetadata}) => completeMetadata,
-      dataConnectorTransport:async request => request.dataSourceRef==='rows' ? new Promise(resolve => {completeRows=resolve;}) : {data:definition(true)}};
-    await mount(services); await flush();
-    expect(completeRows).toBeTypeOf('function');
-    await act(async () => vi.advanceTimersByTime(10000)); await flush();
-    await act(async () => completeRows({data:[{secret:'late-expired-row'}]})); await flush();
-    expect(getCollectionSignal(`${windowId}DSrows`).peek()).toEqual([]);
-    expect(element.querySelector('[data-authorized-renderer]')).toBeNull();
-    expect(element.textContent).toContain('Permissions expired');
-  });
+	 it('keeps a successfully opened MCP-managed view mounted after its hint lease', async () => {
+	   let metadataRequests=0, permissions=0;
+	   const services={authorizationRefresh:{mode:'opening'},applyPermission:async({completeMetadata})=>{permissions++;return completeMetadata;},dataConnectorTransport:async()=>{metadataRequests++;return {data:definition()};}};
+	   await mount(services);await flush();
+	   const metadata=getMetadataSignal(windowId).peek();
+	   expect(latestRendererContext.identity.windowOpenOnly).toBe(true);
+	   await act(async()=>vi.advanceTimersByTime(60000));await flush();
+	   expect(element.querySelector('[data-authorized-renderer]')).not.toBeNull();
+	   expect(getMetadataSignal(windowId).peek()).toBe(metadata);
+	   expect(metadata.authorizationSnapshot.expiresAt).toBe('2026-10-10T12:00:10Z');
+	   expect(metadataRequests).toBe(1);expect(permissions).toBe(1);
+	 });
+	 it('does not mark an unprotected legacy window as opening-admitted', async () => {
+	   const publicMetadata={dataSource:{},view:{content:{id:'public-root',kind:'test.authorized'}}};
+	   const services={authorizationRefresh:{mode:'opening'},dataConnectorTransport:async()=>({data:publicMetadata})};
+	   await mount(services);await flush();
+	   expect(element.querySelector('[data-authorized-renderer]')).not.toBeNull();
+	   expect(latestRendererContext.identity.windowOpenOnly).toBe(false);
+	 });
   it('admits a fresh view separately while an old request keeps its expired scope', async () => {
     let completeOldRows, grants=0, rowRequests=0;
     const services={applyPermission:async ({completeMetadata}) => completeMetadata,
@@ -126,6 +123,46 @@ describe('mounted protected window absolute lease', () => {
 
 });
 
+describe('rendered dataset denial retry behavior', () => {
+  it('keeps the filter and dataset error visible, stops automatic retries, and allows an explicit filter retry', async () => {
+    let rowReads = 0;
+    const denial = Object.assign(new Error('Datasource access denied. Adjust the filter or retry.'), {
+      status: 403, code: 'datasource_denied', scope: 'dataset',
+    });
+    const metadata = {
+      ...definition(true),
+      dataSource: {rows: {
+        service: {uri: 'mcp://opaque/rows'}, selectionMode: 'none', autoFetch: true,
+        quickFilterSet: 'creativeId',
+        filterSet: [{name: 'creativeId', filters: [{field: 'Id', placeholder: 'Creative ID'}]}],
+      }},
+      view: {content: {id: 'denied-root', kind: 'test.dataset-denial', dataSourceRef: 'rows'}},
+    };
+    const services = {
+      applyPermission: async ({completeMetadata}) => completeMetadata,
+      dataConnectorTransport: async request => {
+        if (request.dataSourceRef !== 'rows') return {data: metadata};
+        rowReads += 1;
+        throw denial;
+      },
+    };
+    const testWindow = {windowId, windowKey: 'mcp://opaque/creativeList'};
+    await mount(services, testWindow); await flush();
+    const rowsContext = getWindowContext(windowId).Context('rows');
+    expect(rowReads).toBe(1);
+    expect(element.querySelector('[data-dataset-denial-renderer]')).not.toBeNull();
+    expect(element.querySelector('[placeholder="Creative ID"]')).not.toBeNull();
+    expect(element.querySelector('[role="alert"]')?.textContent).toContain('Datasource access denied');
+
+    // A deliberate filter change remains a supported retry action.
+    await act(async () => rowsContext.handlers.dataSource.setFilter({filter: {Id: 999999999}}));
+    await flush();
+    expect(rowReads).toBe(2);
+    expect(element.querySelector('[placeholder="Creative ID"]')).not.toBeNull();
+    expect(element.querySelector('[role="alert"]')?.textContent).toContain('Datasource access denied');
+  });
+});
+
 const binding = (instanceId = 'delivery-a') => ({actor:{issuer:'issuer',subject:'actor-a',tenantId:'tenant',accountId:'account'},instanceId,parametersDigest:'digest',token:'signed-server-token'});
 const boundWindow = (selectionBinding = binding()) => ({windowId,windowKey:'mcp://opaque/window',parameters:{entityId:'9007199254740993'},selectionBinding});
 describe('canonical delivered window uses display hints only', () => {
@@ -151,7 +188,7 @@ describe('canonical delivered window uses display hints only', () => {
     const result=compileWindowAuthorizationMetadata(metadata,{entityId:'9007199254740993'},binding());
     expect(result.view.content.items.map(item=>item.id)).toEqual(['visible']);
     expect(result.dataSource).toBe(metadata.dataSource);
-    expect(result.authorizationSnapshot.resource.id).toBe('9007199254740993');
+    expect(result.authorizationSnapshot.resource).toBeNull();
     expect(metadata.view.content.items).toHaveLength(2);
   });
   it('keeps mounted real datasources across hint expiry without permission preflight or renewal', async () => {

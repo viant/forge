@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {isProtectedUpstreamDenial} from './dataSourceAuthorization.js';
+import {isProtectedUpstreamDenial,isDataSourceLocalDenial} from './dataSourceAuthorization.js';
 
 const protectedContext = {identity: {windowId: 'orders'}, metadata: {authorizationSnapshot: {authorizationVersion: 'v1'}}};
 assert.equal(isProtectedUpstreamDenial(protectedContext, {status: 403}), true);
@@ -22,3 +22,10 @@ assert.equal(isProtectedUpstreamDenial({identity:{windowId:'bound',protectedWind
 assert.equal(isProtectedUpstreamDenial({identity:{windowId:'bound',protectedWindow:true,canonicalDelivery:true},metadata:{}},{status:403,message:'datasource_denied'}),false);
 
 assert.equal(isProtectedUpstreamDenial({identity:{windowId:'bound',protectedWindow:true,canonicalDelivery:true},metadata:{}},{status:403,code:'datasource_denied',scope:'window'}),false);
+
+const openingContext={identity:{windowId:'opened',protectedWindow:true,windowOpenOnly:true},metadata:{}};
+for(const status of [401,403]) {
+ assert.equal(isProtectedUpstreamDenial(openingContext,{status}),status===401);
+ assert.equal(isDataSourceLocalDenial({status},openingContext),status===403);
+ assert.equal(isProtectedUpstreamDenial(openingContext,{status,code:'resource_denied',scope:'window'}),true);
+}
