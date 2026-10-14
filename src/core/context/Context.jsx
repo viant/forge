@@ -143,7 +143,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
     };
     return {
 
-        identity: {windowId, getDataSourceId, dataSourceRef, getDialogId, protectedWindow: !!(metadata?.authorization || metadata?.authorizationSnapshot || canonicalSelectionBinding(metadata)), canonicalDelivery: !!canonicalSelectionBinding(metadata), ...(actorRef ? { actorRef } : {})},
+        identity: {windowId, getDataSourceId, dataSourceRef, getDialogId, protectedWindow: !!(metadata?.authorization || metadata?.authorizationSnapshot || canonicalSelectionBinding(metadata)), canonicalDelivery: !!canonicalSelectionBinding(metadata), windowOpenOnly: services?.authorizationRefresh?.mode === 'opening' && !!(metadata?.authorization || metadata?.authorizationSnapshot || canonicalSelectionBinding(metadata)), ...(actorRef ? { actorRef } : {})},
         windowState: services?.windowState || null,
         authorization: services?.authorization || null,
         resources: {},

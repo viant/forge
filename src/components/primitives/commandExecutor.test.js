@@ -356,3 +356,12 @@ for(const [field,value] of [['resource.id','different'],['resource.parent.id','d
   assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{any:[businessValidation,{source:'authorization',field,equals:value}]}}),false,`${field} remains a validation constraint`);
 }
 console.log('canonical mixed all/any/not retains local and fidelity validation ✓');
+
+const openedContext={...canonicalContext,identity:{windowOpenOnly:true}};
+const beforeOpenedWrites=canonicalWrites;
+assert.equal((await executeCommand(openedContext,{commandId:'opened-window',dataSourceRef:'canonical',validateWhen:businessValidation},originalMutationArgs)).status,'succeeded');
+assert.equal(canonicalWrites,beforeOpenedWrites+1);
+assert.deepEqual(canonicalParameters,originalMutationArgs);
+assert.equal((await executeCommand(openedContext,{commandId:'opened-local-validation',dataSourceRef:'canonical',validateWhen:{all:[businessValidation,{source:'windowForm',field:'ready',equals:true}]}})).status,'invalid');
+assert.equal(canonicalWrites,beforeOpenedWrites+1);
+console.log('opening-only command retains local validation and delegates data authorization to MCP ✓');

@@ -328,7 +328,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
 }
 
 export function commandValidationPasses(context, command = {}) {
-  const condition = context?.identity?.canonicalDelivery === true
+  const condition = context?.identity?.canonicalDelivery === true || context?.identity?.windowOpenOnly === true
     ? withoutAuthorizationValidationHints(command.validateWhen) : command.validateWhen;
   return !condition || evaluatePlainVisibleWhen(condition, context);
 }
