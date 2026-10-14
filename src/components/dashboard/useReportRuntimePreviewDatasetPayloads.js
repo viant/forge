@@ -109,7 +109,7 @@ export async function fetchReportRuntimePreviewDatasetPayloadResult({
       error: null,
     };
   }
-  const progress = {total: normalizedDatasets.length, completed: 0, running: 0, failed: 0};
+  const progress = {total: normalizedDatasets.length, completed: 0, running: 0, failed: 0, activeLabel: ""};
   const publishProgress = () => {
     if (!signal?.aborted && canContinueDatasetPayloadLifecycle(shouldContinue)) onProgress?.({...progress});
   };
@@ -119,6 +119,7 @@ export async function fetchReportRuntimePreviewDatasetPayloadResult({
     normalizedDatasets.map((dataset) => scheduleReportDataset(async () => {
       if (!canContinueDatasetPayloadLifecycle(shouldContinue)) return [dataset.id, null, false, null, true];
       progress.running++;
+      progress.activeLabel = dataset.label || dataset.id;
       publishProgress();
       try {
         const resolvedFetcher = resolveReportBuilderDatasetPreviewFetcher(
@@ -178,6 +179,7 @@ export async function fetchReportRuntimePreviewDatasetPayloadResult({
       } finally {
         progress.running--;
         progress.completed++;
+        progress.activeLabel = "";
         publishProgress();
       }
     }, {signal,group}).catch(error => {

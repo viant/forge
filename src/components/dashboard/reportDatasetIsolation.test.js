@@ -21,7 +21,7 @@ assert.equal(running,1,'one report must leave room for another report');
 const second = fetchReportRuntimePreviewDatasetPayloadResult({builderContext,datasets:[dataset(99)]});
 await tick();
 assert.equal(running,2,'another report must start ahead of the first report backlog');
-assert.deepEqual(progress.at(-1),{total:6,completed:0,running:1,failed:0});
+assert.deepEqual(progress.at(-1),{total:6,completed:0,running:1,failed:0,activeLabel:'part-0'});
 const originalFetch = globalThis.fetch;
 try {
     globalThis.fetch = async () => new Response(JSON.stringify({rows:[{id:1}]}),{status:200});
@@ -34,7 +34,7 @@ assert.equal(Object.keys((await second).payloads).length,1);
 for(let i=0;i<6;i++) { releases.shift().resolve(); await tick(); }
 assert.equal(Object.keys((await result).payloads).length,6);
 assert.equal(peak,2);
-assert.deepEqual(progress.at(-1),{total:6,completed:6,running:0,failed:0});
+assert.deepEqual(progress.at(-1),{total:6,completed:6,running:0,failed:0,activeLabel:''});
 
 const controller = new AbortController();
 let calls = 0;

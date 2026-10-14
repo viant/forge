@@ -336,9 +336,10 @@ export function buildReportBuilderAuthoredRuntimePreviewState({
         : null;
     const datasetTotal = Number(datasetProgress?.total || 0);
     const datasetCompleted = Number(datasetProgress?.completed || 0);
+    const activeDatasetLabel = String(datasetProgress?.activeLabel || "").trim();
     const datasetProgressText = Number.isFinite(datasetTotal) && datasetTotal > 0
         && Number.isFinite(datasetCompleted)
-        ? ` ${Math.max(0, Math.min(datasetTotal, datasetCompleted))} of ${datasetTotal} data views ready.`
+        ? ` ${Math.max(0, Math.min(datasetTotal, datasetCompleted))} of ${datasetTotal} data views ready.${activeDatasetLabel ? ` Loading ${activeDatasetLabel}.` : ""}`
         : "";
     return {
         eyebrow: reportPresentation ? "Report" : "Preview",
