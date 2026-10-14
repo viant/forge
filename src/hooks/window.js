@@ -402,6 +402,7 @@ export function useWindowHandlers(windowId) {
                 region: options.region,
                 conversationId: options.conversationId,
                 replaceHostedRegion: options.replaceHostedRegion,
+                replaceHostedWindowId: options.replaceHostedWindowId,
                 parentKey: options.parentKey,
                 workspaceSharePct: options.workspaceSharePct,
                 workspaceMinHeight: options.workspaceMinHeight,
@@ -524,6 +525,7 @@ export function useWindowHandlers(windowId) {
             const normalizedRegion = String(options.region || '').trim().toLowerCase();
             if (normalizedPresentation === 'hosted' && normalizedRegion === 'chat.top') {
                 options.replaceHostedRegion = target.replaceHostedRegion !== false;
+                options.replaceHostedWindowId = currentWindow.windowId;
                 options.parentKey = target.parentKey !== undefined ? target.parentKey : currentWindow.parentKey;
                 options.navigationTrail = buildWorkspaceNavigationTrail(currentWindow, target);
             }
