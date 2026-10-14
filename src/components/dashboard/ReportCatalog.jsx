@@ -185,7 +185,7 @@ function ReportCard({
                         <Menu>
                             {!isPreset ? <MenuItem icon="edit" text="Rename" onClick={() => onRename(report)} /> : null}
                             <MenuItem icon="duplicate" text={isPreset ? "Use as new report" : "Duplicate"} onClick={() => onDuplicate(report)} />
-                            {!isPreset ? <MenuItem icon="calendar" text="Run for another date range" onClick={() => onRunRange(report)} /> : null}
+                            <MenuItem icon="calendar" text="Run for another date range" onClick={() => onRunRange(report)} />
                             <MenuItem icon="download" text="Export PDF" onClick={() => onExport(report)} />
                             {!isPreset ? <MenuItem intent="danger" icon="trash" text="Delete report" onClick={() => onDelete(report)} /> : null}
                         </Menu>
@@ -708,7 +708,7 @@ export default function ReportCatalog({container, context}) {
 
             <Dialog isOpen={!!rangeTarget} onClose={() => setRangeTarget(null)} title="Run for another date range" icon="calendar">
                 <DialogBody>
-                    <p className="forge-report-catalog__dialog-copy">This run uses a temporary date override and does not change the saved report defaults.</p>
+                    <p className="forge-report-catalog__dialog-copy">This run uses a temporary date override and does not change the report defaults.</p>
                     <div className="forge-report-catalog__date-fields">
                         <label className="forge-report-catalog__field"><span>From</span><input type="date" value={rangeFrom} onInput={(event) => setRangeFrom(event.currentTarget.value)} /></label>
                         <label className="forge-report-catalog__field"><span>To</span><input type="date" value={rangeTo} onInput={(event) => setRangeTo(event.currentTarget.value)} /></label>
