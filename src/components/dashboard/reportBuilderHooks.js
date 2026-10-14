@@ -303,10 +303,25 @@ async function fetchLookupHydrationRecord(job) {
     if (!fetcher) {
         throw new Error("lookup label resolve unavailable: dataSource fetch handler missing");
     }
+    const filterSets = Array.isArray(job?.dataSourceContext?.dataSource?.filterSet)
+        ? job.dataSourceContext.dataSource.filterSet
+        : [];
+    const input = filterSets.flatMap((set) => Array.isArray(set?.template) ? set.template : [])
+        .find((field) => String(field?.id || "").trim() === job.resolveInput);
+    let value = job.value;
+    if (String(input?.type || "").trim().toLowerCase() === "int[]") {
+        value = (Array.isArray(value) ? value : [value]).map((item) => {
+            const number = Number(item);
+            if (!Number.isSafeInteger(number)) {
+                throw new Error(`lookup label resolve requires an integer for ${job.resolveInput}`);
+            }
+            return number;
+        });
+    }
     const body = await fetcher({
         parameters: {
             ...(job?.parameters || {}),
-            [job.resolveInput]: job.value,
+            [job.resolveInput]: value,
         },
     });
     const selectors = job?.dataSourceContext?.dataSource?.selectors || {};
