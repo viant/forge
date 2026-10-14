@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {openWindowPickerDialog} from './windowPickerDialog.js';
+const record={adOrderId:42,adOrderName:'Original'};
+let received,committed,closed=0;
+const context={handlers:{window:{openDialog:async args=>{received=args;return record},commit:args=>committed=args,closeWindow:()=>closed++}}};
+const window={pickerDialogId:'adOrderPicker',pickerParameters:[{name:'AdOrderId'}],parameters:{AdOrderId:42}};
+await openWindowPickerDialog(window,{dialogs:[{id:'adOrderPicker'}]},context);
+assert.equal(received.execution.args[0],'adOrderPicker');assert.deepEqual(received.parameters,{AdOrderId:42});assert.deepEqual(committed.payload,record);assert.equal(closed,0);
+await assert.rejects(openWindowPickerDialog(window,{dialogs:[{id:'foreign'}]},context),/owning window bundle/);
+context.handlers.window.openDialog=async()=>({status:'canceled',canceled:true});
+await openWindowPickerDialog(window,{dialogs:[{id:'adOrderPicker'}]},context);assert.equal(closed,1);

@@ -1,10 +1,10 @@
 // useGenericDataSourceHandlers.js
 import {
     activeWindows,
-    addWindow,
-    findInputSignal, findSelectionSignal, getDialogSignal, getFormSignal, getViewSignal, removeSignalsForKey,
+    addWindow, removeWindow,
+    findInputSignal, findSelectionSignal, getDialogSignal, getFormSignal, getViewSignal,
 } from "../core/store/signals.js";
-import { clearWindowContext, getWindowContext } from "../core/context/registry.js";
+import { getWindowContext } from "../core/context/registry.js";
 import { resolveSelector } from "../utils/selector.js";
 import { resolveParameters } from './parameters.js';
 import {buildStandaloneDashboardDocument, downloadDashboardHtml} from "../core/ui/dashboardExport.js";
@@ -322,6 +322,9 @@ export function useWindowHandlers(windowId) {
                 || maybe.workspaceSharePct !== undefined
                 || maybe.workspaceMinHeight !== undefined
                 || maybe.workspaceCollapsed !== undefined
+                || maybe.resourceRef !== undefined
+                || maybe.providerIdentity !== undefined
+                || maybe.pickerDialogId !== undefined
                 || maybe.identityParameters !== undefined
                 || maybe.navigation !== undefined
                 || maybe.navigationTrail !== undefined
@@ -378,6 +381,7 @@ export function useWindowHandlers(windowId) {
 
         const activeOwnerWindow = activeWindows.peek().find(entry => entry.windowId === windowId);
         const ownerWindow = activeOwnerWindow || props.context?.windowState || getWindowContext(windowId)?.windowState;
+        console.debug('[window.open][owner]', JSON.stringify({ownerFound:!!activeOwnerWindow,scopedAtCreation:!!windowScopeAtCreation,scopedContext:!!ownerWindow?.windowScopeId,picker:!!options.pickerDialogId,canonicalRef:!!options.resourceRef?.uri}));
         // A late callback from a disposed scoped owner cannot recreate leaked windows.
         if ((windowScopeAtCreation || ownerWindow?.windowScopeId) && !activeOwnerWindow) return undefined;
         const winObj = addWindow(
@@ -405,9 +409,14 @@ export function useWindowHandlers(windowId) {
                 navigationTrail: options.navigationTrail,
                 workspaceCollapsed: options.workspaceCollapsed,
                 identityParameters: options.identityParameters,
+                resourceRef: options.resourceRef,
+                providerIdentity: options.providerIdentity,
+                pickerDialogId: options.pickerDialogId,
+                pickerParameters: options.parameters,
             }
         );
 
+        console.debug('[window.open][created]', JSON.stringify({created:!!winObj,active:activeWindows.peek().some(entry=>entry.windowId===winObj?.windowId),modal:!!winObj?.isModal,picker:!!winObj?.pickerDialogId}));
         const entryBase = {
             resolve: null,
             options,
@@ -434,8 +443,7 @@ export function useWindowHandlers(windowId) {
 
     const closeWindow = (props = {}) => {
         cancelDialogsOwnedByWindow(windowId);
-        clearWindowContext(windowId);
-        removeSignalsForKey(windowId);
+        removeWindow(windowId);
     }
 
     const selectTab = (props = {}) => {
