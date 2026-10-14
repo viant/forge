@@ -2083,14 +2083,14 @@ const drillRefreshWithDatasetProgress = buildReportBuilderAuthoredRuntimePreview
     runtimePreviewArtifact: drillRefreshRetainedRowsDatasets,
     runtimePreviewDatasetState: {
         loading: true,
-        progress: {completed: 3, total: 8},
+        progress: {completed: 3, total: 8, activeLabel: "Channel performance"},
     },
     canRunReport: true,
     presentationMode: "report",
 });
 assert.deepEqual(drillRefreshWithDatasetProgress.updatingNotice, {
     level: "info",
-    message: "Updating this report with the latest results… 3 of 8 data views ready.",
+    message: "Updating this report with the latest results… 3 of 8 data views ready. Loading Channel performance.",
 });
 
 const drillRefreshSettledWithRetainedRowsPreviewState = buildReportBuilderAuthoredRuntimePreviewState({
