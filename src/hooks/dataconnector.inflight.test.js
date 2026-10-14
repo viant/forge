@@ -118,6 +118,29 @@ describe('createDataConnector', () => {
         }
     });
 
+    it('preserves existing metadata query parameters when appending the web target', async () => {
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({ ok: true }),
+        });
+        const reference = JSON.stringify({ uri: 'window://workspace/adOrderPicker' });
+        const url = `/v1/api/agently/forge/window/adOrderPicker?resourceRef=${encodeURIComponent(reference)}&providerIdentity=internal`;
+        const connector = createDataConnector({ service: { URL: url, includeTargetContext: true } }, {
+            endpoints: {}, auth: {},
+            targetContext: { platform: 'web', formFactor: 'desktop', surface: 'browser', capabilities: ['markdown'] },
+        });
+
+        await expect(connector.get({})).resolves.toEqual({ ok: true });
+        const requested = new URL(global.fetch.mock.calls[0][0], 'https://forge.test');
+        expect(JSON.parse(requested.searchParams.get('resourceRef'))).toEqual({ uri: 'window://workspace/adOrderPicker' });
+        expect(requested.searchParams.get('providerIdentity')).toBe('internal');
+        expect(requested.searchParams.get('platform')).toBe('web');
+        expect(requested.searchParams.get('formFactor')).toBe('desktop');
+        expect(requested.searchParams.get('surface')).toBe('browser');
+        expect(requested.searchParams.getAll('capabilities')).toEqual(['markdown']);
+    });
+
     it('does not treat an upstream datasource 401 as an expired workspace session', async () => {
         const handleUnauthorized = vi.fn();
         const response = {

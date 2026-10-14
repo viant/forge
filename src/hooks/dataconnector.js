@@ -7,6 +7,16 @@ import { buildDatasourceFetchPayload } from "./datasourceRequest.js";
 
 const inFlightGetRequests = new Map();
 
+function appendQueryParams(url, queryParams) {
+    const encoded = queryParams?.toString?.() || '';
+    if (!encoded) return url;
+    const fragmentAt = url.indexOf('#');
+    const base = fragmentAt < 0 ? url : url.slice(0, fragmentAt);
+    const fragment = fragmentAt < 0 ? '' : url.slice(fragmentAt);
+    const separator = base.includes('?') ? (base.endsWith('?') || base.endsWith('&') ? '' : '&') : '?';
+    return `${base}${separator}${encoded}${fragment}`;
+}
+
 
 // Toggle with env var or config if you don't always want noisy logs.
 // Guard `process` access because standalone browser previews may execute
@@ -249,7 +259,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
             appendServiceTargetContext(queryParams);
             ({url, method, headers, queryParams, body} = applyRequestPreparation({url, method, headers, queryParams, body}));
-            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            const finalUrl = appendQueryParams(url, queryParams);
 
             const request = {method, headers};
             if (Object.keys(body).length > 0) {
@@ -329,7 +339,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 body: payload,
             }));
 
-            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            const finalUrl = appendQueryParams(url, queryParams);
             const request = {method: String(method || requestMethod).toUpperCase(), headers, ...(signal ? {signal} : {})};
 
             if (requestMethod !== 'GET' && isDatasourceFetchRoute) {
@@ -396,7 +406,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 queryParams,
                 body,
             }));
-            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            const finalUrl = appendQueryParams(url, queryParams);
             const log = getLogger('connector');
             try { log.debug('[request][POST]', { url: finalUrl, body }); } catch(_) {}
             const resp = await fetch(finalUrl, {
@@ -436,7 +446,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 queryParams,
                 body,
             }));
-            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            const finalUrl = appendQueryParams(url, queryParams);
             const resp = await fetch(finalUrl, {
                 method: String(method || 'PATCH').toUpperCase(),
                 headers: {...headers, "Content-Type": "application/json"},
@@ -471,7 +481,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 queryParams,
                 body,
             }));
-            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            const finalUrl = appendQueryParams(url, queryParams);
             const resp = await fetch(finalUrl, {
                 method: String(method || 'PUT').toUpperCase(),
                 headers: {...headers, "Content-Type": "application/json"},
@@ -506,7 +516,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 queryParams,
                 body: undefined,
             }));
-            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            const finalUrl = appendQueryParams(url, queryParams);
             const resp = await fetch(finalUrl, {method: String(method || 'DELETE').toUpperCase(), headers});
             if (!resp.ok) {
                 throw new Error(`DELETE error: ${resp.statusText}`);
