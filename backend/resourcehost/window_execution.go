@@ -98,11 +98,15 @@ func (c *WindowCatalog) ResolveDatasource(ctx context.Context, parent identity.R
 	if !c.AuthzReady() {
 		return nil, identity.ErrResourceDenied
 	}
-	definition, connection, e := c.Gateway.getForProvider(ctx, parent.ProviderIdentity, identity.ResourceRef{URI: parent.URI, Revision: parent.Selector()}, &parent)
+	connection, e := c.Gateway.ConnectionForProvider(ctx, parent.ProviderIdentity)
 	if e != nil {
 		return nil, e
 	}
-	variant, e := types.SelectWindowResourceWithReferences(definition.Resource.Definition, target)
+	definition, e := GetWithCodec[*types.CompiledWindowResource](ctx, c.Gateway, connection, identity.ResourceRef{URI: parent.URI, Revision: parent.Selector()}, &parent, DefinitionCodec[*types.CompiledWindowResource]{ID: "forge.window.resource.v1", Parse: types.CompileWindowResource})
+	if e != nil {
+		return nil, e
+	}
+	variant, e := definition.Definition.Select(target)
 	if e != nil {
 		return nil, e
 	}
@@ -118,7 +122,7 @@ func (c *WindowCatalog) ResolveDatasource(ctx context.Context, parent identity.R
 	if json.Unmarshal(raw, &datasource) != nil || datasource.ID != id {
 		return nil, identity.ErrResourceDenied
 	}
-	reads = append(reads, selectedResourceRead{connection: connection, pin: parent, result: *definition})
+	reads = append(reads, selectedResourceRead{connection: connection, pin: parent, result: definition.GetResult})
 	if e = c.registerSelectedDatasource(ctx, parent, target, id, variant, reads); e != nil {
 		return nil, e
 	}

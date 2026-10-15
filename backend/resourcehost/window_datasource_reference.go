@@ -21,11 +21,11 @@ func (c *WindowCatalog) fetchReferencedDatasource(ctx context.Context, parent id
 		return nil, err
 	}
 	check := func() error {
-		result, err := Get[json.RawMessage](ctx, c.Gateway, connection, identity.ResourceRef{URI: parent.URI, Revision: parent.Selector()}, &parent)
+		result, err := GetWithCodec[*types.CompiledWindowResource](ctx, c.Gateway, connection, identity.ResourceRef{URI: parent.URI, Revision: parent.Selector()}, &parent, DefinitionCodec[*types.CompiledWindowResource]{ID: "forge.window.resource.v1", Parse: types.CompileWindowResource})
 		if err != nil {
 			return err
 		}
-		variant, err := types.SelectWindowResourceWithReferences(result.Resource.Definition, target)
+		variant, err := result.Definition.Select(target)
 		if err != nil {
 			return err
 		}

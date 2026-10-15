@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/viant/forge/backend/clientpool"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
 	mcpclient "github.com/viant/mcp/client"
@@ -83,4 +84,28 @@ func TestDefinitionCodecCannotOutliveRealSourceExpiry(t *testing.T) {
 	}})
 	require.ErrorIs(t, err, identity.ErrResourceDenied)
 	require.Equal(t, 1, source.count(uri), "no reread or replacement lease during compilation")
+}
+
+func TestDatasourceResolutionReusesOpenedWindowRepresentation(t *testing.T) {
+	stack := newDependencyStack(t, time.Now().Add(time.Minute), map[string]string{"team": cfg.ResourceCacheUser})
+	hits, misses := 0, 0
+	ctx := observe.WithObserver(context.Background(), observe.ObserverFunc(func(event observe.Event) {
+		if event.Phase == observe.GatewayDefinitionDecode {
+			if event.Cache == observe.CacheHit {
+				hits++
+			}
+			if event.Cache == observe.CacheMiss {
+				misses++
+			}
+		}
+	}))
+	pin, target := *stack.opened.Definition.Resource, stack.opened.Definition.ResourceTarget
+	first, err := stack.catalog.ResolveDatasource(ctx, pin, target, "orders")
+	require.NoError(t, err)
+	first.ID = "caller-mutated"
+	second, err := stack.catalog.ResolveDatasource(ctx, pin, target, "orders")
+	require.NoError(t, err)
+	require.Equal(t, "orders", second.ID)
+	require.GreaterOrEqual(t, hits, 2, "datasource reads must reuse the window representation compiled during opening")
+	require.Zero(t, misses, "warm datasource reads must not compile the window again")
 }
