@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	identity "github.com/viant/agently-core/protocol/resource"
+	identity "github.com/viant/forge/backend/resource"
 )
 
 // WindowTargetProof signs a presentation selection, not an ACL grant. Every

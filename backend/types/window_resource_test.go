@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	identity "github.com/viant/agently-core/protocol/resource"
+	identity "github.com/viant/forge/backend/resource"
 )
 
 func windowBundleFixture(t *testing.T) WindowResourceEnvelope {

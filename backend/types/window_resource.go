@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	primitive "github.com/viant/agently-core/protocol/primitive"
-	identity "github.com/viant/agently-core/protocol/resource"
+	primitive "github.com/viant/forge/backend/provider/contract"
+	identity "github.com/viant/forge/backend/resource"
 )
 
 const WindowBundleFormat = "window.bundle"

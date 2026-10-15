@@ -2,7 +2,7 @@ package registry
 
 import (
 	"encoding/json"
-	primitive "github.com/viant/agently-core/protocol/primitive"
+	primitive "github.com/viant/forge/backend/provider/contract"
 )
 
 const AuthoredReportFormat = "forge.authoredReport"
