@@ -10,10 +10,15 @@ import {hasResolvedDependencies} from "./dataSourceDependencies.js";
 import {bindingFinalizationAction, isCurrentBindingGeneration} from "./primitives/bindingGeneration.js";
 import {resourceModelRefForDataSource, unmarshalResourceCollection} from "./primitives/resourceModel.js";
 import {settleDataSourceRequest} from './dataSourceRequestLifecycle.js';
+import {isProtectedUpstreamDenial, isDataSourceLocalDenial} from './dataSourceAuthorization.js';
 import {shouldDispatchSelectionEvent} from './selectionEventModel.js';
 import {reconcileFetchForMetadataReadiness} from './dataSourceMetadataReadiness.js';
 import {
     findSelectionSignal,
+    protectedWindowEpoch,
+    protectedDataSourceEpoch,
+    clearDeniedDataSourceState,
+    denyProtectedWindow,
 
 } from "../core/index.js";
 
@@ -22,6 +27,7 @@ import {
 } from "../hooks/index.js";
 
 import {useRef} from "react";
+import {createCursorPagingSession, cursorPagingAssociation, markCompletedCursorAssociation} from "../hooks/paging.js";
 
 
 export {hasResolvedDependencies};
@@ -68,6 +74,7 @@ export default function DataSource({context}) {
     const log = getLogger('ds');
     try { log.debug('[mount]', { ds: context?.identity?.dataSourceRef }); } catch (_) {}
     const prevFilterRef = useRef({});
+    const cursorSessionRef = useRef(null);
     const prevQuerySig = useRef('');
     const lastResolvedParametersRef = useRef({});
     const mountedRef = useRef(true);
@@ -309,6 +316,9 @@ export default function DataSource({context}) {
 
 
     async function refreshRecords() {
+        const authorizationEpoch = protectedWindowEpoch(identity?.windowId);
+        const datasetEpoch = protectedDataSourceEpoch(identity?.dataSourceId);
+        const authorizationIsCurrent = () => protectedWindowEpoch(identity?.windowId) === authorizationEpoch && protectedDataSourceEpoch(identity?.dataSourceId) === datasetEpoch;
         const inputVal = input.value || {};
         let {refreshFilter, parameters} = inputVal || {};
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, refreshFilter, dataSource.requiredAnyParameters)
@@ -344,7 +354,7 @@ export default function DataSource({context}) {
             const payload = await connector.get({
                 filter: finalFilter
             })
-            if (!mountedRef.current) return;
+            if (!mountedRef.current || !authorizationIsCurrent()) return;
             control.value = {...control.peek(), loaded: true, error: null, stale: false};
 
 
@@ -412,7 +422,12 @@ export default function DataSource({context}) {
             } catch (_) {
             }
         } catch (err) {
-            if (!mountedRef.current) return;
+            if (!mountedRef.current || !authorizationIsCurrent()) return;
+            if (isDataSourceLocalDenial(err, context)) { clearDeniedDataSourceState(identity.dataSourceId, err); return; }
+            if (isProtectedUpstreamDenial(context, err)) {
+                denyProtectedWindow(identity.windowId, Number(err.status));
+                return;
+            }
             setError(err);
             try {
                 if (events.onError && events.onError.isDefined()) {
@@ -422,7 +437,7 @@ export default function DataSource({context}) {
             } catch (_) {
             }
         } finally {
-            if (mountedRef.current) setLoading(false);
+            if (mountedRef.current && authorizationIsCurrent()) setLoading(false);
         }
     }
 
@@ -434,6 +449,9 @@ export default function DataSource({context}) {
      *  - Then calls postFetchHook
      */
     async function doFetchRecords() {
+        const authorizationEpoch = protectedWindowEpoch(identity?.windowId);
+        const datasetEpoch = protectedDataSourceEpoch(identity?.dataSourceId);
+        const authorizationIsCurrent = () => protectedWindowEpoch(identity?.windowId) === authorizationEpoch && protectedDataSourceEpoch(identity?.dataSourceId) === datasetEpoch;
         try {
             log.debug('[doFetchRecords] start', {ds: context?.identity?.dataSourceRef, ts: Date.now()});
         } catch (_) {
@@ -497,6 +515,11 @@ export default function DataSource({context}) {
                 previousFilter: prevFilterRef.current,
                 pagingEnabled,
             });
+            const cursorMode = pagingEnabled && String(paging?.mode || '').trim().toLowerCase() === 'cursor';
+            if (cursorMode && !cursorSessionRef.current) cursorSessionRef.current = createCursorPagingSession();
+            if (!cursorMode) cursorSessionRef.current = null;
+            const cursorRequest = cursorMode ? cursorSessionRef.current.begin(page, cursorPagingAssociation(context, {filter, parameters, sort})) : null;
+            if (cursorRequest) page = cursorRequest.page;
             prevFilterRef.current = snapshotFilter(filter);
 
             // 2) Merge into filter
@@ -507,10 +530,12 @@ export default function DataSource({context}) {
             const payload = await connector.get({
                 filter: finalFilter,
                 page,
+                ...(cursorRequest ? {cursor: cursorRequest.cursor} : {}),
                 inputParameters: {...(parameters || {}), ...(sort?.length ? {sort} : {})},
                 cache,
                 invocationId,
             });
+            if (!authorizationIsCurrent()) return;
             if (!mountedRef.current) {
                 settleDataSourceRequest(requestDataSourceId, requestId, new Error('Datasource unmounted before request completion.'));
                 return;
@@ -530,6 +555,10 @@ export default function DataSource({context}) {
             }
 
             let {records, info, stats} = extractData(selectors, paging, payload);
+            if (cursorRequest) {
+                info = cursorSessionRef.current.finish(cursorRequest, info);
+                if (!info) return;
+            }
             const deferredCacheHit = isDeferredCacheHitEnvelope(payload);
             if (deferredCacheHit && records.length === 0) {
                 const previousRecords = Array.isArray(collection.peek()) ? collection.peek() : [];
@@ -565,10 +594,12 @@ export default function DataSource({context}) {
                 });
             } catch (_) {
             }
-            collectionInfo.value = withFetchedPageInfo(info, page, pagingEnabled, {
+            collectionInfo.value = cursorRequest ? markCompletedCursorAssociation({...info, returnedCount: records.length, pageSize: paging?.size}, cursorRequest.signature) : withFetchedPageInfo(info, page, pagingEnabled, {
                 returnedCount: records.length,
                 pageSize: paging?.size,
                 openEnded: paging?.openEnded === true,
+                mode: paging?.mode,
+                hasMoreSelector: paging?.dataInfoSelectors?.hasMore,
             });
             metrics.value = stats;
             control.value = { ...control.peek(), loaded: true, error: null, stale: false };
@@ -635,6 +666,7 @@ export default function DataSource({context}) {
             }
             settleDataSourceRequest(requestDataSourceId, requestId, null, payload);
         } catch (err) {
+            if (!authorizationIsCurrent()) return;
             if (!mountedRef.current) {
                 settleDataSourceRequest(requestDataSourceId, requestId, err);
                 return;
@@ -642,6 +674,11 @@ export default function DataSource({context}) {
             settleDataSourceRequest(requestDataSourceId, requestId, err);
             if (!isCurrentBindingGeneration(input.peek()?.bindingGeneration, bindingGeneration)) {
                 try { log.debug('[doFetchRecords] ignored stale binding error', {ds: context?.identity?.dataSourceRef, bindingGeneration}); } catch (_) {}
+                return;
+            }
+            if (isDataSourceLocalDenial(err, context)) { clearDeniedDataSourceState(identity.dataSourceId, err); return; }
+            if (isProtectedUpstreamDenial(context, err)) {
+                denyProtectedWindow(identity.windowId, Number(err.status));
                 return;
             }
             log.warn('doFetchRecords error', err)
@@ -656,6 +693,7 @@ export default function DataSource({context}) {
             } catch (_) {
             }
         } finally {
+            if (!authorizationIsCurrent()) return;
             const bindingIsCurrent = isCurrentBindingGeneration(input.peek()?.bindingGeneration, bindingGeneration);
             const nextInput = input.peek() || {};
             const finalization = bindingFinalizationAction(bindingIsCurrent, !!(nextInput.fetch || nextInput.refresh));

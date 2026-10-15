@@ -1,6 +1,10 @@
 // useGenericDataSourceHandlers.js
 import {
     getInputSignal,
+    denyProtectedWindow,
+    protectedWindowEpoch,
+    protectedDataSourceEpoch,
+    clearDeniedDataSourceState,
 } from "../core/store/signals.js";
 import {resolveSelector, setSelector} from "../utils/selector.js";
 
@@ -8,6 +12,7 @@ import {arrayEquals} from "../utils/equal.js";
 import { getLogger } from "../utils/logger.js";
 import equal from 'fast-deep-equal';
 import { mapParameters } from '../utils/parameterMapper.js';
+import {isDataSourceLocalDenial, isWindowAuthorizationFailure} from '../components/dataSourceAuthorization.js';
 import { normalizeDataSourceError } from '../utils/dataSourceError.js';
 import {beginDataSourceRequest, settleDataSourceRequest} from '../components/dataSourceRequestLifecycle.js';
 
@@ -658,6 +663,9 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
      * flag reset so UI reflects latest data.
      */
     const handleSave = async () => {
+        const authorizationEpoch = protectedWindowEpoch(identity?.windowId);
+        const datasetEpoch = protectedDataSourceEpoch(identity?.dataSourceId);
+        const authorizationIsCurrent = () => protectedWindowEpoch(identity?.windowId) === authorizationEpoch && protectedDataSourceEpoch(identity?.dataSourceId) === datasetEpoch;
         const record = getFormData();
         if (!record || Object.keys(record).length === 0) {
             console.warn('handleSave: no form data to save');
@@ -687,6 +695,7 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
             } else {
                 await connector.post({ body });
             }
+            if (!authorizationIsCurrent()) return false;
 
             // Refresh collection so UI stays in sync.
             fetchCollection();
@@ -697,11 +706,17 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
 
             return true;
         } catch (err) {
+            if (!authorizationIsCurrent()) return false;
+            if (isDataSourceLocalDenial(err, {identity})) { clearDeniedDataSourceState(identity.dataSourceId, err); return false; }
+            if (identity?.protectedWindow && isWindowAuthorizationFailure(err, {identity})) {
+                denyProtectedWindow(identity.windowId, Number(err.status));
+                return false;
+            }
             setError(err);
             console.error('handleSave error', { ds: identity?.dataSourceRef, err });
             return false;
         } finally {
-            setLoading(false);
+            if (authorizationIsCurrent()) setLoading(false);
         }
     };
 
@@ -990,7 +1005,7 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
             superseded.code = 'request_superseded';
             settleDataSourceRequest(identity?.dataSourceId, previousRequestId, superseded);
         }
-        const completion = requestId ? beginDataSourceRequest(identity?.dataSourceId, requestId) : null;
+        const completion = requestId ? beginDataSourceRequest(identity?.dataSourceId, requestId, identity?.windowId) : null;
         try {
             const log = getLogger('ds');
             log.debug('[fetchCollection]', { ds: identity?.dataSourceRef, filter: newValue.filter });
@@ -1006,12 +1021,20 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
             page = null,
             signal = null,
         } = props || {};
-        return connector.get({
-            filter,
-            page,
-            inputParameters: parameters,
-            ...(signal ? {signal} : {}),
-        });
+        const windowEpoch = protectedWindowEpoch(identity?.windowId);
+        const datasetEpoch = protectedDataSourceEpoch(identity?.dataSourceId);
+        const current = () => protectedWindowEpoch(identity?.windowId) === windowEpoch && protectedDataSourceEpoch(identity?.dataSourceId) === datasetEpoch;
+        try {
+            const result = await connector.get({filter,page,inputParameters:parameters,...(signal ? {signal} : {})});
+            if(!current()) throw Object.assign(new Error('Datasource request superseded.'),{code:'request_superseded'});
+            return result;
+        } catch(error) {
+            if(current()) {
+                if(isDataSourceLocalDenial(error, {identity})) clearDeniedDataSourceState(identity.dataSourceId,error);
+                else if(identity?.protectedWindow && isWindowAuthorizationFailure(error, {identity})) denyProtectedWindow(identity.windowId,Number(error.status));
+            }
+            throw error;
+        }
     };
 
 

@@ -16,6 +16,46 @@ const contains = (actual, expected) => {
   return false;
 };
 
+const guardKeys = ['visibleWhen', 'hiddenWhen', 'disabledWhen', 'readOnlyWhen'];
+const authorizationOperators = new Set(['equals', 'notEquals', 'in', 'contains', 'empty', 'notEmpty', 'exists']);
+
+function validateCondition(condition) {
+  if (!condition || typeof condition !== 'object' || Array.isArray(condition)) throw new Error('condition must be an object');
+  for (const op of ['all', 'any']) {
+    if (Object.hasOwn(condition, op)) {
+      if (!Array.isArray(condition[op]) || condition[op].length === 0 || Object.keys(condition).length !== 1) throw new Error(`malformed ${op} condition`);
+      condition[op].forEach(validateCondition);
+      return;
+    }
+  }
+  if (Object.hasOwn(condition, 'not')) {
+    if (Object.keys(condition).length !== 1) throw new Error('malformed not condition');
+    validateCondition(condition.not);
+    return;
+  }
+  if (String(condition.source || '').toLowerCase() !== 'authorization') return;
+  if (!(condition.field || condition.selector || condition.key)) throw new Error('authorization field is required');
+  const allowed = new Set(['source', 'field', 'selector', 'key', ...authorizationOperators]);
+  let operators = 0;
+  for (const [key, value] of Object.entries(condition)) {
+    if (!allowed.has(key)) throw new Error(`unknown authorization operator ${key}`);
+    if (!authorizationOperators.has(key)) continue;
+    operators++;
+    if (key === 'in' && !Array.isArray(value)) throw new Error('in requires an array');
+    if (['empty', 'notEmpty', 'exists'].includes(key) && typeof value !== 'boolean') throw new Error(`${key} requires a boolean`);
+  }
+  if (operators !== 1) throw new Error('authorization condition requires one operator');
+}
+
+function validateGuards(value) {
+  if (Array.isArray(value)) { value.forEach(validateGuards); return; }
+  if (!value || typeof value !== 'object') return;
+  for (const [key, child] of Object.entries(value)) {
+    if (guardKeys.includes(key)) validateCondition(child);
+    else validateGuards(child);
+  }
+}
+
 export function evaluateAuthorizationLeaf(condition = {}, authorization = null) {
   if (!authorization || typeof authorization !== 'object') return false;
   const field = condition.field || condition.selector || condition.key;
@@ -126,6 +166,7 @@ export function compilePermittedView(metadata, authorization, {requireRead = fal
   if (requireRead && authorization?.resource?.capabilities?.read !== true) {
     return {metadata: null, authorization, dataSourceRefs: new Set(), denied: true, diagnostics: ['resource.read denied']};
   }
+  validateGuards(metadata);
   const compiled = compileNode(clone(metadata), authorization);
   const refs = collectDataSourceRefs(compiled);
   if (compiled?.dataSource && typeof compiled.dataSource === 'object') {
@@ -134,10 +175,24 @@ export function compilePermittedView(metadata, authorization, {requireRead = fal
   return {metadata: compiled, authorization, dataSourceRefs: refs, denied: false, diagnostics: []};
 }
 
+// Delivery hints affect rendered controls only. They must neither admit data
+// operations nor remove datasource definitions used by independently authorized MCPs.
+export function compileDeliveryHintView(metadata, authorization = {}) {
+  validateGuards(metadata?.view);
+  validateGuards(metadata?.dialogs);
+  return {...metadata,
+    view: compileNode(clone(metadata?.view), authorization),
+    ...(metadata?.dialogs ? {dialogs: compileNode(clone(metadata.dialogs), authorization)} : {}),
+  };
+}
+
 export function normalizeAuthorizationSnapshot(response, resourceType = '', resourceId = null) {
   const resources = response?.resources && typeof response.resources === 'object' ? response.resources : {};
-  const resource = resourceId == null ? null : resources[String(resourceId)] || null;
+  const normalizedResource = response?.resource;
+  const retainedResource = normalizedResource && String(normalizedResource.id) === String(resourceId) && (!resourceType || normalizedResource.type === resourceType) ? normalizedResource : null;
+  const resource = resourceId == null ? null : resources[String(resourceId)] || retainedResource || null;
   return {
+    ...(response?.schemaVersion !== undefined ? {schemaVersion: response.schemaVersion} : {}),
     authorizationVersion: response?.authorizationVersion || '',
     expiresAt: response?.expiresAt || '',
     principal: response?.principal || {},
@@ -145,4 +200,27 @@ export function normalizeAuthorizationSnapshot(response, resourceType = '', reso
     globalCapabilities: response?.globalCapabilities || {},
     resource: resource ? {...resource, type: resource.type || resourceType} : null,
   };
+}
+
+// Keep v2 IDs as exact strings; JavaScript numbers cannot represent large
+// resource identifiers without rounding.
+export function resolveAuthorizationResourceID(schemaVersion, selected, snapshot) {
+  const version = Number(schemaVersion || 1);
+  if (version === 1) {
+    const id = selected == null || selected === '' ? null : Number(selected);
+    return {valid: id == null || Number.isSafeInteger(id) && id > 0, id};
+  }
+  if (version === 2) {
+    if (Number(snapshot?.schemaVersion) !== 2) return {valid: false, id: null};
+    if (selected == null || selected === '') return {valid: true, id: null};
+    if (typeof selected !== 'string' || selected.trim() !== selected) return {valid: false, id: null};
+    return {valid: true, id: selected};
+  }
+  return {valid: false, id: null};
+}
+
+export function authorizationSnapshotLeaseMs(snapshot, now = Date.now()) {
+  const expiry = Date.parse(String(snapshot?.expiresAt || ''));
+  if (!Number.isFinite(expiry)) return 0;
+  return Math.max(0, expiry - now);
 }

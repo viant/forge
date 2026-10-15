@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	primitive "github.com/viant/forge/backend/provider/contract"
+	identity "github.com/viant/forge/backend/resource"
 )
 
 // TargetSpec declares where a metadata node applies.
@@ -172,6 +175,7 @@ type NavigationItem struct {
 
 // Dialog represents a dialog with a title, content, actions, and on events.
 type Dialog struct {
+	SelectionMode   string                            `json:"selectionMode,omitempty" yaml:"selectionMode,omitempty"`
 	Id              string                            `json:"id" yaml:"id"`
 	Title           string                            `json:"title" yaml:"title"`
 	DataSourceRef   string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
@@ -188,6 +192,7 @@ type Dialog struct {
 // DialogProperties holds optional flags that tweak dialog UI behavior.
 // Example: properties.searchable: false hides the quick-search input in the dialog header.
 type DialogProperties struct {
+	ResolveInput     string                   `json:"resolveInput,omitempty" yaml:"resolveInput,omitempty"`
 	Searchable       *bool                    `json:"searchable,omitempty" yaml:"searchable,omitempty"`
 	ClassName        string                   `json:"className,omitempty" yaml:"className,omitempty"`
 	BodyClassName    string                   `json:"bodyClassName,omitempty" yaml:"bodyClassName,omitempty"`
@@ -224,7 +229,17 @@ type QuickFilterSpec struct {
 }
 
 type Window struct {
-	Ns                    []string                          `json:"ns,omitempty" yaml:"ns,omitempty"`
+	// Title is the original authored display title; namespace is routing metadata.
+	Title string `json:"title,omitempty" yaml:"title,omitempty"`
+	// SelectionBinding is emitted only after trusted OPEN admission.
+	SelectionBinding     *identity.SelectionBinding `json:"selectionBinding,omitempty" yaml:"-"`
+	ResourceTarget       *WindowTarget              `json:"resourceTarget,omitempty" yaml:"-"`
+	ResourceDependencies map[string]string          `json:"resourceDependencies,omitempty" yaml:"resourceDependencies,omitempty"`
+	Resource             *identity.ResolvedResource `json:"resource,omitempty" yaml:"resource,omitempty"`
+	Ns                   []string                   `json:"ns,omitempty" yaml:"ns,omitempty"`
+	// Parameters retains authored window input declarations, including types,
+	// bindings and defaults, without converting them into datasource parameters.
+	Parameters            []map[string]interface{}          `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 	WindowKey             string                            `json:"windowKey,omitempty" yaml:"windowKey,omitempty"`
 	ChipName              string                            `json:"chipName,omitempty" yaml:"chipName,omitempty"`
 	ChipIcon              string                            `json:"chipIcon,omitempty" yaml:"chipIcon,omitempty"`
@@ -244,6 +259,8 @@ type Window struct {
 	Authorization         *AuthorizationSpec                `json:"authorization,omitempty" yaml:"authorization,omitempty"`
 	Schemas               map[string]ResourceSchema         `json:"schemas,omitempty" yaml:"schemas,omitempty"`
 	ResourceModels        map[string]ResourceModel          `json:"resourceModels,omitempty" yaml:"resourceModels,omitempty"`
+	LookupOverlays        []json.RawMessage                 `json:"lookupOverlays,omitempty" yaml:"lookupOverlays,omitempty"`
+	LookupLibraries       []json.RawMessage                 `json:"lookupLibraries,omitempty" yaml:"lookupLibraries,omitempty"`
 	AuthorizationSnapshot map[string]interface{}            `json:"authorizationSnapshot,omitempty" yaml:"-"`
 }
 
@@ -251,6 +268,7 @@ type Window struct {
 // window's datasource contexts may be created. Policy is resolved server-side; Forge
 // only carries and evaluates the resulting authorization snapshot.
 type AuthorizationSpec struct {
+	SchemaVersion               int                        `json:"schemaVersion,omitempty" yaml:"schemaVersion,omitempty"`
 	DataSourceRef               string                     `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 	Scope                       string                     `json:"scope,omitempty" yaml:"scope,omitempty"`
 	ResourceType                string                     `json:"resourceType,omitempty" yaml:"resourceType,omitempty"`
@@ -485,9 +503,15 @@ type UnitedSize struct {
 	Unit string `json:"unit,omitempty" yaml:"unit,omitempty"`
 }
 
+type MCPAppSpec struct {
+	AssetClosure *primitive.MCPAppClosure `json:"assetClosure,omitempty" yaml:"assetClosure,omitempty"`
+	ResourceURI  string                   `json:"resourceURI" yaml:"resourceURI"`
+}
+
 type Container struct {
-	ID                 string `json:"id" yaml:"id"`
-	ClassName          string `json:"className,omitempty" yaml:"className,omitempty"`
+	MCPApp             *MCPAppSpec `json:"mcpApp,omitempty" yaml:"mcpApp,omitempty"`
+	ID                 string      `json:"id" yaml:"id"`
+	ClassName          string      `json:"className,omitempty" yaml:"className,omitempty"`
 	Binding            `yaml:",inline"`
 	Target             *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
 	TargetOverrides    map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
@@ -597,11 +621,11 @@ type DashboardEditableTableAddRow struct {
 func (c *Container) UnmarshalJSON(data []byte) error {
 	type alias Container
 	var decoded alias
-	if err := json.Unmarshal(data, &decoded); err != nil {
+	if err := decodeWindowResourceJSON(data, &decoded); err != nil {
 		return err
 	}
 	var compact dashboardCompactAliases
-	if err := json.Unmarshal(data, &compact); err != nil {
+	if err := decodeWindowResourceJSON(data, &compact); err != nil {
 		return err
 	}
 	*c = Container(decoded)
@@ -1549,6 +1573,9 @@ type Item struct {
 // selected record fields back to the caller form.
 
 type Lookup struct {
+	DataSourceResource *identity.ResourceRef `json:"dataSourceResource,omitempty" yaml:"dataSourceResource,omitempty"`
+	PickerResource     *identity.ResourceRef `json:"pickerResource,omitempty" yaml:"pickerResource,omitempty"`
+	ProviderIdentity   string                `json:"providerIdentity,omitempty" yaml:"providerIdentity,omitempty"`
 	// RequestTrigger controls typed-value resolution: blur (default) or change.
 	RequestTrigger string `json:"requestTrigger,omitempty" yaml:"requestTrigger,omitempty"`
 	// Either DialogId (preferred) or WindowId can be provided. When DialogId
@@ -1670,13 +1697,18 @@ type UniqueKey struct {
 }
 
 type Selectors struct {
-	Data     string `json:"data,omitempty" yaml:"data,omitempty"`
-	Scope    string `json:"scope,omitempty" yaml:"scope,omitempty"`
-	DataInfo string `json:"dataInfo,omitempty" yaml:"dataInfo,omitempty"`
-	Metrics  string `json:"metrics,omitempty" yaml:"metrics,omitempty"`
+	DataFallbacks []string `json:"dataFallbacks,omitempty" yaml:"dataFallbacks,omitempty"`
+	// ValueColumn explicitly projects scalar values into named rows.
+	ValueColumn string `json:"valueColumn,omitempty" yaml:"valueColumn,omitempty"`
+	Data        string `json:"data,omitempty" yaml:"data,omitempty"`
+	Scope       string `json:"scope,omitempty" yaml:"scope,omitempty"`
+	DataInfo    string `json:"dataInfo,omitempty" yaml:"dataInfo,omitempty"`
+	Metrics     string `json:"metrics,omitempty" yaml:"metrics,omitempty"`
 }
 
 type PagingConfig struct {
+	// Mode opts into explicit upstream page/offset/cursor semantics; empty retains legacy behavior.
+	Mode              string             `json:"mode,omitempty" yaml:"mode,omitempty"`
 	Size              int                `json:"size" yaml:"size"`
 	Enabled           bool               `json:"enabled" yaml:"enabled"`
 	OpenEnded         bool               `json:"openEnded,omitempty" yaml:"openEnded,omitempty"`
@@ -1690,6 +1722,8 @@ type PagingParameters struct {
 }
 
 type DataInfoSelectors struct {
+	NextCursor string `json:"nextCursor,omitempty" yaml:"nextCursor,omitempty"`
+	HasMore    string `json:"hasMore,omitempty" yaml:"hasMore,omitempty"`
 	PageCount  string `json:"pageCount,omitempty" yaml:"pageCount,omitempty"`
 	TotalCount string `json:"totalCount,omitempty" yaml:"totalCount,omitempty"`
 }

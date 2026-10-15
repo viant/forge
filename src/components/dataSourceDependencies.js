@@ -1,3 +1,5 @@
+import {assertSafeAssignmentPath} from '../utils/selector.js';
+
 function hasDefinedPath(target, path) {
     const parts = String(path || '').split('.').filter(Boolean);
     if (parts.length === 0) return false;
@@ -28,6 +30,7 @@ function isMeaningfulDependencyValue(value) {
 }
 
 function assignPath(target, path, value) {
+    assertSafeAssignmentPath(path);
     const parts = String(path || '').split('.').filter(Boolean);
     if (parts.length === 0 || !target || typeof target !== 'object') return;
     let current = target;

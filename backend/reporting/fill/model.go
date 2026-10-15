@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 	"sort"
 	"strings"
 	"unicode/utf16"
@@ -44,13 +45,59 @@ type Diagnostic struct {
 }
 
 type Dataset struct {
+	Scope          *DatasetScope        `json:"scope,omitempty"`
+	Capabilities   *DatasetCapabilities `json:"capabilities,omitempty"`
+	Source         *DatasetSource       `json:"source,omitempty"`
+	ResultContract json.RawMessage      `json:"resultContract,omitempty"`
+
 	ID            string                    `json:"id"`
 	DataSourceRef string                    `json:"dataSourceRef"`
 	Request       reportspec.RequestPayload `json:"request"`
 	Provenance    Provenance                `json:"provenance"`
 	Rows          []map[string]any          `json:"rows"`
 
-	requestPayload json.RawMessage
+	requestPayload          json.RawMessage
+	opaqueDatasourceRequest bool
+}
+
+type DatasetScope struct {
+	Mode              string                    `json:"mode,omitempty"`
+	InheritContext    *bool                     `json:"inheritContext,omitempty"`
+	Local             map[string]any            `json:"local,omitempty"`
+	Exclude           []string                  `json:"exclude,omitempty"`
+	RelativeDateRange *DatasetRelativeDateRange `json:"relativeDateRange,omitempty"`
+}
+type DatasetRelativeDateRange struct {
+	Preset          string `json:"preset,omitempty"`
+	StartExpression string `json:"startExpression,omitempty"`
+	EndExpression   string `json:"endExpression,omitempty"`
+	Format          string `json:"format,omitempty"`
+	StartParamPath  string `json:"startParamPath"`
+	EndParamPath    string `json:"endParamPath"`
+}
+type DatasetCapabilities struct {
+	BackendRefetch  *bool             `json:"backendRefetch,omitempty"`
+	Export          *bool             `json:"export,omitempty"`
+	FieldCatalog    *bool             `json:"fieldCatalog,omitempty"`
+	Preview         *bool             `json:"preview,omitempty"`
+	ScopeParams     *bool             `json:"scopeParams,omitempty"`
+	SemanticBinding *bool             `json:"semanticBinding,omitempty"`
+	LiveFilters     *bool             `json:"liveFilters,omitempty"`
+	Drill           *bool             `json:"drill,omitempty"`
+	LookupHydration *bool             `json:"lookupHydration,omitempty"`
+	RequestModel    map[string]string `json:"requestModel,omitempty"`
+}
+type DatasetSource struct {
+	Kind          string `json:"kind,omitempty"`
+	Server        string `json:"server,omitempty"`
+	Service       string `json:"service,omitempty"`
+	Tool          string `json:"tool,omitempty"`
+	ToolName      string `json:"toolName,omitempty"`
+	Profile       string `json:"profile,omitempty"`
+	ContractRef   string `json:"contractRef,omitempty"`
+	URI           string `json:"uri,omitempty"`
+	Method        string `json:"method,omitempty"`
+	DataSourceRef string `json:"dataSourceRef,omitempty"`
 }
 
 type Provenance struct {
@@ -217,18 +264,19 @@ type GeoContent struct {
 }
 
 type ResolvedGeo struct {
-	Shape        string              `json:"shape"`
-	KeyField     string              `json:"keyField"`
-	LabelField   string              `json:"labelField"`
-	MetricKey    string              `json:"metricKey"`
-	MetricLabel  string              `json:"metricLabel"`
-	Format       string              `json:"format"`
-	Aggregate    string              `json:"aggregate"`
-	Regions      []ResolvedGeoRegion `json:"regions"`
-	Ranking      []ResolvedGeoRegion `json:"ranking"`
-	ActiveRegion *ResolvedGeoRegion  `json:"activeRegion"`
-	Summary      *ResolvedGeoSummary `json:"summary"`
-	Legend       *ResolvedGeoLegend  `json:"legend"`
+	labelFieldPresent bool
+	Shape             string              `json:"shape"`
+	KeyField          string              `json:"keyField"`
+	LabelField        string              `json:"labelField"`
+	MetricKey         string              `json:"metricKey"`
+	MetricLabel       string              `json:"metricLabel"`
+	Format            string              `json:"format"`
+	Aggregate         string              `json:"aggregate"`
+	Regions           []ResolvedGeoRegion `json:"regions"`
+	Ranking           []ResolvedGeoRegion `json:"ranking"`
+	ActiveRegion      *ResolvedGeoRegion  `json:"activeRegion"`
+	Summary           *ResolvedGeoSummary `json:"summary"`
+	Legend            *ResolvedGeoLegend  `json:"legend"`
 }
 
 type ResolvedGeoRegion struct {
@@ -444,8 +492,9 @@ type RefinementBarContent struct {
 }
 
 type MarkdownContent struct {
-	Title    string `json:"title"`
-	Markdown string `json:"markdown"`
+	DatasetRef string `json:"datasetRef,omitempty"`
+	Title      string `json:"title"`
+	Markdown   string `json:"markdown"`
 }
 
 type rawReportFill struct {
@@ -463,6 +512,11 @@ type rawReportFill struct {
 }
 
 type rawDataset struct {
+	Scope          *DatasetScope        `json:"scope,omitempty"`
+	Capabilities   *DatasetCapabilities `json:"capabilities,omitempty"`
+	Source         *DatasetSource       `json:"source,omitempty"`
+	ResultContract json.RawMessage      `json:"resultContract,omitempty"`
+
 	ID            string           `json:"id"`
 	DataSourceRef string           `json:"dataSourceRef"`
 	Request       json.RawMessage  `json:"request"`
@@ -559,11 +613,12 @@ type rawRefinementBarBlock struct {
 }
 
 type rawMarkdownBlock struct {
-	ID       string          `json:"id"`
-	Kind     string          `json:"kind"`
-	Title    string          `json:"title,omitempty"`
-	Markdown string          `json:"markdown,omitempty"`
-	Content  MarkdownContent `json:"content"`
+	ID         string          `json:"id"`
+	Kind       string          `json:"kind"`
+	Title      string          `json:"title,omitempty"`
+	Markdown   string          `json:"markdown,omitempty"`
+	Content    MarkdownContent `json:"content"`
+	DatasetRef string          `json:"datasetRef,omitempty"`
 }
 
 type rawGeoMapBlock struct {
@@ -687,7 +742,46 @@ type rawTimelineBlock struct {
 	Content          TimelineContent            `json:"content"`
 }
 
-func DecodeJSON(data []byte) (*ReportFill, error) {
+func DecodeJSON(data []byte) (*ReportFill, error) { return decodeJSON(data, false) }
+
+// DecodeDatasourceJSON decodes server-materialized datasource results whose
+// request objects belong to arbitrary producers. It retains each original
+// request and its fingerprint without interpreting it as a fixed query.
+// Callers remain responsible for datasource and resource authorization.
+func DecodeDatasourceJSON(data []byte) (*ReportFill, error) { return decodeJSON(data, true) }
+
+// ValidateDatasourceRequestProvenance verifies opaque producer request objects,
+// their canonical fingerprints and row counts without interpreting block layout.
+// Hosts may retain their existing artifact-shell validation before rendering.
+func ValidateDatasourceRequestProvenance(data []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	var raw rawReportFill
+	if err := decoder.Decode(&raw); err != nil {
+		return fmt.Errorf("decode reportFill: %w", err)
+	}
+	if err := rejectTrailingJSON(decoder, "reportFill"); err != nil {
+		return err
+	}
+	for index, dataset := range raw.Datasets {
+		if err := validateOpaqueDatasourceRequest(dataset.Request); err != nil {
+			return fmt.Errorf("reportFill.datasets[%d].request: %w", index, err)
+		}
+		hash, err := computeJSONFNV1aHash(dataset.Request)
+		if err != nil {
+			return err
+		}
+		if dataset.Provenance.RequestHash != hash {
+			return fmt.Errorf("reportFill.datasets[%d].provenance.requestHash must match request", index)
+		}
+		if dataset.Provenance.RowCount != len(dataset.Rows) {
+			return fmt.Errorf("reportFill.datasets[%d].provenance.rowCount must match rows length", index)
+		}
+	}
+	return nil
+}
+
+func decodeJSON(data []byte, datasourceRequests bool) (*ReportFill, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var raw rawReportFill
@@ -711,17 +805,25 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 		Blocks:           make([]Block, 0, len(raw.Blocks)),
 	}
 	for index, dataset := range raw.Datasets {
-		request, err := decodeRequestPayload(dataset.Request, index)
+		var request reportspec.RequestPayload
+		var err error
+		if datasourceRequests {
+			err = validateOpaqueDatasourceRequest(dataset.Request)
+		} else {
+			request, err = decodeRequestPayload(dataset.Request, index)
+		}
 		if err != nil {
 			return nil, err
 		}
 		fill.Datasets = append(fill.Datasets, Dataset{
-			ID:             dataset.ID,
-			DataSourceRef:  dataset.DataSourceRef,
-			Request:        request,
-			Provenance:     dataset.Provenance,
-			Rows:           dataset.Rows,
-			requestPayload: bytes.TrimSpace(dataset.Request),
+			Scope: dataset.Scope, Capabilities: dataset.Capabilities, Source: dataset.Source, ResultContract: dataset.ResultContract,
+			ID:                      dataset.ID,
+			DataSourceRef:           dataset.DataSourceRef,
+			Request:                 request,
+			Provenance:              dataset.Provenance,
+			Rows:                    dataset.Rows,
+			requestPayload:          append(json.RawMessage(nil), bytes.TrimSpace(dataset.Request)...),
+			opaqueDatasourceRequest: datasourceRequests,
 		})
 	}
 	for index, block := range raw.Blocks {
@@ -1015,6 +1117,7 @@ func DecodeJSON(data []byte) (*ReportFill, error) {
 				Kind:            markdownBlock.Kind,
 				Title:           markdownBlock.Title,
 				Markdown:        markdownBlock.Markdown,
+				DatasetRef:      markdownBlock.DatasetRef,
 				MarkdownContent: &markdownBlock.Content,
 			})
 		case "geoMapBlock":
@@ -1112,52 +1215,54 @@ func (r *ReportFill) Validate() error {
 		if err != nil {
 			return fmt.Errorf("reportFill.datasets[%d].request: %w", index, err)
 		}
-		if dataset.Request.Kind == "staticCsv" || dataset.Request.Kind == "staticJson" {
-			if strings.TrimSpace(dataset.Request.Format) == "" {
-				return fmt.Errorf("reportFill.datasets[%d].request.format is required", index)
+		if !dataset.opaqueDatasourceRequest {
+			if dataset.Request.Kind == "staticCsv" || dataset.Request.Kind == "staticJson" {
+				if strings.TrimSpace(dataset.Request.Format) == "" {
+					return fmt.Errorf("reportFill.datasets[%d].request.format is required", index)
+				}
+				if dataset.Request.RowCount == nil || *dataset.Request.RowCount < 0 {
+					return fmt.Errorf("reportFill.datasets[%d].request.rowCount must be >= 0", index)
+				}
+				if dataset.Request.ColumnKeys == nil {
+					return fmt.Errorf("reportFill.datasets[%d].request.columnKeys is required", index)
+				}
+			} else if dataset.Request.Limit == nil {
+				return fmt.Errorf("reportFill.datasets[%d].request.limit is required", index)
+			} else if *dataset.Request.Limit < 1 {
+				return fmt.Errorf("reportFill.datasets[%d].request.limit must be >= 1", index)
+			} else if dataset.Request.Offset == nil {
+				return fmt.Errorf("reportFill.datasets[%d].request.offset is required", index)
+			} else if *dataset.Request.Offset < 0 {
+				return fmt.Errorf("reportFill.datasets[%d].request.offset must be >= 0", index)
 			}
-			if dataset.Request.RowCount == nil || *dataset.Request.RowCount < 0 {
-				return fmt.Errorf("reportFill.datasets[%d].request.rowCount must be >= 0", index)
+			if dataset.Request.TimeoutMs != nil && *dataset.Request.TimeoutMs < 0 {
+				return fmt.Errorf("reportFill.datasets[%d].request.timeoutMs must be >= 0", index)
 			}
-			if dataset.Request.ColumnKeys == nil {
-				return fmt.Errorf("reportFill.datasets[%d].request.columnKeys is required", index)
+			for orderIndex, entry := range dataset.Request.OrderBy {
+				if strings.TrimSpace(entry) == "" {
+					return fmt.Errorf("reportFill.datasets[%d].request.orderBy[%d] must not be blank", index, orderIndex)
+				}
 			}
-		} else if dataset.Request.Limit == nil {
-			return fmt.Errorf("reportFill.datasets[%d].request.limit is required", index)
-		} else if *dataset.Request.Limit < 1 {
-			return fmt.Errorf("reportFill.datasets[%d].request.limit must be >= 1", index)
-		} else if dataset.Request.Offset == nil {
-			return fmt.Errorf("reportFill.datasets[%d].request.offset is required", index)
-		} else if *dataset.Request.Offset < 0 {
-			return fmt.Errorf("reportFill.datasets[%d].request.offset must be >= 0", index)
-		}
-		if dataset.Request.TimeoutMs != nil && *dataset.Request.TimeoutMs < 0 {
-			return fmt.Errorf("reportFill.datasets[%d].request.timeoutMs must be >= 0", index)
-		}
-		for orderIndex, entry := range dataset.Request.OrderBy {
-			if strings.TrimSpace(entry) == "" {
-				return fmt.Errorf("reportFill.datasets[%d].request.orderBy[%d] must not be blank", index, orderIndex)
-			}
-		}
-		if dataset.Request.SemanticSelection != nil {
-			selection := dataset.Request.SemanticSelection
-			if strings.TrimSpace(selection.ModelRef) == "" {
-				return fmt.Errorf("reportFill.datasets[%d].request.semanticSelection.modelRef is required", index)
-			}
-			if strings.TrimSpace(selection.Entity) == "" {
-				return fmt.Errorf("reportFill.datasets[%d].request.semanticSelection.entity is required", index)
-			}
-			if selection.Selection.Dimensions == nil {
-				return fmt.Errorf("reportFill.datasets[%d].request.semanticSelection.selection.dimensions is required", index)
-			}
-			if selection.Selection.Measures == nil {
-				return fmt.Errorf("reportFill.datasets[%d].request.semanticSelection.selection.measures is required", index)
-			}
-			if selection.Refinements == nil {
-				return fmt.Errorf("reportFill.datasets[%d].request.semanticSelection.refinements is required", index)
-			}
-			if selection.Parameters == nil {
-				return fmt.Errorf("reportFill.datasets[%d].request.semanticSelection.parameters is required", index)
+			if dataset.Request.SemanticSelection != nil {
+				selection := dataset.Request.SemanticSelection
+				if strings.TrimSpace(selection.ModelRef) == "" {
+					return fmt.Errorf("reportFill.datasets[%d].request.semanticSelection.modelRef is required", index)
+				}
+				if strings.TrimSpace(selection.Entity) == "" {
+					return fmt.Errorf("reportFill.datasets[%d].request.semanticSelection.entity is required", index)
+				}
+				if selection.Selection.Dimensions == nil {
+					return fmt.Errorf("reportFill.datasets[%d].request.semanticSelection.selection.dimensions is required", index)
+				}
+				if selection.Selection.Measures == nil {
+					return fmt.Errorf("reportFill.datasets[%d].request.semanticSelection.selection.measures is required", index)
+				}
+				if selection.Refinements == nil {
+					return fmt.Errorf("reportFill.datasets[%d].request.semanticSelection.refinements is required", index)
+				}
+				if selection.Parameters == nil {
+					return fmt.Errorf("reportFill.datasets[%d].request.semanticSelection.parameters is required", index)
+				}
 			}
 		}
 		if strings.TrimSpace(dataset.Provenance.RequestHash) == "" {
@@ -1633,7 +1738,7 @@ func (r *ReportFill) Validate() error {
 			if strings.TrimSpace(block.GeoContent.ResolvedGeo.KeyField) == "" {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.keyField is required for geoMapBlock", index)
 			}
-			if strings.TrimSpace(block.GeoContent.ResolvedGeo.LabelField) == "" {
+			if strings.TrimSpace(block.GeoContent.ResolvedGeo.LabelField) == "" && !block.GeoContent.ResolvedGeo.labelFieldPresent {
 				return fmt.Errorf("reportFill.blocks[%d].content.resolvedGeo.labelField is required for geoMapBlock", index)
 			}
 			if strings.TrimSpace(block.GeoContent.ResolvedGeo.MetricKey) == "" {
@@ -1853,6 +1958,26 @@ func writeCanonicalJSON(buffer *bytes.Buffer, value any) error {
 }
 
 func computeRequestHash(dataset Dataset) (string, error) {
+	if dataset.opaqueDatasourceRequest {
+		if err := validateOpaqueDatasourceRequest(dataset.requestPayload); err != nil {
+			return "", err
+		}
+		if !reflect.DeepEqual(dataset.Request, reportspec.RequestPayload{}) {
+			return "", fmt.Errorf("reportFill datasource request changed after decoding")
+		}
+		return computeJSONFNV1aHash(dataset.requestPayload)
+	}
+	if len(dataset.requestPayload) > 0 {
+		original, err := decodeRequestPayload(dataset.requestPayload, 0)
+		if err != nil {
+			return "", err
+		}
+		if !reflect.DeepEqual(original, dataset.Request) {
+			return "", fmt.Errorf("reportFill dataset request changed after decoding")
+		}
+		// Preserve explicit empty objects in the official request fingerprint.
+		return computeJSONFNV1aHash(dataset.requestPayload)
+	}
 	return computeJSONFNV1aHash(dataset.Request)
 }
 
@@ -1933,4 +2058,31 @@ func isAllowedCollectionLayout(value string) bool {
 	default:
 		return false
 	}
+}
+
+func validateOpaqueDatasourceRequest(payload json.RawMessage) error {
+	trimmed := bytes.TrimSpace(payload)
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		return fmt.Errorf("datasource request must be an object")
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(trimmed, &fields); err != nil {
+		return fmt.Errorf("decode datasource request: %w", err)
+	}
+	if fields == nil {
+		return fmt.Errorf("datasource request must be an object")
+	}
+	return nil
+}
+
+// MarshalJSON retains opaque producer arguments across model round trips.
+func (d Dataset) MarshalJSON() ([]byte, error) {
+	type plain Dataset
+	if !d.opaqueDatasourceRequest {
+		return json.Marshal(plain(d))
+	}
+	return json.Marshal(struct {
+		plain
+		Request json.RawMessage `json:"request"`
+	}{plain: plain(d), Request: d.requestPayload})
 }

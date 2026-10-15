@@ -1,13 +1,13 @@
 // Report fan-out shares a small pool. Ordinary table, lookup, navigation and
 // history requests do not use it, so a slow report cannot fill their connections.
-export function createReportDatasetScheduler(limit = 2) {
+export function createReportDatasetScheduler(limit = 4, perGroupLimit = 2) {
     let active = 0;
     const waiting = [];
-    const groups = new Set();
+    const groups = new Map();
     const abortError = signal => signal?.reason || new DOMException('Report request cancelled.','AbortError');
     const drain = () => {
         while (active < limit) {
-            const index = waiting.findIndex(entry => !groups.has(entry.group));
+            const index = waiting.findIndex(entry => (groups.get(entry.group) || 0) < perGroupLimit);
             if (index < 0) return;
             const entry = waiting.splice(index,1)[0];
             entry.start();
@@ -19,7 +19,7 @@ export function createReportDatasetScheduler(limit = 2) {
         await new Promise(resolve => {
             const entry = {group, start: () => {
                 signal?.removeEventListener('abort',cancel);
-                acquired = true; active++; groups.add(group); resolve();
+                acquired = true; active++; groups.set(group,(groups.get(group) || 0) + 1); resolve();
             }};
             const cancel = () => {
                 const index = waiting.indexOf(entry);
@@ -41,7 +41,11 @@ export function createReportDatasetScheduler(limit = 2) {
         }
         finally {
             if (cancel) signal?.removeEventListener('abort',cancel);
-            active--; groups.delete(group); drain();
+            active--;
+            const remaining = (groups.get(group) || 0) - 1;
+            if (remaining > 0) groups.set(group,remaining);
+            else groups.delete(group);
+            drain();
         }
     };
 }

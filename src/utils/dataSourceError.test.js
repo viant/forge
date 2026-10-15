@@ -42,3 +42,8 @@ describe('dataSourceError', () => {
         expect(message).not.toContain('{');
     });
 });
+
+it('keeps the server scoped code and recoverable message through repeated normalization',()=>{
+ const error=normalizeDataSourceError({status:403,code:'datasource_denied',scope:'dataset',message:'Denied'});
+ expect(error.code).toBe('datasource_denied');expect(error.isUnauthorized).toBe(false);expect(formatDataSourceError(error)).toContain('Adjust the filters or retry');
+});
