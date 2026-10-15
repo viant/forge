@@ -3,7 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	identity "github.com/viant/agently-core/protocol/resource"
+	identity "github.com/viant/forge/backend/resource"
 )
 
 // CompiledWindowResource is validated immutable source metadata. It keeps

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	primitive "github.com/viant/agently-core/protocol/primitive"
+	primitive "github.com/viant/forge/backend/provider/contract"
 	"gopkg.in/yaml.v3"
 )
 

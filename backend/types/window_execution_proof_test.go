@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	primitive "github.com/viant/agently-core/protocol/primitive"
-	identity "github.com/viant/agently-core/protocol/resource"
+	primitive "github.com/viant/forge/backend/provider/contract"
+	identity "github.com/viant/forge/backend/resource"
 )
 
 func TestWindowTargetProviderProofIsCopiedComparedSignedAndNeverAuthored(t *testing.T) {

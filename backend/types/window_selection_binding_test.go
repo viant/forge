@@ -2,7 +2,7 @@ package types
 
 import (
 	"encoding/json"
-	identity "github.com/viant/agently-core/protocol/resource"
+	identity "github.com/viant/forge/backend/resource"
 	"gopkg.in/yaml.v3"
 	"strings"
 	"testing"

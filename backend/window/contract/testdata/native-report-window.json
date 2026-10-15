@@ -1,0 +1,121 @@
+{
+  "windowKey": "report",
+  "dataSource": {
+    "portable-report-dataset-primary": {
+      "service": {
+        "endpoint": "agentlyAPI",
+        "uri": "/providers/studio/windows/report/datasources/records/fetch?definitionRevision=published-1",
+        "method": "POST"
+      },
+      "parameters": [
+        {
+          "from": "",
+          "to": "",
+          "name": "request",
+          "codec": {
+            "name": "json",
+            "args": null
+          },
+          "default": "{\"limit\":50,\"offset\":0}"
+        }
+      ],
+      "cardinality": "",
+      "selectors": {
+        "data": "rows"
+      }
+    },
+    "records": {
+      "service": {
+        "endpoint": "agentlyAPI",
+        "uri": "/providers/studio/windows/report/datasources/records/fetch?definitionRevision=published-1",
+        "method": "POST"
+      },
+      "parameters": null,
+      "cardinality": "",
+      "selectors": {
+        "data": "rows"
+      }
+    }
+  },
+  "view": {
+    "layout": {
+      "orientation": "",
+      "rows": 0
+    },
+    "content": {
+      "id": "root",
+      "containers": [
+        {
+          "id": "portable-report-source-portable-report-dataset-primary",
+          "dataSourceRef": "portable-report-dataset-primary",
+          "fetchData": true
+        },
+        {
+          "id": "portable-report-runtime",
+          "title": "Published native report",
+          "kind": "dashboard.reportRuntime",
+          "dashboard": {
+            "reportRuntime": {
+              "datasetBindings": {
+                "primary": {
+                  "dataSourceRef": "portable-report-dataset-primary"
+                }
+              },
+              "reportSpec": {
+                "blocks": [
+                  {
+                    "columns": [
+                      {
+                        "key": "count",
+                        "label": "Count"
+                      }
+                    ],
+                    "datasetRef": "primary",
+                    "id": "results",
+                    "kind": "tableBlock"
+                  }
+                ],
+                "calculatedFields": [],
+                "datasets": [
+                  {
+                    "dataSourceRef": "records",
+                    "id": "primary",
+                    "request": {
+                      "limit": 50,
+                      "offset": 0
+                    }
+                  }
+                ],
+                "kind": "reportSpec",
+                "layoutIntent": {
+                  "blockOrder": [
+                    "results"
+                  ],
+                  "kind": "stack",
+                  "resultPanePosition": "main"
+                },
+                "parameters": {
+                  "groupBy": "",
+                  "orderDir": "asc",
+                  "orderField": "",
+                  "pageSize": 50,
+                  "viewMode": "table"
+                },
+                "refinements": [],
+                "source": {
+                  "containerId": "report",
+                  "dataSourceRef": "records",
+                  "kind": "dashboard.reportBuilder",
+                  "stateKey": "report"
+                },
+                "title": "Published native report",
+                "version": 1
+              },
+              "title": "Published native report"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
