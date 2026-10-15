@@ -540,3 +540,32 @@ func TestZeroTTLReadSnapshotAvailableToRegistryWithinSameOperation(t *testing.T)
 	require.NoError(t, err)
 	require.Empty(t, invalidated, "notifications invalidate even an in-operation snapshot")
 }
+
+func TestToolCatalogRoutingCookieRotationPreservesOperationSnapshot(t *testing.T) {
+	m, provider, client, managed, _ := catalogSetup(t, false)
+	provider.cfg.MetadataCacheIgnoredCookies = []string{"affinity"}
+	jar, err := cookiejar.New(nil)
+	require.NoError(t, err)
+	endpoint, _ := url.Parse("https://example.test/mcp")
+	m.cookieJar = jar
+	m.authRT, err = authtransport.New(authtransport.WithCookieJar(jar))
+	require.NoError(t, err)
+	bff := true
+	provider.cfg.Auth = &mcp.ClientAuth{BackendForFrontend: &bff}
+	jar.SetCookies(endpoint, []*http.Cookie{{Name: "session", Value: "user-one"}, {Name: "affinity", Value: "route-one"}})
+	client.zeroTTL = true
+	client.onList = func() {
+		jar.SetCookies(endpoint, []*http.Cookie{{Name: "affinity", Value: fmt.Sprint(client.calls.Load())}})
+	}
+	ctx := WithToolCatalogReadSnapshot(context.Background())
+	for range 3 {
+		_, err := managed.ListTools(ctx, nil)
+		require.NoError(t, err)
+	}
+	require.EqualValues(t, 1, client.calls.Load(), "routing cookie rotation must not discard the source response")
+	require.Len(t, jar.Cookies(endpoint), 2, "forwarded cookies remain intact")
+	jar.SetCookies(endpoint, []*http.Cookie{{Name: "session", Value: "user-two"}})
+	_, err = managed.ListTools(ctx, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, client.calls.Load(), "authentication cookie rotation still requires fresh discovery")
+}

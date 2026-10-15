@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	cfg "github.com/viant/mcp/client/config"
@@ -44,7 +45,7 @@ func (m *Manager) catalogTransportCredentialScope(ctx context.Context, name stri
 			}
 		}
 		if rt != nil {
-			witness, ok := rt.CredentialScope(endpoint)
+			witness, ok := rt.CredentialScopeForMetadata(endpoint, options.MetadataCacheIgnoredCookies)
 			if !ok {
 				return "", false, nil
 			}
@@ -73,6 +74,9 @@ func (m *Manager) catalogCookies(ctx context.Context, endpoint *url.URL, options
 	cookies := [][2]string{}
 	if jar != nil {
 		for _, cookie := range jar.Cookies(endpoint) {
+			if slices.Contains(options.MetadataCacheIgnoredCookies, cookie.Name) {
+				continue
+			}
 			cookies = append(cookies, [2]string{cookie.Name, cookie.Value})
 		}
 	}
