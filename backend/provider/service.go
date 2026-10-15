@@ -171,7 +171,7 @@ func (s *Service) UICommand(ctx context.Context, in *UICommandInput) (output *UI
 			}
 			parameters, _ := params["parameters"].(map[string]any)
 			approved := resolved.Definition
-			admitted, err := s.ProjectWindowWithInput(ctx, &windowprotocol.PresentationInput{Window: approved, WindowForm: parameters})
+			admitted, err := s.ProjectWindowWithInput(ctx, &windowprotocol.PresentationInput{Window: approved, WindowForm: parameters, ResourceData: parameters})
 			if err != nil || admitted == nil {
 				if err == nil {
 					err = identity.ErrResourceDenied
