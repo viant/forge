@@ -28,13 +28,15 @@ func (g *Gateway) cachedDefinitionGet(ctx context.Context, actor identity.Verifi
 		scope = cfg.ResourceCacheConversation
 	}
 	public := scope == cfg.ResourceCachePublic
-	// Explicitly public definitions, including working/default selections,
-	// remain cached until owner notification, reload/reconnect, or expiry.
-	// Private working projections retain their existing fresh-read behavior.
-	if !public && (ref.Revision == "" || ref.Revision == identity.WorkingCandidate) {
+	// Mutable/default definitions require an explicit host cache declaration.
+	// Otherwise preserve the managing server's existing fresh-read behavior.
+	declared := binding.options.ResourceCacheScopes[uri.Namespace+"/"+uri.Kind] != "" || binding.options.ResourceCacheScopes[uri.Namespace] != "" || binding.options.ResourceCacheScopes["*"] != ""
+	if !declared && (ref.Revision == "" || ref.Revision == identity.WorkingCandidate) {
 		result, err := load(ctx)
 		return result, nil, err
 	}
+	// Scope, source expiry, credential generations and resource notifications
+	// govern reuse for explicitly cached working/default definitions.
 	partition := g.Manager.CatalogPartition(ctx, catalogPrincipalScope(actor), uri.Kind)
 	var scopeKey string
 	if public {
