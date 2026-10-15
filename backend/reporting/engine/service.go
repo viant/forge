@@ -46,3 +46,11 @@ func (s *Service) recordAudit(ctx context.Context, event *AuditEvent) {
 		_ = s.audit.Record(ctx, cloneAuditEvent(event))
 	}
 }
+
+// SetReportCatalog is a pre-serving composition seam, matching the reader and
+// datasource executor setters. It must not race with report execution.
+func (s *Service) SetReportCatalog(provider catalog.Provider) {
+	if s != nil {
+		s.reportCatalog = provider
+	}
+}
