@@ -22,13 +22,22 @@ import {
     normalizeReportCatalogPageSize,
     paginateReportCatalogEntries,
 } from "./reportCatalogPagination.js";
+import {
+    buildReportCatalogListRequest,
+    formatReportCatalogDate,
+    buildReportCatalogMutationRequest,
+    buildReportCatalogResourceRequest,
+    filterReportCatalogResources,
+    normalizeReportCatalogResources,
+    readReportCatalogResource,
+} from "./reportCatalogResources.js";
 import { REPORT_STORE_CHANGED_EVENT } from "./reportBuilderHostServices.js";
 import "./ReportCatalog.css";
 
 const SCOPES = [
     { id: "order", label: "Current order", icon: "layers" },
-    { id: "all", label: "All my reports", icon: "folder-open" },
-    { id: "presets", label: "Built-in presets", icon: "layout-auto" },
+    { id: "all", label: "All reports", icon: "folder-open" },
+    { id: "user", label: "Current user", icon: "person" },
 ];
 const DEFAULT_PAGE_SIZE_OPTIONS = [20, 50, 100];
 
@@ -43,65 +52,7 @@ function normalizeOrderId(value = "") {
     return normalizeString(value);
 }
 
-function normalizeReports(value = null) {
-    const reports = Array.isArray(value) ? value : (Array.isArray(value?.reports) ? value.reports : []);
-    return reports
-        .filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
-        .map((entry) => ({
-            ...entry,
-            artifactId: normalizeString(entry.artifactId),
-            reportId: normalizeString(entry.reportId),
-            title: normalizeString(entry.title || entry.reportId || "Untitled report") || "Untitled report",
-            ownerId: normalizeString(entry.ownerId),
-            reportType: normalizeString(entry.reportType || "Saved report") || "Saved report",
-            builderRef: normalizeString(entry.builderRef || "metricsCubeBuilder") || "metricsCubeBuilder",
-            orderIds: (Array.isArray(entry.orderIds) ? entry.orderIds : []).map(normalizeString).filter(Boolean),
-            defaultFrom: normalizeString(entry.defaultFrom),
-            defaultTo: normalizeString(entry.defaultTo),
-            createdAt: normalizeString(entry.createdAt),
-            updatedAt: normalizeString(entry.updatedAt),
-            lastRunAt: normalizeString(entry.lastRunAt),
-            sourceKind: "report",
-        }))
-        .filter((entry) => entry.reportId && entry.artifactId);
-}
-
-function normalizePresets(value = [], defaultBuilderWindow = "metricReportBuilder") {
-    return (Array.isArray(value) ? value : [])
-        .filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
-        .map((entry) => ({
-            id: normalizeString(entry.id),
-            reportId: normalizeString(entry.id),
-            title: normalizeString(entry.label || entry.title || entry.id),
-            description: normalizeString(entry.description),
-            reportType: normalizeString(entry.reportType || "Built-in preset"),
-            builderWindow: normalizeString(entry.builderWindow || defaultBuilderWindow) || defaultBuilderWindow,
-            sourceKind: "preset",
-        }))
-        .filter((entry) => entry.id && entry.title);
-}
-
-function formatDate(value = "", { relative = false } = {}) {
-    const timestamp = Date.parse(normalizeString(value));
-    if (!Number.isFinite(timestamp)) {
-        return "Not yet";
-    }
-    if (relative) {
-        const delta = Date.now() - timestamp;
-        const minutes = Math.round(delta / 60000);
-        if (minutes < 1) return "Just now";
-        if (minutes < 60) return `${minutes}m ago`;
-        const hours = Math.round(minutes / 60);
-        if (hours < 24) return `${hours}h ago`;
-        const days = Math.round(hours / 24);
-        if (days < 30) return `${days}d ago`;
-    }
-    return new Intl.DateTimeFormat(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-    }).format(new Date(timestamp));
-}
+function formatDate(value, options) {return formatReportCatalogDate(value,options);}
 
 function dateRangeLabel(report = {}) {
     if (report.defaultFrom && report.defaultTo) {
@@ -125,7 +76,7 @@ function resolveBuilderWindow(report = {}, config = {}) {
 }
 
 function reportEntryKey(report = {}) {
-    return `${normalizeString(report.sourceKind || "report")}:${normalizeString(report.artifactId || report.reportId || report.id)}`;
+    return report.resourceUri;
 }
 
 function downloadArtifact(artifact = null, title = "") {
@@ -146,7 +97,7 @@ function downloadArtifact(artifact = null, title = "") {
     }, 1000);
 }
 
-function ReportCard({
+export function ReportCard({
     report,
     currentOrderId,
     busyAction,
@@ -159,40 +110,40 @@ function ReportCard({
     onExport,
     onDelete,
 }) {
-    const isPreset = report.sourceKind === "preset";
-    const orderLabel = isPreset
-        ? "Reusable starter"
-        : (report.orderIds.length > 0 ? report.orderIds.map((id) => `Order ${id}`).join(", ") : "Cross-order report");
+    const capabilities = report.capabilities || {};
+    const orderLabel = report.orderIds.length > 0
+        ? report.orderIds.map((id) => `Order ${id}`).join(", ") : "Cross-order report";
+    const hasMenuActions = ["rename", "duplicate", "runRange", "export", "delete"].some((action) => capabilities[action]);
     return (
         <article className="forge-report-catalog-card">
             <div className="forge-report-catalog-card__accent" />
             <div className="forge-report-catalog-card__header">
                 <div className="forge-report-catalog-card__icon">
-                    <Icon icon={isPreset ? "layout-auto" : "document"} size={20} />
+                    <Icon icon="document" size={20} />
                 </div>
                 <div className="forge-report-catalog-card__identity">
                     <h3>{report.title}</h3>
                     <div className="forge-report-catalog-card__tags">
-                        <Tag minimal intent={isPreset ? "primary" : "success"}>{report.reportType}</Tag>
-                        {!isPreset && reportMatchesOrder(report, currentOrderId) ? (
+                        <Tag minimal>{report.namespace}</Tag>
+                        {reportMatchesOrder(report, currentOrderId) ? (
                             <Tag minimal intent="primary">Current order</Tag>
                         ) : null}
                     </div>
                 </div>
-                <Popover
+                {hasMenuActions ? <Popover
                     placement="bottom-end"
                     content={(
                         <Menu>
-                            {!isPreset ? <MenuItem icon="edit" text="Rename" onClick={() => onRename(report)} /> : null}
-                            <MenuItem icon="duplicate" text={isPreset ? "Use as new report" : "Duplicate"} onClick={() => onDuplicate(report)} />
-                            {!isPreset ? <MenuItem icon="calendar" text="Run for another date range" onClick={() => onRunRange(report)} /> : null}
-                            <MenuItem icon="download" text="Export PDF" onClick={() => onExport(report)} />
-                            {!isPreset ? <MenuItem intent="danger" icon="trash" text="Delete report" onClick={() => onDelete(report)} /> : null}
+                            {capabilities.rename ? <MenuItem icon="edit" text="Rename" onClick={() => onRename(report)} /> : null}
+                            {capabilities.duplicate ? <MenuItem icon="duplicate" text="Duplicate" onClick={() => onDuplicate(report)} /> : null}
+                            {capabilities.runRange ? <MenuItem icon="calendar" text="Run for another date range" onClick={() => onRunRange(report)} /> : null}
+                            {capabilities.export ? <MenuItem icon="download" text="Export PDF" onClick={() => onExport(report)} /> : null}
+                            {capabilities.delete ? <MenuItem intent="danger" icon="trash" text="Delete report" onClick={() => onDelete(report)} /> : null}
                         </Menu>
                     )}
                 >
                     <Button minimal icon="more" aria-label={`More actions for ${report.title}`} />
-                </Popover>
+                </Popover> : null}
             </div>
 
             {report.description ? <p className="forge-report-catalog-card__description">{report.description}</p> : null}
@@ -204,20 +155,20 @@ function ReportCard({
 
             <dl className="forge-report-catalog-card__metadata">
                 <div>
-                    <dt>Saved</dt>
-                    <dd>{isPreset ? "Built in" : formatDate(report.updatedAt || report.createdAt)}</dd>
+                    <dt>Updated</dt>
+                    <dd>{formatDate(report.updatedAt || report.createdAt)}</dd>
                 </div>
                 <div>
                     <dt>Last run</dt>
-                    <dd>{isPreset ? "On demand" : formatDate(report.lastRunAt, { relative: true })}</dd>
+                    <dd>{formatDate(report.lastRunAt, { relative: true })}</dd>
                 </div>
                 <div>
                     <dt>Date range</dt>
-                    <dd>{isPreset ? "Choose when running" : dateRangeLabel(report)}</dd>
+                    <dd>{dateRangeLabel(report)}</dd>
                 </div>
                 <div>
                     <dt>Owner</dt>
-                    <dd>{isPreset ? "Workspace" : (report.ownerId || "You")}</dd>
+                    <dd>{report.ownerId || "Not specified"}</dd>
                 </div>
             </dl>
 
@@ -226,15 +177,16 @@ function ReportCard({
                     intent="primary"
                     icon="play"
                     loading={busyAction === `${reportEntryKey(report)}:run`}
+                    disabled={!capabilities.run}
                     onClick={() => onRun(report)}
                 >
                     Run
                 </Button>
-                <Button icon="folder-open" onClick={() => onOpen(report)}>
+                <Button icon="folder-open" disabled={!capabilities.open} onClick={() => onOpen(report)}>
                     Open
                 </Button>
-                <Button minimal icon="edit" onClick={() => onEdit(report)}>
-                    {isPreset ? "Customize" : "Edit"}
+                <Button minimal icon="edit" disabled={!capabilities.edit} onClick={() => onEdit(report)}>
+                    Edit
                 </Button>
             </div>
         </article>
@@ -253,10 +205,6 @@ export default function ReportCatalog({container, context}) {
         || windowParameters.orderIds
         || windowParameters.adOrderId,
     );
-    const presets = useMemo(
-        () => normalizePresets(config.presets, config.defaultBuilderWindow),
-        [config.defaultBuilderWindow, config.presets],
-    );
     const pageSizeOptions = useMemo(() => {
         const configured = Array.isArray(config.pageSizeOptions) ? config.pageSizeOptions : DEFAULT_PAGE_SIZE_OPTIONS;
         const normalized = configured
@@ -266,6 +214,7 @@ export default function ReportCatalog({container, context}) {
         return normalized.length > 0 ? normalized : DEFAULT_PAGE_SIZE_OPTIONS;
     }, [config.pageSizeOptions]);
     const catalogRef = useRef(null);
+    const loadSequence = useRef(0);
     const [scope, setScope] = useState(currentOrderId ? "order" : "all");
     const [query, setQuery] = useState("");
     const [page, setPage] = useState(1);
@@ -286,22 +235,26 @@ export default function ReportCatalog({container, context}) {
     const [deleteTarget, setDeleteTarget] = useState(null);
 
     const loadReports = useCallback(async ({ silent = false } = {}) => {
+        const sequence = ++loadSequence.current;
         if (typeof reportStore?.listReports !== "function") {
-            setError("Saved reports are unavailable in this workspace.");
+            setError("Reports are unavailable in this workspace.");
             setLoading(false);
             return;
         }
         if (!silent) setLoading(true);
         try {
-            const result = await reportStore.listReports({ limit: 0 });
-            setReports(normalizeReports(result));
+            const result = await reportStore.listReports(buildReportCatalogListRequest(scope));
+            if (sequence !== loadSequence.current) return;
+            setReports(normalizeReportCatalogResources(result));
             setError("");
         } catch (loadError) {
-            setError(loadError?.message || "Could not load saved reports.");
+            if (sequence !== loadSequence.current) return;
+            setReports([]);
+            setError(loadError?.message || "Could not load reports. Try Refresh.");
         } finally {
-            setLoading(false);
+            if (sequence === loadSequence.current) setLoading(false);
         }
-    }, [reportStore]);
+    }, [reportStore, scope]);
 
     useEffect(() => {
         loadReports();
@@ -313,19 +266,9 @@ export default function ReportCatalog({container, context}) {
         return () => globalThis.removeEventListener?.(REPORT_STORE_CHANGED_EVENT, refresh);
     }, [loadReports]);
 
-    const entries = useMemo(() => {
-        const source = scope === "presets"
-            ? presets
-            : (scope === "order" ? reports.filter((report) => reportMatchesOrder(report, currentOrderId)) : reports);
-        const normalizedQuery = normalizeString(query).toLowerCase();
-        if (!normalizedQuery) return source;
-        return source.filter((entry) => [
-            entry.title,
-            entry.description,
-            entry.reportType,
-            ...(entry.orderIds || []),
-        ].join(" ").toLowerCase().includes(normalizedQuery));
-    }, [currentOrderId, presets, query, reports, scope]);
+    const entries = useMemo(() => filterReportCatalogResources(reports, {
+        scope, orderId: currentOrderId, query,
+    }), [currentOrderId, query, reports, scope]);
     const pagination = useMemo(
         () => paginateReportCatalogEntries(entries, page, pageSize),
         [entries, page, pageSize],
@@ -361,77 +304,77 @@ export default function ReportCatalog({container, context}) {
         setPage(1);
     }, [pageSizeOptions]);
 
-    const openBuilder = useCallback((report, {
+    const openBuilder = useCallback(async (report, {
         mode = "result",
         executeOnOpen = false,
         from = "",
         to = "",
         newInstance = false,
-        reportDefinition = null,
     } = {}) => {
-        if (typeof windowHandler?.openWindow !== "function") {
+        const action = from || to ? "runRange" : (executeOnOpen ? "run" : (mode === "design" ? "edit" : "open"));
+        if (!report.capabilities[action]) return;
+        if (typeof windowHandler?.openTarget !== "function") {
             setFeedback({ intent: "danger", message: "The report builder window is unavailable." });
             return;
         }
-        const builderWindow = resolveBuilderWindow(report, config);
-        const isPreset = report.sourceKind === "preset";
-        const isInline = !!reportDefinition;
-        const prefill = {
-            ...(currentOrderId ? { orderId: Number(currentOrderId), orderIds: [Number(currentOrderId)] } : {}),
-            ...(from ? { from } : {}),
-            ...(to ? { to } : {}),
-        };
-        const parameters = {
-            sourceKind: isInline ? "inline" : (isPreset ? "preset" : "report"),
-            sourceId: isInline
-                ? normalizeString(reportDefinition.reportId || reportDefinition.id)
-                : report.reportId,
-            ...(isInline
-                ? { reportDefinition }
-                : (isPreset ? { reportStarterId: report.reportId } : {
-                    artifactId: report.artifactId,
-                    reportId: report.reportId,
-                })),
-            mode,
-            executeOnOpen,
-            ...prefill,
-            ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
-            ...(!isPreset && !isInline && Object.keys(prefill).length > 0 ? {
-                runOverride: prefill,
-                ...(from ? { runFrom: from } : {}),
-                ...(to ? { runTo: to } : {}),
-                ...(prefill.orderIds ? { runOrderIds: prefill.orderIds } : {}),
-            } : {}),
-        };
-        windowHandler.openWindow({
-            execution: {
-                args: [
-                    builderWindow,
-                    report.title,
-                    "",
-                    true,
-                    {
-                        presentation: "hosted",
-                        region: "chat.top",
-                        replaceHostedRegion: true,
-                        newInstance,
-                        conversationId: context?.windowState?.conversationId,
-                    },
-                ],
-            },
-            parameters,
-            context,
-        });
-    }, [config, context, currentOrderId, windowHandler]);
+        const key = `${reportEntryKey(report)}:${action}`;
+        setBusyAction(key);
+        try {
+            report = await readReportCatalogResource(report, reportStore);
+            const builderWindow = resolveBuilderWindow(report, config);
+            const prefill = {
+                ...(from ? { from } : {}),
+                ...(to ? { to } : {}),
+            };
+            const parameters = {
+                ...buildReportCatalogResourceRequest(report),
+                ...(report.resource ? { reportResource: report.resource } : {}),
+                sourceKind: "report",
+                sourceId: report.resourceUri,
+                reportId: report.resourceUri,
+                reportTitle: report.title,
+                reportCapabilities: report.capabilities,
+                mode,
+                executeOnOpen,
+                ...prefill,
+                ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
+                ...(Object.keys(prefill).length > 0 ? {
+                    runOverride: prefill,
+                    ...(from ? { runFrom: from } : {}),
+                    ...(to ? { runTo: to } : {}),
+                    ...(prefill.orderIds ? { runOrderIds: prefill.orderIds } : {}),
+                } : {}),
+            };
+            await windowHandler.openTarget({
+                target: {
+                    kind: "window",
+                    windowKey: builderWindow,
+                    windowTitle: report.title,
+                    presentation: "hosted",
+                    region: "chat.top",
+                    replaceHostedRegion: true,
+                    newInstance,
+                    conversationId: context?.windowState?.conversationId,
+                    parameters,
+                },
+                context,
+            });
+        } catch (openError) {
+            setFeedback({ intent: "danger", message: openError?.message || "Could not open the report. Refresh and try again." });
+        } finally {
+            setBusyAction("");
+        }
+    }, [config, context, currentOrderId, reportStore, windowHandler]);
 
     const renameReport = useCallback(async () => {
-        if (!renameTarget || typeof reportStore?.updateReport !== "function") return;
+        if (!renameTarget?.capabilities.rename || typeof reportStore?.updateReport !== "function") return;
         const title = normalizeString(renameValue);
         if (!title) return;
         const key = `${reportEntryKey(renameTarget)}:rename`;
         setBusyAction(key);
         try {
-            await reportStore.updateReport({ artifactId: renameTarget.artifactId, title });
+            const selected = await readReportCatalogResource(renameTarget, reportStore);
+            await reportStore.updateReport({ ...buildReportCatalogMutationRequest(selected, "update"), title });
             setRenameTarget(null);
             setFeedback({ intent: "success", message: `Renamed report to ${title}.` });
             await loadReports({ silent: true });
@@ -443,10 +386,7 @@ export default function ReportCatalog({container, context}) {
     }, [loadReports, renameTarget, renameValue, reportStore]);
 
     const duplicateReport = useCallback(async (report) => {
-        if (report.sourceKind === "preset") {
-            openBuilder(report, { mode: "design", executeOnOpen: false });
-            return;
-        }
+        if (!report.capabilities.duplicate) return;
         if (typeof reportStore?.duplicateReport !== "function") {
             setFeedback({ intent: "danger", message: "Report duplication is unavailable." });
             return;
@@ -454,7 +394,8 @@ export default function ReportCatalog({container, context}) {
         const key = `${reportEntryKey(report)}:duplicate`;
         setBusyAction(key);
         try {
-            const duplicated = await reportStore.duplicateReport({ artifactId: report.artifactId });
+            const selected = await readReportCatalogResource(report, reportStore);
+            const duplicated = await reportStore.duplicateReport(buildReportCatalogMutationRequest(selected, "duplicate"));
             setFeedback({ intent: "success", message: `Created ${duplicated?.title || `Copy of ${report.title}`}.` });
             await loadReports({ silent: true });
         } catch (duplicateError) {
@@ -462,16 +403,17 @@ export default function ReportCatalog({container, context}) {
         } finally {
             setBusyAction("");
         }
-    }, [loadReports, openBuilder, reportStore]);
+    }, [loadReports, reportStore]);
 
     const deleteReport = useCallback(async () => {
-        if (!deleteTarget || typeof reportStore?.deleteReport !== "function") return;
+        if (!deleteTarget?.capabilities.delete || typeof reportStore?.deleteReport !== "function") return;
         const key = `${reportEntryKey(deleteTarget)}:delete`;
         setBusyAction(key);
         try {
-            await reportStore.deleteReport({ artifactId: deleteTarget.artifactId });
+            const selected = await readReportCatalogResource(deleteTarget, reportStore);
+            await reportStore.deleteReport(buildReportCatalogMutationRequest(selected, "archive"));
             setDeleteTarget(null);
-            setFeedback({ intent: "success", message: `Deleted ${deleteTarget.title}.` });
+            setFeedback({ intent: "success", message: `Archived ${deleteTarget.title}.` });
             await loadReports({ silent: true });
         } catch (deleteError) {
             setFeedback({ intent: "danger", message: deleteError?.message || "Could not delete the report." });
@@ -481,20 +423,17 @@ export default function ReportCatalog({container, context}) {
     }, [deleteTarget, loadReports, reportStore]);
 
     const exportReport = useCallback(async (report) => {
-        if (report.sourceKind === "preset") {
-            openBuilder(report, { mode: "result", executeOnOpen: true });
-            setFeedback({ intent: "primary", message: "Run the preset first, then export its generated report." });
-            return;
-        }
+        if (!report.capabilities.export) return;
         if (typeof reportExport?.submitSource !== "function") {
-            setFeedback({ intent: "danger", message: "Saved-report export is unavailable." });
+            setFeedback({ intent: "danger", message: "Report export is unavailable." });
             return;
         }
         const key = `${reportEntryKey(report)}:export`;
         setBusyAction(key);
         try {
             let job = normalizeReportBuilderExportJob(await reportExport.submitSource({
-                source: { kind: "report", reportId: report.reportId },
+                ...buildReportCatalogResourceRequest(report),
+                source: { kind: "report", ...buildReportCatalogResourceRequest(report) },
                 format: "pdf",
                 conversationId: context?.windowState?.conversationId,
                 workspaceId: resolveBuilderWindow(report, config),
@@ -516,10 +455,10 @@ export default function ReportCatalog({container, context}) {
         } finally {
             setBusyAction("");
         }
-    }, [config, context?.windowState?.conversationId, openBuilder, reportExport]);
+    }, [config, context?.windowState?.conversationId, reportExport]);
 
     const runRange = useCallback(() => {
-        if (!rangeTarget || !rangeFrom || !rangeTo) return;
+        if (!rangeTarget?.capabilities.runRange || !rangeFrom || !rangeTo) return;
         const target = rangeTarget;
         openBuilder(target, {
             mode: "result",
@@ -532,27 +471,26 @@ export default function ReportCatalog({container, context}) {
     }, [openBuilder, rangeFrom, rangeTarget, rangeTo]);
 
     const emptyTitle = scope === "order"
-        ? `No saved reports for order ${currentOrderId || ""}`.trim()
-        : (scope === "presets" ? "No built-in presets are configured" : "No saved reports yet");
+        ? `No reports for order ${currentOrderId || ""}`.trim()
+        : (scope === "user" ? "No reports owned by the current user" : "No reports available");
 
     return (
         <section className="forge-report-catalog" ref={catalogRef}>
             <header className="forge-report-catalog__hero">
                 <div className="forge-report-catalog__hero-icon"><Icon icon="projects" size={24} /></div>
                 <div>
-                    <p className="forge-report-catalog__eyebrow">REPORT LIBRARY</p>
-                    <h2>{currentOrderId ? `Reports for order ${currentOrderId}` : "My reports"}</h2>
+                    <h2>{currentOrderId ? `Reports for order ${currentOrderId}` : "Reports"}</h2>
                     <p>Open, rerun, edit, export, and organize reusable reports without leaving the order workspace.</p>
                 </div>
                 <div className="forge-report-catalog__hero-stat">
-                    <strong>{scope === "presets" ? presets.length : reports.length}</strong>
-                    <span>{scope === "presets" ? "presets" : "saved reports"}</span>
+                    <strong>{entries.length}</strong>
+                    <span>reports</span>
                 </div>
             </header>
 
             <div className="forge-report-catalog__toolbar">
                 <div className="forge-report-catalog__scopes" role="tablist" aria-label="Report catalog scope">
-                    {SCOPES.map((entry) => (
+                    {SCOPES.filter((entry) => entry.id !== "order" || currentOrderId).map((entry) => (
                         <button
                             key={entry.id}
                             type="button"
@@ -602,18 +540,7 @@ export default function ReportCatalog({container, context}) {
                     <div className="forge-report-catalog__empty-icon"><Icon icon="folder-new" size={26} /></div>
                     <h3>{emptyTitle}</h3>
                     <p>{scope === "order" ? "Build or save a report for this order and it will appear here immediately." : "Adjust the scope or create a new report in the report builder."}</p>
-                    <Button
-                        intent="primary"
-                        icon="plus"
-                        onClick={() => openBuilder({
-                            sourceKind: "preset",
-                            reportId: config.defaultPresetId || presets[0]?.id || "",
-                            title: "New performance report",
-                            builderWindow: config.defaultBuilderWindow,
-                        }, { mode: "design", executeOnOpen: false })}
-                    >
-                        Build a report
-                    </Button>
+
                 </div>
             ) : (
                 <>
@@ -724,13 +651,13 @@ export default function ReportCatalog({container, context}) {
                 />
             </Dialog>
 
-            <Dialog isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete saved report?" icon="trash">
+            <Dialog isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete report?" icon="trash">
                 <DialogBody>
                     <div className="forge-report-catalog__delete-warning">
                         <Icon icon="warning-sign" intent="danger" size={22} />
                         <div>
                             <strong>{deleteTarget?.title}</strong>
-                            <p>This permanently removes the user-defined report. Built-in presets are never affected.</p>
+                            <p>This permanently removes this report.</p>
                         </div>
                     </div>
                 </DialogBody>
@@ -738,7 +665,7 @@ export default function ReportCatalog({container, context}) {
                     actions={(
                         <>
                             <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
-                            <Button intent="danger" icon="trash" onClick={deleteReport}>Delete report</Button>
+                            <Button intent="danger" icon="trash" onClick={deleteReport}>Archive report</Button>
                         </>
                     )}
                 />

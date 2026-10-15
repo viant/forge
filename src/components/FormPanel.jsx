@@ -129,7 +129,7 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
         return (
             <div className={`form-panel forge-form-panel-section-tabs${compactTabs ? ' is-compact' : ''}${fillSectionTabs ? ' is-fill' : ''}`}>
                 <SectionTabRail
-                    items={visibleContainers.map((tab) => ({id: tab.id, label: tab.title, icon: tab.icon}))}
+                    items={visibleContainers.map((tab,index) => ({id: tab.id, label: tab.title, icon: tab.icon, panelId:`${tabDOMPrefix}-panel-${index}`}))}
                     selectedId={selected?.id}
                     onChange={handleTabChange}
                     ariaLabel={container?.tabs?.ariaLabel || (workspacePresentation?.kind === 'report' ? 'Report sections' : 'Resource sections')}

@@ -1,5 +1,5 @@
 import SchemaFormChoices from './SchemaFormChoices.jsx';
-import {validateSchemaFormFields} from './schemaFormValidation.js';
+import { validateSchemaFormFields } from './schemaFormValidation.js';
 // SchemaBasedForm.jsx – renders a form based on either an explicit list of
 // fields or a minimal JSON-schema (object with properties).
 

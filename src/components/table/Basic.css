@@ -562,7 +562,15 @@
     margin: 0;
 }
 
+/* Keep a long link's clickable box inside its clipped table cell. */
 .forge-table-link {
+    display: inline-block;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
     color: var(--forge-focus-color, #1757bc);
     font-weight: 600;
     text-decoration: none;
