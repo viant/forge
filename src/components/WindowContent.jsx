@@ -19,6 +19,9 @@ import {
     findFormSignal,
     findMetricsSignal,
     primeWindowSignals,
+    clearProtectedWindowState,
+    clearProtectedWindowDenial,
+    protectedWindowDenials,
     removeWindow,
 } from '../core';
 
@@ -30,6 +33,7 @@ import DataSource from './DataSource.jsx';
 import MessageBus from './MessageBus.jsx';
 import WindowLayout from './WindowLayout.jsx';
 import ViewDialog from './ViewDialog.jsx';
+import {openWindowPickerDialog} from './windowPickerDialog.js';
 import DataSourceContainer from './WindowContentDataSourceContainer.jsx';
 
 import useDataConnector from '../hooks/dataconnector.js';
@@ -37,13 +41,15 @@ import { mergeWindowFormValues } from '../hooks/dataSource.js';
 import {applyParameterCodec} from '../hooks/parameters.js';
 import {injectActions} from '../actions';
 import { resolveMetadataForTarget } from '../runtime/metadataResolver.js';
-import {compilePermittedView, normalizeAuthorizationSnapshot} from '../runtime/permittedView.js';
+import {canonicalSelectionBinding} from '../runtime/canonicalDelivery.js';
+import {compileDeliveryHintView, normalizeAuthorizationSnapshot} from '../runtime/permittedView.js';
 import { applyDataSourceParameterCodecs, resolveParameters } from '../hooks/parameters.js';
 import { resolveSelector } from '../utils/selector.js';
 import { evaluatePlainVisibleWhen } from './visibleWhen.js';
 import { getLogger } from '../utils/logger.js';
 import { runWindowLifecycleHandlers } from './windowLifecycle.js';
 import { buildReportBuilderHostServices } from './dashboard/reportBuilderHostServices.js';
+import { windowMetadataEndpoint } from './windowMetadataEndpoint.js';
 
 export function reuseShallowEqualRuntimeObject(previous = null, candidate = null) {
     if (!previous || !candidate || typeof previous !== 'object' || typeof candidate !== 'object') {
@@ -86,23 +92,19 @@ function collectInitialWindowFormItemValues(node, initial) {
     }
 }
 
-export function compileWindowAuthorizationMetadata(metadata, parameters = {}) {
-    if (!metadata?.authorization) return metadata;
+export function compileWindowAuthorizationMetadata(metadata, parameters = {}, selectionBinding = null) {
+    // The managing MCP owns resource access. The browser projects only supplied
+    // principal roles/exposures and never requests an entity read capability.
     const snapshot = metadata?.authorizationSnapshot;
-    if (!snapshot || typeof snapshot !== 'object') return null;
-    const spec = metadata.authorization || {};
-    const resourceType = String(spec?.resource?.type || spec?.resourceType || '').trim();
-    const selector = String(spec?.resource?.id?.selector || '').trim();
-    const selected = selector ? resolveSelector(parameters || {}, selector) : null;
-    const resourceId = selected == null || selected === '' ? null : Number(selected);
-    const authorization = normalizeAuthorizationSnapshot(snapshot, resourceType, Number.isFinite(resourceId) ? resourceId : null);
-    const result = compilePermittedView(metadata, authorization, {requireRead: String(spec.scope || '').toLowerCase() === 'resource'});
-    if (result.denied || !result.metadata) return null;
-    return {...result.metadata, authorizationSnapshot: authorization};
+    const hints = snapshot ? normalizeAuthorizationSnapshot(snapshot) : {};
+    return {...compileDeliveryHintView(metadata, hints),
+        authorizationSnapshot: snapshot ? hints : undefined,
+        ...(canonicalSelectionBinding({selectionBinding}) ? {selectionBinding} : {}),
+    };
 }
 
 export function isProtectedWindowMetadata(metadata) {
-    return !!metadata && (!!metadata.authorization || !!metadata.authorizationSnapshot);
+    return !!metadata && (!!metadata.authorization || !!metadata.authorizationSnapshot || !!canonicalSelectionBinding(metadata));
 }
 
 export function canUseInlineMetadataFallback(inlineMetadata) {
@@ -125,6 +127,7 @@ export function windowMetadataFetchKey(window = {}, targetContext = null) {
         parameters: window.parameters,
         resource: window.resource,
         targetContext,
+        selectionBinding: canonicalSelectionBinding(window),
     }));
 }
 
@@ -145,6 +148,7 @@ export function isTransientWindowMetadataError(error) {
 
 export function formatWindowMetadataError(error) {
     if (!error) return '';
+    if (error.code === 'WINDOW_AUTHORIZATION_EXPIRED' || error.code === 'PREVIEW_AUTHORIZATION_EXPIRED') return 'Permissions expired. Refresh permission checks or reopen this window.';
     if (Number(error.status) === 504) return 'Permission check timed out. Please try again.';
     if (Number(error.status) === 403) {
         return 'Access denied. You do not have permission to open this resource.';
@@ -236,9 +240,9 @@ export function resolveWindowMetadataForTarget(metadata, targetContext = {}) {
     return resolveMetadataForTarget(metadata, targetContext) || metadata;
 }
 
-export function compilePermissionAppliedMetadata(metadata, targetContext = {}, parameters = {}) {
+export function compilePermissionAppliedMetadata(metadata, targetContext = {}, parameters = {}, selectionBinding = null) {
     const targetResolved = resolveWindowMetadataForTarget(metadata, targetContext);
-    return compileWindowAuthorizationMetadata(targetResolved, parameters);
+    return compileWindowAuthorizationMetadata(targetResolved, parameters, selectionBinding);
 }
 
 export function resolveWindowRootContainer(content = null, parameters = {}) {
@@ -368,6 +372,9 @@ function expandRequiredDataSourceRefs(metadata, refs) {
     while (queue.length > 0) {
         const ref = queue.shift();
         const parentRef = String(all?.[ref]?.dataSourceRef || '').trim();
+        // `_` is the authored local-datasource placeholder, not a parent to
+        // mount. Preserve an explicitly declared source with that name.
+        if (parentRef === '_' && !Object.prototype.hasOwnProperty.call(all, parentRef)) continue;
         if (parentRef && !result.has(parentRef)) {
             result.add(parentRef);
             queue.push(parentRef);
@@ -647,6 +654,17 @@ function WindowContentInner({window, metadata, services}) {
             clearWindowContext(windowId);
         };
     }, [windowId, context]);
+
+    const openedPickerRef = useRef(false);
+    useEffect(() => {
+        if (!context || !window?.pickerDialogId || openedPickerRef.current) return;
+        openedPickerRef.current = true;
+        openWindowPickerDialog(window, metadata, context).catch(error => {
+            console.error('Window picker failed', error);
+            context.handlers?.window?.closeWindow?.();
+        });
+    }, [context, metadata, window]);
+
 
     useEffect(() => {
         const currentSignature = JSON.stringify(liveWindowForm);
@@ -1059,9 +1077,10 @@ function WindowContentInner({window, metadata, services}) {
                 overflow: shouldFillParent ? 'hidden' : 'visible',
             }}
         >
+            {!defaultDataSourceRef && context.signals ? <MessageBus context={context} /> : null}
             {renderDataSources()}
             {renderDialogs()}
-            <WindowLayout
+            {!window.pickerDialogId && <WindowLayout
                 title={`${windowKey.toUpperCase()}${windowData ? ` (${windowData})` : ''}`}
                 context={context}
                 contentOverride={rootContainer}
@@ -1070,8 +1089,8 @@ function WindowContentInner({window, metadata, services}) {
                 }}
                 isInTab={window.isInTab}
                 fillParent={shouldFillParent}
-            />
-            {showWindowSelectionFooter(window) ? <FloatingFooter /> : null}
+            />}
+            {!window.pickerDialogId && showWindowSelectionFooter(window) ? <FloatingFooter /> : null}
         </div>
     );
 }
@@ -1086,7 +1105,7 @@ export default function WindowContent(props) {
     return <ForgeThemeBoundary windowKey={props.window?.windowKey}><WindowContentRuntime {...props} /></ForgeThemeBoundary>;
 }
 
-function WindowContentRuntime({window, isInTab = false}) {
+function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}) {
     useSignals();
     const {windowKey, windowId} = window;
     const baseKey = windowKey.split('?')[0];
@@ -1146,10 +1165,11 @@ function WindowContentRuntime({window, isInTab = false}) {
             endpoints,
             targetContext,
             auth,
+            transport: services.dataConnectorTransport,
             prepareRequest: prepareConnectorRequest,
         },
     }), [reportBuilderServices, runtimeWindow, endpoints, targetContext, auth, prepareConnectorRequest]);
-    const config  = {service: {...service, uri: `${service.uri}/${baseKey}`, includeTargetContext: true}};
+    const config  = {service: {...service, uri: windowMetadataEndpoint(service.uri, baseKey, runtimeWindow), includeTargetContext: true}};
     const connector = useDataConnector(config);
 
     useEffect(() => {
@@ -1179,8 +1199,27 @@ function WindowContentRuntime({window, isInTab = false}) {
         setSignalsReady(false);
         setLoading(true);
         setFetchError(null);
+        clearProtectedWindowDenial(windowId);
         if (isProtectedWindowMetadata(existingMetadata)) {
-            metadataSignalHandle.value = null;
+            clearProtectedWindowState(windowId);
+        }
+
+        const admittedBinding = canonicalSelectionBinding(window);
+        const deliveredMetadata = selectedMetadata?.view ? selectedMetadata : admittedBinding && window?.inlineMetadata?.view ? window.inlineMetadata : null;
+        if (deliveredMetadata) {
+            // A completed selected GET may deliver a generic or signed definition.
+            // This rendering input is not an authorization grant for data calls.
+            try {
+                const admittedMetadata = compilePermissionAppliedMetadata(deliveredMetadata,
+                    targetContext, window?.parameters || {}, admittedBinding);
+                injectActions(admittedMetadata);
+                metadataSignalHandle.value = {...admittedMetadata, __windowKey: baseKey,
+                    __targetKey: targetKey, __provisionalInline: false};
+            } catch (error) {
+                setFetchError(error);
+            }
+            setLoading(false);
+            return () => { cancelled = true; };
         }
 
         let hasInlineFallback = false;
@@ -1207,7 +1246,10 @@ function WindowContentRuntime({window, isInTab = false}) {
                 setFetchError(null);
                 const completeMetadata = resolveWindowMetadataForTarget(resp.data, targetContext);
                 fetchedProtectedMetadata = isProtectedWindowMetadata(completeMetadata);
-                const permissionAppliedMetadata = await applyWindowPermissionMetadata(completeMetadata, {
+                // A signed delivery is emitted only after host OPEN admission. Its
+                // snapshot is a rendering hint, not a data-operation preflight.
+                const selectionBinding = canonicalSelectionBinding(window);
+                const permissionAppliedMetadata = selectionBinding ? completeMetadata : await applyWindowPermissionMetadata(completeMetadata, {
                     services,
                     windowKey: baseKey,
                     resource: window?.resource || window?.parameters || {},
@@ -1216,17 +1258,18 @@ function WindowContentRuntime({window, isInTab = false}) {
                     targetContext,
                 });
                 if (cancelled || expired) return;
-                const resolvedMetadata = compilePermissionAppliedMetadata(permissionAppliedMetadata, targetContext, window?.parameters || {});
+                const resolvedMetadata = compilePermissionAppliedMetadata(permissionAppliedMetadata, targetContext, window?.parameters || {}, selectionBinding);
                 if (!resolvedMetadata) {
                     throw Object.assign(new Error('Resource not found or access denied'), {status: 403});
                 }
                 injectActions(resolvedMetadata);
-                metadataSignalHandle.value = {
+                const heldMetadata = {
                     ...resolvedMetadata,
                     __windowKey: baseKey,
                     __targetKey: targetKey,
                     __provisionalInline: false,
                 };
+                metadataSignalHandle.value = heldMetadata;
             }))
             .catch((err) => {
                 if (Number(err?.status) === 504) expired = true;
@@ -1246,7 +1289,7 @@ function WindowContentRuntime({window, isInTab = false}) {
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey, metadataRetryVersion]);
+    }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey, auth, selectedMetadata, metadataRetryVersion]);
 
     useEffect(() => {
         const metadata = metadataSignalHandle?.value;
@@ -1257,8 +1300,8 @@ function WindowContentRuntime({window, isInTab = false}) {
     }, [windowId, metadataSignalHandle?.value, resolvedServices, window]);
 
     const metadata = metadataSignalHandle?.peek?.();
-
-    const displayState = resolveWindowMetadataDisplayState({loading, signalsReady, metadata, fetchError});
+    const protectedDenial = protectedWindowDenials.value[windowId];
+    const displayState = resolveWindowMetadataDisplayState({loading, signalsReady: protectedDenial ? false : signalsReady, metadata, fetchError: protectedDenial || fetchError});
 
     // Keep the service runtime referentially stable while the effective
     // window, metadata authorization, and host services are unchanged.
@@ -1313,7 +1356,7 @@ function WindowContentRuntime({window, isInTab = false}) {
                     lineHeight: 1.4,
                 }}
             >
-                {formatWindowMetadataError(fetchError)}
+                {formatWindowMetadataError(protectedDenial || fetchError)}
             </div>
         );
     }

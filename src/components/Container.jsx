@@ -3,6 +3,7 @@ import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
 import {Card, Section} from '@blueprintjs/core';
 import ControlRenderer from './ControlRenderer.jsx';
+import {getContainerRenderer} from '../runtime/containerRendererRegistry.js';
 import {useControlEvents} from "../hooks/index.js";
 import TablePanel from "./TablePanel.jsx";
 import EditableCollection from "./primitives/EditableCollection.jsx";
@@ -440,7 +441,9 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
     // ------------------------------------------------------------------
     // Early exit: container used only for auto-fetch (no visual output)
     // ------------------------------------------------------------------
+    const InstalledContainerRenderer = getContainerRenderer(container?.kind);
     const hasVisual =
+        !!InstalledContainerRenderer || container?.kind === 'mcpApp' ||
         (visualItems?.length || 0) > 0 ||
         !!container.toolbar ||
         tablePanel || assignmentPanel || derivedDataSourcePanel || mutationCommandPanel || statusWorkflowPanel || treeEditorPanel || wizardPanel || uploadCollectionPanel || historyDiffPanel || scheduleEditorPanel || draftFormPanel || queryToolbarPanel || resourceHeaderPanel || relationDrillPanel || notificationRulesPanel || metricSummaryPanel || detailViewPanel || masterDetailPanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || treeBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
@@ -631,6 +634,22 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
             />
         );
     };
+
+    if (InstalledContainerRenderer) {
+        return <>
+            <InstalledContainerRenderer container={container} context={effectiveContext} isActive={isActive} />
+            {containerWantsFetcher && <DataSourceFetcher
+                key={`auto-fetcher-${container.id}-${dataSourceRef}`}
+                context={resolveChildContext(effectiveContext, dataSourceRef)}
+                selectFirst={container.selectFirst === true}
+                fetchData={container.fetchData === true}
+                fetchOnce={dataSourceFetchMode === 'once'}
+            />}
+        </>;
+    }
+    if (container?.kind === 'mcpApp') {
+        return <div role="alert">MCP app renderer is unavailable in this host.</div>;
+    }
 
     if (isDashboardRoot) {
         return (

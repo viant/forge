@@ -3,6 +3,18 @@ import { describe, expect, it } from 'vitest';
 import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, isProtectedWindowMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowRootContainer, reuseShallowEqualRuntimeObject, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
 import { resolveDataSourceOptions } from '../runtime/WidgetRenderer.jsx';
 
+describe('local datasource parent placeholder', () => {
+  it('does not mount the undeclared underscore parent of a local shell datasource', () => {
+    const metadata = {dataSource: {settings: {dataSourceRef: '_'}}, view: {content: {dataSourceRef: 'settings'}}};
+    expect(resolveRequiredDataSourceRefs(metadata, 'settings')).toEqual(['settings']);
+    metadata.dataSource.settings.dataSourceRef = 'missingBusinessParent';
+    expect(resolveRequiredDataSourceRefs(metadata, 'settings')).toEqual(['settings', 'missingBusinessParent']);
+    metadata.dataSource.settings.dataSourceRef = '_';
+    metadata.dataSource._ = {};
+    expect(resolveRequiredDataSourceRefs(metadata, 'settings')).toEqual(['settings', '_']);
+  });
+});
+
 describe('applyWindowPermissionMetadata', () => {
   it('passes the complete tree and one concrete resource to the dedicated service', async () => {
     const completeMetadata = {authorization: {scope: 'resource'}, view: {content: {id: 'root'}}};
@@ -261,8 +273,8 @@ describe('resolveDataSourceOptions', () => {
       optionLabelField: 'caption',
       optionValueField: 'caption',
     }, context)).toEqual([
-      { value: 'Category A', label: 'Category A' },
-      { value: 'Category B', label: 'Category B' },
+      { value: 'Category A', label: 'Category A', disabled: false },
+      { value: 'Category B', label: 'Category B', disabled: false },
     ]);
   });
 
@@ -281,7 +293,7 @@ describe('resolveDataSourceOptions', () => {
       optionValueField: 'caption',
       optionSecondaryField: 'id',
     }, context)).toEqual([
-      { value: 'Category B', label: 'Category B (2)', secondary: 2 },
+      { value: 'Category B', label: 'Category B (2)', secondary: 2, disabled: false },
     ]);
   });
 
@@ -303,7 +315,7 @@ describe('resolveDataSourceOptions', () => {
       optionLabelField: 'label',
       optionValueField: 'value',
       optionFilter: { field: 'group', source: 'form', selector: 'group' },
-    }, context)).toEqual([{ value: 'age:5', label: '18-24' }]);
+    }, context)).toEqual([{ value: 'age:5', label: '18-24', disabled: false }]);
   });
 
 });
@@ -568,5 +580,33 @@ describe('shouldResetWindowDashboardState', () => {
     expect(shouldResetWindowDashboardState('window-1:dashboard-1', 'window-1', 'dashboard-2')).toBe(true);
     expect(shouldResetWindowDashboardState('', '', 'dashboard-1')).toBe(false);
     expect(shouldResetWindowDashboardState('', 'window-1', '')).toBe(false);
+  });
+});
+
+
+describe('invalid protected metadata', () => {
+  it('keeps owner metadata open when presentation snapshot expires', () => {
+    expect(compilePermissionAppliedMetadata({authorizationSnapshot:{expiresAt:'2000-01-01T00:00:00Z'},view:{content:{id:'expired'}}}).view.content.id).toBe('expired');
+  });
+  it('rejects malformed presentation guard syntax', () => {
+    const metadata = {authorization:{scope:'window'}, authorizationSnapshot:{authorizationVersion:'v1',expiresAt:'2999-01-01T00:00:00Z'},view:{content:{visibleWhen:{source:'authorization',field:'canRead',unsupported:true}}}};
+    expect(() => compilePermissionAppliedMetadata(metadata)).toThrow();
+  });
+});
+
+describe('owner metadata with presentation-only conditions', () => {
+  it('renders resource-scoped metadata without a selected resource or read grant', () => {
+    const metadata = {authorization: {scope: 'resource', resource: {type: 'advertiser', id: {source: 'resource', selector: 'Id'}}}, dataSource: {owner: {service: {endpoint: 'owning-mcp'}, parameters: {Id: 42}}}, view: {content: {id: 'owner-frame', containers: [
+      {id: 'editor', visibleWhen: {source: 'authorization', field: 'principal.roles', contains: 'editor'}},
+      {id: 'history', visibleWhen: {source: 'authorization', field: 'principal.features', contains: 'history'}},
+      {id: 'plain'},
+    ]}}};
+    const first = compilePermissionAppliedMetadata({...metadata, authorizationSnapshot: {principal: {roles: ['editor'], features: []}, resources: {}}});
+    expect(first.view.content.id).toBe('owner-frame');
+    expect(first.view.content.containers.map(item => item.id)).toEqual(['editor', 'plain']);
+    expect(first.dataSource).toEqual(metadata.dataSource);
+    const next = compilePermissionAppliedMetadata({...metadata, authorizationSnapshot: {principal: {roles: [], features: ['history']}, resources: {}}});
+    expect(next.view.content.containers.map(item => item.id)).toEqual(['history', 'plain']);
+    expect(next.dataSource).toEqual(metadata.dataSource);
   });
 });

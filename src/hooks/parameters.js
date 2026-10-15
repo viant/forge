@@ -1,4 +1,4 @@
-import {resolveSelector, setSelector} from "../utils/selector.js";
+import {resolveSelector, setSelector, assertSafeAssignmentPath, assertSafeAssignmentKeys} from "../utils/selector.js";
 
 // Context caches are keyed by datasource and selection mode. Resolve authored
 // prefixes against the declared graph, not the cache's implementation keys.
@@ -24,6 +24,11 @@ export function applyParameterCodec(value, codec) {
     }
 
     switch (name) {
+        case 'json': {
+            const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+            assertSafeAssignmentKeys(parsed);
+            return parsed;
+        }
         case 'int':
         case 'integer': {
             if (typeof value === 'number') return Number.isInteger(value) ? value : value;
@@ -96,6 +101,10 @@ function assignResolvedField(target, fieldName, nextValue) {
 }
 
 export function resolveParameters(parameterDefinitions = [], context) {
+    for (const parameter of parameterDefinitions) {
+        assertSafeAssignmentPath(parameter?.name);
+        assertSafeAssignmentPath(parameter?.to);
+    }
     // New-style rows: have explicit `from` and `to` with a ':' separator.
     const isCompactedFormat = (p) => typeof p.from === 'string' && typeof p.to === 'string' && p.from.includes(':') && p.to.includes(':');
 
@@ -173,6 +182,7 @@ export function resolveParameters(parameterDefinitions = [], context) {
                 const targetObj = dstStore === 'input' ? dsRes.input : (dsRes.input[dstStore] = dsRes.input[dstStore] || {});
 
                 if (dstPath === '...') {
+                    assertSafeAssignmentKeys(srcVal);
                     Object.assign(targetObj, srcVal);
                 } else if (dstPath.startsWith('[]')) {
                     const k = dstPath.substring(2);
@@ -253,6 +263,7 @@ export function resolveParameters(parameterDefinitions = [], context) {
             param.codec,
         );
         if(name === "...") {
+            assertSafeAssignmentKeys(value);
             if (toDataSource) {
                 resolved[toDataSource] = {...value};
             } else if (value && typeof value === 'object' && !Array.isArray(value)) {

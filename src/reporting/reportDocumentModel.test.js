@@ -1675,6 +1675,26 @@ assert.deepEqual(
   },
 );
 
+// Shared dataset preparation must not share mutable output between blocks or
+// survive into the next lowering after the document changes.
+const repeatedDatasetDocument = JSON.parse(JSON.stringify(explicitDatasetDocument));
+repeatedDatasetDocument.blocks.push(...["first", "second"].map((id) => buildReportDocumentTableBlock({
+  id: `repeated-${id}`,
+  datasetRef: "reach_summary",
+  columns: [{key: "country", label: id}],
+})));
+const repeatedBefore = JSON.stringify(repeatedDatasetDocument);
+const repeatedSpec = lowerReportDocumentToReportSpec(repeatedDatasetDocument);
+const firstRepeated = repeatedSpec.blocks.find((block) => block.id === "repeated-first");
+const secondRepeated = repeatedSpec.blocks.find((block) => block.id === "repeated-second");
+assert.equal(firstRepeated.columns[0].label, "first");
+assert.equal(secondRepeated.columns[0].label, "second");
+firstRepeated.columns[0].label = "mutated output";
+assert.equal(secondRepeated.columns[0].label, "second");
+assert.equal(JSON.stringify(repeatedDatasetDocument), repeatedBefore);
+repeatedDatasetDocument.blocks.find((block) => block.id === "repeated-first").columns[0].label = "edited input";
+assert.equal(lowerReportDocumentToReportSpec(repeatedDatasetDocument).blocks.find((block) => block.id === "repeated-first").columns[0].label, "edited input");
+
 const inheritedSameSourceDocument = buildReportBuilderReportDocument({
   container,
   config: {

@@ -94,6 +94,28 @@ export function isDeferredCacheHitEnvelope(data) {
     && data.cache.hit === true;
 }
 
+// Opt-in datasource data selection distinguishes an absent path from an
+// explicitly present null/empty value. Other selector lookup stays unchanged.
+function resolveDataPath(holder, path) {
+  const keys = String(path).trim().replaceAll("[", ".").replaceAll("]", "")
+    .replace(/^\./, "").split(".").map((key) => key.trim()).filter(Boolean);
+  let value = holder;
+  for (let key of keys) {
+    if (Array.isArray(value)) {
+      if (!/^\d+$/.test(key) || !Number.isSafeInteger(Number(key))) {
+        return { present: false };
+      }
+      key = Number(key);
+    }
+    if (value == null || typeof value !== "object"
+      || !Object.prototype.hasOwnProperty.call(value, key)) {
+      return { present: false };
+    }
+    value = value[key];
+  }
+  return { present: true, value };
+}
+
 export function extractData(selectors = {}, paging, data) {
   let records = [];
   let info = {};
@@ -101,8 +123,19 @@ export function extractData(selectors = {}, paging, data) {
   const dataSelector = selectors.data;
   let respData;
   if (dataSelector) {
-    respData = resolveKey(data, dataSelector);
-    if (typeof respData === "undefined") {
+    const fallbacks = selectors.dataFallbacks;
+    if (Array.isArray(fallbacks) && fallbacks.length > 0) {
+      for (const path of [dataSelector, ...fallbacks]) {
+        const selected = resolveDataPath(data, path);
+        if (selected.present) {
+          respData = selected.value;
+          break;
+        }
+      }
+    } else {
+      respData = resolveKey(data, dataSelector);
+    }
+    if (typeof respData === "undefined" && !(Array.isArray(fallbacks) && fallbacks.length > 0)) {
       if (Array.isArray(data)) {
         respData = data;
       } else {
@@ -153,6 +186,15 @@ export function extractData(selectors = {}, paging, data) {
       ...(pageCount != null ? {pageCount} : {}),
       ...(totalCount != null ? {totalCount} : {}),
     };
+    if (String(paging.mode || '').trim() && dataInfoSelectors.hasMore) {
+      const more = resolveKey(summary, dataInfoSelectors.hasMore);
+      if (typeof more !== 'boolean') throw new Error('Explicit paging result requires a boolean hasMore');
+      info.hasMore = more;
+    }
+    if (String(paging.mode || '').trim().toLowerCase() === 'cursor') {
+      info = {hasMore: resolveKey(summary, dataInfoSelectors.hasMore),
+        nextCursor: resolveKey(summary, dataInfoSelectors.nextCursor)};
+    }
   }
 
   if (data && typeof data === "object" && data.metrics && typeof data.metrics === "object" && !Array.isArray(data.metrics)) {

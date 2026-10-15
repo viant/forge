@@ -1,0 +1,354 @@
+{
+  "version": 1,
+  "kind": "reportPrint",
+  "specVersion": 1,
+  "specHash": "fnv1a:6b941511",
+  "fillVersion": 1,
+  "fillHash": "fnv1a:4e19b403",
+  "source": {
+    "kind": "dashboard.reportBuilder",
+    "containerId": "ownedReportBuilder",
+    "stateKey": "ownedReportBuilder",
+    "dataSourceRef": "widgets"
+  },
+  "title": "Owned MCP Widgets",
+  "pageGeometry": {
+    "width": 612,
+    "height": 792,
+    "marginTop": 36,
+    "marginRight": 36,
+    "marginBottom": 36,
+    "marginLeft": 36,
+    "headerHeight": 36,
+    "footerHeight": 24
+  },
+  "pages": [
+    {
+      "number": 1,
+      "elements": [
+        {
+          "id": "table__title_0",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 84,
+            "width": 540,
+            "height": 20
+          },
+          "text": "Table",
+          "fontSize": 14,
+          "fontWeight": "600",
+          "color": "#101828"
+        },
+        {
+          "id": "table__header_bg__page_1",
+          "kind": "rect",
+          "box": {
+            "x": 36,
+            "y": 108,
+            "width": 540,
+            "height": 24
+          },
+          "fillColor": "#f8fafc",
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "table__header__id__page_1",
+          "kind": "text",
+          "box": {
+            "x": 42,
+            "y": 112,
+            "width": 145.69230769230768,
+            "height": 16
+          },
+          "text": "ID",
+          "fontSize": 9,
+          "fontWeight": "600",
+          "color": "#101828",
+          "align": "left",
+          "wrap": true
+        },
+        {
+          "id": "table__header__channel__page_1",
+          "kind": "text",
+          "box": {
+            "x": 199.69230769230768,
+            "y": 112,
+            "width": 212.6153846153846,
+            "height": 16
+          },
+          "text": "Channel",
+          "fontSize": 9,
+          "fontWeight": "600",
+          "color": "#101828",
+          "align": "left",
+          "wrap": true
+        },
+        {
+          "id": "table__header__spend__page_1",
+          "kind": "text",
+          "box": {
+            "x": 424.30769230769226,
+            "y": 112,
+            "width": 145.69230769230768,
+            "height": 16
+          },
+          "text": "Spend",
+          "fontSize": 9,
+          "fontWeight": "600",
+          "color": "#101828",
+          "align": "left",
+          "wrap": true
+        },
+        {
+          "id": "table__row_rule_0",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 156,
+            "width": 540,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "table__row_1__id__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 136,
+            "width": 145.69230769230768,
+            "height": 16
+          },
+          "rowKey": "row_1",
+          "columnKey": "id",
+          "text": "alpha",
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
+        },
+        {
+          "id": "table__row_1__channel__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 199.69230769230768,
+            "y": 136,
+            "width": 212.6153846153846,
+            "height": 16
+          },
+          "rowKey": "row_1",
+          "columnKey": "channel",
+          "text": "Display",
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
+        },
+        {
+          "id": "table__row_1__spend__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 424.30769230769226,
+            "y": 136,
+            "width": 145.69230769230768,
+            "height": 16
+          },
+          "rowKey": "row_1",
+          "columnKey": "spend",
+          "text": "125.5",
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
+        },
+        {
+          "id": "table__row_rule_1",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 180,
+            "width": 540,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "table__row_2__id__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 160,
+            "width": 145.69230769230768,
+            "height": 16
+          },
+          "rowKey": "row_2",
+          "columnKey": "id",
+          "text": "beta",
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
+        },
+        {
+          "id": "table__row_2__channel__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 199.69230769230768,
+            "y": 160,
+            "width": 212.6153846153846,
+            "height": 16
+          },
+          "rowKey": "row_2",
+          "columnKey": "channel",
+          "text": "CTV",
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
+        },
+        {
+          "id": "table__row_2__spend__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 424.30769230769226,
+            "y": 160,
+            "width": 145.69230769230768,
+            "height": 16
+          },
+          "rowKey": "row_2",
+          "columnKey": "spend",
+          "text": "274.5",
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
+        },
+        {
+          "id": "table__row_rule_2",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 204,
+            "width": 540,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "table__row_3__id__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 42,
+            "y": 184,
+            "width": 145.69230769230768,
+            "height": 16
+          },
+          "rowKey": "row_3",
+          "columnKey": "id",
+          "text": "gamma",
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
+        },
+        {
+          "id": "table__row_3__channel__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 199.69230769230768,
+            "y": 184,
+            "width": 212.6153846153846,
+            "height": 16
+          },
+          "rowKey": "row_3",
+          "columnKey": "channel",
+          "text": "Online Video",
+          "align": "left",
+          "fontSize": 9,
+          "wrap": true
+        },
+        {
+          "id": "table__row_3__spend__text",
+          "kind": "tableCellText",
+          "box": {
+            "x": 424.30769230769226,
+            "y": 184,
+            "width": 145.69230769230768,
+            "height": 16
+          },
+          "rowKey": "row_3",
+          "columnKey": "spend",
+          "text": "100",
+          "align": "right",
+          "fontSize": 9,
+          "wrap": true
+        }
+      ],
+      "headerElements": [
+        {
+          "id": "page_1__header_title",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 36,
+            "width": 540,
+            "height": 28
+          },
+          "text": "Owned MCP Widgets",
+          "fontSize": 18,
+          "fontWeight": "700",
+          "color": "#101828"
+        },
+        {
+          "id": "page_1__header_rule",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 70,
+            "width": 540,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        }
+      ],
+      "footerElements": [
+        {
+          "id": "page_1__footer_rule",
+          "kind": "line",
+          "box": {
+            "x": 36,
+            "y": 734,
+            "width": 540,
+            "height": 0
+          },
+          "strokeColor": "#d0d5dd",
+          "strokeWidth": 1
+        },
+        {
+          "id": "page_1__footer_page_number",
+          "kind": "text",
+          "box": {
+            "x": 36,
+            "y": 738,
+            "width": 540,
+            "height": 16
+          },
+          "text": "Page 1",
+          "fontSize": 11,
+          "color": "#667085",
+          "align": "right"
+        }
+      ]
+    }
+  ],
+  "bookmarks": [
+    {
+      "id": "bookmark.table",
+      "title": "Table",
+      "pageNumber": 1,
+      "level": 1,
+      "elementId": "table__title_0",
+      "y": 84
+    }
+  ],
+  "diagnostics": []
+}

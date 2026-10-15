@@ -1,6 +1,0 @@
-baseURL: ./window
-windows:
-  - windowId: record-browser
-    title: Record browser
-    namespace: example
-    key: records

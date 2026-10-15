@@ -294,3 +294,10 @@ testApplyLookupSelectionMapsOutputs();
 testApplyLookupSelectionHonorsDataFieldDisplayAndCallback();
 testApplyLookupSelectionNeverReplacesMappedIdWithDisplayText();
 console.log('\nLOOKUP UTILS TESTS PASSED');
+{
+ const resourceRef={uri:'window://external/picker'};
+ let call;
+ const result=await requestLookupSelection({item:{lookup:{dialogId:'originalDialog',pickerResource:resourceRef,providerIdentity:'source',inputs:[{name:'Id'}],outputs:[]}},context:{handlers:{window:{openDialog:()=>{throw new Error('ambient dialog must not open')},openWindow:async args=>{call=args;return {id:42}}}}}});
+ assert.deepEqual(result,{id:42});assert.equal(call.execution.args[0],resourceRef.uri);
+ assert.deepEqual(call.execution.args[4].resourceRef,resourceRef);assert.equal(call.execution.args[4].providerIdentity,'source');assert.equal(call.execution.args[4].pickerDialogId,'originalDialog');
+}

@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {getContainerRenderer,registerContainerRenderer} from './containerRendererRegistry.js';
+const renderer=()=>null;
+assert.equal(getContainerRenderer('mcpApp'),null);
+registerContainerRenderer('mcpApp',renderer);
+assert.equal(getContainerRenderer('mcpApp'),renderer);
+registerContainerRenderer('mcpApp',renderer);
+assert.throws(()=>registerContainerRenderer('mcpApp',()=>null),/already installed/);
+assert.throws(()=>registerContainerRenderer('unknown',null),/requires/);
+assert.equal(getContainerRenderer('uninstalled'),null);

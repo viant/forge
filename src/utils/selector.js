@@ -83,7 +83,29 @@ export const resolveSelector = (holder, selector) => {
  * @param {*} value value to set
  * @returns {Object} new cloned object with the desired value set
  */
+// Metadata paths must never traverse or assign JavaScript prototype keys.
+// Compact datasource bindings use ':' and '/' as well as dotted paths.
+export function assertSafeAssignmentPath(path) {
+    if (typeof path !== 'string') return;
+    for (const raw of path.split(/[.:/]/)) {
+        const key = raw.startsWith('[]') ? raw.slice(2) : raw;
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+            throw new Error(`Unsafe assignment path: ${path}`);
+        }
+    }
+}
+
+export function assertSafeAssignmentKeys(value, seen = new Set()) {
+    if (!value || typeof value !== 'object' || seen.has(value)) return;
+    seen.add(value);
+    for (const key of Object.keys(value)) {
+        assertSafeAssignmentPath(key);
+        assertSafeAssignmentKeys(value[key], seen);
+    }
+}
+
 export const setSelector = (holder, path, value) => {
+    assertSafeAssignmentPath(path);
     if (!path || typeof path !== 'string' || path.indexOf('.') === -1) {
         return {
             ...(holder || {}),

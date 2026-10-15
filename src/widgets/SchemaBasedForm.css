@@ -478,7 +478,7 @@
     min-width: 0;
     margin: 0;
     padding: 12px;
-    border: 1px solid #d8e1e8;
+    border: 1px solid var(--forge-control-border);
     border-radius: 4px;
 }
 .forge-schema-choices-options > label {
