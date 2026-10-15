@@ -47,14 +47,6 @@
     box-shadow: 0 8px 18px rgba(36, 95, 218, 0.23);
 }
 
-.forge-report-catalog__eyebrow {
-    margin: 0 0 4px;
-    color: #42617f;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: .14em;
-}
-
 .forge-report-catalog__hero h2 {
     margin: 0;
     font-size: clamp(22px, 3vw, 30px);
@@ -490,10 +482,15 @@
     }
     .forge-report-catalog__scopes {
         width: 100%;
-        overflow-x: auto;
+        box-sizing: border-box;
+        flex-wrap: wrap;
     }
     .forge-report-catalog__scopes button {
-        white-space: nowrap;
+        flex: 1 1 auto;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 8px;
+        font-size: 12px;
     }
     .forge-report-catalog__search {
         max-width: none;

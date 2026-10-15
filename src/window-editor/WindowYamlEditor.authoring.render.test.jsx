@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import '../../public/window-editor/wasm_exec.js';
+import {JSDOM} from 'jsdom';
+const dom=new JSDOM('<div id="root"></div>',{url:'http://localhost',pretendToBeVisual:true});
+for(const key of ['window','document','navigator','HTMLElement','MutationObserver','Window','Document','Node','Range','DOMRect','getComputedStyle','requestAnimationFrame','cancelAnimationFrame'])Object.defineProperty(globalThis,key,{value:dom.window[key],configurable:true});
+window.Range.prototype.getClientRects=()=>[];window.Range.prototype.getBoundingClientRect=()=>new window.DOMRect();globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+const React=await import('react');const {act}=React;const {createRoot}=await import('react-dom/client');const {EditorView}=await import('@codemirror/view');
+const {default:WindowYamlEditor}=await import('./WindowYamlEditor');
+
+const go=new globalThis.Go();const {instance}=await WebAssembly.instantiate(await fs.readFile(new URL('../../public/window-editor/canonical.wasm',import.meta.url)),go.importObject);go.run(instance);
+const {sample}=await import('./demoSample');const {readDocument,rekeyBundle}=await import('./windowDocument');
+const original=readDocument(sample).document;rekeyBundle(original);const source=original.toString({lineWidth:0});const output=[],states=[];
+const root=createRoot(document.getElementById('root'));await act(()=>root.render(<WindowYamlEditor defaultValue={source} canonicalizer={globalThis.forgeWindowCanonicalize} authoringCompiler={globalThis.forgeWindowCompile} onChange={v=>output.push(v)} onStateChange={v=>states.push(v)}/>));
+assert.equal(document.querySelector('[role="treeitem"][aria-selected="true"]').getAttribute('aria-label').includes('window'),true);
+assert.ok(!document.querySelector('[role="treeitem"][aria-label="Document root"]'));
+await act(()=>[...document.querySelectorAll('button')].find(n=>n.textContent==='YAML').click());
+const view=EditorView.findFromDOM(document.querySelector('.cm-editor'));const visible=view.state.doc.toString();assert.doesNotMatch(visible,/schemaVersion:|format:|variants:|[a-f0-9]{64}/);
+const draft=readDocument(visible).document;draft.getIn(['dataSources','records'],true).set('parameters',draft.createNode([{name:'Region',location:'RenderedChanged',codec:{name:'string'}}]));
+await act(()=>view.dispatch({changes:{from:0,to:view.state.doc.length,insert:draft.toString({lineWidth:0})}}));assert.equal(output.length,0);assert.equal(states.at(-1).canCommit,false);
+await act(()=>[...document.querySelectorAll('button')].find(n=>n.textContent==='Apply YAML changes').click());assert.equal(output.length,1);const result=readDocument(output[0]).value;
+const desktop=result.targets.find(t=>t.target.platform==='web'&&t.target.formFactor==='desktop');assert.equal(result.variants[desktop.variant].window.dataSource.records.parameters[0].location,'RenderedChanged');assert.equal(states.at(-1).canCommit,true);assert.equal(result.targets.length,readDocument(source).value.targets.length);
+await act(()=>root.unmount());console.log('Rendered Desktop source tree and readable YAML datasource edit run real Go WASM compiler, preserve full targets, and emit complete saveable runtime.');process.exit(0);

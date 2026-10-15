@@ -483,3 +483,10 @@ assert.equal(disabledLegacySelect.props.disabled, true);
 assert.equal(disabledLegacySelect.props.children.props.disabled, true);
 
 console.log('SchemaBasedForm field-tracks render contract passed');
+
+const refinedChoiceHtml = renderToStaticMarkup(<SchemaBasedForm schema={{type: 'object', required: ['segments'], properties: {segments: {type: 'array', title: 'Segments', 'x-ui-widget': 'tags', default: [], 'x-ui-order': 10, minItems: 1, uniqueItems: true, items: {type: 'string', enum: ['medical', 'recreational', 'CBD']}}}}} data={{}} showSubmit={false} />);
+assert.equal((refinedChoiceHtml.match(/type="checkbox"/g) || []).length, 3);
+assert.equal((refinedChoiceHtml.match(/type="text"/g) || []).length, 0);
+assert.ok(!refinedChoiceHtml.includes('checked='));
+assert.match(refinedChoiceHtml, /<legend>Segments \(required\)<\/legend>/);
+console.log('SchemaBasedForm refined array enum render contract passed');

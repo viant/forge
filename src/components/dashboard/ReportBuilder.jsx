@@ -1,5 +1,6 @@
+import ReportResourceEditor from "./ReportResourceEditor.jsx";
 import ReportResourceRuntime from "./ReportResourceRuntime.jsx";
-import {hostedReportResource} from "./reportBuilderResourceLifecycle.js";
+import {hostedReportResource, buildReportBuilderResourceSaveRequest} from "./reportBuilderResourceLifecycle.js";
 import {reportRestoreSnapshot, reportRestoreSnapshotKey, reportRestoreEqual, loadFrozenReportRestore} from "./reportBuilderFrozenRestore.js";
 import {updateReportDateRangeValue} from '../../reporting/reportDateRangeValue.js';
 import { normalizeReportFilterRefreshMode, reportFilterValuesChanged } from "./reportBuilderFilterRefresh.js";
@@ -1914,7 +1915,11 @@ function ReportOptionHeader({ anchor, setMountedHeaders, children }) {
 const DEFAULT_REPORT_BUILDER_HOST_ADAPTER = Object.freeze({ mode: "dashboard" });
 
 export default function ReportBuilder({ container: sourceContainer, context, hostAdapter = DEFAULT_REPORT_BUILDER_HOST_ADAPTER }) {
-    if (hostedReportResource(sourceContainer)) return <ReportResourceRuntime container={sourceContainer} context={context}/>;
+    if (hostedReportResource(sourceContainer)) {
+        return sourceContainer?.parameters?.mode === "design"
+            ? <ReportResourceEditor container={sourceContainer} context={context}/>
+            : <ReportResourceRuntime container={sourceContainer} context={context}/>;
+    }
     if (hostAdapter?.mode === "controlled") {
         return <ReportBuilderReady container={sourceContainer} context={context} embedded={hostAdapter} />;
     }
@@ -7206,7 +7211,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                             placement="bottom-start"
                             content={(
                                 <Menu className="forge-report-builder__chart-menu">
-                                    <MenuDivider title="Report presets" />
+                                    <MenuDivider title="Reports" />
                                     {reportDocumentTemplates.map((template) => (
                                         <MenuItem
                                             key={template.id}
@@ -7219,7 +7224,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                             )}
                         >
                             <Button small outlined icon="duplicate">
-                                Apply report preset
+                                Use report
                             </Button>
                         </Popover>
                     ) : null}
@@ -14272,7 +14277,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 error: "The current report is not saveable. Resolve report validation issues and run it before saving.",
             };
         }
-        const saveReportRequest = buildReportBuilderSaveReportRequest(bundle.payload, {
+        let saveReportRequest = buildReportBuilderSaveReportRequest(bundle.payload, {
             runtimeArtifact: bundle.runtimeArtifactValue,
             savedReportPayloadRecord: bundle.nextSavedReportPayloadRecord,
             metadata: {
@@ -14293,10 +14298,12 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 error: "Could not build the report-store request from the current report.",
             };
         }
-        const canUpdateStoredReport = !!storedReportArtifact?.artifactId
+        const canonicalReport = !!storedReportArtifact?.resource || !!hostedReportResource(container) || !!config?.reportResources;
+        const canUpdateStoredReport = (!!storedReportArtifact?.artifactId || !!storedReportArtifact?.resource)
             && bundle.payload?.sourceSession?.unsavedDraft !== true
             && typeof reportStoreHandler?.updateReport === "function";
         try {
+            if (canonicalReport) saveReportRequest = buildReportBuilderResourceSaveRequest(saveReportRequest, {current: storedReportArtifact, defaults: config?.reportResources});
             const storedReport = canUpdateStoredReport
                 ? await reportStoreHandler.updateReport({
                     artifactId: storedReportArtifact.artifactId,
@@ -14335,7 +14342,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             });
             return { ok: false, error: message };
         }
-    }, [buildCurrentReportSaveBundle, builderContext?.conversationId, builderContext?.windowState?.conversationId, container, designWorkspaceMode, reportStoreHandler, stageCurrentReportSaveBundle, storedReportArtifact, windowFormValue?.prefill]);
+    }, [buildCurrentReportSaveBundle, builderContext?.conversationId, builderContext?.windowState?.conversationId, container, designWorkspaceMode, config?.reportResources, reportStoreHandler, stageCurrentReportSaveBundle, storedReportArtifact, windowFormValue?.prefill]);
     useEffect(() => {
         const windowId = normalizeString(reportEventContext.windowId);
         if (!windowId) {
@@ -14883,7 +14890,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         if (hostedReportSource.kind !== "report") {
             return undefined;
         }
-        const request = buildHostedReportActivationRequest(hostedReportId, hostedReportArtifactId);
+        const request = buildHostedReportActivationRequest(hostedReportId, hostedReportArtifactId, hostedReportResource(container));
         if (!request) {
             hostedReportActivationKeyRef.current = "";
             setHostedReportActivationState({ reportId: "", status: "idle" });
@@ -14910,6 +14917,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     return;
                 }
                 if (result && typeof result === "object" && !Array.isArray(result)) {
+                    const expected = hostedReportResource(container);
+                    if (expected && ["uri","kind","revision","contentFingerprint","authorityBinding"].some(field => (expected[field] ?? "") !== (result.resource?.[field] ?? ""))) throw new Error("The selected report changed. Refresh and try again.");
                     setStoredReportArtifact(result);
                 }
                 const response = applySavedReportRunOverride(
@@ -14945,7 +14954,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 });
             });
         return attempt.cancel;
-    }, [hostedActivationScopeOverrideSignature, hostedReportArtifactId, hostedReportId, hostedReportSource.kind, reportStoreHandler]);
+    }, [hostedActivationScopeOverrideSignature, hostedReportArtifactId, hostedReportId, hostedReportSource.kind, reportStoreHandler, container]);
     useEffect(() => {
         if (
             hostedReportSource.kind !== "report"

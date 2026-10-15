@@ -250,6 +250,15 @@
     background-color: var(--forge-required-bg, #fff3f4);
 }
 
+/* Required text controls keep the label's asterisk and accessibility state,
+   but a value that passes required validation uses the normal control surface.
+   Missing/invalid controls remain rose via aria-invalid=true above. */
+.forge-required-input
+    :is(.bp4-input, .bp5-input, .bp6-input)[aria-invalid="false"]:not(:disabled):not(.forge-required-resolved):not(.bp4-intent-danger):not(.bp5-intent-danger):not(.bp6-intent-danger) {
+    border-color: var(--forge-control-border, #b7c5d9);
+    background-color: var(--forge-control-bg, #f6f8fd);
+}
+
 .forge-required-input
     :is(.forge-required-resolved,
         .forge-required-resolved.bp4-input, .forge-required-resolved.bp5-input, .forge-required-resolved.bp6-input,

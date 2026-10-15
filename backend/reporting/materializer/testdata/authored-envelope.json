@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "format": "forge.authoredReport",
+  "builderRef": "stewardPerformance",
+  "reportDocument": {
+    "version": 1,
+    "kind": "reportDocument",
+    "id": "delivery-performance",
+    "title": "Delivery Performance",
+    "subtitle": "Trusted migrated report",
+    "blocks": [
+      {
+        "id": "intro",
+        "kind": "markdownBlock",
+        "markdown": "## Delivery\nNative materializer parity fixture."
+      }
+    ]
+  },
+  "builderDefinition": {
+    "kind": "forge.reporting.builder",
+    "id": "stewardPerformance",
+    "reportBuilder": {
+      "title": "Delivery Performance",
+      "dataSourceRef": "steward-orders",
+      "dimensions": [
+        { "id": "eventDate", "key": "eventDate", "label": "Event date", "paramPath": "dimensions.eventDate", "default": true, "chartAxis": true }
+      ],
+      "measures": [
+        { "id": "spend", "key": "spend", "label": "Spend", "paramPath": "measures.spend", "format": "currency", "default": true }
+      ],
+      "staticFilters": [
+        { "id": "account", "type": "select", "field": "accountId", "default": "acct-21" }
+      ],
+      "result": {
+        "defaultMode": "chart",
+        "chartCreationMode": "explicit",
+        "pageSize": 50
+      }
+    }
+  },
+  "state": {
+    "viewMode": "chart",
+    "selectedMeasures": ["spend"],
+    "selectedDimensions": ["eventDate"],
+    "chartSpec": {
+      "title": "Spend over time",
+      "type": "line",
+      "xField": "eventDate",
+      "yFields": ["spend"]
+    },
+    "scopeParams": {
+      "account": "acct-21"
+    }
+  },
+  "dataSources": {
+    "steward-orders": {
+      "dataSourceRef": "steward-orders",
+      "kind": "published",
+      "source": { "kind": "datly", "uri": "orders" },
+      "request": { "measures": { "spend": true } },
+      "dimensions": [
+        { "id": "eventDate", "key": "eventDate", "label": "Event date", "kind": "dimension" }
+      ],
+      "measures": [
+        { "id": "spend", "key": "spend", "label": "Spend", "kind": "measure", "format": "currency" }
+      ]
+    }
+  },
+  "dependencies": [
+    { "kind": "builder", "id": "stewardPerformance", "contentFingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    { "kind": "datasource", "id": "steward-orders", "contentFingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+  ]
+}

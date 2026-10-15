@@ -198,7 +198,7 @@ assert.equal(
 );
 
 assert.equal(
-  source.includes("Apply report preset") && source.includes("Switch report preset..."),
+  source.includes("Use report") && source.includes("Switch report preset..."),
   true,
   "ReportBuilder should distinguish complete authored report presets from lightweight quick views.",
 );

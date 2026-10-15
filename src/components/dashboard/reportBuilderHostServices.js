@@ -527,6 +527,14 @@ function createReportingHandlers({
                 notifyReportStoreChanged({ action: "saved", report: result });
                 return result;
             },
+            async runReport(request = {}) {
+                return call("reporting:run_report", cloneValue(request));
+            },
+            async stampReport(request = {}) {
+                const result = await call("reporting:stamp_report", cloneValue(request));
+                notifyReportStoreChanged({ action: "stamped", report: result });
+                return result;
+            },
             async getReport(request = {}) {
                 return call("reporting:get_report", cloneValue(request));
             },
