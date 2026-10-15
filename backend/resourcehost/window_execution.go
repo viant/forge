@@ -122,7 +122,7 @@ func (c *WindowCatalog) ResolveDatasource(ctx context.Context, parent identity.R
 	if json.Unmarshal(raw, &datasource) != nil || datasource.ID != id {
 		return nil, identity.ErrResourceDenied
 	}
-	reads = append(reads, selectedResourceRead{connection: connection, pin: parent, result: definition.GetResult})
+	reads = append(reads, selectedResourceRead{connection: connection, pin: parent, result: definition.GetResult, definitionCache: definition.definitionCache})
 	if e = c.registerSelectedDatasource(ctx, parent, target, id, variant, reads); e != nil {
 		return nil, e
 	}
