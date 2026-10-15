@@ -510,3 +510,33 @@ func TestPublicToolCatalogSharesEagerMetadataWithUnusedHostHooks(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, 2, client.calls.Load(), "credential-bearing requests must not reuse public metadata")
 }
+
+func TestZeroTTLReadSnapshotAvailableToRegistryWithinSameOperation(t *testing.T) {
+	m, _, client, managed, _ := catalogSetup(t, false)
+	client.zeroTTL = true
+	ctx := WithToolCatalogReadSnapshot(context.Background())
+	first, err := managed.ListTools(ctx, nil)
+	require.NoError(t, err)
+	partial, _, err := managed.toolCatalogSnapshot(ctx)
+	require.NoError(t, err)
+	require.Empty(t, partial, "all pages are required before publishing a catalog identity")
+	_, err = managed.ListTools(ctx, first.NextCursor)
+	require.NoError(t, err)
+	generation, tools, err := managed.toolCatalogSnapshot(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, generation)
+	require.Len(t, tools, 2)
+	require.EqualValues(t, 2, client.calls.Load())
+	foreign, _, err := managed.toolCatalogSnapshot(authctx.WithBearer(ctx, "other-credential"))
+	require.NoError(t, err)
+	require.Empty(t, foreign, "an operation snapshot must still isolate credentials")
+	outside, _, err := managed.toolCatalogSnapshot(WithToolCatalogReadSnapshot(context.Background()))
+	require.NoError(t, err)
+	require.Empty(t, outside, "zero-TTL snapshots must not cross operations")
+	m.mu.Lock()
+	m.invalidateToolCatalogLocked("server")
+	m.mu.Unlock()
+	invalidated, _, err := managed.toolCatalogSnapshot(ctx)
+	require.NoError(t, err)
+	require.Empty(t, invalidated, "notifications invalidate even an in-operation snapshot")
+}

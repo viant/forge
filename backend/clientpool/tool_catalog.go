@@ -291,8 +291,9 @@ func (c *managedClient) toolCatalogScope(ctx context.Context, options ...mcpclie
 	return ctx, raw, scope, witness, delegatedToken, true, nil
 }
 
-// ToolCatalogSnapshot returns only an already cached, complete tools/list
-// catalog. Its opaque identity expires with the source pages and changes on
+// ToolCatalogSnapshot returns an already cached, complete tools/list catalog,
+// including a zero-TTL snapshot held by this operation. Its opaque identity
+// expires with the source pages or operation and changes on
 // publication, connection/configuration changes or invalidation. It never lists
 // tools or stores a parallel catalog.
 func (m *Manager) ToolCatalogSnapshot(ctx context.Context, conversation, server string, options ...mcpclient.RequestOption) (string, []mcpschema.Tool, error) {
@@ -312,6 +313,7 @@ func (c *managedClient) toolCatalogSnapshot(ctx context.Context, options ...mcpc
 	if err != nil || !cacheable {
 		return "", nil, err
 	}
+	readSnapshot, _ := ctx.Value(toolCatalogReadSnapshotKey{}).(*toolCatalogReadSnapshot)
 	m := c.mgr
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -326,8 +328,20 @@ func (c *managedClient) toolCatalogSnapshot(ctx context.Context, options ...mcpc
 		}
 		seen[cursor] = true
 		key := fmt.Sprintf("%s:%s:%x:%d:%s", c.serverName, scope, sha256.Sum256(raw), m.toolCatalogGeneration[c.serverName], cursor)
-		page := m.toolCatalog[key]
-		if page == nil || page.ready != nil || !page.expires.After(now) {
+		var pageBytes []byte
+		var revision string
+		if page := m.toolCatalog[key]; page != nil && page.ready == nil && page.expires.After(now) {
+			pageBytes = page.bytes
+			revision = fmt.Sprintf("%x", page.revision)
+		} else if readSnapshot != nil {
+			// Zero-TTL catalogs are reusable only within the current operation.
+			// Connection, credentials and notification generation still fence the key.
+			if held, found := readSnapshot.pages.Load(key); found {
+				pageBytes = held.([]byte)
+				revision = fmt.Sprintf("read:%x", sha256.Sum256(pageBytes))
+			}
+		}
+		if pageBytes == nil {
 			return "", nil, nil
 		}
 		type plain mcpschema.ListToolsResult
@@ -336,11 +350,11 @@ func (c *managedClient) toolCatalogSnapshot(ctx context.Context, options ...mcpc
 			*plain
 			CacheScope string `json:"cacheScope"`
 		}{plain: &result}
-		if err := json.Unmarshal(page.bytes, &wire); err != nil {
+		if err := json.Unmarshal(pageBytes, &wire); err != nil {
 			return "", nil, err
 		}
 		tools = append(tools, result.Tools...)
-		revisions = append(revisions, fmt.Sprintf("%s:%x", key, page.revision))
+		revisions = append(revisions, key+":"+revision)
 		if result.NextCursor == nil || *result.NextCursor == "" {
 			break
 		}
