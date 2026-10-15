@@ -90,8 +90,12 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 		m.mu.Lock()
 		generation := m.toolCatalogGeneration[c.serverName]
 		key := fmt.Sprintf("%s:%s:%x:%d:%s", c.serverName, scope, sha256.Sum256(raw), generation, pageCursor)
-		if readSnapshot != nil {
+		snapshotTiming := observe.Start(ctx, "mcp.tools.list.read_snapshot", observe.Labels{Provider: c.serverName})
+		if readSnapshot == nil {
+			snapshotTiming.End(observe.OK, observe.CacheBypass)
+		} else {
 			if cached, found := readSnapshot.pages.Load(key); found {
+				snapshotTiming.End(observe.OK, observe.CacheHit)
 				m.mu.Unlock()
 				type plain mcpschema.ListToolsResult
 				var result plain
@@ -105,6 +109,7 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 				result.CacheScope = mcpschema.ListToolsResultCacheScope(wire.CacheScope)
 				return (*mcpschema.ListToolsResult)(&result), nil
 			}
+			snapshotTiming.End(observe.OK, observe.CacheMiss)
 		}
 		if m.toolCatalog == nil {
 			m.toolCatalog = map[string]*toolCatalogPage{}
