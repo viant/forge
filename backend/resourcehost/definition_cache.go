@@ -66,7 +66,7 @@ func (g *Gateway) cachedDefinitionGet(ctx context.Context, actor identity.Verifi
 	partition = g.Manager.WithCatalogSources(ctx, partition, []string{binding.name})
 	// A namespace slot holds sorted URI/selector entries, not one cache slot per
 	// resource. Private keys retain the existing credential/conversation scope.
-	key := fmt.Sprintf("primitive-definitions:%p:%s:%s:%s:%s", g, binding.name, uri.Namespace, uri.Kind, scopeKey)
+	key := fmt.Sprintf("primitive-definitions:%p:%s:%d:%s:%s:%s", g, binding.name, g.generation(binding.name), uri.Namespace, uri.Kind, scopeKey)
 	entry := ref.URI + "\x00" + ref.Revision
 	value, err := g.Manager.VisibleCatalogEntryInPartition(ctx, key, partition, entry, func(ctx context.Context) (json.RawMessage, time.Time, error) {
 		result, err := load(ctx)
