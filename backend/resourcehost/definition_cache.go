@@ -20,14 +20,6 @@ import (
 type definitionCacheReference struct{ key, entry string }
 
 func (g *Gateway) cachedDefinitionGet(ctx context.Context, actor identity.VerifiedActor, binding *resourceReadBinding, caps capabilities, uri identity.ResourceURI, ref identity.ResourceRef, load func(context.Context) (primitive.GetResult, error)) (primitive.GetResult, *definitionCacheReference, error) {
-	// Working and default selections can change without a new immutable URI.
-	// Reuse is confined to the current read sequence; a later operation must
-	// obtain a fresh owner-authorized definition and source check.
-	if ref.Revision == "" || ref.Revision == identity.WorkingCandidate {
-		result, err := load(ctx)
-		return result, nil, err
-	}
-
 	scope, err := binding.options.ResourceCacheScope(uri.Namespace, uri.Kind)
 	if err != nil {
 		return primitive.GetResult{}, nil, err
@@ -36,6 +28,13 @@ func (g *Gateway) cachedDefinitionGet(ctx context.Context, actor identity.Verifi
 		scope = cfg.ResourceCacheConversation
 	}
 	public := scope == cfg.ResourceCachePublic
+	// Explicitly public definitions, including working/default selections,
+	// remain cached until owner notification, reload/reconnect, or expiry.
+	// Private working projections retain their existing fresh-read behavior.
+	if !public && (ref.Revision == "" || ref.Revision == identity.WorkingCandidate) {
+		result, err := load(ctx)
+		return result, nil, err
+	}
 	partition := g.Manager.CatalogPartition(ctx, catalogPrincipalScope(actor), uri.Kind)
 	var scopeKey string
 	if public {
