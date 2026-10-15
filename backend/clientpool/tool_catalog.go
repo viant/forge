@@ -3,15 +3,18 @@
 package manager
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sync"
 	"time"
 
 	"github.com/viant/forge/backend/clientpool/internal/name"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	mcpschema "github.com/viant/mcp-protocol/schema"
 	mcpclient "github.com/viant/mcp/client"
 	authctx "github.com/viant/mcp/client/auth/link"
@@ -73,7 +76,7 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 		return nil, err
 	}
 	if !cacheable {
-		return client.ListTools(ctx, cursor, options...)
+		return c.fetchToolCatalog(ctx, client, cursor, observe.CacheBypass, options...)
 	}
 	readSnapshot, _ := ctx.Value(toolCatalogReadSnapshotKey{}).(*toolCatalogReadSnapshot)
 	pageCursor := "first"
@@ -143,16 +146,17 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 		}
 		if len(m.toolCatalog) >= 512 {
 			m.mu.Unlock()
-			return client.ListTools(ctx, cursor, options...)
+			return c.fetchToolCatalog(ctx, client, cursor, observe.CacheBypass, options...)
 		}
 		pending := &toolCatalogPage{server: c.serverName, ready: make(chan struct{})}
 		m.toolCatalog[key] = pending
 		m.mu.Unlock()
-		result, err := client.ListTools(ctx, cursor, options...)
-		validCredential := true
+		result, err := c.fetchToolCatalog(ctx, client, cursor, observe.CacheMiss, options...)
+		_, currentRaw, currentScope, _, _, currentCacheable, scopeErr := c.toolCatalogScope(ctx, options...)
+		validCredential := scopeErr == nil && currentCacheable && currentScope == scope && bytes.Equal(currentRaw, raw)
 		if witness != nil {
 			witness.mu.Lock()
-			validCredential = witness.observed && witness.token == delegatedToken
+			validCredential = validCredential && witness.observed && witness.token == delegatedToken
 			witness.mu.Unlock()
 		}
 		var bytes []byte
@@ -214,7 +218,15 @@ func (m *Manager) IsToolsListPublic(ctx context.Context, server string) bool {
 	if seen && protected == sha256.Sum256(raw) {
 		return false
 	}
-	return cfg.IsToolsListPublic() && cfg.Auth == nil && !m.IsLocalClient(server) && cfg.CookieJar == nil && m.cookieJar == nil && m.jarProvider == nil && m.authRT == nil && m.authRTProvider == nil && m.newClientFn == nil && cfg.Transport.URL != ""
+	if !cfg.IsToolsListPublic() || cfg.Auth != nil || m.IsLocalClient(server) || m.newClientFn != nil || cfg.Transport.URL == "" {
+		return false
+	}
+	endpoint, err := url.Parse(cfg.Transport.URL)
+	if err != nil {
+		return false
+	}
+	cookies, err := m.catalogCookies(ctx, endpoint, cfg)
+	return err == nil && len(cookies) == 0
 }
 
 // toolCatalogScope is shared by population and read-only snapshot lookup, so
@@ -225,9 +237,9 @@ func (c *managedClient) toolCatalogScope(ctx context.Context, options ...mcpclie
 	if err != nil {
 		return ctx, nil, "", nil, "", false, err
 	}
-	// In-process handlers can inspect arbitrary context authority. Cookie jars
-	// without a stable witness cannot safely reuse metadata.
-	if cfg == nil || cfg.ClientOptions == nil || m.IsLocalClient(c.serverName) || cfg.CookieJar != nil || m.cookieJar != nil || m.jarProvider != nil {
+	// In-process handlers can inspect arbitrary context authority. HTTP cookies
+	// are partitioned by the endpoint-specific transport witness below.
+	if cfg == nil || cfg.ClientOptions == nil || m.IsLocalClient(c.serverName) {
 		return ctx, nil, "", nil, "", false, nil
 	}
 	transportScope, transportCacheable, err := m.catalogTransportCredentialScope(ctx, c.serverName, cfg)
@@ -369,4 +381,13 @@ func (m *Manager) MayHaveToolCatalogAlias(server, alias string) bool {
 		}
 	}
 	return !observed
+}
+
+// fetchToolCatalog measures source work separately from cached page decoding.
+// It records configured provider names only, never tokens or tool arguments.
+func (c *managedClient) fetchToolCatalog(ctx context.Context, client mcpclient.Interface, cursor *string, cache observe.Cache, options ...mcpclient.RequestOption) (*mcpschema.ListToolsResult, error) {
+	span := observe.Start(ctx, "mcp.tools.list.source", observe.Labels{Provider: c.serverName})
+	result, err := client.ListTools(ctx, cursor, options...)
+	span.End(observe.OutcomeFor(err), cache)
+	return result, err
 }

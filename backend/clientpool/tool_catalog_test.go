@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -32,10 +34,14 @@ type catalogClient struct {
 	stubClient
 	calls   atomic.Int32
 	zeroTTL bool
+	onList  func()
 }
 
 func (c *catalogClient) ListTools(ctx context.Context, cursor *string, _ ...mcpclient.RequestOption) (*schema.ListToolsResult, error) {
 	c.calls.Add(1)
+	if c.onList != nil {
+		c.onList()
+	}
 	name := "generic/tool"
 	result := &schema.ListToolsResult{Tools: []schema.Tool{{Name: name, Meta: map[string]interface{}{"custom": map[string]interface{}{"nested": "original"}}}}}
 	if c.zeroTTL {
@@ -436,4 +442,71 @@ func TestHTTPBoundarySharesPrivateToolCatalogOnlyWithinRequest(t *testing.T) {
 		require.Equal(t, http.StatusNoContent, response.Code)
 		require.EqualValues(t, request, client.calls.Load(), "a new HTTP request must not inherit a prior private snapshot")
 	}
+}
+
+func TestToolCatalogCookieJarReusesOnlyMatchingEndpointAndPrincipal(t *testing.T) {
+	m, _, client, a, _ := catalogSetup(t, false)
+	jar, err := cookiejar.New(nil)
+	require.NoError(t, err)
+	endpoint, err := url.Parse("https://example.test/mcp")
+	require.NoError(t, err)
+	m.jarProvider = func(context.Context) (http.CookieJar, error) { return jar, nil }
+	alice := authctx.WithUserInfo(context.Background(), &authctx.UserInfo{Subject: "alice"})
+	jar.SetCookies(endpoint, []*http.Cookie{{Name: "session", Value: "first"}})
+	for i := 0; i < 5; i++ {
+		_, err = a.ListTools(alice, nil)
+		require.NoError(t, err)
+	}
+	require.EqualValues(t, 1, client.calls.Load(), "stable authenticated metadata must not re-discover per tool")
+	jar.SetCookies(endpoint, []*http.Cookie{{Name: "session", Value: "second"}})
+	_, err = a.ListTools(alice, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, client.calls.Load(), "changed transport credentials need their own catalog")
+	_, err = a.ListTools(authctx.WithUserInfo(context.Background(), &authctx.UserInfo{Subject: "bob"}), nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 3, client.calls.Load(), "private metadata must not cross principals")
+}
+
+func TestToolCatalogDoesNotPublishUnderChangedCookieWitness(t *testing.T) {
+	m, _, client, a, _ := catalogSetup(t, false)
+	jar, err := cookiejar.New(nil)
+	require.NoError(t, err)
+	endpoint, err := url.Parse("https://example.test/mcp")
+	require.NoError(t, err)
+	m.cookieJar = jar
+	jar.SetCookies(endpoint, []*http.Cookie{{Name: "session", Value: "before"}})
+	client.onList = func() { jar.SetCookies(endpoint, []*http.Cookie{{Name: "session", Value: "after"}}) }
+	_, err = a.ListTools(context.Background(), nil)
+	require.NoError(t, err)
+	require.Empty(t, m.toolCatalog, "a response must not populate a different credential's cache")
+	_, err = a.ListTools(context.Background(), nil)
+	require.NoError(t, err)
+	_, err = a.ListTools(context.Background(), nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, client.calls.Load())
+}
+
+func TestPublicToolCatalogSharesEagerMetadataWithUnusedHostHooks(t *testing.T) {
+	m, _, client, a, b := catalogSetup(t, true)
+	jar, err := cookiejar.New(nil)
+	require.NoError(t, err)
+	m.jarProvider = func(context.Context) (http.CookieJar, error) { return jar, nil }
+	m.authRTProvider = func(context.Context) *authtransport.RoundTripper {
+		t.Fatal("auth:null must not select a host auth hook")
+		return nil
+	}
+	require.True(t, m.IsToolsListPublic(context.Background(), "server"))
+	_, err = a.ListTools(context.Background(), nil)
+	require.NoError(t, err)
+	bob := authctx.WithUserInfo(context.Background(), &authctx.UserInfo{Subject: "bob"})
+	_, err = b.ListTools(bob, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, client.calls.Load(), "startup public metadata must be reusable by authenticated users")
+	endpoint, err := url.Parse("https://example.test/mcp")
+	require.NoError(t, err)
+	jar.SetCookies(endpoint, []*http.Cookie{{Name: "session", Value: "private"}})
+	require.False(t, m.IsToolsListPublic(bob, "server"))
+	_, err = b.ListTools(bob, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, client.calls.Load(), "credential-bearing requests must not reuse public metadata")
 }
