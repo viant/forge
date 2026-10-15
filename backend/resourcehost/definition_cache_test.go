@@ -88,6 +88,9 @@ func TestGenericPrivateDefinitionCacheSeparatesAccountAndIdentityRevision(t *tes
 	require.Equal(t, 3, source.count(uri), "private definitions must not cross account or identity revisions")
 	get("one", "r1")
 	require.Equal(t, 3, source.count(uri), "original authority partition should remain warm")
+	g.Invalidate("source")
+	get("one", "r1")
+	require.Equal(t, 4, source.count(uri), "gateway invalidation must refresh private definitions too")
 }
 
 func TestGenericDefinitionCachePublicImmutableWindowAndPrivateWorkingMenu(t *testing.T) {
