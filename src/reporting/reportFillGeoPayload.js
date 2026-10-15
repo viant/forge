@@ -52,7 +52,7 @@ export function buildReportFillGeoPayload(block = {}, rows = [], { locale = "en-
     .map((entry) => {
       const row = entry?.row || null;
       const sourceKey = resolveKey(row, config.key);
-      const key = normalizeGeoKey(sourceKey);
+      const key = normalizeGeoKey(sourceKey, config.shape);
       const label = config.labelKey ? resolveKey(row, config.labelKey) : sourceKey;
       const rawValue = Number.isFinite(Number(entry?.value)) ? Number(entry.value) : null;
       const colorRule = row ? findGeoColorRule(row, config.color) : null;

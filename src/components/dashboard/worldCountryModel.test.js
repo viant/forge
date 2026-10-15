@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import {normalizeCountryKey, countryRegionsByKey, WORLD_COUNTRY_PATHS} from './worldCountryModel.js';
+import {normalizeGeoKey, buildGeoConfig, aggregateGeoRows} from './geoMapUtils.js';
+import {buildReportFillGeoPayload} from '../../reporting/reportFillGeoPayload.js';
+
+for (const key of ['US','USA','840','United States','United States of America']) assert.equal(normalizeCountryKey(key), 'US');
+assert.equal(normalizeCountryKey('36'), 'AU');
+assert.equal(normalizeGeoKey('Georgia', 'world'), 'GE');
+assert.equal(normalizeGeoKey('Georgia'), 'GA');
+assert.equal(normalizeGeoKey('California'), 'CA');
+assert.equal(buildGeoConfig({}).shape, 'us-states');
+assert.equal(normalizeCountryKey('unknown'), 'UNKNOWN');
+assert.equal(countryRegionsByKey([{key:'USA',rawValue:3}]).get('US').rawValue,3);
+assert.equal(WORLD_COUNTRY_PATHS.filter(country => country.key === 'US').length,1);
+assert.ok(WORLD_COUNTRY_PATHS.every(country => country.path.startsWith('M')));
+const block = {geo:{shape:'world',key:'Country',metric:{key:'Spend',format:'currency'}}};
+const rows = [{Country:'US',Spend:2},{Country:'USA',Spend:3},{Country:'Georgia',Spend:4}];
+assert.equal(aggregateGeoRows(rows,buildGeoConfig(block)).get('US').value,5);
+const fill = buildReportFillGeoPayload(block,rows);
+assert.equal(fill.shape,'world');
+assert.equal(fill.regions.length,2);
+assert.equal(fill.ranking[0].rawValue,5);
+console.log('Country matching, world aggregation, and legacy state defaults passed.');

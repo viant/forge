@@ -587,7 +587,7 @@ export const reportFillSchema = {
       additionalProperties: false,
       required: ["key", "metric"],
       properties: {
-        shape: { enum: ["us-states", "us-state-tiles"] },
+        shape: { enum: ["us-states", "us-state-tiles", "world"] },
         key: { type: "string" },
         codeKey: { type: "string" },
         regionKey: { type: "string" },

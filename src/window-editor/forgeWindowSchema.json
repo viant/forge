@@ -1,0 +1,6132 @@
+{
+  "$defs": {
+    "Actions": {
+      "additionalProperties": true,
+      "properties": {
+        "code": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "AnimationProperties": {
+      "additionalProperties": true,
+      "properties": {
+        "animationDelay": {
+          "type": "string"
+        },
+        "animationDirection": {
+          "type": "string"
+        },
+        "animationDuration": {
+          "type": "string"
+        },
+        "animationIterationCount": {
+          "type": "string"
+        },
+        "animationName": {
+          "type": "string"
+        },
+        "animationTimingFunction": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "AssignmentPicker": {
+      "additionalProperties": true,
+      "properties": {
+        "allowMultiple": {
+          "type": "boolean"
+        },
+        "assign": {
+          "$ref": "#/$defs/MutationCommand"
+        },
+        "assignedDataSourceRef": {
+          "type": "string"
+        },
+        "availableDataSourceRef": {
+          "type": "string"
+        },
+        "identityFields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "labelField": {
+          "type": "string"
+        },
+        "unassign": {
+          "$ref": "#/$defs/MutationCommand"
+        }
+      },
+      "type": "object"
+    },
+    "AuthorizationBehavior": {
+      "additionalProperties": true,
+      "properties": {
+        "authorizeBeforeDatasourceInit": {
+          "type": "boolean"
+        },
+        "clearProtectedStateOnChange": {
+          "type": "boolean"
+        },
+        "failClosed": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "AuthorizationResourceSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/AuthorizationValueSelector"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "AuthorizationSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "behavior": {
+          "$ref": "#/$defs/AuthorizationBehavior"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "requestedCapabilities": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "requestedGlobalCapabilities": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "resource": {
+          "$ref": "#/$defs/AuthorizationResourceSpec"
+        },
+        "resourceType": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "integer"
+        },
+        "scope": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "AuthorizationValueSelector": {
+      "additionalProperties": true,
+      "properties": {
+        "selector": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "BackgroundProperties": {
+      "additionalProperties": true,
+      "properties": {
+        "backgroundAttachment": {
+          "type": "string"
+        },
+        "backgroundBlendMode": {
+          "type": "string"
+        },
+        "backgroundClip": {
+          "type": "string"
+        },
+        "backgroundColor": {
+          "type": "string"
+        },
+        "backgroundImage": {
+          "type": "string"
+        },
+        "backgroundPosition": {
+          "type": "string"
+        },
+        "backgroundRepeat": {
+          "type": "string"
+        },
+        "backgroundSize": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Binding": {
+      "additionalProperties": true,
+      "properties": {
+        "bindingPath": {
+          "type": "string"
+        },
+        "dataField": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "dataSourceRefSelector": {
+          "type": "string"
+        },
+        "dataSourceRefSource": {
+          "type": "string"
+        },
+        "dataSourceRefs": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "mutationMode": {
+          "type": "string"
+        },
+        "optionsField": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "BorderProperties": {
+      "additionalProperties": true,
+      "properties": {
+        "borderColor": {
+          "type": "string"
+        },
+        "borderRadius": {
+          "type": "string"
+        },
+        "borderSpacing": {
+          "type": "string"
+        },
+        "borderStyle": {
+          "type": "string"
+        },
+        "borderWidth": {
+          "type": "string"
+        },
+        "outline": {
+          "type": "string"
+        },
+        "outlineColor": {
+          "type": "string"
+        },
+        "outlineStyle": {
+          "type": "string"
+        },
+        "outlineWidth": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Card": {
+      "additionalProperties": true,
+      "properties": {
+        "compact": {
+          "type": "boolean"
+        },
+        "elevation": {
+          "type": "integer"
+        },
+        "interactive": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "CartesianGrid": {
+      "additionalProperties": true,
+      "properties": {
+        "strokeDasharray": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Chart": {
+      "additionalProperties": true,
+      "properties": {
+        "axes": {
+          "$ref": "#/$defs/ChartAxes"
+        },
+        "cartesianGrid": {
+          "$ref": "#/$defs/CartesianGrid"
+        },
+        "categoryKey": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "dataSourceRefSelector": {
+          "type": "string"
+        },
+        "dataSourceRefSource": {
+          "type": "string"
+        },
+        "dataSourceRefs": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "emptyHeight": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "height": {
+          "type": "string"
+        },
+        "hideControlsWhenEmpty": {
+          "type": "boolean"
+        },
+        "on": {
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "palette": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "series": {
+          "$ref": "#/$defs/ChartSeries"
+        },
+        "type": {
+          "type": "string"
+        },
+        "valueKey": {
+          "type": "string"
+        },
+        "width": {
+          "type": "string"
+        },
+        "xAxis": {
+          "$ref": "#/$defs/ChartXAxis"
+        },
+        "yAxis": {
+          "$ref": "#/$defs/ChartYAxis"
+        }
+      },
+      "type": "object"
+    },
+    "ChartAxes": {
+      "additionalProperties": true,
+      "properties": {
+        "left": {
+          "$ref": "#/$defs/ChartYAxis"
+        },
+        "right": {
+          "$ref": "#/$defs/ChartYAxis"
+        }
+      },
+      "type": "object"
+    },
+    "ChartSeries": {
+      "additionalProperties": true,
+      "properties": {
+        "categoryColors": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "nameKey": {
+          "type": "string"
+        },
+        "palette": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "valueKey": {
+          "type": "string"
+        },
+        "values": {
+          "items": {
+            "$ref": "#/$defs/ChartSeriesValue"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ChartSeriesValue": {
+      "additionalProperties": true,
+      "properties": {
+        "axis": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string"
+        },
+        "fillOpacity": {
+          "type": "number"
+        },
+        "format": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "opacity": {
+          "type": "number"
+        },
+        "stackId": {
+          "type": "string"
+        },
+        "strokeDasharray": {
+          "type": "string"
+        },
+        "strokeWidth": {
+          "type": "number"
+        },
+        "type": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ChartXAxis": {
+      "additionalProperties": true,
+      "properties": {
+        "dataKey": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "tickFormat": {
+          "type": "string"
+        },
+        "tickFormatSelector": {
+          "type": "string"
+        },
+        "tickFormatSource": {
+          "type": "string"
+        },
+        "tickFormats": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "valueMode": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ChartYAxis": {
+      "additionalProperties": true,
+      "properties": {
+        "domain": {
+          "items": {},
+          "type": "array"
+        },
+        "format": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Chat": {
+      "additionalProperties": true,
+      "properties": {
+        "abortVisible": {
+          "$ref": "#/$defs/SelectorCondition",
+          "description": "AbortVisible allows declarative, data-bound control of the abort button\nvisibility. When provided, the UI shows the abort button if the value\nresolved at `selector` matches `when` (or is truthy if `when` is omitted).\nExample:\n  abortVisible: { selector: \"job.status\", when: [\"queued\", \"running\"] }"
+        },
+        "allowAgentSelection": {
+          "description": "Optional composer selector visibility; omitted preserves existing behavior.",
+          "type": "boolean"
+        },
+        "allowModelSelection": {
+          "type": "boolean"
+        },
+        "commandCenter": {
+          "description": "CommandCenter enables the \"composer-as-command-center\" UI layout.",
+          "type": "boolean"
+        },
+        "dataSourceRef": {
+          "description": "DataSourceRef points to the data source that supplies messages.",
+          "type": "string"
+        },
+        "disableInputOnLoading": {
+          "type": "boolean"
+        },
+        "height": {
+          "type": "string"
+        },
+        "on": {
+          "description": "On defines event handlers such as submit, upload",
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "showAbort": {
+          "type": "boolean"
+        },
+        "showMic": {
+          "description": "ShowMic toggles the microphone icon in the composer (to the left of Send).",
+          "type": "boolean"
+        },
+        "showSettings": {
+          "type": "boolean"
+        },
+        "showTools": {
+          "description": "ShowTools toggles the tools picker in the composer.",
+          "type": "boolean"
+        },
+        "showUpload": {
+          "description": "ShowUpload controls whether file upload input should be displayed (default true).",
+          "type": "boolean"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "targetOverrides": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "toolbar": {
+          "$ref": "#/$defs/Toolbar"
+        },
+        "tooltips": {
+          "$ref": "#/$defs/ChatTooltips",
+          "description": "Tooltips optional per-icon tooltip labels for the composer controls."
+        },
+        "upload": {
+          "$ref": "#/$defs/Upload",
+          "description": "Upload optional configuration for file uploads (endpoint/path/uri)."
+        },
+        "uploadField": {
+          "description": "UploadField publishes uploaded files to this form field (default: \"upload\").",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ChatTooltips": {
+      "additionalProperties": true,
+      "properties": {
+        "abort": {
+          "type": "string"
+        },
+        "mic": {
+          "type": "string"
+        },
+        "send": {
+          "type": "string"
+        },
+        "settings": {
+          "type": "string"
+        },
+        "upload": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Codec": {
+      "additionalProperties": true,
+      "properties": {
+        "args": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Column": {
+      "additionalProperties": true,
+      "properties": {
+        "align": {
+          "type": "string"
+        },
+        "badge": {
+          "$ref": "#/$defs/TableCellBadge"
+        },
+        "badges": {
+          "items": {
+            "$ref": "#/$defs/TableCellBadge"
+          },
+          "type": "array"
+        },
+        "cellProperties": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "disabledWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "emptyText": {
+          "type": "string"
+        },
+        "enforceColumnSize": {
+          "type": "boolean"
+        },
+        "format": {
+          "type": "string"
+        },
+        "headProperties": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "hiddenWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "iconFromValue": {
+          "type": "boolean"
+        },
+        "id": {
+          "type": "string"
+        },
+        "link": {
+          "$ref": "#/$defs/TableLink"
+        },
+        "multiSelect": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "numericFormat": {
+          "type": "string"
+        },
+        "on": {
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "pluralLabel": {
+          "type": "string"
+        },
+        "pressedWhenValue": {},
+        "progress": {
+          "$ref": "#/$defs/Progress"
+        },
+        "readOnlyWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "selectionDisabledWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "showFullContent": {
+          "type": "boolean"
+        },
+        "singularLabel": {
+          "type": "string"
+        },
+        "sortable": {
+          "type": "boolean"
+        },
+        "sticky": {
+          "type": "string"
+        },
+        "timeZone": {
+          "type": "string"
+        },
+        "timeZoneSelector": {
+          "type": "string"
+        },
+        "tooltip": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "valueMap": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "width": {
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "Container": {
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/Binding"
+        }
+      ],
+      "properties": {
+        "addRow": {
+          "$ref": "#/$defs/DashboardEditableTableAddRow"
+        },
+        "allowAdd": {
+          "type": "boolean"
+        },
+        "allowRemove": {
+          "type": "boolean"
+        },
+        "assignmentPicker": {
+          "$ref": "#/$defs/AssignmentPicker"
+        },
+        "card": {
+          "$ref": "#/$defs/Card"
+        },
+        "chart": {
+          "$ref": "#/$defs/Chart"
+        },
+        "chat": {
+          "$ref": "#/$defs/Chat"
+        },
+        "className": {
+          "type": "string"
+        },
+        "columnSpan": {
+          "type": "integer"
+        },
+        "columns": {
+          "description": "Editable-table fields are first-class because authored dashboard.editableTable\nmetadata must survive YAML -\u003e Go -\u003e JSON without losing explicit false values.",
+          "items": {
+            "$ref": "#/$defs/DashboardEditableTableColumn"
+          },
+          "type": "array"
+        },
+        "containers": {
+          "items": {
+            "$ref": "#/$defs/Container"
+          },
+          "type": "array"
+        },
+        "dashboard": {
+          "$ref": "#/$defs/Dashboard"
+        },
+        "dataStateBoundary": {
+          "$ref": "#/$defs/DataStateBoundarySpec"
+        },
+        "defaultMode": {
+          "type": "string"
+        },
+        "derivedDataSource": {
+          "$ref": "#/$defs/DerivedDataSourceSpec"
+        },
+        "detailView": {
+          "$ref": "#/$defs/DetailViewSpec"
+        },
+        "dialogs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "disabledWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "draftForm": {
+          "$ref": "#/$defs/DraftFormSpec"
+        },
+        "editableCollection": {
+          "$ref": "#/$defs/EditableCollection"
+        },
+        "editor": {
+          "$ref": "#/$defs/Editor"
+        },
+        "fetchData": {
+          "type": "boolean"
+        },
+        "fileBrowser": {
+          "$ref": "#/$defs/FileBrowser"
+        },
+        "filterBindings": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "footer": {
+          "$ref": "#/$defs/Container"
+        },
+        "hiddenWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "historyDiff": {
+          "$ref": "#/$defs/HistoryDiffSpec"
+        },
+        "id": {
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Item"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "layout": {
+          "$ref": "#/$defs/Layout"
+        },
+        "masterDetail": {
+          "$ref": "#/$defs/MasterDetailSpec"
+        },
+        "mcpApp": {
+          "$ref": "#/$defs/MCPAppSpec"
+        },
+        "metricSummary": {
+          "$ref": "#/$defs/MetricSummarySpec"
+        },
+        "minRows": {
+          "type": "integer"
+        },
+        "mobileCards": {
+          "$ref": "#/$defs/DashboardEditableTableMobileCards"
+        },
+        "mutationCommand": {
+          "$ref": "#/$defs/MutationCommand"
+        },
+        "notificationRules": {
+          "$ref": "#/$defs/NotificationRulesSpec"
+        },
+        "on": {
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "pageSize": {
+          "type": "integer"
+        },
+        "permissionBoundary": {
+          "$ref": "#/$defs/PermissionBoundarySpec"
+        },
+        "queryToolbar": {
+          "$ref": "#/$defs/QueryToolbarSpec"
+        },
+        "quickFilter": {
+          "type": "boolean"
+        },
+        "readOnlyWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "relationDrill": {
+          "$ref": "#/$defs/RelationDrillSpec"
+        },
+        "removeRowLabel": {
+          "type": "string"
+        },
+        "repeat": {
+          "$ref": "#/$defs/Repeat"
+        },
+        "resourceHeader": {
+          "$ref": "#/$defs/ResourceHeaderSpec"
+        },
+        "responsiveDataGrid": {
+          "$ref": "#/$defs/ResponsiveDataGridSpec"
+        },
+        "role": {
+          "type": "string"
+        },
+        "rowSpan": {
+          "type": "integer"
+        },
+        "scheduleEditor": {
+          "$ref": "#/$defs/ScheduleEditorSpec"
+        },
+        "schemaBasedForm": {
+          "$ref": "#/$defs/SchemaBasedForm"
+        },
+        "scrollMode": {
+          "type": "string"
+        },
+        "section": {
+          "$ref": "#/$defs/Section"
+        },
+        "selectFirst": {
+          "type": "boolean"
+        },
+        "selectionBindings": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "sizingMode": {
+          "type": "string"
+        },
+        "stableTabs": {
+          "$ref": "#/$defs/StableTabsSpec"
+        },
+        "state": {
+          "$ref": "#/$defs/Parameter"
+        },
+        "statusWorkflow": {
+          "$ref": "#/$defs/StatusWorkflow"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleProperties"
+        },
+        "subtitle": {
+          "type": "string"
+        },
+        "table": {
+          "$ref": "#/$defs/Table"
+        },
+        "tabs": {
+          "$ref": "#/$defs/Tabs"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "targetOverrides": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "terminal": {
+          "$ref": "#/$defs/Terminal"
+        },
+        "title": {
+          "type": "string"
+        },
+        "toolbar": {
+          "$ref": "#/$defs/Toolbar"
+        },
+        "treeBrowser": {
+          "$ref": "#/$defs/TreeBrowser"
+        },
+        "treeEditor": {
+          "$ref": "#/$defs/TreeEditorSpec"
+        },
+        "uploadCollection": {
+          "$ref": "#/$defs/UploadCollectionSpec"
+        },
+        "viewModes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "wizard": {
+          "$ref": "#/$defs/WizardSpec"
+        }
+      },
+      "type": "object"
+    },
+    "Dashboard": {
+      "additionalProperties": true,
+      "properties": {
+        "badges": {
+          "$ref": "#/$defs/DashboardBadges"
+        },
+        "compare": {
+          "$ref": "#/$defs/DashboardCompare"
+        },
+        "composition": {
+          "$ref": "#/$defs/DashboardComposition"
+        },
+        "detail": {
+          "$ref": "#/$defs/DashboardDetail"
+        },
+        "dimensions": {
+          "$ref": "#/$defs/DashboardDimensions"
+        },
+        "feed": {
+          "$ref": "#/$defs/DashboardFeed"
+        },
+        "filters": {
+          "$ref": "#/$defs/DashboardFilters"
+        },
+        "geo": {
+          "$ref": "#/$defs/DashboardGeoMap"
+        },
+        "kpiTable": {
+          "$ref": "#/$defs/DashboardKPITable"
+        },
+        "messages": {
+          "$ref": "#/$defs/DashboardMessages"
+        },
+        "report": {
+          "$ref": "#/$defs/DashboardReport"
+        },
+        "reportBuilder": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "reportBuilderRef": {
+          "description": "ReportBuilder intentionally remains open-ended so report-builder-specific\nmetadata can pass through unchanged from YAML/JSON into the Forge\nfrontend contract, including explicit chart configuration under\nreportBuilder.result.",
+          "type": "string"
+        },
+        "reportBuilders": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "reportCatalog": {
+          "additionalProperties": {},
+          "description": "ReportCatalog remains open-ended so workspace extensions own their\npreset catalog, builder routing, and product-specific labels.",
+          "type": "object"
+        },
+        "reportOptions": {
+          "$ref": "#/$defs/DashboardReportOptions",
+          "description": "ReportOptions controls the dashboard-level report mode. The older\ncompact alias is Container.report."
+        },
+        "reportRuntime": {
+          "additionalProperties": {},
+          "description": "ReportRuntime embeds an authored report inside an ordinary Forge window.\nThe report engine validates its spec; dataset bindings reference window sources.",
+          "type": "object"
+        },
+        "status": {
+          "$ref": "#/$defs/DashboardStatus"
+        },
+        "summary": {
+          "$ref": "#/$defs/DashboardSummary"
+        },
+        "table": {
+          "$ref": "#/$defs/DashboardTable"
+        },
+        "timeline": {
+          "$ref": "#/$defs/DashboardTimeline"
+        },
+        "visibleWhen": {
+          "$ref": "#/$defs/DashboardCondition"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardAnnotation": {
+      "additionalProperties": true,
+      "properties": {
+        "selector": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardBadgeItem": {
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "tone": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardBadges": {
+      "additionalProperties": true,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/DashboardBadgeItem"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardCompare": {
+      "additionalProperties": true,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/DashboardCompareItem"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardCompareItem": {
+      "additionalProperties": true,
+      "properties": {
+        "current": {
+          "type": "string"
+        },
+        "deltaFormat": {
+          "type": "string"
+        },
+        "deltaLabel": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "positiveIsUp": {
+          "type": "boolean"
+        },
+        "previous": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardComposition": {
+      "additionalProperties": true,
+      "properties": {
+        "categoryKey": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "legendLimit": {
+          "type": "integer"
+        },
+        "palette": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "type": {
+          "type": "string"
+        },
+        "valueKey": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardCondition": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "empty": {
+          "type": "boolean"
+        },
+        "equals": {},
+        "field": {
+          "type": "string"
+        },
+        "gt": {
+          "type": "number"
+        },
+        "gte": {
+          "type": "number"
+        },
+        "in": {
+          "items": {},
+          "type": "array"
+        },
+        "key": {
+          "type": "string"
+        },
+        "lt": {
+          "type": "number"
+        },
+        "lte": {
+          "type": "number"
+        },
+        "notEmpty": {
+          "type": "boolean"
+        },
+        "notEquals": {},
+        "selector": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "when": {}
+      },
+      "type": "object"
+    },
+    "DashboardDetail": {
+      "additionalProperties": true,
+      "properties": {},
+      "type": "object"
+    },
+    "DashboardDimensions": {
+      "additionalProperties": true,
+      "properties": {
+        "dimension": {
+          "$ref": "#/$defs/DashboardField"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "metric": {
+          "$ref": "#/$defs/DashboardField"
+        },
+        "orderBy": {
+          "type": "string"
+        },
+        "viewModes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardEditableTableAddRow": {
+      "additionalProperties": true,
+      "properties": {
+        "defaults": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "deriveHandler": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardEditableTableColumn": {
+      "additionalProperties": true,
+      "properties": {
+        "cardLabel": {
+          "type": "string"
+        },
+        "editor": {},
+        "format": {
+          "type": "string"
+        },
+        "frozen": {
+          "type": "boolean"
+        },
+        "key": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "tooltip": {
+          "type": "string"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardEditableTableMobileCards": {
+      "additionalProperties": true,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "fields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "metaField": {
+          "type": "string"
+        },
+        "metaFormat": {
+          "type": "string"
+        },
+        "metaLabel": {
+          "type": "string"
+        },
+        "requiredFields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "titleField": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardFeed": {
+      "additionalProperties": true,
+      "properties": {
+        "fields": {
+          "$ref": "#/$defs/DashboardFeedFields"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardFeedFields": {
+      "additionalProperties": true,
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardField": {
+      "additionalProperties": true,
+      "properties": {
+        "format": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardFilterItem": {
+      "additionalProperties": true,
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "multiple": {
+          "type": "boolean"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/DashboardFilterOption"
+          },
+          "type": "array"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardFilterOption": {
+      "additionalProperties": true,
+      "properties": {
+        "default": {
+          "type": "boolean"
+        },
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardFilters": {
+      "additionalProperties": true,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/DashboardFilterItem"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardGeoColor": {
+      "additionalProperties": true,
+      "properties": {
+        "empty": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "palette": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/DashboardGeoColorRule"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardGeoColorRule": {
+      "additionalProperties": true,
+      "properties": {
+        "color": {
+          "type": "string"
+        },
+        "equals": {},
+        "label": {
+          "type": "string"
+        },
+        "value": {},
+        "when": {}
+      },
+      "type": "object"
+    },
+    "DashboardGeoMap": {
+      "additionalProperties": true,
+      "properties": {
+        "aggregate": {
+          "type": "string"
+        },
+        "codeKey": {
+          "type": "string"
+        },
+        "color": {
+          "$ref": "#/$defs/DashboardGeoColor"
+        },
+        "dimension": {
+          "type": "string"
+        },
+        "emptyColor": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "labelKey": {
+          "type": "string"
+        },
+        "legend": {
+          "type": "boolean"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "metric": {
+          "$ref": "#/$defs/DashboardField"
+        },
+        "metricKey": {
+          "type": "string"
+        },
+        "nameKey": {
+          "type": "string"
+        },
+        "palette": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "regionKey": {
+          "type": "string"
+        },
+        "shape": {
+          "type": "string"
+        },
+        "valueKey": {
+          "type": "string"
+        },
+        "valueLabel": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardKPIRow": {
+      "additionalProperties": true,
+      "properties": {
+        "context": {
+          "type": "string"
+        },
+        "contextTone": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "timeZone": {
+          "type": "string"
+        },
+        "timeZoneSelector": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardKPITable": {
+      "additionalProperties": true,
+      "properties": {
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/DashboardTableColumn"
+          },
+          "type": "array"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/DashboardKPIRow"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardMessage": {
+      "additionalProperties": true,
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "severity": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "visibleWhen": {
+          "$ref": "#/$defs/DashboardCondition"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardMessages": {
+      "additionalProperties": true,
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/DashboardMessage"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardMetric": {
+      "additionalProperties": true,
+      "properties": {
+        "format": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "selector": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardReport": {
+      "additionalProperties": true,
+      "properties": {
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/DashboardReportSection"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardReportOptions": {
+      "additionalProperties": true,
+      "properties": {
+        "defaultMode": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "export": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "generatedAt": {
+          "type": "string"
+        },
+        "include": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "includeState": {
+          "additionalProperties": {
+            "type": "boolean"
+          },
+          "type": "object"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "subtitle": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardReportSection": {
+      "additionalProperties": true,
+      "properties": {
+        "body": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "tone": {
+          "type": "string"
+        },
+        "visibleWhen": {
+          "$ref": "#/$defs/DashboardCondition"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardStatus": {
+      "additionalProperties": true,
+      "properties": {
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/DashboardStatusCheck"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardStatusCheck": {
+      "additionalProperties": true,
+      "properties": {
+        "format": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "selector": {
+          "type": "string"
+        },
+        "tone": {
+          "$ref": "#/$defs/DashboardTone"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardSummary": {
+      "additionalProperties": true,
+      "properties": {
+        "metrics": {
+          "items": {
+            "$ref": "#/$defs/DashboardMetric"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardTable": {
+      "additionalProperties": true,
+      "properties": {
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/DashboardTableColumn"
+          },
+          "type": "array"
+        },
+        "density": {
+          "type": "string"
+        },
+        "formattingRules": {
+          "items": {
+            "$ref": "#/$defs/TableFormattingRule"
+          },
+          "type": "array"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "quickFilter": {
+          "type": "boolean"
+        },
+        "rowActions": {
+          "items": {
+            "$ref": "#/$defs/DashboardTableAction"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardTableAction": {
+      "additionalProperties": true,
+      "properties": {
+        "dimension": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "handler": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardTableColumn": {
+      "additionalProperties": true,
+      "properties": {
+        "align": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "link": {
+          "$ref": "#/$defs/TableLink"
+        },
+        "timeZone": {
+          "type": "string"
+        },
+        "timeZoneSelector": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardTimeline": {
+      "additionalProperties": true,
+      "properties": {
+        "annotations": {
+          "$ref": "#/$defs/DashboardAnnotation",
+          "description": "Annotations are reserved for future timeline overlays; the current JS\nruntime ignores this field in v1."
+        },
+        "viewModes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "DashboardTone": {
+      "additionalProperties": true,
+      "properties": {
+        "dangerAbove": {
+          "type": "number"
+        },
+        "dangerBelow": {
+          "type": "number"
+        },
+        "successAbove": {
+          "type": "number"
+        },
+        "successBelow": {
+          "type": "number"
+        },
+        "warningAbove": {
+          "type": "number"
+        },
+        "warningBelow": {
+          "type": "number"
+        }
+      },
+      "type": "object"
+    },
+    "DataInfoSelectors": {
+      "additionalProperties": true,
+      "properties": {
+        "hasMore": {
+          "type": "string"
+        },
+        "nextCursor": {
+          "type": "string"
+        },
+        "pageCount": {
+          "type": "string"
+        },
+        "totalCount": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DataSource": {
+      "additionalProperties": true,
+      "properties": {
+        "autoFetch": {
+          "type": "boolean"
+        },
+        "autoSelect": {
+          "type": "boolean"
+        },
+        "cardinality": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "filterMode": {
+          "type": "string"
+        },
+        "filterSet": {
+          "items": {
+            "$ref": "#/$defs/Filter"
+          },
+          "type": "array"
+        },
+        "on": {
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "paginationMode": {
+          "type": "string"
+        },
+        "paging": {
+          "$ref": "#/$defs/PagingConfig"
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/Parameter"
+          },
+          "type": "array"
+        },
+        "preserveDialogStateOnReopen": {
+          "type": "boolean"
+        },
+        "preserveParametersOnMissingDependencies": {
+          "type": "boolean"
+        },
+        "quickFilterSet": {
+          "description": "QuickFilterSet selects which filterSet should be rendered in the toolbar as quick filters.\nAccepts either a string (filterSet.name) or an integer index (0-based)."
+        },
+        "replayPendingFetchOnRestore": {
+          "type": "boolean"
+        },
+        "requiredAnyParameters": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "resourceModelRef": {
+          "type": "string"
+        },
+        "selectionMode": {
+          "$ref": "#/$defs/SelectionMode"
+        },
+        "selectors": {
+          "$ref": "#/$defs/Selectors"
+        },
+        "selfReference": {
+          "type": "string"
+        },
+        "service": {
+          "$ref": "#/$defs/Service"
+        },
+        "sortMapping": {
+          "$ref": "#/$defs/SortMapping"
+        },
+        "sortMode": {
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "targetOverrides": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "uniqueKey": {
+          "items": {
+            "$ref": "#/$defs/UniqueKey"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "DataStateBoundarySpec": {
+      "additionalProperties": true,
+      "properties": {
+        "allowPartial": {
+          "type": "boolean"
+        },
+        "dataSourceRefs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "emptyMessage": {
+          "type": "string"
+        },
+        "errorAction": {
+          "$ref": "#/$defs/DataStateErrorAction"
+        },
+        "errorMessage": {
+          "type": "string"
+        },
+        "loadingMessage": {
+          "type": "string"
+        },
+        "renderEmptyContent": {
+          "type": "boolean"
+        },
+        "staleMessage": {
+          "type": "string"
+        },
+        "suppressErrorWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "DataStateErrorAction": {
+      "additionalProperties": true,
+      "properties": {
+        "bypassCache": {
+          "type": "boolean"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DerivedDataSourceSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "maxRows": {
+          "type": "integer"
+        },
+        "optionalSources": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "pipeline": {
+          "items": {
+            "$ref": "#/$defs/DerivedDataStep"
+          },
+          "type": "array"
+        },
+        "sources": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DerivedDataStep": {
+      "additionalProperties": true,
+      "properties": {
+        "fields": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "groupBy": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "joinCardinality": {
+          "type": "string"
+        },
+        "joinType": {
+          "type": "string"
+        },
+        "measures": {
+          "items": {
+            "$ref": "#/$defs/DerivedMeasure"
+          },
+          "type": "array"
+        },
+        "on": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "orderBy": {
+          "items": {
+            "$ref": "#/$defs/TableSort"
+          },
+          "type": "array"
+        },
+        "projections": {
+          "items": {
+            "$ref": "#/$defs/DerivedProjection"
+          },
+          "type": "array"
+        },
+        "source": {
+          "type": "string"
+        },
+        "when": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "DerivedMeasure": {
+      "additionalProperties": true,
+      "properties": {
+        "operation": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DerivedProjection": {
+      "additionalProperties": true,
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "value": {}
+      },
+      "type": "object"
+    },
+    "DetailViewField": {
+      "additionalProperties": true,
+      "properties": {
+        "copyable": {
+          "type": "boolean"
+        },
+        "currencyField": {
+          "type": "string"
+        },
+        "emptyText": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "link": {
+          "$ref": "#/$defs/TableLink"
+        },
+        "span": {
+          "type": "integer"
+        },
+        "timeZone": {
+          "type": "string"
+        },
+        "timeZoneSelector": {
+          "type": "string"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "DetailViewSection": {
+      "additionalProperties": true,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/DetailViewField"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "DetailViewSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "columns": {
+          "type": "integer"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "emptyText": {
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/DetailViewField"
+          },
+          "type": "array"
+        },
+        "responsiveColumns": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/DetailViewSection"
+          },
+          "type": "array"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Dialog": {
+      "additionalProperties": true,
+      "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/Item"
+          },
+          "type": "array"
+        },
+        "className": {
+          "type": "string"
+        },
+        "content": {
+          "$ref": "#/$defs/Container"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "on": {
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "properties": {
+          "$ref": "#/$defs/DialogProperties"
+        },
+        "selectionMode": {
+          "type": "string"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleProperties"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "targetOverrides": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "DialogProperties": {
+      "additionalProperties": true,
+      "properties": {
+        "bodyClassName": {
+          "type": "string"
+        },
+        "bodyStyle": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "className": {
+          "type": "string"
+        },
+        "contentClassName": {
+          "type": "string"
+        },
+        "contentStyle": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "quickFilter": {
+          "$ref": "#/$defs/QuickFilterSpec"
+        },
+        "quickFilters": {
+          "items": {
+            "$ref": "#/$defs/QuickFilterSpec"
+          },
+          "type": "array"
+        },
+        "quickSearch": {
+          "$ref": "#/$defs/DialogQuickSearchConfig"
+        },
+        "resolveInput": {
+          "type": "string"
+        },
+        "searchable": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "DialogQuickSearchConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "align": {
+          "type": "string"
+        },
+        "className": {
+          "type": "string"
+        },
+        "debounceMs": {
+          "type": "integer"
+        },
+        "gap": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "inputClassName": {
+          "type": "string"
+        },
+        "inputStyle": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "inputWidth": {
+          "type": "string"
+        },
+        "style": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "trigger": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Divider": {
+      "additionalProperties": true,
+      "properties": {
+        "sizes": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "visible": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "DraftFormSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "confirmDiscard": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "dirtyWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "onReset": {
+          "type": "string"
+        },
+        "resetLabel": {
+          "type": "string"
+        },
+        "saveLabel": {
+          "type": "string"
+        },
+        "submit": {
+          "$ref": "#/$defs/MutationCommand"
+        },
+        "validWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "EditableCollection": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "identityFields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "mutation": {
+          "$ref": "#/$defs/MutationCommand"
+        },
+        "operations": {
+          "items": {
+            "$ref": "#/$defs/EditableCollectionOperation"
+          },
+          "type": "array"
+        },
+        "selection": {
+          "$ref": "#/$defs/PrimitiveSelection"
+        },
+        "selectionPrompt": {
+          "type": "string"
+        },
+        "selectionStatus": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "EditableCollectionOperation": {
+      "additionalProperties": true,
+      "properties": {
+        "ariaLabel": {
+          "type": "string"
+        },
+        "dialogId": {
+          "type": "string"
+        },
+        "disabledWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "handler": {
+          "type": "string"
+        },
+        "hideLabel": {
+          "type": "boolean"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "intent": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "mutation": {
+          "$ref": "#/$defs/MutationCommand"
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/Parameter"
+          },
+          "type": "array"
+        },
+        "requiresSelection": {
+          "type": "boolean"
+        },
+        "selection": {
+          "$ref": "#/$defs/PrimitiveSelection"
+        },
+        "tooltip": {
+          "type": "string"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "Editor": {
+      "additionalProperties": true,
+      "properties": {
+        "on": {
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "selector": {
+          "$ref": "#/$defs/EditorSelector"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleProperties"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "EditorSelector": {
+      "additionalProperties": true,
+      "properties": {
+        "extension": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "EmptyPolicy": {
+      "type": "string"
+    },
+    "Execute": {
+      "additionalProperties": true,
+      "properties": {
+        "args": {
+          "items": {},
+          "type": "array"
+        },
+        "async": {
+          "type": "boolean"
+        },
+        "disabledWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "event": {
+          "type": "string"
+        },
+        "handler": {
+          "type": "string"
+        },
+        "init": {
+          "type": "string"
+        },
+        "onDone": {
+          "type": "string"
+        },
+        "onError": {
+          "type": "string"
+        },
+        "onSuccess": {
+          "type": "string"
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/Parameter"
+          },
+          "type": "array"
+        },
+        "state": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "targetOverrides": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "FileBrowser": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "folderOnly": {
+          "type": "boolean"
+        },
+        "on": {
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleProperties"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Filter": {
+      "additionalProperties": true,
+      "properties": {
+        "default": {
+          "type": "boolean"
+        },
+        "defaultField": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "template": {
+          "items": {
+            "$ref": "#/$defs/TemplateItem"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "FormField": {
+      "additionalProperties": true,
+      "properties": {
+        "default": {},
+        "enum": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "group": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "max": {
+          "type": "number"
+        },
+        "min": {
+          "type": "number"
+        },
+        "name": {
+          "description": "Core",
+          "type": "string"
+        },
+        "order": {
+          "description": "Ordering \u0026 grouping",
+          "type": "integer"
+        },
+        "pattern": {
+          "description": "Validation / dynamic UI",
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleProperties"
+        },
+        "type": {
+          "description": "string, integer, boolean, object, array, schema …",
+          "type": "string"
+        },
+        "visibleIf": {
+          "type": "string"
+        },
+        "widget": {
+          "description": "Visuals / behaviour",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "HistoryDiffSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "afterField": {
+          "type": "string"
+        },
+        "arrayStrategy": {
+          "type": "string"
+        },
+        "beforeField": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "fieldLabels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "identityField": {
+          "type": "string"
+        },
+        "ignoreFields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "recordLabelField": {
+          "type": "string"
+        },
+        "redactFields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Item": {
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/Binding"
+        }
+      ],
+      "properties": {
+        "accept": {
+          "type": "string"
+        },
+        "aggregate": {},
+        "align": {
+          "type": "string"
+        },
+        "appearance": {
+          "type": "string"
+        },
+        "ariaLabel": {
+          "type": "string"
+        },
+        "className": {
+          "type": "string"
+        },
+        "close": {
+          "type": "boolean"
+        },
+        "columnSpan": {
+          "description": "ColumnSpan defines how many columns this item occupies in a grid layout.\nAlternative casings ColSpan/colspan are accepted for backward compatibility.",
+          "type": "integer"
+        },
+        "dateFnsFormat": {
+          "type": "string"
+        },
+        "dirtyValue": {},
+        "disabled": {
+          "type": "boolean"
+        },
+        "disabledWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "emptyOptionLabel": {
+          "type": "string"
+        },
+        "emptyText": {
+          "type": "string"
+        },
+        "enableWhenSelection": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "fallbackOptionsDataSelector": {
+          "type": "string"
+        },
+        "fallbackOptionsDataSourceRef": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "hiddenWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "hideLabel": {
+          "type": "boolean"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "includeEmptyOption": {
+          "type": "boolean"
+        },
+        "intent": {
+          "type": "string"
+        },
+        "isStandalone": {
+          "type": "boolean"
+        },
+        "label": {
+          "type": "string"
+        },
+        "labelPosition": {
+          "type": "string"
+        },
+        "link": {
+          "$ref": "#/$defs/TableLink"
+        },
+        "lookup": {
+          "$ref": "#/$defs/Lookup"
+        },
+        "menuItems": {
+          "items": {
+            "$ref": "#/$defs/Item"
+          },
+          "type": "array"
+        },
+        "mutationCommand": {
+          "$ref": "#/$defs/MutationCommand"
+        },
+        "numericFormat": {
+          "type": "string"
+        },
+        "on": {
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "optionDataSourceRets": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "optionDisabledField": {
+          "type": "string"
+        },
+        "optionFilter": {},
+        "optionFilters": {},
+        "optionLabelField": {
+          "type": "string"
+        },
+        "optionSecondaryField": {
+          "type": "string"
+        },
+        "optionValueField": {
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/Option"
+          },
+          "type": "array"
+        },
+        "optionsDataSelector": {
+          "type": "string"
+        },
+        "optionsDataSourceRef": {
+          "type": "string"
+        },
+        "placement": {
+          "type": "string"
+        },
+        "properties": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "readOnly": {
+          "type": "boolean"
+        },
+        "readOnlyWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "rowSpan": {
+          "type": "integer"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleProperties"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "targetOverrides": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "tooltip": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "value": {},
+        "valueMap": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "widget": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Labels": {
+      "additionalProperties": true,
+      "properties": {
+        "align": {
+          "type": "string"
+        },
+        "controlGap": {
+          "type": "integer"
+        },
+        "height": {
+          "type": "string"
+        },
+        "labelStyle": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "rowHeight": {
+          "type": "string"
+        },
+        "style": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "width": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Layout": {
+      "additionalProperties": true,
+      "properties": {
+        "appearance": {
+          "type": "string"
+        },
+        "collapseAt": {
+          "type": "string"
+        },
+        "columnGap": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "integer"
+        },
+        "divider": {
+          "$ref": "#/$defs/Divider"
+        },
+        "gap": {
+          "type": "string"
+        },
+        "itemStretch": {
+          "type": "boolean"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "labelPosition": {
+          "type": "string"
+        },
+        "labels": {
+          "$ref": "#/$defs/Labels"
+        },
+        "orientation": {
+          "type": "string"
+        },
+        "rowGap": {
+          "type": "string"
+        },
+        "rows": {
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "LayoutProperties": {
+      "additionalProperties": true,
+      "properties": {
+        "alignItems": {
+          "type": "string"
+        },
+        "alignSelf": {
+          "type": "string"
+        },
+        "columnGap": {
+          "type": "string"
+        },
+        "display": {
+          "type": "string"
+        },
+        "flex": {
+          "type": "string"
+        },
+        "flexBasis": {
+          "type": "string"
+        },
+        "flexDirection": {
+          "type": "string"
+        },
+        "flexGrow": {
+          "type": "string"
+        },
+        "flexShrink": {
+          "type": "string"
+        },
+        "flexWrap": {
+          "type": "string"
+        },
+        "gap": {
+          "type": "string"
+        },
+        "gridArea": {
+          "type": "string"
+        },
+        "gridAutoColumns": {
+          "type": "string"
+        },
+        "gridAutoFlow": {
+          "type": "string"
+        },
+        "gridAutoRows": {
+          "type": "string"
+        },
+        "gridColumn": {
+          "type": "string"
+        },
+        "gridRow": {
+          "type": "string"
+        },
+        "gridTemplateAreas": {
+          "type": "string"
+        },
+        "gridTemplateColumns": {
+          "description": "Grid-specific properties",
+          "type": "string"
+        },
+        "gridTemplateRows": {
+          "type": "string"
+        },
+        "justifyContent": {
+          "type": "string"
+        },
+        "justifySelf": {
+          "type": "string"
+        },
+        "placeContent": {
+          "type": "string"
+        },
+        "placeItems": {
+          "type": "string"
+        },
+        "placeSelf": {
+          "type": "string"
+        },
+        "rowGap": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Lookup": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSource": {
+          "type": "string"
+        },
+        "dataSourceResource": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1resource.ResourceRef"
+        },
+        "dialogId": {
+          "description": "Either DialogId (preferred) or WindowId can be provided. When DialogId\nis set, the UI opens a Forge dialog which renders a built-in\nCancel/OK footer. WindowId uses a floating window instead.",
+          "type": "string"
+        },
+        "display": {
+          "type": "string"
+        },
+        "footer": {
+          "$ref": "#/$defs/LookupFooter",
+          "description": "Optional footer customisation for modal flows: labels/handlers."
+        },
+        "inputs": {
+          "items": {
+            "$ref": "#/$defs/Parameter"
+          },
+          "type": "array"
+        },
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/Parameter"
+          },
+          "type": "array"
+        },
+        "pickerResource": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1resource.ResourceRef"
+        },
+        "providerIdentity": {
+          "type": "string"
+        },
+        "queryInput": {
+          "type": "string"
+        },
+        "requestTrigger": {
+          "description": "RequestTrigger controls typed-value resolution: blur (default) or change.",
+          "type": "string"
+        },
+        "resolveInput": {
+          "type": "string"
+        },
+        "size": {
+          "$ref": "#/$defs/LookupSize",
+          "description": "Optional size for dialog/window."
+        },
+        "title": {
+          "type": "string"
+        },
+        "windowId": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "LookupFooter": {
+      "additionalProperties": true,
+      "properties": {
+        "cancel": {
+          "$ref": "#/$defs/LookupFooterAction"
+        },
+        "ok": {
+          "$ref": "#/$defs/LookupFooterAction"
+        }
+      },
+      "type": "object"
+    },
+    "LookupFooterAction": {
+      "additionalProperties": true,
+      "properties": {
+        "handler": {
+          "description": "Handler refers to a namespaced action exposed to the UI, e.g. \"schedule.onPickOk\".",
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "requireSelection": {
+          "description": "When false, OK remains enabled even with no current selection (default true).",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "LookupSize": {
+      "additionalProperties": true,
+      "properties": {
+        "height": {
+          "type": "string"
+        },
+        "width": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "MCPAppSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "assetClosure": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1provider~1contract.MCPAppClosure"
+        },
+        "resourceURI": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "MasterDetailEmpty": {
+      "additionalProperties": true,
+      "properties": {
+        "message": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "MasterDetailRegion": {
+      "additionalProperties": true,
+      "properties": {
+        "allowedWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "containerId": {
+          "type": "string"
+        },
+        "parameters": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "MasterDetailSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "detail": {
+          "$ref": "#/$defs/MasterDetailRegion"
+        },
+        "emptyDetail": {
+          "$ref": "#/$defs/MasterDetailEmpty"
+        },
+        "identityFields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "master": {
+          "$ref": "#/$defs/MasterDetailRegion"
+        },
+        "responsive": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "selectionInvalidation": {
+          "type": "string"
+        },
+        "stateKey": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "MetricSummaryItem": {
+      "additionalProperties": true,
+      "properties": {
+        "betterWhen": {
+          "type": "string"
+        },
+        "comparisonField": {
+          "type": "string"
+        },
+        "comparisonFormat": {
+          "type": "string"
+        },
+        "currencyField": {
+          "type": "string"
+        },
+        "emptyText": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "MetricSummarySpec": {
+      "additionalProperties": true,
+      "properties": {
+        "columns": {
+          "type": "integer"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "metrics": {
+          "items": {
+            "$ref": "#/$defs/MetricSummaryItem"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "MutationCommand": {
+      "additionalProperties": true,
+      "properties": {
+        "className": {
+          "type": "string"
+        },
+        "commandId": {
+          "type": "string"
+        },
+        "confirm": {
+          "type": "string"
+        },
+        "confirmSelection": {
+          "$ref": "#/$defs/SelectionConfirmation"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "errorState": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "hideLabel": {
+          "type": "boolean"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "indeterminateState": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "intent": {
+          "type": "string"
+        },
+        "invalidMessage": {
+          "type": "string"
+        },
+        "invocationParameter": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "parameters": {
+          "items": {
+            "$ref": "#/$defs/Parameter"
+          },
+          "type": "array"
+        },
+        "payload": {
+          "$ref": "#/$defs/ResourcePayloadPreparation"
+        },
+        "pendingState": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "reconcile": {
+          "$ref": "#/$defs/ReconcileSpec"
+        },
+        "refresh": {
+          "items": {
+            "$ref": "#/$defs/RefreshSpec"
+          },
+          "type": "array"
+        },
+        "successState": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "timeoutMs": {
+          "type": "integer"
+        },
+        "validateWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "NotificationRule": {
+      "additionalProperties": true,
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/ResourceHeaderAction"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "intent": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "NotificationRulesSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/NotificationRule"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Option": {
+      "additionalProperties": true,
+      "properties": {
+        "disabled": {
+          "type": "boolean"
+        },
+        "disabledWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "hiddenWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "label": {
+          "type": "string"
+        },
+        "tooltip": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "PagingConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "dataInfoSelectors": {
+          "$ref": "#/$defs/DataInfoSelectors"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "description": "Mode opts into explicit upstream page/offset/cursor semantics; empty retains legacy behavior.",
+          "type": "string"
+        },
+        "openEnded": {
+          "type": "boolean"
+        },
+        "parameters": {
+          "$ref": "#/$defs/PagingParameters"
+        },
+        "size": {
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "PagingParameters": {
+      "additionalProperties": true,
+      "properties": {
+        "page": {
+          "type": "string"
+        },
+        "size": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Parameter": {
+      "additionalProperties": true,
+      "properties": {
+        "codec": {
+          "$ref": "#/$defs/Codec"
+        },
+        "default": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "in": {
+          "description": "Deprecated",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Deprecated",
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "scope": {
+          "description": "Deprecated",
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PermissionBoundarySpec": {
+      "additionalProperties": true,
+      "properties": {
+        "capability": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "deniedMessage": {
+          "type": "string"
+        },
+        "identityField": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "PositioningProperties": {
+      "additionalProperties": true,
+      "properties": {
+        "bottom": {
+          "type": "string"
+        },
+        "inset": {
+          "type": "string"
+        },
+        "left": {
+          "type": "string"
+        },
+        "objectFit": {
+          "type": "string"
+        },
+        "objectPosition": {
+          "type": "string"
+        },
+        "overflow": {
+          "type": "string"
+        },
+        "overflowX": {
+          "type": "string"
+        },
+        "overflowY": {
+          "type": "string"
+        },
+        "position": {
+          "type": "string"
+        },
+        "right": {
+          "type": "string"
+        },
+        "top": {
+          "type": "string"
+        },
+        "visibility": {
+          "type": "string"
+        },
+        "zIndex": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PrimitiveSelection": {
+      "additionalProperties": true,
+      "properties": {
+        "any": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "disabledWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "every": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "max": {
+          "type": "integer"
+        },
+        "min": {
+          "type": "integer"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "none": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "Progress": {
+      "additionalProperties": true,
+      "properties": {
+        "maxValueField": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "QueryToolbarSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "density": {
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Item"
+          },
+          "type": "array"
+        },
+        "layout": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "QuickFilterSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "className": {
+          "type": "string"
+        },
+        "debounceMs": {
+          "type": "integer"
+        },
+        "field": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "style": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "trigger": {
+          "type": "string"
+        },
+        "width": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ReconcileSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "identityField": {
+          "type": "string"
+        },
+        "identityFields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "resultPath": {
+          "type": "string"
+        },
+        "rowsPath": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "RefreshSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "bypassCache": {
+          "type": "boolean"
+        },
+        "clearSelection": {
+          "type": "boolean"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "RelationDrillSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "countField": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "emptyText": {
+          "type": "string"
+        },
+        "labelField": {
+          "type": "string"
+        },
+        "link": {
+          "$ref": "#/$defs/TableLink"
+        },
+        "pluralLabel": {
+          "type": "string"
+        },
+        "singularLabel": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Repeat": {
+      "additionalProperties": true,
+      "properties": {
+        "item": {
+          "$ref": "#/$defs/Item"
+        },
+        "iterator": {
+          "$ref": "#/$defs/Parameter"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceCollectionBinding": {
+      "additionalProperties": true,
+      "properties": {
+        "clientKey": {
+          "type": "string"
+        },
+        "identity": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "modelRef": {
+          "type": "string"
+        },
+        "preserveOrder": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceFieldBinding": {
+      "additionalProperties": true,
+      "properties": {
+        "alwaysWrite": {
+          "type": "boolean"
+        },
+        "codec": {
+          "type": "string"
+        },
+        "collection": {
+          "$ref": "#/$defs/ResourceCollectionBinding"
+        },
+        "default": {},
+        "empty": {
+          "$ref": "#/$defs/EmptyPolicy"
+        },
+        "modelRef": {
+          "type": "string"
+        },
+        "omitIfUnchanged": {
+          "type": "boolean"
+        },
+        "read": {
+          "type": "string"
+        },
+        "trim": {
+          "type": "boolean"
+        },
+        "write": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceFieldSchema": {
+      "additionalProperties": true,
+      "properties": {
+        "$ref": {
+          "type": "string"
+        },
+        "default": {},
+        "enum": {
+          "items": {},
+          "type": "array"
+        },
+        "format": {
+          "type": "string"
+        },
+        "items": {
+          "$ref": "#/$defs/ResourceFieldSchema"
+        },
+        "maxItems": {
+          "type": "integer"
+        },
+        "maxLength": {
+          "type": "integer"
+        },
+        "maximum": {
+          "type": "number"
+        },
+        "minItems": {
+          "type": "integer"
+        },
+        "minLength": {
+          "type": "integer"
+        },
+        "minimum": {
+          "type": "number"
+        },
+        "nullable": {
+          "type": "boolean"
+        },
+        "properties": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ResourceFieldSchema"
+          },
+          "type": "object"
+        },
+        "readOnly": {
+          "type": "boolean"
+        },
+        "required": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "type": {
+          "type": "string"
+        },
+        "writeOnly": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceHeaderAction": {
+      "additionalProperties": true,
+      "properties": {
+        "disabledWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "handler": {
+          "type": "string"
+        },
+        "hideLabel": {
+          "type": "boolean"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "intent": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "mutation": {
+          "$ref": "#/$defs/MutationCommand"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceHeaderField": {
+      "additionalProperties": true,
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceHeaderSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/ResourceHeaderAction"
+          },
+          "type": "array"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/ResourceHeaderField"
+          },
+          "type": "array"
+        },
+        "subtitleField": {
+          "type": "string"
+        },
+        "titleField": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceModel": {
+      "additionalProperties": true,
+      "properties": {
+        "fields": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ResourceFieldBinding"
+          },
+          "type": "object"
+        },
+        "hooks": {
+          "$ref": "#/$defs/ResourceModelHooks"
+        },
+        "read": {
+          "$ref": "#/$defs/ResourceReadBinding"
+        },
+        "schemaRef": {
+          "type": "string"
+        },
+        "write": {
+          "$ref": "#/$defs/ResourceWriteBinding"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceModelHooks": {
+      "additionalProperties": true,
+      "properties": {
+        "afterMarshal": {
+          "type": "string"
+        },
+        "afterUnmarshal": {
+          "type": "string"
+        },
+        "beforeMarshal": {
+          "type": "string"
+        },
+        "beforeUnmarshal": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ResourcePayloadPreparation": {
+      "additionalProperties": true,
+      "properties": {
+        "baseline": {
+          "$ref": "#/$defs/ResourceValueSource"
+        },
+        "fields": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ResourceValueSource"
+          },
+          "type": "object"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "modelRef": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/ResourceValueSource"
+        },
+        "target": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceReadBinding": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "preserveUnbound": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceSchema": {
+      "additionalProperties": true,
+      "properties": {
+        "additionalProperties": {
+          "type": "boolean"
+        },
+        "identity": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "properties": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ResourceFieldSchema"
+          },
+          "type": "object"
+        },
+        "required": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceValueFilter": {
+      "additionalProperties": true,
+      "properties": {
+        "equals": {},
+        "field": {
+          "type": "string"
+        },
+        "in": {
+          "items": {},
+          "type": "array"
+        },
+        "notEquals": {}
+      },
+      "type": "object"
+    },
+    "ResourceValueSource": {
+      "additionalProperties": true,
+      "properties": {
+        "codec": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "mapSelector": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "selector": {
+          "type": "string"
+        },
+        "value": {},
+        "where": {
+          "$ref": "#/$defs/ResourceValueFilter"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceWriteBinding": {
+      "additionalProperties": true,
+      "properties": {
+        "collection": {
+          "type": "boolean"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "inputPath": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "ResponsiveDataGridSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "breakpoints": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ResponsiveDataGridState"
+          },
+          "type": "object"
+        },
+        "identityColumns": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "ResponsiveDataGridState": {
+      "additionalProperties": true,
+      "properties": {
+        "columnOverrides": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "density": {
+          "type": "string"
+        },
+        "readOnlyCards": {
+          "type": "boolean"
+        },
+        "rowLayout": {
+          "type": "string"
+        },
+        "stickyColumns": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "style": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "ScheduleEditorSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "allowAdd": {
+          "type": "boolean"
+        },
+        "allowOverlap": {
+          "type": "boolean"
+        },
+        "allowRemove": {
+          "type": "boolean"
+        },
+        "ambiguousTimePolicy": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "endField": {
+          "type": "string"
+        },
+        "minDuration": {
+          "type": "string"
+        },
+        "mutation": {
+          "$ref": "#/$defs/MutationCommand"
+        },
+        "startField": {
+          "type": "string"
+        },
+        "timeZoneField": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "SchemaBasedForm": {
+      "additionalProperties": true,
+      "properties": {
+        "dataBinding": {
+          "description": "Where to persist the collected answers (same semantics as Chat/Editor)",
+          "type": "string"
+        },
+        "datasourceRef": {
+          "type": "string"
+        },
+        "fields": {
+          "description": "Fields are rendered in slice order; you can still override per-field\norder later via Field.Order.",
+          "items": {
+            "$ref": "#/$defs/FormField"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "Optional name so other widgets can reference the answers via\n{{window.state.\u003cId\u003e}}",
+          "type": "string"
+        },
+        "layout": {
+          "$ref": "#/$defs/Layout"
+        },
+        "on": {
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleProperties"
+        }
+      },
+      "type": "object"
+    },
+    "Section": {
+      "additionalProperties": true,
+      "properties": {
+        "appearance": {
+          "type": "string"
+        },
+        "collapsible": {
+          "type": "boolean"
+        },
+        "contentInset": {
+          "type": "string"
+        },
+        "persistState": {
+          "type": "boolean"
+        },
+        "properties": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "stateKey": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "SelectionConfirmation": {
+      "additionalProperties": true,
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "identityField": {
+          "type": "string"
+        },
+        "labelField": {
+          "type": "string"
+        },
+        "maxItems": {
+          "type": "integer"
+        },
+        "pluralLabel": {
+          "type": "string"
+        },
+        "singularLabel": {
+          "type": "string"
+        },
+        "suffix": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "SelectionMode": {
+      "type": "string"
+    },
+    "SelectorCondition": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSourceRef": {
+          "description": "Optional override to read the selector from another DataSource.",
+          "type": "string"
+        },
+        "selector": {
+          "type": "string"
+        },
+        "when": {}
+      },
+      "type": "object"
+    },
+    "Selectors": {
+      "additionalProperties": true,
+      "properties": {
+        "data": {
+          "type": "string"
+        },
+        "dataFallbacks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "dataInfo": {
+          "type": "string"
+        },
+        "metrics": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "valueColumn": {
+          "description": "ValueColumn explicitly projects scalar values into named rows.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Service": {
+      "additionalProperties": true,
+      "properties": {
+        "delete": {
+          "$ref": "#/$defs/Service"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "patch": {
+          "$ref": "#/$defs/Service"
+        },
+        "post": {
+          "$ref": "#/$defs/Service"
+        },
+        "put": {
+          "$ref": "#/$defs/Service"
+        },
+        "uri": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "SizingProperties": {
+      "additionalProperties": true,
+      "properties": {
+        "height": {
+          "type": "string"
+        },
+        "itemSize": {
+          "type": "string"
+        },
+        "maxHeight": {
+          "type": "string"
+        },
+        "maxWidth": {
+          "type": "string"
+        },
+        "minHeight": {
+          "type": "string"
+        },
+        "minWidth": {
+          "type": "string"
+        },
+        "width": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "SortMapping": {
+      "additionalProperties": true,
+      "properties": {
+        "fields": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "parameter": {
+          "type": "string"
+        },
+        "template": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "SpacingProperties": {
+      "additionalProperties": true,
+      "properties": {
+        "margin": {
+          "type": "string"
+        },
+        "marginBottom": {
+          "type": "string"
+        },
+        "marginLeft": {
+          "type": "string"
+        },
+        "marginRight": {
+          "type": "string"
+        },
+        "marginTop": {
+          "type": "string"
+        },
+        "padding": {
+          "type": "string"
+        },
+        "paddingBottom": {
+          "type": "string"
+        },
+        "paddingLeft": {
+          "type": "string"
+        },
+        "paddingRight": {
+          "type": "string"
+        },
+        "paddingTop": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "StableTabsSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "appearance": {
+          "type": "string"
+        },
+        "compact": {
+          "type": "boolean"
+        },
+        "dataSourceFetchMode": {
+          "type": "string"
+        },
+        "defaultSelectedTabId": {
+          "type": "string"
+        },
+        "fill": {
+          "type": "boolean"
+        },
+        "keepVisitedTabPanelsMounted": {
+          "type": "boolean"
+        },
+        "renderActiveTabPanelOnly": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "StatusWorkflow": {
+      "additionalProperties": true,
+      "properties": {
+        "stateField": {
+          "type": "string"
+        },
+        "transitions": {
+          "items": {
+            "$ref": "#/$defs/StatusWorkflowTransition"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "StatusWorkflowTransition": {
+      "additionalProperties": true,
+      "properties": {
+        "availableWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "command": {
+          "$ref": "#/$defs/MutationCommand"
+        },
+        "confirm": {
+          "type": "string"
+        },
+        "from": {
+          "items": {},
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "to": {}
+      },
+      "type": "object"
+    },
+    "StyleProperties": {
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/SizingProperties"
+        },
+        {
+          "$ref": "#/$defs/SpacingProperties"
+        },
+        {
+          "$ref": "#/$defs/TypographyProperties"
+        },
+        {
+          "$ref": "#/$defs/LayoutProperties"
+        },
+        {
+          "$ref": "#/$defs/PositioningProperties"
+        },
+        {
+          "$ref": "#/$defs/BorderProperties"
+        },
+        {
+          "$ref": "#/$defs/BackgroundProperties"
+        },
+        {
+          "$ref": "#/$defs/AnimationProperties"
+        }
+      ],
+      "properties": {},
+      "type": "object"
+    },
+    "Table": {
+      "additionalProperties": true,
+      "properties": {
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/Column"
+          },
+          "type": "array"
+        },
+        "defaultSort": {
+          "$ref": "#/$defs/TableSort"
+        },
+        "density": {
+          "type": "string"
+        },
+        "emptyState": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "enforceColumnSize": {
+          "type": "boolean"
+        },
+        "fillRemainingWidth": {
+          "type": "boolean"
+        },
+        "formattingRules": {
+          "items": {
+            "$ref": "#/$defs/TableFormattingRule"
+          },
+          "type": "array"
+        },
+        "fullWidth": {
+          "type": "boolean"
+        },
+        "minRows": {
+          "type": "integer"
+        },
+        "on": {
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "pagination": {},
+        "presentation": {
+          "type": "string"
+        },
+        "rowHeight": {
+          "type": "integer"
+        },
+        "selectionEnabled": {
+          "type": "boolean"
+        },
+        "selectionVisibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "targetOverrides": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "toolbar": {
+          "$ref": "#/$defs/Toolbar"
+        },
+        "width": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "TableCellBadge": {
+      "additionalProperties": true,
+      "properties": {
+        "className": {
+          "type": "string"
+        },
+        "equals": {},
+        "field": {
+          "type": "string"
+        },
+        "hideLabel": {
+          "type": "boolean"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "replaceValue": {
+          "type": "boolean"
+        },
+        "tone": {
+          "type": "string"
+        },
+        "toneMap": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "tooltip": {
+          "type": "string"
+        },
+        "valueMap": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "TableFormattingRule": {
+      "additionalProperties": true,
+      "properties": {
+        "className": {
+          "type": "string"
+        },
+        "column": {
+          "type": "string"
+        },
+        "columnId": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "style": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "target": {
+          "type": "string"
+        },
+        "value": {},
+        "values": {
+          "items": {},
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "TableLink": {
+      "additionalProperties": true,
+      "properties": {
+        "autoIndexTitle": {
+          "type": "boolean"
+        },
+        "awaitResult": {
+          "type": "boolean"
+        },
+        "chipIcon": {
+          "type": "string"
+        },
+        "chipName": {
+          "type": "string"
+        },
+        "dialogId": {
+          "type": "string"
+        },
+        "footer": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "height": {
+          "type": "string"
+        },
+        "href": {
+          "type": "string"
+        },
+        "hrefTemplate": {
+          "type": "string"
+        },
+        "identityParameters": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "inTab": {
+          "type": "boolean"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "modal": {
+          "type": "boolean"
+        },
+        "newInstance": {
+          "type": "boolean"
+        },
+        "parameters": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "rel": {
+          "type": "string"
+        },
+        "replaceHostedRegion": {
+          "type": "boolean"
+        },
+        "size": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "target": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "width": {
+          "type": "string"
+        },
+        "windowKey": {
+          "type": "string"
+        },
+        "windowTitle": {
+          "type": "string"
+        },
+        "windowTitleSelector": {
+          "type": "string"
+        },
+        "windowTitleSource": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "TableSort": {
+      "additionalProperties": true,
+      "properties": {
+        "columnId": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Tabs": {
+      "additionalProperties": true,
+      "properties": {
+        "animate": {
+          "type": "boolean"
+        },
+        "appearance": {
+          "type": "string"
+        },
+        "className": {
+          "type": "string"
+        },
+        "compact": {
+          "type": "boolean"
+        },
+        "dataSourceFetchMode": {
+          "type": "string"
+        },
+        "defaultSelectedTabId": {
+          "type": "string"
+        },
+        "fill": {
+          "type": "boolean"
+        },
+        "keepVisitedTabPanelsMounted": {
+          "type": "boolean"
+        },
+        "large": {
+          "type": "boolean"
+        },
+        "listTitle": {
+          "type": "string"
+        },
+        "presentation": {
+          "type": "string"
+        },
+        "renderActiveTabPanelOnly": {
+          "type": "boolean"
+        },
+        "selectedTabId": {
+          "type": "string"
+        },
+        "showBack": {
+          "type": "boolean"
+        },
+        "style": {
+          "type": "string"
+        },
+        "vertical": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "TargetSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "capabilities": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "excludePlatforms": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "formFactors": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "platforms": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "TemplateItem": {
+      "additionalProperties": true,
+      "properties": {
+        "dataField": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "optionLabel": {
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/Option"
+          },
+          "type": "array"
+        },
+        "placeholder": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "width": {
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "Terminal": {
+      "additionalProperties": true,
+      "properties": {
+        "autoScroll": {
+          "type": "boolean"
+        },
+        "dataSourceRef": {
+          "description": "DataSourceRef points to the data source that supplies terminal entries.",
+          "type": "string"
+        },
+        "height": {
+          "description": "Visual options",
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "showDividers": {
+          "type": "boolean"
+        },
+        "toolbar": {
+          "$ref": "#/$defs/Toolbar",
+          "description": "Optional toolbar to host actions (e.g., run, clear)."
+        },
+        "truncateLength": {
+          "type": "integer"
+        },
+        "truncateLongOutput": {
+          "description": "Truncation options for long outputs",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "Toolbar": {
+      "additionalProperties": true,
+      "properties": {
+        "className": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "density": {
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Item"
+          },
+          "type": "array"
+        },
+        "layout": {
+          "type": "string"
+        },
+        "modes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "placement": {
+          "type": "string"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleProperties"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "targetOverrides": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "TreeBrowser": {
+      "additionalProperties": true,
+      "properties": {
+        "childrenField": {
+          "type": "string"
+        },
+        "className": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "labelField": {
+          "type": "string"
+        },
+        "lazyExpand": {
+          "type": "boolean"
+        },
+        "on": {
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "pathField": {
+          "type": "string"
+        },
+        "separator": {
+          "type": "string"
+        },
+        "style": {
+          "$ref": "#/$defs/StyleProperties"
+        },
+        "subtitleField": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "valueField": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "TreeEditorSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "cascade": {
+          "type": "string"
+        },
+        "childrenField": {
+          "type": "string"
+        },
+        "collapsible": {
+          "type": "boolean"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "defaultExpandedDepth": {
+          "type": "integer"
+        },
+        "emptyMessage": {
+          "type": "string"
+        },
+        "excludedField": {
+          "type": "string"
+        },
+        "identityField": {
+          "type": "string"
+        },
+        "labelField": {
+          "type": "string"
+        },
+        "mutation": {
+          "$ref": "#/$defs/MutationCommand"
+        },
+        "searchable": {
+          "type": "boolean"
+        },
+        "selectedField": {
+          "type": "string"
+        },
+        "selectionMode": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "TypographyProperties": {
+      "additionalProperties": true,
+      "properties": {
+        "color": {
+          "type": "string"
+        },
+        "fontFamily": {
+          "type": "string"
+        },
+        "fontSize": {
+          "type": "string"
+        },
+        "fontWeight": {
+          "type": "string"
+        },
+        "letterSpacing": {
+          "type": "string"
+        },
+        "lineHeight": {
+          "type": "string"
+        },
+        "textAlign": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "UniqueKey": {
+      "additionalProperties": true,
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "parameter": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "Upload": {
+      "additionalProperties": true,
+      "properties": {
+        "endpoint": {
+          "description": "Endpoint key from frontend settings (SettingProvider.endpoints)",
+          "type": "string"
+        },
+        "path": {
+          "description": "Path relative to endpoint base (defaults to 'upload')",
+          "type": "string"
+        },
+        "uri": {
+          "description": "Uri destination (prefix) relative to backend file service root",
+          "type": "string"
+        },
+        "url": {
+          "description": "Absolute URL override. If set, takes precedence over endpoint/path.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "UploadCollectionSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "accept": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "blobField": {
+          "type": "string"
+        },
+        "emptyMessage": {
+          "type": "string"
+        },
+        "maxBytes": {
+          "type": "integer"
+        },
+        "maxFiles": {
+          "type": "integer"
+        },
+        "metadataField": {
+          "type": "string"
+        },
+        "multiple": {
+          "type": "boolean"
+        },
+        "transport": {
+          "type": "string"
+        },
+        "upload": {
+          "$ref": "#/$defs/MutationCommand"
+        }
+      },
+      "type": "object"
+    },
+    "View": {
+      "additionalProperties": true,
+      "properties": {
+        "content": {
+          "$ref": "#/$defs/Container"
+        },
+        "layout": {
+          "$ref": "#/$defs/Layout"
+        },
+        "on": {
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "targetOverrides": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "Window": {
+      "additionalProperties": true,
+      "properties": {
+        "actionAliases": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "actionRefs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "actions": {
+          "$ref": "#/$defs/Actions"
+        },
+        "authorization": {
+          "$ref": "#/$defs/AuthorizationSpec"
+        },
+        "chipIcon": {
+          "type": "string"
+        },
+        "chipName": {
+          "type": "string"
+        },
+        "dataSource": {
+          "additionalProperties": {
+            "$ref": "#/$defs/DataSource"
+          },
+          "type": "object"
+        },
+        "dialogs": {
+          "items": {
+            "$ref": "#/$defs/Dialog"
+          },
+          "type": "array"
+        },
+        "lookupLibraries": {
+          "items": {},
+          "type": "array"
+        },
+        "lookupOverlays": {
+          "items": {},
+          "type": "array"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "ns": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "on": {
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "parameters": {
+          "description": "Parameters retains authored window input declarations, including types,\nbindings and defaults, without converting them into datasource parameters.",
+          "items": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "presentation": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "resource": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1resource.ResolvedResource"
+        },
+        "resourceDependencies": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "resourceModels": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ResourceModel"
+          },
+          "type": "object"
+        },
+        "schemas": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ResourceSchema"
+          },
+          "type": "object"
+        },
+        "target": {
+          "$ref": "#/$defs/TargetSpec"
+        },
+        "targetOverrides": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "title": {
+          "description": "Title is the original authored display title; namespace is routing metadata.",
+          "type": "string"
+        },
+        "view": {
+          "$ref": "#/$defs/View"
+        },
+        "window": {
+          "$ref": "#/$defs/WindowSettings"
+        },
+        "windowKey": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "WindowResourceEnvelope": {
+      "additionalProperties": true,
+      "properties": {
+        "format": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "integer"
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/$defs/WindowTargetBinding"
+          },
+          "type": "array"
+        },
+        "variants": {
+          "additionalProperties": {
+            "$ref": "#/$defs/WindowResourceVariant"
+          },
+          "type": "object"
+        },
+        "viewMetadata": {
+          "description": "ViewMetadata retains the original authored view descriptor as owning-window\nmetadata. It grants no identity, permissions, or execution authority."
+        }
+      },
+      "type": "object"
+    },
+    "WindowResourceVariant": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSourceResources": {
+          "additionalProperties": {
+            "$ref": "#/$defs/github.com~1viant~1forge~1backend~1provider~1contract.DataSourceReference"
+          },
+          "type": "object"
+        },
+        "dataSources": {
+          "additionalProperties": {
+            "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.DataSource"
+          },
+          "type": "object"
+        },
+        "window": {
+          "$ref": "#/$defs/Window"
+        }
+      },
+      "type": "object"
+    },
+    "WindowSettings": {
+      "additionalProperties": true,
+      "properties": {
+        "on": {
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "titleBinding": {
+          "$ref": "#/$defs/WindowTitleBinding"
+        }
+      },
+      "type": "object"
+    },
+    "WindowTarget": {
+      "additionalProperties": true,
+      "properties": {
+        "capabilities": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "dependencyPins": {
+          "additionalProperties": {
+            "$ref": "#/$defs/github.com~1viant~1forge~1backend~1resource.ResolvedResource"
+          },
+          "description": "DependencyPins are runtime-only exact child authority snapshots. The\ntarget proof signs them; authored target declarations must omit them.",
+          "type": "object"
+        },
+        "executionProof": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1provider~1contract.ExecutionProof",
+          "description": "ExecutionProof is runtime-only original provider provenance. The host\ntarget MAC covers it; it never grants ACL or renews either lease."
+        },
+        "formFactor": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "selectionToken": {
+          "type": "string"
+        },
+        "surface": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "WindowTargetBinding": {
+      "additionalProperties": true,
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/WindowTarget"
+        },
+        "variant": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "WindowTitleBinding": {
+      "additionalProperties": true,
+      "properties": {
+        "controlId": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "domControlId": {
+          "type": "string"
+        },
+        "domSelector": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "selector": {
+          "type": "string"
+        },
+        "selectorCss": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "template": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "WizardSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "stateKey": {
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/WizardStep"
+          },
+          "type": "array"
+        },
+        "submit": {
+          "$ref": "#/$defs/MutationCommand"
+        }
+      },
+      "type": "object"
+    },
+    "WizardStep": {
+      "additionalProperties": true,
+      "properties": {
+        "containerId": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "validWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/datasource/contract.AuthorizationBinding": {
+      "additionalProperties": true,
+      "properties": {
+        "capabilities": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "includePrincipal": {
+          "type": "boolean"
+        },
+        "maxResourceIds": {
+          "type": "integer"
+        },
+        "resourceIdsArgument": {
+          "type": "string"
+        },
+        "resourceType": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/datasource/contract.Backend": {
+      "additionalProperties": true,
+      "properties": {
+        "authorization": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.AuthorizationBinding"
+        },
+        "calls": {
+          "items": {
+            "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.MCPCall"
+          },
+          "type": "array"
+        },
+        "component": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1window~1contract.ComponentBinding"
+        },
+        "fanout": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.MCPFanout"
+        },
+        "feed": {
+          "description": "feed_ref",
+          "type": "string"
+        },
+        "inlineFilters": {
+          "description": "InlineFilters explicitly opt fixtures into request-scoped filtering.",
+          "items": {
+            "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.InlineFilter"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.BackendKind"
+        },
+        "mcpRequest": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.MCPRequestBinding",
+          "description": "MCPRequest declares where an authored report query is placed in tool\narguments. Report compilers require an explicit mapping."
+        },
+        "method": {
+          "type": "string"
+        },
+        "ownership": {
+          "description": "Ownership=provider retains execution at the selected resource provider.",
+          "type": "string"
+        },
+        "pinned": {
+          "additionalProperties": {},
+          "description": "Pinned args — fixed inputs the workspace author sets. On merge with\ncaller-supplied inputs, Pinned wins on conflict.",
+          "type": "object"
+        },
+        "producerKind": {
+          "description": "ProducerKind is host-owned classification. Datly requires an exact component pin.",
+          "type": "string"
+        },
+        "requestMetadata": {
+          "description": "RequestMetadata names literal top-level logical request keys omitted only\nfrom MCP transport arguments. Cache and admission identity retain these keys.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "rows": {
+          "description": "inline",
+          "items": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "serverVersion": {
+          "type": "string"
+        },
+        "service": {
+          "description": "mcp_tool",
+          "type": "string"
+        },
+        "sort": {
+          "items": {
+            "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.SortField"
+          },
+          "type": "array"
+        },
+        "uri": {
+          "description": "mcp_resource",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/datasource/contract.BackendKind": {
+      "type": "string"
+    },
+    "github.com/viant/forge/backend/datasource/contract.CachePolicy": {
+      "additionalProperties": true,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "key": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "maxEntries": {
+          "type": "integer"
+        },
+        "refreshPolicy": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.RefreshPolicy"
+        },
+        "scope": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.CacheScope"
+        },
+        "ttl": {}
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/datasource/contract.CacheScope": {
+      "type": "string"
+    },
+    "github.com/viant/forge/backend/datasource/contract.DataSource": {
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/DataSource"
+        }
+      ],
+      "properties": {
+        "backend": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.Backend",
+          "description": "Backend describes the upstream source. Required."
+        },
+        "cache": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.CachePolicy",
+          "description": "Cache policy. When nil, defaults apply (enabled=true, scope=user,\nttl=30m, refreshPolicy=stale-while-revalidate, maxEntries=5000).\nWriters should declare cache: {enabled:false}; datasource semantics are\nnever inferred from a tool name or HTTP method."
+        },
+        "id": {
+          "description": "ID uniquely identifies this datasource within a workspace. It is\nalso the URL path segment used by the HTTP endpoint\n/v1/api/datasources/{id}/fetch.",
+          "type": "string"
+        },
+        "responseAliases": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "ResponseAliases maps logical top-level row keys to exact producer keys.\nIt applies only to newly fetched rows, preserving original keys/values.",
+          "type": "object"
+        },
+        "title": {
+          "description": "Title is a human-readable label shown in admin UIs. Optional.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/datasource/contract.InlineFilter": {
+      "additionalProperties": true,
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "input": {
+          "type": "string"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/datasource/contract.ListArgument": {
+      "additionalProperties": true,
+      "properties": {
+        "fields": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "target": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/datasource/contract.MCPCall": {
+      "additionalProperties": true,
+      "properties": {
+        "args": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "constants": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "fieldMap": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "id": {
+          "type": "string"
+        },
+        "ignoreNotFound": {
+          "type": "boolean"
+        },
+        "method": {
+          "type": "string"
+        },
+        "pinned": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "service": {
+          "type": "string"
+        },
+        "valueMaps": {
+          "additionalProperties": {
+            "additionalProperties": {},
+            "type": "object"
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/datasource/contract.MCPFanout": {
+      "additionalProperties": true,
+      "properties": {
+        "call": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.MCPCall"
+        },
+        "fieldMap": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "includeUnresolved": {
+          "type": "boolean"
+        },
+        "itemsSelector": {
+          "type": "string"
+        },
+        "listArgument": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.ListArgument"
+        },
+        "resultKey": {
+          "type": "string"
+        },
+        "resultMap": {
+          "type": "string"
+        },
+        "seed": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.MCPCall"
+        },
+        "unmappedAsUnresolved": {
+          "type": "boolean"
+        },
+        "valueSets": {
+          "items": {
+            "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.ValueSet"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/datasource/contract.MCPRequestBinding": {
+      "additionalProperties": true,
+      "properties": {
+        "authContextPath": {
+          "description": "AuthContextPath receives a server-verified auth.Context value, including\nthe current narrowed allowedEntities. Never populate it from authored\nreport input or caller-provided datasource arguments.",
+          "type": "string"
+        },
+        "completeResult": {
+          "description": "CompleteResult is a server-owned assertion that the tool returns the\nentire result in one call. When false, report callers require an explicit\nhasMore signal and an offset page to prove completeness.",
+          "type": "boolean"
+        },
+        "dataSourcePath": {
+          "type": "string"
+        },
+        "hasMorePath": {
+          "description": "HasMorePath is the exact path in the projected DataInfo object used by\nreport callers to determine whether another offset page exists.",
+          "type": "string"
+        },
+        "queryPath": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/datasource/contract.RefreshPolicy": {
+      "type": "string"
+    },
+    "github.com/viant/forge/backend/datasource/contract.SortField": {
+      "additionalProperties": true,
+      "properties": {
+        "direction": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/datasource/contract.ValueSet": {
+      "additionalProperties": true,
+      "properties": {
+        "constants": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "selector": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/provider/contract.DataSourceReference": {
+      "additionalProperties": true,
+      "properties": {
+        "contentFingerprint": {
+          "type": "string"
+        },
+        "providerIdentity": {
+          "type": "string"
+        },
+        "resource": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1resource.ResourceRef"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/provider/contract.ExecutionProof": {
+      "additionalProperties": true,
+      "properties": {
+        "binding": {
+          "type": "string"
+        },
+        "resource": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1resource.ResolvedResource"
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/provider/contract.MCPAppClosure": {
+      "additionalProperties": true,
+      "properties": {
+        "entryPath": {
+          "type": "string"
+        },
+        "entrySHA256": {
+          "type": "string"
+        },
+        "fingerprint": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/resource.ResolvedResource": {
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1resource.ResourceCandidate"
+        }
+      ],
+      "properties": {
+        "authorityBinding": {
+          "description": "AuthorityBinding is recomputed by trusted policy from the current verified\nprincipal, account and authority revision. Client text grants no authority.",
+          "type": "string"
+        },
+        "providerIdentity": {
+          "description": "ProviderIdentity is host-declared instance provenance. It is separate\nfrom the logical URI and must match the executing resolver when present.",
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "validUntil": {
+          "format": "date-time",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/resource.ResourceCandidate": {
+      "additionalProperties": true,
+      "properties": {
+        "contentFingerprint": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/resource.ResourceRef": {
+      "additionalProperties": true,
+      "properties": {
+        "revision": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/window/contract.ComponentBinding": {
+      "additionalProperties": true,
+      "properties": {
+        "contentFingerprint": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "schemaFingerprint": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/Window",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "x-forge-provenance": {
+    "baseCommit": "f5fae310ed5ad13e54f8e3a02438a92f95d2d7f3",
+    "generator": "scripts/window-schema/main.go",
+    "sha256": {
+      "datasource_projection.go": "854b7858c0e997ea0e84bb3a91c9805c8ed728c39a8b740713e524cc43529ec9",
+      "form.go": "aa2114822f1e688942aa4b63ec51c4b4c0f728b44b6d82b8b04fbf95efa807f0",
+      "github.com/viant/forge/backend/datasource/contract.datasource.go": "597d1879ea032c9a94f0797ce2f40b566ac96abea729f7875a8881ec3a590293",
+      "github.com/viant/forge/backend/datasource/contract.denial.go": "33f9f5fd666591f7b90392b410efe982051197652fa18881f8f2a238b7e24d05",
+      "github.com/viant/forge/backend/provider/contract.catalog.go": "570746519947177f2681e7ce63da4461173f129149bdfdcb4d22eaf12d6fc1d7",
+      "github.com/viant/forge/backend/provider/contract.datasource.go": "a29fb4c0208c3036e572d9bd952e3df0ef6c99362a85249ce5067f1d2820c932",
+      "github.com/viant/forge/backend/provider/contract.lifecycle.go": "e4ffdcd8a6660bc325a894206df8f0162b88cd677d1f4ecd01f81c3d7b471bda",
+      "github.com/viant/forge/backend/provider/contract.mcp_app.go": "a52f98962f47f5766d96a451465297f2728a32504509514dbd511b4ab74a134d",
+      "github.com/viant/forge/backend/provider/contract.methods.go": "7fa0e8bc2df0fefb6b0f6ac3a77912dd3555b9826c9c0fdbb21a9ad3e446dd63",
+      "github.com/viant/forge/backend/provider/contract.model.go": "fd8546cc7a8a3a40288eba267c771dc45584b563cc9b1a2e6d8ee11656d5096b",
+      "github.com/viant/forge/backend/provider/contract.toolfeed.go": "67049e40066c4f0594a8f799d202159cbe73ab224128612f73462897819db50f",
+      "github.com/viant/forge/backend/resource.actor.go": "514487161fff419ba4a593e267eb6f997e67decaa18070fce8ef113449feeb2e",
+      "github.com/viant/forge/backend/resource.authority.go": "1e4c2912a8a4f78e4db3d88f708b39703986999fcbd45256cdc14400faafbbd9",
+      "github.com/viant/forge/backend/resource.list_scope.go": "596f33704067305c360de81d501bcdd743465c2ab12857002082c4dee3ea9285",
+      "github.com/viant/forge/backend/resource.metadata_expiry.go": "80024234c7390ec0f29edef05627019e70f703b3bf295dfeda5518d93cae7851",
+      "github.com/viant/forge/backend/resource.policy_id.go": "d758c5d33930277b10e57938b989ed7c199999dd2a42a7014fc072891ac2c59e",
+      "github.com/viant/forge/backend/resource.renewal.go": "8ec8a5ac014ea46027bc7af3f0da0e0fd55d58cf615dcd5092a5ba3266ed7bf8",
+      "github.com/viant/forge/backend/resource.resource.go": "b9a066383710fcb6047f18183fd539278153a4832abd4a546484a341934a2828",
+      "github.com/viant/forge/backend/resource.selection_binding.go": "a09f48c8aef6c4395435e1e73beba7cbeb47c4f803761da126a38d450926890b",
+      "github.com/viant/forge/backend/window/contract.component.go": "1f3b9b0e6ff7b707dfbbae3d9ecafaa145c5a8eb682156da64290464717eb1d8",
+      "github.com/viant/forge/backend/window/contract.model.go": "3f7687bb19b0849e8322404ee29d397c17c088a5071feba02f3f05c1f3d75681",
+      "github.com/viant/forge/backend/window/contract.presentation.go": "239b91f0d3dd60a87b46d1b33ac8e45d15beb7b94d2b0aed01e2fa14d464250a",
+      "github.com/viant/forge/backend/window/contract.resource.go": "3d405993972615d81f63d4f8fdf1ed99539af092353f20e7b80005fd196fc467",
+      "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
+      "model.go": "3da975c78d17da28d5cbafddba4df37cd282e703f80307f14f0bf60ca6839d5b",
+      "presentation_primitives.go": "69ece4b1e8d7ddc365d6b618069406d4f4e8be0fcfb708cceb5a48d323610ea4",
+      "resource_model.go": "2d09c19334a806ae9879b9e022e403640cc5ca0f7cabe494b38aaa86881cd610",
+      "resource_model_validation.go": "be1cb0525d5f0a2f609775e46b2fe2cb7a3f74dd4160fed26764bfd3a9fa8fb4",
+      "window_compiled_resource.go": "4ef03d542848c1d062238e59cb84b99c33e51007a021690412e53a85232f4905",
+      "window_descriptor.go": "bfb7555db206ad6122b8dcdf7b805bec2a98ca2a18c167716554ff1803994d5d",
+      "window_resource.go": "e4df4c63255a775d4aab5cd8dcfd171c697ad76f4c1e90691c4f33dad9cf424f",
+      "window_target_proof.go": "53605c132aae2b8c8d6e377daaae416f347e0ff8c48a39fb2a0f15f95ad5faeb",
+      "workflow_primitives.go": "13b3ab4a61ba77144e639c282208b892794f0c0a3c58a2f5b829826de9614d79"
+    },
+    "sourceNote": "Generated from committed canonical Forge authored model and Forge-owned public contracts; SHA-256 identifies every parsed source file."
+  }
+}

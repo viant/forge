@@ -1,0 +1,16 @@
+import assert from "node:assert/strict";
+import React from "react";
+import {renderToStaticMarkup} from "react-dom/server";
+import ReportCatalog, {ReportCard} from "./ReportCatalog.jsx";
+import {normalizeReportCatalogResources} from "./reportCatalogResources.js";
+const [report] = normalizeReportCatalogResources([{resourceUri:"report://analytics/performance",title:"Performance",ownerId:"analytics team",capabilities:{open:true,run:false,edit:true}}]);
+const card = renderToStaticMarkup(<ReportCard report={report} />);
+assert.ok(card.includes("Performance") && card.includes("analytics team") && card.includes("analytics"));
+assert.match(card,/<button[^>]*disabled[^>]*>[\s\S]*?Run/);
+assert.ok(!card.includes("More actions for"),"no menu when no server menu capability");
+for (const label of ["Built-in", "preset", "Customize", "Saved report"]) assert.ok(!card.includes(label));
+const catalog = renderToStaticMarkup(<ReportCatalog container={{reportCatalog:{presets:[{id:"unsupported",title:"Forbidden fallback entry"}]}}} context={{}} />);
+assert.ok(catalog.includes("All reports") && catalog.includes("Current user"));
+assert.ok(!catalog.includes("Current order"),"optional order filter is omitted without an order context");
+assert.ok(!catalog.includes("Forbidden fallback entry") && !catalog.includes("Built-in") && !catalog.includes("presets"));
+console.log("ReportCatalog.render ✓ unified naming/actions, capability denial, server-only source, optional order scope");

@@ -3,6 +3,7 @@ import {
   normalizeGeoKey,
   US_STATE_TILES,
 } from "../components/dashboard/geoMapUtils.js";
+import {WORLD_COUNTRY_PATHS, countryRegionsByKey} from '../components/dashboard/worldCountryModel.js';
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -119,6 +120,22 @@ export function buildReportPrintGeoSvg({
     };
   }
 
+  if (geo.shape === 'world') {
+    const regions = Array.isArray(geo.regions) ? geo.regions : [];
+    if (!regions.length) return {svg:'',height:0,diagnostics:[buildGeoDiagnostic('emptyReportPrintGeo','Geo block has no regions to lower into ReportPrint.')]};
+    const byKey = countryRegionsByKey(regions);
+    const mapHeight = width * 500 / 960;
+    const countries = WORLD_COUNTRY_PATHS.map(country => {
+      const region = byKey.get(country.key);
+      const color = escapeXml(region?.color || '#e6edf2');
+      const title = escapeXml(`${country.label}: ${region?.displayValue || 'No data'}`);
+      return `<path d="${country.path}" fill="${color}" stroke="#bccbd6" stroke-width=".65"><title>${title}</title></path>${region && country.small ? `<circle cx="${country.center[0]}" cy="${country.center[1]}" r="2.5" fill="${color}" stroke="#fff" stroke-width=".6"><title>${title}</title></circle>` : ''}`;
+    }).join('');
+    const legend = buildLegendSvg(geo.legend,0,mapHeight+24,width);
+    const ranking = buildRankingSvg(geo.ranking,0,mapHeight+48,width);
+    const height = mapHeight + 56 + ranking.height;
+    return {svg:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}"><g transform="scale(${width/960})">${countries}</g>${legend.svg}${ranking.svg}</svg>`,height,diagnostics:[]};
+  }
   const tiles = resolveGeoTiles(geo?.shape);
   if (!tiles) {
     return {

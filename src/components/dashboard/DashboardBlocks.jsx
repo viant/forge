@@ -4,6 +4,8 @@ import {useSignals} from '@preact/signals-react/runtime';
 import {Icon} from '@blueprintjs/core';
 import {useDataSourceState} from "../../hooks/useDataSourceState.js";
 import Chart from "../Chart.jsx";
+import WorldCountryMap from "./WorldCountryMap.jsx";
+import {WORLD_COUNTRY_PATHS} from "./worldCountryModel.js";
 import {resolveKey} from "../../utils/selector.js";
 import ReportBuilder from "./ReportBuilder.jsx";
 import ReportCatalog from "./ReportCatalog.jsx";
@@ -533,7 +535,7 @@ export function DashboardGeoMap({container, context}) {
     const regions = useMemo(() => {
         const tiles = config.shape === 'us-states' || config.shape === 'us-state-tiles'
             ? US_STATE_TILES
-            : [];
+            : config.shape === 'world' ? WORLD_COUNTRY_PATHS : [];
         return tiles.map((tile) => {
             const entry = geoRows.get(tile.key);
             const dataRow = entry?.row || null;
@@ -554,7 +556,7 @@ export function DashboardGeoMap({container, context}) {
         });
     }, [config, geoRows, locale, valueRange]);
 
-    const selectedKey = normalizeGeoKey(dashboardSelection?.entityKey);
+    const selectedKey = normalizeGeoKey(dashboardSelection?.entityKey, config.shape);
     const sortedRegions = useMemo(
         () => regions
             .filter((region) => Number.isFinite(Number(region.value)))
@@ -597,7 +599,7 @@ export function DashboardGeoMap({container, context}) {
         }
     };
 
-    if (config.shape !== 'us-states' && config.shape !== 'us-state-tiles') {
+    if (config.shape !== 'us-states' && config.shape !== 'us-state-tiles' && config.shape !== 'world') {
         return (
             <Panel container={container}>
                 <div style={subtitleStyle}>Unsupported geo shape: {config.shape}</div>
@@ -620,7 +622,7 @@ export function DashboardGeoMap({container, context}) {
                         <span><strong>{formatDashboardValue(totalValue, config.format, locale)}</strong> Total {config.metricLabel}</span>
                         <span><strong>{topRegion?.key || '-'}</strong> Top Region</span>
                     </div>
-                    <div className="forge-dashboard-geo-map" role="list" aria-label={container.title || 'Geo map'}>
+                    <>{config.shape === 'world' ? <WorldCountryMap title={container.title || 'Country map'} regions={regions.filter(region => region.dataRow).map(region => ({...region, displayValue:region.formattedValue}))} onSelect={region => {setHoveredKey(region.key);onSelect(region);}}/> : <div className="forge-dashboard-geo-map" role="list" aria-label={container.title || 'Geo map'}>
                         {regions.map((region, index) => {
                             const isSelected = selectedKey === region.key;
                             const isEmpty = !region.dataRow;
@@ -650,7 +652,7 @@ export function DashboardGeoMap({container, context}) {
                                 </button>
                             );
                         })}
-                    </div>
+                    </div>}</>
                 </div>
                 <aside className="forge-dashboard-geo-detail">
                     <div
