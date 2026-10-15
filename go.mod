@@ -5,18 +5,33 @@ go 1.25.8
 require (
 	codeberg.org/go-pdf/fpdf v0.10.0
 	github.com/fsnotify/fsnotify v1.8.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/google/uuid v1.6.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/stretchr/testify v1.11.1
+	github.com/tidwall/gjson v1.20.0
 	github.com/viant/afs v1.30.1-0.20260914155934-90e95d483861
+	github.com/viant/authz v0.0.0-20261014234113-96042135a76f
+	github.com/viant/jsonrpc v0.25.1-0.20261014230436-c7e03c1c46eb
+	github.com/viant/mcp v0.24.1-0.20261014183435-4ede589f52da
+	github.com/viant/mcp-protocol v0.19.1-0.20261014173008-af92f34f304b
 	github.com/xuri/excelize/v2 v2.10.0
 	golang.org/x/image v0.33.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
-	github.com/kr/pretty v0.3.0 // indirect
-	github.com/rogpeppe/go-internal v1.9.0 // indirect
-	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
+	cloud.google.com/go/compute/metadata v0.9.0 // indirect
+	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
+	github.com/kr/text v0.2.0 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.1 // indirect
+	github.com/viant/gosh v0.3.0 // indirect
+	github.com/viant/scy v0.30.0 // indirect
+	github.com/viant/toolbox v0.37.1-0.20241210210120-32350b063cf8 // indirect
+	github.com/viant/xunsafe v0.11.0 // indirect
+	golang.org/x/oauth2 v0.32.0 // indirect
 )
 
 require (
