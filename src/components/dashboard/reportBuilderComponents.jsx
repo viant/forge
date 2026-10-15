@@ -2045,6 +2045,7 @@ export function ReportBuilderDocumentBlockDialog({
     const geoShapeOptions = [
         { value: "us-states", label: "US states" },
         { value: "us-state-tiles", label: "US state tiles" },
+        { value: "world", label: "World countries" },
     ];
     const errors = Array.isArray(validation?.errors) ? validation.errors : [];
     const errorByField = new Map();

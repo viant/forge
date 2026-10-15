@@ -113,6 +113,7 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
                 widget = 'datetime';
             } else if (p.format === 'json') {
                 widget = 'object';
+
             } else if (Array.isArray(p.enum) && p.enum.length > 0) {
                 // 3. Enum mapping ------------------------------------------
                 widget = 'select';

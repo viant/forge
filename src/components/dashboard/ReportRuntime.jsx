@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Icon } from "@blueprintjs/core";
 
 import Chart from "../Chart.jsx";
+import WorldCountryMap from "./WorldCountryMap.jsx";
 import SectionTabRail from "../SectionTabRail.jsx";
 import {
   REPORT_LAYOUT_GRID_COLUMNS,
@@ -2637,7 +2638,8 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
     ? content.resolvedGeo
     : {};
   const shape = normalizeString(resolvedGeo?.shape || geo?.shape || "us-states");
-  const supportedShape = shape === "us-states" || shape === "us-state-tiles";
+  const supportedShape = shape === "us-states" || shape === "us-state-tiles" || shape === "world";
+  const [selectedRegion, setSelectedRegion] = useState(null);
   const regions = Array.isArray(resolvedGeo?.regions) ? resolvedGeo.regions : [];
   const ranking = Array.isArray(resolvedGeo?.ranking) ? resolvedGeo.ranking : [];
   const regionsByKey = new Map(
@@ -2651,9 +2653,9 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
       region: regionsByKey.get(tile.key) || null,
     }))
     : [];
-  const activeRegion = resolvedGeo?.activeRegion && typeof resolvedGeo.activeRegion === "object" && !Array.isArray(resolvedGeo.activeRegion)
+  const activeRegion = selectedRegion || (resolvedGeo?.activeRegion && typeof resolvedGeo.activeRegion === "object" && !Array.isArray(resolvedGeo.activeRegion)
     ? resolvedGeo.activeRegion
-    : (ranking[0] || null);
+    : (ranking[0] || null));
   const legend = resolvedGeo?.legend && typeof resolvedGeo.legend === "object" && !Array.isArray(resolvedGeo.legend)
     ? resolvedGeo.legend
     : null;
@@ -2692,7 +2694,7 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
               <span><strong>{normalizeString(resolvedGeo?.summary?.totalValue || "-")}</strong> Total</span>
               <span><strong>{normalizeString(resolvedGeo?.summary?.topKey || "-")}</strong> Top Region</span>
             </div>
-            <div
+            {shape === "world" ? <WorldCountryMap regions={regions} title={normalizeString(block?.title || "Country map")} onSelect={setSelectedRegion}/> : <div
               role="list"
               className="forge-report-runtime-geo-tiles"
               aria-label={normalizeString(block?.title || "Geo map")}
@@ -2731,7 +2733,7 @@ function GeoMapBlock({ block = {}, diagnostics = [], onRetryProviderActions = nu
                   </div>
                 );
               })}
-            </div>
+            </div>}
             {legend ? (
               Array.isArray(legend?.rules) && legend.rules.length > 0 ? (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: "var(--forge-report-type-caption-size, 11px)", lineHeight: "var(--forge-report-type-caption-line-height, normal)", color: "var(--forge-report-text-secondary, #30404d)" }}>
