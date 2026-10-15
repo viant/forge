@@ -1007,6 +1007,7 @@ function WindowContentInner({window, metadata, services}) {
     //   cancel: { handler?: 'ns.fn', label?: 'Cancel' }
     // }
     const FloatingFooter = () => {
+        useSignals();
         if (!context) return null;
         const dsCtx = context.Context(context.identity.dataSourceRef);
         const selectionValue = dsCtx?.signals?.selection?.value;
