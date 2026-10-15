@@ -190,7 +190,7 @@ type dependencyStack struct {
 	opened         *forgeMCP.WindowDefinitionGetOutput
 }
 
-func newDependencyStack(t *testing.T, childLease time.Time) *dependencyStack {
+func newDependencyStack(t *testing.T, childLease time.Time, parentCacheScopes ...map[string]string) *dependencyStack {
 	t.Helper()
 	ctx := context.Background()
 	now := time.Now().UTC()
@@ -228,6 +228,9 @@ func newDependencyStack(t *testing.T, childLease time.Time) *dependencyStack {
 	childProvider := &dependencyMCPProvider{owner: "child-provider", items: map[string]*dependencyResource{childURI: child}}
 	providers := map[string]mcpclient.Interface{"parent": provider, "child": childProvider}
 	options := fixtureOptions{"parent": &cfg.MCPClient{}, "child": &cfg.MCPClient{}}
+	if len(parentCacheScopes) > 0 {
+		options["parent"].ResourceCacheScopes = parentCacheScopes[0]
+	}
 	mgr, err := manager.New(options, manager.WithClientFactory(func(_ context.Context, _, name string) (mcpclient.Interface, error) { return providers[name], nil }))
 	require.NoError(t, err)
 	t.Cleanup(func() { mgr.CloseConversation("") })
