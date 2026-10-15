@@ -979,7 +979,7 @@ func get[T any](ctx context.Context, g *Gateway, connection Connection, ref iden
 	if sequence := sequenceFromContext(ctx); sequence != nil && !force {
 		result, found, e = sequence.reportRead(connection, pin, binding.key)
 		if e == nil && !found {
-			result, found, e = sequence.selectedRead(ctx, connection, pin, binding.key)
+			result, cacheReference, found, e = sequence.selectedRead(ctx, connection, pin, binding.key)
 		}
 	}
 	if e == nil {
@@ -1061,7 +1061,7 @@ func get[T any](ctx context.Context, g *Gateway, connection Connection, ref iden
 		return nil, identity.ErrResourceDenied
 	}
 	if sequence := sequenceFromContext(ctx); sequence != nil && !force && !found {
-		if err := sequence.recordSelectedRead(ctx, connection, pin, &result, binding.key); err != nil {
+		if err := sequence.recordSelectedRead(ctx, connection, pin, &result, binding.key, cacheReference); err != nil {
 			return nil, err
 		}
 	}

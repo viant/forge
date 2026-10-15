@@ -28,7 +28,7 @@ func TestSelectedMetadataAllowsNoExpiryButExecutionProofRequiresDeadline(t *test
 				}
 			}
 			state := &resourceReadSequence{gateway: &Gateway{Now: time.Now}, active: true, selection: &selectedDatasourceBundle{resources: map[string]selectedResourceRead{selectionResourceID(connection, pin): {connection: connection, pin: pin, result: result, key: "original-binding"}}}}
-			got, found, err := state.selectedRead(context.Background(), connection, &pin, "original-binding")
+			got, _, found, err := state.selectedRead(context.Background(), connection, &pin, "original-binding")
 			if condition == "notification-bound" {
 				require.NoError(t, err)
 				require.True(t, found)

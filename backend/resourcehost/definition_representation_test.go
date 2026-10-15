@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/viant/forge/backend/clientpool"
 	"github.com/viant/forge/backend/provider/contract/observe"
+	"github.com/viant/forge/backend/requestctx"
 	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
 	mcpclient "github.com/viant/mcp/client"
@@ -100,6 +101,11 @@ func TestDatasourceResolutionReusesOpenedWindowRepresentation(t *testing.T) {
 		}
 	}))
 	pin, target := *stack.opened.Definition.Resource, stack.opened.Definition.ResourceTarget
+	ctx, err := requestctx.WithResourceReadAssociation(ctx, &pin, target)
+	require.NoError(t, err)
+	ctx, finish, err := stack.gateway.BeginReadSequence(ctx, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, finish()) })
 	first, err := stack.catalog.ResolveDatasource(ctx, pin, target, "orders")
 	require.NoError(t, err)
 	first.ID = "caller-mutated"
