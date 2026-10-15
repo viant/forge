@@ -115,6 +115,8 @@ github.com/viant/mcp v0.24.1-0.20261014183435-4ede589f52da h1:23UH4uXo4QN77mapxH
 github.com/viant/mcp v0.24.1-0.20261014183435-4ede589f52da/go.mod h1:FugrWHC2uxjpRh+7X77taoLiGTywmDg6pkwFdlJuHt4=
 github.com/viant/mcp v0.24.1-0.20261015004649-02abcc0b8cae h1:8tHO0ZxTRmZRnT/hMwRKMjOddZ8ynudn8gpPn6QJLew=
 github.com/viant/mcp v0.24.1-0.20261015004649-02abcc0b8cae/go.mod h1:Yn0ypkLtyn531y0pQTGBdNU8mFtEJlW+r76YoFaOAY0=
+github.com/viant/mcp v0.24.1-0.20261015005417-1d6bc8f12751 h1:wcPDMHb87wIzhwxd+EWpUD1+hzfBW+7vKYJFf41OGek=
+github.com/viant/mcp v0.24.1-0.20261015005417-1d6bc8f12751/go.mod h1:Yn0ypkLtyn531y0pQTGBdNU8mFtEJlW+r76YoFaOAY0=
 github.com/viant/mcp-protocol v0.19.1-0.20261014173008-af92f34f304b h1:0VPbrlB8gbHLc1zrwbFW+f3IowORM5MmqpldnWm0+eY=
 github.com/viant/mcp-protocol v0.19.1-0.20261014173008-af92f34f304b/go.mod h1:8h2yGk/LjWpyLqQEZYOGuNZQPohCr1vtM8IvtcNcEIQ=
 github.com/viant/scy v0.30.0 h1:GhfyqxSP5+I2XUVfb7Gt05lOJmJEZ9V16hRYW7g8N1w=
@@ -169,6 +171,8 @@ golang.org/x/oauth2 v0.32.0/go.mod h1:lzm5WQJQwKZ3nwavOZ3IS5Aulzxi68dUSgRHujetwE
 golang.org/x/sync v0.0.0-20190423024810-112230192c58/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
 golang.org/x/sync v0.1.0/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
+golang.org/x/sync v0.24.0 h1:iqiDrGoDgyuvAKrhLQthUEzU/R378N78gXbBjxed7oA=
+golang.org/x/sync v0.24.0/go.mod h1:sUUOizhqBxiL6pEWpqNLUiaJn1ShEbZ6BBqskPbjZm0=
 golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
 golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
