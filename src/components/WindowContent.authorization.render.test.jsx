@@ -45,6 +45,22 @@ function definition(withRows = false) {
     dataSource: withRows ? {rows:{service:{uri:'mcp://opaque/rows'}, selectionMode:'none'}} : {},
     view:{content:{id:'authorized-root',kind:'test.authorized', ...(withRows ? {dataSourceRef:'rows'} : {})}}};
 }
+
+it('updates a floating picker footer when its selection changes', async () => {
+  const metadata={dataSource:{rows:{selectionMode:'single',cardinality:'many',autoFetch:false,parameters:[]}},
+    view:{content:{id:'picker-root',kind:'test.authorized',dataSourceRef:'rows'}}};
+  await mount({dataConnectorTransport:async()=>({data:metadata})},
+    {windowId,windowKey:'window://example/picker',inTab:false,isModal:true,footer:{ok:{label:'Select customer'}}});
+  await flush();
+  const confirm=()=>[...element.querySelectorAll('button')].find(button=>button.textContent==='Select customer');
+  expect(confirm().disabled).toBe(true);
+  await act(async()=>{latestRendererContext.signals.selection.value={selected:{id:802},rowIndex:1};});
+  expect(confirm().disabled).toBe(false);
+  await act(async()=>{latestRendererContext.signals.selection.value={selected:null,rowIndex:-1};});
+  expect(confirm().disabled).toBe(true);
+  await act(async()=>{latestRendererContext.signals.selection.value={selection:[{id:801},{id:802}]};});
+  expect(confirm().disabled).toBe(false);
+});
 describe('mounted protected window absolute lease', () => {
 	 it('keeps a successfully opened MCP-managed view mounted after its hint lease', async () => {
 	   let metadataRequests=0, permissions=0;
