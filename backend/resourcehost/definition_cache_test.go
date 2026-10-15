@@ -233,3 +233,36 @@ func TestGenericDefinitionCacheDeclaredConversationScopeSeparatesLogicalConversa
 	}
 	require.Equal(t, 2, source.count(uri), "same credential and connection, two distinct conversation metadata slots")
 }
+
+func TestPublicWorkingDefinitionCachesUntilInvalidation(t *testing.T) {
+	for _, revision := range []string{"", identity.WorkingCandidate} {
+		t.Run("selector="+revision, func(t *testing.T) {
+			const uri = "window://shared/live"
+			source := &definitionCacheProvider{dependencyMCPProvider: &dependencyMCPProvider{owner: "provider", items: map[string]*dependencyResource{uri: {raw: json.RawMessage(`{"title":"original"}`), formatVersion: 1, revision: identity.WorkingCandidate, authorityBinding: "neutral-definition"}}}, gets: map[string]int{}}
+			mgr, err := manager.New(fixtureOptions{"source": {PrimitiveProviderIdentity: "provider", ResourceCacheScopes: map[string]string{"shared": cfg.ResourceCachePublic}}}, manager.WithClientFactory(func(context.Context, string, string) (mcpclient.Interface, error) { return source, nil }))
+			require.NoError(t, err)
+			defer mgr.CloseConversation("")
+			g := NewGateway(mgr, func(context.Context) (identity.VerifiedActor, error) {
+				return identity.VerifiedActor{PublicRead: true}, nil
+			}, func(context.Context, identity.VerifiedActor) error { return nil }, "gateway")
+			defer g.Close()
+			get := func(subject string) *Result[json.RawMessage] {
+				ctx := cacheUser(subject, subject+"-token", subject+"-conversation")
+				connection, err := g.ConnectionForResource(ctx, mustCacheURI(t, uri), "provider")
+				require.NoError(t, err)
+				result, err := Get[json.RawMessage](ctx, g, connection, identity.ResourceRef{URI: uri, Revision: revision}, nil)
+				require.NoError(t, err)
+				return result
+			}
+			first := get("alice")
+			first.Definition[0] = 'X'
+			require.JSONEq(t, `{"title":"original"}`, string(get("bob").Definition))
+			require.Equal(t, 1, source.count(uri), "public working metadata must not be reconstructed for every user or request")
+			source.items[uri].raw = json.RawMessage(`{"title":"updated"}`)
+			require.JSONEq(t, `{"title":"original"}`, string(get("alice").Definition))
+			g.Invalidate("source")
+			require.JSONEq(t, `{"title":"updated"}`, string(get("alice").Definition))
+			require.Equal(t, 2, source.count(uri))
+		})
+	}
+}
