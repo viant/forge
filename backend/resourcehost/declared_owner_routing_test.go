@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -83,6 +84,10 @@ func TestDeclaredOwnerRoutingDoesNotContactUnrelatedOfflineProvider(t *testing.T
 				require.Equal(t, uri.String(), definition.Definition.Resource.URI)
 				require.Zero(t, remoteCalls, "known local windows must not discover unrelated MCP connections")
 			}
+			resolved, err := ResolveDefinitionIn[json.RawMessage](context.Background(), g, "window", "sales", DefinitionScope{Namespace: "example", ProviderIdentity: "native-owner"}, func(json.RawMessage) string { return "sales" })
+			require.NoError(t, err)
+			require.Equal(t, uri.String(), resolved.Resource.URI)
+			require.Zero(t, remoteCalls, "scoped aliases must not discover unrelated MCP connections")
 			local.after = func(method string) {
 				if method == "windows/get" {
 					revoked = true
