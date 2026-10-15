@@ -163,12 +163,22 @@ func (s *NativeAssetSnapshot) Reload(ctx context.Context) error {
 		}
 		uri, _ := identity.ParseResourceURI(definition.URI)
 		validator := s.options.Validators[uri.Kind]
-		if validator == nil {
+		if validator == nil && !definition.RawDocument {
 			switch uri.Kind {
 			case "window":
 				validator = ValidateWindowBundle
 			case "report":
 				validator = ValidateReportEnvelope
+			case "datasource":
+				validator = ValidateDatasourceDefinition
+			case "lookup":
+				validator = ValidateLookupDefinition
+			case "navigation":
+				validator = ValidateMenu
+			case "toolfeed":
+				validator = ValidateToolfeedDefinition
+			case "mcp":
+				validator = ValidateMCPDefinition
 			default:
 				return fmt.Errorf("native snapshot kind %q requires a host validator", uri.Kind)
 			}
@@ -348,7 +358,7 @@ func pureLocalValidator(kind string, validator LocalResourceValidator) bool {
 		return false
 	}
 	pointer := reflect.ValueOf(validator).Pointer()
-	return kind == "window" && pointer == reflect.ValueOf(ValidateWindowBundle).Pointer() || kind == "report" && pointer == reflect.ValueOf(ValidateReportEnvelope).Pointer()
+	return kind == "lookup" && pointer == reflect.ValueOf(ValidateLookupDefinition).Pointer() || kind == "mcp" && pointer == reflect.ValueOf(ValidateMCPDefinition).Pointer() || kind == "window" && pointer == reflect.ValueOf(ValidateWindowBundle).Pointer() || kind == "report" && pointer == reflect.ValueOf(ValidateReportEnvelope).Pointer()
 }
 
 // CheckCandidate compares captured validated content against an exact original

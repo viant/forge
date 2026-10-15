@@ -126,3 +126,18 @@ func newLocalMCPServer(p *LocalProvider, compact ...bool) (*mcp.Server, error) {
 func sameLocalActor(a, b identity.VerifiedActor) bool {
 	return a.Subject == b.Subject && a.Issuer == b.Issuer && a.TenantID == b.TenantID && a.AccountID == b.AccountID && a.IdentityRevision == b.IdentityRevision
 }
+
+// ConfigurationSnapshot returns a detached startup configuration.
+func (p *LocalProvider) ConfigurationSnapshot() LocalConfig {
+	return p.provider.Load().ConfigurationSnapshot()
+}
+
+// ReplaceConfiguration validates and atomically publishes a complete producer generation.
+func (p *LocalProvider) ReplaceConfiguration(config LocalConfig) error {
+	next, err := NewLocalProvider(config)
+	if err != nil {
+		return err
+	}
+	p.provider.Store(next.provider.Load())
+	return nil
+}

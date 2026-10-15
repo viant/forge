@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: Apache-2.0
-// Resource host implementation extracted from Viant Agently Core.
 package resource
 
 import (

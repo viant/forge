@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: Apache-2.0
-// Forge resource client pooling extracted from Viant Agently Core.
 package manager
 
 import (
@@ -413,5 +411,29 @@ func TestToolCatalogPublicSnapshotSharesAcrossConnections(t *testing.T) {
 	}
 	if client.calls.Load() != 2 {
 		t.Fatal("public snapshot rediscovered")
+	}
+}
+
+func TestHTTPBoundarySharesPrivateToolCatalogOnlyWithinRequest(t *testing.T) {
+	m, provider, client, a, _ := catalogSetup(t, false)
+	bff := true
+	provider.cfg.Auth = &mcp.ClientAuth{BackendForFrontend: &bff}
+	rt, err := authtransport.New()
+	require.NoError(t, err)
+	m.authRT = rt
+	client.zeroTTL = true
+	user := authctx.WithUserInfo(context.Background(), &authctx.UserInfo{Subject: "alice"})
+	handler := WithRequestCatalog(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for range 3 {
+			_, err := a.ListTools(r.Context(), nil)
+			require.NoError(t, err)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	for request := 1; request <= 2; request++ {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/metadata", nil).WithContext(user))
+		require.Equal(t, http.StatusNoContent, response.Code)
+		require.EqualValues(t, request, client.calls.Load(), "a new HTTP request must not inherit a prior private snapshot")
 	}
 }

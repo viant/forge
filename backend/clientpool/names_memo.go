@@ -4,6 +4,7 @@ package manager
 
 import (
 	"context"
+	"net/http"
 	"sync"
 )
 
@@ -49,4 +50,13 @@ func (memo *namesMemo) put(manager *Manager, scope, generation string, value []s
 	memo.mu.Lock()
 	defer memo.mu.Unlock()
 	memo.values[namesMemoEntry{manager: manager, scope: scope, generation: generation}] = append([]string(nil), value...)
+}
+
+// WithRequestCatalog shares one operation's catalog preparation without
+// persisting selected resource definitions or execution results.
+func WithRequestCatalog(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := WithToolCatalogReadSnapshot(WithNamesMemo(r.Context()))
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

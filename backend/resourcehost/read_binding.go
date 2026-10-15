@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Forge MCP resource access extracted from Viant Agently Core.
+// Shared primitive delivery; kept aligned with the Core compatibility boundary.
 package resource
 
 import (
@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/viant/forge/backend/clientpool"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	identity "github.com/viant/forge/backend/resource"
 	mcpclient "github.com/viant/mcp/client"
 	cfg "github.com/viant/mcp/client/config"
@@ -26,7 +27,9 @@ type resourceReadBinding struct {
 	catalogKey string
 }
 
-func (g *Gateway) resolveReadBinding(ctx context.Context, actor identity.VerifiedActor, name string) (*resourceReadBinding, error) {
+func (g *Gateway) resolveReadBinding(ctx context.Context, actor identity.VerifiedActor, name string) (result *resourceReadBinding, resultErr error) {
+	span := observe.Start(ctx, "gateway.binding", observe.Labels{Provider: name})
+	defer func() { span.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	options, err := g.Manager.Options(ctx, name)
 	if err != nil {
 		return nil, err
