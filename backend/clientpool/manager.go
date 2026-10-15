@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	"log"
 	"net/http"
 	"net/url"
@@ -99,6 +100,22 @@ func WithUserIDExtractor(fn UserIDExtractor) Option {
 	return func(m *Manager) error { m.userIDFn = fn; return nil }
 }
 
+// TokenContextPreparer lets a host refresh its transport tokens in context.
+// It must preserve caller identity. The shared pool owns no application store.
+type TokenContextPreparer func(context.Context, string, bool) context.Context
+
+func WithTokenContextPreparer(prepare TokenContextPreparer) Option {
+	return func(m *Manager) error { m.prepareTokens = prepare; return nil }
+}
+
+// CredentialErrorHandler adapts a transport credential failure to a host's
+// presentation without importing application login or persistence packages.
+type CredentialErrorHandler func(context.Context, *mcpcfg.MCPClient, authcfg.Requirement, error) error
+
+func WithCredentialErrorHandler(handler CredentialErrorHandler) Option {
+	return func(m *Manager) error { m.credentialError = handler; return nil }
+}
+
 // WithCredentialResolver installs the host credential resolver used for MCP
 // definitions with auth.mode=oauth (delegated). For those servers viant/mcp
 // becomes the sole transport-level OAuth coordinator and the resolver the
@@ -139,6 +156,8 @@ type Manager struct {
 	authRT                    *authtransport.RoundTripper
 	authRTProvider            AuthRTProvider
 	userIDFn                  UserIDExtractor
+	prepareTokens             TokenContextPreparer
+	credentialError           CredentialErrorHandler
 	credResolver              authcfg.CredentialResolver
 	providerRegistry          authcfg.ProviderRegistry
 	// bindings persists validated non-secret challenge-learned MCP auth
@@ -255,9 +274,10 @@ func (m *Manager) PreflightCredential(ctx context.Context, serverName string) er
 		return err
 	}
 	_, err = m.credResolver.Resolve(ctx, *requirement)
-	wrapped := err
-
-	return wrapped
+	if m.credentialError != nil {
+		return m.credentialError(ctx, opts, *requirement, err)
+	}
+	return err
 }
 
 // poolKey returns a user-scoped key for the connection pool.
@@ -277,7 +297,9 @@ func (m *Manager) poolKey(ctx context.Context, convID string) string {
 
 // Options exposes the underlying provider client options (authoring metadata,
 // timeouts, etc.) for a given server name.
-func (m *Manager) Options(ctx context.Context, serverName string) (*mcpcfg.MCPClient, error) {
+func (m *Manager) Options(ctx context.Context, serverName string) (result *mcpcfg.MCPClient, resultErr error) {
+	span := observe.Start(ctx, "mcp.configuration", observe.Labels{Provider: serverName})
+	defer func() { span.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	if m == nil {
 		return nil, errors.New("mcp manager: provider not configured")
 	}
@@ -362,7 +384,9 @@ func (m *Manager) names(ctx context.Context) ([]string, error) {
 // Get returns an MCP client for (user+convID, serverName), creating it if needed.
 // When a UserIDExtractor is configured, the pool key includes the user ID to
 // prevent shared conversations from leaking MCP auth/tokens across users.
-func (m *Manager) Get(ctx context.Context, convID, serverName string) (mcpclient.Interface, error) {
+func (m *Manager) Get(ctx context.Context, convID, serverName string) (result mcpclient.Interface, resultErr error) {
+	span := observe.Start(ctx, "mcp.pool.acquire", observe.Labels{Provider: serverName})
+	defer func() { span.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	requestedName := serverName
 	if _, ok := m.localRegistration(serverName); ok {
 		if err := m.checkLocalCollision(ctx, serverName); err != nil {
@@ -444,8 +468,10 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (mcpclient
 	}
 	if call := m.inflight[key][serverName]; call != nil {
 		m.mu.Unlock()
+		waitTiming := observe.Start(ctx, "mcp.pool.wait", observe.Labels{Provider: serverName})
 		select {
 		case <-call.ready:
+			waitTiming.End(observe.OutcomeFor(call.err), observe.CacheUnknown)
 			if call.entry == nil || call.entry.managed == nil {
 				if call.err != nil {
 					return nil, call.err
@@ -454,6 +480,7 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (mcpclient
 			}
 			return m.Get(ctx, convID, requestedName)
 		case <-ctx.Done():
+			waitTiming.End(observe.Canceled, observe.CacheUnknown)
 			return nil, ctx.Err()
 		}
 	}
@@ -481,7 +508,9 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (mcpclient
 			return client, err
 		}
 	}
+	createTiming := observe.Start(ctx, "mcp.pool.create", observe.Labels{Provider: serverName})
 	client, err := newClient(ctx, convID, serverName)
+	createTiming.End(observe.OutcomeFor(err), observe.CacheMiss)
 	if err == nil {
 		current, configErr := m.Options(ctx, requestedName)
 		currentFingerprint, fingerprintErr := effectiveConfigFingerprint(current)

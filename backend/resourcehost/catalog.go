@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Forge MCP resource access extracted from Viant Agently Core.
+// Shared primitive delivery; kept aligned with the Core compatibility boundary.
 package resource
 
 import (
@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	requestctx "github.com/viant/forge/backend/requestctx"
 	"sort"
-	"sync"
 	"time"
 
 	primitive "github.com/viant/forge/backend/provider/contract"
@@ -60,30 +60,11 @@ func (g *Gateway) catalog(ctx context.Context, kind, category string, load func(
 	discoveryTiming := observe.Start(ctx, discoveryPhase, observe.Labels{})
 	// Provider capability reads are independent. Bound cold fan-out, then apply
 	// results in sorted connection order so collision/error handling is stable.
-	type discovered struct {
-		caps capabilities
-		err  error
-	}
-	results := make([]discovered, len(names))
-	semaphore := make(chan struct{}, 4)
-	var discoveryWG sync.WaitGroup
+	results := providerFanout(ctx, names, func(ctx context.Context, name string) (capabilities, error) {
+		return g.catalogCapability(ctx, actor, name)
+	})
 	for i, name := range names {
-		discoveryWG.Add(1)
-		go func() {
-			defer discoveryWG.Done()
-			select {
-			case semaphore <- struct{}{}:
-				defer func() { <-semaphore }()
-			case <-ctx.Done():
-				results[i].err = ctx.Err()
-				return
-			}
-			results[i].caps, results[i].err = g.catalogCapability(ctx, actor, name)
-		}()
-	}
-	discoveryWG.Wait()
-	for i, name := range names {
-		caps, discoverErr := results[i].caps, results[i].err
+		caps, discoverErr := results[i].value, results[i].err
 		if aggregateLinkRequired(discoverErr) {
 			continue
 		}
@@ -185,16 +166,25 @@ func (g *Gateway) catalogCapability(ctx context.Context, actor identity.Verified
 		return g.discover(ctx, actor, name)
 	}
 	scope, cacheable, scopeErr := g.Manager.CatalogScopeForResources(ctx, "", []string{name}, []string{name})
-	if scopeErr != nil || !cacheable {
+	if scopeErr != nil {
 		probe.End(observe.OutcomeFor(scopeErr), observe.CacheBypass)
+		return capabilities{}, scopeErr
+	}
+	if !cacheable {
+		probe.End(observe.OK, observe.CacheBypass)
 		return g.discover(ctx, actor, name)
 	}
 	hintKey := actorKey(actor, name, g.generation(name)) + ":" + scope
+	if g.Manager.IsLocalClient(name) {
+		// In-process providers can see request target context; remote wire
+		// catalogs do not carry that association. Keep their cache scopes distinct.
+		hintKey += fmt.Sprintf(":%x", requestctx.ResourceReadAssociation(ctx))
+	}
 	g.mu.Lock()
 	hint, found := g.capabilityHints[hintKey]
 	cached, present := g.cache[hint.cacheKey]
 	g.mu.Unlock()
-	if found && hint.unavailableUntil.After(g.now()) {
+	if found && hint.unavailable {
 		probe.End(observe.OK, observe.CacheHit)
 		return capabilities{}, ErrUnavailable
 	}
@@ -211,7 +201,7 @@ func (g *Gateway) catalogCapability(ctx context.Context, actor identity.Verified
 		}
 		hint := capabilityHint{connection: name, cacheKey: resolved.cacheKey}
 		if errors.Is(err, ErrUnavailable) {
-			hint.unavailableUntil = g.now().Add(30 * time.Second)
+			hint.unavailable = true
 		}
 		g.capabilityHints[hintKey] = hint
 		g.mu.Unlock()
