@@ -1,3 +1,4 @@
+import {snapshotFetchedPageResult} from './dataSourceFetchState.js';
 import assert from "node:assert/strict";
 
 import {
@@ -188,3 +189,10 @@ assert.deepEqual(withFetchedPageInfo({pageCount: 1, totalCount: 100}, 1, true, {
 });
 
 console.log("dataSourceFetchState ✓ stabilizes filter snapshots and paging metadata");
+// A full transport page can become empty after a presentation filter; it still
+// has a next page. Expansion of a partial page must not invent a next page.
+const transportRows = Array.from({length: 25}, (_, id) => ({id}));
+const fetchedPageResult = snapshotFetchedPageResult(transportRows, {size: 25, openEnded: true});
+transportRows.splice(0);
+assert.equal(withFetchedPageInfo({}, 1, true, fetchedPageResult).hasMore, true);
+assert.equal(withFetchedPageInfo({}, 1, true, snapshotFetchedPageResult([{id: 1}], {size: 25, openEnded: true})).hasMore, false);

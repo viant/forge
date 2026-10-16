@@ -1,3 +1,4 @@
+import {createTransportConnector} from './connectorTransport.js';
 import {useSetting} from "../core/index.js";
 import { getLogger } from "../utils/logger.js";
 import { appendTargetContextQuery } from "../runtime/targetContext.js";
@@ -5,6 +6,16 @@ import { resolvePagingValues, withPagingInputs } from "./paging.js";
 import { buildDatasourceFetchPayload } from "./datasourceRequest.js";
 
 const inFlightGetRequests = new Map();
+
+function appendQueryParams(url, queryParams) {
+    const encoded = queryParams?.toString?.() || '';
+    if (!encoded) return url;
+    const fragmentAt = url.indexOf('#');
+    const base = fragmentAt < 0 ? url : url.slice(0, fragmentAt);
+    const fragment = fragmentAt < 0 ? '' : url.slice(fragmentAt);
+    const separator = base.includes('?') ? (base.endsWith('?') || base.endsWith('&') ? '' : '&') : '?';
+    return `${base}${separator}${encoded}${fragment}`;
+}
 
 
 // Toggle with env var or config if you don't always want noisy logs.
@@ -35,6 +46,7 @@ function logCallerStack(name , maxFrames = 5) {
 }
 
 export function createDataConnector(dataSource, runtime = {}) {
+    if (runtime.transport !== undefined) return createTransportConnector(dataSource, runtime);
     const {
         endpoints = {},
         targetContext = {},
@@ -114,8 +126,12 @@ export function createDataConnector(dataSource, runtime = {}) {
 
     async function makeRequestError(resp, prefix = 'Request error') {
         let detail = '';
+        let code = '';
+        let scope = '';
         try {
-            detail = summarizeErrorPayload(await resp.clone().text());
+            const raw = await resp.clone().text();
+            detail = summarizeErrorPayload(raw);
+            try { const payload=JSON.parse(raw); if(typeof payload?.code==='string')code=payload.code; if(typeof payload?.scope==='string')scope=payload.scope; } catch (_) {}
         } catch (_) {
             // Best-effort only; preserve the status-based error when the body
             // cannot be read.
@@ -126,7 +142,9 @@ export function createDataConnector(dataSource, runtime = {}) {
         const error = new Error(message);
         error.status = resp.status;
         error.statusText = resp.statusText;
-        error.isUnauthorized = resp.status === 401 || resp.status === 403;
+        if(code)error.code=code;
+        if(scope)error.scope=scope;
+        error.isUnauthorized = !(resp.status===403 && code==='datasource_denied' && scope==='dataset') && (resp.status === 401 || resp.status === 403);
         error.authRequired = String(resp.headers?.get?.('X-Agently-Auth-Required') || '').toLowerCase() === 'true';
         if (detail) {
             error.detail = detail;
@@ -241,7 +259,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             url = applyParameters({url, headers, queryParams, body}, inputParameters);
             appendServiceTargetContext(queryParams);
             ({url, method, headers, queryParams, body} = applyRequestPreparation({url, method, headers, queryParams, body}));
-            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            const finalUrl = appendQueryParams(url, queryParams);
 
             const request = {method, headers};
             if (Object.keys(body).length > 0) {
@@ -269,7 +287,7 @@ export function createDataConnector(dataSource, runtime = {}) {
     /**
      * GET method
      */
-    async function get({filter = {}, page, inputParameters = {}, cache = null, invocationId = null, signal = null}) {
+    async function get({filter = {}, page, cursor, inputParameters = {}, cache = null, invocationId = null, signal = null}) {
         try {
             let {method, url, headers} = getUrlAndHeaders();
             let queryParams = new URLSearchParams();
@@ -277,13 +295,16 @@ export function createDataConnector(dataSource, runtime = {}) {
             const isDatasourceFetchRoute = /\/v1\/api\/datasources\/[^/]+\/fetch$/.test(url);
             const pagingValues = String(dataSource?.paginationMode || '').toLowerCase() === 'client'
                 ? null
-                : resolvePagingValues(page, paging);
+                : resolvePagingValues(page, paging, cursor);
             const effectiveInputParameters = requestMethod === 'GET'
-                ? { ...(inputParameters || {}) }
+                ? (pagingValues?.cursor
+                    ? Object.fromEntries(Object.entries(inputParameters || {}).filter(([key]) => key !== pagingValues.pageParamName && key !== pagingValues.sizeParamName))
+                    : { ...(inputParameters || {}) })
                 : withPagingInputs(inputParameters, pagingValues);
             // Merge filter into query string
             if (requestMethod === 'GET') {
                 Object.entries(filter).forEach(([key, val]) => {
+                    if (pagingValues?.cursor && (key === pagingValues.pageParamName || key === pagingValues.sizeParamName)) return;
                     if (val != null) queryParams.append(key, val);
                 });
             }
@@ -291,7 +312,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             // Handle paging
             if (requestMethod === 'GET' && pagingValues) {
                 const { pageParamName, sizeParamName, pageValue, sizeValue } = pagingValues;
-                queryParams.append(pageParamName, pageValue);
+                if (pageValue !== undefined) queryParams.append(pageParamName, pageValue);
                 if (sizeValue != null) {
                     queryParams.append(sizeParamName, sizeValue);
                 }
@@ -318,7 +339,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 body: payload,
             }));
 
-            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            const finalUrl = appendQueryParams(url, queryParams);
             const request = {method: String(method || requestMethod).toUpperCase(), headers, ...(signal ? {signal} : {})};
 
             if (requestMethod !== 'GET' && isDatasourceFetchRoute) {
@@ -385,7 +406,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 queryParams,
                 body,
             }));
-            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            const finalUrl = appendQueryParams(url, queryParams);
             const log = getLogger('connector');
             try { log.debug('[request][POST]', { url: finalUrl, body }); } catch(_) {}
             const resp = await fetch(finalUrl, {
@@ -425,7 +446,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 queryParams,
                 body,
             }));
-            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            const finalUrl = appendQueryParams(url, queryParams);
             const resp = await fetch(finalUrl, {
                 method: String(method || 'PATCH').toUpperCase(),
                 headers: {...headers, "Content-Type": "application/json"},
@@ -460,7 +481,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 queryParams,
                 body,
             }));
-            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            const finalUrl = appendQueryParams(url, queryParams);
             const resp = await fetch(finalUrl, {
                 method: String(method || 'PUT').toUpperCase(),
                 headers: {...headers, "Content-Type": "application/json"},
@@ -495,7 +516,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 queryParams,
                 body: undefined,
             }));
-            const finalUrl = queryParams.toString() ? `${url}?${queryParams}` : url;
+            const finalUrl = appendQueryParams(url, queryParams);
             const resp = await fetch(finalUrl, {method: String(method || 'DELETE').toUpperCase(), headers});
             if (!resp.ok) {
                 throw new Error(`DELETE error: ${resp.statusText}`);
@@ -525,6 +546,7 @@ function useDataConnector(dataSource) {
         endpoints,
         targetContext,
         auth,
+        transport: services.dataConnectorTransport,
         prepareRequest: typeof services?.prepareDataConnectorRequest === 'function'
             ? services.prepareDataConnectorRequest
             : undefined,

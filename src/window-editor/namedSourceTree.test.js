@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {parseDocument} from 'yaml';
+import {applyNamedTreeChange} from './namedSourceTree';
+const entry='extension/forge/windows/named/main.yaml',shared='extension/forge/windows/named/shared/main.yaml';
+const text='# original\nwindowKey: named\ntitle: Before # title comment\nresources:\n  dataSources:\n  - rows\nview:\n  content: $import(content.yaml)\n';
+const manifest={version:1,binding:{windowKey:'named'},files:{[entry]:'$import(shared/main.yaml)\n',[shared]:text}};
+const before={windowKey:'named',title:'Before',resources:{dataSources:['rows']}};
+const plain=applyNamedTreeChange(manifest,JSON.stringify(before),JSON.stringify({...before,title:'Changed'}));
+assert.equal(plain.files[shared],text.replace('title: Before','title: Changed'));
+assert.equal(applyNamedTreeChange(plain,JSON.stringify({...before,title:'Changed'}),JSON.stringify(before)).files[shared],text);
+const changed=applyNamedTreeChange(manifest,JSON.stringify(before),JSON.stringify({...before,title:'After: Title'}));
+assert.equal(changed.files[entry],manifest.files[entry]);
+assert.equal(changed.files[shared].replace('"After: Title"','Before'),text);
+assert.equal(parseDocument(changed.files[shared]).get('title'),'After: Title');
+const restored=applyNamedTreeChange(changed,JSON.stringify({...before,title:'After: Title'}),JSON.stringify(before));
+assert.equal(parseDocument(restored.files[shared]).get('title'),'Before');
+assert.equal(restored.files[shared].replace('"Before"','Before'),text);
+console.log('Scalar Tree edits preserve imports, comments, and unrelated list indentation.');

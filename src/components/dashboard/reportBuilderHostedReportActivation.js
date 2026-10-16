@@ -1,3 +1,4 @@
+import {hostedReportResource} from "./reportBuilderResourceLifecycle.js";
 import { buildReportBuilderGetReportDocumentResponse } from "./reportBuilderReportDocumentReadResponse.js";
 import { compileInlineReportDefinition } from "../../reporting/inlineReportCompiler.js";
 
@@ -141,6 +142,7 @@ export function resolveHostedReportActivationIdentity(container = null) {
         const request = buildHostedReportActivationRequest(
             source.id,
             resolveHostedReportArtifactId(container),
+            hostedReportResource(container),
         );
         return normalizeString(request?.artifactId || request?.reportId);
     }
@@ -172,7 +174,11 @@ export function resolveHostedReportWorkspaceMode(container = null) {
     return normalizeString(container?.parameters?.workspaceMode);
 }
 
-export function buildHostedReportActivationRequest(reportId = "", artifactId = "") {
+export function buildHostedReportActivationRequest(reportId = "", artifactId = "", pin = null) {
+ if (pin) {
+ if (pin.uri !== normalizeString(reportId) || !["working","stamped"].includes(pin.kind) || !pin.contentFingerprint || !pin.authorityBinding) throw new Error("Selected report resource is invalid.");
+ return {resource: {uri: pin.uri, revision: pin.kind === "working" ? "working" : pin.revision}, resolvedResource: cloneValue(pin), reportId: pin.uri};
+ }
     const normalizedArtifactId = normalizeString(artifactId);
     if (normalizedArtifactId) {
         return { artifactId: normalizedArtifactId };

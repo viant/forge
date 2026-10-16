@@ -147,6 +147,11 @@ function buildContainerStyle(layout, rows) {
         style.alignItems = align;
     }
 
+    // Auto-placement is for peer containers, not interleaved field labels.
+    if (labelMode === 'none' && layout.minColumnWidth) {
+        style.gridTemplateColumns = `repeat(auto-fit, minmax(min(100%, ${layout.minColumnWidth}), 1fr))`;
+        style.gridAutoFlow = 'row';
+    }
     if (spacing.rowGap !== undefined) style.rowGap = spacing.rowGap;
     if (spacing.columnGap !== undefined) style.columnGap = spacing.columnGap;
     return style;
@@ -232,7 +237,9 @@ export default function GridLayoutRenderer({
                 const subCtx = typeof context?.Context === 'function' ? context.Context(dsRef) : context;
                 const hasLabel = !!item.label && !item.hideLabel && !item.isStandalone && labelMode !== 'none';
                 const pos = { r, c, w, h };
-                const css = mapToCss(pos, labelMode, hasLabel);
+                const css = labelMode === 'none' && layout.minColumnWidth
+                    ? {ctrl: {}, label: null}
+                    : mapToCss(pos, labelMode, hasLabel);
 
                 if (typeof renderEntry === 'function') {
                     return (

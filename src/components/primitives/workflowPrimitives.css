@@ -171,3 +171,8 @@
   .forge-editable-collection__operation-bar > .bp5-button,
   .forge-editable-collection__operation-bar > .bp4-button { min-height: 44px; }
 }
+
+/* A composed draft owns a toolbar and a locked editor, not a sticky footer row. */
+.forge-draft-form__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; width: 100%; }
+.forge-draft-form.forge-draft-form--editor { position: static; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 0; border: 0; background: transparent; width: 100%; min-width: 0; }
+.forge-draft-form__fields { width: 100%; box-sizing: border-box; }

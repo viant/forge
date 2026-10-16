@@ -14,6 +14,8 @@ draftForm:
   dataSourceRef: draft
   saveLabel: Apply
   onReset: Host.refreshDerivedPresentation
+  validate: Host.validateDraft
+  wrapContent: true
   validWhen: {source: form, field: name, notEmpty: true}
   submit: {dataSourceRef: patch}
 queryToolbar:
@@ -72,7 +74,7 @@ masterDetail:
 	if err := yaml.Unmarshal(data, &container); err != nil {
 		t.Fatal(err)
 	}
-	if container.DraftForm == nil || container.DraftForm.Submit == nil || container.DraftForm.SaveLabel != "Apply" || container.DraftForm.OnReset != "Host.refreshDerivedPresentation" {
+	if container.DraftForm == nil || container.DraftForm.Validate != "Host.validateDraft" || !container.DraftForm.WrapContent || container.DraftForm.Submit == nil || container.DraftForm.SaveLabel != "Apply" || container.DraftForm.OnReset != "Host.refreshDerivedPresentation" {
 		t.Fatal("draftForm truncated")
 	}
 	if container.QueryToolbar == nil || len(container.QueryToolbar.Items) != 1 || container.StableTabs == nil {
@@ -118,7 +120,29 @@ masterDetail:
 			t.Fatalf("%s was not serialized", key)
 		}
 	}
+	draft := output["draftForm"].(map[string]interface{})
+	if draft["validate"] != "Host.validateDraft" || draft["wrapContent"] != true {
+		t.Fatal("draftForm validation/composition fields were not serialized")
+	}
 	if output["stableTabs"].(map[string]interface{})["fill"] != true {
 		t.Fatal("stableTabs.fill was not serialized")
+	}
+}
+
+func TestResponsiveCardGridRoundTrip(t *testing.T) {
+	var container Container
+	if err := yaml.Unmarshal([]byte("id: cards\nlayout:\n  kind: grid\n  minColumnWidth: var(--card-min, 280px)\n  labels: {mode: none}\n"), &container); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(container)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded["layout"].(map[string]interface{})["minColumnWidth"] != "var(--card-min, 280px)" {
+		t.Fatal("responsive grid width was lost")
 	}
 }

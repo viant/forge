@@ -623,6 +623,9 @@ export async function runUICommand(cmd = {}) {
       const refs = Array.isArray(params.dataSourceRefs) ? params.dataSourceRefs.map((value) => String(value || '').trim()).filter(Boolean) : [];
       if (refs.length === 0) throw new Error('dataSourceRefs are required');
       const windowId = `feed-${feedId}-${conversationId}`;
+      const context = getWindowContext(windowId);
+      if (context?.identity?.feedId !== feedId || context?.identity?.conversationId !== conversationId) throw new Error('active conversation feed is required');
+      for (const ref of refs) if (!Object.prototype.hasOwnProperty.call(context.metadata?.dataSource || {}, ref)) throw new Error('feed datasource is unavailable');
       const dataSources = {};
       for (const ref of refs) {
         const { dataSourceId } = getDataSourceId(windowId, ref);
@@ -636,8 +639,12 @@ export async function runUICommand(cmd = {}) {
     }
     case 'ui.feed.update': {
       const feedId = requireString('feedId', params.feedId);
+      const conversationId = requireString('conversationId', params.conversationId);
+      const context = getWindowContext(`feed-${feedId}-${conversationId}`);
+      if (context?.identity?.feedId !== feedId || context?.identity?.conversationId !== conversationId) throw new Error('active conversation feed is required');
       const operations = Array.isArray(params.operations) ? params.operations : [];
       if (operations.length === 0) throw new Error('operations are required');
+      for (const operation of operations) if (!Object.prototype.hasOwnProperty.call(context.metadata?.dataSource || {}, operation.dataSourceRef)) throw new Error('feed datasource is unavailable');
       if (typeof window === 'undefined') throw new Error('feed updates require a browser client');
       window.dispatchEvent(new CustomEvent('forge:feed-update', {
         detail: {

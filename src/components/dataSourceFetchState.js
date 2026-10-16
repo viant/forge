@@ -155,12 +155,13 @@ export function withFetchedPageInfo(info = {}, page = 1, pagingEnabled = false, 
         ? Math.min(requestedPage, pageCount)
         : requestedPage;
     const hasPrevious = currentPage > 1;
-    const hasNext = pageCount > 0
+    const explicitContinuation = String(pageResult?.mode || '').trim() !== '' && !!pageResult?.hasMoreSelector && typeof base.hasMore === 'boolean';
+    const hasNext = explicitContinuation ? base.hasMore : pageCount > 0
         ? currentPage < pageCount
         : (returnedCount != null && pageSize > 0
             ? returnedCount >= pageSize
             : base.hasNext === true);
-    const hasMore = base.hasMore === true || hasNext;
+    const hasMore = explicitContinuation ? base.hasMore : base.hasMore === true || hasNext;
     return {
         ...base,
         currentPage,
@@ -172,5 +173,15 @@ export function withFetchedPageInfo(info = {}, page = 1, pagingEnabled = false, 
         hasPrevious,
         hasNext,
         hasMore,
+        ...(explicitContinuation ? {hasMoreExplicit: true} : {}),
+    };
+}
+
+// Snapshot transport rows before presentation transforms filter or expand them.
+export function snapshotFetchedPageResult(records = [], paging = {}) {
+    return {
+        returnedCount: Array.isArray(records) ? records.length : 0,
+        pageSize: paging?.size,
+        openEnded: paging?.openEnded === true,
     };
 }

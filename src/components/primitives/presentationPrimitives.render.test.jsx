@@ -42,6 +42,9 @@ has(genericLoadingMarkup, 'Loading generic data');
 if (genericLoadingMarkup.includes('Hidden while loading')) throw new Error(`non-table boundary exposed content while loading: ${genericLoadingMarkup}`);
 const errorDataContext = {...dataContext, signals: {...dataContext.signals, control: signal({loaded: true, error: new Error('duplicate error')}), windowForm: signal({sharedError: 'Actionable parent error'})}};
 const suppressedErrorMarkup = renderToStaticMarkup(<DataStateBoundary context={{...context, signals: errorDataContext.signals, Context: () => errorDataContext}} container={{dataSourceRef: 'record', dataStateBoundary: {dataSourceRefs: ['record'], suppressErrorWhen: {source: 'windowForm', field: 'sharedError', notEmpty: true}}}}/>);
+const recoverableTableError=renderToStaticMarkup(<DataStateBoundary context={{...context,Context:()=>errorDataContext}} container={{dataSourceRef:'record',table:{columns:[]},dataStateBoundary:{dataSourceRefs:['record']}}}><button>Change filter</button></DataStateBoundary>);
+has(recoverableTableError,'Unable to load data');
+has(recoverableTableError,'Change filter');
 if (suppressedErrorMarkup.includes('duplicate error')) throw new Error(`duplicate datasource error was not suppressed: ${suppressedErrorMarkup}`);
 has(renderToStaticMarkup(<DataStateBoundary context={{...context, Context: () => errorDataContext}} container={{dataSourceRef: 'record', dataStateBoundary: {dataSourceRefs: ['record'], errorMessage: 'Could not load.', errorAction: {label: 'Retry history', dataSourceRef: 'record'}}}}/>), 'Retry history');
 has(renderToStaticMarkup(<RelationDrill context={context} container={{relationDrill: {countField: 'childCount', emptyText: 'No children', link: {windowKey: 'children'}}}}/>), 'No children');
@@ -63,3 +66,15 @@ has(gatedCollection, 'title="Disabled until sparse updates are safe."');
 has(gatedCollection, 'tabindex="0"');
 
 console.log('presentation primitive render contracts passed');
+
+const {executeCommand} = await import('./commandExecutor.js');
+let finishDraftWrite;
+const guardedContext = {...dataContext, identity: {dataSourceRef: 'guarded-draft', dataSourceId: 'guarded-draft'}, signals: {...dataContext.signals, formStatus: signal({dirty: true, version: 1})}, lookupHandler: () => () => '', Context: () => ({handlers: {dataSource: {setInputParameters() {}, fetchCollection: () => new Promise(resolve => {finishDraftWrite = resolve;})}}})};
+const guardedCommand = {commandId: 'draft-guarded-render', dataSourceRef: 'draft-patch'};
+const saving = executeCommand(guardedContext, guardedCommand);
+const pendingDraft = renderToStaticMarkup(<DraftForm context={guardedContext} container={{id: 'guarded', draftForm: {submit: guardedCommand}}}><input aria-label="Editable field"/></DraftForm>);
+assert.match(pendingDraft, /<fieldset[^>]*disabled/);
+assert.match(pendingDraft, /aria-busy="true"/);
+assert.match(pendingDraft, /forge-draft-form--editor/);
+finishDraftWrite();
+await saving;

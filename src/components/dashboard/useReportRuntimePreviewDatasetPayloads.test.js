@@ -9,6 +9,7 @@ const {
   fetchReportRuntimePreviewDatasetPayloads,
   resolveFreshReportRuntimePreviewPrimaryDatasetPayload,
   resolveReportRuntimePreviewDatasetResultFreshness,
+  shouldStartReportRuntimePreviewDatasetFetch,
 } = reportRuntimePreviewDatasetPayloadsModule;
 
 const builderContext = {
@@ -478,6 +479,21 @@ const pendingRetainedDatasetPayloadState = buildPendingReportRuntimePreviewDatas
   requestKey: datasetRequestKey,
   currentState: retainedDatasetPayloadState,
 });
+assert.equal(shouldStartReportRuntimePreviewDatasetFetch({
+  state: pendingRetainedDatasetPayloadState,
+  requestKey: datasetRequestKey,
+  activeRequestKey: "",
+}), true, "a canceled request must restart even when its pending key is unchanged");
+assert.equal(shouldStartReportRuntimePreviewDatasetFetch({
+  state: pendingRetainedDatasetPayloadState,
+  requestKey: datasetRequestKey,
+  activeRequestKey: datasetRequestKey,
+}), false, "an active request must not be duplicated");
+assert.equal(shouldStartReportRuntimePreviewDatasetFetch({
+  state: retainedDatasetPayloadState,
+  requestKey: retainedDatasetPayloadState.requestKey,
+  activeRequestKey: "",
+}), false, "a completed request remains settled");
 assert.deepEqual(
   pendingRetainedDatasetPayloadState.payloads.primary.rows,
   [{ channel: "Retained display row", spend: 41 }],

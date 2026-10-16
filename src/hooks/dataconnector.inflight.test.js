@@ -118,6 +118,29 @@ describe('createDataConnector', () => {
         }
     });
 
+    it('preserves existing metadata query parameters when appending the web target', async () => {
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            json: async () => ({ ok: true }),
+        });
+        const reference = JSON.stringify({ uri: 'window://workspace/adOrderPicker' });
+        const url = `/v1/api/agently/forge/window/adOrderPicker?resourceRef=${encodeURIComponent(reference)}&providerIdentity=internal`;
+        const connector = createDataConnector({ service: { URL: url, includeTargetContext: true } }, {
+            endpoints: {}, auth: {},
+            targetContext: { platform: 'web', formFactor: 'desktop', surface: 'browser', capabilities: ['markdown'] },
+        });
+
+        await expect(connector.get({})).resolves.toEqual({ ok: true });
+        const requested = new URL(global.fetch.mock.calls[0][0], 'https://forge.test');
+        expect(JSON.parse(requested.searchParams.get('resourceRef'))).toEqual({ uri: 'window://workspace/adOrderPicker' });
+        expect(requested.searchParams.get('providerIdentity')).toBe('internal');
+        expect(requested.searchParams.get('platform')).toBe('web');
+        expect(requested.searchParams.get('formFactor')).toBe('desktop');
+        expect(requested.searchParams.get('surface')).toBe('browser');
+        expect(requested.searchParams.getAll('capabilities')).toEqual(['markdown']);
+    });
+
     it('does not treat an upstream datasource 401 as an expired workspace session', async () => {
         const handleUnauthorized = vi.fn();
         const response = {
@@ -155,4 +178,15 @@ describe('createDataConnector', () => {
         await expect(connector.get({ filter: {}, inputParameters: {} })).rejects.toThrow('authorization required');
         expect(handleUnauthorized).toHaveBeenCalledOnce();
     });
+});
+
+it('preserves the server dataset denial code/scope and leaves it recoverable',async()=>{
+ global.fetch=vi.fn(async()=>new Response(JSON.stringify({error:'Datasource access denied. Adjust the filter or retry.',code:'datasource_denied',scope:'dataset'}),{status:403,statusText:'Forbidden',headers:{'Content-Type':'application/json'}}));
+ const connector=createDataConnector({service:{URL:'/v1/api/datasources/rows/fetch'}});
+ await expect(connector.get({})).rejects.toMatchObject({status:403,code:'datasource_denied',scope:'dataset',isUnauthorized:false});
+});
+it('does not turn an untyped403 or401 into a dataset marker',async()=>{
+ global.fetch=vi.fn(async()=>new Response(JSON.stringify({error:'denied'}),{status:403,statusText:'Forbidden'}));
+ const connector=createDataConnector({service:{URL:'/v1/api/datasources/rows/fetch'}});
+ await expect(connector.get({})).rejects.toMatchObject({status:403,isUnauthorized:true});
 });

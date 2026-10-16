@@ -10,6 +10,7 @@ const (
 
 	KindBuilder  = "forge.reporting.builder"
 	KindPreset   = "forge.reporting.preset"
+	KindReport   = "forge.reporting.report"
 	KindFragment = "forge.reporting.fragment"
 	KindGroup    = "forge.reporting.group"
 
@@ -20,6 +21,10 @@ const (
 // configured reporting root. Raw remains generic so workspace metadata can
 // evolve without introducing a backend release gate for every UI property.
 type Asset struct {
+	ResourceURI string `json:"resourceUri,omitempty"`
+	Namespace   string `json:"namespace,omitempty"`
+	Name        string `json:"name,omitempty"`
+	OwnerID     string `json:"ownerId,omitempty"`
 	Kind        string `json:"kind"`
 	ID          string `json:"id"`
 	BuilderRef  string `json:"builderRef,omitempty"`
@@ -47,17 +52,22 @@ type Asset struct {
 
 // Registry is the immutable result of one successful discovery pass.
 type Registry struct {
-	Root      string
-	Builders  []*Asset
-	Presets   []*Asset
+	Root     string
+	Builders []*Asset
+	Presets  []*Asset
+	// Reports is the ordinary unified authored inventory. Presets remains a
+	// compatibility API for existing builder references, not an access category.
+	Reports   []*Asset
 	Fragments []*Asset
 	Groups    []*Asset
 	Warnings  []Diagnostic
 
-	buildersByID  map[string]*Asset
-	presetsByID   map[string]*Asset
-	fragmentsByID map[string]*Asset
-	groupsByID    map[string]*Asset
+	buildersByID         map[string]*Asset
+	presetsByID          map[string]*Asset
+	fragmentsByID        map[string]*Asset
+	groupsByID           map[string]*Asset
+	reportsByURI         map[string]*Asset
+	reportAliasConflicts map[string]bool
 }
 
 func (r *Registry) Builder(id string) *Asset {
@@ -71,7 +81,17 @@ func (r *Registry) Preset(id string) *Asset {
 	if r == nil {
 		return nil
 	}
+	if report := r.reportsByURI[id]; report != nil {
+		return report
+	}
 	return r.presetsByID[normalizeID(id)]
+}
+
+func (r *Registry) Report(uri string) *Asset {
+	if r == nil {
+		return nil
+	}
+	return r.reportsByURI[uri]
 }
 
 func (r *Registry) Fragment(id string) *Asset {

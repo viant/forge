@@ -1,4 +1,5 @@
 import {resolveKey} from "../../utils/selector.js";
+import {normalizeCountryKey} from './worldCountryModel.js';
 
 export const US_STATE_TILES = [
     {key: 'AK', label: 'Alaska', col: 1, row: 1},
@@ -60,7 +61,8 @@ const US_STATE_CODE_BY_NAME = new Map(
     US_STATE_TILES.map((state) => [state.label.toUpperCase(), state.key]),
 );
 
-export function normalizeGeoKey(value) {
+export function normalizeGeoKey(value, shape) {
+    if (shape === 'world') return normalizeCountryKey(value);
     const normalized = String(value ?? '').trim().toUpperCase();
     return US_STATE_CODE_BY_NAME.get(normalized) || normalized;
 }
@@ -138,7 +140,7 @@ export function buildGeoConfig(container = {}, titleize = (value) => value) {
 export function aggregateGeoRows(collection = [], config) {
     const byKey = new Map();
     for (const row of collection || []) {
-        const key = normalizeGeoKey(resolveKey(row, config.key));
+        const key = normalizeGeoKey(resolveKey(row, config.key), config.shape);
         if (!key) {
             continue;
         }

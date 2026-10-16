@@ -347,6 +347,10 @@ func branchPathCandidates(target *TargetContext) []string {
 	return uniqueStrings(result)
 }
 
+// TargetBranchCandidates exposes the same precedence used for window/import
+// materialization. Authoring bundles use it to deduplicate equivalent profiles.
+func TargetBranchCandidates(target *TargetContext) []string { return branchPathCandidates(target) }
+
 func isMobileTarget(platform, formFactor, surface string) bool {
 	switch platform {
 	case "android", "ios":

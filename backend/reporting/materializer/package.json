@@ -1,0 +1,1 @@
+{"private":true,"name":"forge-authored-report-materializer-build","type":"module","dependencies":{"@formatjs/intl-datetimeformat":"7.8.1","@formatjs/intl-getcanonicallocales":"3.2.12","@formatjs/intl-locale":"5.3.12","@formatjs/intl-numberformat":"9.4.3","@formatjs/intl-pluralrules":"6.3.15"}}

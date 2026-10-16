@@ -1,28 +1,13 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import path from "node:path";
+import {buildReportBuilderAuthoredRuntimePreviewState} from "../../components/dashboard/reportBuilderResultFrame.js";
 
-const source = fs.readFileSync(
-  path.join(process.cwd(), "src/components/dashboard/reportBuilderResultFrame.js"),
-  "utf8",
-);
-
-assert.equal(
-  source.includes('"Updating results…"'),
-  true,
-  "Authored runtime preview state should keep the lightweight updating notice for preview-mode retained rows.",
-);
-
-assert.equal(
-  source.includes('"Updating this report with the latest results…"'),
-  true,
-  "Authored runtime preview state should also expose the report-mode retained-row updating notice.",
-);
-
-assert.equal(
-  source.includes("updatingNotice: isLoadingWithRetainedRuntimeRows"),
-  true,
-  "Retained-row updating notices should stay enabled for both preview and report presentation modes.",
-);
-
-console.log("reportBuilderPreviewAuthoredRuntimeUpdatingNotice ✓ authored runtime retained-row notice copy stays wired for preview and report modes");
+const artifact = {runtimeBlock:{dashboard:{reportRuntime:{reportFill:{datasets:[{id:"primary",rows:[{value:1}]}]}}}}};
+for (const [presentationMode,message] of [["preview","Updating results…"],["report","Updating this report with the latest results…"]]) {
+ const state=buildReportBuilderAuthoredRuntimePreviewState({runtimePreviewEnabled:true,runtimePreviewArtifact:artifact,runtimePreviewRowsSource:{loading:true},canRunReport:true,presentationMode});
+ assert.equal(state.loadingState,null);
+ assert.equal(state.canRenderRuntime,true);
+ assert.deepEqual(state.updatingNotice,{level:"info",message});
+ const settled=buildReportBuilderAuthoredRuntimePreviewState({runtimePreviewEnabled:true,runtimePreviewArtifact:artifact,runtimePreviewRowsSource:{loading:false},canRunReport:true,presentationMode});
+ assert.equal(settled.updatingNotice,null);
+}
+console.log("Authored preview and report retain rows and show update notices until loading settles.");

@@ -804,6 +804,30 @@ assert.equal(
     "Resolved Audience Via Connector",
 );
 
+const orderHydrationCalls = [];
+const orderHydrated = await hydrateReportBuilderLookupLabels(
+    {
+        metadata: {
+            dialogs: [{id: "orderPicker", dataSourceRef: "ad_order_lookup", properties: {resolveInput: "AdOrderId"}}],
+        },
+        Context(dataSourceRef) {
+            assert.equal(dataSourceRef, "ad_order_lookup");
+            return {
+                dataSource: {filterSet: [{template: [{id: "AdOrderId", type: "int[]"}]}]},
+                handlers: {dataSource: {async fetchRecords({parameters}) {
+                    orderHydrationCalls.push(parameters);
+                    return {rows: [{adOrderId: 2695999, adOrderName: "Resolved Order"}]};
+                }}},
+            };
+        },
+    },
+    {dynamicFilterGroups: [{id: "scope", filters: [{id: "orderIds", dialogId: "orderPicker", valueSelector: "adOrderId", labelSelector: "adOrderName"}]}]},
+    {dynamicGroups: {scope: [{id: "order_row", filterId: "orderIds", selections: [{value: "2695999", label: "2695999"}]}]}},
+    () => ({dialogId: "orderPicker", dataSourceRef: "ad_order_lookup", resolveInput: "AdOrderId"}),
+);
+assert.deepEqual(orderHydrationCalls, [{AdOrderId: [2695999]}], "an int[] lookup receives numeric array values");
+assert.equal(orderHydrated.dynamicGroups.scope[0].selections[0].label, "Resolved Order");
+
 const targetingHydrationCalls = [];
 const targetingHydrationContext = {
     metadata: {

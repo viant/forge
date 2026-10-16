@@ -1,0 +1,35 @@
+import assert from "node:assert/strict";
+import React from "react";
+import {renderToStaticMarkup} from "react-dom/server";
+import ReportBuilderManualRunControl from "./ReportBuilderManualRunControl.jsx";
+import {dispatchReportBuilderDatasourceRequest} from "./reportBuilderDatasourceDispatch.js";
+import {captureReportRunDispatchSnapshot} from "./reportBuilderRunPersistence.js";
+import {createCursorPagingSession} from "../../hooks/paging.js";
+import {createTransportConnector} from "../../hooks/connectorTransport.js";
+const paging={enabled:true,mode:"cursor",size:1,parameters:{page:"resumeToken",size:"batchSize"}};
+let input={filter:{term:"owned"}};
+const context={dataSource:{paging},signals:{input:{peek:()=>input,get value(){return input;},set value(next){input=next;}}}};
+const request={limit:50,offset:0,scope:{account:"owned"}};
+const snapshot=captureReportRunDispatchSnapshot({request,readiness:{canRun:true},metadata:{datasourcePage:1}});
+const onRun=()=>dispatchReportBuilderDatasourceRequest(context,snapshot.request,true,snapshot.metadata.datasourcePage);
+const element=ReportBuilderManualRunControl({manualRequired:true,canRun:true,busy:false,readOnly:false,onRun});
+const html=renderToStaticMarkup(element);
+assert.match(html,/>Run</);
+assert.doesNotMatch(html,/disabled=""/);
+element.props.onClick();
+assert.equal(input.fetch,true);assert.equal(input.page,1);
+const session=createCursorPagingSession(),calls=[];
+const connector=createTransportConnector({paging},{transport:async({options})=>{calls.push(options.inputParameters);return {rows:[{id:options.inputParameters.resumeToken?'beta':'alpha'}],hasMore:true,nextCursor:'after-alpha'};}});
+let cursor=session.begin(input.page,{parameters:input.parameters,filter:input.filter});
+const result=await connector.get({page:cursor.page,cursor:cursor.cursor,inputParameters:input.parameters});
+session.finish(cursor,result);
+dispatchReportBuilderDatasourceRequest(context,{...request,offset:50},true,2);
+cursor=session.begin(input.page,{parameters:input.parameters,filter:input.filter});
+const next=await connector.get({page:cursor.page,cursor:cursor.cursor,inputParameters:input.parameters});
+assert.equal(next.rows[0].id,'beta');assert.equal(calls[1].resumeToken,'after-alpha');
+for(const props of [{manualRequired:false},{readOnly:true}])assert.equal(ReportBuilderManualRunControl({manualRequired:true,canRun:true,onRun,...props}),null);
+for(const props of [{canRun:false},{busy:true}]){
+ const blocked=ReportBuilderManualRunControl({manualRequired:true,canRun:true,busy:false,readOnly:false,onRun,...props});
+ assert.match(renderToStaticMarkup(blocked),/disabled=""/);
+}
+console.log('compact manual Run renders and executes captured datasource scope; cursor Next advances; busy/read-only guards retained');
