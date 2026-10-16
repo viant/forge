@@ -7,7 +7,7 @@ import {useSignalEffect, useSignals} from '@preact/signals-react/runtime';
 import {dialogHandlers} from "../hooks/index.js";
 import {resolveTemplate} from "../utils/index.js";
 import { getLogger } from '../utils/logger.js';
-import { buildQuickFilterSeed, mergeQuickFilterValue } from './viewDialogQuickFilters.js';
+import { buildQuickFilterSeed, mergeQuickFilterValue, withoutQuickFilterParameters } from './viewDialogQuickFilters.js';
 import {evaluatePlainVisibleWhen, trackVisibleWhen} from './visibleWhen.js';
 import {dialogCloseDisabledWhen, isDialogCloseDisabled} from './dialogClose.js';
 import {consumeDialogFocusRevision, dialogFreshFormSeed, shouldRefreshDialogDataSourceForMount} from './viewDialogFreshState.js';
@@ -297,6 +297,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                     const inputObj = (scoped && typeof scoped === 'object') ? (scoped.input || scoped) : {};
                     params = (inputObj && typeof inputObj === 'object') ? (inputObj.parameters || inputObj) : {};
                 }
+                params = withoutQuickFilterParameters(params, quickFilterSpecs);
                 const current = dialogDataSourceHandlers?.peekInput?.() || {};
                 const filterSeedSource = Object.keys(explicitParameters).length > 0
                     ? explicitParameters

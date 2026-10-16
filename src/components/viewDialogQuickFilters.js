@@ -14,6 +14,16 @@ export function mergeQuickFilterValue(filter, field, value) {
     return setSelector(next, field, value);
 }
 
+// Quick-filter values have one mutable owner. Keeping their initial values
+// in fixed parameters would reapply them after the user clears the filter.
+export function withoutQuickFilterParameters(parameters, quickFilterSpecs = []) {
+    let result = {...(parameters || {})};
+    for (const spec of Array.isArray(quickFilterSpecs) ? quickFilterSpecs : []) {
+        result = deleteSelector(result, spec?.field);
+    }
+    return result;
+}
+
 export function buildQuickFilterSeed(args, quickFilterSpecs = []) {
     let filter = {};
     for (const spec of Array.isArray(quickFilterSpecs) ? quickFilterSpecs : []) {
