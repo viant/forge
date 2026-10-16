@@ -250,3 +250,14 @@ Selected values remain visible as their bound IDs before labels arrive; loaded
 producer labels replace those fallback tags without changing the selection.
 Disabled/read-only variants do not request choices. No per-window fetch JavaScript
 is needed.
+
+### Conditional filter controls
+
+Table filter sets, template fields and option entries support `visibleWhen` and
+`hiddenWhen` using the existing table context and condition evaluator. Conditions
+react while the dialog is open. Hidden predicates and selected options that are
+no longer displayed are omitted on Apply; unrelated draft values remain intact.
+These are UI display rules, not authorization, and issue no permission request.
+The producer still authorizes every datasource operation. Dialog spacing and
+stacking use `--forge-filter-dialog-spacing` / `--forge-filter-dialog-z-index`
+and scoped `forge-filter-dialog__*` classes.
