@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	identity "github.com/viant/forge/backend/resource"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -15,6 +16,9 @@ import (
 )
 
 type Options struct {
+	// Optional host-owned confined filesystem hooks; defaults preserve native semantics.
+	ReadFile      func(string) ([]byte, error)
+	WalkDir       func(string, fs.WalkDirFunc) error
 	WorkspaceRoot string
 	ReportingRoot string
 }
@@ -123,7 +127,15 @@ func Discover(ctx context.Context, options Options) (*Registry, error) {
 	}
 
 	paths := make([]string, 0)
-	err = filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+	walk := options.WalkDir
+	if walk == nil {
+		walk = filepath.WalkDir
+	}
+	read := options.ReadFile
+	if read == nil {
+		read = os.ReadFile
+	}
+	err = walk(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -149,7 +161,7 @@ func Discover(ctx context.Context, options Options) (*Registry, error) {
 
 	diagnostics := make([]Diagnostic, 0)
 	for _, path := range paths {
-		assets, fileDiagnostics := loadAssets(options.WorkspaceRoot, path)
+		assets, fileDiagnostics := loadAssetsWithReader(options.WorkspaceRoot, path, read)
 		diagnostics = append(diagnostics, fileDiagnostics...)
 		for _, asset := range assets {
 			diagnostics = append(diagnostics, result.add(asset)...)
@@ -181,16 +193,20 @@ func newRegistry(root string) *Registry {
 		presetsByID:   map[string]*Asset{},
 		fragmentsByID: map[string]*Asset{},
 		groupsByID:    map[string]*Asset{},
+		reportsByURI:  map[string]*Asset{}, reportAliasConflicts: map[string]bool{},
 	}
 }
 
 func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
+	return loadAssetsWithReader(workspaceRoot, filename, os.ReadFile)
+}
+func loadAssetsWithReader(workspaceRoot, filename string, read func(string) ([]byte, error)) ([]*Asset, []Diagnostic) {
 	relativePath, err := filepath.Rel(workspaceRoot, filename)
 	if err != nil {
 		relativePath = filename
 	}
 	relativePath = filepath.ToSlash(relativePath)
-	data, err := os.ReadFile(filename)
+	data, err := read(filename)
 	if err != nil {
 		return nil, []Diagnostic{{Code: "assetReadFailed", Message: err.Error(), SourcePath: relativePath}}
 	}
@@ -203,7 +219,7 @@ func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
 		return nil, []Diagnostic{{Code: "assetDecodeFailed", Message: err.Error(), SourcePath: relativePath}}
 	}
 	kind := stringValue(raw["kind"])
-	if kind != KindBuilder && kind != KindPreset && kind != KindFragment && kind != KindGroup && kind != legacyBuilderKind {
+	if kind != KindBuilder && kind != KindPreset && kind != KindReport && kind != KindFragment && kind != KindGroup && kind != legacyBuilderKind {
 		return nil, nil
 	}
 	id := stringValue(raw["id"])
@@ -212,6 +228,7 @@ func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
 		return nil, []Diagnostic{diagnosticAt("assetIDRequired", "reporting asset id is required", relativePath, "$.id", idNode)}
 	}
 	asset := &Asset{
+		ResourceURI: stringValue(raw["resourceUri"]), Namespace: stringValue(raw["namespace"]), Name: firstString(raw, "name", "id"), OwnerID: stringValue(raw["ownerId"]),
 		Kind:                    kind,
 		ID:                      id,
 		BuilderRef:              stringValue(raw["builderRef"]),
@@ -230,7 +247,7 @@ func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
 		YAMLPath:                "$",
 		Raw:                     raw,
 	}
-	profileDiagnostics := loadPresentationProfiles(workspaceRoot, filename, asset, documentContent(&node))
+	profileDiagnostics := loadPresentationProfilesWithReader(workspaceRoot, filename, asset, documentContent(&node), read)
 	catalogDiagnostics := make([]Diagnostic, 0)
 	if asset.Kind == KindGroup && asset.CatalogRef != "" {
 		normalizedRef, catalogPath, resolveErr := ResolveAssetReference(workspaceRoot, filename, asset.CatalogRef)
@@ -265,6 +282,9 @@ func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
 }
 
 func loadPresentationProfiles(workspaceRoot, assetFilename string, asset *Asset, rootNode *yaml.Node) []Diagnostic {
+	return loadPresentationProfilesWithReader(workspaceRoot, assetFilename, asset, rootNode, os.ReadFile)
+}
+func loadPresentationProfilesWithReader(workspaceRoot, assetFilename string, asset *Asset, rootNode *yaml.Node, read func(string) ([]byte, error)) []Diagnostic {
 	if asset == nil || asset.Kind != KindBuilder {
 		return nil
 	}
@@ -290,7 +310,7 @@ func loadPresentationProfiles(workspaceRoot, assetFilename string, asset *Asset,
 			diagnostics = append(diagnostics, diagnosticAt("presentationProfileRefInvalid", err.Error(), asset.SourcePath, entryPath, mappingValue(rootNode, "presentationProfileRefs")))
 			continue
 		}
-		data, readErr := os.ReadFile(resolvedPath)
+		data, readErr := read(resolvedPath)
 		if readErr != nil {
 			diagnostics = append(diagnostics, Diagnostic{Code: "presentationProfileReadFailed", Message: readErr.Error(), SourcePath: asset.SourcePath, YAMLPath: entryPath})
 			continue
@@ -414,7 +434,7 @@ func validateAsset(asset *Asset, rootNode *yaml.Node) []Diagnostic {
 			"data source",
 		)...)
 	}
-	if asset.Kind == KindPreset {
+	if asset.Kind == KindPreset || asset.Kind == KindReport {
 		if strings.TrimSpace(asset.BuilderRef) == "" {
 			diagnostics = append(diagnostics, diagnosticAt(
 				"presetBuilderRefRequired",
@@ -537,12 +557,37 @@ func (r *Registry) add(asset *Asset) []Diagnostic {
 	if asset == nil {
 		return nil
 	}
+	if asset.Kind == KindReport {
+		uri := asset.ResourceURI
+		if uri == "" {
+			uri = "report://" + asset.Namespace + "/" + asset.Name
+		}
+		parsed, err := identity.ParseResourceURI(uri)
+		if err != nil || parsed.Kind != "report" {
+			return []Diagnostic{{Code: "reportResourceIdentityInvalid", Message: "report requires canonical resourceUri or namespace/name", SourcePath: asset.SourcePath}}
+		}
+		if r.reportsByURI[uri] != nil {
+			return []Diagnostic{{Code: "reportResourceIdentityDuplicate", Message: "duplicate report namespace/name: " + uri, SourcePath: asset.SourcePath}}
+		}
+		asset.ResourceURI, asset.Namespace, asset.Name = uri, parsed.Namespace, parsed.Name
+		r.reportsByURI[uri] = asset
+		alias := normalizeID(asset.ID)
+		if r.presetsByID[alias] != nil || r.reportAliasConflicts[alias] {
+			delete(r.presetsByID, alias)
+			r.reportAliasConflicts[alias] = true
+		} else {
+			r.presetsByID[alias] = asset
+		}
+		r.Presets = append(r.Presets, asset)
+		r.Reports = append(r.Reports, asset)
+		return nil
+	}
 	key := normalizeID(asset.ID)
 	var index map[string]*Asset
 	switch asset.Kind {
 	case KindBuilder:
 		index = r.buildersByID
-	case KindPreset:
+	case KindPreset, KindReport:
 		index = r.presetsByID
 	case KindFragment:
 		index = r.fragmentsByID
@@ -563,8 +608,9 @@ func (r *Registry) add(asset *Asset) []Diagnostic {
 	switch asset.Kind {
 	case KindBuilder:
 		r.Builders = append(r.Builders, asset)
-	case KindPreset:
+	case KindPreset, KindReport:
 		r.Presets = append(r.Presets, asset)
+		r.Reports = append(r.Reports, asset)
 	case KindFragment:
 		r.Fragments = append(r.Fragments, asset)
 	case KindGroup:

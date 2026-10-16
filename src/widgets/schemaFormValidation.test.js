@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import {jsonSchemaToFields} from '../utils/schema.js';
+import {validateSchemaFormFields} from './schemaFormValidation.js';
+const schema = {type: 'object', required: ['kinds'], properties: {kinds: {type: 'array', minItems: 1, maxItems: 2, uniqueItems: true, items: {type: 'string', enum: ['brands', 'stores', 'delivery']}}}};
+const fields = jsonSchemaToFields(schema);
+assert.equal(fields[0].widget, 'checkboxGroup');
+assert.deepEqual(fields[0].options.map((option) => option.value), ['brands', 'stores', 'delivery']);
+assert.deepEqual(validateSchemaFormFields(fields, {kinds: ['brands', 'stores']}), {});
+assert.equal(validateSchemaFormFields(fields, {kinds: ['brands', 'brands']}).kinds, 'Choose each option only once');
+assert.equal(validateSchemaFormFields(fields, {kinds: []}).kinds, 'Select at least 1');
+assert.equal(validateSchemaFormFields(fields, {kinds: ['invalid']}).kinds, 'Invalid value');
+assert.equal(validateSchemaFormFields(fields, {kinds: ['brands', 'stores', 'delivery']}).kinds, 'Select at most 2');
+assert.equal(validateSchemaFormFields(fields, {kinds: 'brands'}).kinds, 'Invalid value');
+console.log('Schema form array enum validation passed');
+
+const refinedSchema = {type: 'object', required: ['segments'], properties: {segments: {type: 'array', title: 'Segments', 'x-ui-widget': 'tags', default: [], 'x-ui-order': 10, minItems: 1, uniqueItems: true, items: {type: 'string', enum: ['medical', 'recreational', 'CBD']}}}};
+const refinedFields = jsonSchemaToFields(refinedSchema);
+assert.equal(refinedFields[0].widget, 'checkboxGroup');
+assert.deepEqual(refinedFields[0].default, []);
+assert.equal(refinedFields[0].order, 10);
+assert.deepEqual(validateSchemaFormFields(refinedFields, {segments: ['medical', 'CBD']}), {});
+assert.equal(validateSchemaFormFields(refinedFields, {segments: 'medical'}).segments, 'Invalid value');

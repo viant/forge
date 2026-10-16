@@ -99,7 +99,7 @@ export async function requestLookupSelection({ item, context, value, signal } = 
     try {
         if (typeof lookupOpen === 'function') {
             result = await lookupOpen(request);
-        } else if (lookup.dialogId && typeof context?.handlers?.window?.openDialog === 'function') {
+        } else if (lookup.dialogId && !lookup.pickerResource && typeof context?.handlers?.window?.openDialog === 'function') {
             const parameters = Array.isArray(lookup.inputs) ? lookup.inputs : [];
             result = await context.handlers.window.openDialog({
                 execution: {
@@ -113,20 +113,23 @@ export async function requestLookupSelection({ item, context, value, signal } = 
                 },
                 context,
             });
-        } else if (lookup.windowId && typeof context?.handlers?.window?.openWindow === 'function') {
+        } else if ((lookup.pickerResource?.uri || lookup.windowId) && typeof context?.handlers?.window?.openWindow === 'function') {
             const parameters = Array.isArray(lookup.inputs) ? lookup.inputs : [];
             const options = {
                 awaitResult: true,
                 parameters,
                 modal: true,
                 signal,
+                resourceRef: lookup.pickerResource,
+                providerIdentity: lookup.providerIdentity,
+                pickerDialogId: lookup.dialogId || undefined,
             };
             for (const key of ['size', 'width', 'height', 'footer']) {
                 if (lookup[key] !== undefined) options[key] = lookup[key];
             }
             result = await context.handlers.window.openWindow({
                 execution: {
-                    args: [lookup.windowId, lookup.title || '', '', false, options],
+                    args: [lookup.pickerResource?.uri || lookup.windowId, lookup.title || '', '', false, options],
                     parameters,
                 },
                 context,
@@ -294,6 +297,8 @@ export async function resolveLookupValue({ item, value }) {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+            reference: item?.lookup?.dataSourceResource,
+            providerIdentity: item?.lookup?.providerIdentity,
             inputs: {
                 [resolveInput]: raw,
             },

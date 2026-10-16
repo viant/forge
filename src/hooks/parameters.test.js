@@ -132,3 +132,23 @@ assert.deepEqual(crossResolved, {
   scheduleId: 'sched-1',
   requireScheduleId: 'true',
 });
+
+// Nested current-input paths are fields, not implicit datasource names. This
+// shape is used by native writer bindings after their own ref is normalized.
+const inputContexts = {
+  current: {parameters: {Items: [{Id: 42}], Payload: {enabled: false}}},
+  other: {parameters: {Items: [{Id: 99}]}},
+};
+const nestedInputContext = {
+  identity: {dataSourceRef: 'current'},
+  dataSources: {current: {}, other: {}},
+  Context(ref) {
+    assert.ok(Object.hasOwn(inputContexts, ref), `unknown datasource lookup: ${ref}`);
+    return {signals: {input: {peek: () => inputContexts[ref]}}};
+  },
+};
+assert.deepEqual(resolveParameters([
+  {name: 'Items', in: 'input', location: 'parameters.Items'},
+  {name: 'Payload', in: 'input', location: 'parameters.Payload'},
+  {name: 'OtherItems', in: 'input', location: 'other.parameters.Items'},
+], nestedInputContext), {Items: [{Id: 42}], Payload: {enabled: false}, OtherItems: [{Id: 99}]});

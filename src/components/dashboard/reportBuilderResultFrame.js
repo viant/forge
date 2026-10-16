@@ -331,6 +331,16 @@ export function buildReportBuilderAuthoredRuntimePreviewState({
     const runtimePreviewContext = authoredRuntimeSemanticSections.runtimePreviewContext || null;
     const isLoadingWithoutRuntimeRows = loading && !hasRuntimeRows;
     const isLoadingWithRetainedRuntimeRows = loading && hasRuntimeRows;
+    const datasetProgress = runtimePreviewDatasetState.loading === true
+        ? runtimePreviewDatasetState.progress
+        : null;
+    const datasetTotal = Number(datasetProgress?.total || 0);
+    const datasetCompleted = Number(datasetProgress?.completed || 0);
+    const activeDatasetLabel = String(datasetProgress?.activeLabel || "").trim();
+    const datasetProgressText = Number.isFinite(datasetTotal) && datasetTotal > 0
+        && Number.isFinite(datasetCompleted)
+        ? ` ${Math.max(0, Math.min(datasetTotal, datasetCompleted))} of ${datasetTotal} data views ready.${activeDatasetLabel ? ` Loading ${activeDatasetLabel}.` : ""}`
+        : "";
     return {
         eyebrow: reportPresentation ? "Report" : "Preview",
         title: runtimePreviewArtifact?.document?.title
@@ -365,8 +375,8 @@ export function buildReportBuilderAuthoredRuntimePreviewState({
             ? {
                 level: "info",
                 message: reportPresentation
-                    ? "Updating this report with the latest results…"
-                    : "Updating results…",
+                    ? `Updating this report with the latest results…${datasetProgressText}`
+                    : `Updating results…${datasetProgressText}`,
             }
             : null,
         blockedState: !hasRuntimeRows && !canRunReport && !loading ? runtimePreviewBlockedState : null,

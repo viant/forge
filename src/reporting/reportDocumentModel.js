@@ -2496,7 +2496,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
     baseSpec.datasets = (Array.isArray(baseSpec?.datasets) ? baseSpec.datasets : [])
       .filter((dataset) => normalizeString(dataset?.id) !== "primary");
   }
-  const resolveDatasetSpecificRuntimeContext = (datasetRef = "") => {
+  const buildDatasetSpecificRuntimeContext = (datasetRef = "") => {
     const normalizedDatasetRef = normalizeString(datasetRef || "primary") || "primary";
     if (!normalizedDatasetRef || normalizedDatasetRef === "primary") {
       return {
@@ -2534,6 +2534,17 @@ export function lowerReportDocumentToReportSpec(document = {}, {
       fieldCatalog: effectiveFieldCatalog,
       container: loweredContainer,
     };
+  };
+  // Dataset configuration and field catalogs are immutable during one lowering.
+  // Reuse them across blocks instead of cloning the full builder for each chart,
+  // table and KPI. Keep this cache local so later edits always rebuild it.
+  const datasetRuntimeContexts = new Map();
+  const resolveDatasetSpecificRuntimeContext = (datasetRef = "") => {
+    const key = normalizeString(datasetRef || "primary") || "primary";
+    if (!datasetRuntimeContexts.has(key)) {
+      datasetRuntimeContexts.set(key, buildDatasetSpecificRuntimeContext(key));
+    }
+    return datasetRuntimeContexts.get(key);
   };
   const additionalBlocks = blocks
     .filter((block) => normalizeString(block?.kind) !== "reportBuilderBlock")

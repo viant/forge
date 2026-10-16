@@ -6,6 +6,7 @@ import {Section} from '@blueprintjs/core';
 import GridLayoutRenderer from './GridLayoutRenderer.jsx';
 import AccessibleSection from './AccessibleSection.jsx';
 import Container from './Container.jsx';
+import '../packs/blueprint/index.jsx';
 import {sectionAppearanceAttributes, sectionContentInsetAttributes} from './containerChrome.js';
 import {registerWidget} from '../runtime/widgetRegistry.jsx';
 
@@ -81,6 +82,40 @@ assert.equal((fieldTracksHtml.match(/data-forge-field-id="firstName"/g) || []).l
 assert.match(fieldTracksHtml, /<label[^>]*for="firstName"[^>]*data-forge-field-id="firstName"/);
 assert.match(fieldTracksHtml, /<input id="firstName"/);
 assert.doesNotMatch(fieldTracksHtml, /data-forge-layout-appearance="field-tracks"/);
+
+function requiredTextMarkup(value) {
+    const formData = {name: value};
+    const context = {
+        signals: {form: {value: formData, peek: () => formData}},
+        handlers: {dataSource: {getFormData: () => formData, setFormField: () => {}}},
+    };
+    return renderToStaticMarkup(
+        <GridLayoutRenderer
+            context={context}
+            container={{layout: {kind: 'grid', columns: 1, labels: {mode: 'top'}}}}
+            items={[{
+                id: 'siteListName',
+                label: 'Site List Name',
+                type: 'text',
+                scope: 'form',
+                dataField: 'name',
+                properties: {required: true, maxLength: 255},
+            }]}
+        />,
+    );
+}
+
+const emptyRequiredTextHtml = requiredTextMarkup('');
+const filledRequiredTextHtml = requiredTextMarkup('AISTUDIO Site List Parity QA');
+const emptyRequiredTextInput = emptyRequiredTextHtml.match(/<input\b[^>]*id="siteListName"[^>]*>/)?.[0];
+const filledRequiredTextInput = filledRequiredTextHtml.match(/<input\b[^>]*id="siteListName"[^>]*>/)?.[0];
+assert.ok(emptyRequiredTextInput, emptyRequiredTextHtml);
+assert.ok(filledRequiredTextInput, filledRequiredTextHtml);
+assert.match(emptyRequiredTextHtml, /forge-required-input/);
+assert.match(emptyRequiredTextInput, /aria-invalid="true"/);
+assert.match(filledRequiredTextInput, /aria-invalid="false"/);
+assert.match(filledRequiredTextInput, /value="AISTUDIO Site List Parity QA"/);
+assert.match(filledRequiredTextHtml, /Site List Name[\s\S]*?<span aria-hidden="true">\s*\*<\/span>/);
 
 const dividedSectionsHtml = renderToStaticMarkup(
     <GridLayoutRenderer
@@ -213,3 +248,12 @@ assert.doesNotMatch(invalidSectionTag, /data-forge-section-(?:appearance|content
 assert.doesNotMatch(defaultSectionTag, /data-forge-section-(?:appearance|content-inset)=/);
 
 console.log('grid and Section hierarchy render contracts passed');
+
+const responsiveCards = renderToStaticMarkup(<GridLayoutRenderer context={{}} container={{layout: {kind: 'grid', minColumnWidth: '280px', labels: {mode: 'none'}, gap: '8px'}}} entries={[{id: 'one'}, {id: 'two'}]} renderEntry={({entry, css}) => <section style={css.ctrl}>{entry.id}</section>}/>);
+assert.match(responsiveCards, /repeat\(auto-fit, minmax\(min\(100%, 280px\), 1fr\)\)/);
+assert.doesNotMatch(responsiveCards, /grid-column:|grid-row:/);
+const staticSection = renderToStaticMarkup(<AccessibleSection title="General" collapsible={false}>Fields</AccessibleSection>);
+assert.match(staticSection, /data-forge-part="section-header"/);
+assert.match(staticSection, /data-forge-part="section-title"/);
+assert.match(staticSection, /data-forge-part="section-content"/);
+assert.doesNotMatch(staticSection, /aria-expanded|collapse section/);

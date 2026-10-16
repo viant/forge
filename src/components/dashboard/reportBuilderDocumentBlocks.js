@@ -2163,7 +2163,7 @@ export function validateReportBuilderDocumentBlockDraft(draft = null, {
                 message: "The selected geo metric field is not available in the current builder.",
             });
         }
-        if (!["us-states", "us-state-tiles"].includes(shape)) {
+        if (!["us-states", "us-state-tiles", "world"].includes(shape)) {
             errors.push({
                 field: "geo.shape",
                 code: "unsupported",

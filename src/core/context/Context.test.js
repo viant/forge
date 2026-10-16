@@ -4,7 +4,7 @@ import path from 'node:path';
 
 import {Context, resolveWindowContentContext} from './Context.jsx';
 import {clearWindowContext, getWindowContext, setWindowContext} from './registry.js';
-import {activeWindows, restoreWindowsFromSnapshot} from '../store/signals.js';
+import {activeWindows, clearProtectedWindowState, restoreWindowsFromSnapshot} from '../store/signals.js';
 import {runUICommand} from '../ui/commands.js';
 import {resolveHostedExecuteOnOpenHostAction} from '../../components/dashboard/reportBuilderHooks.js';
 
@@ -31,6 +31,24 @@ const metadata = {
 
 const context = Context('W_ctx_override', metadata, 'lookup', {});
 context.init();
+
+const staticWindow = Context('W_static_controls', {dataSource: {}, view: {}}, '', {});
+staticWindow.init();
+assert.equal(staticWindow.signals.form, staticWindow.signals.windowForm);
+staticWindow.signals.form.value = {title: 'Local preview'};
+const restoredStaticWindow = Context('W_static_controls', {dataSource: {}, view: {}}, '', {});
+assert.equal(restoredStaticWindow.signals.form.value.title, 'Local preview');
+assert.equal(restoredStaticWindow.signals.message, staticWindow.signals.message);
+const otherStaticWindow = Context('W_other_static_controls', {dataSource: {}, view: {}}, '', {});
+assert.notEqual(otherStaticWindow.signals.form, staticWindow.signals.form);
+otherStaticWindow.signals.form.value = {title: 'Other window'};
+staticWindow.signals.message.value = [{event: 'pending'}];
+clearProtectedWindowState('W_static_controls');
+assert.deepEqual(staticWindow.signals.form.value, {});
+assert.deepEqual(staticWindow.signals.message.value, []);
+assert.equal(otherStaticWindow.signals.form.value.title, 'Other window');
+assert.equal(context.signals, undefined, 'datasource windows must retain their scoped context resolution');
+assert.ok(context.Context('lookup').signals.message);
 
 const previewOpenTarget = () => 'preview-target';
 const mergedWindowHandlerContext = Context('W_ctx_window_handlers', metadata, 'lookup', {

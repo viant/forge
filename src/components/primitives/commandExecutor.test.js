@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import {dispatchMutationCommand, executeCommand, getCommandState, mergeCommandParameters, resetCommandState, resolveCommandConfirmation, resolveIndeterminateCommand} from './commandExecutor.js';
+import {dispatchMutationCommand, executeCommand, getCommandState, mergeCommandParameters, resetCommandState, commandValidationPasses, resolveCommandConfirmation, resolveIndeterminateCommand} from './commandExecutor.js';
+import {clearProtectedWindowState, getCollectionSignal, getControlSignal, getMetadataSignal, primeWindowSignals} from '../../core/store/signals.js';
 
 const mutableSignal = (initial) => {
   let value = initial;
@@ -285,4 +286,82 @@ assert.deepEqual(mergeCommandParameters(
   {Mutation: {operation: 'assign', relatedItemIds: [11]}},
 ), {Mutation: {recordId: 101, trace: 'base', operation: 'assign', relatedItemIds: [11]}, Header: 'keep'});
 
+const protectedWindowId = 'protected-command';
+primeWindowSignals(protectedWindowId, {dataSource: {patch: {}}});
+getMetadataSignal(protectedWindowId).value = {authorizationSnapshot: {authorizationVersion: 'v1'}};
+const protectedControl = getControlSignal(`${protectedWindowId}DSpatch`);
+const protectedCollection = getCollectionSignal(`${protectedWindowId}DSpatch`);
+protectedCollection.value = [{secret: 'old-account'}];
+let completeProtectedWriter;
+const protectedTarget = {signals: {control: protectedControl, collection: protectedCollection}, handlers: {dataSource: {setInputParameters() {}, fetchCollection() {
+  protectedControl.value = {loading: true, error: null};
+  return new Promise(resolve => { completeProtectedWriter = resolve; });
+}}}};
+const protectedContext = {identity: {windowId: protectedWindowId, protectedWindow: true}, Context: () => protectedTarget};
+const protectedCommand = {dataSourceRef: 'patch'};
+const pendingProtectedCommand = executeCommand(protectedContext, protectedCommand);
+clearProtectedWindowState(protectedWindowId);
+completeProtectedWriter({ok: true});
+const superseded = await pendingProtectedCommand;
+assert.equal(superseded.status, 'failed');
+assert.equal(superseded.error.code, 'request_superseded');
+assert.deepEqual(protectedCollection.value, []);
+assert.equal(getCommandState(protectedContext, protectedCommand).guarded, false);
+
 console.log('canonical command executor contract passed');
+
+// A false business hint cannot authorize/deny canonical data writes; local
+// authored form validation still runs and the writer transport stays singular.
+const canonicalControl = mutableSignal({loading:false,error:null});
+let canonicalWrites=0,canonicalParameters;
+const originalMutationArgs=Object.freeze({id:'9007199254740993',value:'original'});
+const canonicalTarget={
+  signals:{control:canonicalControl},
+  handlers:{dataSource:{
+    setInputParameters(value){canonicalParameters=value;},
+    fetchCollection(){canonicalWrites++;canonicalControl.value={loading:true,error:null};queueMicrotask(()=>{canonicalControl.value={loading:false,error:null};});},
+  }},
+};
+const canonicalContext={identity:{canonicalDelivery:true},authorization:{resource:{capabilities:{write:false}}},signals:{windowForm:mutableSignal({ready:false})},Context:()=>canonicalTarget};
+const businessValidation={source:'authorization',field:'resource.capabilities.write',equals:true};
+assert.equal((await executeCommand(canonicalContext,{dataSourceRef:'canonical',validateWhen:businessValidation},originalMutationArgs)).status,'succeeded');
+assert.equal(canonicalWrites,1);
+assert.deepEqual(canonicalParameters,originalMutationArgs);
+assert.equal((await executeCommand(canonicalContext,{commandId:'mixed',dataSourceRef:'canonical',validateWhen:{all:[businessValidation,{source:'windowForm',field:'ready',equals:true}]}})).status,'invalid');
+assert.equal(canonicalWrites,1);
+assert.equal(dispatchMutationCommand(canonicalContext,{commandId:'direct',dataSourceRef:'canonical',validateWhen:{not:businessValidation}}),true);
+await Promise.resolve();await Promise.resolve();
+assert.equal(canonicalWrites,2);
+console.log('canonical command validation delegates business authorization to data MCP ✓');
+
+const fidelityContext={identity:{canonicalDelivery:true},authorization:{resource:{id:'original',parent:{id:'parent-a'},capabilities:{write:false}},principal:{roles:[],features:[]}},signals:{windowForm:mutableSignal({ready:true})}};
+const resourceGuard={source:'authorization',field:'resource.id',equals:'changed'};
+const parentGuard={source:'authorization',field:'resource.parent.id',equals:'parent-b'};
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:resourceGuard}),false);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:parentGuard}),false);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{all:[businessValidation,resourceGuard]}}),false);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{not:{source:'authorization',field:'resource.id',equals:'original'}}}),false);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{not:businessValidation}}),true);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{source:'authorization',field:'principal.roles',contains:'admin'}}),true);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{source:'authorization',field:'principal.features',contains:'write'}}),true);
+console.log('canonical identity and parent validation remains mandatory ✓');
+
+const localFalse={source:'windowForm',field:'ready',equals:false};
+const localTrue={source:'windowForm',field:'ready',equals:true};
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{any:[businessValidation,localFalse]}}),false);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{any:[businessValidation,localTrue]}}),true);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{not:{all:[businessValidation,localTrue]}}}),false);
+assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{not:{any:[businessValidation,localFalse]}}}),true);
+for(const [field,value] of [['resource.id','different'],['resource.parent.id','different'],['actor.subject','different'],['selection.id','different'],['authorizationVersion','different']]) {
+  assert.equal(commandValidationPasses(fidelityContext,{validateWhen:{any:[businessValidation,{source:'authorization',field,equals:value}]}}),false,`${field} remains a validation constraint`);
+}
+console.log('canonical mixed all/any/not retains local and fidelity validation ✓');
+
+const openedContext={...canonicalContext,identity:{windowOpenOnly:true}};
+const beforeOpenedWrites=canonicalWrites;
+assert.equal((await executeCommand(openedContext,{commandId:'opened-window',dataSourceRef:'canonical',validateWhen:businessValidation},originalMutationArgs)).status,'succeeded');
+assert.equal(canonicalWrites,beforeOpenedWrites+1);
+assert.deepEqual(canonicalParameters,originalMutationArgs);
+assert.equal((await executeCommand(openedContext,{commandId:'opened-local-validation',dataSourceRef:'canonical',validateWhen:{all:[businessValidation,{source:'windowForm',field:'ready',equals:true}]}})).status,'invalid');
+assert.equal(canonicalWrites,beforeOpenedWrites+1);
+console.log('opening-only command retains local validation and delegates data authorization to MCP ✓');

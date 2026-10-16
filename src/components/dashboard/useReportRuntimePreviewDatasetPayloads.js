@@ -109,7 +109,8 @@ export async function fetchReportRuntimePreviewDatasetPayloadResult({
       error: null,
     };
   }
-  const progress = {total: normalizedDatasets.length, completed: 0, running: 0, failed: 0};
+  const progress = {total: normalizedDatasets.length, completed: 0, running: 0, failed: 0, activeLabel: ""};
+  const activeLabels = new Map();
   const publishProgress = () => {
     if (!signal?.aborted && canContinueDatasetPayloadLifecycle(shouldContinue)) onProgress?.({...progress});
   };
@@ -118,7 +119,10 @@ export async function fetchReportRuntimePreviewDatasetPayloadResult({
   const entries = await Promise.all(
     normalizedDatasets.map((dataset) => scheduleReportDataset(async () => {
       if (!canContinueDatasetPayloadLifecycle(shouldContinue)) return [dataset.id, null, false, null, true];
+      const activeKey = Symbol(dataset.id);
       progress.running++;
+      activeLabels.set(activeKey, dataset.label || dataset.id);
+      progress.activeLabel = activeLabels.values().next().value || "";
       publishProgress();
       try {
         const resolvedFetcher = resolveReportBuilderDatasetPreviewFetcher(
@@ -178,6 +182,8 @@ export async function fetchReportRuntimePreviewDatasetPayloadResult({
       } finally {
         progress.running--;
         progress.completed++;
+        activeLabels.delete(activeKey);
+        progress.activeLabel = activeLabels.values().next().value || "";
         publishProgress();
       }
     }, {signal,group}).catch(error => {
@@ -385,6 +391,11 @@ export function resolveReportRuntimePreviewDatasetResultFreshness({
   return requiredDatasetIds.every((datasetId) => freshDatasetIds.has(datasetId));
 }
 
+export function shouldStartReportRuntimePreviewDatasetFetch({state, requestKey, activeRequestKey} = {}) {
+  return state?.requestKey !== requestKey
+    || (state?.loading === true && activeRequestKey !== requestKey);
+}
+
 export function useReportRuntimePreviewDatasetPayloads({
   enabled = false,
   builderContext = null,
@@ -423,6 +434,7 @@ export function useReportRuntimePreviewDatasetPayloads({
         })),
     );
   const lifecycleGenerationRef = React.useRef(0);
+  const activeRequestKeyRef = React.useRef("");
   const currentRequestKeyRef = React.useRef(normalizedRequestKey);
   currentRequestKeyRef.current = normalizedRequestKey;
 
@@ -430,16 +442,23 @@ export function useReportRuntimePreviewDatasetPayloads({
     const hasDatasets = Array.isArray(datasetsRef.current) && datasetsRef.current.length > 0;
     if (!enabled || !hasDatasets || !builderContextRef.current || !normalizedRequestKey) {
       lifecycleGenerationRef.current += 1;
+      activeRequestKeyRef.current = "";
       if (stateRef.current.loading || Object.keys(stateRef.current.payloads || {}).length > 0 || stateRef.current.requestKey) {
         setState(buildIdleReportRuntimePreviewDatasetPayloadState());
       }
+      setProgress(null);
       return undefined;
     }
-    if (stateRef.current.requestKey === normalizedRequestKey) {
+    if (!shouldStartReportRuntimePreviewDatasetFetch({
+      state: stateRef.current,
+      requestKey: normalizedRequestKey,
+      activeRequestKey: activeRequestKeyRef.current,
+    })) {
       return undefined;
     }
     const requestGeneration = lifecycleGenerationRef.current + 1;
     lifecycleGenerationRef.current = requestGeneration;
+    activeRequestKeyRef.current = normalizedRequestKey;
     let cancelled = false;
     const controller = new AbortController();
     const startedAt = Date.now();
@@ -468,10 +487,26 @@ export function useReportRuntimePreviewDatasetPayloads({
           setState(nextState);
         }
       },
+    }).catch((error) => {
+      if (shouldContinue()) {
+        setState(buildResolvedReportRuntimePreviewDatasetPayloadState({
+          requestKey: normalizedRequestKey,
+          payloads: stateRef.current.payloads,
+          currentState: stateRef.current,
+          error,
+        }));
+      }
+    }).finally(() => {
+      if (lifecycleGenerationRef.current === requestGeneration) {
+        activeRequestKeyRef.current = "";
+      }
     });
     return () => {
       cancelled = true;
       controller.abort();
+      if (lifecycleGenerationRef.current === requestGeneration) {
+        activeRequestKeyRef.current = "";
+      }
     };
   }, [enabled, normalizedRequestKey]);
 

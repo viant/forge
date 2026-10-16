@@ -1,3 +1,4 @@
+import MissingDataSourceBoundary from '../components/MissingDataSourceBoundary.jsx';
 /* -------------------------------------------------------------------------
  * WidgetRenderer – generic control renderer (Phase 1 placeholder)
  * -------------------------------------------------------------------------
@@ -15,7 +16,7 @@ import {getWidgetEntry} from './widgetRegistry.jsx';
 import {getEventAdapter, resolveStateAdapter, runDynamicEvaluators,} from './binding.js';
 import {resolveSelector} from '../utils/selector.js';
 import { resolveLinkTarget } from '../utils/linkTarget.js';
-import {evaluatePlainVisibleWhen} from '../components/visibleWhen.js';
+import {evaluatePlainVisibleWhen, trackVisibleWhen} from '../components/visibleWhen.js';
 import {resolveDynamicDataSourceRef} from './dataSourceRef.js';
 import {resolveRequiredControlState, usesResolvedRequiredPastel} from './requiredControlState.js';
 import MutationCommand from '../components/primitives/MutationCommand.jsx';
@@ -60,7 +61,7 @@ export function resolveDataSourceOptions(item = {}, context = {}, fallback = [])
     }
 }
 
-export default function WidgetRenderer({
+function WidgetRendererContent({
     item,
     context = {},
     container = {},
@@ -94,16 +95,19 @@ export default function WidgetRenderer({
 
     const resolvedDataSourceRef = resolveDynamicDataSourceRef(item, context);
     const resolvedContext = resolvedDataSourceRef ? context.Context(resolvedDataSourceRef) : context;
+    // Guards subscribe to their declared fields, independently of the widget value.
+    [item.visibleWhen, item.hiddenWhen, item.disabledWhen, item.readOnlyWhen]
+        .forEach(condition => trackVisibleWhen(condition, resolvedContext));
 
     // ------------------------------------------------------------------
     // 1. Resolve widget key / factory
     // ------------------------------------------------------------------
     const classifiedWidgetKey = item.widget || classify(item);
-    const resolvedItemLink = resolveLinkTarget({
-        linkConfig: item?.link,
+    const resolvedItemLink = item?.link ? resolveLinkTarget({
+        linkConfig: item.link,
         value: resolveItemBoundValue(resolvedContext, item),
         context: resolvedContext,
-    });
+    }) : null;
     const widgetKey = resolvedItemLink?.kind === 'window' || item?.type === 'link'
         ? 'link'
         : classifiedWidgetKey;
@@ -342,4 +346,10 @@ export default function WidgetRenderer({
             <Widget { ...widgetProps} />
         </ControlWrapper>
     );
+}
+
+export default function WidgetRenderer(props) {
+    useSignals();
+    const reference = resolveDynamicDataSourceRef(props.item, props.context);
+    return <MissingDataSourceBoundary metadata={props.context?.metadata} reference={reference}><WidgetRendererContent {...props}/></MissingDataSourceBoundary>;
 }

@@ -1,3 +1,5 @@
+import {MissingDataSourceReferenceError} from './dataSourceReference.js';
+import {canonicalSelectionBinding} from '../../runtime/canonicalDelivery.js';
 import {useDataSourceHandlers} from "../../hooks/index.js";
 import {
     getControlSignal,
@@ -34,13 +36,7 @@ function resolveActionHandler(actions, handlers, name) {
 }
 
 function buildDataSourceNotFoundError(dataSourceRef = "", identity = null) {
-    const error = new Error(`DataSource not found: ${dataSourceRef}`);
-    error.code = "DataSourceNotFound";
-    error.dataSourceRef = dataSourceRef;
-    if (identity && typeof identity === "object" && !Array.isArray(identity)) {
-        error.identity = identity;
-    }
-    return error;
+    return new MissingDataSourceReferenceError(dataSourceRef, identity);
 }
 
 export function resolveWindowContentContext({
@@ -142,7 +138,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
     };
     return {
 
-        identity: {windowId, getDataSourceId, dataSourceRef, getDialogId, ...(actorRef ? { actorRef } : {})},
+        identity: {windowId, getDataSourceId, dataSourceRef, getDialogId, protectedWindow: !!(metadata?.authorization || metadata?.authorizationSnapshot || canonicalSelectionBinding(metadata)), canonicalDelivery: !!canonicalSelectionBinding(metadata), windowOpenOnly: services?.authorizationRefresh?.mode === 'opening' && !!(metadata?.authorization || metadata?.authorizationSnapshot || canonicalSelectionBinding(metadata)), ...(actorRef ? { actorRef } : {})},
         windowState: services?.windowState || null,
         authorization: services?.authorization || null,
         resources: {},
@@ -150,6 +146,18 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
         dataSourceRef: dataSourceRef,
         _globalServices: services || {},
         services,
+        // A window may contain local controls without a datasource. Its form
+        // and events still need stable window-scoped signals; datasource
+        // contexts replace these with their own scoped signals below.
+        ...(dataSourceRef ? {} : {signals: {
+            input: getInputSignal(`${windowId}:local`),
+            form: getFormSignal(`${windowId}:windowForm`),
+            windowForm: getFormSignal(`${windowId}:windowForm`),
+            control: getControlSignal(windowId),
+            message: getMessageSignal(windowId),
+            formStatus: getFormStatusSignal(`${windowId}:windowForm`),
+            windowControl: windowControlSignal,
+        }}),
         handlers: {
             ...(services || {}),
             window: {
@@ -245,7 +253,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 ns,
                 dataSourceId: getDataSourceId(dataSourceRef)
             }
-            const baseDataSource = metadata.dataSource[dataSourceRef]
+            const baseDataSource = metadata.dataSource?.[dataSourceRef]
             if (!baseDataSource) {
                 throw buildDataSourceNotFoundError(dataSourceRef, identity)
             }
@@ -287,7 +295,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             }
 
 
-            const connector = createDataConnector(dataSource, connectorRuntime);
+            const connector = createDataConnector(dataSource, {...connectorRuntime, dataSourceRef});
             result = {
                 ...this,
                 // Preserve existing handlers (e.g., dialog) and merge DS/window + services
@@ -345,7 +353,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 ns,
                 dataSourceId: getDataSourceId(dataSourceRef)
             };
-            const baseDataSource = metadata.dataSource[dataSourceRef];
+            const baseDataSource = metadata.dataSource?.[dataSourceRef];
             if (!baseDataSource) {
                 throw buildDataSourceNotFoundError(dataSourceRef, identity);
             }
@@ -353,7 +361,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 ? { ...baseDataSource, selectionMode: selectionModeOverride }
                 : baseDataSource;
 
-            const connector = createDataConnector(dataSource, connectorRuntime);
+            const connector = createDataConnector(dataSource, {...connectorRuntime, dataSourceRef});
 
             let cached = dataSourceContextCache[contextCacheKey];
             if (cached) {

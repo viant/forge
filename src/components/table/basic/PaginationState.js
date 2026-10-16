@@ -37,6 +37,7 @@ export function resolvePaginationState({
         recordCount: initialLoading ? null : normalizeNonNegativeInteger(info?.totalCount ?? info?.recordCount),
         hasMore: initialLoading ? null : hasMore,
         initialLoading,
+        ...(info?.hasMoreExplicit === true ? {hasMoreExplicit: true} : {}),
     };
 }
 
@@ -55,8 +56,9 @@ export function compactPaginationStatusLabel({initialLoading = false, currentPag
     return recordCount != null ? `${pageLabel} · ${Number(recordCount).toLocaleString('en-US')}` : pageLabel;
 }
 
-export function canNavigateNext({inactive = false, initialLoading = false, currentPage = 1, totalPages = null, recordCount = null, hasMore = null} = {}) {
+export function canNavigateNext({inactive = false, initialLoading = false, currentPage = 1, totalPages = null, recordCount = null, hasMore = null, hasMoreExplicit = false} = {}) {
     if (inactive || initialLoading || recordCount === 0) return false;
+    if (hasMoreExplicit) return hasMore === true;
     if (totalPages != null) return currentPage < totalPages;
     return hasMore === true;
 }

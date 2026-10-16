@@ -473,13 +473,13 @@
 }
 
 .forge-schema-choices {
-    display: grid;
-    gap: 10px;
-    min-width: 0;
+    border: 0;
+    padding: 0;
     margin: 0;
-    padding: 12px;
-    border: 1px solid #d8e1e8;
-    border-radius: 4px;
+    min-width: 0;
+    display: grid;
+    gap: 8px;
+    color: inherit;
 }
 .forge-schema-choices-options > label {
     display: flex;
@@ -505,3 +505,7 @@
     scrollbar-gutter: stable;
     padding-right: 4px;
 }
+
+.forge-schema-choices legend { padding: 0; margin-bottom: 8px; font-weight: 600; }
+.forge-schema-choices label { display: flex; align-items: baseline; gap: 8px; cursor: pointer; overflow-wrap: anywhere; }
+.forge-schema-choices input { accent-color: var(--forge-accent, var(--forge-focus-color)); }

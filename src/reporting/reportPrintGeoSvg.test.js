@@ -88,7 +88,7 @@ assert.match(supported.svg, />WA</);
 
 const unsupportedShape = buildReportPrintGeoSvg({
   resolvedGeo: {
-    shape: "world",
+    shape: "unsupported",
     regions: [{ key: "US", label: "United States", rawValue: 1, displayValue: "1", color: "#2563eb" }],
   },
 });
@@ -98,8 +98,14 @@ assert.deepEqual(unsupportedShape.diagnostics, [
   {
     code: "unsupportedReportPrintGeoShape",
     severity: "warning",
-    message: "ReportPrint geo lowering does not support shape world.",
+    message: "ReportPrint geo lowering does not support shape unsupported.",
   },
 ]);
+
+const world = buildReportPrintGeoSvg({resolvedGeo:{shape:'world',regions:[{key:'USA',displayValue:'$12',color:'#123456'},{key:'GU',displayValue:'$3',color:'#abcdef'}]}});
+assert.deepEqual(world.diagnostics,[]);
+assert.match(world.svg, /United States of America: \$12/);
+assert.match(world.svg, /Guam: \$3/);
+assert.match(world.svg, /<circle/);
 
 console.log("reportPrintGeoSvg ✓ lowers resolved geo payloads into deterministic SVG output");

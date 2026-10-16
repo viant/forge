@@ -1,10 +1,10 @@
-import React, {useState} from "react";
+import React, {useMemo, useState} from "react";
 import {Card, Elevation} from "@blueprintjs/core";
 import {oneDark} from "@codemirror/theme-one-dark";
 
 import CodeMirror from "@uiw/react-codemirror";
 import {EditorView} from "@codemirror/view";
-import {HighlightStyle, syntaxHighlighting} from "@codemirror/language";
+import {HighlightStyle, syntaxHighlighting, defaultHighlightStyle} from "@codemirror/language";
 import {tags} from "@lezer/highlight";
 import {javascript} from "@codemirror/lang-javascript";
 import {python} from "@codemirror/lang-python";
@@ -34,6 +34,8 @@ const languages = {
 // CodeMirror's default light-theme string color falls below WCAG AA on white.
 // Use semantic highlighting so the accessible color remains stable even when
 // CodeMirror changes its generated class names.
+// Explicit base highlighting stays active alongside the accessible string override.
+const baseSyntax = syntaxHighlighting(defaultHighlightStyle);
 const accessibleSyntax = syntaxHighlighting(HighlightStyle.define([
     {tag: tags.string, color: "#b42318"},
 ]));
@@ -56,7 +58,7 @@ const BoundEditor = ({context, container}) => {
             const extensionValue = data[selector.extension||'extension']
             let values = []
             if(languages[extensionValue]) {
-                values = [languages[extensionValue], accessibleSyntax]
+                values = [languages[extensionValue], baseSyntax, accessibleSyntax]
             }
             setExtensions(values);
         }
@@ -83,7 +85,20 @@ const BoundEditor = ({context, container}) => {
     );
 };
 
-const Editor = ({context, container, value, onChange, language, height, readOnly = false, ariaLabel}) => value !== undefined
-    ? <CodeMirror value={value || ''} height={height || '280px'} extensions={[...(languages[language || 'sql'] ? [languages[language || 'sql']] : []), accessibleSyntax, ...(ariaLabel ? [EditorView.contentAttributes.of({'aria-label': ariaLabel})] : [])]} onChange={onChange} readOnly={readOnly} />
-    : <BoundEditor context={context} container={container}/>;
+function ControlledEditor({value, onChange, language, height, readOnly = false, ariaLabel}) {
+    // Keep the language/facet identities stable while unrelated form state
+    // changes. Reconfiguring a multi-megabyte YAML document on every render
+    // repeatedly restarts parsing and can stall the editor's browser tab.
+    const extensions = useMemo(() => [
+        ...(languages[language || 'sql'] ? [languages[language || 'sql']] : []),
+        baseSyntax,
+        accessibleSyntax,
+        ...(ariaLabel ? [EditorView.contentAttributes.of({'aria-label': ariaLabel})] : []),
+    ], [language, ariaLabel]);
+    return <CodeMirror value={value || ''} height={height || '280px'} extensions={extensions} onChange={onChange} readOnly={readOnly} />;
+}
+
+const Editor = props => props.value !== undefined
+    ? <ControlledEditor {...props}/>
+    : <BoundEditor context={props.context} container={props.container}/>;
 export default Editor;

@@ -1,5 +1,5 @@
 .*/
-node_modules/
+node_modules
 dist/
 android/sample/
 android/app/
@@ -8,6 +8,12 @@ output/
 
 # Logs and lock files
 *.log
-package-lock.json
 yarn.lock
 thtest_local.go
+
+backend/reporting/materializer/package-lock.json
+
+# Generated window editor bundle and Go browser bridge.
+dist-window-editor/
+public/window-editor/canonical.wasm
+public/window-editor/wasm_exec.js

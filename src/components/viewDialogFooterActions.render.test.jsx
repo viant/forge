@@ -36,7 +36,7 @@ assert.match(html, /forge-disabled-action-shell/);
 assert.match(html, /title="Disabled until sparse updates are safe\." tabindex="0"/);
 assert.match(html, /forge-mutation-command/);
 assert.match(html, /bp6-intent-primary/);
-assert.match(html, /title="Save Record"[^>]*disabled=""[^>]*bp6-intent-primary/);
+assert.match(html, /<button(?=[^>]*title="Save Record")(?=[^>]*disabled="")(?=[^>]*bp6-intent-primary)[^>]*>/);
 assert.match(html, /bp6-button-text">Save Record<\/span>/);
 assert.match(html, /aria-live="polite"/);
 

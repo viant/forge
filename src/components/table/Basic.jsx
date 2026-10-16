@@ -22,7 +22,7 @@ import {resolveKey} from "../../utils/selector.js";
 import {filterEmptyStateToolbarItems, resolveTableEmptyState, shouldRenderTableEmptyState} from "./tableEmptyState.js";
 import {tableTrailingSpace, tableSurfaceWidth, tableRowSlots, preserveDeclaredColumnWidths, scrollableTableWidth, tableBackfillCount, withStickyColumnOffsets} from './tableSizing.js';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
-import {resolveClientPagination} from './clientPagination.js';
+import {resolveClientPagination, usesClientPaginationInfo} from './clientPagination.js';
 import {requestServerTableSort} from './serverSort.js';
 import {useSignals} from '@preact/signals-react/runtime';
 import {applyClientFilters} from './clientFilters.js';
@@ -209,7 +209,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         pending: false,
     });
     const toolbarContext = useMemo(() => {
-        if (dataSource?.filterMode !== 'client' && !clientPagination) return context;
+        if (!usesClientPaginationInfo({filterMode: dataSource?.filterMode, pagingEnabled, clientPagination})) return context;
         return {
             ...context,
             handlers: {
@@ -229,7 +229,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                 },
             },
         };
-    }, [context, dataSource?.filterMode, clientPagination, pagingSize, activeFilterSet]);
+    }, [context, dataSource?.filterMode, pagingEnabled, clientPagination, pagingSize, activeFilterSet]);
 
 
     const handleShowFullContent = (content) => {

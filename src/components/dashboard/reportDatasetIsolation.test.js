@@ -17,11 +17,11 @@ const builderContext = {handlers:{reportBuilderPreview:{fetchByRef:async ({param
 const dataset = index => ({id:`part-${index}`,dataSourceRef:'report',request:{index},resultContract:{rowPath:'rows'}});
 const result = fetchReportRuntimePreviewDatasetPayloadResult({builderContext,datasets:Array.from({length:6},(_,i)=>dataset(i)),onProgress:p=>progress.push(p)});
 await tick();
-assert.equal(running,1,'one report must leave room for another report');
+assert.equal(running,2,'one report can fetch two views while leaving room for another report');
 const second = fetchReportRuntimePreviewDatasetPayloadResult({builderContext,datasets:[dataset(99)]});
 await tick();
-assert.equal(running,2,'another report must start ahead of the first report backlog');
-assert.deepEqual(progress.at(-1),{total:6,completed:0,running:1,failed:0});
+assert.equal(running,3,'another report must start ahead of the first report backlog');
+assert.deepEqual(progress.at(-1),{total:6,completed:0,running:2,failed:0,activeLabel:'part-0'});
 const originalFetch = globalThis.fetch;
 try {
     globalThis.fetch = async () => new Response(JSON.stringify({rows:[{id:1}]}),{status:200});
@@ -31,10 +31,14 @@ try {
 } finally { globalThis.fetch = originalFetch; }
 releases.splice(releases.findIndex(entry=>entry.index===99),1)[0].resolve();
 assert.equal(Object.keys((await second).payloads).length,1);
-for(let i=0;i<6;i++) { releases.shift().resolve(); await tick(); }
+for(let i=0;i<6;i++) {
+    releases.shift().resolve();
+    await tick();
+    if(i===0) assert.equal(progress.at(-1).activeLabel,'part-1','progress names a request that is still running');
+}
 assert.equal(Object.keys((await result).payloads).length,6);
-assert.equal(peak,2);
-assert.deepEqual(progress.at(-1),{total:6,completed:6,running:0,failed:0});
+assert.equal(peak,3);
+assert.deepEqual(progress.at(-1),{total:6,completed:6,running:0,failed:0,activeLabel:''});
 
 const controller = new AbortController();
 let calls = 0;
@@ -47,7 +51,7 @@ const cancelled = fetchReportRuntimePreviewDatasetPayloadResult({
 });
 await tick(); controller.abort();
 assert.equal((await cancelled).cancelled,true);
-assert.equal(calls,1,'queued work from the abandoned report must never start');
+assert.equal(calls,2,'queued work from the abandoned report must never start');
 assert.equal(forwardedSignal.aborted,true);
 const recovered = await fetchReportRuntimePreviewDatasetPayloadResult({datasets:[dataset(42)],
     builderContext:{handlers:{reportBuilderPreview:{fetchByRef:async()=>({rows:[{value:42}]})}}}});
