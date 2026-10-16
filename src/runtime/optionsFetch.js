@@ -3,7 +3,7 @@ const requests = new WeakMap();
 
 export function usesLazyOptions(item = {}) {
     return item.optionsFetchMode === 'onFocus'
-        && String(item.widget || item.type || '').toLowerCase() === 'select'
+        && ['select', 'multiselect'].includes(String(item.widget || item.type || '').toLowerCase())
         && !!String(item.optionsDataSourceRef || '').trim()
         && !Array.isArray(item.options);
 }
