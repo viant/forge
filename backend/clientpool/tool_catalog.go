@@ -363,7 +363,49 @@ func (m *Manager) ToolCatalogSnapshot(ctx context.Context, conversation, server 
 	return managed.toolCatalogSnapshot(ctx, options...)
 }
 
+// ToolCatalogIdentity returns the same opaque identity as a complete cached
+// snapshot without decoding tool schemas or initializing a missing connection.
+func (m *Manager) ToolCatalogIdentity(ctx context.Context, conversation, server string, options ...mcpclient.RequestOption) (string, error) {
+	if m == nil || ctx == nil {
+		return "", nil
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	configured, err := m.Options(ctx, server)
+	if err != nil {
+		return "", err
+	}
+	fingerprint, err := effectiveConfigFingerprint(configured)
+	if err != nil {
+		return "", err
+	}
+	key, service := m.poolKey(ctx, conversation), resolvedServiceName(configured, server)
+	m.mu.Lock()
+	held := m.pool[key][service]
+	var managed *managedClient
+	if held != nil && held.client != nil && !held.evicted && !held.closed && held.configFingerprint == fingerprint {
+		managed = held.managed
+	}
+	m.mu.Unlock()
+	if managed == nil {
+		return "", nil
+	}
+	identity, _, err := managed.toolCatalogState(ctx, false, options...)
+	if err != nil {
+		return "", err
+	}
+	if !m.IsCurrentClient(ctx, conversation, server, managed) {
+		return "", nil
+	}
+	return identity, nil
+}
+
 func (c *managedClient) toolCatalogSnapshot(ctx context.Context, options ...mcpclient.RequestOption) (string, []mcpschema.Tool, error) {
+	return c.toolCatalogState(ctx, true, options...)
+}
+
+func (c *managedClient) toolCatalogState(ctx context.Context, includeTools bool, options ...mcpclient.RequestOption) (string, []mcpschema.Tool, error) {
 	_, raw, scope, _, _, cacheable, err := c.toolCatalogScope(ctx, options...)
 	if err != nil || !cacheable {
 		return "", nil, err
@@ -384,10 +426,12 @@ func (c *managedClient) toolCatalogSnapshot(ctx context.Context, options ...mcpc
 		seen[cursor] = true
 		key := fmt.Sprintf("%s:%s:%x:%d:%s", c.serverName, scope, sha256.Sum256(raw), m.toolCatalogGeneration[c.serverName], cursor)
 		var pageBytes []byte
-		var revision string
+		var revision, nextCursor string
+		retained := false
 		if page := m.toolCatalog[key]; page != nil && page.ready == nil && page.reusable(now) {
 			pageBytes = page.bytes
 			revision = fmt.Sprintf("%x", page.revision)
+			nextCursor, retained = page.nextCursor, true
 		} else if readSnapshot != nil {
 			// Zero-TTL catalogs are reusable only within the current operation.
 			// Connection, credentials and notification generation still fence the key.
@@ -399,21 +443,34 @@ func (c *managedClient) toolCatalogSnapshot(ctx context.Context, options ...mcpc
 		if pageBytes == nil {
 			return "", nil, nil
 		}
-		type plain mcpschema.ListToolsResult
-		var result plain
-		wire := struct {
-			*plain
-			CacheScope string `json:"cacheScope"`
-		}{plain: &result}
-		if err := json.Unmarshal(pageBytes, &wire); err != nil {
-			return "", nil, err
+		if includeTools {
+			result, err := decodeToolCatalogPage(pageBytes)
+			if err != nil {
+				return "", nil, err
+			}
+			tools = append(tools, result.Tools...)
+			if !retained && result.NextCursor != nil && *result.NextCursor != "" {
+				nextCursor = "cursor:" + *result.NextCursor
+			}
 		}
-		tools = append(tools, result.Tools...)
+		if !retained && !includeTools {
+			// Operation-local zero-TTL pages carry only serialized wire bytes.
+			// Read only their cursor; never materialize schemas for identity.
+			var header struct {
+				NextCursor *string `json:"nextCursor"`
+			}
+			if err := json.Unmarshal(pageBytes, &header); err != nil {
+				return "", nil, err
+			}
+			if header.NextCursor != nil && *header.NextCursor != "" {
+				nextCursor = "cursor:" + *header.NextCursor
+			}
+		}
 		revisions = append(revisions, key+":"+revision)
-		if result.NextCursor == nil || *result.NextCursor == "" {
+		if nextCursor == "" {
 			break
 		}
-		cursor = "cursor:" + *result.NextCursor
+		cursor = nextCursor
 	}
 	encoded, _ := json.Marshal(revisions)
 	return fmt.Sprintf("%x", sha256.Sum256(encoded)), tools, nil
