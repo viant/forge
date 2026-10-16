@@ -233,3 +233,12 @@ its source do not invalidate cells. Explicit `timeZone` and row-level
 `timeZoneSelector` take precedence over the bound fallback. Missing binding values
 retain existing formatting defaults. Timestamps remain unchanged; `dateTime24`
 uses an h23 clock so midnight displays as00:00.
+
+### Date-range drafts
+
+`dateRangePreset` keeps custom start/end edits local until Apply. Preset context
+updates therefore cannot overwrite the edited dates, and typing does not change
+datasource parameters. Apply commits both endpoints, granularity and the custom
+preset together. Inverted ranges cannot be applied. Closing and reopening the
+popup restores the applied range; choosing a preset also commits its range as
+one update. The partial-data checkbox retains its independent behavior.
