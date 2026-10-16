@@ -298,7 +298,19 @@ func (c *managedClient) toolCatalogScope(ctx context.Context, options ...mcpclie
 	if m.userIDFn != nil {
 		principal = m.userIDFn(ctx)
 	}
-	credential, _ := json.Marshal([]string{principal, delegatedToken, token, request.StringToken, authctx.MCPAuthToken(ctx, false), authctx.MCPAuthToken(ctx, true), authctx.Provider(ctx), authctx.EffectiveUserID(ctx), transportScope})
+	requestToken := request.StringToken
+	if requestToken != "" && requestToken == token && m.newClientFn == nil && !cfg.IsDelegatedAuth() && !cfg.IsBrowserExecution() {
+		switch cfg.Transport.Type {
+		case "streamable", "sse", "http":
+			if endpoint, err := url.Parse(cfg.Transport.URL); err == nil && (endpoint.Scheme == "http" || endpoint.Scheme == "https") {
+				// For the ordinary HTTP client this explicit option only replaces
+				// the same context Bearer value. Preserve the request itself;
+				// normalize its redundant slot only in the existing metadata key.
+				requestToken = ""
+			}
+		}
+	}
+	credential, _ := json.Marshal([]string{principal, delegatedToken, token, requestToken, authctx.MCPAuthToken(ctx, false), authctx.MCPAuthToken(ctx, true), authctx.Provider(ctx), authctx.EffectiveUserID(ctx), transportScope})
 	scope := fmt.Sprintf("private:%p:%x", c.entry, sha256.Sum256(credential))
 	// Explicit public visibility is necessary. Any configured authentication
 	// or request credential keeps the page within its connection/principal.
