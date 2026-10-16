@@ -489,6 +489,15 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (result mc
 	m.mu.Unlock()
 
 	newClient := func(ctx context.Context, conversation, server string) (mcpclient.Interface, error) {
+		// Resolve the existing delegated link before metadata discovery or transport
+		// initialization. Missing links must not create a remote MCP connection.
+		// Keep this inside ordinary creation singleflight, outside the pool lock;
+		// pooled clients and explicit local/custom factories keep their lifecycle.
+		if configured.IsDelegatedAuth() {
+			if err := m.PreflightCredential(ctx, requestedName); err != nil {
+				return nil, err
+			}
+		}
 		return m.newClientWithOptions(ctx, conversation, server, configured)
 	}
 	if registration, ok := m.localRegistration(serverName); ok {
