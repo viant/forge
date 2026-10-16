@@ -12,6 +12,7 @@ import (
 
 	lookupProto "github.com/viant/forge/backend/lookup/contract"
 	forgeTypes "github.com/viant/forge/backend/types"
+	"github.com/viant/forge/backend/window/diagnostic"
 	wsmeta "github.com/viant/forge/backend/window/source/internal/meta"
 )
 
@@ -58,6 +59,7 @@ func mergeWorkspaceForgeAssetsWithOptionsAt(ctx context.Context, workspaceRoot s
 		return err
 	}
 	resolver := newAssignmentResolver(window, catalog)
+	resolver.workspaceRoot = workspaceRoot
 	normalized := assignment.Normalized()
 	if containsChat(window.View.Content) {
 		if err := attachNamedLookupReferences(ctx, svc, normalized, window); err != nil {
@@ -102,7 +104,7 @@ func mergeWorkspaceForgeAssetsWithOptionsAt(ctx context.Context, workspaceRoot s
 	}
 	// Host extensions (including report builders) add datasource references.
 	// Validate the complete window, while keeping missing datasources non-fatal.
-	if _, err := validateWindowReferences(window, catalog); err != nil {
+	if _, err := validateWindowReferences(window, catalog, workspaceRoot); err != nil {
 		return err
 	}
 	return forgeTypes.ValidateResourceModels(window)
@@ -116,8 +118,9 @@ func mergeWorkspaceForgeAssetsWithOptionsAt(ctx context.Context, workspaceRoot s
 //	resource model  -> schemaRef, read/write dataSourceRef, field modelRef
 //	schema          -> $ref schemas
 type assignmentResolver struct {
-	window  *forgeTypes.Window
-	catalog *workspaceCatalog
+	workspaceRoot string
+	window        *forgeTypes.Window
+	catalog       *workspaceCatalog
 
 	localDataSources map[string]bool
 	localDialogs     map[string]bool
@@ -187,7 +190,7 @@ func (r *assignmentResolver) applyAssignment(assignment *ResourceAssignment) {
 			continue
 		}
 		if _, ok := r.catalog.dataSources[id]; !ok {
-			r.noteUnresolved(identity, fmt.Sprintf("datasource %q", id))
+			r.noteUnresolved(identity, "datasource", id, fmt.Sprintf("datasource %q", id))
 			continue
 		}
 		r.queue = append(r.queue, dependency{kind: "dataSource", id: id})
@@ -197,7 +200,7 @@ func (r *assignmentResolver) applyAssignment(assignment *ResourceAssignment) {
 			continue
 		}
 		if _, ok := r.catalog.dialogs[id]; !ok {
-			r.noteUnresolved(identity, fmt.Sprintf("dialog %q", id))
+			r.noteUnresolved(identity, "dialog", id, fmt.Sprintf("dialog %q", id))
 			continue
 		}
 		r.explicitDialogs[id] = true
@@ -206,7 +209,7 @@ func (r *assignmentResolver) applyAssignment(assignment *ResourceAssignment) {
 	for _, name := range assignment.Models {
 		registry, ok := r.catalog.registries[name]
 		if !ok {
-			r.noteUnresolved(identity, fmt.Sprintf("resource model registry %q (missing or quarantined)", name))
+			r.noteUnresolved(identity, "model-registry", name, fmt.Sprintf("resource model registry %q (missing or quarantined)", name))
 			continue
 		}
 		for schema := range registry.Schemas {
@@ -221,7 +224,7 @@ func (r *assignmentResolver) applyAssignment(assignment *ResourceAssignment) {
 			continue
 		}
 		if _, ok := r.catalog.schemas[name]; !ok {
-			r.noteUnresolved(identity, fmt.Sprintf("resource schema %q", name))
+			r.noteUnresolved(identity, "schema", name, fmt.Sprintf("resource schema %q", name))
 			continue
 		}
 		r.queue = append(r.queue, dependency{kind: "schema", id: name})
@@ -231,16 +234,16 @@ func (r *assignmentResolver) applyAssignment(assignment *ResourceAssignment) {
 			continue
 		}
 		if _, ok := r.catalog.models[name]; !ok {
-			r.noteUnresolved(identity, fmt.Sprintf("resource model %q", name))
+			r.noteUnresolved(identity, "model", name, fmt.Sprintf("resource model %q", name))
 			continue
 		}
 		r.queue = append(r.queue, dependency{kind: "model", id: name})
 	}
 }
 
-func (r *assignmentResolver) noteUnresolved(identity, what string) {
+func (r *assignmentResolver) noteUnresolved(identity, kind, ref, what string) {
 	message := fmt.Sprintf("resources assigns %s that the workspace does not provide (unresolved, ignored)", what)
-	log.Printf("workspace forge: window %s %s", identity, message)
+	diagnostic.WarnOnce(r.workspaceRoot, identity, kind, ref, "workspace forge: window %s %s", identity, message)
 	r.unresolved = append(r.unresolved, message)
 }
 
@@ -383,13 +386,17 @@ func (r *assignmentResolver) attach() error {
 // Missing datasource references are warnings so one unavailable source cannot
 // prevent the rest of a window from loading. Other known missing resources
 // remain assignment errors. Unknown identities and dynamic dialog ids are logged.
-func validateWindowReferences(window *forgeTypes.Window, catalog *workspaceCatalog) ([]string, error) {
+func validateWindowReferences(window *forgeTypes.Window, catalog *workspaceCatalog, workspaceRoots ...string) ([]string, error) {
 	refs := CollectWindowReferences(window)
 	identity := windowIdentity(window)
 	var notes []string
-	note := func(format string, args ...interface{}) {
+	root := ""
+	if len(workspaceRoots) > 0 {
+		root = workspaceRoots[0]
+	}
+	note := func(kind, ref, format string, args ...interface{}) {
 		message := fmt.Sprintf(format, args...)
-		log.Printf("workspace forge: window %s %s", identity, message)
+		diagnostic.WarnOnce(root, identity, kind, ref, "workspace forge: window %s %s", identity, message)
 		notes = append(notes, message)
 	}
 	attachedDialogs := map[string]bool{}
@@ -402,9 +409,9 @@ func validateWindowReferences(window *forgeTypes.Window, catalog *workspaceCatal
 			continue
 		}
 		if _, known := catalog.dataSources[id]; known {
-			note("references datasource %q that is not attached to the window", id)
+			note("datasource", id, "references datasource %q that is not attached to the window", id)
 		} else {
-			note("references datasource %q that is not declared in the workspace", id)
+			note("datasource", id, "references datasource %q that is not declared in the workspace", id)
 		}
 	}
 	for id := range refs.YAML.Dialogs {
@@ -414,7 +421,7 @@ func validateWindowReferences(window *forgeTypes.Window, catalog *workspaceCatal
 		if _, known := catalog.dialogs[id]; known {
 			missing["dialogs"][id] = true
 		} else {
-			note("references dialog %q that is not declared in the workspace", id)
+			note("dialog", id, "references dialog %q that is not declared in the workspace", id)
 		}
 	}
 	for name := range refs.YAML.ResourceModels {
@@ -439,12 +446,12 @@ func validateWindowReferences(window *forgeTypes.Window, catalog *workspaceCatal
 		}
 		if _, known := catalog.dataSources[literal]; known {
 			if _, attached := window.DataSource[literal]; !attached {
-				note("action code references datasource %q that is not attached to the window", literal)
+				note("datasource", literal, "action code references datasource %q that is not attached to the window", literal)
 			}
 		}
 	}
 	if count := len(refs.Code.DynamicDialogs); count > 0 {
-		log.Printf("workspace forge: window %s computes dialog ids dynamically at %d code location(s), e.g. %s; make sure resources.dialogs lists every dialog it can open", identity, count, refs.Code.DynamicDialogs[0])
+		diagnostic.WarnOnce(root, identity, "dynamic-dialog", "", "workspace forge: window %s computes dialog ids dynamically at %d code location(s), e.g. %s; make sure resources.dialogs lists every dialog it can open", identity, count, refs.Code.DynamicDialogs[0])
 	}
 	var problems []string
 	for _, kind := range []string{"dialogs", "resourceModels", "schemas"} {
