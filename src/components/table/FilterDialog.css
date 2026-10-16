@@ -1,0 +1,14 @@
+
+.forge-filter-dialog { z-index: var(--forge-filter-dialog-z-index, 100); }
+.forge-filter-dialog__sets { margin-bottom: var(--forge-filter-dialog-spacing, 10px); }
+.forge-filter-dialog__fields {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--forge-filter-dialog-spacing, 10px);
+    align-items: center;
+    margin-bottom: var(--forge-filter-dialog-spacing, 10px);
+}
+.forge-filter-dialog__label {
+    text-align: right;
+    padding-right: var(--forge-filter-dialog-spacing, 10px);
+}
