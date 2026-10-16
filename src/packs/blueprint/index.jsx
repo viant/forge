@@ -48,6 +48,9 @@ import { formatDisplayValue, mapDisplayValue, resolveEmptyDisplayText } from '..
 import { resolveLinkTarget } from '../../utils/linkTarget.js';
 import { permittedOptions } from './permittedOptions.js';
 import ChipList from '../../components/ChipList.jsx';
+import ContentCarousel from '../../components/content/ContentCarousel.jsx';
+import CardRail from '../../components/content/CardRail.jsx';
+import FilterChips from '../../components/content/FilterChips.jsx';
 import {currencyInputIcon} from '../../utils/currency.js';
 import MediaPreview from '../../components/MediaPreview.jsx';
 import {formatPercentFraction2Input, parsePercentFraction2Input} from './percentFractionInput.js';
@@ -570,6 +573,11 @@ export function registerPack() {
     }, { framework: 'blueprint' });
     registerWidget('booleanPill', (props) => <BooleanPill {...props}/>, { framework: 'blueprint' });
     registerWidget('chipList', (props) => <ChipList {...props}/>, { framework: 'blueprint' });
+    registerWidget('contentCarousel', props => <ContentCarousel {...props}/>, {framework: 'blueprint'});
+    registerWidget('cardRail', props => <CardRail {...props}/>, {framework: 'blueprint'});
+    registerWidget('filterChips', props => <FilterChips {...props}/>, {framework: 'blueprint'});
+    for (const key of ['contentCarousel', 'cardRail']) registerEventAdapter(key, {onClick: () => () => {}});
+    registerEventAdapter('filterChips', {onChange: ({adapter}) => values => adapter.set(values)});
 
     const checkboxChangeHandler = ({ adapter }) => (arg) => {
         if (arg && arg.target) {

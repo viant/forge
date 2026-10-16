@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {safeContentImage, toggleChipValue, contentRecords} from './contentModel.js';
+for (const value of ['javascript:alert(1)', 'data:image/svg+xml,<svg/>', '//other.example/image.png', 'file:///etc/passwd', 'blob:other', 'not a URL']) assert.equal(safeContentImage(value), '');
+assert.equal(safeContentImage('/assets/banner.png'), '/assets/banner.png');
+assert.equal(safeContentImage('https://example.com/photo.png'), 'https://example.com/photo.png');
+assert.deepEqual(contentRecords(null), []);
+assert.deepEqual(contentRecords([null, 'text', {id: 1}]), [{id: 1}]);
+const original = Object.freeze([1, '1']);
+assert.deepEqual(toggleChipValue(original, 1, false), ['1']);
+assert.deepEqual(toggleChipValue(original, 2, true), [1, '1', 2]);
+assert.deepEqual(toggleChipValue(original, '1', true), [1, '1']);
+assert.deepEqual(original, [1, '1']);
+console.log('Content image, typed chip selection and immutable input contracts pass');
