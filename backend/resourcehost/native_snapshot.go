@@ -5,7 +5,10 @@ package resource
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -39,6 +42,11 @@ type NativeSnapshotDefinition struct {
 // Static registry state is captured by BeforeCompile during startup or Reload.
 type StaticWorkspaceWindowEnricher func(context.Context, *types.Window) error
 type NativeSnapshotOptions struct {
+	// IsolateMissingWindowImports keeps a window with a missing authored file
+	// unavailable while publishing healthy definitions. Other compilation,
+	// validation and confinement errors retain strict atomic failure behavior.
+	IsolateMissingWindowImports bool
+
 	// BeforeCompile prepares static authored dependencies before initial capture
 	// or explicit Reload. It must not make identity or permission decisions.
 	BeforeCompile func(context.Context, *ExtensionReader) error
@@ -47,6 +55,7 @@ type NativeSnapshotOptions struct {
 }
 
 type nativeSnapshotValue struct {
+	failure     error
 	raw         json.RawMessage
 	fingerprint string
 	kind        string
@@ -114,7 +123,8 @@ func (s *NativeAssetSnapshot) CompileCount() uint64 {
 }
 
 // Reload compiles off the read path and publishes one complete validated
-// generation atomically. Failed or canceled reloads retain the prior bytes.
+// generation atomically. Strict failures or canceled reloads retain prior bytes.
+// Explicit missing-window isolation publishes those windows as unavailable.
 // A standard resource-change notification follows successful publication.
 func (s *NativeAssetSnapshot) Reload(ctx context.Context) error {
 	if s == nil || ctx == nil || ctx.Err() != nil {
@@ -157,11 +167,17 @@ func (s *NativeAssetSnapshot) Reload(ctx context.Context) error {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+		uri, _ := identity.ParseResourceURI(definition.URI)
 		raw, err := definition.Load(ctx, reader, definition.File)
 		if err != nil {
+			if s.options.IsolateMissingWindowImports && uri.Kind == "window" && errors.Is(err, fs.ErrNotExist) && !errors.Is(err, identity.ErrResourceDenied) && !errors.Is(err, identity.ErrResourceStale) {
+				diagnostic := fmt.Errorf("%w: native window %s (%s): %w", identity.ErrResourceDenied, definition.URI, definition.File, err)
+				values[definition.URI] = nativeSnapshotValue{kind: uri.Kind, version: definition.FormatVersion, failure: diagnostic}
+				log.Printf("native window unavailable uri=%q file=%q: %v", definition.URI, definition.File, err)
+				continue
+			}
 			return err
 		}
-		uri, _ := identity.ParseResourceURI(definition.URI)
 		validator := s.options.Validators[uri.Kind]
 		if validator == nil && !definition.RawDocument {
 			switch uri.Kind {
@@ -218,7 +234,27 @@ func (s *NativeAssetSnapshot) value(ctx context.Context, uri identity.ResourceUR
 	if !ok {
 		return nativeSnapshotValue{}, identity.ErrResourceDenied
 	}
+	if value.failure != nil {
+		return nativeSnapshotValue{}, value.failure
+	}
 	return value, nil
+}
+
+// CompilationErrors returns detached per-window diagnostics from the published
+// generation. Reads never retry compilation; explicit Reload may repair them.
+func (s *NativeAssetSnapshot) CompilationErrors() map[string]error {
+	result := map[string]error{}
+	if s == nil {
+		return result
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for uri, value := range s.values {
+		if value.failure != nil {
+			result[uri] = value.failure
+		}
+	}
+	return result
 }
 
 // WindowIndex returns trusted metadata without loading/resolving any definition
@@ -237,6 +273,9 @@ func (s *NativeAssetSnapshot) WindowIndex(ctx context.Context) ([]primitive.Reso
 			continue
 		}
 		value := s.values[definition.URI]
+		if value.failure != nil {
+			continue
+		}
 		result = append(result, primitive.ResourceState{Kind: "window", Namespace: uri.Namespace, Name: uri.Name, URI: uri.String(), Title: definition.Title, Lifecycle: identity.WorkingCandidate, Revision: identity.WorkingCandidate, FormatVersion: definition.FormatVersion, ContentFingerprint: value.fingerprint})
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].URI < result[j].URI })
