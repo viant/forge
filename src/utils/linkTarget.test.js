@@ -246,3 +246,14 @@ assert.deepEqual(
     },
   },
 );
+
+
+const configurable = {kind:'external', kindSelector:'CreativeLinkMode', kindSource:'windowForm', baseUrl:'https://dsp.viantinc.com', baseUrlSelector:'DspBaseUrl', hrefTemplate:'/campaigns/creative-details/{{id}}', windowKey:'creative', parameters:{CreativeId:{source:'row',selector:'id',wrap:'array'}}};
+const configContext = values => ({signals:{windowForm:{peek:()=>values}}});
+assert.equal(resolveLinkTarget({linkConfig:configurable,row:{id:42},value:'Creative',context:configContext({})}).href,'https://dsp.viantinc.com/campaigns/creative-details/42');
+assert.equal(resolveLinkTarget({linkConfig:configurable,row:{id:42},context:configContext({DspBaseUrl:'http://127.0.0.1:4200/dsp/'})}).href,'http://127.0.0.1:4200/dsp/campaigns/creative-details/42');
+const native = resolveLinkTarget({linkConfig:configurable,row:{id:42},context:configContext({CreativeLinkMode:'window'})});
+assert.equal(native.kind,'window');assert.deepEqual(native.parameters.CreativeId,[42]);
+assert.equal(resolveLinkTarget({linkConfig:configurable,row:{id:42},context:configContext({DspBaseUrl:'not a URL'})}),null);
+assert.equal(resolveLinkTarget({linkConfig:configurable,row:{id:42},context:configContext({DspBaseUrl:'javascript:bad'})}),null);
+console.log('configurable link destination/base URL with external default passed');

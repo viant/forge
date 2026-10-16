@@ -23,6 +23,7 @@ import MutationCommand from '../components/primitives/MutationCommand.jsx';
 import {filterDataSourceOptions, resolveDataSourceOptionRows} from './optionFilter.js';
 
 import ControlWrapper from './ControlWrapper.jsx';
+import {lazyOptionsState, requestLazyOptions} from './optionsFetch.js';
 
 export function resolveDataSourceOptions(item = {}, context = {}, fallback = []) {
     const dataSourceRef = String(item?.optionsDataSourceRef || '').trim();
@@ -195,7 +196,8 @@ function WidgetRendererContent({
     }
 
 
-    const options = item.options || resolveDataSourceOptions(item, resolvedContext, adapter.getOptions())
+    const lazyOptions = lazyOptionsState(item, resolvedContext);
+    const options = item.options || (lazyOptions && !lazyOptions.current && !item.fallbackOptionsDataSourceRef ? [] : resolveDataSourceOptions(item, resolvedContext, adapter.getOptions()));
 
     const boundValue = adapter.get();
     const literalValue = item?.properties?.value !== undefined
@@ -250,7 +252,7 @@ function WidgetRendererContent({
 
     // ------------------------------------------------------------------
     // Stable styling targets for the initial theme-supported widget family.
-    const legacyThemeWidget = ['text', 'password', 'number', 'textarea', 'button'].includes(widgetKey);
+    const legacyThemeWidget = ['text', 'password', 'number', 'textarea', 'button', 'select'].includes(widgetKey);
     const fieldTrackThemeWidget = item?.wrapper === 'control-only'
         && ['select', 'dateRange', 'booleanPill'].includes(widgetKey);
     if (legacyThemeWidget || fieldTrackThemeWidget) {
@@ -299,6 +301,13 @@ function WidgetRendererContent({
 
     if (item?.disabledWhen && evaluatePlainVisibleWhen(item.disabledWhen, resolvedContext)) widgetProps.disabled = true;
     if (item?.readOnlyWhen && evaluatePlainVisibleWhen(item.readOnlyWhen, resolvedContext)) widgetProps.readOnly = true;
+
+    if (lazyOptions) {
+        widgetProps.optionsFetchStatus = lazyOptions.status;
+        widgetProps.onOptionsRequest = reason => requestLazyOptions(item, resolvedContext, {
+            reason, readOnly: widgetProps.readOnly === true, disabled: widgetProps.disabled === true,
+        });
+    }
 
     if (item?.mutationCommand) {
         const command = {

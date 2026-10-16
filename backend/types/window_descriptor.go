@@ -13,70 +13,79 @@ import (
 // object-key ordering introduced by native MCP argument maps. It preserves
 // numeric precision; historical singleton bytes retain their original hashes.
 func CanonicalWindowDescriptor(raw json.RawMessage) (json.RawMessage, error) {
-	strict := json.NewDecoder(bytes.NewReader(raw))
-	strict.UseNumber()
-	if err := uniqueWindowJSON(strict, 0); err != nil {
-		return nil, err
-	}
-	if _, err := strict.Token(); err != io.EOF {
-		return nil, fmt.Errorf("invalid trailing descriptor JSON")
-	}
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.UseNumber()
-	var object map[string]interface{}
-	if decoder.Decode(&object) != nil || object == nil || decoder.Decode(new(any)) != io.EOF {
+	value, err := decodeUniqueWindowJSON(decoder, 0)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := decoder.Token(); err != io.EOF {
+		return nil, fmt.Errorf("invalid trailing descriptor JSON")
+	}
+	object, ok := value.(map[string]interface{})
+	if !ok || object == nil {
 		return nil, fmt.Errorf("window descriptor must be a JSON object")
 	}
 	return json.Marshal(object)
 }
 
-func uniqueWindowJSON(decoder *json.Decoder, depth int) error {
+// Build the canonical value during duplicate-key validation rather than
+// tokenizing the complete descriptor and then decoding it a second time.
+func decodeUniqueWindowJSON(decoder *json.Decoder, depth int) (interface{}, error) {
 	if depth > 128 {
-		return fmt.Errorf("descriptor JSON nesting exceeds limit")
+		return nil, fmt.Errorf("descriptor JSON nesting exceeds limit")
 	}
 	token, err := decoder.Token()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	delimiter, container := token.(json.Delim)
 	if !container {
-		return nil
+		return token, nil
 	}
 	switch delimiter {
 	case '{':
-		seen := map[string]bool{}
+		object := map[string]interface{}{}
 		for decoder.More() {
 			token, err := decoder.Token()
 			if err != nil {
-				return err
+				return nil, err
 			}
 			key, ok := token.(string)
-			if !ok || seen[key] {
-				return fmt.Errorf("duplicate/invalid descriptor key")
+			if !ok {
+				return nil, fmt.Errorf("invalid descriptor key")
 			}
-			seen[key] = true
-			if err := uniqueWindowJSON(decoder, depth+1); err != nil {
-				return err
+			if _, exists := object[key]; exists {
+				return nil, fmt.Errorf("duplicate descriptor key")
 			}
+			value, err := decodeUniqueWindowJSON(decoder, depth+1)
+			if err != nil {
+				return nil, err
+			}
+			object[key] = value
 		}
 		end, err := decoder.Token()
 		if err != nil || end != json.Delim('}') {
-			return fmt.Errorf("invalid descriptor object")
+			return nil, fmt.Errorf("invalid descriptor object")
 		}
+		return object, nil
 	case '[':
+		values := []interface{}{}
 		for decoder.More() {
-			if err := uniqueWindowJSON(decoder, depth+1); err != nil {
-				return err
+			value, err := decodeUniqueWindowJSON(decoder, depth+1)
+			if err != nil {
+				return nil, err
 			}
+			values = append(values, value)
 		}
 		end, err := decoder.Token()
 		if err != nil || end != json.Delim(']') {
-			return fmt.Errorf("invalid descriptor array")
+			return nil, fmt.Errorf("invalid descriptor array")
 		}
+		return values, nil
 	default:
-		return fmt.Errorf("invalid descriptor JSON")
+		return nil, fmt.Errorf("invalid descriptor JSON")
 	}
-	return nil
 }
 func WindowDescriptorFingerprint(raw json.RawMessage) (string, error) {
 	canonical, err := CanonicalWindowDescriptor(raw)

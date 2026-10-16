@@ -1,4 +1,4 @@
-import {resolvePagingValues,withPagingInputs} from './paging.js';
+import {resolvePagingValues,withPagingInputs,withPagingSize} from './paging.js';
 
 // A host can execute connector operations through MCP or another supported
 // transport. A configured transport owns the request; failures never fall back
@@ -8,7 +8,7 @@ export function createTransportConnector(dataSource, runtime) {
     const invoke = async (operation, options = {}) => {
         if (options.signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
         const paging = String(dataSource?.paginationMode || '').toLowerCase() === 'client'
-            ? null : resolvePagingValues(options.page, dataSource?.paging, options.cursor);
+            ? null : resolvePagingValues(options.page, withPagingSize(dataSource?.paging, options.pageSize), options.cursor);
         const result = await runtime.transport({operation, dataSource, dataSourceRef: runtime.dataSourceRef || dataSource?.id || dataSource?.dataSourceRef,
             targetContext: runtime.targetContext || {},
             options: {...options, inputParameters: withPagingInputs(options.inputParameters || {}, paging)}});

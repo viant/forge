@@ -27,7 +27,7 @@ import {
 } from "../hooks/index.js";
 
 import {useRef} from "react";
-import {createCursorPagingSession, cursorPagingAssociation, markCompletedCursorAssociation} from "../hooks/paging.js";
+import {createCursorPagingSession, cursorPagingAssociation, markCompletedCursorAssociation, withPagingSize} from "../hooks/paging.js";
 
 
 export {hasResolvedDependencies};
@@ -458,6 +458,7 @@ export default function DataSource({context}) {
         }
         const inputVal = input.value || {};
         let {page, filter = {}, parameters, sort = [], cache = null, invocationId = null, bindingGeneration = null} = inputVal || {};
+        const requestPaging = withPagingSize(paging, inputVal.pageSize);
         const requestId = bindingGeneration || invocationId;
         const requestDataSourceId = context?.identity?.dataSourceId;
         const hasDeps = hasResolvedDependencies(dataSource.parameters, parameters, filter, dataSource.requiredAnyParameters);
@@ -492,7 +493,7 @@ export default function DataSource({context}) {
         // the result). If unchanged, we keep existing collection; otherwise
         // we optimistically clear.
         // ------------------------------------------------------------------
-        const requestSig = JSON.stringify({filter, parameters, page, sort});
+        const requestSig = JSON.stringify({filter, parameters, page, pageSize: requestPaging?.size, sort});
         // const queryChanged = requestSig !== prevQuerySig.current;
         // if (queryChanged) {
         //     setSelected({selected: null, rowIndex: -1});
@@ -530,6 +531,7 @@ export default function DataSource({context}) {
             const payload = await connector.get({
                 filter: finalFilter,
                 page,
+                pageSize: requestPaging?.size,
                 ...(cursorRequest ? {cursor: cursorRequest.cursor} : {}),
                 inputParameters: {...(parameters || {}), ...(sort?.length ? {sort} : {})},
                 cache,
@@ -554,7 +556,7 @@ export default function DataSource({context}) {
             } catch (_) {
             }
 
-            let {records, info, stats} = extractData(selectors, paging, payload);
+            let {records, info, stats} = extractData(selectors, requestPaging, payload);
             if (cursorRequest) {
                 info = cursorSessionRef.current.finish(cursorRequest, info);
                 if (!info) return;
@@ -568,7 +570,7 @@ export default function DataSource({context}) {
                     stats = metrics.peek() || stats;
                 }
             }
-            const fetchedPageResult = snapshotFetchedPageResult(records, paging);
+            const fetchedPageResult = snapshotFetchedPageResult(records, requestPaging);
             records = unmarshalResourceCollection(records, context, resourceModelRef);
             if (events.onFetch.isDefined()) {
                 try {
@@ -595,7 +597,7 @@ export default function DataSource({context}) {
                 });
             } catch (_) {
             }
-            collectionInfo.value = cursorRequest ? markCompletedCursorAssociation({...info, returnedCount: records.length, pageSize: paging?.size}, cursorRequest.signature) : withFetchedPageInfo(info, page, pagingEnabled, {
+            collectionInfo.value = cursorRequest ? markCompletedCursorAssociation({...info, returnedCount: records.length, pageSize: requestPaging?.size}, cursorRequest.signature) : withFetchedPageInfo(info, page, pagingEnabled, {
                 ...fetchedPageResult,
                 mode: paging?.mode,
                 hasMoreSelector: paging?.dataInfoSelectors?.hasMore,

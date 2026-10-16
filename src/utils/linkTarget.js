@@ -108,7 +108,9 @@ export function resolveLinkTarget({ linkConfig = null, row = null, value = null,
         };
     }
 
-    const kind = normalizeString(linkConfig.kind || '');
+    const kind = normalizeString(linkConfig.kindSelector
+        ? resolveContextSourceValue({source: linkConfig.kindSource || 'windowForm', selector: linkConfig.kindSelector, context, row, value})
+        : '') || normalizeString(linkConfig.kind || '');
     const windowKey = normalizeString(linkConfig.windowKey || '');
     const dialogId = normalizeString(linkConfig.dialogId || linkConfig.dialog || '');
 
@@ -149,7 +151,7 @@ export function resolveLinkTarget({ linkConfig = null, row = null, value = null,
         };
     }
 
-    if (kind === 'dialog' || dialogId) {
+    if (kind === 'dialog' || (!kind && dialogId)) {
         if (!dialogId) {
             return null;
         }
@@ -174,7 +176,7 @@ export function resolveLinkTarget({ linkConfig = null, row = null, value = null,
         };
     }
 
-    if (kind === 'window' || windowKey) {
+    if (kind === 'window' || (!kind && windowKey)) {
         if (!windowKey) {
             return null;
         }
@@ -238,7 +240,7 @@ export function resolveLinkTarget({ linkConfig = null, row = null, value = null,
         };
     }
 
-    const href = normalizeString(
+    let href = normalizeString(
         linkConfig?.hrefTemplate
             ? resolveTemplateText(linkConfig.hrefTemplate, row || {})
             : linkConfig?.href
@@ -248,6 +250,16 @@ export function resolveLinkTarget({ linkConfig = null, row = null, value = null,
 
     if (!href) {
         return null;
+    }
+    const baseUrl = normalizeString(linkConfig.baseUrlSelector
+        ? resolveContextSourceValue({source: linkConfig.baseUrlSource || 'windowForm', selector: linkConfig.baseUrlSelector, context, row, value})
+        : '') || normalizeString(linkConfig.baseUrl);
+    if (baseUrl && !/^[a-z][a-z0-9+.-]*:/i.test(href)) {
+        try {
+            const base = new URL(baseUrl);
+            if (!['http:', 'https:'].includes(base.protocol)) return null;
+            href = new URL(href.replace(/^\/+/, ''), base.href.replace(/\/?$/, '/')).href;
+        } catch { return null; }
     }
 
     const textSource = linkConfig?.label

@@ -80,8 +80,9 @@ type Backend struct {
 	Kind          BackendKind                      `json:"kind" yaml:"kind"`
 
 	// mcp_tool
-	Service string `json:"service,omitempty" yaml:"service,omitempty"`
-	Method  string `json:"method,omitempty" yaml:"method,omitempty"`
+	Service        string             `json:"service,omitempty" yaml:"service,omitempty"`
+	Method         string             `json:"method,omitempty" yaml:"method,omitempty"`
+	MethodVariants []MCPMethodVariant `json:"methodVariants,omitempty" yaml:"methodVariants,omitempty"`
 	// RequestMetadata names literal top-level logical request keys omitted only
 	// from MCP transport arguments. Cache and admission identity retain these keys.
 	RequestMetadata []string `json:"requestMetadata,omitempty" yaml:"requestMetadata,omitempty"`

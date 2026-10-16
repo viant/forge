@@ -2,7 +2,7 @@ import {createTransportConnector} from './connectorTransport.js';
 import {useSetting} from "../core/index.js";
 import { getLogger } from "../utils/logger.js";
 import { appendTargetContextQuery } from "../runtime/targetContext.js";
-import { resolvePagingValues, withPagingInputs } from "./paging.js";
+import { resolvePagingValues, withPagingInputs, withPagingSize } from "./paging.js";
 import { buildDatasourceFetchPayload } from "./datasourceRequest.js";
 
 const inFlightGetRequests = new Map();
@@ -287,7 +287,7 @@ export function createDataConnector(dataSource, runtime = {}) {
     /**
      * GET method
      */
-    async function get({filter = {}, page, cursor, inputParameters = {}, cache = null, invocationId = null, signal = null}) {
+    async function get({filter = {}, page, cursor, pageSize, inputParameters = {}, cache = null, invocationId = null, signal = null}) {
         try {
             let {method, url, headers} = getUrlAndHeaders();
             let queryParams = new URLSearchParams();
@@ -295,7 +295,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             const isDatasourceFetchRoute = /\/v1\/api\/datasources\/[^/]+\/fetch$/.test(url);
             const pagingValues = String(dataSource?.paginationMode || '').toLowerCase() === 'client'
                 ? null
-                : resolvePagingValues(page, paging, cursor);
+                : resolvePagingValues(page, withPagingSize(paging, pageSize), cursor);
             const effectiveInputParameters = requestMethod === 'GET'
                 ? (pagingValues?.cursor
                     ? Object.fromEntries(Object.entries(inputParameters || {}).filter(([key]) => key !== pagingValues.pageParamName && key !== pagingValues.sizeParamName))

@@ -484,3 +484,14 @@ The command proves the twelve workflow primitives at the framework boundary: typ
 | `scheduleEditor` | overlap validation plus explicit DST gap/fold conversion | resource-timezone writer, readback/rollback, and ambiguous-time UX |
 
 The ledger is intentionally asymmetric: a green framework gate makes a primitive eligible for a host proof; it does not make an unadopted primitive production-proven.
+
+### Draft form composition
+
+A container with `draftForm.wrapContent: true` renders its actions above its fields/child containers. Omit this opt-in to preserve the existing standalone/footer placement.
+Those children are disabled for the entire guarded command, including confirmation,
+synchronization and an indeterminate write outcome. Standalone draft forms remain
+supported. `draftForm.validate` optionally names a synchronous application handler
+receiving `{context, form}` and returning an empty string/true for valid data or an
+error message/false for invalid data. Missing or asynchronous validators fail closed.
+The validation is UX feedback; the resource model/writer must still validate writes.
+Reset uses the latest clean baseline, including asynchronously loaded reader data.

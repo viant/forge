@@ -133,3 +133,12 @@ Migration tips
 - Start by adding `layout.kind: "grid"` and `columns` to a container.
 - Keep item order and add `columnSpan`/`rowSpan` only where needed.
 - If you prefer wrappers to render labels, set `labels.mode: "none"`.
+
+### Responsive peer cards
+
+For a label-free grid of peer containers, `layout.minColumnWidth: 280px`
+(or a workspace CSS variable) opts into CSS auto-fit tracks. The grid wraps at
+its available content width, including inside narrower windows. Entries use DOM
+order and automatic placement; explicit row/column spans do not apply in this
+mode. Omit `minColumnWidth` for the existing fixed-column/span layout. Field grids
+with labels continue to use their authored tracks and spans.

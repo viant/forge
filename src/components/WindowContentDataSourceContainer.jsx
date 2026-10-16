@@ -7,7 +7,7 @@ import { getLogger } from "../utils/logger.js";
 import DataSource from './DataSource.jsx';
 import MessageBus from './MessageBus.jsx';
 
-function DataSourceMount({ windowContext, dsKey, initialParams }) {
+function DataSourceMount({ windowContext, dsKey, initialParams, suppressAutomaticFetch = false }) {
     const log = getLogger('ds');
     // Guard hook order: ensure the first hook is always useRef
     const firstHookGuard = useRef(true);
@@ -30,7 +30,7 @@ function DataSourceMount({ windowContext, dsKey, initialParams }) {
                 const input = dsContext.signals.input;
                 const prev = input.peek();
                 if (JSON.stringify(prev?.[k] ?? {}) === JSON.stringify(v ?? {})) return;
-                input.value = { ...prev, [k]: v, fetch: k === 'filter' ? true : !!prev.fetch };
+                input.value = { ...prev, [k]: v, fetch: k === 'filter' ? (!!prev.fetch || !suppressAutomaticFetch) : !!prev.fetch };
                 return;
             }
             const signal = dsContext.signals[k];
@@ -38,7 +38,7 @@ function DataSourceMount({ windowContext, dsKey, initialParams }) {
                 signal.value = v;
             }
         });
-    }, [dsContext, initialParams, dsKey]);
+    }, [dsContext, initialParams, dsKey, suppressAutomaticFetch]);
 
     return (
         <>
@@ -48,7 +48,7 @@ function DataSourceMount({ windowContext, dsKey, initialParams }) {
     );
 }
 
-export default function WindowContentDataSourceContainer({windowContext, dsKey, initialParams = {}}) {
+export default function WindowContentDataSourceContainer({windowContext, dsKey, initialParams = {}, suppressAutomaticFetch = false}) {
     // No hooks here – delegate to child that has a stable hook order
-    return <DataSourceMount windowContext={windowContext} dsKey={dsKey} initialParams={initialParams} />;
+    return <DataSourceMount windowContext={windowContext} dsKey={dsKey} initialParams={initialParams} suppressAutomaticFetch={suppressAutomaticFetch} />;
 }

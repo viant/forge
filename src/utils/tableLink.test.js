@@ -307,3 +307,11 @@ assert.equal(
   }),
   '',
 );
+
+
+const configuredColumn = {id:'name',type:'link',link:{kind:'external',kindSelector:'CreativeLinkMode',baseUrl:'https://dsp.viantinc.com',baseUrlSelector:'DspBaseUrl',hrefTemplate:'/campaigns/creative-details/{{id}}',windowKey:'creative',parameters:{CreativeId:{source:'row',selector:'id',wrap:'array'}}}};
+const configuredContext = values => ({signals:{windowForm:{peek:()=>values}}});
+assert.equal(resolveTableLink({row:{id:7},column:configuredColumn,value:'Creative',context:configuredContext({DspBaseUrl:'https://other.example.test'})}).href,'https://other.example.test/campaigns/creative-details/7');
+assert.equal(resolveTableLink({row:{id:7},column:configuredColumn,value:'Creative',context:configuredContext({CreativeLinkMode:'window'})}).kind,'window');
+assert.equal(resolveTableLink({row:{id:7},column:configuredColumn,value:'Creative'}).href,'https://dsp.viantinc.com/campaigns/creative-details/7');
+console.log('table links carry runtime configuration context with external default');
