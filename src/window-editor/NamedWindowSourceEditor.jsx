@@ -1,6 +1,9 @@
 import React, {useEffect, useRef, useState} from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import {yaml} from '@codemirror/lang-yaml';
+import {javascript} from '@codemirror/lang-javascript';
+import {css} from '@codemirror/lang-css';
+import SourceAssetTree from './SourceAssetTree.jsx';
 import {EditorView} from '@codemirror/view';
 import {readDocument} from './windowDocument';
 
@@ -53,9 +56,12 @@ export default function NamedWindowSourceEditor({sourceManifest,compileSourceMan
   };
   return <section className="fwe-source" aria-label="Named window source">
     <h2>{title}</h2>
-    <label>Source file <select aria-label="Source file" value={selected} disabled={busy} onChange={event=>setSelected(event.target.value)}>{Object.keys(draft.files).sort().map(name=><option key={name} value={name}>{name}</option>)}</select></label>
+    <label className="fwe-source-compat-select">Source file <select tabIndex={-1} aria-label="Source file" value={selected} disabled={busy} onChange={event=>setSelected(event.target.value)}>{Object.keys(draft.files).sort().map(name=><option key={name} value={name}>{name}</option>)}</select></label>
     {!readOnly&&<div className="fwe-authoring-actions"><label>New source file <input aria-label="New source file" value={newFile} disabled={busy} placeholder="extension/forge/datasources/customers.yaml" onChange={event=>setNewFile(event.target.value)}/></label><button disabled={busy||!newFile.trim()} onClick={addFile}>Add source file</button></div>}
-    <CodeMirror value={draft.files[selected]||''} readOnly={readOnly||busy} editable={!readOnly&&!busy} height="100%" extensions={[...(selected?.endsWith('.yaml')?[yaml()]:[]),EditorView.lineWrapping,EditorView.contentAttributes.of({'aria-label':'Named source file'})]} onChange={text=>{if(readOnly||busy)return;setError('');setDraft(previous=>({...previous,files:{...previous.files,[selected]:text}}));}}/>
+    <div className="fwe-source-layout"><SourceAssetTree files={draft.files} selectedPath={selected} onSelect={setSelected} disabled={busy}/>
+    <div className="fwe-source-document"><p className="fwe-source-document__path">{selected}</p>
+    <CodeMirror value={draft.files[selected]||''} readOnly={readOnly||busy} editable={!readOnly&&!busy} height="100%" extensions={[...(/\.ya?ml$/.test(selected)?[yaml()]:/\.js$/.test(selected)?[javascript()]:/\.css$/.test(selected)?[css()]:[]),EditorView.lineWrapping,EditorView.contentAttributes.of({'aria-label':'Named source file'})]} onChange={text=>{if(readOnly||busy)return;setError('');setDraft(previous=>({...previous,files:{...previous.files,[selected]:text}}));}}/>
+    </div></div>
     <div className="fwe-authoring-actions"><button disabled={readOnly||busy||!pending} onClick={apply}>{busy?'Compiling source…':'Apply source changes'}</button><button disabled={busy||!pending} onClick={()=>{setDraft(sourceManifest);setSelected(previous=>Object.hasOwn(sourceManifest.files,previous)?previous:windowFile(sourceManifest));setNewFile('');setError('');}}>Discard source draft</button></div>
     {error&&<p role="alert">{error}</p>}
     <p>Named YAML and JavaScript files are compiled by the original workspace loader. Imports and script references remain in their source files.</p>

@@ -9,3 +9,9 @@ export function resolveClientPagination(collection = [], requestedPage = 1, page
     const start = (page - 1) * size;
     return {rows: rows.slice(start, start + size), page, pageCount, recordCount: rows.length};
 }
+
+// Client filters on a server page only narrow the loaded rows. The server's
+// collection metadata remains authoritative for navigation across pages.
+export function usesClientPaginationInfo({filterMode, pagingEnabled = false, clientPagination = false} = {}) {
+    return clientPagination || (filterMode === 'client' && !pagingEnabled);
+}

@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {draftSnapshot, resetDraft, validateDraft} from './draftFormModel.js';
+const original = {id: 1, cap: {limit: 2}};
+const baseline = draftSnapshot(original);
+original.cap.limit = 8;
+let restored;
+const context = {handlers: {dataSource: {setFormData: ({values}) => { restored = values; }, resetFormDirty() {}}}, lookupHandler: () => ({form}) => form.id ? '' : 'ID required'};
+assert.equal(resetDraft(context, baseline, true), false);
+assert.equal(restored, undefined);
+assert.equal(resetDraft(context, baseline, false), true);
+assert.equal(restored.cap.limit, 2);
+assert.equal(validateDraft({validate: 'validate'}, context, {}), 'ID required');
+assert.equal(validateDraft({validate: 'validate'}, context, {id: 1}), '');
+assert.equal(validateDraft({validate: 'missing'}, {}, {}), 'Form validation is unavailable.');
+assert.equal(validateDraft({validate: 'async'}, {lookupHandler: () => async () => true}, {}), 'Form validation must be synchronous.');
+console.log('draft baseline, pending reset and validation contracts passed');

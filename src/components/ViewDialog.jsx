@@ -14,6 +14,15 @@ import {consumeDialogFocusRevision, dialogFreshFormSeed, shouldRefreshDialogData
 import MutationCommand from './primitives/MutationCommand.jsx';
 import DisabledActionShell from './DisabledActionShell.jsx';
 
+export function resolveViewDialogDataSourceContext(context, reference, selectionMode = '') {
+    if (!reference || !context?.metadata?.dataSource?.[reference]) return null;
+    const reuse = context?.identity?.dataSourceRef === reference
+        && (!selectionMode || String(context?.dataSource?.selectionMode || '').trim().toLowerCase() === selectionMode);
+    // A supplied definition may still fail authorization or initialization. Let
+    // that real failure propagate instead of relabelling it as missing metadata.
+    return reuse ? context : context.Context(reference, {selectionMode});
+}
+
 export function ViewDialogFooterAction({action, context, disabled = false, onClose, onInvoke, invokeBeforeClose = false}) {
     const [invoking, setInvoking] = useState(false);
     const invocationPending = useRef(false);
@@ -261,6 +270,10 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
         return () => clearTimeout(timer);
     }, [dialogOpen, focusClassName, focusRequest]);
     useEffect(() => {
+        if (resolvedDataSourceRef && !context?.metadata?.dataSource?.[resolvedDataSourceRef]) {
+            previousOpenRef.current = false;
+            return;
+        }
         const isDialogOpen = dialogOpen;
         const wasOpen = previousOpenRef.current;
         log.debug('open effect', { isDialogOpen, wasOpen, dsRef: resolvedDataSourceRef });
@@ -412,39 +425,11 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
         return true;
     };
 
-    // Prepare a DS-scoped context for the dialog data source so hooks below
-    // can subscribe to its signals regardless of visibility.
-    let dsCtx;
-    try {
-        const dsExists = !!(resolvedDataSourceRef && context?.metadata?.dataSource && context.metadata.dataSource[resolvedDataSourceRef]);
-        if (!dsExists) {
-            const keys = Object.keys(context?.metadata?.dataSource || {});
-            let callers = [];
-            try {
-                const stack = (new Error()).stack || '';
-                callers = String(stack).split('\n').slice(2, 6).map((s) => s.trim());
-            } catch (_) {}
-            console.error('[ViewDialog] dataSourceRef not found for dialog', dialog?.id || '(no id)', {
-                dataSourceRef: resolvedDataSourceRef,
-                available: keys,
-                callers,
-            });
-        }
-        const reuseDirectContext = resolvedDataSourceRef
-            && context?.identity?.dataSourceRef === resolvedDataSourceRef
-            && (!selectionModeOverride || String(context?.dataSource?.selectionMode || "").trim().toLowerCase() === selectionModeOverride);
-        dsCtx = reuseDirectContext
-            ? context
-            : (resolvedDataSourceRef ? context.Context(resolvedDataSourceRef, { selectionMode: selectionModeOverride }) : null);
-    } catch (e) {
-        let callers = [];
-        try {
-            const stack = (new Error()).stack || '';
-            callers = String(stack).split('\n').slice(2, 6).map((s) => s.trim());
-        } catch (_) {}
-        console.error('[ViewDialog] failed to create DS context for', resolvedDataSourceRef, { error: String(e?.message || e), callers });
-        dsCtx = null;
-    }
+    // An unresolved local definition omits this dialog without an end-user
+    // warning or action buttons accidentally bound to its parent datasource.
+    const dsCtx = resolveViewDialogDataSourceContext(context, resolvedDataSourceRef, selectionModeOverride);
+    const missingDataSourceDefinition = !!resolvedDataSourceRef && !context?.metadata?.dataSource?.[resolvedDataSourceRef];
+    if (missingDataSourceDefinition) log.debug('Omitted dialog with unresolved datasource reference', {dialogId: dialog?.id, dataSourceRef: resolvedDataSourceRef});
 
     if (dsCtx?.dataSource && selectionModeOverride) {
         dsCtx.dataSource.selectionMode = selectionModeOverride;
@@ -492,7 +477,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
     trackVisibleWhen(closeDisabledWhen, dsCtx);
     const closeDisabled = isDialogCloseDisabled(dialog, dsCtx);
 
-    if (!dialogOpen) {
+    if (!dialogOpen || missingDataSourceDefinition) {
         return null;
     }
 
@@ -559,9 +544,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                 {dsCtx ? (<>
                     <DataSource context={dsCtx} />
                     <MessageBus context={dsCtx} />
-                </>) : (
-                    <div style={{ color: '#a82a2a', padding: 8 }}>Dialog misconfigured: missing data source “{String(resolvedDataSourceRef)}”.</div>
-                )}
+                </>) : null}
                 {/* Inline quick-search input above the content for a friendlier UX */}
                 <DialogQuickSearch dsCtx={dsCtx} dialog={dialog} quickFilterSpecs={quickFilterSpecs} />
                 <div className={contentClassName} style={contentStyle}>

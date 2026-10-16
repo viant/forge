@@ -264,11 +264,15 @@ function AssembledWindowYamlEditor({
   yamlDocumentMode = "authoring",
   namedSourceSurface,
   namedSourceState,
+  editorMode,
+  onEditorModeChange,
 }) {
   const [source, setSource] = useState(value ?? initialSource);
   const parsed = useMemo(() => readDocument(source), [source]);
   const [valid, setValid] = useState(parsed);
-  const [mode, setMode] = useState(defaultMode);
+  const [localMode, setLocalMode] = useState(defaultMode);
+  const mode = editorMode ?? localMode;
+  const setMode = next => { setLocalMode(next); onEditorModeChange?.(next); };
   const [selection, setSelection] = useState([]);
   const [selectedId, setSelectedId] = useState("document-root");
   const [focusedId, setFocusedId] = useState("document-root");
@@ -950,6 +954,8 @@ function AssembledWindowYamlEditor({
 }
 function RetainedSourceWindowEditor(props){
  const [namedState,setNamedState]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const [mode,setMode]=useState(props.defaultMode||'tree');
+ const [treeMounted,setTreeMounted]=useState((props.defaultMode||'tree')!=='yaml');
  const latest=useRef(props);latest.current=props;
  useEffect(()=>setError(''),[props.value,props.sourceManifest]);
  const applyTree=async(next,change)=>{
@@ -971,8 +977,18 @@ function RetainedSourceWindowEditor(props){
   }catch(error){setError(error?.message||'Source compilation failed.');}
   finally{setBusy(false);}
  };
- const state={...namedState,pendingEdits:(namedState?.pendingEdits||0)+(busy?1:0),canCommit:!busy&&!error&&namedState?.canCommit!==false};
- return <><AssembledWindowYamlEditor {...props} readOnly={props.readOnly||busy||(namedState?.pendingEdits||0)>0} onChange={applyTree} namedSourceState={state} namedSourceSurface={<NamedWindowSourceEditor {...props} onStateChange={setNamedState}/>}/>{error&&<p role="alert">{error}</p>}</>;
+ const state={validSource:false,canonicalStatus:'loading',errors:[],...namedState,pendingEdits:(namedState?.pendingEdits||0)+(busy?1:0),canCommit:!busy&&!error&&namedState?.canCommit===true};
+ // Named files remain mounted across mode changes so unapplied drafts survive.
+ // The assembled document is deliberately absent until Tree is requested: even
+ // a hidden instance parses, projects and canonicalizes the entire bundle.
+ useEffect(()=>{if(!treeMounted)props.onStateChange?.({...state,readOnly:!!props.readOnly,canCommit:!props.readOnly&&state.canCommit});},[treeMounted,namedState,busy,error,props.readOnly,props.onStateChange]);
+ const chooseMode=next=>{if(next==='tree')setTreeMounted(true);setMode(next);};
+ return <>
+  {!treeMounted&&<section className="fwe" aria-label={props.title||'Window editor'}><div className="fwe-header"><div className="fwe-switch" aria-label="Editor mode"><button aria-pressed={false} onClick={()=>chooseMode('tree')}>Tree</button><button aria-pressed={true}>YAML</button></div></div></section>}
+  {treeMounted&&<AssembledWindowYamlEditor {...props} editorMode={mode} onEditorModeChange={chooseMode} readOnly={props.readOnly||busy||(namedState?.pendingEdits||0)>0} onChange={applyTree} namedSourceState={state} namedSourceSurface={<></>}/>}
+  <div className="fwe-named-source" hidden={mode!=='yaml'}><NamedWindowSourceEditor {...props} onStateChange={setNamedState}/></div>
+  {error&&<p role="alert">{error}</p>}
+ </>;
 }
 export function WindowYamlEditor(props) {
   return props.sourceManifest ? <RetainedSourceWindowEditor {...props}/> : <AssembledWindowYamlEditor {...props}/>;

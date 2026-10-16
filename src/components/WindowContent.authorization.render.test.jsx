@@ -204,7 +204,7 @@ describe('canonical delivered window uses display hints only', () => {
     const result=compileWindowAuthorizationMetadata(metadata,{entityId:'9007199254740993'},binding());
     expect(result.view.content.items.map(item=>item.id)).toEqual(['visible']);
     expect(result.dataSource).toBe(metadata.dataSource);
-    expect(result.authorizationSnapshot.resource).toBeNull();
+    expect(result.authorizationSnapshot.resource).toMatchObject({id:'9007199254740993',type:'entity',capabilities:{read:false,write:false}});
     expect(metadata.view.content.items).toHaveLength(2);
   });
   it('keeps mounted real datasources across hint expiry without permission preflight or renewal', async () => {
