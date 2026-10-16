@@ -141,6 +141,7 @@ type Manager struct {
 	resourceUpdatedListeners  map[uint64]func(string, string)
 	resourceCatalogGeneration map[resourceCatalogScope]uint64
 	resourceContentGeneration map[resourceCatalogScope]uint64
+	persistentToolCatalog     bool
 	toolCatalog               map[string]*toolCatalogPage
 	toolCatalogGeneration     map[string]uint64
 	protectedToolCatalog      map[string][32]byte
