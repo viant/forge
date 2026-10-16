@@ -25,6 +25,7 @@ import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import {resolveClientPagination, usesClientPaginationInfo} from './clientPagination.js';
 import {requestServerTableSort} from './serverSort.js';
 import {useSignals} from '@preact/signals-react/runtime';
+import {useTableColumnTimeZones} from './columnFormatting.js';
 import {applyClientFilters} from './clientFilters.js';
 import {resetPaginationScroll} from './paginationScroll.js';
 import PaginationBar from './basic/PaginationBar.jsx';
@@ -422,6 +423,8 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         percent: "0.00%",
     };
 
+    const columnTimeZones = useTableColumnTimeZones(columnsToUse, context);
+
     // Use useMemo to compute preparedData from the active server/client page.
     const preparedData = useMemo(() => {
         const newPreparedData = [];
@@ -435,7 +438,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
             for (let colIndex = 0; colIndex < columnsToUse.length; colIndex++) {
                 const col = columnsToUse[colIndex];
                 const rawValue = resolveKey(item, col.id);
-                let displayedText = resolveTableCellText({row: item, column: col, value: rawValue});
+                let displayedText = resolveTableCellText({row: item, column: col, value: rawValue, timeZone: columnTimeZones[colIndex]});
                 if (col.numericFormat && rawValue != null && rawValue !== "") {
                     const format = numeralFormats[col.numericFormat] || col.numericFormat
                     let numeralValue = 0.0
@@ -471,7 +474,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
             });
         }
         return newPreparedData;
-    }, [renderedCollection, columnsToUse, loading, formattingRules]);
+    }, [renderedCollection, columnsToUse, loading, formattingRules, columnTimeZones]);
 
     const handleOpenFilter = () => setIsFilterOpen(true);
     const handleCloseFilter = () => setIsFilterOpen(false);

@@ -37,7 +37,7 @@ export function resolveTableLink({row, column, value, context = null} = {}) {
     return resolved;
 }
 
-export function resolveTableCellText({row, column, value} = {}) {
+export function resolveTableCellText({row, column, value, timeZone: boundTimeZone} = {}) {
     if (column?.format === 'relationCount') {
         const singular = column?.singularLabel || 'item';
         const plural = column?.pluralLabel || `${singular}s`;
@@ -57,7 +57,8 @@ export function resolveTableCellText({row, column, value} = {}) {
     }
     if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
         const timeZone = column?.timeZone
-            || (column?.timeZoneSelector ? resolveSelector(row, column.timeZoneSelector) : undefined);
+            || (column?.timeZoneSelector ? resolveSelector(row, column.timeZoneSelector) : undefined)
+            || boundTimeZone;
         const currency = column?.currency
             || (column?.currencySelector ? resolveSelector(row, column.currencySelector) : undefined)
             || (column?.currencyField ? resolveSelector(row, column.currencyField) : undefined);

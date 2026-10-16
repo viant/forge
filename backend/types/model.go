@@ -1431,6 +1431,7 @@ type Column struct {
 	Format                string                 `json:"format,omitempty" yaml:"format,omitempty"`
 	TimeZone              string                 `json:"timeZone,omitempty" yaml:"timeZone,omitempty"`
 	TimeZoneSelector      string                 `json:"timeZoneSelector,omitempty" yaml:"timeZoneSelector,omitempty"`
+	TimeZoneBinding       *Binding               `json:"timeZoneBinding,omitempty" yaml:"timeZoneBinding,omitempty"`
 	ValueMap              map[string]interface{} `json:"valueMap,omitempty" yaml:"valueMap,omitempty"`
 	NumericFormat         string                 `json:"numericFormat,omitempty" yaml:"numericFormat,omitempty"`
 	EmptyText             string                 `json:"emptyText,omitempty" yaml:"emptyText,omitempty"`
