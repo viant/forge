@@ -820,7 +820,16 @@ export function registerPack() {
             value = [],
             onChange,
             onItemSelect,
+            onOptionsRequest,
+            optionsFetchStatus,
+            onFocus,
+            onClick,
+            onKeyDown,
+            id,
+            'aria-label': ariaLabel,
+            'aria-labelledby': ariaLabelledBy,
             readOnly,
+            disabled,
             options = [],
             appearance,
             placeholder,
@@ -828,10 +837,18 @@ export function registerPack() {
             context,
             ...rest
         }) {
+            const unavailable = !!(readOnly || disabled);
+            const requestOptions = reason => { if (!unavailable) onOptionsRequest?.(reason); };
+            const lazyGroup = onOptionsRequest ? {id, role: 'group', 'aria-label': ariaLabel,
+                'aria-labelledby': ariaLabelledBy, tabIndex: unavailable ? -1 : 0,
+                onFocusCapture: () => requestOptions('focus'), onClick: () => requestOptions('open')} : {id};
             const selectedValues = normalizeMultiValues(value);
             const selectedSet = new Set(selectedValues);
             const normalizedOptions = permittedOptions(options, context);
-            const selectedItems = normalizedOptions.filter((opt) => selectedSet.has(`${opt?.value ?? ''}`));
+            const selectedItems = onOptionsRequest
+                ? selectedValues.map(selected => normalizedOptions.find(opt => String(opt?.value ?? '') === selected)
+                    || {value: selected, label: selected})
+                : normalizedOptions.filter((opt) => selectedSet.has(`${opt?.value ?? ''}`));
             const toggle = (option) => {
                 const optionValue = `${option?.value ?? ''}`;
                 if (!optionValue) return;
@@ -852,20 +869,20 @@ export function registerPack() {
                     ...(style || {}),
                 };
                 return (
-                    <div style={checkboxContainerStyle} className="forge-checkboxes-container">
+                    <div {...lazyGroup} style={checkboxContainerStyle} className="forge-checkboxes-container">
                         {normalizedOptions.map((opt) => {
                             const optionValue = `${opt?.value ?? ''}`;
                             const optionLabel = opt?.label || optionValue;
                             return (
                                 <label
                                     key={optionValue}
-                                    style={{display: 'flex', alignItems: 'center', gap: 8, minWidth: 128, cursor: readOnly ? 'default' : 'pointer'}}
+                                    style={{display: 'flex', alignItems: 'center', gap: 8, minWidth: 128, cursor: unavailable ? 'default' : 'pointer'}}
                                 >
                                     <input
                                         type="checkbox"
                                         aria-label={optionLabel}
                                         checked={selectedSet.has(optionValue)}
-                                        disabled={readOnly}
+                                        disabled={unavailable}
                                         style={{width: 16, height: 16, margin: 0, accentColor: '#2563eb'}}
                                         onChange={() => toggle(opt)}
                                     />
@@ -886,7 +903,7 @@ export function registerPack() {
                     ...(style || {}),
                 };
                 return (
-                    <div style={pillContainerStyle} className="forge-pills-container">
+                    <div {...lazyGroup} style={pillContainerStyle} className="forge-pills-container">
                         {normalizedOptions.map((opt) => {
                             const optionValue = `${opt?.value ?? ''}`;
                             const selected = selectedSet.has(optionValue);
@@ -898,7 +915,7 @@ export function registerPack() {
                                     aria-pressed={selected}
                                     data-selected={selected ? 'true' : 'false'}
                                     small
-                                    disabled={readOnly}
+                                    disabled={unavailable}
                                     outlined={false}
                                     minimal={!selected}
                                     intent="none"
@@ -933,9 +950,12 @@ export function registerPack() {
                     {...rest}
                     items={normalizedOptions}
                     selectedItems={selectedItems}
-                    disabled={readOnly}
+                    disabled={unavailable}
                     fill
                     resetOnSelect
+                    noResults={optionsFetchStatus === 'loading' || optionsFetchStatus === 'error'
+                        ? <MenuItem disabled text={optionsFetchStatus === 'loading' ? 'Loading options…' : 'Options could not be loaded. Open again to retry.'}/>
+                        : rest.noResults}
                     itemRenderer={(item, { handleClick, modifiers }) => (
                         <MenuItem
                             key={`${item?.value ?? ''}`}
@@ -948,15 +968,22 @@ export function registerPack() {
                     )}
                     tagRenderer={(item) => item?.label || `${item?.value ?? ''}`}
                     tagInputProps={{
-                        disabled: readOnly,
+                        disabled: unavailable,
                         style: style || undefined,
                         inputProps: {
+                            id, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy,
+                            onFocus: event => { requestOptions('focus'); onFocus?.(event); },
+                            onClick: event => { requestOptions('open'); onClick?.(event); },
+                            onKeyDown: event => {
+                                if (['Enter', ' ', 'ArrowDown'].includes(event.key)) requestOptions('open');
+                                onKeyDown?.(event);
+                            },
                             placeholder: selectedItems.length ? '' : (placeholder || 'Select...'),
                         },
                     }}
                     onItemSelect={toggle}
                     onRemove={remove}
-                    popoverProps={{ minimal: true, matchTargetWidth: true, placement: 'bottom-start' }}
+                    popoverProps={{ minimal: true, matchTargetWidth: true, placement: 'bottom-start', onOpening: () => requestOptions('open') }}
                 />
             );
         },

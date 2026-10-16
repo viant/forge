@@ -55,3 +55,34 @@ describe('real Blueprint datasource-backed lazy select',()=>{
   await f.finish([{caption:'Existing caption'},{caption:'New parent option'}]);await act(async()=>f.button().click());expect(f.fetchCollection).toHaveBeenCalledTimes(1);
  });
 });
+
+describe('real Blueprint datasource-backed lazy multi-select',()=>{
+ it('waits for native input focus, deduplicates open, and renders returned options',async()=>{
+  const f=fixture({type:'multiSelect'});f.form.value={category:[]};await f.render();
+  const input=host.querySelector('input');expect(input).toBeTruthy();expect(f.fetchCollection).not.toHaveBeenCalled();
+  await act(async()=>{input.focus();input.click();});expect(f.fetchCollection).toHaveBeenCalledTimes(1);
+  await f.finish([{caption:'First category'},{caption:'Second category'}]);
+  await act(async()=>input.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',keyCode:40,which:40,bubbles:true})));
+  expect(document.body.textContent).toContain('First category');
+  await act(async()=>{input.blur();input.focus();});expect(f.fetchCollection).toHaveBeenCalledTimes(1);
+ });
+ it.each([{readOnly:true},{disabled:true}])('disabled multi-select does not request options: %j',async(overrides)=>{
+  const f=fixture({type:'multiSelect',...overrides});f.form.value={category:[]};await f.render();
+  const input=host.querySelector('input');expect(input.disabled).toBe(true);
+  await act(async()=>{input.dispatchEvent(new FocusEvent('focusin',{bubbles:true}));input.click();});expect(f.fetchCollection).not.toHaveBeenCalled();
+ });
+ it.each(['checkboxes','pills'])('lazy %s choices can request through the keyboard-focusable group',async(appearance)=>{
+  const f=fixture({type:'multiSelect',properties:{appearance}});f.form.value={category:[]};await f.render();
+  const group=host.querySelector('[role="group"]');expect(group).toBeTruthy();expect(f.fetchCollection).not.toHaveBeenCalled();
+  await act(async()=>group.focus());expect(f.fetchCollection).toHaveBeenCalledTimes(1);
+  await f.finish([{caption:'First category'}]);expect(host.textContent).toContain('First category');
+ });
+
+ it('retains selected IDs before loading and replaces them with producer labels',async()=>{
+  const f=fixture({type:'multiSelect',optionValueField:'id'});f.form.value={category:['IAB1']};await f.render();
+  expect(host.textContent).toContain('IAB1');expect(f.fetchCollection).not.toHaveBeenCalled();
+  await act(async()=>host.querySelector('input').focus());await f.finish([{id:'IAB1',caption:'Arts and Entertainment'}]);
+  expect(host.textContent).toContain('Arts and Entertainment');expect(f.form.peek().category).toEqual(['IAB1']);
+ });
+
+});
