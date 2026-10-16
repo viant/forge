@@ -176,3 +176,12 @@ export function withFetchedPageInfo(info = {}, page = 1, pagingEnabled = false, 
         ...(explicitContinuation ? {hasMoreExplicit: true} : {}),
     };
 }
+
+// Snapshot transport rows before presentation transforms filter or expand them.
+export function snapshotFetchedPageResult(records = [], paging = {}) {
+    return {
+        returnedCount: Array.isArray(records) ? records.length : 0,
+        pageSize: paging?.size,
+        openEnded: paging?.openEnded === true,
+    };
+}

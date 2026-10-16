@@ -1,6 +1,8 @@
 package types
 
 type DraftFormSpec struct {
+	WrapContent    bool                   `json:"wrapContent,omitempty" yaml:"wrapContent,omitempty"`
+	Validate       string                 `json:"validate,omitempty" yaml:"validate,omitempty"`
 	DataSourceRef  string                 `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 	SaveLabel      string                 `json:"saveLabel,omitempty" yaml:"saveLabel,omitempty"`
 	ResetLabel     string                 `json:"resetLabel,omitempty" yaml:"resetLabel,omitempty"`

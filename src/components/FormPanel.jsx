@@ -11,6 +11,7 @@ import {findBusSignal, getViewSignal} from "../core/index.js";
 import {isContainerVisible, trackContainerVisibility} from "./visibleWhen.js";
 import {initialBusMessageState, mergeSelectedTab, nextBusMessage, resolveDataSourceFetchMode} from './FormPanelState';
 import SectionTabRail from './SectionTabRail.jsx';
+import {useViewPartition} from './useViewPartition.js';
 
 const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourceFetchMode = 'always'}) => {
     useSignals();
@@ -21,7 +22,8 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
     const windowId = context?.identity?.windowId;
     const panelId = container?.id || visibleContainers[0]?.id || containers[0]?.id || 'root';
     const viewSignal = windowId ? getViewSignal(windowId) : null;
-    const viewValue = viewSignal?.value || {};
+    const selectedTabSignal = useViewPartition(viewSignal, 'tabs', panelId);
+    const savedTabId = String(selectedTabSignal.value || '').trim();
     const busMessages = windowId ? ((findBusSignal(windowId)?.value) || []) : [];
     const processedBusMessage = useRef(initialBusMessageState(busMessages));
     const [browserPrintMode, setBrowserPrintMode] = useState(false);
@@ -37,8 +39,6 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
         };
     }, []);
     const resolveSelectedTabId = () => {
-        const viewState = viewValue || {};
-        const savedTabId = String(viewState?.tabs?.[panelId] || '').trim();
         if (savedTabId && visibleContainers.some((entry) => String(entry?.id || '').trim() === savedTabId)) {
             return savedTabId;
         }
@@ -48,7 +48,7 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
         }
         return visibleContainers[0]?.id;
     };
-    const selectedTabId = useMemo(resolveSelectedTabId, [viewValue, panelId, container?.tabs?.selectedTabId, container?.tabs?.defaultSelectedTabId, visibleContainers]);
+    const selectedTabId = useMemo(resolveSelectedTabId, [savedTabId, panelId, container?.tabs?.selectedTabId, container?.tabs?.defaultSelectedTabId, visibleContainers]);
     const mountPolicy = String(container?.tabs?.mountPolicy || '').trim().toLowerCase();
     const keepVisitedTabPanelsMounted = mountPolicy === 'visited' || container?.tabs?.keepVisitedTabPanelsMounted === true;
     const renderAllTabPanels = mountPolicy === 'all';

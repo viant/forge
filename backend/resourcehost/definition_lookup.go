@@ -44,6 +44,22 @@ func ResolveDefinitionIn[T any](ctx context.Context, g *Gateway, kind, key strin
 	var selected *Located[json.RawMessage]
 	parsed, parseErr := identity.ParseResourceURI(key)
 	exactURI := parseErr == nil && parsed.Kind == kind
+	if !exactURI && scope.ProviderIdentity != "" {
+		// An authored relative reference belongs to its selected provider. Use
+		// the existing rooted catalog/cache instead of discovering other MCPs.
+		// Absolute URIs retain cross-provider resolution semantics.
+		connection, found, err := g.configuredOwnerConnection(ctx, scope.ProviderIdentity)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			if !catalogRootMatches(ctx, connection) {
+				return nil, identity.ErrResourceDenied
+			}
+			ctx = context.WithValue(ctx, catalogRootsKey{}, []Connection{connection})
+		}
+		query.Namespace = scope.Namespace
+	}
 	for {
 		pageTiming := observe.Start(ctx, observe.Phase("definition.resolve.page"), observe.Labels{Kind: kind})
 		page, err := ListPage[json.RawMessage](ctx, g, kind, query, true)

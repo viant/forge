@@ -1,3 +1,4 @@
+import MissingDataSourceBoundary from './MissingDataSourceBoundary.jsx';
 // src/components/WindowLayout.jsx
 import React from 'react';
 import LayoutRenderer from './LayoutRenderer';
@@ -71,4 +72,6 @@ const WindowLayout = ({
     );
 };
 
-export default WindowLayout;
+export default function WindowLayoutBoundary(props) {
+    return <MissingDataSourceBoundary metadata={props.context?.metadata} reference={props.context?.identity?.dataSourceRef}><WindowLayout {...props}/></MissingDataSourceBoundary>;
+}

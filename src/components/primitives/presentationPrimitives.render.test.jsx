@@ -66,3 +66,15 @@ has(gatedCollection, 'title="Disabled until sparse updates are safe."');
 has(gatedCollection, 'tabindex="0"');
 
 console.log('presentation primitive render contracts passed');
+
+const {executeCommand} = await import('./commandExecutor.js');
+let finishDraftWrite;
+const guardedContext = {...dataContext, identity: {dataSourceRef: 'guarded-draft', dataSourceId: 'guarded-draft'}, signals: {...dataContext.signals, formStatus: signal({dirty: true, version: 1})}, lookupHandler: () => () => '', Context: () => ({handlers: {dataSource: {setInputParameters() {}, fetchCollection: () => new Promise(resolve => {finishDraftWrite = resolve;})}}})};
+const guardedCommand = {commandId: 'draft-guarded-render', dataSourceRef: 'draft-patch'};
+const saving = executeCommand(guardedContext, guardedCommand);
+const pendingDraft = renderToStaticMarkup(<DraftForm context={guardedContext} container={{id: 'guarded', draftForm: {submit: guardedCommand}}}><input aria-label="Editable field"/></DraftForm>);
+assert.match(pendingDraft, /<fieldset[^>]*disabled/);
+assert.match(pendingDraft, /aria-busy="true"/);
+assert.match(pendingDraft, /forge-draft-form--editor/);
+finishDraftWrite();
+await saving;

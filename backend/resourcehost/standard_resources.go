@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Forge MCP resource access extracted from Viant Agently Core.
+// Shared primitive delivery; kept aligned with the Core compatibility boundary.
 package resource
 
 import (
@@ -91,7 +91,11 @@ func (g *Gateway) discoverStandardResources(ctx context.Context, actor identity.
 		seenCursor[*listed.NextCursor] = true
 		cursor = listed.NextCursor
 	}
-	if minTTL == 0 {
+	if len(result.indexedResources) == 0 {
+		// An ordinary MCP with no supported primitives is a stable empty
+		// discovery result. Retain it until scoped connection/catalog events.
+		result.cacheUntil = result.expires
+	} else if minTTL == 0 {
 		result.cacheUntil = g.now()
 	} else if minTTL != int(^uint(0)>>1) {
 		until := g.now().Add(time.Duration(minTTL) * time.Millisecond)

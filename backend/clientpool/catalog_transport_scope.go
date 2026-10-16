@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	cfg "github.com/viant/mcp/client/config"
@@ -27,23 +28,9 @@ func (m *Manager) catalogTransportCredentialScope(ctx context.Context, name stri
 	if endpoint.Scheme != "http" && endpoint.Scheme != "https" {
 		return "", true, nil
 	}
-	var jar http.CookieJar
-	if m.jarProvider != nil {
-		jar, err = m.jarProvider(ctx)
-		if err != nil {
-			return "", false, err
-		}
-	} else if m.cookieJar != nil {
-		jar = m.cookieJar
-	} else {
-		jar = options.CookieJar
-	}
-	// Preserve actual wire order: duplicate cookie names can be order-sensitive.
-	cookies := [][2]string{}
-	if jar != nil {
-		for _, cookie := range jar.Cookies(endpoint) {
-			cookies = append(cookies, [2]string{cookie.Name, cookie.Value})
-		}
+	cookies, err := m.catalogCookies(ctx, endpoint, options)
+	if err != nil {
+		return "", false, err
 	}
 	authScope := ""
 	useTransportAuth := false
@@ -58,7 +45,7 @@ func (m *Manager) catalogTransportCredentialScope(ctx context.Context, name stri
 			}
 		}
 		if rt != nil {
-			witness, ok := rt.CredentialScope(endpoint)
+			witness, ok := rt.CredentialScopeForMetadata(endpoint, options.MetadataCacheIgnoredCookies)
 			if !ok {
 				return "", false, nil
 			}
@@ -67,4 +54,31 @@ func (m *Manager) catalogTransportCredentialScope(ctx context.Context, name stri
 	}
 	raw, _ := json.Marshal([]any{strings.TrimSpace(options.Transport.URL), cookies, authScope})
 	return fmt.Sprintf("%x", sha256.Sum256(raw)), true, nil
+}
+
+// catalogCookies selects exactly the cookies the configured HTTP client sends.
+func (m *Manager) catalogCookies(ctx context.Context, endpoint *url.URL, options *cfg.MCPClient) ([][2]string, error) {
+	var jar http.CookieJar
+	if m.jarProvider != nil {
+		var err error
+		jar, err = m.jarProvider(ctx)
+		if err != nil {
+			return nil, err
+		}
+	} else if m.cookieJar != nil {
+		jar = m.cookieJar
+	} else {
+		jar = options.CookieJar
+	}
+	// Preserve actual wire order: duplicate cookie names can be order-sensitive.
+	cookies := [][2]string{}
+	if jar != nil {
+		for _, cookie := range jar.Cookies(endpoint) {
+			if slices.Contains(options.MetadataCacheIgnoredCookies, cookie.Name) {
+				continue
+			}
+			cookies = append(cookies, [2]string{cookie.Name, cookie.Value})
+		}
+	}
+	return cookies, nil
 }

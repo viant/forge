@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Forge MCP resource access extracted from Viant Agently Core.
+// Shared primitive delivery; kept aligned with the Core compatibility boundary.
 // Package resource federates delegated primitive providers. A gateway never
 // exports its aggregate catalog as a local authoritative provider.
 package resource
@@ -90,9 +90,9 @@ type discoveryCall struct {
 
 type capabilityHint struct {
 	connection, cacheKey string
-	// A provider without primitives is still a stable discovery result. Keep
-	// it briefly so ordinary MCP servers are not probed for every datasource.
-	unavailableUntil time.Time
+	// Unsupported primitives are a discovery result, invalidated by the same
+	// connection/configuration and catalog events as positive capabilities.
+	unavailable bool
 }
 
 func NewGateway(m *manager.Manager, a ActorResolver, v ActorVerifier, localIdentity string) *Gateway {
@@ -303,6 +303,8 @@ func (g *Gateway) discover(ctx context.Context, a identity.VerifiedActor, name s
 }
 
 func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, name string, force bool, bindings ...*resourceReadBinding) (resolved capabilities, retErr error) {
+	span := observe.Start(ctx, "gateway.provider.discovery", observe.Labels{Provider: name})
+	defer func() { span.End(observe.OutcomeFor(retErr), observe.CacheUnknown) }()
 	var scopeErr error
 	ctx, scopeErr = ReadContext(ctx)
 	if scopeErr != nil {
@@ -383,8 +385,10 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 		}
 		if pending := g.discoveryInflight[key]; pending != nil {
 			g.mu.Unlock()
+			waitTiming := observe.Start(ctx, "gateway.discovery.wait", observe.Labels{Provider: name})
 			select {
 			case <-pending.ready:
+				waitTiming.End(observe.OutcomeFor(pending.err), observe.CacheUnknown)
 				if pending.err != nil {
 					if (errors.Is(pending.err, context.Canceled) || errors.Is(pending.err, context.DeadlineExceeded)) && ctx.Err() == nil {
 						return g.discoverMode(ctx, a, name, false, binding)
@@ -393,6 +397,7 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 				}
 				return g.discoverMode(ctx, a, name, false, binding)
 			case <-ctx.Done():
+				waitTiming.End(observe.Canceled, observe.CacheUnknown)
 				return capabilities{}, ctx.Err()
 			}
 		}
@@ -423,7 +428,9 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 	} else {
 		toolCursor := (*string)(nil)
 		for page := 0; page < 100; page++ {
+			toolsTiming := observe.Start(ctx, "gateway.tools.list", observe.Labels{Provider: name})
 			tools, e := c.ListTools(ctx, toolCursor)
+			toolsTiming.End(observe.OutcomeFor(e), observe.CacheUnknown)
 			if e != nil {
 				var rpc *jsonrpc.Error
 				if errors.As(e, &rpc) && rpc.Code == -32601 {
@@ -705,7 +712,9 @@ func (g *Gateway) Discover(ctx context.Context) ([]DiscoveredNamespace, error) {
 	return g.discoverExcept(ctx, "")
 }
 
-func (g *Gateway) discoverExcept(ctx context.Context, excludedLocal string) ([]DiscoveredNamespace, error) {
+func (g *Gateway) discoverExcept(ctx context.Context, excludedLocal string) (outcome []DiscoveredNamespace, resultErr error) {
+	span := observe.Start(ctx, "gateway.discovery", observe.Labels{})
+	defer func() { span.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	a, e := g.actor(ctx)
 	if e != nil {
 		return nil, e
@@ -726,11 +735,17 @@ func (g *Gateway) discoverExcept(ctx context.Context, excludedLocal string) ([]D
 		// A different connection claiming that owner is still a collision.
 		owners[options.PrimitiveProviderIdentity] = excludedLocal
 	}
+	selected := make([]string, 0, len(names))
 	for _, name := range names {
-		if name == excludedLocal {
-			continue
+		if name != excludedLocal {
+			selected = append(selected, name)
 		}
-		c, e := g.discover(ctx, a, name)
+	}
+	results := providerFanout(ctx, selected, func(ctx context.Context, name string) (capabilities, error) {
+		return g.catalogCapability(ctx, a, name)
+	})
+	for i, name := range selected {
+		c, e := results[i].value, results[i].err
 		if errors.Is(e, ErrUnavailable) || aggregateLinkRequired(e) {
 			continue
 		}
@@ -922,6 +937,8 @@ func (g *Gateway) Get(ctx context.Context, connection Connection, ref identity.R
 }
 
 func get[T any](ctx context.Context, g *Gateway, connection Connection, ref identity.ResourceRef, pin *identity.ResolvedResource, force, menuRead bool, decoders ...DefinitionDecoder[T]) (out *Result[T], err error) {
+	span := observe.Start(ctx, "gateway.definition.read", observe.Labels{Provider: connection.Name})
+	defer func() { span.End(observe.OutcomeFor(err), observe.CacheUnknown) }()
 	// A failed read is part of this operation's provenance. Restoring authority
 	// later cannot revive its original selected metadata or release cached rows.
 	defer func() { poisonReadSequence(ctx, err) }()
@@ -962,7 +979,7 @@ func get[T any](ctx context.Context, g *Gateway, connection Connection, ref iden
 	if sequence := sequenceFromContext(ctx); sequence != nil && !force {
 		result, found, e = sequence.reportRead(connection, pin, binding.key)
 		if e == nil && !found {
-			result, found, e = sequence.selectedRead(ctx, connection, pin, binding.key)
+			result, cacheReference, found, e = sequence.selectedRead(ctx, connection, pin, binding.key)
 		}
 	}
 	if e == nil {
@@ -1044,7 +1061,7 @@ func get[T any](ctx context.Context, g *Gateway, connection Connection, ref iden
 		return nil, identity.ErrResourceDenied
 	}
 	if sequence := sequenceFromContext(ctx); sequence != nil && !force && !found {
-		if err := sequence.recordSelectedRead(ctx, connection, pin, &result, binding.key); err != nil {
+		if err := sequence.recordSelectedRead(ctx, connection, pin, &result, binding.key, cacheReference); err != nil {
 			return nil, err
 		}
 	}

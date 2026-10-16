@@ -3,15 +3,18 @@
 package manager
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sync"
 	"time"
 
 	"github.com/viant/forge/backend/clientpool/internal/name"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	mcpschema "github.com/viant/mcp-protocol/schema"
 	mcpclient "github.com/viant/mcp/client"
 	authctx "github.com/viant/mcp/client/auth/link"
@@ -73,7 +76,7 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 		return nil, err
 	}
 	if !cacheable {
-		return client.ListTools(ctx, cursor, options...)
+		return c.fetchToolCatalog(ctx, client, cursor, observe.CacheBypass, options...)
 	}
 	readSnapshot, _ := ctx.Value(toolCatalogReadSnapshotKey{}).(*toolCatalogReadSnapshot)
 	pageCursor := "first"
@@ -87,8 +90,12 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 		m.mu.Lock()
 		generation := m.toolCatalogGeneration[c.serverName]
 		key := fmt.Sprintf("%s:%s:%x:%d:%s", c.serverName, scope, sha256.Sum256(raw), generation, pageCursor)
-		if readSnapshot != nil {
+		snapshotTiming := observe.Start(ctx, "mcp.tools.list.read_snapshot", observe.Labels{Provider: c.serverName})
+		if readSnapshot == nil {
+			snapshotTiming.End(observe.OK, observe.CacheBypass)
+		} else {
 			if cached, found := readSnapshot.pages.Load(key); found {
+				snapshotTiming.End(observe.OK, observe.CacheHit)
 				m.mu.Unlock()
 				type plain mcpschema.ListToolsResult
 				var result plain
@@ -102,6 +109,7 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 				result.CacheScope = mcpschema.ListToolsResultCacheScope(wire.CacheScope)
 				return (*mcpschema.ListToolsResult)(&result), nil
 			}
+			snapshotTiming.End(observe.OK, observe.CacheMiss)
 		}
 		if m.toolCatalog == nil {
 			m.toolCatalog = map[string]*toolCatalogPage{}
@@ -143,16 +151,17 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 		}
 		if len(m.toolCatalog) >= 512 {
 			m.mu.Unlock()
-			return client.ListTools(ctx, cursor, options...)
+			return c.fetchToolCatalog(ctx, client, cursor, observe.CacheBypass, options...)
 		}
 		pending := &toolCatalogPage{server: c.serverName, ready: make(chan struct{})}
 		m.toolCatalog[key] = pending
 		m.mu.Unlock()
-		result, err := client.ListTools(ctx, cursor, options...)
-		validCredential := true
+		result, err := c.fetchToolCatalog(ctx, client, cursor, observe.CacheMiss, options...)
+		_, currentRaw, currentScope, _, _, currentCacheable, scopeErr := c.toolCatalogScope(ctx, options...)
+		validCredential := scopeErr == nil && currentCacheable && currentScope == scope && bytes.Equal(currentRaw, raw)
 		if witness != nil {
 			witness.mu.Lock()
-			validCredential = witness.observed && witness.token == delegatedToken
+			validCredential = validCredential && witness.observed && witness.token == delegatedToken
 			witness.mu.Unlock()
 		}
 		var bytes []byte
@@ -214,7 +223,15 @@ func (m *Manager) IsToolsListPublic(ctx context.Context, server string) bool {
 	if seen && protected == sha256.Sum256(raw) {
 		return false
 	}
-	return cfg.IsToolsListPublic() && cfg.Auth == nil && !m.IsLocalClient(server) && cfg.CookieJar == nil && m.cookieJar == nil && m.jarProvider == nil && m.authRT == nil && m.authRTProvider == nil && m.newClientFn == nil && cfg.Transport.URL != ""
+	if !cfg.IsToolsListPublic() || cfg.Auth != nil || m.IsLocalClient(server) || m.newClientFn != nil || cfg.Transport.URL == "" {
+		return false
+	}
+	endpoint, err := url.Parse(cfg.Transport.URL)
+	if err != nil {
+		return false
+	}
+	cookies, err := m.catalogCookies(ctx, endpoint, cfg)
+	return err == nil && len(cookies) == 0
 }
 
 // toolCatalogScope is shared by population and read-only snapshot lookup, so
@@ -225,9 +242,9 @@ func (c *managedClient) toolCatalogScope(ctx context.Context, options ...mcpclie
 	if err != nil {
 		return ctx, nil, "", nil, "", false, err
 	}
-	// In-process handlers can inspect arbitrary context authority. Cookie jars
-	// without a stable witness cannot safely reuse metadata.
-	if cfg == nil || cfg.ClientOptions == nil || m.IsLocalClient(c.serverName) || cfg.CookieJar != nil || m.cookieJar != nil || m.jarProvider != nil {
+	// In-process handlers can inspect arbitrary context authority. HTTP cookies
+	// are partitioned by the endpoint-specific transport witness below.
+	if cfg == nil || cfg.ClientOptions == nil || m.IsLocalClient(c.serverName) {
 		return ctx, nil, "", nil, "", false, nil
 	}
 	transportScope, transportCacheable, err := m.catalogTransportCredentialScope(ctx, c.serverName, cfg)
@@ -279,8 +296,9 @@ func (c *managedClient) toolCatalogScope(ctx context.Context, options ...mcpclie
 	return ctx, raw, scope, witness, delegatedToken, true, nil
 }
 
-// ToolCatalogSnapshot returns only an already cached, complete tools/list
-// catalog. Its opaque identity expires with the source pages and changes on
+// ToolCatalogSnapshot returns an already cached, complete tools/list catalog,
+// including a zero-TTL snapshot held by this operation. Its opaque identity
+// expires with the source pages or operation and changes on
 // publication, connection/configuration changes or invalidation. It never lists
 // tools or stores a parallel catalog.
 func (m *Manager) ToolCatalogSnapshot(ctx context.Context, conversation, server string, options ...mcpclient.RequestOption) (string, []mcpschema.Tool, error) {
@@ -300,6 +318,7 @@ func (c *managedClient) toolCatalogSnapshot(ctx context.Context, options ...mcpc
 	if err != nil || !cacheable {
 		return "", nil, err
 	}
+	readSnapshot, _ := ctx.Value(toolCatalogReadSnapshotKey{}).(*toolCatalogReadSnapshot)
 	m := c.mgr
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -314,8 +333,20 @@ func (c *managedClient) toolCatalogSnapshot(ctx context.Context, options ...mcpc
 		}
 		seen[cursor] = true
 		key := fmt.Sprintf("%s:%s:%x:%d:%s", c.serverName, scope, sha256.Sum256(raw), m.toolCatalogGeneration[c.serverName], cursor)
-		page := m.toolCatalog[key]
-		if page == nil || page.ready != nil || !page.expires.After(now) {
+		var pageBytes []byte
+		var revision string
+		if page := m.toolCatalog[key]; page != nil && page.ready == nil && page.expires.After(now) {
+			pageBytes = page.bytes
+			revision = fmt.Sprintf("%x", page.revision)
+		} else if readSnapshot != nil {
+			// Zero-TTL catalogs are reusable only within the current operation.
+			// Connection, credentials and notification generation still fence the key.
+			if held, found := readSnapshot.pages.Load(key); found {
+				pageBytes = held.([]byte)
+				revision = fmt.Sprintf("read:%x", sha256.Sum256(pageBytes))
+			}
+		}
+		if pageBytes == nil {
 			return "", nil, nil
 		}
 		type plain mcpschema.ListToolsResult
@@ -324,11 +355,11 @@ func (c *managedClient) toolCatalogSnapshot(ctx context.Context, options ...mcpc
 			*plain
 			CacheScope string `json:"cacheScope"`
 		}{plain: &result}
-		if err := json.Unmarshal(page.bytes, &wire); err != nil {
+		if err := json.Unmarshal(pageBytes, &wire); err != nil {
 			return "", nil, err
 		}
 		tools = append(tools, result.Tools...)
-		revisions = append(revisions, fmt.Sprintf("%s:%x", key, page.revision))
+		revisions = append(revisions, key+":"+revision)
 		if result.NextCursor == nil || *result.NextCursor == "" {
 			break
 		}
@@ -369,4 +400,13 @@ func (m *Manager) MayHaveToolCatalogAlias(server, alias string) bool {
 		}
 	}
 	return !observed
+}
+
+// fetchToolCatalog measures source work separately from cached page decoding.
+// It records configured provider names only, never tokens or tool arguments.
+func (c *managedClient) fetchToolCatalog(ctx context.Context, client mcpclient.Interface, cursor *string, cache observe.Cache, options ...mcpclient.RequestOption) (*mcpschema.ListToolsResult, error) {
+	span := observe.Start(ctx, "mcp.tools.list.source", observe.Labels{Provider: c.serverName})
+	result, err := client.ListTools(ctx, cursor, options...)
+	span.End(observe.OutcomeFor(err), cache)
+	return result, err
 }

@@ -176,7 +176,7 @@ func (g *Gateway) resolveDependencyReads(ctx context.Context, parent Connection,
 			if original != nil {
 				selected = *original
 			}
-			reads = append(reads, selectedResourceRead{connection: connection, pin: selected, result: child.GetResult})
+			reads = append(reads, selectedResourceRead{connection: connection, pin: selected, result: child.GetResult, definitionCache: child.definitionCache})
 		}
 	}
 	if reportSequence {
