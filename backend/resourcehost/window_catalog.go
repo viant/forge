@@ -66,7 +66,18 @@ func (c *WindowCatalog) List(ctx context.Context, input *service.WindowDefinitio
 	return c.listExcludingLocalProvider(ctx, input, "")
 }
 
+// ListFrom limits delegated inventory to host-selected roots while retaining
+// the ordinary list conversion, query, pagination and provider admission.
+func (c *WindowCatalog) ListFrom(ctx context.Context, roots []Connection, input *service.WindowDefinitionListInput) (*service.WindowDefinitionListOutput, error) {
+	if len(roots) == 0 {
+		return nil, identity.ErrResource
+	}
+	return c.listWindows(ctx, input, "", roots)
+}
 func (c *WindowCatalog) listExcludingLocalProvider(ctx context.Context, input *service.WindowDefinitionListInput, owner string) (*service.WindowDefinitionListOutput, error) {
+	return c.listWindows(ctx, input, owner, nil)
+}
+func (c *WindowCatalog) listWindows(ctx context.Context, input *service.WindowDefinitionListInput, owner string, roots []Connection) (*service.WindowDefinitionListOutput, error) {
 	if !c.AuthzReady() {
 		return nil, identity.ErrResourceDenied
 	}
@@ -76,7 +87,13 @@ func (c *WindowCatalog) listExcludingLocalProvider(ctx context.Context, input *s
 	if input.Offset < 0 || input.Limit < 0 || input.Limit > 100 {
 		return nil, identity.ErrResource
 	}
-	rows, e := c.Gateway.listExcludingLocalProvider(ctx, "window", "", owner)
+	var rows []LocatedResource
+	var e error
+	if roots == nil {
+		rows, e = c.Gateway.listExcludingLocalProvider(ctx, "window", "", owner)
+	} else {
+		rows, e = c.scopedWindowRows(ctx, roots, owner)
+	}
 	if e != nil {
 		return nil, e
 	}
@@ -103,6 +120,52 @@ func (c *WindowCatalog) listExcludingLocalProvider(ctx context.Context, input *s
 	}
 	return &service.WindowDefinitionListOutput{Windows: summaries[offset:end], HasMore: end < len(summaries)}, nil
 }
+func (c *WindowCatalog) scopedWindowRows(ctx context.Context, roots []Connection, excludedOwner string) ([]LocatedResource, error) {
+	excluded := ""
+	if excludedOwner != "" {
+		// Validate every declared root even if its local owner is excluded.
+		scoped := context.WithValue(ctx, catalogRootsKey{}, roots)
+		if _, err := c.Gateway.catalogConnectionNames(scoped); err != nil {
+			return nil, err
+		}
+		names, err := c.Gateway.Manager.LocalProviderNames(ctx, excludedOwner)
+		if err != nil {
+			return nil, err
+		}
+		if len(names) > 1 {
+			return nil, ErrCollision
+		}
+		if len(names) == 1 {
+			excluded = names[0]
+		}
+	}
+	selected := make([]Connection, 0, len(roots))
+	for _, root := range roots {
+		if excluded == "" || root.Name != excluded {
+			selected = append(selected, root)
+		}
+	}
+	if len(selected) == 0 {
+		return nil, nil
+	}
+	var rows []LocatedResource
+	query := CatalogQuery{Limit: primitive.MaxCatalogPageSize}
+	for {
+		page, err := ListPageFrom[json.RawMessage](ctx, c.Gateway, selected, "window", query, false)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, untypedLocations(page.Items)...)
+		if page.Complete {
+			return rows, nil
+		}
+		if page.NextCursor == "" || page.NextCursor == query.Cursor {
+			return nil, primitive.ErrCatalogCursor
+		}
+		query.Cursor = page.NextCursor
+	}
+}
+
 func (c *WindowCatalog) locate(ctx context.Context, key, owner string) (windowLocator, error) {
 	if strings.HasPrefix(key, locatorPrefix) {
 		return decodeWindowLocator(key)
