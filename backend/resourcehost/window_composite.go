@@ -31,7 +31,18 @@ func (c *CompositeWindowCatalog) AuthzReady() bool {
 	return ok && ready.AuthzReady()
 }
 func (c *CompositeWindowCatalog) UsesResourceResolution() bool { return true }
-func (c *CompositeWindowCatalog) List(ctx context.Context, input *service.WindowDefinitionListInput) (result *service.WindowDefinitionListOutput, err error) {
+
+// ListFrom retains local UI exposure while limiting delegated inventory to trusted roots.
+func (c *CompositeWindowCatalog) ListFrom(ctx context.Context, roots []Connection, input *service.WindowDefinitionListInput) (*service.WindowDefinitionListOutput, error) {
+	if len(roots) == 0 {
+		return nil, identity.ErrResource
+	}
+	return c.listWindows(ctx, input, roots)
+}
+func (c *CompositeWindowCatalog) List(ctx context.Context, input *service.WindowDefinitionListInput) (*service.WindowDefinitionListOutput, error) {
+	return c.listWindows(ctx, input, nil)
+}
+func (c *CompositeWindowCatalog) listWindows(ctx context.Context, input *service.WindowDefinitionListInput, roots []Connection) (result *service.WindowDefinitionListOutput, err error) {
 	span := observe.Start(ctx, "window.catalog.list", observe.Labels{})
 	defer func() { span.End(observe.OutcomeFor(err), observe.CacheUnknown) }()
 	if !c.AuthzReady() {
@@ -77,7 +88,9 @@ func (c *CompositeWindowCatalog) List(ctx context.Context, input *service.Window
 			request := &service.WindowDefinitionListInput{Query: query, Offset: offset, Limit: 100}
 			var page *service.WindowDefinitionListOutput
 			var e error
-			if remote, ok := catalog.(*WindowCatalog); ok && excludedOwner != "" {
+			if remote, ok := catalog.(*WindowCatalog); ok && roots != nil {
+				page, e = remote.listWindows(ctx, request, excludedOwner, roots)
+			} else if remote, ok := catalog.(*WindowCatalog); ok && excludedOwner != "" {
 				page, e = remote.listExcludingLocalProvider(ctx, request, excludedOwner)
 			} else {
 				page, e = catalog.List(ctx, request)
