@@ -87,14 +87,14 @@ func TestToolCatalogZeroTTLReusesOnlyOneReadSnapshot(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, 4, client.calls.Load(), "tool generation must fence a read snapshot")
 }
-func catalogSetup(t *testing.T, public bool) (*Manager, *catalogProvider, *catalogClient, *managedClient, *managedClient) {
+func catalogSetup(t *testing.T, public bool, options ...Option) (*Manager, *catalogProvider, *catalogClient, *managedClient, *managedClient) {
 	t.Helper()
 	cfg := &mcpcfg.MCPClient{ClientOptions: &mcp.ClientOptions{Transport: mcp.ClientTransport{Type: "streamable", ClientTransportHTTP: mcp.ClientTransportHTTP{URL: "https://example.test/mcp"}}}}
 	if public {
 		cfg.ToolsListVisibility = "public"
 	}
 	p := &catalogProvider{cfg: cfg}
-	m, err := New(p)
+	m, err := New(p, options...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,8 +342,8 @@ func TestToolCatalogSnapshotRequiresCompleteCurrentPrincipalPages(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !m.MayHaveToolCatalogAlias("server", "server/generic/tool") || m.MayHaveToolCatalogAlias("server", "absent/tool") {
-		t.Fatal("catalog candidate hint mismatch")
+	if !m.MayHaveToolCatalogAlias("server", "server/generic/tool") || !m.MayHaveToolCatalogAlias("server", "absent/tool") {
+		t.Fatal("private catalog can suggest aliases but must not exclude another caller")
 	}
 	identity, tools, err := a.toolCatalogSnapshot(alice)
 	if err != nil || identity == "" || len(tools) != 2 {

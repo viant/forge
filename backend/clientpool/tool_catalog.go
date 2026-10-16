@@ -21,15 +21,30 @@ import (
 	authtransport "github.com/viant/mcp/client/auth/transport"
 )
 
+// WithPersistentToolCatalog lets the application retain scoped tools/list
+// metadata until notification, configuration/connection invalidation or manager
+// lifetime ends, regardless of producer TTL. Retained memory follows that
+// lifetime rather than the legacy page-count cap. It changes no tool invocation or
+// credential fence. Without this option the producer/legacy TTL policy remains.
+func WithPersistentToolCatalog() Option {
+	return func(m *Manager) error { m.persistentToolCatalog = true; return nil }
+}
+
 // Only tools/list metadata is retained. Bytes preserve arbitrary _meta and
 // prevent callers from mutating the catalog shared with another request.
 type toolCatalogPage struct {
-	server   string
-	ready    chan struct{}
-	bytes    []byte
-	expires  time.Time
-	revision [16]byte
-	names    []string
+	server                         string
+	public                         bool
+	catalogKey, cursor, nextCursor string
+	ready                          chan struct{}
+	bytes                          []byte
+	expires                        time.Time
+	revision                       [16]byte
+	names                          []string
+}
+
+func (p *toolCatalogPage) reusable(now time.Time) bool {
+	return p.expires.IsZero() || p.expires.After(now)
 }
 
 type toolCatalogReadSnapshotKey struct{}
@@ -37,7 +52,8 @@ type toolCatalogReadSnapshot struct{ pages sync.Map }
 
 // WithToolCatalogReadSnapshot reuses one authenticated tools/list generation
 // while assembling a single tool surface. Explicit ttlMs=0 still prevents
-// reuse by later independent requests.
+// reuse by later independent requests unless the manager explicitly owns
+// persistent catalog retention.
 func WithToolCatalogReadSnapshot(ctx context.Context) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
@@ -89,7 +105,8 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 		}
 		m.mu.Lock()
 		generation := m.toolCatalogGeneration[c.serverName]
-		key := fmt.Sprintf("%s:%s:%x:%d:%s", c.serverName, scope, sha256.Sum256(raw), generation, pageCursor)
+		catalogKey := fmt.Sprintf("%s:%s:%x:%d:", c.serverName, scope, sha256.Sum256(raw), generation)
+		key := catalogKey + pageCursor
 		snapshotTiming := observe.Start(ctx, "mcp.tools.list.read_snapshot", observe.Labels{Provider: c.serverName})
 		if readSnapshot == nil {
 			snapshotTiming.End(observe.OK, observe.CacheBypass)
@@ -126,7 +143,7 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 					}
 					m.mu.Lock()
 					payload := cached.bytes
-					current := generation == m.toolCatalogGeneration[c.serverName] && (cached.expires.IsZero() || cached.expires.After(time.Now()))
+					current := generation == m.toolCatalogGeneration[c.serverName] && cached.reusable(time.Now())
 					m.mu.Unlock()
 					if payload != nil && current {
 						if err := ctx.Err(); err != nil {
@@ -142,25 +159,26 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 					return nil, ctx.Err()
 				}
 			}
-			if cached.expires.After(time.Now()) {
+			if cached.reusable(time.Now()) {
 				bytes := cached.bytes
 				m.mu.Unlock()
 				return decodeToolCatalogPage(bytes)
 			}
 			delete(m.toolCatalog, key)
 		}
-		// Bound retained metadata; pending requests remain valid and their results
+		// Bound legacy retained metadata; persistent retention is application-owned.
+		// Pending requests remain valid and their results
 		// are published only if their slot and generation are still current.
 		for k, v := range m.toolCatalog {
-			if v.ready == nil && !v.expires.After(time.Now()) {
+			if v.ready == nil && !v.reusable(time.Now()) {
 				delete(m.toolCatalog, k)
 			}
 		}
-		if len(m.toolCatalog) >= 512 {
+		if !m.persistentToolCatalog && len(m.toolCatalog) >= 512 {
 			m.mu.Unlock()
 			return c.fetchToolCatalog(ctx, client, cursor, observe.CacheBypass, options...)
 		}
-		pending := &toolCatalogPage{server: c.serverName, ready: make(chan struct{})}
+		pending := &toolCatalogPage{server: c.serverName, catalogKey: catalogKey, cursor: pageCursor, ready: make(chan struct{})}
 		m.toolCatalog[key] = pending
 		m.mu.Unlock()
 		result, err := c.fetchToolCatalog(ctx, client, cursor, observe.CacheMiss, options...)
@@ -189,20 +207,27 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 		publishable := m.toolCatalog[key] == pending && validCredential && cacheErr == nil && err == nil && result != nil && ctx.Err() == nil && generation == m.toolCatalogGeneration[c.serverName] && !(scope == "public" && result.CacheScope == mcpschema.ListToolsResultCacheScopePrivate)
 		if publishable {
 			// The pending object is held only by callers already waiting on it.
-			// Its bytes do not create a retained entry when the producer's TTL is zero.
+			// Legacy zero-TTL results do not create a retained entry; an explicit
+			// application retention option keeps them in this existing catalog.
 			pending.bytes = bytes
 		}
 		if m.toolCatalog[key] == pending {
-			if publishable && !(result.CacheScope != "" && result.TtlMs == 0) {
+			if publishable && (m.persistentToolCatalog || !(result.CacheScope != "" && result.TtlMs == 0)) {
+				pending.public = scope == "public"
+				if result.NextCursor != nil && *result.NextCursor != "" {
+					pending.nextCursor = "cursor:" + *result.NextCursor
+				}
 				pending.names = make([]string, len(result.Tools))
 				for i, tool := range result.Tools {
 					pending.names[i] = tool.Name
 				}
-				ttl := 5 * time.Minute
-				if result.TtlMs > 0 && time.Duration(result.TtlMs)*time.Millisecond < ttl {
-					ttl = time.Duration(result.TtlMs) * time.Millisecond
+				if !m.persistentToolCatalog {
+					ttl := 5 * time.Minute
+					if result.TtlMs > 0 && time.Duration(result.TtlMs)*time.Millisecond < ttl {
+						ttl = time.Duration(result.TtlMs) * time.Millisecond
+					}
+					pending.expires = time.Now().Add(ttl)
 				}
-				pending.expires = time.Now().Add(ttl)
 			} else {
 				delete(m.toolCatalog, key)
 			}
@@ -321,8 +346,9 @@ func (c *managedClient) toolCatalogScope(ctx context.Context, options ...mcpclie
 }
 
 // ToolCatalogSnapshot returns an already cached, complete tools/list catalog,
-// including a zero-TTL snapshot held by this operation. Its opaque identity
-// expires with the source pages or operation and changes on
+// including a zero-TTL snapshot held by this operation or an explicitly
+// persistent manager. Its opaque identity follows the selected retention policy
+// and changes on
 // publication, connection/configuration changes or invalidation. It never lists
 // tools or stores a parallel catalog.
 func (m *Manager) ToolCatalogSnapshot(ctx context.Context, conversation, server string, options ...mcpclient.RequestOption) (string, []mcpschema.Tool, error) {
@@ -359,7 +385,7 @@ func (c *managedClient) toolCatalogSnapshot(ctx context.Context, options ...mcpc
 		key := fmt.Sprintf("%s:%s:%x:%d:%s", c.serverName, scope, sha256.Sum256(raw), m.toolCatalogGeneration[c.serverName], cursor)
 		var pageBytes []byte
 		var revision string
-		if page := m.toolCatalog[key]; page != nil && page.ready == nil && page.expires.After(now) {
+		if page := m.toolCatalog[key]; page != nil && page.ready == nil && page.reusable(now) {
 			pageBytes = page.bytes
 			revision = fmt.Sprintf("%x", page.revision)
 		} else if readSnapshot != nil {
@@ -401,7 +427,9 @@ func (m *Manager) ToolCatalogGeneration(server string) uint64 {
 }
 
 // MayHaveToolCatalogAlias is only a candidate hint: it cannot authorize or return a
-// tool. Callers must subsequently select the current scoped snapshot. Keeping
+// tool. Only a complete public catalog can establish a negative hint; private
+// catalogs remain unknown for another caller. Callers must subsequently select
+// the current scoped snapshot. Keeping
 // names beside the manager's serialized pages avoids decoding unrelated
 // catalogs and resolving credentials for aliases that cannot match. Missing
 // reusable pages remain an unknown candidate so local/uncacheable clients keep
@@ -410,12 +438,27 @@ func (m *Manager) MayHaveToolCatalogAlias(server, alias string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	now := time.Now()
-	observed := false
+	privateObserved, completePublic := false, false
 	for _, page := range m.toolCatalog {
-		if page.server != server || page.ready != nil || !page.expires.After(now) {
+		if page.server != server || page.ready != nil || !page.reusable(now) {
 			continue
 		}
-		observed = true
+		if !page.public {
+			privateObserved = true
+		}
+		if page.public && page.cursor == "first" {
+			// Follow this exact scoped generation in the existing page map;
+			// partial public pages cannot prove a negative alias hint.
+			current, seen := page, map[string]bool{}
+			for current != nil && current.public && current.ready == nil && current.reusable(now) && !seen[current.cursor] {
+				seen[current.cursor] = true
+				if current.nextCursor == "" {
+					completePublic = true
+					break
+				}
+				current = m.toolCatalog[page.catalogKey+current.nextCursor]
+			}
+		}
 		for _, name := range page.names {
 			full, colon := server+"/"+name, server+":"+name
 			if alias == full || alias == colon || alias == mcpname.Canonical(full) || alias == mcpname.Canonical(colon) {
@@ -423,7 +466,9 @@ func (m *Manager) MayHaveToolCatalogAlias(server, alias string) bool {
 			}
 		}
 	}
-	return !observed
+	// This API has no caller context. Another user's private catalog can
+	// suggest a candidate, but can never exclude an unseen private tool.
+	return privateObserved || !completePublic
 }
 
 // fetchToolCatalog measures source work separately from cached page decoding.
