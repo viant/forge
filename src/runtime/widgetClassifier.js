@@ -149,6 +149,12 @@ registerClassifier((item) => {
         case 'multiSelect':
         case 'multiselect':
             return 'multiSelect';
+        case 'contentCarousel':
+            return 'contentCarousel';
+        case 'cardRail':
+            return 'cardRail';
+        case 'filterChips':
+            return 'filterChips';
         case 'chipList':
         case 'chiplist':
             return 'chipList';
