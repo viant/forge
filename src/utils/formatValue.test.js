@@ -22,3 +22,5 @@ assert.equal(formatDisplayValue({width: 300, height: 250}, 'dimensions'), '300x2
 assert.equal(formatDisplayValue({width: 0, height: 0}, 'dimensions'), '0x0');
 
 console.log('formatValue ✓ 24-hour date-time rendering');
+
+assert.equal(formatDisplayValue('2026-01-01T00:00:00Z','dateTime24','en-US',{timeZone:'UTC'}),'Jan 1, 2026, 00:00');

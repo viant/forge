@@ -214,3 +214,22 @@ access-control or business-authority contract.
 The lazy datasource-option lifecycle regressions run with `npm run test:lazy-options`
 and are included in `npm test`. They exercise real Blueprint selects and mounted
 window ownership under JSDOM; browser integration remains a separate host check.
+
+### Bound table date timezones
+
+A date column can read its timezone from an already-mounted datasource:
+
+```yaml
+format: dateTime24
+timeZoneBinding:
+  dataSourceRef: header
+  scope: metrics
+  dataField: timeZone.ianaTimezoneStr
+```
+
+This uses the existing read-only state adapter and makes no datasource request.
+The table reacts when that scalar timezone arrives or changes; unrelated edits in
+its source do not invalidate cells. Explicit `timeZone` and row-level
+`timeZoneSelector` take precedence over the bound fallback. Missing binding values
+retain existing formatting defaults. Timestamps remain unchanged; `dateTime24`
+uses an h23 clock so midnight displays as00:00.

@@ -57,7 +57,7 @@ export const formatDisplayValue = (value, format, locale = 'en-US', options = {}
                 day: 'numeric',
                 hour: 'numeric',
                 minute: '2-digit',
-                ...(format === 'dateTime24' ? {hour12: false} : {}),
+                ...(format === 'dateTime24' ? {hourCycle: 'h23'} : {}),
                 ...(timeZone ? {timeZone} : {}),
             }).format(date);
         }

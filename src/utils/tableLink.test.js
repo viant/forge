@@ -315,3 +315,8 @@ assert.equal(resolveTableLink({row:{id:7},column:configuredColumn,value:'Creativ
 assert.equal(resolveTableLink({row:{id:7},column:configuredColumn,value:'Creative',context:configuredContext({CreativeLinkMode:'window'})}).kind,'window');
 assert.equal(resolveTableLink({row:{id:7},column:configuredColumn,value:'Creative'}).href,'https://dsp.viantinc.com/campaigns/creative-details/7');
 console.log('table links carry runtime configuration context with external default');
+
+const zonedInstant='2026-01-01T00:00:00Z';
+assert.equal(resolveTableCellText({row:{},column:{format:'dateTime24'},value:zonedInstant,timeZone:'America/New_York'}),'Dec 31, 2025, 19:00');
+assert.equal(resolveTableCellText({row:{zone:'UTC'},column:{format:'dateTime24',timeZoneSelector:'zone'},value:zonedInstant,timeZone:'America/New_York'}),'Jan 1, 2026, 00:00');
+assert.equal(resolveTableCellText({row:{},column:{format:'dateTime24',timeZone:'UTC'},value:zonedInstant,timeZone:'America/New_York'}),'Jan 1, 2026, 00:00');
