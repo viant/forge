@@ -20,7 +20,12 @@ function fixture(metricsValue){
  const container={id:'time-grid',table:{selectionEnabled:false,toolbar:{items:[]}}};
  const services={tablePreferences:{get:async()=>null,set:async()=>null,reset:async()=>null}};
  let commits=0;
- const render=()=>act(async()=>root.render(<SettingProvider endpoints={{}} connectorConfig={{}} services={services}><Profiler id="table" onRender={()=>commits++}><Basic context={context} container={container} columns={columns}/></Profiler></SettingProvider>));
+ const render=async()=>{
+  await act(async()=>root.render(<SettingProvider endpoints={{}} connectorConfig={{}} services={services}><Profiler id="table" onRender={()=>commits++}><Basic context={context} container={container} columns={columns}/></Profiler></SettingProvider>));
+  // Initial viewport measurement is scheduled independently of metadata. Settle
+  // that frame before attributing a later commit to the bound header update.
+  await act(async()=>new Promise(resolve=>requestAnimationFrame(()=>resolve())));
+ };
  return {header,collection,fetchCollection,render,commits:()=>commits,cell:()=>host.querySelector('td[data-col="at"]')?.textContent};
 }
 it('formats a bound timezone and reacts only to relevant metadata changes without fetching',async()=>{
