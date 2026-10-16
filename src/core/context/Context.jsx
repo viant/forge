@@ -1,3 +1,4 @@
+import {MissingDataSourceReferenceError} from './dataSourceReference.js';
 import {canonicalSelectionBinding} from '../../runtime/canonicalDelivery.js';
 import {useDataSourceHandlers} from "../../hooks/index.js";
 import {
@@ -35,13 +36,7 @@ function resolveActionHandler(actions, handlers, name) {
 }
 
 function buildDataSourceNotFoundError(dataSourceRef = "", identity = null) {
-    const error = new Error(`DataSource not found: ${dataSourceRef}`);
-    error.code = "DataSourceNotFound";
-    error.dataSourceRef = dataSourceRef;
-    if (identity && typeof identity === "object" && !Array.isArray(identity)) {
-        error.identity = identity;
-    }
-    return error;
+    return new MissingDataSourceReferenceError(dataSourceRef, identity);
 }
 
 export function resolveWindowContentContext({
@@ -258,7 +253,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 ns,
                 dataSourceId: getDataSourceId(dataSourceRef)
             }
-            const baseDataSource = metadata.dataSource[dataSourceRef]
+            const baseDataSource = metadata.dataSource?.[dataSourceRef]
             if (!baseDataSource) {
                 throw buildDataSourceNotFoundError(dataSourceRef, identity)
             }
@@ -358,7 +353,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
                 ns,
                 dataSourceId: getDataSourceId(dataSourceRef)
             };
-            const baseDataSource = metadata.dataSource[dataSourceRef];
+            const baseDataSource = metadata.dataSource?.[dataSourceRef];
             if (!baseDataSource) {
                 throw buildDataSourceNotFoundError(dataSourceRef, identity);
             }

@@ -70,6 +70,11 @@ func (m *Manager) WithAuthTokenContext(ctx context.Context, serverName string) c
 	}
 	debugMCPAuthEnsure(serverName, ctx, "before_ensure", m.UseIDToken(ctx, serverName))
 	useIDToken := m.UseIDToken(ctx, serverName)
+	if m.prepareTokens != nil {
+		if prepared := m.prepareTokens(ctx, serverName, useIDToken); prepared != nil {
+			ctx = prepared
+		}
+	}
 	useID := useIDToken
 	tok := authctx.MCPAuthToken(ctx, useID)
 	if strings.TrimSpace(tok) == "" {

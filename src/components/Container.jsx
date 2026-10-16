@@ -1,3 +1,4 @@
+import MissingDataSourceBoundary from './MissingDataSourceBoundary.jsx';
 import {hasContainerClass, containerSurfaceClass} from './containerClasses.js';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
@@ -48,6 +49,7 @@ import DashboardSurface from "./dashboard/DashboardSurface.jsx";
 import {createDashboardContext, getDashboardVisibleWhen, seedDashboardDefaultFilters} from "./dashboard/dashboardUtils.js";
 import { findDashboardFilterSignal, findDashboardSelectionSignal, getDashboardSelectionSignal } from "../core/store/signals.js";
 import {getViewSignal} from '../core/index.js';
+import {useViewPartition} from './useViewPartition.js';
 import {isDashboardRootContainer, isSemanticDashboardBlock, shouldSkipGenericNonVisualEarlyReturn} from "./containerSemantics.js";
 import {isContainerVisible, resolveChildContext, trackContainerVisibility} from "./visibleWhen.js";
 import {
@@ -88,7 +90,7 @@ const wrapContainerChrome = (container, content, suppressTitle = false, sectionP
     }
     if (container?.section) {
         const sectionProperties = sectionPropertiesOverride || resolveSectionProperties(container.section);
-        const SectionComponent = sectionProperties.collapsible === true ? AccessibleSection : Section;
+        const SectionComponent = sectionProperties.collapsible === true || container.section.appearance ? AccessibleSection : Section;
         const sectionStyle = {
             ...outerStyle,
             ...(sectionProperties.style || {}),
@@ -142,7 +144,7 @@ const resolveContainerItemValue = (item, context) => {
     return item?.dataField ? resolveSelector(holder, item.dataField) : undefined;
 };
 
-const Container = ({context, container, isActive, suppressTitle = false, dataSourceFetchMode = 'always', sizingMode: allocatedMode = 'fill'}) => {
+const ContainerContent = ({context, container, isActive, suppressTitle = false, dataSourceFetchMode = 'always', sizingMode: allocatedMode = 'fill'}) => {
     useSignals();
     const sizingMode = resolveContainerSizing(container, allocatedMode);
     const rootSizingStyle = containerSizingStyle(container, sizingMode, {chrome: !!(container.card || container.section)});
@@ -159,12 +161,14 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
     const dashboardKey = effectiveContext?.dashboardKey;
     const windowId = effectiveContext?.identity?.windowId;
     const sectionViewSignal = windowId && container?.section?.persistState === true ? getViewSignal(windowId) : null;
-    const sectionViewValue = sectionViewSignal?.value || {};
+    const sectionStateKey = String(container?.section?.stateKey || container?.id || '').trim();
+    const sectionPartition = useViewPartition(sectionViewSignal, 'sections', sectionStateKey);
+    const sectionState = sectionPartition.value;
     const persistentSectionProperties = useMemo(() => {
         if (!sectionViewSignal || container?.section?.collapsible !== true) return null;
         const authored = resolveSectionProperties(container.section);
-        const stateKey = String(container.section.stateKey || container.id || '').trim();
-        const isOpen = resolveSectionOpenState({...container.section, stateKey}, sectionViewValue);
+        const stateKey = sectionStateKey;
+        const isOpen = resolveSectionOpenState({...container.section, stateKey}, {sections: {[stateKey]: sectionState}});
         const authoredToggle = authored?.collapseProps?.onToggle;
         return {
             ...authored,
@@ -178,7 +182,7 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
                 },
             },
         };
-    }, [sectionViewSignal, sectionViewValue, container?.section, container?.id]);
+    }, [sectionViewSignal, sectionState, sectionStateKey, container?.section, container?.id]);
     if (dashboardKey) {
         findDashboardFilterSignal(dashboardKey)?.value;
         findDashboardSelectionSignal(dashboardKey)?.value;
@@ -252,7 +256,10 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
             return stepContainer ? <Container context={resolveChildContext(effectiveContext, stepContainer.dataSourceRef || dataSourceRef)} container={stepContainer} isActive={isActive} dataSourceFetchMode={dataSourceFetchMode}/> : null;
         }}/>
         : null;
-    const draftFormPanel = container.draftForm ? <DraftForm container={container} context={effectiveContext}/> : null;
+    const wrapDraftContent = container.draftForm?.wrapContent === true;
+    const draftFormPanel = container.draftForm && !wrapDraftContent ? <DraftForm container={container} context={effectiveContext}/> : null;
+    const DraftBody = wrapDraftContent ? DraftForm : React.Fragment;
+    const draftBodyProps = wrapDraftContent ? {container, context: effectiveContext} : {};
     const queryToolbarPanel = container.queryToolbar ? <QueryToolbar container={container} context={effectiveContext}/> : null;
     const resourceHeaderPanel = container.resourceHeader ? <ResourceHeader container={container} context={effectiveContext}/> : null;
     const relationDrillPanel = container.relationDrill ? <RelationDrill container={container} context={effectiveContext}/> : null;
@@ -446,7 +453,7 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
         !!InstalledContainerRenderer || container?.kind === 'mcpApp' ||
         (visualItems?.length || 0) > 0 ||
         !!container.toolbar ||
-        tablePanel || assignmentPanel || derivedDataSourcePanel || mutationCommandPanel || statusWorkflowPanel || treeEditorPanel || wizardPanel || uploadCollectionPanel || historyDiffPanel || scheduleEditorPanel || draftFormPanel || queryToolbarPanel || resourceHeaderPanel || relationDrillPanel || notificationRulesPanel || metricSummaryPanel || detailViewPanel || masterDetailPanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || treeBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
+        tablePanel || assignmentPanel || derivedDataSourcePanel || mutationCommandPanel || statusWorkflowPanel || treeEditorPanel || wizardPanel || uploadCollectionPanel || historyDiffPanel || scheduleEditorPanel || container.draftForm || queryToolbarPanel || resourceHeaderPanel || relationDrillPanel || notificationRulesPanel || metricSummaryPanel || detailViewPanel || masterDetailPanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || treeBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
     if (!hasVisual && !shouldSkipGenericNonVisualEarlyReturn(container)) {
         return (
             <>
@@ -726,6 +733,7 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
         <PermissionBoundary sizingMode={sizingMode} container={container} context={effectiveContext}>
             <DataStateBoundary sizingMode={sizingMode} container={container} context={effectiveContext}>
             <div {...(!container?.card && !container?.section ? containerAnchorProps(container) : {})} className={!container.card && !container.section ? containerSurfaceClass(container, 'body') : 'forge-container-body'} data-forge-part="container-content" data-forge-sizing={sizingMode} data-forge-scroll={container.scrollMode === 'self' ? 'self' : 'parent'} style={rootSizingStyle}>
+                <DraftBody {...draftBodyProps}>
                 {resourceHeaderPanel}
                 {notificationRulesPanel}
                 {queryToolbarPanel}
@@ -814,6 +822,7 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
                     </div>
                 ) : null}
 
+                </DraftBody>
             </div>
             </DataStateBoundary>
             {/* Container-level fetcher */}
@@ -830,4 +839,9 @@ const Container = ({context, container, isActive, suppressTitle = false, dataSou
     ), suppressTitle, persistentSectionProperties, sizingMode);
 };
 
+const Container = props => {
+    useSignals();
+    const reference = resolveDynamicDataSourceRef(props.container, props.context, props.container?.dataSourceRef || props.context?.identity?.dataSourceRef);
+    return <MissingDataSourceBoundary metadata={props.context?.metadata} reference={reference}><ContainerContent {...props}/></MissingDataSourceBoundary>;
+};
 export default Container;

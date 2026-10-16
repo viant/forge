@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Forge MCP resource access extracted from Viant Agently Core.
+// Shared primitive delivery; kept aligned with the Core compatibility boundary.
 package resource
 
 import (
@@ -9,6 +9,7 @@ import (
 	"fmt"
 	service "github.com/viant/forge/backend/provider"
 	primitive "github.com/viant/forge/backend/provider/contract"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
 	"strings"
@@ -146,7 +147,9 @@ func (c *WindowCatalog) GetForProvider(ctx context.Context, owner string, input 
 	return c.getForProvider(ctx, owner, input)
 }
 
-func (c *WindowCatalog) getForProvider(ctx context.Context, explicitOwner string, input *service.WindowDefinitionGetInput) (*service.WindowDefinitionGetOutput, error) {
+func (c *WindowCatalog) getForProvider(ctx context.Context, explicitOwner string, input *service.WindowDefinitionGetInput) (out *service.WindowDefinitionGetOutput, resultErr error) {
+	span := observe.Start(ctx, "window.open", observe.Labels{Kind: "window"})
+	defer func() { span.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	if !c.AuthzReady() || input == nil {
 		return nil, identity.ErrResourceDenied
 	}
@@ -175,7 +178,9 @@ func (c *WindowCatalog) getForProvider(ctx context.Context, explicitOwner string
 	if e != nil {
 		return nil, fmt.Errorf("window read/select: %w", e)
 	}
+	selectionTiming := observe.Start(ctx, "window.target.select", observe.Labels{})
 	selected, e := result.Definition.Select(input.Target)
+	selectionTiming.End(observe.OutcomeFor(e), observe.CacheUnknown)
 	if e != nil {
 		return nil, e
 	}
@@ -232,7 +237,9 @@ func (c *WindowCatalog) getForProvider(ctx context.Context, explicitOwner string
 		} else if input.Target != nil && len(input.Target.DependencyPins) > 0 {
 			return nil, identity.ErrResourceDenied
 		}
+		dependencyTiming := observe.Start(ctx, "window.dependencies", observe.Labels{})
 		dependencyPins, e = c.Gateway.ResolveDependencyPins(ctx, loc.Connection, pin, selected.DataSourceResources, selected.DataSources, existing)
+		dependencyTiming.End(observe.OutcomeFor(e), observe.CacheUnknown)
 		if e != nil {
 			return nil, e
 		}

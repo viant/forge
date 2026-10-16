@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: Apache-2.0
-// Forge resource client pooling extracted from Viant Agently Core.
 package manager
 
 import (

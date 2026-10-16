@@ -17,10 +17,11 @@ import (
 // selectedResourceRead is detached metadata from an actual verified Get. It
 // becomes reusable only after registration of the complete selected bundle.
 type selectedResourceRead struct {
-	connection Connection
-	pin        identity.ResolvedResource
-	result     primitive.GetResult
-	key        string
+	definitionCache *definitionCacheReference
+	connection      Connection
+	pin             identity.ResolvedResource
+	result          primitive.GetResult
+	key             string
 }
 type selectedDatasourceBundle struct {
 	parent       identity.ResolvedResource
@@ -91,41 +92,41 @@ func (s *resourceReadSequence) selectionKey(ctx context.Context, read selectedRe
 	return s.gateway.namespaceReadKey(ctx, actor, read.connection.Name, options, client)
 }
 
-func (s *resourceReadSequence) selectedRead(ctx context.Context, connection Connection, pin *identity.ResolvedResource, bindingKey string) (primitive.GetResult, bool, error) {
+func (s *resourceReadSequence) selectedRead(ctx context.Context, connection Connection, pin *identity.ResolvedResource, bindingKey string) (primitive.GetResult, *definitionCacheReference, bool, error) {
 	if pin == nil {
-		return primitive.GetResult{}, false, nil
+		return primitive.GetResult{}, nil, false, nil
 	}
 	s.mu.Lock()
 	if s.closed || s.failed != nil {
 		s.mu.Unlock()
-		return primitive.GetResult{}, false, identity.ErrResourceDenied
+		return primitive.GetResult{}, nil, false, identity.ErrResourceDenied
 	}
 	if !s.active || s.selection == nil {
 		s.mu.Unlock()
-		return primitive.GetResult{}, false, nil
+		return primitive.GetResult{}, nil, false, nil
 	}
 	read, found := s.selection.resources[selectionResourceID(connection, *pin)]
 	s.mu.Unlock()
 	if !found {
-		return primitive.GetResult{}, false, nil
+		return primitive.GetResult{}, nil, false, nil
 	}
 	if bindingKey != read.key || !identity.MetadataExpiryValid(read.pin.ValidUntil, s.gateway.now()) || read.result.ResolvedResource != nil && !identity.MetadataExpiryValid(read.result.ResolvedResource.ValidUntil, s.gateway.now()) || read.result.ExecutionProof != nil && !read.result.ExecutionProof.Resource.ValidUntil.After(s.gateway.now()) {
 		err := identity.ErrResourceDenied
 		s.mu.Lock()
 		s.failed = err
 		s.mu.Unlock()
-		return primitive.GetResult{}, false, err
+		return primitive.GetResult{}, nil, false, err
 	}
 	if read.result.Resource == nil {
-		return primitive.GetResult{}, false, nil
+		return primitive.GetResult{}, nil, false, nil
 	}
 	result, err := detachedGet(&read.result)
-	return result, err == nil, err
+	return result, read.definitionCache, err == nil, err
 }
 
 // recordSelectedRead fills a POST slot only for the original catalog-verified
 // closed association. Arbitrary successful Gets cannot register themselves.
-func (s *resourceReadSequence) recordSelectedRead(ctx context.Context, connection Connection, pin *identity.ResolvedResource, result *primitive.GetResult, bindingKey string) error {
+func (s *resourceReadSequence) recordSelectedRead(ctx context.Context, connection Connection, pin *identity.ResolvedResource, result *primitive.GetResult, bindingKey string, cacheReference *definitionCacheReference) error {
 	if pin == nil {
 		return nil
 	}
@@ -155,6 +156,7 @@ func (s *resourceReadSequence) recordSelectedRead(ctx context.Context, connectio
 	detached.ExecutionProof = prior.ExecutionProof
 	detached.ResolvedResource.ValidUntil = identity.MinimumMetadataExpiry(detached.ResolvedResource.ValidUntil, prior.ResolvedResource.ValidUntil)
 	held.result = detached
+	held.definitionCache = cacheReference
 	// The first fresh POST result must retain the original proof too, rather
 	// than exposing a newly issued proof while only the memo keeps provenance.
 	returned, err := detachedGet(&detached)

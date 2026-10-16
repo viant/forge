@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Forge MCP resource access extracted from Viant Agently Core.
+// Shared primitive delivery; kept aligned with the Core compatibility boundary.
 package resource
 
 import (
@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	dsproto "github.com/viant/forge/backend/datasource/contract"
 	primitive "github.com/viant/forge/backend/provider/contract"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
 )
@@ -14,7 +15,9 @@ import (
 func (g *Gateway) ConnectionForProvider(ctx context.Context, owner string) (Connection, error) {
 	return g.dependencyConnection(ctx, Connection{}, owner)
 }
-func (g *Gateway) ConnectionForResource(ctx context.Context, uri identity.ResourceURI, owner string) (Connection, error) {
+func (g *Gateway) ConnectionForResource(ctx context.Context, uri identity.ResourceURI, owner string) (result Connection, resultErr error) {
+	span := observe.Start(ctx, "gateway.routing", observe.Labels{Kind: uri.Kind})
+	defer func() { span.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	if connection, found, err := g.declaredOwnerConnection(ctx, owner); found || err != nil {
 		if err != nil {
 			return Connection{}, err
@@ -95,11 +98,15 @@ func (c *WindowCatalog) ResolveDatasource(ctx context.Context, parent identity.R
 	if !c.AuthzReady() {
 		return nil, identity.ErrResourceDenied
 	}
-	definition, connection, e := c.Gateway.getForProvider(ctx, parent.ProviderIdentity, identity.ResourceRef{URI: parent.URI, Revision: parent.Selector()}, &parent)
+	connection, e := c.Gateway.ConnectionForProvider(ctx, parent.ProviderIdentity)
 	if e != nil {
 		return nil, e
 	}
-	variant, e := types.SelectWindowResourceWithReferences(definition.Resource.Definition, target)
+	definition, e := GetWithCodec[*types.CompiledWindowResource](ctx, c.Gateway, connection, identity.ResourceRef{URI: parent.URI, Revision: parent.Selector()}, &parent, DefinitionCodec[*types.CompiledWindowResource]{ID: "forge.window.resource.v1", Parse: types.CompileWindowResource})
+	if e != nil {
+		return nil, e
+	}
+	variant, e := definition.Definition.Select(target)
 	if e != nil {
 		return nil, e
 	}
@@ -115,7 +122,7 @@ func (c *WindowCatalog) ResolveDatasource(ctx context.Context, parent identity.R
 	if json.Unmarshal(raw, &datasource) != nil || datasource.ID != id {
 		return nil, identity.ErrResourceDenied
 	}
-	reads = append(reads, selectedResourceRead{connection: connection, pin: parent, result: *definition})
+	reads = append(reads, selectedResourceRead{connection: connection, pin: parent, result: definition.GetResult, definitionCache: definition.definitionCache})
 	if e = c.registerSelectedDatasource(ctx, parent, target, id, variant, reads); e != nil {
 		return nil, e
 	}

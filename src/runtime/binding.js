@@ -48,6 +48,8 @@ registerStateAdapter('local', (ctx, item, pair) => {
  * ------------------------------------------------------------------ */
 
 import { resolveSelector, setSelector } from '../utils/selector.js';
+import {formFieldValue} from './formFieldValue.js';
+
 
 registerStateAdapter('form', (ctx, item) => {
     const dsHandlers = ctx?.handlers?.dataSource;
@@ -56,12 +58,10 @@ registerStateAdapter('form', (ctx, item) => {
     const optionsFieldKey = item.optionsField  || fieldKey + 'Options'
     return {
         get: () => {
-            const data = dsHandlers?.getFormData?.() || {};
-            return resolveSelector(data, fieldKey);
+            return formFieldValue(ctx, fieldKey);
         },
         getOptions: () => {
-            const data = dsHandlers?.getFormData?.() || {};
-            return   resolveSelector(data, optionsFieldKey) || [];
+            return formFieldValue(ctx, optionsFieldKey) || [];
         },
         set: (v) => {
             dsHandlers?.setFormField?.({ item, value: v });

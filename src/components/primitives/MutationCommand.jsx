@@ -20,7 +20,7 @@ export function useMutationCommandState(context, command) {
 }
 
 export default function MutationCommand({command, context, extras = {}, disabled = false, children, onSettled}) {
-  usePredicateSignals(context);
+  usePredicateSignals(context, [command?.validateWhen]);
   const state = useMutationCommandState(context, command);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [confirmMessage, setConfirmMessage] = React.useState('');

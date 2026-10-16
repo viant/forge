@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: Apache-2.0
-// Forge resource client pooling extracted from Viant Agently Core.
 package manager
 
 import (
@@ -7,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
+	"net/url"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -34,10 +34,14 @@ type catalogClient struct {
 	stubClient
 	calls   atomic.Int32
 	zeroTTL bool
+	onList  func()
 }
 
 func (c *catalogClient) ListTools(ctx context.Context, cursor *string, _ ...mcpclient.RequestOption) (*schema.ListToolsResult, error) {
 	c.calls.Add(1)
+	if c.onList != nil {
+		c.onList()
+	}
 	name := "generic/tool"
 	result := &schema.ListToolsResult{Tools: []schema.Tool{{Name: name, Meta: map[string]interface{}{"custom": map[string]interface{}{"nested": "original"}}}}}
 	if c.zeroTTL {
@@ -414,4 +418,154 @@ func TestToolCatalogPublicSnapshotSharesAcrossConnections(t *testing.T) {
 	if client.calls.Load() != 2 {
 		t.Fatal("public snapshot rediscovered")
 	}
+}
+
+func TestHTTPBoundarySharesPrivateToolCatalogOnlyWithinRequest(t *testing.T) {
+	m, provider, client, a, _ := catalogSetup(t, false)
+	bff := true
+	provider.cfg.Auth = &mcp.ClientAuth{BackendForFrontend: &bff}
+	rt, err := authtransport.New()
+	require.NoError(t, err)
+	m.authRT = rt
+	client.zeroTTL = true
+	user := authctx.WithUserInfo(context.Background(), &authctx.UserInfo{Subject: "alice"})
+	handler := WithRequestCatalog(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		for range 3 {
+			_, err := a.ListTools(r.Context(), nil)
+			require.NoError(t, err)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	for request := 1; request <= 2; request++ {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/metadata", nil).WithContext(user))
+		require.Equal(t, http.StatusNoContent, response.Code)
+		require.EqualValues(t, request, client.calls.Load(), "a new HTTP request must not inherit a prior private snapshot")
+	}
+}
+
+func TestToolCatalogCookieJarReusesOnlyMatchingEndpointAndPrincipal(t *testing.T) {
+	m, _, client, a, _ := catalogSetup(t, false)
+	jar, err := cookiejar.New(nil)
+	require.NoError(t, err)
+	endpoint, err := url.Parse("https://example.test/mcp")
+	require.NoError(t, err)
+	m.jarProvider = func(context.Context) (http.CookieJar, error) { return jar, nil }
+	alice := authctx.WithUserInfo(context.Background(), &authctx.UserInfo{Subject: "alice"})
+	jar.SetCookies(endpoint, []*http.Cookie{{Name: "session", Value: "first"}})
+	for i := 0; i < 5; i++ {
+		_, err = a.ListTools(alice, nil)
+		require.NoError(t, err)
+	}
+	require.EqualValues(t, 1, client.calls.Load(), "stable authenticated metadata must not re-discover per tool")
+	jar.SetCookies(endpoint, []*http.Cookie{{Name: "session", Value: "second"}})
+	_, err = a.ListTools(alice, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, client.calls.Load(), "changed transport credentials need their own catalog")
+	_, err = a.ListTools(authctx.WithUserInfo(context.Background(), &authctx.UserInfo{Subject: "bob"}), nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 3, client.calls.Load(), "private metadata must not cross principals")
+}
+
+func TestToolCatalogDoesNotPublishUnderChangedCookieWitness(t *testing.T) {
+	m, _, client, a, _ := catalogSetup(t, false)
+	jar, err := cookiejar.New(nil)
+	require.NoError(t, err)
+	endpoint, err := url.Parse("https://example.test/mcp")
+	require.NoError(t, err)
+	m.cookieJar = jar
+	jar.SetCookies(endpoint, []*http.Cookie{{Name: "session", Value: "before"}})
+	client.onList = func() { jar.SetCookies(endpoint, []*http.Cookie{{Name: "session", Value: "after"}}) }
+	_, err = a.ListTools(context.Background(), nil)
+	require.NoError(t, err)
+	require.Empty(t, m.toolCatalog, "a response must not populate a different credential's cache")
+	_, err = a.ListTools(context.Background(), nil)
+	require.NoError(t, err)
+	_, err = a.ListTools(context.Background(), nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, client.calls.Load())
+}
+
+func TestPublicToolCatalogSharesEagerMetadataWithUnusedHostHooks(t *testing.T) {
+	m, _, client, a, b := catalogSetup(t, true)
+	jar, err := cookiejar.New(nil)
+	require.NoError(t, err)
+	m.jarProvider = func(context.Context) (http.CookieJar, error) { return jar, nil }
+	m.authRTProvider = func(context.Context) *authtransport.RoundTripper {
+		t.Fatal("auth:null must not select a host auth hook")
+		return nil
+	}
+	require.True(t, m.IsToolsListPublic(context.Background(), "server"))
+	_, err = a.ListTools(context.Background(), nil)
+	require.NoError(t, err)
+	bob := authctx.WithUserInfo(context.Background(), &authctx.UserInfo{Subject: "bob"})
+	_, err = b.ListTools(bob, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, client.calls.Load(), "startup public metadata must be reusable by authenticated users")
+	endpoint, err := url.Parse("https://example.test/mcp")
+	require.NoError(t, err)
+	jar.SetCookies(endpoint, []*http.Cookie{{Name: "session", Value: "private"}})
+	require.False(t, m.IsToolsListPublic(bob, "server"))
+	_, err = b.ListTools(bob, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, client.calls.Load(), "credential-bearing requests must not reuse public metadata")
+}
+
+func TestZeroTTLReadSnapshotAvailableToRegistryWithinSameOperation(t *testing.T) {
+	m, _, client, managed, _ := catalogSetup(t, false)
+	client.zeroTTL = true
+	ctx := WithToolCatalogReadSnapshot(context.Background())
+	first, err := managed.ListTools(ctx, nil)
+	require.NoError(t, err)
+	partial, _, err := managed.toolCatalogSnapshot(ctx)
+	require.NoError(t, err)
+	require.Empty(t, partial, "all pages are required before publishing a catalog identity")
+	_, err = managed.ListTools(ctx, first.NextCursor)
+	require.NoError(t, err)
+	generation, tools, err := managed.toolCatalogSnapshot(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, generation)
+	require.Len(t, tools, 2)
+	require.EqualValues(t, 2, client.calls.Load())
+	foreign, _, err := managed.toolCatalogSnapshot(authctx.WithBearer(ctx, "other-credential"))
+	require.NoError(t, err)
+	require.Empty(t, foreign, "an operation snapshot must still isolate credentials")
+	outside, _, err := managed.toolCatalogSnapshot(WithToolCatalogReadSnapshot(context.Background()))
+	require.NoError(t, err)
+	require.Empty(t, outside, "zero-TTL snapshots must not cross operations")
+	m.mu.Lock()
+	m.invalidateToolCatalogLocked("server")
+	m.mu.Unlock()
+	invalidated, _, err := managed.toolCatalogSnapshot(ctx)
+	require.NoError(t, err)
+	require.Empty(t, invalidated, "notifications invalidate even an in-operation snapshot")
+}
+
+func TestToolCatalogRoutingCookieRotationPreservesOperationSnapshot(t *testing.T) {
+	m, provider, client, managed, _ := catalogSetup(t, false)
+	provider.cfg.MetadataCacheIgnoredCookies = []string{"affinity"}
+	jar, err := cookiejar.New(nil)
+	require.NoError(t, err)
+	endpoint, _ := url.Parse("https://example.test/mcp")
+	m.cookieJar = jar
+	m.authRT, err = authtransport.New(authtransport.WithCookieJar(jar))
+	require.NoError(t, err)
+	bff := true
+	provider.cfg.Auth = &mcp.ClientAuth{BackendForFrontend: &bff}
+	jar.SetCookies(endpoint, []*http.Cookie{{Name: "session", Value: "user-one"}, {Name: "affinity", Value: "route-one"}})
+	client.zeroTTL = true
+	client.onList = func() {
+		jar.SetCookies(endpoint, []*http.Cookie{{Name: "affinity", Value: fmt.Sprint(client.calls.Load())}})
+	}
+	ctx := WithToolCatalogReadSnapshot(context.Background())
+	for range 3 {
+		_, err := managed.ListTools(ctx, nil)
+		require.NoError(t, err)
+	}
+	require.EqualValues(t, 1, client.calls.Load(), "routing cookie rotation must not discard the source response")
+	require.Len(t, jar.Cookies(endpoint), 2, "forwarded cookies remain intact")
+	jar.SetCookies(endpoint, []*http.Cookie{{Name: "session", Value: "user-two"}})
+	_, err = managed.ListTools(ctx, nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 2, client.calls.Load(), "authentication cookie rotation still requires fresh discovery")
 }

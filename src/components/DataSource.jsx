@@ -3,7 +3,7 @@ import React, {useEffect, useState} from "react";
 import {getLogger} from "../utils/logger.js";
 import {useSignals} from '@preact/signals-react/runtime';
 import { extractData, isDeferredCacheHitEnvelope } from "./dataSourceExtract.js";
-import { beginDataSourceFetch, consumeDataSourceFetchRequest, reconcileRestoredPendingFetch, recoverInterruptedFetchOnMount, resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, withFetchedPageInfo } from "./dataSourceFetchState.js";
+import { beginDataSourceFetch, consumeDataSourceFetchRequest, reconcileRestoredPendingFetch, recoverInterruptedFetchOnMount, resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, withFetchedPageInfo, snapshotFetchedPageResult } from "./dataSourceFetchState.js";
 import {reconcileMultiSelection, reconcileSingleSelection} from "./dataSourceSelection.js";
 import {applyFetchTransform} from "./dataSourceTransform.js";
 import {hasResolvedDependencies} from "./dataSourceDependencies.js";
@@ -568,6 +568,7 @@ export default function DataSource({context}) {
                     stats = metrics.peek() || stats;
                 }
             }
+            const fetchedPageResult = snapshotFetchedPageResult(records, paging);
             records = unmarshalResourceCollection(records, context, resourceModelRef);
             if (events.onFetch.isDefined()) {
                 try {
@@ -595,9 +596,7 @@ export default function DataSource({context}) {
             } catch (_) {
             }
             collectionInfo.value = cursorRequest ? markCompletedCursorAssociation({...info, returnedCount: records.length, pageSize: paging?.size}, cursorRequest.signature) : withFetchedPageInfo(info, page, pagingEnabled, {
-                returnedCount: records.length,
-                pageSize: paging?.size,
-                openEnded: paging?.openEnded === true,
+                ...fetchedPageResult,
                 mode: paging?.mode,
                 hasMoreSelector: paging?.dataInfoSelectors?.hasMore,
             });

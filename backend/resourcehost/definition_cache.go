@@ -20,14 +20,6 @@ import (
 type definitionCacheReference struct{ key, entry string }
 
 func (g *Gateway) cachedDefinitionGet(ctx context.Context, actor identity.VerifiedActor, binding *resourceReadBinding, caps capabilities, uri identity.ResourceURI, ref identity.ResourceRef, load func(context.Context) (primitive.GetResult, error)) (primitive.GetResult, *definitionCacheReference, error) {
-	// Working and default selections can change without a new immutable URI.
-	// Reuse is confined to the current read sequence; a later operation must
-	// obtain a fresh owner-authorized definition and source check.
-	if ref.Revision == "" || ref.Revision == identity.WorkingCandidate {
-		result, err := load(ctx)
-		return result, nil, err
-	}
-
 	scope, err := binding.options.ResourceCacheScope(uri.Namespace, uri.Kind)
 	if err != nil {
 		return primitive.GetResult{}, nil, err
@@ -36,6 +28,15 @@ func (g *Gateway) cachedDefinitionGet(ctx context.Context, actor identity.Verifi
 		scope = cfg.ResourceCacheConversation
 	}
 	public := scope == cfg.ResourceCachePublic
+	// Mutable/default definitions require an explicit host cache declaration.
+	// Otherwise preserve the managing server's existing fresh-read behavior.
+	declared := binding.options.ResourceCacheScopes[uri.Namespace+"/"+uri.Kind] != "" || binding.options.ResourceCacheScopes[uri.Namespace] != "" || binding.options.ResourceCacheScopes["*"] != ""
+	if !declared && (ref.Revision == "" || ref.Revision == identity.WorkingCandidate) {
+		result, err := load(ctx)
+		return result, nil, err
+	}
+	// Scope, source expiry, credential generations and resource notifications
+	// govern reuse for explicitly cached working/default definitions.
 	partition := g.Manager.CatalogPartition(ctx, catalogPrincipalScope(actor), uri.Kind)
 	var scopeKey string
 	if public {
@@ -65,7 +66,7 @@ func (g *Gateway) cachedDefinitionGet(ctx context.Context, actor identity.Verifi
 	partition = g.Manager.WithCatalogSources(ctx, partition, []string{binding.name})
 	// A namespace slot holds sorted URI/selector entries, not one cache slot per
 	// resource. Private keys retain the existing credential/conversation scope.
-	key := fmt.Sprintf("primitive-definitions:%p:%s:%s:%s:%s", g, binding.name, uri.Namespace, uri.Kind, scopeKey)
+	key := fmt.Sprintf("primitive-definitions:%p:%s:%d:%s:%s:%s", g, binding.name, g.generation(binding.name), uri.Namespace, uri.Kind, scopeKey)
 	entry := ref.URI + "\x00" + ref.Revision
 	value, err := g.Manager.VisibleCatalogEntryInPartition(ctx, key, partition, entry, func(ctx context.Context) (json.RawMessage, time.Time, error) {
 		result, err := load(ctx)

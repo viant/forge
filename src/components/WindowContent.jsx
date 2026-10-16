@@ -42,7 +42,7 @@ import {applyParameterCodec} from '../hooks/parameters.js';
 import {injectActions} from '../actions';
 import { resolveMetadataForTarget } from '../runtime/metadataResolver.js';
 import {canonicalSelectionBinding} from '../runtime/canonicalDelivery.js';
-import {compileDeliveryHintView, normalizeAuthorizationSnapshot} from '../runtime/permittedView.js';
+import {compileDeliveryHintView, normalizeAuthorizationSnapshot, resolveAuthorizationResourceID} from '../runtime/permittedView.js';
 import { applyDataSourceParameterCodecs, resolveParameters } from '../hooks/parameters.js';
 import { resolveSelector } from '../utils/selector.js';
 import { evaluatePlainVisibleWhen } from './visibleWhen.js';
@@ -50,6 +50,7 @@ import { getLogger } from '../utils/logger.js';
 import { runWindowLifecycleHandlers } from './windowLifecycle.js';
 import { buildReportBuilderHostServices } from './dashboard/reportBuilderHostServices.js';
 import { windowMetadataEndpoint } from './windowMetadataEndpoint.js';
+import {useViewPartition} from './useViewPartition.js';
 
 export function reuseShallowEqualRuntimeObject(previous = null, candidate = null) {
     if (!previous || !candidate || typeof previous !== 'object' || typeof candidate !== 'object') {
@@ -93,10 +94,18 @@ function collectInitialWindowFormItemValues(node, initial) {
 }
 
 export function compileWindowAuthorizationMetadata(metadata, parameters = {}, selectionBinding = null) {
-    // The managing MCP owns resource access. The browser projects only supplied
-    // principal roles/exposures and never requests an entity read capability.
+    // The managing MCP owns resource access. Selected capabilities only affect
+    // rendered controls; they never admit or deny datasource operations.
     const snapshot = metadata?.authorizationSnapshot;
-    const hints = snapshot ? normalizeAuthorizationSnapshot(snapshot) : {};
+    const spec = metadata?.authorization;
+    const selector = spec?.resource?.id?.selector;
+    const selected = selector ? resolveSelector(parameters, selector) : undefined;
+    // Recompiling already projected metadata must retain its selected display
+    // resource when no new parameter context was supplied.
+    const retained = Object.keys(parameters || {}).length === 0 ? snapshot?.resource?.id : null;
+    const resourceType = spec?.resource?.type || spec?.resourceType || snapshot?.resource?.type || '';
+    const resolved = resolveAuthorizationResourceID(spec?.schemaVersion || snapshot?.schemaVersion, selected ?? retained, snapshot);
+    const hints = snapshot ? normalizeAuthorizationSnapshot(snapshot, resourceType, resolved.valid ? resolved.id : null) : {};
     return {...compileDeliveryHintView(metadata, hints),
         authorizationSnapshot: snapshot ? hints : undefined,
         ...(canonicalSelectionBinding({selectionBinding}) ? {selectionBinding} : {}),
@@ -636,7 +645,9 @@ function WindowContentInner({window, metadata, services}) {
     );
 
     const liveWindowForm = windowFormSignal?.value || {};
-    const liveWindowView = windowViewSignal?.value || {};
+    const windowTabsSignal = useViewPartition(windowViewSignal, 'tabs');
+    const liveWindowTabs = windowTabsSignal.value;
+    const liveWindowView = useMemo(() => ({tabs: liveWindowTabs || {}}), [liveWindowTabs]);
     const windowFormSnapshot = useMemo(() => ({
         ...initialWindowFormSeed,
         ...liveWindowForm,

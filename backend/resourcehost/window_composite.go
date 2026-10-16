@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-// Forge MCP resource access extracted from Viant Agently Core.
+// Shared primitive delivery; kept aligned with the Core compatibility boundary.
 package resource
 
 import (
 	"context"
 	service "github.com/viant/forge/backend/provider"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
 	"strings"
@@ -31,6 +32,8 @@ func (c *CompositeWindowCatalog) AuthzReady() bool {
 }
 func (c *CompositeWindowCatalog) UsesResourceResolution() bool { return true }
 func (c *CompositeWindowCatalog) List(ctx context.Context, input *service.WindowDefinitionListInput) (result *service.WindowDefinitionListOutput, err error) {
+	span := observe.Start(ctx, "window.catalog.list", observe.Labels{})
+	defer func() { span.End(observe.OutcomeFor(err), observe.CacheUnknown) }()
 	if !c.AuthzReady() {
 		return nil, identity.ErrResourceDenied
 	}
@@ -132,7 +135,9 @@ func (c *CompositeWindowCatalog) List(ctx context.Context, input *service.Window
 	}
 	return &service.WindowDefinitionListOutput{Windows: out[start:end], HasMore: end < len(out)}, nil
 }
-func (c *CompositeWindowCatalog) Get(ctx context.Context, input *service.WindowDefinitionGetInput) (*service.WindowDefinitionGetOutput, error) {
+func (c *CompositeWindowCatalog) Get(ctx context.Context, input *service.WindowDefinitionGetInput) (result *service.WindowDefinitionGetOutput, resultErr error) {
+	span := observe.Start(ctx, "window.catalog.get", observe.Labels{})
+	defer func() { span.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	if input == nil {
 		return nil, identity.ErrResource
 	}
@@ -140,6 +145,21 @@ func (c *CompositeWindowCatalog) Get(ctx context.Context, input *service.WindowD
 		return c.Remote.Get(ctx, input)
 	}
 	if uri, e := identity.ParseResourceURI(input.WindowID); e == nil && uri.Kind == "window" {
+		if input.Namespace != "" && input.Namespace != uri.Namespace {
+			return nil, identity.ErrResource
+		}
+		if input.ProviderIdentity != "" {
+			// Preserve the explicit provider locator supplied by discovery. A URI
+			// is resource identity, not a reason to enumerate unrelated catalogs.
+			// The selected provider still performs the ordinary Get below.
+			if input.ResolvedResource != nil && input.ResolvedResource.ProviderIdentity != input.ProviderIdentity {
+				return nil, identity.ErrResourceDenied
+			}
+			if input.ProviderIdentity == c.LocalProviderIdentity && c.Local != nil {
+				return c.Local.Get(ctx, input)
+			}
+			return c.Remote.GetForProvider(ctx, input.ProviderIdentity, input)
+		}
 		if pin := input.ResolvedResource; pin != nil && pin.ProviderIdentity != "" {
 			if !c.AuthzReady() || pin.URI != uri.String() {
 				return nil, identity.ErrResourceDenied
