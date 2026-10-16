@@ -1,3 +1,4 @@
+import {formFieldValue} from '../runtime/formFieldValue.js';
 import {resolveSelector} from '../utils/selector.js';
 import {evaluateDashboardCondition, getDashboardVisibleWhen} from './dashboard/dashboardUtils.js';
 
@@ -167,7 +168,7 @@ export const trackVisibleWhen = (visibleWhen, context) => {
             break;
         case 'form':
         default:
-            context?.signals?.form?.value;
+            formFieldValue(context, visibleWhen.field || visibleWhen.selector || visibleWhen.key);
             break;
     }
 };

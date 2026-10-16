@@ -36,6 +36,17 @@ func (s *WorkspaceResourceSource) LoadBundleWithOptions(ctx context.Context, uri
 	return s.loadBundleWithBase(ctx, uri, options, nil)
 }
 
+// LoadTargetWithOptions materializes only the requested native target. Target
+// equivalence indexing is unnecessary when there is exactly one profile. The
+// canonical default binding aliases that same variant without another load.
+func (s *WorkspaceResourceSource) LoadTargetWithOptions(ctx context.Context, uri identity.ResourceURI, target types.WindowTarget, options LoaderOptions) (json.RawMessage, error) {
+	normalized, err := target.Normalize()
+	if err != nil || normalized.SelectionToken != "" || len(normalized.Capabilities) > 0 || len(normalized.DependencyPins) > 0 || normalized.ExecutionProof != nil {
+		return nil, fmt.Errorf("invalid declared target profile")
+	}
+	return s.loadBundleProfilesWithBase(ctx, uri, options, nil, []types.WindowTarget{normalized})
+}
+
 // LoadComposedWindowBundleWithOptionsAt composes a trusted linked window with
 // the same authored workspace assignment closure as native windows. The loader
 // is startup-owned; request actors and authorization never enter compilation.
@@ -55,6 +66,10 @@ func LoadComposedWindowBundleWithOptionsAt(ctx context.Context, root string, bin
 }
 
 func (s *WorkspaceResourceSource) loadBundleWithBase(ctx context.Context, uri identity.ResourceURI, options LoaderOptions, base func(context.Context, *types.WindowTarget) (*types.Window, error)) (result json.RawMessage, failure error) {
+	return s.loadBundleProfilesWithBase(ctx, uri, options, base, nil)
+}
+
+func (s *WorkspaceResourceSource) loadBundleProfilesWithBase(ctx context.Context, uri identity.ResourceURI, options LoaderOptions, base func(context.Context, *types.WindowTarget) (*types.Window, error), profiles []types.WindowTarget) (result json.RawMessage, failure error) {
 	defer func() {
 		if err := options.check(); err != nil {
 			result = nil
@@ -64,7 +79,9 @@ func (s *WorkspaceResourceSource) loadBundleWithBase(ctx context.Context, uri id
 	if s == nil || ctx == nil || ctx.Err() != nil || !uri.Valid() || s.windows[uri.String()] == "" {
 		return nil, identity.ErrResourceDenied
 	}
-	profiles := append(standardWindowTargets(), s.targets[uri.String()]...)
+	if profiles == nil {
+		profiles = append(standardWindowTargets(), s.targets[uri.String()]...)
+	}
 	if len(profiles) > 128 {
 		return nil, fmt.Errorf("too many window targets")
 	}
@@ -72,7 +89,9 @@ func (s *WorkspaceResourceSource) loadBundleWithBase(ctx context.Context, uri id
 	// actual Forge asset directories, then retain the existing loader's exact
 	// ordered precedence. No content is cached across candidate reads.
 	dirs := map[string]bool{}
-	if options.AssetDirectories != nil {
+	if len(profiles) == 1 {
+		// A single profile never compares branches with another target.
+	} else if options.AssetDirectories != nil {
 		var err error
 		dirs, err = options.AssetDirectories(ctx)
 		if err != nil {
@@ -242,6 +261,11 @@ func (s *WorkspaceResourceSource) loadBundleWithBase(ctx context.Context, uri id
 			materialized[signature] = variantID
 		}
 		envelope.Targets = append(envelope.Targets, types.WindowTargetBinding{Target: profile, Variant: variantID})
+	}
+	// Canonical bundles require an explicit default. A selected profile supplies
+	// that alias using its already materialized variant, never another load.
+	if len(profiles) == 1 && profiles[0].ProfileKey() != (types.WindowTarget{}).ProfileKey() {
+		envelope.Targets = append(envelope.Targets, types.WindowTargetBinding{Target: types.WindowTarget{}, Variant: envelope.Targets[0].Variant})
 	}
 	if err := envelope.Validate(); err != nil {
 		return nil, err

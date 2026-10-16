@@ -331,19 +331,20 @@ type View struct {
 }
 
 type Layout struct {
-	Kind          string   `json:"kind,omitempty" yaml:"kind,omitempty"`
-	Appearance    string   `json:"appearance,omitempty" yaml:"appearance,omitempty"`
-	Orientation   string   `json:"orientation" yaml:"orientation"`
-	Rows          int      `json:"rows" yaml:"rows"`
-	Columns       int      `json:"columns,omitempty" yaml:"columns,omitempty"`
-	ItemStretch   *bool    `json:"itemStretch,omitempty" yaml:"itemStretch,omitempty"`
-	Gap           string   `json:"gap,omitempty" yaml:"gap,omitempty"`
-	RowGap        string   `json:"rowGap,omitempty" yaml:"rowGap,omitempty"`
-	ColumnGap     string   `json:"columnGap,omitempty" yaml:"columnGap,omitempty"`
-	CollapseAt    string   `json:"collapseAt,omitempty" yaml:"collapseAt,omitempty"`
-	LabelPosition string   `json:"labelPosition,omitempty" yaml:"labelPosition,omitempty"`
-	Labels        *Labels  `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Divider       *Divider `json:"divider,omitempty" yaml:"divider,omitempty"`
+	MinColumnWidth string   `json:"minColumnWidth,omitempty" yaml:"minColumnWidth,omitempty"`
+	Kind           string   `json:"kind,omitempty" yaml:"kind,omitempty"`
+	Appearance     string   `json:"appearance,omitempty" yaml:"appearance,omitempty"`
+	Orientation    string   `json:"orientation" yaml:"orientation"`
+	Rows           int      `json:"rows" yaml:"rows"`
+	Columns        int      `json:"columns,omitempty" yaml:"columns,omitempty"`
+	ItemStretch    *bool    `json:"itemStretch,omitempty" yaml:"itemStretch,omitempty"`
+	Gap            string   `json:"gap,omitempty" yaml:"gap,omitempty"`
+	RowGap         string   `json:"rowGap,omitempty" yaml:"rowGap,omitempty"`
+	ColumnGap      string   `json:"columnGap,omitempty" yaml:"columnGap,omitempty"`
+	CollapseAt     string   `json:"collapseAt,omitempty" yaml:"collapseAt,omitempty"`
+	LabelPosition  string   `json:"labelPosition,omitempty" yaml:"labelPosition,omitempty"`
+	Labels         *Labels  `json:"labels,omitempty" yaml:"labels,omitempty"`
+	Divider        *Divider `json:"divider,omitempty" yaml:"divider,omitempty"`
 }
 
 type Divider struct {

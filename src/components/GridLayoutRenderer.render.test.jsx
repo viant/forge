@@ -248,3 +248,12 @@ assert.doesNotMatch(invalidSectionTag, /data-forge-section-(?:appearance|content
 assert.doesNotMatch(defaultSectionTag, /data-forge-section-(?:appearance|content-inset)=/);
 
 console.log('grid and Section hierarchy render contracts passed');
+
+const responsiveCards = renderToStaticMarkup(<GridLayoutRenderer context={{}} container={{layout: {kind: 'grid', minColumnWidth: '280px', labels: {mode: 'none'}, gap: '8px'}}} entries={[{id: 'one'}, {id: 'two'}]} renderEntry={({entry, css}) => <section style={css.ctrl}>{entry.id}</section>}/>);
+assert.match(responsiveCards, /repeat\(auto-fit, minmax\(min\(100%, 280px\), 1fr\)\)/);
+assert.doesNotMatch(responsiveCards, /grid-column:|grid-row:/);
+const staticSection = renderToStaticMarkup(<AccessibleSection title="General" collapsible={false}>Fields</AccessibleSection>);
+assert.match(staticSection, /data-forge-part="section-header"/);
+assert.match(staticSection, /data-forge-part="section-title"/);
+assert.match(staticSection, /data-forge-part="section-content"/);
+assert.doesNotMatch(staticSection, /aria-expanded|collapse section/);
