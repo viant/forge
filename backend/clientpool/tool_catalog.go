@@ -97,17 +97,7 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 			if cached, found := readSnapshot.pages.Load(key); found {
 				snapshotTiming.End(observe.OK, observe.CacheHit)
 				m.mu.Unlock()
-				type plain mcpschema.ListToolsResult
-				var result plain
-				wire := struct {
-					*plain
-					CacheScope string `json:"cacheScope"`
-				}{plain: &result}
-				if err := json.Unmarshal(cached.([]byte), &wire); err != nil {
-					return nil, err
-				}
-				result.CacheScope = mcpschema.ListToolsResultCacheScope(wire.CacheScope)
-				return (*mcpschema.ListToolsResult)(&result), nil
+				return decodeToolCatalogPage(cached.([]byte))
 			}
 			snapshotTiming.End(observe.OK, observe.CacheMiss)
 		}
@@ -120,6 +110,33 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 				m.mu.Unlock()
 				select {
 				case <-ready:
+					// This caller already joined the source operation. A zero-TTL
+					// result is not retained in m.toolCatalog, but its completed
+					// bytes may satisfy these existing waiters under the same
+					// credential, configuration and notification generation.
+					_, currentRaw, currentScope, _, _, currentCacheable, scopeErr := c.toolCatalogScope(ctx, options...)
+					if scopeErr != nil {
+						return nil, scopeErr
+					}
+					if !bytes.Equal(currentRaw, raw) {
+						return nil, fmt.Errorf("MCP tool catalog configuration changed during source read")
+					}
+					if !currentCacheable || currentScope != scope {
+						return c.listTools(ctx, client, cursor, options...)
+					}
+					m.mu.Lock()
+					payload := cached.bytes
+					current := generation == m.toolCatalogGeneration[c.serverName] && (cached.expires.IsZero() || cached.expires.After(time.Now()))
+					m.mu.Unlock()
+					if payload != nil && current {
+						if err := ctx.Err(); err != nil {
+							return nil, err
+						}
+						if readSnapshot != nil {
+							readSnapshot.pages.Store(key, payload)
+						}
+						return decodeToolCatalogPage(payload)
+					}
 					continue
 				case <-ctx.Done():
 					return nil, ctx.Err()
@@ -128,17 +145,7 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 			if cached.expires.After(time.Now()) {
 				bytes := cached.bytes
 				m.mu.Unlock()
-				type plain mcpschema.ListToolsResult
-				var result plain
-				wire := struct {
-					*plain
-					CacheScope string `json:"cacheScope"`
-				}{plain: &result}
-				if err := json.Unmarshal(bytes, &wire); err != nil {
-					return nil, err
-				}
-				result.CacheScope = mcpschema.ListToolsResultCacheScope(wire.CacheScope)
-				return (*mcpschema.ListToolsResult)(&result), nil
+				return decodeToolCatalogPage(bytes)
 			}
 			delete(m.toolCatalog, key)
 		}
@@ -179,9 +186,14 @@ func (c *managedClient) listTools(ctx context.Context, client mcpclient.Interfac
 			}
 			m.protectedToolCatalog[c.serverName] = sha256.Sum256(raw)
 		}
+		publishable := m.toolCatalog[key] == pending && validCredential && cacheErr == nil && err == nil && result != nil && ctx.Err() == nil && generation == m.toolCatalogGeneration[c.serverName] && !(scope == "public" && result.CacheScope == mcpschema.ListToolsResultCacheScopePrivate)
+		if publishable {
+			// The pending object is held only by callers already waiting on it.
+			// Its bytes do not create a retained entry when the producer's TTL is zero.
+			pending.bytes = bytes
+		}
 		if m.toolCatalog[key] == pending {
-			if validCredential && cacheErr == nil && err == nil && result != nil && ctx.Err() == nil && generation == m.toolCatalogGeneration[c.serverName] && !(scope == "public" && result.CacheScope == mcpschema.ListToolsResultCacheScopePrivate) && !(result.CacheScope != "" && result.TtlMs == 0) {
-				pending.bytes = bytes
+			if publishable && !(result.CacheScope != "" && result.TtlMs == 0) {
 				pending.names = make([]string, len(result.Tools))
 				for i, tool := range result.Tools {
 					pending.names[i] = tool.Name
@@ -409,4 +421,18 @@ func (c *managedClient) fetchToolCatalog(ctx context.Context, client mcpclient.I
 	result, err := client.ListTools(ctx, cursor, options...)
 	span.End(observe.OutcomeFor(err), cache)
 	return result, err
+}
+
+func decodeToolCatalogPage(payload []byte) (*mcpschema.ListToolsResult, error) {
+	type plain mcpschema.ListToolsResult
+	var result plain
+	wire := struct {
+		*plain
+		CacheScope string `json:"cacheScope"`
+	}{plain: &result}
+	if err := json.Unmarshal(payload, &wire); err != nil {
+		return nil, err
+	}
+	result.CacheScope = mcpschema.ListToolsResultCacheScope(wire.CacheScope)
+	return (*mcpschema.ListToolsResult)(&result), nil
 }
