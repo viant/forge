@@ -6,6 +6,7 @@ export default defineConfig({
     include: [
       'src/runtime/optionsFetch.render.test.jsx',
       'src/components/table/Basic.timeZoneBinding.render.test.jsx',
+      'src/components/table/FilterDialog.visibility.test.jsx',
       'src/packs/blueprint/dateRangePresetDraft.render.test.jsx',
       'src/components/optionsFetchOwnership.test.jsx',
       'src/components/WindowContent.fetchQueue.test.jsx',

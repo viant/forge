@@ -703,6 +703,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
 
             {/* Filter Dialog */}
             <FilterDialog
+                context={context}
                 isOpen={isFilterOpen}
                 onClose={handleCloseFilter}
                 filterSets={filterSets}
