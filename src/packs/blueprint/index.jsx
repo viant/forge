@@ -609,12 +609,18 @@ export function registerPack() {
         function BPSelect({
             value,
             onChange,
+            onOptionsRequest,
+            optionsFetchStatus,
+            onFocus,
+            onClick,
+            onKeyDown,
             readOnly,
             disabled,
             options = [],
             context,
             fill,
             filterable,
+            alignText,
             itemListPredicate,
             itemPredicate,
             itemRenderer,
@@ -656,6 +662,13 @@ export function registerPack() {
                 ...(forgePart !== undefined ? {'data-forge-part': forgePart} : {}),
             };
             const defaultPopoverProps = {minimal: true, matchTargetWidth: true, placement: 'bottom-start'};
+            const requestOptions = reason => {
+                if (!unavailable) onOptionsRequest?.(reason);
+            };
+            const opening = (...args) => {
+                requestOptions('open');
+                popoverProps?.onOpening?.(...args);
+            };
             const resolvedPopoverProps = isFieldTrack ? {
                 ...defaultPopoverProps,
                 ...popoverProps,
@@ -668,6 +681,7 @@ export function registerPack() {
                     popoverProps?.portalClassName,
                 ),
             } : (popoverProps === undefined ? defaultPopoverProps : popoverProps);
+            const lazyPopoverProps = onOptionsRequest ? {...resolvedPopoverProps, onOpening: opening} : resolvedPopoverProps;
             const resolvedPopoverTargetProps = isFieldTrack ? {
                 ...popoverTargetProps,
                 className: mergeClassNames(
@@ -682,16 +696,17 @@ export function registerPack() {
                     menuProps?.className,
                 ),
             } : menuProps;
-            const resolvedInputProps = isFieldTrack ? {
+            const resolvedInputProps = resolvedFilterable ? {
+                type: 'search',
+                role: 'searchbox',
                 ...inputProps,
                 className: mergeClassNames(
-                    'forge-field-track-select-search',
+                    isFieldTrack && 'forge-field-track-select-search',
                     inputProps?.className,
                 ),
                 'aria-label': inputProps?.['aria-label'] || `Search ${ariaLabel || rest.item?.label || 'options'}`,
             } : inputProps;
-            const resolvedItemPredicate = isFieldTrack
-                && resolvedFilterable
+            const resolvedItemPredicate = resolvedFilterable
                 && itemPredicate === undefined
                 && itemListPredicate === undefined
                 ? defaultSelectItemPredicate
@@ -722,11 +737,11 @@ export function registerPack() {
                     onClick={isSelectOptionDisabled(item) ? undefined : handleClick}
                 />
             );
-            const resolvedNoResults = isFieldTrack && resolvedFilterable && noResults === undefined ? (
+            const resolvedNoResults = resolvedFilterable && noResults === undefined ? (
                 <MenuItem
-                    className="forge-field-track-select-option forge-field-track-select-empty"
+                    className={isFieldTrack ? "forge-field-track-select-option forge-field-track-select-empty" : undefined}
                     disabled
-                    roleStructure="listoption"
+                    roleStructure={isFieldTrack ? "listoption" : undefined}
                     text="No matching options"
                 />
             ) : noResults;
@@ -739,12 +754,14 @@ export function registerPack() {
                     filterable={resolvedFilterable}
                     itemListPredicate={itemListPredicate}
                     itemPredicate={resolvedItemPredicate}
-                    noResults={resolvedNoResults}
+                    noResults={optionsFetchStatus === 'loading' || optionsFetchStatus === 'error'
+                        ? <MenuItem disabled text={optionsFetchStatus === 'loading' ? 'Loading options…' : 'Options could not be loaded. Open again to retry.'}/>
+                        : resolvedNoResults}
                     disabled={unavailable}
                     inputProps={resolvedInputProps}
                     menuProps={resolvedMenuProps}
                     popoverContentProps={popoverContentProps}
-                    popoverProps={resolvedPopoverProps}
+                    popoverProps={lazyPopoverProps}
                     popoverTargetProps={resolvedPopoverTargetProps}
                     placeholder={placeholder}
                     onItemSelect={(item) => commitSelectOption(item, onChange)}
@@ -756,14 +773,20 @@ export function registerPack() {
                         aria-describedby={fieldTrackControl ? ariaDescribedBy : undefined}
                         aria-required={fieldTrackControl ? ariaRequired : undefined}
                         aria-invalid={fieldTrackControl ? ariaInvalid : undefined}
-                        data-forge-widget={fieldTrackControl ? forgeWidget : undefined}
-                        data-forge-control-id={fieldTrackControl ? forgeControlId : undefined}
-                        data-forge-part={fieldTrackControl ? forgePart : undefined}
+                        data-forge-widget={forgeWidget}
+                        data-forge-control-id={forgeControlId}
+                        data-forge-part={forgePart}
                         data-forge-field-track-control={fieldTrackControl}
                         fill={resolvedFill}
-                        alignText={isFieldTrack ? 'start' : undefined}
+                        alignText={alignText ?? (isFieldTrack ? 'start' : undefined)}
                         ellipsizeText={isFieldTrack || undefined}
-                        text={selected?.label || placeholder || 'Select…'}
+                        text={selected?.label || (onOptionsRequest && value !== '' && value != null ? String(value) : placeholder || 'Select…')}
+                        onFocus={event => { requestOptions('focus'); onFocus?.(event); }}
+                        onClick={event => { requestOptions('open'); onClick?.(event); }}
+                        onKeyDown={event => {
+                            if (['Enter', ' ', 'ArrowDown'].includes(event.key)) requestOptions('open');
+                            onKeyDown?.(event);
+                        }}
                         rightIcon="caret-down"
                         disabled={unavailable}
                     />

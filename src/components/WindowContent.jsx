@@ -38,6 +38,8 @@ import DataSourceContainer from './WindowContentDataSourceContainer.jsx';
 
 import useDataConnector from '../hooks/dataconnector.js';
 import { mergeWindowFormValues } from '../hooks/dataSource.js';
+import {usesLazyOptions} from '../runtime/optionsFetch.js';
+import {resolveSectionOpenState, resolveSectionProperties} from './containerChrome.js';
 import {applyParameterCodec} from '../hooks/parameters.js';
 import {injectActions} from '../actions';
 import { resolveMetadataForTarget } from '../runtime/metadataResolver.js';
@@ -51,6 +53,7 @@ import { runWindowLifecycleHandlers } from './windowLifecycle.js';
 import { buildReportBuilderHostServices } from './dashboard/reportBuilderHostServices.js';
 import { windowMetadataEndpoint } from './windowMetadataEndpoint.js';
 import {useViewPartition} from './useViewPartition.js';
+import {applyTablePagingMetadata} from '../runtime/tablePagingMetadata.js';
 
 export function reuseShallowEqualRuntimeObject(previous = null, candidate = null) {
     if (!previous || !candidate || typeof previous !== 'object' || typeof candidate !== 'object') {
@@ -106,7 +109,7 @@ export function compileWindowAuthorizationMetadata(metadata, parameters = {}, se
     const resourceType = spec?.resource?.type || spec?.resourceType || snapshot?.resource?.type || '';
     const resolved = resolveAuthorizationResourceID(spec?.schemaVersion || snapshot?.schemaVersion, selected ?? retained, snapshot);
     const hints = snapshot ? normalizeAuthorizationSnapshot(snapshot, resourceType, resolved.valid ? resolved.id : null) : {};
-    return {...compileDeliveryHintView(metadata, hints),
+    return {...applyTablePagingMetadata(compileDeliveryHintView(metadata, hints)),
         authorizationSnapshot: snapshot ? hints : undefined,
         ...(canonicalSelectionBinding({selectionBinding}) ? {selectionBinding} : {}),
     };
@@ -287,7 +290,7 @@ export function resolveWindowRootContainer(content = null, parameters = {}) {
     return next;
 }
 
-function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}) {
+function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchUsage = null) {
     if (!node || typeof node !== 'object') return;
 
     const isWindowFormPredicate = (condition) => {
@@ -304,9 +307,15 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}) {
 
     if (!visibleInWindowForm(node)) return;
 
-    const addRef = (ref) => {
+    const addRef = (ref, deferred = false) => {
         const value = String(ref || '').trim();
-        if (value) refs.add(value);
+        if (!value) return;
+        refs.add(value);
+        if (fetchUsage) {
+            const usage = fetchUsage.get(value) || {deferred: false, eager: false};
+            usage[deferred ? 'deferred' : 'eager'] = true;
+            fetchUsage.set(value, usage);
+        }
     };
 
     const resolveMappedRef = (entry) => {
@@ -319,24 +328,31 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}) {
         return key != null ? String(mapping[key] || '').trim() : '';
     };
 
-    addRef(node.dataSourceRef);
+    addRef(node.dataSourceRef, node.fetchData === false);
     addRef(node.definitionDataSourceRef);
     addRef(node.runtime?.definitionDataSourceRef);
     addRef(node.dashboard?.reportBuilder?.definitionDataSourceRef);
-    addRef(resolveMappedRef(node));
+    addRef(resolveMappedRef(node), node.fetchData === false);
+
+    // Match the rendered lifecycle of persistent collapsed sections. Their
+    // header can retain its own datasource, but unmounted content must not
+    // initialize reporting/child datasources until the user expands it.
+    if (node.section?.persistState === true && node.section?.collapsible === true
+        && resolveSectionProperties(node.section).collapseProps?.keepChildrenMounted === false
+        && !resolveSectionOpenState({...node.section, stateKey: node.section.stateKey || node.id}, viewState)) return;
 
     if (node.chart) {
-        addRef(node.chart.dataSourceRef);
-        addRef(resolveMappedRef(node.chart));
+        addRef(node.chart.dataSourceRef, node.fetchData === false || node.chart.fetchData === false);
+        addRef(resolveMappedRef(node.chart), node.fetchData === false || node.chart.fetchData === false);
     }
 
     if (Array.isArray(node.items)) {
         for (const item of node.items) {
             if (!visibleInWindowForm(item)) continue;
-            addRef(item?.dataSourceRef);
-            addRef(item?.optionsDataSourceRef);
+            addRef(item?.dataSourceRef, item?.fetchData === false);
+            addRef(item?.optionsDataSourceRef, usesLazyOptions(item));
             addRef(item?.fallbackOptionsDataSourceRef);
-            addRef(resolveMappedRef(item));
+            addRef(resolveMappedRef(item), item?.fetchData === false);
         }
     }
 
@@ -355,7 +371,7 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}) {
             children = selected ? [selected] : [];
         }
         for (const child of children) {
-            collectRequiredDataSourceRefs(child, scope, refs, viewState);
+            collectRequiredDataSourceRefs(child, scope, refs, viewState, fetchUsage);
         }
     }
 }
@@ -409,16 +425,41 @@ export function resolveRequiredDataSourceRefs(metadata, defaultDataSourceRef = '
     return expandRequiredDataSourceRefs(metadata, refs);
 }
 
+// Mount deferred contexts normally, but let active eager consumers retain
+// their existing fetch behavior. No datasource declaration is rewritten.
+export function resolveDeferredDataSourceRefs(metadata, defaultRef = '', scope = {}, viewState = {}) {
+    const usage = new Map();
+    const refs = new Set();
+    collectRequiredDataSourceRefs(metadata?.view?.content, scope, refs, viewState, usage);
+    for (const ref of [defaultRef, metadata?.window?.titleBinding?.dataSourceRef || metadata?.window?.titleBinding?.ref]) {
+        if (ref) usage.set(ref, {deferred: false, ...(usage.get(ref) || {}), eager: true});
+    }
+    const queue = [...usage.keys()];
+    for (let index = 0; index < queue.length; index++) {
+        const ref = queue[index];
+        const parent = String(metadata?.dataSource?.[ref]?.dataSourceRef || '').trim();
+        if (!parent || parent === '_' && !Object.hasOwn(metadata?.dataSource || {}, parent)) continue;
+        const previous = usage.get(parent) || {deferred: false, eager: false};
+        const source = usage.get(ref);
+        const next = {deferred: previous.deferred || source.deferred, eager: previous.eager || source.eager};
+        if (next.deferred !== previous.deferred || next.eager !== previous.eager) {usage.set(parent, next); queue.push(parent);}
+    }
+    return new Set([...usage].filter(([,value]) => value.deferred && !value.eager).map(([ref]) => ref));
+}
+
+// Compatibility for callers of the original lazy-options ownership helper.
+export const resolveLazyOptionsDataSourceRefs = resolveDeferredDataSourceRefs;
+
 export function resolveFetcherOwnedDataSourceRefs(metadata) {
     const refs = new Set();
     collectFetcherOwnedDataSourceRefs(metadata?.view?.content || null, refs);
     return Array.from(refs);
 }
 
-export function shouldPrimeDataSourceFetch(dataSource = {}, prevInput = {}, collection = [], paramsChanged = false, control = {}) {
+export function shouldPrimeDataSourceFetch(dataSource = {}, prevInput = {}, collection = [], paramsChanged = false, control = {}, {deferAutomatic = false} = {}) {
     if (control?.loading === true) return false;
     if (prevInput.fetch) return true;
-    const autoFetchEnabled = dataSource?.autoFetch !== false;
+    const autoFetchEnabled = dataSource?.autoFetch !== false && !deferAutomatic;
     if (!autoFetchEnabled) return false;
     // A terminal dataset-scope 403 stays visible until explicit fetch intent.
     // Window/resource denial handling remains in its existing authorization path.
@@ -647,7 +688,9 @@ function WindowContentInner({window, metadata, services}) {
     const liveWindowForm = windowFormSignal?.value || {};
     const windowTabsSignal = useViewPartition(windowViewSignal, 'tabs');
     const liveWindowTabs = windowTabsSignal.value;
-    const liveWindowView = useMemo(() => ({tabs: liveWindowTabs || {}}), [liveWindowTabs]);
+    const windowSectionsSignal = useViewPartition(windowViewSignal, 'sections');
+    const liveWindowSections = windowSectionsSignal.value;
+    const liveWindowView = useMemo(() => ({tabs: liveWindowTabs || {}, sections: liveWindowSections || {}}), [liveWindowTabs, liveWindowSections]);
     const windowFormSnapshot = useMemo(() => ({
         ...initialWindowFormSeed,
         ...liveWindowForm,
@@ -879,6 +922,10 @@ function WindowContentInner({window, metadata, services}) {
         } catch (_) {}
         return resolvedRefs;
     }, [metadata, defaultDataSourceRef, windowFormSnapshot, liveWindowView]);
+    const deferredDataSourceRefs = useMemo(
+        () => resolveDeferredDataSourceRefs(metadata, defaultDataSourceRef, windowFormSnapshot, liveWindowView),
+        [metadata, defaultDataSourceRef, windowFormSnapshot, liveWindowView],
+    );
     const fetcherOwnedDataSourceRefs = useMemo(
         () => new Set(resolveFetcherOwnedDataSourceRefs(metadata)),
         [metadata],
@@ -915,7 +962,7 @@ function WindowContentInner({window, metadata, services}) {
             const paramsChanged = JSON.stringify(prevParams) !== JSON.stringify(nextParams);
             const collection = collectionSignal?.peek?.() || [];
             const control = controlSignal?.peek?.() || {};
-            const shouldFetch = shouldPrimeDataSourceFetch(dataSourceDef, prevInput, collection, paramsChanged, control);
+            const shouldFetch = shouldPrimeDataSourceFetch(dataSourceDef, prevInput, collection, paramsChanged, control, {deferAutomatic: deferredDataSourceRefs.has(ref)});
             const fetchOwnedByContainer = fetcherOwnedDataSourceRefs.has(ref);
             if (!ownsParameters && !shouldFetch) {
                 continue;
@@ -956,7 +1003,7 @@ function WindowContentInner({window, metadata, services}) {
                 }),
             };
         }
-    }, [windowFormSignal, windowFormSnapshot, metadata, defaultDataSourceRef, initialWindowFormSeed, context, parameters, windowId, log, fetcherOwnedDataSourceRefs, requiredDataSourceRefs]);
+    }, [windowFormSignal, windowFormSnapshot, metadata, defaultDataSourceRef, initialWindowFormSeed, context, parameters, windowId, log, fetcherOwnedDataSourceRefs, requiredDataSourceRefs, deferredDataSourceRefs]);
 
     const renderDataSources = () => {
         if (!context) return null;
@@ -967,6 +1014,7 @@ function WindowContentInner({window, metadata, services}) {
                         key={key}
                         windowContext={context}
                         dsKey={key}
+                        suppressAutomaticFetch={deferredDataSourceRefs.has(key)}
                         initialParams={parameters[key] || {}}
                     />
                 ))}

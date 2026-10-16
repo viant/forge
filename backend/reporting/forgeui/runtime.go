@@ -114,7 +114,8 @@ func AttachReportRuntime(window *types.Window, report *reportspec.ReportSpec, re
 	}
 	sort.Strings(refs)
 	for _, ref := range refs {
-		root.Containers = append(root.Containers, types.Container{ID: unique("portable-report-source-" + ref), Binding: types.Binding{DataSourceRef: ref}, FetchData: true})
+		fetchData := true
+		root.Containers = append(root.Containers, types.Container{ID: unique("portable-report-source-" + ref), Binding: types.Binding{DataSourceRef: ref}, FetchData: &fetchData})
 	}
 	root.Containers = append(root.Containers, types.Container{ID: unique("portable-report-runtime"), Kind: "dashboard.reportRuntime", Title: report.Title, Dashboard: &types.Dashboard{ReportRuntime: map[string]any{"title": report.Title, "reportSpec": spec, "datasetBindings": bindings}}})
 	return nil

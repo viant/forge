@@ -137,3 +137,40 @@ root-array fallback; `selectors.data: rows` would try to project a missing field
 Verify both the public fetch result and the rendered report for the same request.
 A static fixture is test data, not proof that a production backend filters or
 aggregates correctly.
+
+#### Option-source startup ownership
+
+`Item.optionsFetchMode: onFocus` is an optional single-select rendering hint.
+WindowContent mounts its `optionsDataSourceRef` normally but suppresses automatic
+startup fetch only when every active consumer of that source is lazy. A shared
+eager consumer, title/default data binding, or normal fallback reference retains
+the source's existing behavior. The authored datasource `autoFetch` and other
+metadata remain immutable. This ownership decision follows active-only window
+tabs and propagates through inherited datasource parents. Explicit request intent
+is not suppressed. See the widgets guide for focus/open deduplication, selected
+value display and deliberate error retry.
+
+An explicit `fetchData: false` on a container/item datasource binding is also a
+**deferred consumer**, not an instruction to remove its context. It initializes
+parameters and manual handlers but does not cause startup/parameter-change
+priming. A dynamically mapped datasource reference follows the same rule. Any
+active eager consumer, the selected default datasource or title binding still
+wins, independent of traversal order; inherited parents receive the combined
+ownership. No datasource `autoFetch` declaration is rewritten.
+
+For tabbed windows, this is separate from lookup focus: an inactive tab never
+contributes eager ownership when `renderActiveTabPanelOnly` is true. Activating a
+visible `fetchData: true` tab starts its read even if a common hidden
+`fetchData: false` binding already mounted the same datasource. Existing
+`dataSourceFetchMode: once` and `keepVisitedTabPanelsMounted` behavior is retained
+when revisiting the tab. Calling a deferred context's native `fetchCollection`,
+refresh or explicit fetch intent remains supported. This controls automatic
+consumer scheduling only; the producer continues to authorize each invocation.
+
+Native Go metadata preserves this three-state policy as `Container.FetchData
+*bool`: nil is omitted, a pointer to false is explicitly deferred, and a pointer
+to true enables container activation fetch. YAML/JSON roundtrips retain literal
+false, including nested containers and target overrides. Go constructors that
+intend a policy must pass a bool pointer. Published components compiled by an
+older bool/omitempty model must be recompiled and republished; deploying only the
+new renderer cannot restore an already omitted field.

@@ -196,7 +196,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         ? applyClientFilters(collection, activeFilterSet, currentFilter)
         : collection;
     const pagingEnabled = dataSource?.paging?.enabled || false;
-    const pagingSize = dataSource?.paging?.size || 0;
+    const pagingSize = Number(context?.signals?.input?.value?.pageSize || dataSource?.paging?.size || 0);
     const clientPagination = pagingEnabled
         && String(dataSource?.paginationMode || '').toLowerCase() === 'client'
         && pagingSize > 0;
@@ -628,7 +628,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                         context={toolbarContext}
                         toolbarItems={primaryToolbarItems}
                         leftContent={toolbarActions}
-                        centerContent={<PaginationBar context={toolbarContext} pagingEnabled={!!pagingEnabled && pagingSize > 0}/>}
+                        centerContent={<PaginationBar context={toolbarContext} pagingEnabled={!!pagingEnabled && pagingSize > 0} pageSize={pagingSize} pageSizeOptions={pagination?.pageSizeOptions}/>}
                         className="has-table-navigation"
                         exportRows={sortedCollection}
                         exportPageRows={renderedCollection}

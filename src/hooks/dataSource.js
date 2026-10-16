@@ -749,6 +749,21 @@ export function useDataSourceHandlers(identity, signals, dataSources, connector,
         return input.value?.page || 1;
     };
 
+    const getPageSize = () => Number(input.value?.pageSize || dataSource?.paging?.size || 0);
+
+    const setPageSize = (value) => {
+        const pageSize = Number(value);
+        if (!dataSource?.paging?.enabled || !Number.isSafeInteger(pageSize) || pageSize <= 0) return false;
+        if (pageSize === getPageSize()) return false;
+        input.value = {
+            ...input.peek(),
+            page: 1,
+            pageSize,
+            fetch: String(dataSource?.paginationMode || '').toLowerCase() !== 'client',
+        };
+        return true;
+    };
+
     const setSort = ({columnId, direction = 'asc', fetch = true, parameter = '', value = null} = {}) => {
         const field = String(columnId || '').trim();
         const destination = String(parameter || '').trim();
@@ -1025,7 +1040,7 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
         const datasetEpoch = protectedDataSourceEpoch(identity?.dataSourceId);
         const current = () => protectedWindowEpoch(identity?.windowId) === windowEpoch && protectedDataSourceEpoch(identity?.dataSourceId) === datasetEpoch;
         try {
-            const result = await connector.get({filter,page,inputParameters:parameters,...(signal ? {signal} : {})});
+            const result = await connector.get({filter,page,pageSize:getPageSize() || undefined,inputParameters:parameters,...(signal ? {signal} : {})});
             if(!current()) throw Object.assign(new Error('Datasource request superseded.'),{code:'request_superseded'});
             return result;
         } catch(error) {
@@ -1088,6 +1103,8 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
         noSelection,
         setPage,
         getPage,
+        getPageSize,
+        setPageSize,
         setSort,
         getSort,
         setFilter,

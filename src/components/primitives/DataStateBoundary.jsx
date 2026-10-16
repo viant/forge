@@ -1,3 +1,4 @@
+import {isDataSourceLocalDenial} from '../dataSourceAuthorization.js';
 import {formatDataSourceError} from '../../utils/dataSourceError.js';
 import {containerSizingStyle} from '../containerSizing.js';
 import React from 'react';
@@ -35,6 +36,9 @@ export default function DataStateBoundary({sizingMode = 'fill', container, conte
     const target = ref ? (context.Context?.(ref) || context) : context;
     return target?.handlers?.dataSource?.fetchCollection?.({cache: {bypassCache: errorAction?.bypassCache !== false}});
   };
+  // Dataset denial belongs to the datasource notification, not the window shell.
+  // Keep fields, tabs, filters and unrelated content mounted.
+  if (state.kind === 'error' && state.errors.every(error => isDataSourceLocalDenial(error))) return <>{children}</>;
   if (state.kind === 'loading' && !tableOwnsLoading) return <div className="forge-data-state" data-forge-primitive="dataStateBoundary"><Spinner size={24}/><span>{spec.loadingMessage || 'Loading…'}</span></div>;
   if (state.kind === 'error' && spec.suppressErrorWhen && evaluatePlainVisibleWhen(spec.suppressErrorWhen, context)) return null;
   if (state.kind === 'error') {

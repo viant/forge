@@ -4,6 +4,8 @@ import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import {executeCommand, getMutationCommandState, resetMutationCommandState, subscribeMutationCommand} from './primitiveMutation.js';
 import {usePredicateSignals} from './usePredicateSignals.js';
 import DisabledActionShell from '../DisabledActionShell.jsx';
+import {getLogger} from '../../utils/logger.js';
+const mutationLog = getLogger('mutation');
 
 export function useMutationCommandState(context, command) {
   const [state, setState] = React.useState(() => {
@@ -33,12 +35,13 @@ export default function MutationCommand({command, context, extras = {}, disabled
   const busy = state.guarded === true || ['validating', 'confirming', 'pending'].includes(state.phase);
   const statusMessage = state.message || ({validating: 'Validating…', confirming: 'Awaiting confirmation…', pending: 'Saving…', indeterminate: 'Outcome unknown; refresh authoritative data before retrying.'}[state.phase]) || (state.guarded ? 'Working…' : '');
   const invoke = () => {
+    mutationLog.debug('activate', {commandId: command?.commandId, dataSourceRef: command?.dataSourceRef, blocked, busy, phase: state.phase, guarded: getMutationCommandState(context, command).guarded});
     if (blocked || busy) return;
     void executeCommand(context, command, extras, {onSettled, confirm: (message) => new Promise((resolve) => {
       confirmResolver.current = resolve;
       setConfirmMessage(message);
       setConfirmOpen(true);
-    })});
+    })}).then(result => mutationLog.debug('settled', {commandId: command?.commandId, status: result.status, accepted: result.accepted, errorCode: result.error?.code}));
   };
   const settleConfirmation = (accepted) => {
     setConfirmOpen(false);

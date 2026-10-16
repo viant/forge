@@ -1,7 +1,7 @@
 // src/components/table/basic/PaginationBar.jsx
 
 import React, {useState} from "react";
-import {Button} from "@blueprintjs/core";
+import {Button, HTMLSelect} from "@blueprintjs/core";
 import {useSignalEffect} from "@preact/signals-react";
 import {canNavigateNext, paginationStatusLabel, resolvePaginationState} from "./PaginationState.js";
 
@@ -16,6 +16,8 @@ const PaginationBar = ({
                            context,
                            showBoundaryButtons = true,
                            pagingEnabled = true,
+                           pageSize = 0,
+                           pageSizeOptions = [],
                            children,
                        }) => {
     const [currentPage, setCurrentPage] = useState(1);
@@ -56,19 +58,15 @@ const PaginationBar = ({
     };
 
     const onNextPage = () => {
-        setCurrentPage((prevPage) => {
-            const newPage = prevPage + 1;
-            handlers.dataSource.setPage(newPage);
-            return newPage;
-        });
+        const newPage = currentPage + 1;
+        handlers.dataSource.setPage(newPage);
+        setCurrentPage(newPage);
     };
 
     const onPreviousPage = () => {
-        setCurrentPage((prevPage) => {
-            const newPage = prevPage - 1;
-            handlers.dataSource.setPage(newPage);
-            return newPage;
-        });
+        const newPage = currentPage - 1;
+        handlers.dataSource.setPage(newPage);
+        setCurrentPage(newPage);
     };
 
     const onLastPage = () => {
@@ -99,6 +97,10 @@ const PaginationBar = ({
     const canGoNext = pagingEnabled && !busy && canNavigateNext({inactive, initialLoading, currentPage, totalPages, recordCount, hasMore, hasMoreExplicit});
     const canGoLast = pagingEnabled && !busy && !inactive && (!hasMoreExplicit || hasMore === true) && totalPages != null && currentPage < totalPages;
     const statusLabel = paginationStatusLabel({initialLoading, currentPage, totalPages});
+    const sizeOptions = Array.from(new Set((Array.isArray(pageSizeOptions) ? pageSizeOptions : [])
+        .map(Number).filter(size => Number.isSafeInteger(size) && size > 0)));
+    if (sizeOptions.length > 1 && Number.isSafeInteger(pageSize) && pageSize > 0 && !sizeOptions.includes(pageSize)) sizeOptions.unshift(pageSize);
+
 
     return (
         <div className="pagination-bar" aria-busy={initialLoading || undefined}>
@@ -109,6 +111,14 @@ const PaginationBar = ({
 
                     <span className="forge-pagination-announcement" role="status" aria-live="polite">{pagingEnabled ? statusLabel : 'All loaded rows'}</span>
                     {children}
+                    {pagingEnabled && sizeOptions.length > 1 ? (
+                        <label style={{display: 'inline-flex', alignItems: 'center', gap: 6, marginInline: 8}}>
+                            Rows per page
+                            <HTMLSelect aria-label="Rows per page" value={pageSize} disabled={busy || inactive}
+                                onChange={event => handlers.dataSource.setPageSize?.(Number(event.target.value))}
+                                options={sizeOptions.map(size => ({value: size, label: String(size)}))}/>
+                        </label>
+                    ) : null}
 
 
 

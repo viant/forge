@@ -164,3 +164,53 @@ lookup anatomy, responsive CSS, accessibility state, and legacy fallback.
 ---
 
 *Last updated: 2026-10-05*
+
+### Deferred datasource options for single-select controls
+
+A datasource-backed `select` can opt in to fetching its choices on first keyboard
+focus or dropdown open:
+
+```yaml
+- id: category
+  type: select
+  label: Category
+  scope: form
+  dataField: category
+  optionsDataSourceRef: categories
+  optionsFetchMode: onFocus
+  optionValueField: caption
+  optionLabelField: caption
+```
+
+Without `optionsFetchMode`, startup behavior is unchanged. `onFocus` defers only
+an options datasource used solely by lazy controls in the active window view.
+The context/handlers and parameter bindings still initialize normally. An active
+eager options, business, default/title or fallback consumer of the same source
+wins; neither ordering of controls nor mutation of the shared source definition
+changes that decision. Explicit `fetchCollection`/refresh intent is preserved.
+Active-only tabs do not mount/fetch inactive options; switching to an eager tab
+retains its usual startup read. Inherited datasource parents receive the same
+ownership rule.
+
+Focus and pointer/keyboard open share a per-datasource request lock, including
+before loading becomes visible. Typing, refocus, an already loading source, or a
+completed empty/nonempty result do not cause another request. After an error,
+refocus does not silently retry: explicitly reopen the dropdown to retry. The
+existing native datasource retains its error state and producer authorization.
+Read-only/disabled controls do not request options. A change in bound lookup
+parameters defers fresh choices until the next focus/open instead of showing
+choices for the previous parameter scope.
+
+The selected option label is retained when loaded; before options arrive the
+select shows its existing bound value rather than a blank placeholder. Supply a
+human-readable bound value when that is the required display; this mode does not
+guess a label or secondary identifier for an opaque ID. Do not opt a field in if
+its current label requires an unavailable full dictionary. Static `options`,
+non-select widgets and existing fallback-source behavior remain unchanged;
+fallback references are eager consumers. Lookup dialogs already fetch on opening
+and do not need this mode. This is an interaction/performance choice, not an
+access-control or business-authority contract.
+
+The lazy datasource-option lifecycle regressions run with `npm run test:lazy-options`
+and are included in `npm test`. They exercise real Blueprint selects and mounted
+window ownership under JSDOM; browser integration remains a separate host check.

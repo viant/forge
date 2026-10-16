@@ -554,7 +554,7 @@ type Container struct {
 	Dialogs            []string                          `json:"dialogs,omitempty" yaml:"dialogs,omitempty"`
 	Repeat             *Repeat                           `json:"repeat,omitempty" yaml:"repeat,omitempty"`
 	SelectFirst        bool                              `json:"selectFirst,omitempty"  yaml:"selectFirst,omitempty"`
-	FetchData          bool                              `json:"fetchData,omitempty"  yaml:"fetchData,omitempty"`
+	FetchData          *bool                             `json:"fetchData,omitempty"  yaml:"fetchData,omitempty"`
 	Dashboard          *Dashboard                        `json:"dashboard,omitempty" yaml:"dashboard,omitempty"`
 	MutationCommand    *MutationCommand                  `json:"mutationCommand,omitempty" yaml:"mutationCommand,omitempty"`
 	EditableCollection *EditableCollection               `json:"editableCollection,omitempty" yaml:"editableCollection,omitempty"`
@@ -622,8 +622,20 @@ type DashboardEditableTableAddRow struct {
 func (c *Container) UnmarshalJSON(data []byte) error {
 	type alias Container
 	var decoded alias
-	if err := decodeWindowResourceJSON(data, &decoded); err != nil {
+	input := struct {
+		*alias
+		Report *DashboardReportOptions `json:"report,omitempty"`
+	}{alias: &decoded}
+	if err := decodeWindowResourceJSON(data, &input); err != nil {
 		return err
+	}
+	// Ordinary form containers have no compact dashboard aliases to apply.
+	// Avoid decoding their entire subtree a second time. The report alias is
+	// historically accepted for every kind and is decoded alongside the fields.
+	if !isDashboardContainerKind(decoded.Kind) {
+		*c = Container(decoded)
+		c.applyDashboardCompactAliases(dashboardCompactAliases{Report: input.Report})
+		return nil
 	}
 	var compact dashboardCompactAliases
 	if err := decodeWindowResourceJSON(data, &compact); err != nil {
@@ -1365,6 +1377,11 @@ type TableLink struct {
 	Kind                string                 `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Href                string                 `json:"href,omitempty" yaml:"href,omitempty"`
 	HrefTemplate        string                 `json:"hrefTemplate,omitempty" yaml:"hrefTemplate,omitempty"`
+	KindSelector        string                 `json:"kindSelector,omitempty" yaml:"kindSelector,omitempty"`
+	KindSource          string                 `json:"kindSource,omitempty" yaml:"kindSource,omitempty"`
+	BaseURL             string                 `json:"baseUrl,omitempty" yaml:"baseUrl,omitempty"`
+	BaseURLSelector     string                 `json:"baseUrlSelector,omitempty" yaml:"baseUrlSelector,omitempty"`
+	BaseURLSource       string                 `json:"baseUrlSource,omitempty" yaml:"baseUrlSource,omitempty"`
 	Label               string                 `json:"label,omitempty" yaml:"label,omitempty"`
 	Text                string                 `json:"text,omitempty" yaml:"text,omitempty"`
 	Title               string                 `json:"title,omitempty" yaml:"title,omitempty"`
@@ -1519,9 +1536,11 @@ type Item struct {
 	Style                        *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
 	Label                        string                            `json:"label" yaml:"label"`
 	LabelPosition                string                            `json:"labelPosition,omitempty" yaml:"labelPosition,omitempty"`
+	Wrapper                      string                            `json:"wrapper,omitempty" yaml:"wrapper,omitempty"`
 	Align                        string                            `json:"align,omitempty" yaml:"align,omitempty"`
 	Placement                    string                            `json:"placement,omitempty" yaml:"placement,omitempty"`
 	Options                      []Option                          `json:"options,omitempty" yaml:"options,omitempty"`
+	OptionsFetchMode             string                            `json:"optionsFetchMode,omitempty" yaml:"optionsFetchMode,omitempty"`
 	OptionsDataSourceRef         string                            `json:"optionsDataSourceRef,omitempty" yaml:"optionsDataSourceRef,omitempty"`
 	OptionsDataSelector          string                            `json:"optionsDataSelector,omitempty" yaml:"optionsDataSelector,omitempty"`
 	FallbackOptionsDataSourceRef string                            `json:"fallbackOptionsDataSourceRef,omitempty" yaml:"fallbackOptionsDataSourceRef,omitempty"`

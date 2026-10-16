@@ -14,7 +14,7 @@ function inferTableCellFormat(column = {}) {
     return undefined;
 }
 
-export function resolveTableLink({row, column, value} = {}) {
+export function resolveTableLink({row, column, value, context = null} = {}) {
     const isMissingLinkValue = value === undefined
         || value === null
         || (typeof value === 'string' && value.trim() === '')
@@ -27,6 +27,7 @@ export function resolveTableLink({row, column, value} = {}) {
         row,
         value: column?.type === 'link' ? value : value,
         linkConfig: column?.link,
+        context,
     });
     if (resolved && Array.isArray(value) && column?.format === 'relationCount') {
         const singular = column?.singularLabel || 'item';

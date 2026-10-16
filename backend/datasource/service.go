@@ -337,6 +337,11 @@ func (s *Service) Fetch(ctx context.Context, id string, inputs map[string]interf
 	if ds.Backend == nil {
 		return nil, fmt.Errorf("datasource %q has no backend", id)
 	}
+	if len(ds.Backend.MethodVariants) > 0 {
+		if _, err := ds.Backend.DeclaredMCPMethods(); err != nil {
+			return nil, err
+		}
+	}
 	if s.authorize != nil {
 		if err := s.authorize(ctx, ds.ID, inputs); err != nil {
 			return nil, err
@@ -354,6 +359,19 @@ func (s *Service) Fetch(ctx context.Context, id string, inputs map[string]interf
 	scopeID := s.scopeID(ctx, policy.Scope)
 	normalizedInputs := normalizeFilterSemantics(inputs, &ds.DataSource)
 	mergedArgs := expandNestedArgs(mergeArgs(normalizedInputs, ds.Backend.Pinned))
+	executionDS := ds
+	if len(ds.Backend.MethodVariants) > 0 {
+		method, resolveErr := ds.Backend.ResolveMCPMethod(mergedArgs)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		selected := *ds
+		selectedBackend := *ds.Backend
+		selectedBackend.Method = method
+		selected.Backend = &selectedBackend
+		executionDS = &selected
+	}
+
 	// A definition delivery is not a grant to reuse rows across managing-MCP
 	// authorization changes. Canonical managed datasources use the existing
 	// fresh-backend path; the server remains free to cache its business data.
@@ -383,6 +401,17 @@ func (s *Service) Fetch(ctx context.Context, id string, inputs map[string]interf
 				return nil, err
 			}
 		}
+	}
+	if len(ds.Backend.MethodVariants) > 0 {
+		declaration, encodeErr := json.Marshal(struct {
+			Backend *dsproto.Backend
+			Method  string
+		}{ds.Backend, executionDS.Backend.Method})
+		if encodeErr != nil {
+			return nil, encodeErr
+		}
+		digest := sha256.Sum256(declaration)
+		cacheKey += "|method-variants-v1:" + hex.EncodeToString(digest[:])
 	}
 	if ds.Paging != nil && ds.Paging.Enabled && strings.EqualFold(strings.TrimSpace(ds.Paging.Mode), "cursor") {
 		raw, _ := json.Marshal(ds)
@@ -424,7 +453,7 @@ func (s *Service) Fetch(ctx context.Context, id string, inputs map[string]interf
 	// The managing MCP owns dataset authorization after dispatch. An upstream
 	// denial must not trigger a second artifact read or a host permission check.
 	backend := observe.Start(ctx, observe.Phase("datasource.service.backend"), observe.Labels{Kind: "datasource"})
-	raw, err := s.runBackend(ctx, ds, mergedArgs)
+	raw, err := s.runBackend(ctx, executionDS, mergedArgs)
 	backend.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		if errors.Is(err, identity.ErrResourceDenied) || errors.Is(err, identity.ErrResourceStale) {
@@ -512,6 +541,7 @@ func (s *Service) InvalidateDefinitionCache(ctx context.Context, ds *dsproto.Dat
 	}
 	s.cache.drop(prefix + inputsHash)
 	s.cache.dropPrefix(prefix + inputsHash + "|response-aliases-v1:")
+	s.cache.dropPrefix(prefix + inputsHash + "|method-variants-v1:")
 	return nil
 }
 

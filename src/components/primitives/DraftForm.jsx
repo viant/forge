@@ -14,13 +14,21 @@ export default function DraftForm({container, context, children}) {
   const formStatus = dataContext?.signals?.formStatus?.value || {};
   const snapshot = draftSnapshot(form);
   const [baseline, setBaseline] = React.useState(snapshot);
+  const baselineOwner = dataContext?.signals?.form || dataContext;
+  const acceptedBaseline = React.useRef({owner: baselineOwner, version: formStatus.version});
   const [confirmReset, setConfirmReset] = React.useState(false);
   const command = {...spec.submit, commandId: spec.submit?.commandId || `${container.id || 'draft'}:submit`, label: spec.saveLabel || spec.submit?.label || 'Save'};
   const commandState = useMutationCommandState(dataContext, command);
   const busy = commandState.guarded === true;
   React.useEffect(() => {
-    if (formStatus.dirty === false) setBaseline(snapshot);
-  }, [formStatus.dirty, formStatus.version, dataContext, snapshot]);
+    if (formStatus.dirty !== false) return;
+    const previous = acceptedBaseline.current;
+    // A field value can publish before its dirty flag. Only an accepted clean
+    // datasource version (load/reset/save) may replace the reset baseline.
+    if (typeof formStatus.version === 'number' && previous.owner === baselineOwner && previous.version === formStatus.version) return;
+    acceptedBaseline.current = {owner: baselineOwner, version: formStatus.version};
+    setBaseline(snapshot);
+  }, [formStatus.dirty, formStatus.version, baselineOwner, snapshot]);
   const dirty = spec.dirtyWhen ? evaluatePlainVisibleWhen(spec.dirtyWhen, dataContext) : typeof formStatus.dirty === 'boolean' ? formStatus.dirty : snapshot !== baseline;
   const validationMessage = validateDraft(spec, dataContext, form);
   const valid = !validationMessage && (!spec.validWhen || evaluatePlainVisibleWhen(spec.validWhen, dataContext));

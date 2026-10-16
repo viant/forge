@@ -190,7 +190,7 @@ const TableCell = ({
                 cellContent = displayedText;
                 break;
             }
-            const link = resolveTableLink({row, column: col, value})
+            const link = resolveTableLink({row, column: col, value, context})
                 || resolveLinkTarget({ linkConfig: col?.link, row, value, context });
             if (!link) {
                 cellContent = displayedText;

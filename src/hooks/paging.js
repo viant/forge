@@ -1,3 +1,12 @@
+// A runtime table preference changes request paging without mutating the
+// admitted datasource descriptor or leaking an extra producer argument.
+export function withPagingSize(paging, pageSize) {
+    if (!paging || paging.enabled === false || pageSize == null) return paging;
+    const size = Number(pageSize);
+    if (!Number.isSafeInteger(size) || size <= 0) throw new Error('Page size must be a positive integer');
+    return paging?.size === size ? paging : {...paging, size};
+}
+
 function pagingConfig(paging) {
     if (!paging || paging.enabled === false) {
         return null;

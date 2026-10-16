@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -311,5 +312,37 @@ chart:
 	}
 	if len(c.ViewModes) != 2 || c.ViewModes[0] != "chart" || c.ViewModes[1] != "table" {
 		t.Fatalf("expected chart/table view modes to survive, got %#v", c.ViewModes)
+	}
+}
+
+// Wrapper mode already controls frontend label/track composition. It must
+// survive the typed window compiler used by published runtime components.
+func TestItemWrapperSurvivesYAMLAndJSON(t *testing.T) {
+	for _, mode := range []string{"control-only", "none"} {
+		var item Item
+		if err := yaml.Unmarshal([]byte("id: limit\nlabel: Impressions\ntype: number\nwrapper: "+mode+"\n"), &item); err != nil {
+			t.Fatal(err)
+		}
+		if item.Wrapper != mode {
+			t.Fatalf("lost source wrapper: %#v", item)
+		}
+		data, err := json.Marshal(item)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var result map[string]any
+		if err = json.Unmarshal(data, &result); err != nil {
+			t.Fatal(err)
+		}
+		if result["wrapper"] != mode {
+			t.Fatalf("lost published wrapper: %s", data)
+		}
+		var decoded Item
+		if err = json.Unmarshal(data, &decoded); err != nil {
+			t.Fatal(err)
+		}
+		if decoded.Wrapper != mode {
+			t.Fatalf("lost runtime wrapper: %#v", decoded)
+		}
 	}
 }

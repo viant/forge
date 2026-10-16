@@ -1,0 +1,34 @@
+import assert from 'node:assert/strict';
+import './index.jsx';
+import {getWidget} from '../../runtime/widgetRegistry.jsx';
+
+const Select = getWidget('select');
+const options = [{value: 'b', label: 'Business', secondary: 3}, {value: 's', label: 'Science', secondary: 19}];
+const normal = Select({options, filterable: true, 'aria-label': 'Category'}).props;
+assert.equal(normal.filterable, true);
+assert.equal(normal.inputProps.type, 'search');
+assert.equal(normal.inputProps.role, 'searchbox');
+assert.equal(normal.inputProps['aria-label'], 'Search Category');
+assert.equal(normal.itemPredicate('BUSI', options[0]), true);
+assert.equal(normal.itemPredicate('Science', options[0]), false);
+assert.equal(normal.itemPredicate('3', options[0]), true);
+assert.equal(normal.itemPredicate('No such category', options[0]), false);
+assert.equal(normal.noResults.props.text, 'No matching options');
+assert.notEqual(normal.noResults.props.roleStructure, 'listoption');
+const custom = () => true;
+const overridden = Select({options, filterable:true, itemPredicate:custom, inputProps:{type:'text','aria-label':'Find category'}}).props;
+assert.equal(overridden.itemPredicate, custom);
+assert.equal(overridden.inputProps['aria-label'], 'Find category');
+assert.equal(overridden.inputProps.type, 'text');
+const disabledSearch = Select({options, filterable:false}).props;
+assert.equal(disabledSearch.filterable, false);
+assert.equal(disabledSearch.itemPredicate, undefined);
+const fieldTrack = Select({options, filterable:true, 'data-forge-field-track-control':true}).props;
+assert.equal(fieldTrack.noResults.props.roleStructure, 'listoption');
+console.log('select filtering, accessible search, empty result, and authored overrides passed');
+
+const target = Select({options, alignText:'start', 'data-forge-widget':'select', 'data-forge-control-id':'category', 'data-forge-part':'input'}).props.children.props;
+assert.equal(target.alignText,'start');
+assert.equal(target['data-forge-widget'],'select');
+assert.equal(target['data-forge-control-id'],'category');
+assert.equal(target['data-forge-part'],'input');
