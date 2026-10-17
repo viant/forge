@@ -3,7 +3,7 @@ import React, {useEffect, useState} from "react";
 import {getLogger} from "../utils/logger.js";
 import {useSignals} from '@preact/signals-react/runtime';
 import { extractData, isDeferredCacheHitEnvelope } from "./dataSourceExtract.js";
-import { beginDataSourceFetch, consumeDataSourceFetchRequest, reconcileRestoredPendingFetch, recoverInterruptedFetchOnMount, resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, withFetchedPageInfo, snapshotFetchedPageResult } from "./dataSourceFetchState.js";
+import { beginDataSourceFetch, consumeDataSourceFetchRequest, reconcileRestoredPendingFetch, recoverInterruptedFetchOnMount, resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, suppressRepeatedFailedFetch, withFetchedPageInfo, snapshotFetchedPageResult } from "./dataSourceFetchState.js";
 import {pageSelectionPolicy, reconcileMultiSelection, reconcileSingleSelection} from "./dataSourceSelection.js";
 import {applyFetchTransform} from "./dataSourceTransform.js";
 import {hasResolvedDependencies} from "./dataSourceDependencies.js";
@@ -501,6 +501,13 @@ export default function DataSource({context}) {
         // we optimistically clear.
         // ------------------------------------------------------------------
         const requestSig = JSON.stringify({filter, parameters, page, pageSize: requestPaging?.size, sort});
+        const previousFailure = control.peek() || {};
+        if (suppressRepeatedFailedFetch(previousFailure, requestSig, cache)) {
+            flagReadDone();
+            setLoading(false);
+            settleDataSourceRequest(requestDataSourceId, requestId, previousFailure.error);
+            return;
+        }
         // const queryChanged = requestSig !== prevQuerySig.current;
         // if (queryChanged) {
         //     setSelected({selected: null, rowIndex: -1});
@@ -610,7 +617,7 @@ export default function DataSource({context}) {
                 hasMoreSelector: paging?.dataInfoSelectors?.hasMore,
             });
             metrics.value = stats;
-            control.value = { ...control.peek(), loaded: true, error: null, stale: false };
+            control.value = { ...control.peek(), loaded: true, error: null, stale: false, failedRequestSignature: null };
             if (selectionMode === 'multi') {
                 const policy = dataSource.selectionRetention === 'pages'
                     ? pageSelectionPolicy(prevQuerySig.current, requestSig)
@@ -700,6 +707,7 @@ export default function DataSource({context}) {
             }
             log.warn('doFetchRecords error', err)
             setError(err);
+            control.value = {...control.peek(), failedRequestSignature: requestSig};
 
             notifyFetchError(err, 'doFetchRecords');
         } finally {
