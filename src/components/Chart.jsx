@@ -77,6 +77,7 @@ import { SoftBlock } from "./SoftSkeleton.jsx";
 import { resolveSelector } from "../utils/selector.js";
 import { getLogger } from "../utils/logger.js";
 import { normalizeServiceErrorText } from "../utils/errorText.js";
+import { isDatasetScopedDenial } from "./dataSourceAuthorization.js";
 import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "../reporting/reportChartAnnotations.js";
 import { buildChartCategoryTickLabel, buildMeasuredChartCategoryTickLabel, normalizeChartCategoryLabelConfig } from "./chartCategoryLabel.js";
 import {
@@ -344,6 +345,7 @@ function tooltipFormatterForFormat(formatType) {
 }
 
 function formatChartErrorMessage(error) {
+    if (!error || isDatasetScopedDenial(error)) return "";
     return normalizeServiceErrorText(error, { serviceLabel: "chart data service" }) || "Chart data failed to load.";
 }
 
@@ -568,6 +570,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const resolvedTickFormat = resolveMappedConfigValue(context, xAxis, "tickFormat", "windowForm");
     const resolvedTickValueMode = resolveMappedConfigValue(context, xAxis, "valueMode", "windowForm");
     const { collection, loading, error } = useDataSourceState(chartContext);
+    const chartErrorMessage = formatChartErrorMessage(error);
     const chartMetrics = chartContext?.signals?.metrics?.value || {};
     const collectionOverride = Array.isArray(container?.collection) ? container.collection : null;
     const effectiveCollection = collectionOverride || collection;
@@ -1501,8 +1504,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     </div>
                 </>
             ) : null}
-            {error && (
-                <div style={{color: 'var(--forge-status-danger-foreground, #a82a2a)', padding: 4}}>{formatChartErrorMessage(error)}</div>
+            {chartErrorMessage && (
+                <div style={{color: 'var(--forge-status-danger-foreground, #a82a2a)', padding: 4}}>{chartErrorMessage}</div>
             )}
 
             {viewMode === "chart" ? (
