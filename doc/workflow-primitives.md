@@ -228,6 +228,10 @@ an exhausted page bound, and publishes the collection only after a short or
 empty final page proves completion. A later-page failure never exposes a
 partial replacement baseline. Keep visible lists on ordinary server paging;
 this opt-in is for commands that require the complete relation set.
+Only enable it after proving the producer's Page/Limit continuation and total
+against representative multi-page data. A producer that falsely reports a
+short or empty page can make any client aggregator believe a partial baseline
+is complete; the consumer must not use that producer for replacement writes.
 
 ### Workflow primitive reference
 
