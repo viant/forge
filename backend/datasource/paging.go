@@ -51,6 +51,13 @@ func applyPaging(rows []map[string]interface{}, dataInfo map[string]interface{},
 		dataInfo = map[string]interface{}{}
 	}
 	if ds.Paging.OpenEnded {
+		if strings.EqualFold(pageName, "offset") {
+			offset := intArg(args, pageName, 0)
+			if offset < 0 {
+				offset = 0
+			}
+			page = offset/pageSize + 1
+		}
 		delete(dataInfo, "pageCount")
 		delete(dataInfo, "totalPages")
 		delete(dataInfo, "totalCount")
