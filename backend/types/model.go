@@ -1378,6 +1378,7 @@ type TableLink struct {
 	Kind                string                 `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Href                string                 `json:"href,omitempty" yaml:"href,omitempty"`
 	HrefTemplate        string                 `json:"hrefTemplate,omitempty" yaml:"hrefTemplate,omitempty"`
+	HrefTemplateSource  string                 `json:"hrefTemplateSource,omitempty" yaml:"hrefTemplateSource,omitempty"`
 	KindSelector        string                 `json:"kindSelector,omitempty" yaml:"kindSelector,omitempty"`
 	KindSource          string                 `json:"kindSource,omitempty" yaml:"kindSource,omitempty"`
 	BaseURL             string                 `json:"baseUrl,omitempty" yaml:"baseUrl,omitempty"`
