@@ -365,3 +365,34 @@ assert.deepEqual(canonicalParameters,originalMutationArgs);
 assert.equal((await executeCommand(openedContext,{commandId:'opened-local-validation',dataSourceRef:'canonical',validateWhen:{all:[businessValidation,{source:'windowForm',field:'ready',equals:true}]}})).status,'invalid');
 assert.equal(canonicalWrites,beforeOpenedWrites+1);
 console.log('opening-only command retains local validation and delegates data authorization to MCP ✓');
+
+// A retry can publish stale status from its previous invocation before the new
+// loading pulse. That previous error must not settle the new command.
+const priorRetryError = new Error('previous validation failure');
+const retryControl = mutableSignal({loading: false, loaded: false, error: priorRetryError});
+let retryRefreshes = 0;
+const retryTarget = {signals: {control: retryControl}, handlers: {dataSource: {
+  setInputParameters() {},
+  fetchCollection() {
+    retryControl.value = {...retryControl.peek(), stale: true};
+    retryControl.value = {loading: true, error: null};
+    return Promise.resolve().then(() => { retryControl.value = {loading: false, loaded: true, error: null}; });
+  },
+}}};
+const retryContext = {Context: ref => ref === 'retry-writer' ? retryTarget : {handlers: {dataSource: {fetchCollection() { retryRefreshes++; return Promise.resolve(); }}}}};
+const retryOutcome = await executeCommand(retryContext, {commandId: 'retry-corrected', dataSourceRef: 'retry-writer', refresh: [{dataSourceRef: 'retry-reader'}]});
+assert.equal(retryOutcome.status, 'succeeded', 'previous error cannot defeat acknowledged retry success');
+assert.equal(retryRefreshes, 1, 'a successful corrected retry must refresh its reader');
+
+const freshRetryError = new Error('new validation failure');
+retryTarget.handlers.dataSource.fetchCollection = () => {
+  retryControl.value = {loading: false, error: freshRetryError};
+  return Promise.resolve();
+};
+const freshFailure = await executeCommand(retryContext, {commandId: 'retry-fresh-failure', dataSourceRef: 'retry-writer'});
+assert.equal(freshFailure.status, 'failed');
+assert.equal(freshFailure.error, freshRetryError, 'new failures without a loading pulse must still propagate');
+retryTarget.handlers.dataSource.fetchCollection = () => Promise.resolve();
+const sameFailure = await executeCommand(retryContext, {commandId: 'retry-terminal-error', dataSourceRef: 'retry-writer'});
+assert.equal(sameFailure.status, 'failed', 'resolved transport cannot hide a remaining terminal error');
+console.log('retry command ignores previous stale error, propagates current failures, and refreshes acknowledged success ✓');

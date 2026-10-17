@@ -89,11 +89,15 @@ function awaitWriter(target, invoke, timeoutMs) {
       resolve(outcome);
     };
     const control = target?.signals?.control;
+    const previousError = (control?.peek?.() || control?.value || {}).error;
     const observed = typeof control?.subscribe === 'function';
     if (observed) dispose = control.subscribe((value = {}) => {
       if (!invocationStarted) return;
       if (value.loading) { loadingSeen = true; return; }
-      if (value.error) { settle({status: 'failed', error: value.error}); return; }
+      // Parameter/stale publications can carry the prior invocation's error
+      // before this retry starts loading. Fresh failures and terminal promise
+      // outcomes still settle normally.
+      if (value.error && (loadingSeen || value.error !== previousError)) { settle({status: 'failed', error: value.error}); return; }
       if (loadingSeen) settle(value.error ? {status: 'failed', error: value.error} : {status: 'succeeded'});
     });
     if (settled) return;
