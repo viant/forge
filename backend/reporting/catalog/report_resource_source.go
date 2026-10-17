@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/viant/forge/backend/reporting/registry"
 	identity "github.com/viant/forge/backend/resource"
+	"github.com/viant/forge/backend/types"
 	"sort"
 	"strings"
 )
@@ -144,22 +145,32 @@ func (s *ReportResourceSource) load(ctx context.Context, uri identity.ResourceUR
 	}
 	dependencies := []registry.ReportDependency{{Kind: "report", ID: asset.ResourceURI, ContentFingerprint: identity.ContentFingerprint(authoredRaw)}, {Kind: "builder", ID: builder.ID, ContentFingerprint: identity.ContentFingerprint(builderRaw)}}
 	envelope := registry.ReportEnvelope{SchemaVersion: 1, Format: registry.AuthoredReportFormat, ReportDocument: documentRaw, BuilderRef: builder.ID, BuilderDefinition: builderRaw, State: stateRaw, Dependencies: dependencies}
+	if metadata, exists := asset.Raw["metadata"]; exists {
+		envelope.Metadata, err = json.Marshal(metadata)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if s.options.DataSources != nil {
 		sources, err := s.options.DataSources(ctx, builder)
 		if err != nil {
 			return nil, err
 		}
-		envelope.DataSources = sources
+		envelope.DataSources = make(map[string]json.RawMessage, len(sources))
 		ids := make([]string, 0, len(sources))
 		for id := range sources {
 			ids = append(ids, id)
 		}
 		sort.Strings(ids)
 		for _, id := range ids {
-			if !json.Valid(sources[id]) {
-				return nil, fmt.Errorf("report datasource descriptor invalid")
+			// Native MCP maps and YAML imports reorder object keys. Emit canonical
+			// descriptor bytes before hashing so portable reports retain exact pins.
+			descriptor, err := types.CanonicalWindowDescriptor(sources[id])
+			if err != nil {
+				return nil, fmt.Errorf("report datasource descriptor invalid: %w", err)
 			}
-			envelope.Dependencies = append(envelope.Dependencies, registry.ReportDependency{Kind: "datasource", ID: id, ContentFingerprint: identity.ContentFingerprint(sources[id])})
+			envelope.DataSources[id] = descriptor
+			envelope.Dependencies = append(envelope.Dependencies, registry.ReportDependency{Kind: "datasource", ID: id, ContentFingerprint: identity.ContentFingerprint(descriptor)})
 		}
 	}
 	return json.Marshal(envelope)
