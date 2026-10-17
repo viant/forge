@@ -257,3 +257,12 @@ assert.equal(native.kind,'window');assert.deepEqual(native.parameters.CreativeId
 assert.equal(resolveLinkTarget({linkConfig:configurable,row:{id:42},context:configContext({DspBaseUrl:'not a URL'})}),null);
 assert.equal(resolveLinkTarget({linkConfig:configurable,row:{id:42},context:configContext({DspBaseUrl:'javascript:bad'})}),null);
 console.log('configurable link destination/base URL with external default passed');
+
+// Standalone fields have no table row. Template sources use the same scoped
+// values as parameter bindings rather than requiring an application JS builder.
+const metricsLink={kind:'external',hrefTemplate:'campaigns/campaign-change-log/{{id}}',hrefTemplateSource:'metrics',baseUrl:'https://example.test',text:'View Change Log'};
+const metricsContext={signals:{metrics:{peek:()=>({id:42})},windowForm:{peek:()=>({selectedId:84})}}};
+assert.equal(resolveLinkTarget({linkConfig:metricsLink,context:metricsContext}).href,'https://example.test/campaigns/campaign-change-log/42');
+assert.equal(resolveLinkTarget({linkConfig:{...metricsLink,hrefTemplateSource:'windowForm',hrefTemplate:'campaigns/{{selectedId}}'},context:metricsContext}).href,'https://example.test/campaigns/84');
+assert.equal(resolveLinkTarget({linkConfig:{...metricsLink,hrefTemplateSource:'value'},value:{id:21}}).href,'https://example.test/campaigns/campaign-change-log/21');
+assert.equal(resolveLinkTarget({linkConfig:{...metricsLink,hrefTemplateSource:undefined},row:{id:7},context:metricsContext}).href,'https://example.test/campaigns/campaign-change-log/7');
