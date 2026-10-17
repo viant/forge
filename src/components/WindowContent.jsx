@@ -943,6 +943,10 @@ function WindowContentInner({window, metadata, services}) {
         const resolvedRefs = requiredDataSourceRefs;
         const dataSourceDefs = metadata?.dataSource || {};
         for (const ref of resolvedRefs) {
+            // Optional authored definitions can be absent. Their render regions
+            // are omitted by MissingDataSourceBoundary; root parameter priming
+            // must not resolve that missing context before the boundary mounts.
+            if (!dataSourceDefs[ref]) continue;
             const dsID = `${windowId}DS${ref}`;
             const inputSignal = getInputSignal(dsID);
             const controlSignal = getControlSignal(dsID);

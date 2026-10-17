@@ -145,6 +145,17 @@ const resolveContainerItemValue = (item, context) => {
     return item?.dataField ? resolveSelector(holder, item.dataField) : undefined;
 };
 
+function ResolvedChildContainer({context, dataSourceRef, container, ...props}) {
+    return <Container context={resolveChildContext(context, dataSourceRef)} container={container} {...props} />;
+}
+
+function ScopedChildContainer(props) {
+    if (props.dataSourceRef && !props.context?.metadata?.dataSource?.[props.dataSourceRef]) return null;
+    return <MissingDataSourceBoundary metadata={props.context?.metadata} reference={props.dataSourceRef}>
+        <ResolvedChildContainer {...props} />
+    </MissingDataSourceBoundary>;
+}
+
 const ContainerContent = ({context, container, isActive, suppressTitle = false, dataSourceFetchMode = 'always', sizingMode: allocatedMode = 'fill'}) => {
     useSignals();
     const sizingMode = resolveContainerSizing(container, allocatedMode);
@@ -567,9 +578,10 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
                                 flexDirection: 'column',
                             }}
                         >
-                            <Container
+                            <ScopedChildContainer
                                 key={'Sc' + subContainer.id}
-                                context={resolveChildContext(effectiveContext, subContainer.dataSourceRef || dataSourceRef)}
+                                context={effectiveContext}
+                                dataSourceRef={subContainer.dataSourceRef || dataSourceRef}
                                 container={subContainer}
                                 isActive={isActive}
                                 dataSourceFetchMode={dataSourceFetchMode}
@@ -604,10 +616,11 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
                     };
                     return (
                         <div key={'dSc' + subContainer.id} style={childStyle}>
-                            <Container
+                            <ScopedChildContainer
                                 sizingMode={sizingMode === 'fill' && (isHorizontal || isLast) ? 'fill' : 'content'}
                                 key={'Sc' + subContainer.id}
-                                context={resolveChildContext(effectiveContext, subContainer.dataSourceRef || dataSourceRef)}
+                                context={effectiveContext}
+                                dataSourceRef={subContainer.dataSourceRef || dataSourceRef}
                                 container={subContainer}
                                 isActive={isActive}
                                 dataSourceFetchMode={dataSourceFetchMode}
@@ -846,6 +859,7 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
 const Container = props => {
     useSignals();
     const reference = resolveDynamicDataSourceRef(props.container, props.context, props.container?.dataSourceRef || props.context?.identity?.dataSourceRef);
+    if (reference && !props.context?.metadata?.dataSource?.[reference]) return null;
     return <MissingDataSourceBoundary metadata={props.context?.metadata} reference={reference}><ContainerContent {...props}/></MissingDataSourceBoundary>;
 };
 export default Container;

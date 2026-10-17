@@ -46,3 +46,17 @@ it('advertiser-like hidden binding defers sibling-tab data until activation, the
  const tab=name=>Array.from(host.querySelectorAll('[role="tab"]')).find(e=>e.textContent===name);await settle(()=>tab('Related').click());expect(requests.filter(x=>x==='choices')).toHaveLength(1);
  await settle(()=>tab('Properties').click());await settle(()=>tab('Related').click());expect(requests.filter(x=>x==='choices')).toHaveLength(1);expect(JSON.stringify(def)).toBe(before);
 });
+it('omits a missing datasource region while the healthy root and sibling controls remain usable',async()=>{
+ const def=metadata();def.view.content.containers=[
+  {id:'missing-history',dataSourceRef:'missingHistory',fetchData:true,items:[{id:'history',type:'label',value:'Missing history'}]},
+  {id:'healthy-sibling',dataSourceRef:'record',items:[{id:'healthy-label',type:'label',value:'Healthy sibling'}]},
+ ];
+ const errors=[];const original=console.error;console.error=(...args)=>errors.push(args.join(' '));
+ let requests;
+ try {({requests}=await mount(def));} finally {console.error=original;}
+ expect(host.textContent).toContain('Healthy sibling');
+ expect(host.textContent).not.toContain('Missing history');
+ expect(host.querySelector('button[aria-label="Category"]')).not.toBeNull();
+ expect(requests).not.toContain('missingHistory');
+ expect(errors.filter(message=>message.includes('MissingDataSourceReferenceError'))).toHaveLength(0);
+});
