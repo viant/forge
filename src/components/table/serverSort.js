@@ -12,12 +12,17 @@ export function requestServerTableSort({dataSource = {}, handlers = {}, columnId
         const mappedValue = template
             .split('{{field}}').join(mappedField)
             .split('{{direction}}').join(normalizedDirection);
+        const mappedValues = [mappedValue, ...(Array.isArray(mapping.thenBy) ? mapping.thenBy : [])
+            .map(value => String(value || '').trim()
+                .split('{{field}}').join(mappedField)
+                .split('{{direction}}').join(normalizedDirection))
+            .filter(Boolean)];
         handlers?.dataSource?.setSort?.({
             columnId,
             direction: normalizedDirection,
             fetch: true,
             parameter,
-            value: [mappedValue],
+            value: mappedValues,
         });
         return true;
     }

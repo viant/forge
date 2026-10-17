@@ -1681,34 +1681,34 @@ type Option struct {
 
 type DataSource struct {
 	// InitialFilter seeds UI filter state once; restored/user filters take precedence.
-	InitialFilter                           map[string]interface{}            `json:"initialFilter,omitempty" yaml:"initialFilter,omitempty"`
-	Service                                 *Service                          `json:"service,omitempty" yaml:"service,omitempty"`
-	DataSourceRef                           string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
-	ResourceModelRef                        string                            `json:"resourceModelRef,omitempty" yaml:"resourceModelRef,omitempty"`
-	Target                                  *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
-	TargetOverrides                         map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
-	UniqueKey                               []*UniqueKey                      `json:"uniqueKey,omitempty" yaml:"uniqueKey,omitempty"`
-	Parameters                              []Parameter                       `json:"parameters" yaml:"parameters"`
-	On                                      []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
-	Cardinality                             string                            `json:"cardinality" yaml:"cardinality"`
-	Selectors                               *Selectors                        `json:"selectors,omitempty" yaml:"selectors,omitempty"`
-	SelectionPreserveAcrossPages            bool                              `json:"selectionPreserveAcrossPages,omitempty" yaml:"selectionPreserveAcrossPages,omitempty"`
-	SelectionMode                           *SelectionMode                    `json:"selectionMode,omitempty" yaml:"selectionMode,omitempty"`
+	InitialFilter                map[string]interface{}            `json:"initialFilter,omitempty" yaml:"initialFilter,omitempty"`
+	Service                      *Service                          `json:"service,omitempty" yaml:"service,omitempty"`
+	DataSourceRef                string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	ResourceModelRef             string                            `json:"resourceModelRef,omitempty" yaml:"resourceModelRef,omitempty"`
+	Target                       *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides              map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
+	UniqueKey                    []*UniqueKey                      `json:"uniqueKey,omitempty" yaml:"uniqueKey,omitempty"`
+	Parameters                   []Parameter                       `json:"parameters" yaml:"parameters"`
+	On                           []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
+	Cardinality                  string                            `json:"cardinality" yaml:"cardinality"`
+	Selectors                    *Selectors                        `json:"selectors,omitempty" yaml:"selectors,omitempty"`
+	SelectionPreserveAcrossPages bool                              `json:"selectionPreserveAcrossPages,omitempty" yaml:"selectionPreserveAcrossPages,omitempty"`
+	SelectionMode                *SelectionMode                    `json:"selectionMode,omitempty" yaml:"selectionMode,omitempty"`
 	// SelectionRetention "pages" keeps selected rows when only the server page changes.
-	SelectionRetention                      string                            `json:"selectionRetention,omitempty" yaml:"selectionRetention,omitempty"`
-	Paging                                  *PagingConfig                     `json:"paging,omitempty" yaml:"paging,omitempty"`
-	FilterSet                               []Filter                          `json:"filterSet,omitempty" yaml:"filterSet,omitempty"`
-	AutoSelect                              *bool                             `json:"autoSelect,omitempty" yaml:"autoSelect,omitempty"`
-	AutoFetch                               *bool                             `json:"autoFetch,omitempty" yaml:"autoFetch,omitempty"`
-	ReplayPendingFetchOnRestore             *bool                             `json:"replayPendingFetchOnRestore,omitempty" yaml:"replayPendingFetchOnRestore,omitempty"`
-	PreserveDialogStateOnReopen             *bool                             `json:"preserveDialogStateOnReopen,omitempty" yaml:"preserveDialogStateOnReopen,omitempty"`
-	PreserveParametersOnMissingDependencies *bool                             `json:"preserveParametersOnMissingDependencies,omitempty" yaml:"preserveParametersOnMissingDependencies,omitempty"`
-	RequiredAnyParameters                   []string                          `json:"requiredAnyParameters,omitempty" yaml:"requiredAnyParameters,omitempty"`
-	SelfReference                           string                            `json:"selfReference,omitempty" yaml:"selfReference,omitempty"`
-	SortMode                                string                            `json:"sortMode,omitempty" yaml:"sortMode,omitempty"`
-	SortMapping                             *SortMapping                      `json:"sortMapping,omitempty" yaml:"sortMapping,omitempty"`
-	FilterMode                              string                            `json:"filterMode,omitempty" yaml:"filterMode,omitempty"`
-	PaginationMode                          string                            `json:"paginationMode,omitempty" yaml:"paginationMode,omitempty"`
+	SelectionRetention                      string        `json:"selectionRetention,omitempty" yaml:"selectionRetention,omitempty"`
+	Paging                                  *PagingConfig `json:"paging,omitempty" yaml:"paging,omitempty"`
+	FilterSet                               []Filter      `json:"filterSet,omitempty" yaml:"filterSet,omitempty"`
+	AutoSelect                              *bool         `json:"autoSelect,omitempty" yaml:"autoSelect,omitempty"`
+	AutoFetch                               *bool         `json:"autoFetch,omitempty" yaml:"autoFetch,omitempty"`
+	ReplayPendingFetchOnRestore             *bool         `json:"replayPendingFetchOnRestore,omitempty" yaml:"replayPendingFetchOnRestore,omitempty"`
+	PreserveDialogStateOnReopen             *bool         `json:"preserveDialogStateOnReopen,omitempty" yaml:"preserveDialogStateOnReopen,omitempty"`
+	PreserveParametersOnMissingDependencies *bool         `json:"preserveParametersOnMissingDependencies,omitempty" yaml:"preserveParametersOnMissingDependencies,omitempty"`
+	RequiredAnyParameters                   []string      `json:"requiredAnyParameters,omitempty" yaml:"requiredAnyParameters,omitempty"`
+	SelfReference                           string        `json:"selfReference,omitempty" yaml:"selfReference,omitempty"`
+	SortMode                                string        `json:"sortMode,omitempty" yaml:"sortMode,omitempty"`
+	SortMapping                             *SortMapping  `json:"sortMapping,omitempty" yaml:"sortMapping,omitempty"`
+	FilterMode                              string        `json:"filterMode,omitempty" yaml:"filterMode,omitempty"`
+	PaginationMode                          string        `json:"paginationMode,omitempty" yaml:"paginationMode,omitempty"`
 	// QuickFilterSet selects which filterSet should be rendered in the toolbar as quick filters.
 	// Accepts either a string (filterSet.name) or an integer index (0-based).
 	QuickFilterSet interface{} `json:"quickFilterSet,omitempty" yaml:"quickFilterSet,omitempty"`
@@ -1718,6 +1718,7 @@ type SortMapping struct {
 	Parameter string            `json:"parameter" yaml:"parameter"`
 	Template  string            `json:"template" yaml:"template"`
 	Fields    map[string]string `json:"fields" yaml:"fields"`
+	ThenBy    []string          `json:"thenBy,omitempty" yaml:"thenBy,omitempty"`
 }
 
 type SelectionMode string
@@ -1745,10 +1746,10 @@ type Selectors struct {
 
 type PagingConfig struct {
 	// Mode opts into explicit upstream page/offset/cursor semantics; empty retains legacy behavior.
-	Mode              string             `json:"mode,omitempty" yaml:"mode,omitempty"`
-	Size              int                `json:"size" yaml:"size"`
-	Enabled           bool               `json:"enabled" yaml:"enabled"`
-	OpenEnded         bool               `json:"openEnded,omitempty" yaml:"openEnded,omitempty"`
+	Mode      string `json:"mode,omitempty" yaml:"mode,omitempty"`
+	Size      int    `json:"size" yaml:"size"`
+	Enabled   bool   `json:"enabled" yaml:"enabled"`
+	OpenEnded bool   `json:"openEnded,omitempty" yaml:"openEnded,omitempty"`
 	// Aggregate collects bounded server pages before publishing one complete collection.
 	Aggregate         bool               `json:"aggregate,omitempty" yaml:"aggregate,omitempty"`
 	MaxPages          int                `json:"maxPages,omitempty" yaml:"maxPages,omitempty"`
@@ -1790,14 +1791,14 @@ type Codec struct {
 }
 
 type Parameter struct {
-	From      string `json:"from" yaml:"from"`                             //source [dataSource]:store
-	Location  string `json:"location,omitempty" yaml:"location,omitempty"` //source selector
-	To        string `json:"to" yaml:"to"`                                 //dest [dataSource]:store
-	Name      string `json:"name" yaml:"name"`                             //dest selector
-	Direction string `json:"direction,omitempty" yaml:"direction,omitempty"`
-	Codec     *Codec `json:"codec,omitempty" yaml:"codec,omitempty"`
-	Default   string `json:"default,omitempty" yaml:"default,omitempty"`
-	Required  *bool  `json:"required,omitempty" yaml:"required,omitempty"`
+	From      string      `json:"from" yaml:"from"`                             //source [dataSource]:store
+	Location  string      `json:"location,omitempty" yaml:"location,omitempty"` //source selector
+	To        string      `json:"to" yaml:"to"`                                 //dest [dataSource]:store
+	Name      string      `json:"name" yaml:"name"`                             //dest selector
+	Direction string      `json:"direction,omitempty" yaml:"direction,omitempty"`
+	Codec     *Codec      `json:"codec,omitempty" yaml:"codec,omitempty"`
+	Default   interface{} `json:"default,omitempty" yaml:"default,omitempty"`
+	Required  *bool       `json:"required,omitempty" yaml:"required,omitempty"`
 
 	//Deprecated
 	In string `json:"in,omitempty" yaml:"in,omitempty"`
