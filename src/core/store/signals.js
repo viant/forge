@@ -149,7 +149,7 @@ export const findMetadataSignal = (windowId) => {
 
 
 // Get or create data signal for a unique window key
-export const getInputSignal = (sourceId) => {
+export const getInputSignal = (sourceId, initialFilter) => {
     if (!inputSignals.value[sourceId]) {
         const newSignal = signal({fetch: false, refresh: false});
         inputSignals.value = {
@@ -157,7 +157,13 @@ export const getInputSignal = (sourceId) => {
             [sourceId]: newSignal,
         };
     }
-    return inputSignals.value[sourceId];
+    const result = inputSignals.value[sourceId];
+    const current = result.peek();
+    if (initialFilter && typeof initialFilter === 'object' && !Array.isArray(initialFilter)
+        && !Object.prototype.hasOwnProperty.call(current, 'filter')) {
+        result.value = {...current, filter: structuredClone(initialFilter)};
+    }
+    return result;
 };
 
 export const findInputSignal = (sourceId) => {
