@@ -1683,6 +1683,8 @@ type DataSource struct {
 	Cardinality                             string                            `json:"cardinality" yaml:"cardinality"`
 	Selectors                               *Selectors                        `json:"selectors,omitempty" yaml:"selectors,omitempty"`
 	SelectionMode                           *SelectionMode                    `json:"selectionMode,omitempty" yaml:"selectionMode,omitempty"`
+	// SelectionRetention "pages" keeps selected rows when only the server page changes.
+	SelectionRetention                      string                            `json:"selectionRetention,omitempty" yaml:"selectionRetention,omitempty"`
 	Paging                                  *PagingConfig                     `json:"paging,omitempty" yaml:"paging,omitempty"`
 	FilterSet                               []Filter                          `json:"filterSet,omitempty" yaml:"filterSet,omitempty"`
 	AutoSelect                              *bool                             `json:"autoSelect,omitempty" yaml:"autoSelect,omitempty"`
