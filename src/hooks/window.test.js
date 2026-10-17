@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import {useDialogHandlers, useWindowHandlers} from './window.js';
+import {buildWorkspaceNavigationTrail, useDialogHandlers, useWindowHandlers} from './window.js';
 import {setWindowContext, clearWindowContext} from '../core/context/registry.js';
 import {activeWindows, getBusSignal, getDashboardFilterSignal, getDashboardSelectionSignal, getDialogSignal, getInputSignal, removeWindow} from '../core/store/signals.js';
 import {mirrorQuickFilterDraft} from '../components/table/basic/QuickFilterHelpers.js';
@@ -315,3 +315,12 @@ assert.equal(activeWindows.peek().some((entry) => entry.windowId === 'W_dispose'
 console.log('removeWindow ✓ synchronously disposes the cached window context');
 
 clearWindowContext(windowId);
+
+
+// A completed view may explicitly return to a target without a back link to it.
+assert.deepEqual(buildWorkspaceNavigationTrail({windowId:'completed',navigationTrail:[{windowId:'before'}]},{navigationTrail:[]}),[]);
+const explicitTrail=[{windowId:'origin',parameters:{RecordId:[7]}}];
+const copiedTrail=buildWorkspaceNavigationTrail({windowId:'completed'},{navigationTrail:explicitTrail});
+copiedTrail[0].parameters.RecordId[0]=9;
+assert.equal(explicitTrail[0].parameters.RecordId[0],7,'explicit navigation must be detached from caller state');
+console.log('explicit window navigation trail can replace automatic history without sharing mutable state ✓');
