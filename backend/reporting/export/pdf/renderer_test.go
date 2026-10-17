@@ -2772,8 +2772,10 @@ func assertCapacityInventoryLandscapeParityAcrossPages(t *testing.T, report *rep
 	require.Contains(t, inspected.plainText, "Top Channel KPI")
 	require.NotContains(t, inspected.plainText, "Chart output is not available for this ReportPrint block.")
 	page1 := inspected.pageStream[1]
-	require.True(t, hasMatchingPathBounds(page1, 152, 304, 736, 276, "f"))
-	require.True(t, hasMatchingPathBounds(page1, 152, 266, 661.52525, 238, "f"))
+	// The fixture's SVG bars are 24 points tall, at y=16 and y=48,
+	// with widths 538 and 469.391414; the chart starts at (36, 292).
+	require.True(t, hasMatchingPathBounds(page1, 152, 304, 690, 280, "f"))
+	require.True(t, hasMatchingPathBounds(page1, 152, 272, 621.39141, 248, "f"))
 
 	expectedRuns := collectExpectedSVGTextRuns(report)
 	targets := map[string]bool{"Display": true, "CTV": true}
@@ -2813,8 +2815,10 @@ func assertCapacityLocationLandscapeParityAcrossPages(t *testing.T, report *repo
 	require.Contains(t, inspected.plainText, "Top Market KPI")
 	require.NotContains(t, inspected.plainText, "Chart output is not available for this ReportPrint block.")
 	page1 := inspected.pageStream[1]
-	require.True(t, hasMatchingPathBounds(page1, 152, 320, 736, 292, "f"))
-	require.True(t, hasMatchingPathBounds(page1, 152, 282, 699.3808, 254, "f"))
+	// The fixture's SVG bars are 24 points tall, at y=16 and y=48,
+	// with widths 538 and 504.265186; the chart starts at (36, 276).
+	require.True(t, hasMatchingPathBounds(page1, 152, 320, 690, 296, "f"))
+	require.True(t, hasMatchingPathBounds(page1, 152, 288, 656.26519, 264, "f"))
 
 	expectedRuns := collectExpectedSVGTextRuns(report)
 	targets := map[string]bool{"US": true, "CA": true}

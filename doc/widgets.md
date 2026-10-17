@@ -165,9 +165,9 @@ lookup anatomy, responsive CSS, accessibility state, and legacy fallback.
 
 *Last updated: 2026-10-05*
 
-### Deferred datasource options for single-select controls
+### Deferred datasource options for select controls
 
-A datasource-backed `select` can opt in to fetching its choices on first keyboard
+A datasource-backed `select` or `multiSelect` can opt in to fetching its choices on first keyboard
 focus or dropdown open:
 
 ```yaml
@@ -206,7 +206,7 @@ select shows its existing bound value rather than a blank placeholder. Supply a
 human-readable bound value when that is the required display; this mode does not
 guess a label or secondary identifier for an opaque ID. Do not opt a field in if
 its current label requires an unavailable full dictionary. Static `options`,
-non-select widgets and existing fallback-source behavior remain unchanged;
+other widgets and existing fallback-source behavior remain unchanged;
 fallback references are eager consumers. Lookup dialogs already fetch on opening
 and do not need this mode. This is an interaction/performance choice, not an
 access-control or business-authority contract.
@@ -233,3 +233,20 @@ its source do not invalidate cells. Explicit `timeZone` and row-level
 `timeZoneSelector` take precedence over the bound fallback. Missing binding values
 retain existing formatting defaults. Timestamps remain unchanged; `dateTime24`
 uses an h23 clock so midnight displays as00:00.
+
+### Date-range drafts
+
+`dateRangePreset` keeps custom start/end edits local until Apply. Preset context
+updates therefore cannot overwrite the edited dates, and typing does not change
+datasource parameters. Apply commits both endpoints, granularity and the custom
+preset together. Inverted ranges cannot be applied. Closing and reopening the
+popup restores the applied range; choosing a preset also commits its range as
+one update. The partial-data checkbox retains its independent behavior.
+
+Multi-select dropdowns request options through their native text input on focus
+and pointer/keyboard open, using the same per-source lock. Checkbox and pill
+appearances expose a keyboard-focusable group when configured for lazy choices.
+Selected values remain visible as their bound IDs before labels arrive; loaded
+producer labels replace those fallback tags without changing the selection.
+Disabled/read-only variants do not request choices. No per-window fetch JavaScript
+is needed.

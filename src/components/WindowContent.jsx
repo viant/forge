@@ -457,7 +457,6 @@ export function resolveFetcherOwnedDataSourceRefs(metadata) {
 }
 
 export function shouldPrimeDataSourceFetch(dataSource = {}, prevInput = {}, collection = [], paramsChanged = false, control = {}, {deferAutomatic = false} = {}) {
-    if (control?.loading === true) return false;
     if (prevInput.fetch) return true;
     const autoFetchEnabled = dataSource?.autoFetch !== false && !deferAutomatic;
     if (!autoFetchEnabled) return false;
@@ -466,7 +465,11 @@ export function shouldPrimeDataSourceFetch(dataSource = {}, prevInput = {}, coll
     if (Number(control?.error?.status) === 403
         && control?.error?.code === 'datasource_denied'
         && control?.error?.scope === 'dataset') return false;
+    // A changed binding must remain queued while the previous read settles.
+    // DataSource owns serialization; clearing fetch here loses the new range
+    // when an empty result lets the next user action happen immediately.
     if (paramsChanged) return true;
+    if (control?.loading === true) return false;
     if (control?.error) return false;
     const hasCollection = Array.isArray(collection) && collection.length > 0;
     const hasCompletedLoad = control?.loaded === true;

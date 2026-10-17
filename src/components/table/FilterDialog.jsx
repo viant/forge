@@ -1,5 +1,8 @@
 
 import React, { useEffect, useState } from "react";
+import {useSignals} from '@preact/signals-react/runtime';
+import {evaluatePlainVisibleWhen, trackVisibleWhen} from '../visibleWhen.js';
+import './FilterDialog.css';
 import { Button, Checkbox, Classes, Dialog, DialogBody, DialogFooter, HTMLSelect, InputGroup } from "@blueprintjs/core";
 
 const FilterDialog = ({
@@ -8,13 +11,28 @@ const FilterDialog = ({
                           filterSets = [],
                           filter = {},
                           onApplyFilters,
+                          context,
                       }) => {
+    useSignals();
+    const visible = item => {
+        if (isOpen) {
+            trackVisibleWhen(item?.visibleWhen, context);
+            trackVisibleWhen(item?.hiddenWhen, context);
+        }
+        return (!item?.visibleWhen || evaluatePlainVisibleWhen(item.visibleWhen, context))
+            && (!item?.hiddenWhen || !evaluatePlainVisibleWhen(item.hiddenWhen, context));
+    };
+    const visibleSets = filterSets.filter(visible);
     const [selectedSet, setSelectedSet] = useState({});
     const [filterValues, setFilterValues] = useState({});
 
+    const activeSet = visibleSets.find(set => set.name === selectedSet.name) || visibleSets[0] || {};
+    const visibleTemplate = (activeSet.template || []).filter(visible).map(field => ({...field,
+        ...(Array.isArray(field.options) ? {options: field.options.filter(visible)} : {})}));
+
     useEffect(() => {
-        if (isOpen && filterSets.length > 0) {
-            const defSet = filterSets.find((fs) => fs.default) || filterSets[0];
+        if (isOpen && visibleSets.length > 0) {
+            const defSet = visibleSets.find((fs) => fs.default) || visibleSets[0];
             setSelectedSet(defSet);
             setFilterValues(
                 defSet?.template?.reduce((acc, tpl) => {
@@ -37,17 +55,18 @@ const FilterDialog = ({
 
     const handleApplyFilters = () => {
         const appliedFilter = {};
-        for (const key in filterValues) {
-            if (filterValues[key] !== "") {
-                appliedFilter[key] = filterValues[key];
-            }
+        for (const field of visibleTemplate) {
+            const value = filterValues[field.id];
+            if (value === '' || value === undefined) continue;
+            if (Array.isArray(field.options) && !field.options.some(option => String(option.value) === String(value))) continue;
+            appliedFilter[field.id] = value;
         }
-        onApplyFilters({ ...selectedSet, filter: appliedFilter });
+        onApplyFilters({...activeSet, filter: appliedFilter});
         onClose();
     };
 
     const handleClearFilters = () => {
-        onApplyFilters({ ...selectedSet, filter: {} });
+        onApplyFilters({ ...activeSet, filter: {} });
         onClose();
     };
 
@@ -56,21 +75,19 @@ const FilterDialog = ({
             isOpen={isOpen}
             onClose={onClose}
             title="Filter"
-            style={{
-                zIndex: 100,
-            }}
+            className="forge-filter-dialog"
         >
             <DialogBody>
-                {filterSets?.length > 1 && (
+                {visibleSets.length > 1 && (
                     <>
                         <h5>Available Filter Sets</h5>
-                        <div style={{ marginBottom: "10px" }}>
-                            {filterSets.map((fs) => (
+                        <div className="forge-filter-dialog__sets">
+                            {visibleSets.map((fs) => (
                                 <Button
                                     key={fs.name}
                                     minimal
                                     text={fs.name}
-                                    intent={fs.name === selectedSet.name ? "primary" : "none"}
+                                    intent={fs.name === activeSet.name ? "primary" : "none"}
                                     onClick={() => {
                                         setSelectedSet(fs);
                                         setFilterValues(
@@ -86,18 +103,10 @@ const FilterDialog = ({
                     </>
                 )}
 
-                <div
-                    style={{
-                        display: "grid",
-                        gridTemplateColumns: "max-content 1fr",
-                        gap: "10px",
-                        alignItems: "center",
-                        marginBottom: "10px",
-                    }}
-                >
-                    {selectedSet?.template?.map((tpl) => (
+                <div className="forge-filter-dialog__fields">
+                    {visibleTemplate.map((tpl) => (
                         <React.Fragment key={tpl.id}>
-                            <label htmlFor={`forge-filter-${tpl.id}`} style={{ textAlign: "right", paddingRight: "10px" }}>
+                            <label htmlFor={`forge-filter-${tpl.id}`} className="forge-filter-dialog__label">
                                 {tpl.label}
                             </label>
                             {tpl.type === 'boolean' ? (
