@@ -9795,6 +9795,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
 
     useEffect(() => {
         if (!shouldAutoCollapseReportBuilderFilters({
+            editingFilters: reportFilterRailOpen || filtersDrawerOpen,
             canShowResults,
             hasCompletedCurrentRun,
             manualRunSequence,
@@ -9805,17 +9806,17 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         lastAutoCollapsedRunSequenceRef.current = manualRunSequence;
         setFilterPanels(collapseReportBuilderFilterBodyState);
         setFiltersDrawerOpen(false);
-    }, [canShowResults, hasCompletedCurrentRun, manualRunSequence]);
+    }, [canShowResults, hasCompletedCurrentRun, manualRunSequence, reportFilterRailOpen, filtersDrawerOpen]);
 
     useEffect(() => {
-        if (!designWorkspaceMode || !useFilterRail || !railFilterState.shouldAutoCollapseSeededPanel) {
+        if (reportFilterRailOpen || filtersDrawerOpen || !designWorkspaceMode || !useFilterRail || !railFilterState.shouldAutoCollapseSeededPanel) {
             return;
         }
         lastSeededRailFilterCollapseFingerprintRef.current = currentRequestFingerprint;
         setFilterPanels((current) => (
             current.common ? { ...current, common: false } : current
         ));
-    }, [currentRequestFingerprint, designWorkspaceMode, railFilterState.shouldAutoCollapseSeededPanel, useFilterRail]);
+    }, [currentRequestFingerprint, designWorkspaceMode, railFilterState.shouldAutoCollapseSeededPanel, useFilterRail, reportFilterRailOpen, filtersDrawerOpen]);
 
     useEffect(() => {
         if (!explicitChartMode || state.chartSpec || !autoChartCycleKey) {
@@ -11418,10 +11419,11 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         storedReportArtifact?.artifactId,
     ]);
     useEffect(() => {
-        const shouldCollapseHostedExecution = hostedExecuteOnOpen
+        const shouldCollapseHostedExecution = !reportFilterRailOpen && !filtersDrawerOpen && hostedExecuteOnOpen
             && authoredRuntimePreviewState?.canRenderRuntime
             && !hostedRuntimeFiltersCollapsedRef.current;
         const shouldCollapseCompletedRun = shouldAutoCollapseReportBuilderFilters({
+            editingFilters: reportFilterRailOpen || filtersDrawerOpen,
             canShowResults: authoredRuntimePreviewState?.canRenderRuntime,
             hasCompletedCurrentRun,
             manualRunSequence,
@@ -11435,7 +11437,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         lastAutoCollapsedRunSequenceRef.current = manualRunSequence;
         setFilterPanels(collapseReportBuilderFilterBodyState);
         setFiltersDrawerOpen(false);
-    }, [authoredRuntimePreviewState?.canRenderRuntime, hasCompletedCurrentRun, hostedExecuteOnOpen, manualRunSequence]);
+    }, [authoredRuntimePreviewState?.canRenderRuntime, hasCompletedCurrentRun, hostedExecuteOnOpen, manualRunSequence, reportFilterRailOpen, filtersDrawerOpen]);
     const hideAuthoredRuntimeSemanticErrorCard = useMemo(() => {
         const errorState = authoredRuntimePreviewState?.errorState || null;
         if (!semanticResultSurfaceState || !errorState) {

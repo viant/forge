@@ -17,7 +17,7 @@ import (
 func TestAuthoredReportsMaterializeOneWorkingCandidateWithDependencyDrift(t *testing.T) {
 	root := t.TempDir()
 	writeAsset(t, root, "extension/forge/reporting/builder.yaml", "kind: forge.reporting.builder\nid: metrics\nreportBuilder:\n  document: {title: Default, subtitle: Preserved}\n")
-	writeAsset(t, root, "extension/forge/reporting/report.yaml", "kind: forge.reporting.report\nid: delivery\nnamespace: analytics\nname: delivery\nresourceUri: report://analytics/delivery\nbuilderRef: metrics\nlabel: Delivery\ndocumentPatch: {title: Delivery, blocks: [{id: intro, kind: markdownBlock, markdown: Hello}]}\nstatePatch: {selectedMeasures: [spend]}\n")
+	writeAsset(t, root, "extension/forge/reporting/report.yaml", "kind: forge.reporting.report\nid: delivery\nnamespace: analytics\nname: delivery\nresourceUri: report://analytics/delivery\nbuilderRef: metrics\nlabel: Delivery\ndocumentPatch: {title: Delivery, blocks: [{id: intro, kind: markdownBlock, markdown: Hello}]}\nstatePatch: {selectedMeasures: [spend]}\nmetadata: {category: synthetic}\n")
 	backend := json.RawMessage(`{"backend":{"kind":"mcp_tool","service":"metrics","method":"QueryV1"}}`)
 	source, err := NewReportResourceSource(ReportResourceOptions{Options: registry.Options{WorkspaceRoot: root}, DataSources: func(context.Context, *registry.Asset) (map[string]json.RawMessage, error) {
 		return map[string]json.RawMessage{"rows": backend}, nil
@@ -41,6 +41,9 @@ func TestAuthoredReportsMaterializeOneWorkingCandidateWithDependencyDrift(t *tes
 	var envelope registry.ReportEnvelope
 	if json.Unmarshal(raw, &envelope) != nil || envelope.Format != registry.AuthoredReportFormat || len(envelope.Dependencies) != 3 || !strings.Contains(string(envelope.ReportDocument), "Preserved") {
 		t.Fatalf("complete materialization=%s", raw)
+	}
+	if string(envelope.Metadata) != `{"category":"synthetic"}` {
+		t.Fatalf("authored metadata lost: %s", envelope.Metadata)
 	}
 	backend = json.RawMessage(`{"backend":{"kind":"mcp_tool","service":"metrics","method":"QueryV2"}}`)
 	changed, err := source.Candidates(context.Background(), uri)
@@ -76,5 +79,46 @@ func writeAsset(t *testing.T, root, name, body string) {
 	}
 	if err := os.WriteFile(path, []byte(body), 0600); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestAuthoredDescriptorFingerprintSurvivesJSONMapRoundtrip(t *testing.T) {
+	root := t.TempDir()
+	writeAsset(t, root, "extension/forge/reporting/builder.yaml", "kind: forge.reporting.builder\nid: metrics\nreportBuilder: {document: {title: Metrics}}\n")
+	writeAsset(t, root, "extension/forge/reporting/report.yaml", "kind: forge.reporting.report\nid: delivery\nnamespace: analytics\nname: delivery\nbuilderRef: metrics\n")
+	descriptor := json.RawMessage(`{"title":"Rows","backend":{"service":"metrics","pinned":{"id":9007199254740993},"method":"read","kind":"mcp_tool"},"id":"rows"}`)
+	source, err := NewReportResourceSource(ReportResourceOptions{Options: registry.Options{WorkspaceRoot: root}, DataSources: func(context.Context, *registry.Asset) (map[string]json.RawMessage, error) {
+		return map[string]json.RawMessage{"rows": descriptor}, nil
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := source.Materialize(context.Background(), "report://analytics/delivery")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope registry.ReportEnvelope
+	if err = json.Unmarshal(raw, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(envelope.DataSources["rows"]), "9007199254740993") {
+		t.Fatal("numeric precision lost")
+	}
+	var mapped map[string]json.RawMessage
+	if err = json.Unmarshal(envelope.DataSources["rows"], &mapped); err != nil {
+		t.Fatal(err)
+	}
+	reordered, err := json.Marshal(mapped)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range envelope.Dependencies {
+		if d.Kind == "datasource" && d.ContentFingerprint != identity.ContentFingerprint(reordered) {
+			t.Fatal("roundtrip changed descriptor fingerprint")
+		}
+	}
+	descriptor = json.RawMessage(`{"id":"rows","id":"other"}`)
+	if _, err = source.Materialize(context.Background(), "report://analytics/delivery"); err == nil {
+		t.Fatal("duplicate descriptor key accepted")
 	}
 }

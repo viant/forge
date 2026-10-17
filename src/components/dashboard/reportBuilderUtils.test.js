@@ -3250,3 +3250,5 @@ const coloredSpoContainer = buildExplicitReportBuilderChartContainer(
     {selectedDimensions: ["siteType"], selectedMeasures: ["totalSpend"]}, coloredSpoSpec,
 );
 assert.deepEqual(coloredSpoContainer.chart.series.categoryColors, coloredSpoSpec.categoryColors);
+
+assert.equal(shouldAutoCollapseReportBuilderFilters({canShowResults:true,hasCompletedCurrentRun:true,manualRunSequence:2,collapsedRunSequence:1,editingFilters:true}),false,'completed requests must not collapse filters while the user is editing them');

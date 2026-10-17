@@ -17,10 +17,13 @@ import (
 
 type Options struct {
 	// Optional host-owned confined filesystem hooks; defaults preserve native semantics.
-	ReadFile      func(string) ([]byte, error)
-	WalkDir       func(string, fs.WalkDirFunc) error
-	WorkspaceRoot string
-	ReportingRoot string
+	ReadFile func(string) ([]byte, error)
+	Stat     func(string) (os.FileInfo, error)
+	// ResolveReference is a trusted host hook for confined virtual filesystems.
+	ResolveReference func(workspaceRoot, assetFilename, reference string) (string, string, error)
+	WalkDir          func(string, fs.WalkDirFunc) error
+	WorkspaceRoot    string
+	ReportingRoot    string
 }
 
 // ResolveRoot resolves the singular workspace reporting root and rejects paths
@@ -120,7 +123,11 @@ func Discover(ctx context.Context, options Options) (*Registry, error) {
 		return nil, err
 	}
 	result := newRegistry(root)
-	if _, err = os.Stat(root); errors.Is(err, os.ErrNotExist) {
+	stat := options.Stat
+	if stat == nil {
+		stat = os.Stat
+	}
+	if _, err = stat(root); errors.Is(err, os.ErrNotExist) {
 		return result, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("stat reporting root: %w", err)
@@ -161,7 +168,7 @@ func Discover(ctx context.Context, options Options) (*Registry, error) {
 
 	diagnostics := make([]Diagnostic, 0)
 	for _, path := range paths {
-		assets, fileDiagnostics := loadAssetsWithReader(options.WorkspaceRoot, path, read)
+		assets, fileDiagnostics := loadAssetsWithReader(options.WorkspaceRoot, path, read, options)
 		diagnostics = append(diagnostics, fileDiagnostics...)
 		for _, asset := range assets {
 			diagnostics = append(diagnostics, result.add(asset)...)
@@ -200,7 +207,7 @@ func newRegistry(root string) *Registry {
 func loadAssets(workspaceRoot, filename string) ([]*Asset, []Diagnostic) {
 	return loadAssetsWithReader(workspaceRoot, filename, os.ReadFile)
 }
-func loadAssetsWithReader(workspaceRoot, filename string, read func(string) ([]byte, error)) ([]*Asset, []Diagnostic) {
+func loadAssetsWithReader(workspaceRoot, filename string, read func(string) ([]byte, error), options ...Options) ([]*Asset, []Diagnostic) {
 	relativePath, err := filepath.Rel(workspaceRoot, filename)
 	if err != nil {
 		relativePath = filename
@@ -247,10 +254,10 @@ func loadAssetsWithReader(workspaceRoot, filename string, read func(string) ([]b
 		YAMLPath:                "$",
 		Raw:                     raw,
 	}
-	profileDiagnostics := loadPresentationProfilesWithReader(workspaceRoot, filename, asset, documentContent(&node), read)
+	profileDiagnostics := loadPresentationProfilesWithReader(workspaceRoot, filename, asset, documentContent(&node), read, options...)
 	catalogDiagnostics := make([]Diagnostic, 0)
 	if asset.Kind == KindGroup && asset.CatalogRef != "" {
-		normalizedRef, catalogPath, resolveErr := ResolveAssetReference(workspaceRoot, filename, asset.CatalogRef)
+		normalizedRef, catalogPath, resolveErr := resolveAssetReferenceWithOptions(workspaceRoot, filename, asset.CatalogRef, options)
 		if resolveErr != nil {
 			catalogDiagnostics = append(catalogDiagnostics, diagnosticAt(
 				"groupCatalogRefInvalid",
@@ -284,7 +291,7 @@ func loadAssetsWithReader(workspaceRoot, filename string, read func(string) ([]b
 func loadPresentationProfiles(workspaceRoot, assetFilename string, asset *Asset, rootNode *yaml.Node) []Diagnostic {
 	return loadPresentationProfilesWithReader(workspaceRoot, assetFilename, asset, rootNode, os.ReadFile)
 }
-func loadPresentationProfilesWithReader(workspaceRoot, assetFilename string, asset *Asset, rootNode *yaml.Node, read func(string) ([]byte, error)) []Diagnostic {
+func loadPresentationProfilesWithReader(workspaceRoot, assetFilename string, asset *Asset, rootNode *yaml.Node, read func(string) ([]byte, error), options ...Options) []Diagnostic {
 	if asset == nil || asset.Kind != KindBuilder {
 		return nil
 	}
@@ -304,7 +311,7 @@ func loadPresentationProfilesWithReader(workspaceRoot, assetFilename string, ass
 	diagnostics := make([]Diagnostic, 0)
 	seenViews := map[string]string{}
 	for index, reference := range refs {
-		normalizedRef, resolvedPath, err := ResolveAssetReference(workspaceRoot, assetFilename, reference)
+		normalizedRef, resolvedPath, err := resolveAssetReferenceWithOptions(workspaceRoot, assetFilename, reference, options)
 		entryPath := fmt.Sprintf("%s[%d]", yamlPath, index)
 		if err != nil {
 			diagnostics = append(diagnostics, diagnosticAt("presentationProfileRefInvalid", err.Error(), asset.SourcePath, entryPath, mappingValue(rootNode, "presentationProfileRefs")))
@@ -799,4 +806,11 @@ func (l *Loader) Current() *Registry {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 	return l.current
+}
+
+func resolveAssetReferenceWithOptions(workspaceRoot, assetFilename, reference string, options []Options) (string, string, error) {
+	if len(options) > 0 && options[0].ResolveReference != nil {
+		return options[0].ResolveReference(workspaceRoot, assetFilename, reference)
+	}
+	return ResolveAssetReference(workspaceRoot, assetFilename, reference)
 }

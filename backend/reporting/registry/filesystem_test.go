@@ -2,11 +2,14 @@ package registry
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
+	"testing/fstest"
 )
 
 func TestDiscoverFilesystemHooksPreserveNativeAssetsAndProfileReads(t *testing.T) {
@@ -32,5 +35,44 @@ func TestDiscoverFilesystemHooksPreserveNativeAssetsAndProfileReads(t *testing.T
 	}
 	if !reflect.DeepEqual(baseline.Builder("family"), actual.Builder("family")) {
 		t.Fatal("filesystem hooks changed native builder/profile semantics")
+	}
+}
+
+func TestDiscoverVirtualSourceWithoutHostFilesystem(t *testing.T) {
+	const root = "/__forge_registry_virtual_test__"
+	memory := fstest.MapFS{
+		"extension/forge/reporting/builder.yaml": {Data: []byte("kind: forge.reporting.builder\nid: virtual\nreportBuilder:\n  presentationProfileRefs: [./profile.json]\n")},
+		"extension/forge/reporting/profile.json": {Data: []byte(`{"kind":"forge.reporting.presentationProfileCatalog","schemaVersion":1,"familyId":"virtual","views":[{"reportId":"one","visualProfile":"one","revision":"1","tabs":[{"id":"main","title":"Main","blockIds":["intro"]}],"blocks":[{"id":"intro","kind":"markdownBlock"}]}]}`)},
+	}
+	relative := func(name string) string { return strings.TrimPrefix(name, root+"/") }
+	resolves := 0
+	result, err := Discover(context.Background(), Options{
+		WorkspaceRoot: root,
+		Stat:          func(name string) (os.FileInfo, error) { return fs.Stat(memory, relative(name)) },
+		ReadFile:      func(name string) ([]byte, error) { return fs.ReadFile(memory, relative(name)) },
+		WalkDir: func(name string, visit fs.WalkDirFunc) error {
+			return fs.WalkDir(memory, relative(name), func(p string, d fs.DirEntry, e error) error { return visit(filepath.Join(root, p), d, e) })
+		},
+		ResolveReference: func(workspace, filename, reference string) (string, string, error) {
+			resolves++
+			resolved := filepath.Join(filepath.Dir(filename), reference)
+			if !pathWithin(workspace, resolved) {
+				return "", "", fmt.Errorf("outside virtual workspace")
+			}
+			if _, err := fs.Stat(memory, relative(resolved)); err != nil {
+				return "", "", err
+			}
+			return reference, resolved, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolves != 1 || result.Builder("virtual") == nil {
+		t.Fatalf("virtual discovery not used: resolves=%d registry=%+v", resolves, result)
+	}
+	config := result.Builder("virtual").Raw["reportBuilder"].(map[string]any)
+	if len(config["presentationProfiles"].([]any)) != 1 {
+		t.Fatal("virtual profile was not retained")
 	}
 }
