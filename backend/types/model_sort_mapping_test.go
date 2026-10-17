@@ -18,6 +18,10 @@ sortMapping:
   fields:
     campaignId: campaign_id
     advertiserName: advertiser_name
+  thenBy:
+    - id:{{direction}}
+parameters:
+  - {name: OrderBy, default: ['created:desc', 'id:desc']}
 `), &dataSource); err != nil {
 		t.Fatal(err)
 	}
@@ -28,6 +32,7 @@ sortMapping:
 			"campaignId":     "campaign_id",
 			"advertiserName": "advertiser_name",
 		},
+		ThenBy: []string{"id:{{direction}}"},
 	}
 	if !reflect.DeepEqual(dataSource.SortMapping, want) {
 		t.Fatalf("unexpected YAML sort mapping: %#v", dataSource.SortMapping)
@@ -42,5 +47,8 @@ sortMapping:
 	}
 	if !reflect.DeepEqual(roundTrip.SortMapping, want) {
 		t.Fatalf("unexpected JSON sort mapping: %#v", roundTrip.SortMapping)
+	}
+	if !reflect.DeepEqual(roundTrip.Parameters[0].Default, []interface{}{"created:desc", "id:desc"}) {
+		t.Fatalf("lost array parameter default: %#v", roundTrip.Parameters[0].Default)
 	}
 }

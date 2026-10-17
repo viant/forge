@@ -59,3 +59,13 @@ assert.equal(requestServerTableSort({
 assert.deepEqual(clientCalls, []);
 
 console.log('serverSort ✓ backend and legacy server-sort interactions fetch; client sort stays local');
+
+const tieBreakCalls = [];
+assert.equal(requestServerTableSort({
+    dataSource: {sortMode: 'server', backend: {kind: 'mcp_tool'},
+        sortMapping: {parameter: 'OrderBy', template: '{{field}}:{{direction}}',
+            fields: {created: 'created'}, thenBy: ['id:{{direction}}']}},
+    handlers: {dataSource: {setSort: input => tieBreakCalls.push(input)}},
+    columnId: 'created', direction: 'asc',
+}), true);
+assert.deepEqual(tieBreakCalls[0].value, ['created:asc', 'id:asc']);
