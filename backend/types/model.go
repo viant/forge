@@ -1738,6 +1738,9 @@ type PagingConfig struct {
 	Size              int                `json:"size" yaml:"size"`
 	Enabled           bool               `json:"enabled" yaml:"enabled"`
 	OpenEnded         bool               `json:"openEnded,omitempty" yaml:"openEnded,omitempty"`
+	// Aggregate collects bounded server pages before publishing one complete collection.
+	Aggregate         bool               `json:"aggregate,omitempty" yaml:"aggregate,omitempty"`
+	MaxPages          int                `json:"maxPages,omitempty" yaml:"maxPages,omitempty"`
 	Parameters        *PagingParameters  `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 	DataInfoSelectors *DataInfoSelectors `json:"dataInfoSelectors,omitempty" yaml:"dataInfoSelectors,omitempty"`
 }

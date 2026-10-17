@@ -3,6 +3,7 @@ import React, {useEffect, useState} from "react";
 import {getLogger} from "../utils/logger.js";
 import {useSignals} from '@preact/signals-react/runtime';
 import { extractData, isDeferredCacheHitEnvelope } from "./dataSourceExtract.js";
+import {collectPagedCollection} from "./pagedCollectionAggregate.js";
 import { beginDataSourceFetch, consumeDataSourceFetchRequest, reconcileRestoredPendingFetch, recoverInterruptedFetchOnMount, resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, suppressRepeatedFailedFetch, withFetchedPageInfo, snapshotFetchedPageResult } from "./dataSourceFetchState.js";
 import {pageSelectionPolicy, reconcileMultiSelection, reconcileSingleSelection} from "./dataSourceSelection.js";
 import {applyFetchTransform} from "./dataSourceTransform.js";
@@ -542,15 +543,30 @@ export default function DataSource({context}) {
             const currentSelection = {...selection.peek()};
 
             // 3) Perform GET
-            const payload = await connector.get({
+            const aggregate = requestPaging?.aggregate === true;
+            if (aggregate && (!pagingEnabled || cursorMode || requestPaging?.mode === 'offset')) {
+                throw new Error('Aggregated paging requires bounded page-number requests.');
+            }
+            const fetchPage = requestedPage => connector.get({
                 filter: finalFilter,
-                page,
+                page: requestedPage,
                 pageSize: requestPaging?.size,
                 ...(cursorRequest ? {cursor: cursorRequest.cursor} : {}),
                 inputParameters: {...(parameters || {}), ...(sort?.length ? {sort} : {})},
                 cache,
                 invocationId,
             });
+            const collected = aggregate ? await collectPagedCollection({
+                pageSize: Number(requestPaging.size),
+                maxPages: Number(requestPaging.maxPages),
+                fetchPage,
+                extractPage: payload => extractData(selectors, requestPaging, payload),
+                keyForRow: getUniqueKeyValue,
+                shouldContinue: () => authorizationIsCurrent() && mountedRef.current
+                    && isCurrentBindingGeneration(input.peek()?.bindingGeneration, bindingGeneration),
+            }) : null;
+            if (aggregate) page = 1;
+            const payload = aggregate ? collected.payload : await fetchPage(page);
             if (!authorizationIsCurrent()) return;
             if (!mountedRef.current) {
                 settleDataSourceRequest(requestDataSourceId, requestId, new Error('Datasource unmounted before request completion.'));
@@ -570,12 +586,14 @@ export default function DataSource({context}) {
             } catch (_) {
             }
 
-            let {records, info, stats} = extractData(selectors, requestPaging, payload);
+            let {records, info, stats} = aggregate
+                ? collected
+                : extractData(selectors, requestPaging, payload);
             if (cursorRequest) {
                 info = cursorSessionRef.current.finish(cursorRequest, info);
                 if (!info) return;
             }
-            const deferredCacheHit = isDeferredCacheHitEnvelope(payload);
+            const deferredCacheHit = !aggregate && isDeferredCacheHitEnvelope(payload);
             if (deferredCacheHit && records.length === 0) {
                 const previousRecords = Array.isArray(collection.peek()) ? collection.peek() : [];
                 if (previousRecords.length > 0) {
@@ -611,7 +629,7 @@ export default function DataSource({context}) {
                 });
             } catch (_) {
             }
-            collectionInfo.value = cursorRequest ? markCompletedCursorAssociation({...info, returnedCount: records.length, pageSize: requestPaging?.size}, cursorRequest.signature) : withFetchedPageInfo(info, page, pagingEnabled, {
+            collectionInfo.value = aggregate ? info : cursorRequest ? markCompletedCursorAssociation({...info, returnedCount: records.length, pageSize: requestPaging?.size}, cursorRequest.signature) : withFetchedPageInfo(info, page, pagingEnabled, {
                 ...fetchedPageResult,
                 mode: paging?.mode,
                 hasMoreSelector: paging?.dataInfoSelectors?.hasMore,

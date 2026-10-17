@@ -217,6 +217,18 @@ clears them. A successful mutation should use `clearSelection: true` on its
 list refresh so stale off-page rows cannot be reused after the write. The
 default datasource behavior still reconciles selection to the current page.
 
+For a hidden complete-replacement baseline, use bounded page aggregation:
+
+```yaml
+paging: {enabled: true, size: 25, aggregate: true, maxPages: 100, parameters: {page: Page, size: Limit}}
+```
+
+Forge requests producer pages sequentially, rejects duplicate identities and
+an exhausted page bound, and publishes the collection only after a short or
+empty final page proves completion. A later-page failure never exposes a
+partial replacement baseline. Keep visible lists on ordinary server paging;
+this opt-in is for commands that require the complete relation set.
+
 ### Workflow primitive reference
 
 | Primitive | Required | Important optional fields | Runtime responsibility |
