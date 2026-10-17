@@ -146,7 +146,10 @@ func runEntry(ctx context.Context, program *goja.Program, entry string, raw json
 }
 
 func runEntryWithTimeSource(ctx context.Context, program *goja.Program, entry string, raw json.RawMessage, now goja.Now) (goja.Value, error) {
-	return runEntryWithTimeSourceTimeout(ctx, program, entry, raw, now, 5*time.Second)
+	// The bundled lowerer is trusted and its input/output sizes are bounded above.
+	// Large report documents can exceed five seconds under a loaded host; retain
+	// a finite limit while honoring an earlier caller deadline.
+	return runEntryWithTimeSourceTimeout(ctx, program, entry, raw, now, 15*time.Second)
 }
 
 func runEntryWithTimeSourceTimeout(ctx context.Context, program *goja.Program, entry string, raw json.RawMessage, now goja.Now, timeout time.Duration) (goja.Value, error) {
