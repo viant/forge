@@ -536,11 +536,17 @@ export function registerPack() {
 
     // Explicit switch uses a small native button shell so it remains visually
     // stable even when host and embedded Blueprint CSS versions differ.
-    registerWidget('switch', ({ value = false, onChange, readOnly, disabled, 'aria-label': ariaLabel, item, title, trueLabel, falseLabel }) => {
+    registerWidget('switch', ({ value = false, onChange, readOnly, disabled, id, className, 'aria-label': ariaLabel, item, title, trueLabel, falseLabel }) => {
         const checked = !!value;
         const unavailable = readOnly || disabled;
+        const controlId = id || item?.id;
         const control = (
             <button
+                id={controlId}
+                className={['forge-switch', className].filter(Boolean).join(' ')}
+                data-forge-widget="switch"
+                data-forge-control-id={controlId}
+                data-forge-part="switch-control"
                 type="button"
                 role="switch"
                 aria-checked={checked}
@@ -548,38 +554,16 @@ export function registerPack() {
                 title={title || item?.label}
                 disabled={unavailable}
                 onClick={() => onChange?.(!checked)}
-                style={{
-                    position: 'relative',
-                    display: 'inline-flex',
-                    width: 36,
-                    height: 20,
-                    padding: 2,
-                    border: '1px solid',
-                    borderColor: checked ? '#2f6fdd' : '#8a9aaa',
-                    borderRadius: 999,
-                    background: checked ? '#2f6fdd' : '#d8e0e8',
-                    cursor: unavailable ? 'not-allowed' : 'pointer',
-                    opacity: unavailable ? 0.55 : 1,
-                }}
             >
-                <span aria-hidden="true" style={{
-                    display: 'block',
-                    width: 14,
-                    height: 14,
-                    borderRadius: '50%',
-                    background: '#fff',
-                    boxShadow: '0 1px 2px rgba(0,0,0,.28)',
-                    transform: checked ? 'translateX(16px)' : 'translateX(0)',
-                    transition: 'transform 120ms ease',
-                }}/>
+                <span aria-hidden="true" className="forge-switch__thumb"/>
             </button>
         );
         const stateLabel = checked ? trueLabel : falseLabel;
         if (!stateLabel) return control;
         return (
-            <span style={{display: 'inline-flex', alignItems: 'center', gap: 8, minWidth: 0}}>
+            <span className={['forge-switch-field', className].filter(Boolean).join(' ')}>
                 {control}
-                <span>{stateLabel}</span>
+                <span className="forge-switch-field__state">{stateLabel}</span>
             </span>
         );
     }, { framework: 'blueprint' });
