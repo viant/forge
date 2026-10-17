@@ -6,6 +6,7 @@ import { getLogger } from "../utils/logger.js";
 
 import DataSource from './DataSource.jsx';
 import MessageBus from './MessageBus.jsx';
+import MissingDataSourceBoundary from './MissingDataSourceBoundary.jsx';
 
 function DataSourceMount({ windowContext, dsKey, initialParams, suppressAutomaticFetch = false }) {
     const log = getLogger('ds');
@@ -50,5 +51,7 @@ function DataSourceMount({ windowContext, dsKey, initialParams, suppressAutomati
 
 export default function WindowContentDataSourceContainer({windowContext, dsKey, initialParams = {}, suppressAutomaticFetch = false}) {
     // No hooks here – delegate to child that has a stable hook order
-    return <DataSourceMount windowContext={windowContext} dsKey={dsKey} initialParams={initialParams} suppressAutomaticFetch={suppressAutomaticFetch} />;
+    return <MissingDataSourceBoundary metadata={windowContext?.metadata} reference={dsKey}>
+        <DataSourceMount windowContext={windowContext} dsKey={dsKey} initialParams={initialParams} suppressAutomaticFetch={suppressAutomaticFetch} />
+    </MissingDataSourceBoundary>;
 }
