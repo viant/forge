@@ -179,6 +179,7 @@ type Dialog struct {
 	Id              string                            `json:"id" yaml:"id"`
 	Title           string                            `json:"title" yaml:"title"`
 	DataSourceRef   string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	FetchOnOpen     *bool                             `json:"fetchOnOpen,omitempty" yaml:"fetchOnOpen,omitempty"`
 	Content         *Container                        `json:"content" yaml:"content"`
 	ClassName       string                            `json:"className,omitempty" yaml:"className,omitempty"`
 	Style           *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
