@@ -18,7 +18,7 @@ selectionRetention: pages
 replayPendingFetchOnRestore: false
 preserveDialogStateOnReopen: true
 requiredAnyParameters: [AdvertiserId, CampaignId]
-paging: {enabled: true, size: 100, openEnded: true, parameters: {page: Page}}
+paging: {enabled: true, size: 100, openEnded: true, aggregate: true, maxPages: 100, parameters: {page: Page}}
 filterSet:
   - name: quick
     default: true
@@ -42,7 +42,7 @@ filterSet:
 	if len(actual.RequiredAnyParameters) != 2 || actual.RequiredAnyParameters[0] != "AdvertiserId" || actual.RequiredAnyParameters[1] != "CampaignId" {
 		t.Fatalf("required-any parameter contract was not retained: %#v", actual.RequiredAnyParameters)
 	}
-	if actual.Paging == nil || !actual.Paging.OpenEnded {
+	if actual.Paging == nil || !actual.Paging.OpenEnded || !actual.Paging.Aggregate || actual.Paging.MaxPages != 100 {
 		t.Fatalf("open-ended paging policy was not retained: %#v", actual.Paging)
 	}
 	template := actual.FilterSet[0].Template[0]
@@ -53,7 +53,7 @@ filterSet:
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, fragment := range []string{`"sortMode":"client"`, `"filterMode":"client"`, `"paginationMode":"client"`, `"selectionRetention":"pages"`, `"replayPendingFetchOnRestore":false`, `"preserveDialogStateOnReopen":true`, `"requiredAnyParameters":["AdvertiserId","CampaignId"]`, `"openEnded":true`, `"field":"siteName"`, `"dataField":"legacySiteName"`} {
+	for _, fragment := range []string{`"sortMode":"client"`, `"filterMode":"client"`, `"paginationMode":"client"`, `"selectionRetention":"pages"`, `"replayPendingFetchOnRestore":false`, `"preserveDialogStateOnReopen":true`, `"aggregate":true`, `"maxPages":100`, `"requiredAnyParameters":["AdvertiserId","CampaignId"]`, `"openEnded":true`, `"field":"siteName"`, `"dataField":"legacySiteName"`} {
 		if !strings.Contains(string(payload), fragment) {
 			t.Fatalf("missing %s in datasource JSON: %s", fragment, payload)
 		}
