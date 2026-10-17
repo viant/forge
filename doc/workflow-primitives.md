@@ -210,6 +210,13 @@ table: {columns: [{id: id, name: ID}, {id: name, name: Name}]}
 
 Each editable operation may override the collection-level `selection` contract. This allows one list to combine exactly-one Edit with independently bounded bulk operations. `selection.every`, `selection.any`, and `selection.none` apply the normal predicate operators to each selected row and fail closed before dispatch.
 
+For a server-paginated multi-select datasource, opt in to `selectionRetention: pages`
+when a bulk operation may span pages. Only changing `page` retains selected rows
+from earlier pages. Changing the filter, sort, page size, or parent parameters
+clears them. A successful mutation should use `clearSelection: true` on its
+list refresh so stale off-page rows cannot be reused after the write. The
+default datasource behavior still reconciles selection to the current page.
+
 ### Workflow primitive reference
 
 | Primitive | Required | Important optional fields | Runtime responsibility |

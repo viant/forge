@@ -14,6 +14,7 @@ func TestDataSourceYAMLRetainsClientModes(t *testing.T) {
 sortMode: client
 filterMode: client
 paginationMode: client
+selectionRetention: pages
 replayPendingFetchOnRestore: false
 preserveDialogStateOnReopen: true
 requiredAnyParameters: [AdvertiserId, CampaignId]
@@ -28,6 +29,9 @@ filterSet:
 	}
 	if actual.SortMode != "client" || actual.FilterMode != "client" || actual.PaginationMode != "client" {
 		t.Fatalf("client modes were not retained: %#v", actual)
+	}
+	if actual.SelectionRetention != "pages" {
+		t.Fatalf("selection retention was not retained: %#v", actual.SelectionRetention)
 	}
 	if actual.ReplayPendingFetchOnRestore == nil || *actual.ReplayPendingFetchOnRestore {
 		t.Fatalf("pending fetch replay policy was not retained: %#v", actual.ReplayPendingFetchOnRestore)
@@ -49,7 +53,7 @@ filterSet:
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, fragment := range []string{`"sortMode":"client"`, `"filterMode":"client"`, `"paginationMode":"client"`, `"replayPendingFetchOnRestore":false`, `"preserveDialogStateOnReopen":true`, `"requiredAnyParameters":["AdvertiserId","CampaignId"]`, `"openEnded":true`, `"field":"siteName"`, `"dataField":"legacySiteName"`} {
+	for _, fragment := range []string{`"sortMode":"client"`, `"filterMode":"client"`, `"paginationMode":"client"`, `"selectionRetention":"pages"`, `"replayPendingFetchOnRestore":false`, `"preserveDialogStateOnReopen":true`, `"requiredAnyParameters":["AdvertiserId","CampaignId"]`, `"openEnded":true`, `"field":"siteName"`, `"dataField":"legacySiteName"`} {
 		if !strings.Contains(string(payload), fragment) {
 			t.Fatalf("missing %s in datasource JSON: %s", fragment, payload)
 		}

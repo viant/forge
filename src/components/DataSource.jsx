@@ -4,7 +4,7 @@ import {getLogger} from "../utils/logger.js";
 import {useSignals} from '@preact/signals-react/runtime';
 import { extractData, isDeferredCacheHitEnvelope } from "./dataSourceExtract.js";
 import { beginDataSourceFetch, consumeDataSourceFetchRequest, reconcileRestoredPendingFetch, recoverInterruptedFetchOnMount, resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, withFetchedPageInfo, snapshotFetchedPageResult } from "./dataSourceFetchState.js";
-import {reconcileMultiSelection, reconcileSingleSelection} from "./dataSourceSelection.js";
+import {pageSelectionPolicy, reconcileMultiSelection, reconcileSingleSelection} from "./dataSourceSelection.js";
 import {applyFetchTransform} from "./dataSourceTransform.js";
 import {hasResolvedDependencies} from "./dataSourceDependencies.js";
 import {bindingFinalizationAction, isCurrentBindingGeneration} from "./primitives/bindingGeneration.js";
@@ -612,7 +612,12 @@ export default function DataSource({context}) {
             metrics.value = stats;
             control.value = { ...control.peek(), loaded: true, error: null, stale: false };
             if (selectionMode === 'multi') {
-                const reconciledSelection = reconcileMultiSelection(currentSelection, records, getUniqueKeyValue);
+                const policy = dataSource.selectionRetention === 'pages'
+                    ? pageSelectionPolicy(prevQuerySig.current, requestSig)
+                    : {retainMissing: false, clear: false};
+                const nextSelection = policy.clear ? {selection: []} : currentSelection;
+                const reconciledSelection = reconcileMultiSelection(nextSelection, records, getUniqueKeyValue,
+                    {retainMissing: policy.retainMissing});
                 if (stableSnapshotSignature(currentSelection?.selection) !== stableSnapshotSignature(reconciledSelection.selection)) {
                     setSelected(reconciledSelection);
                 }
