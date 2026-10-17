@@ -3605,9 +3605,7 @@
         "codec": {
           "$ref": "#/$defs/Codec"
         },
-        "default": {
-          "type": "string"
-        },
+        "default": {},
         "direction": {
           "type": "string"
         },
@@ -4616,6 +4614,12 @@
         },
         "template": {
           "type": "string"
+        },
+        "thenBy": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object"
