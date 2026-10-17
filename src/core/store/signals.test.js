@@ -112,3 +112,24 @@ assert.equal(scoped.getInputSignal(ds).peek().cache,null);
 assert.equal(scoped.protectedWindowEpoch('scoped'),windowEpoch);assert.equal(scoped.protectedDataSourceEpoch(ds),dsEpoch+1);
 assert.deepEqual(scoped.getFormSignal('scoped:windowForm').peek(),{selectedCategory:'user-selected'});
 assert.ok(scoped.getMetadataSignal('scoped').peek());assert.equal(scoped.protectedWindowDenials.peek().scoped,undefined);
+
+// Filter defaults seed a newly created (or metadata-less precreated) signal once.
+const defaults={Archived:false,Ids:[1,2]};
+const precreated=scoped.getInputSignal('filter-defaults');
+assert.equal(Object.hasOwn(precreated.peek(),'filter'),false);
+const seeded=scoped.getInputSignal('filter-defaults',defaults);
+assert.equal(seeded,precreated);
+assert.deepEqual(seeded.peek().filter,defaults);
+seeded.peek().filter.Ids.push(3);
+assert.deepEqual(defaults.Ids,[1,2],'seed must not mutate metadata');
+seeded.value={...seeded.peek(),filter:{Archived:true}};
+scoped.getInputSignal('filter-defaults',defaults);
+assert.deepEqual(seeded.peek().filter,{Archived:true},'user filter wins');
+seeded.value={...seeded.peek(),filter:{}};
+scoped.getInputSignal('filter-defaults',defaults);
+assert.deepEqual(seeded.peek().filter,{},'explicit clear is not reseeded');
+const restored=scoped.getInputSignal('filter-restored');
+restored.value={fetch:false,filter:{Name:'restored'}};
+scoped.getInputSignal('filter-restored',defaults);
+assert.deepEqual(restored.peek().filter,{Name:'restored'});
+console.log('Datasource initial filters preserve later edits, clears and restored state');

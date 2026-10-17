@@ -1669,6 +1669,8 @@ type Option struct {
 }
 
 type DataSource struct {
+	// InitialFilter seeds UI filter state once; restored/user filters take precedence.
+	InitialFilter                           map[string]interface{}            `json:"initialFilter,omitempty" yaml:"initialFilter,omitempty"`
 	Service                                 *Service                          `json:"service,omitempty" yaml:"service,omitempty"`
 	DataSourceRef                           string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 	ResourceModelRef                        string                            `json:"resourceModelRef,omitempty" yaml:"resourceModelRef,omitempty"`

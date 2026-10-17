@@ -279,7 +279,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             }
 
             const standardSignals = {
-                input: getInputSignal(identity.dataSourceId),
+                input: getInputSignal(identity.dataSourceId, dataSource.initialFilter),
                 form: getFormSignal(identity.dataSourceId),
                 windowForm: getFormSignal(`${windowId}:windowForm`),
                 control: getControlSignal(identity.dataSourceId),
@@ -378,7 +378,7 @@ export const Context = (windowId, metadata, dataSourceRef, services) => {
             };
 
             const standardSignals = {
-                input: getInputSignal(identity.dataSourceId),
+                input: getInputSignal(identity.dataSourceId, dataSource.initialFilter),
                 form: getFormSignal(identity.dataSourceId),
                 windowForm: getFormSignal(`${windowId}:windowForm`),
                 control: getControlSignal(identity.dataSourceId),
