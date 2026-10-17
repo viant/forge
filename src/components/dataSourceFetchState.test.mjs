@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
     beginDataSourceFetch,
+    suppressRepeatedFailedFetch,
     consumeDataSourceFetchRequest,
     reconcileRestoredPendingFetch,
     recoverInterruptedFetchOnMount,
@@ -15,6 +16,11 @@ import {
 
 const begunRefresh = beginDataSourceFetch({loading: false, loaded: true, error: new Error('old'), stale: true});
 assert.deepEqual(begunRefresh, {loading: true, loaded: false, error: null, stale: false});
+const failed = {error: new Error('upstream failed'), failedRequestSignature: 'same-query'};
+assert.equal(suppressRepeatedFailedFetch(failed, 'same-query'), true, 'automatic duplicate read stays local');
+assert.equal(suppressRepeatedFailedFetch(failed, 'changed-query'), false, 'new query can recover');
+assert.equal(suppressRepeatedFailedFetch(failed, 'same-query', {bypassCache: true}), false, 'explicit refresh can retry');
+assert.equal(suppressRepeatedFailedFetch({failedRequestSignature: 'same-query'}, 'same-query'), false, 'success is not blocked');
 assert.deepEqual(
     consumeDataSourceFetchRequest({fetch: true, refresh: false, parameters: {id: 7}}, "fetch"),
     {fetch: false, refresh: false, parameters: {id: 7}},
