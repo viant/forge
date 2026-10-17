@@ -60,6 +60,8 @@ if (!permissionBoundaryAllows({mode: 'resource', capability: 'write'}, root)) th
 if (responsiveTarget(390) !== 'phone' || responsiveTarget(900) !== 'narrow' || responsiveTarget(1200) !== 'desktop') throw new Error('responsive targets are not stable');
 if (responsiveGridStyle({style: {height: '300px'}}).flexShrink !== 0) throw new Error('explicit responsive height may not be silently flex-shrunk');
 if (projectResponsiveColumns([{id: 'status'}, {id: 'name'}, {id: 'id'}], ['__select__', 'name', 'id', 'status']).map((column) => column.id).join(',') !== 'name,id,status') throw new Error('responsive breakpoint column order is not authoritative');
+const guardedSelection = {id: '__select__', multiSelect: true, selectionDisabledWhen: {source: 'row', field: 'directAssociation', notEquals: true}};
+if (projectResponsiveColumns([guardedSelection, {id: 'name'}], ['__select__', 'name'])[0]?.selectionDisabledWhen !== guardedSelection.selectionDisabledWhen) throw new Error('responsive selection must retain its authored row guard');
 assert.deepEqual(
   applyResponsiveColumnState([{id: 'name', width: 300, sticky: true}, {id: 'status', width: 120, sticky: true}], {stickyColumns: ['name'], columnOverrides: {name: {width: 180}}}),
   [{id: 'name', width: 180, sticky: 'left'}, {id: 'status', width: 120, sticky: false}],
