@@ -206,3 +206,13 @@ layer and should not be used to continually overwrite a filter control's state.
 Verification: `src/core/store/signals.test.js` covers one-time seeding, metadata
 cloning, user edits, explicit clearing, and restored filters. Typed metadata is
 represented by `DataSource.InitialFilter` in `backend/types/model.go`.
+
+## Integer-array filter inputs
+
+Declared `int[]` filters normalize native form CSV (`"1,2"`) and the `in`
+control's wrapped form (`["1,2"]`) into integer arrays before MCP dispatch.
+Already typed integer arrays retain their values/order. Invalid tokens, nested
+arrays and fractional IDs remain uncoerced for normal producer validation;
+normalization never dispatches only a valid subset or truncates fractional IDs.
+String-array values remain distinct: an already typed string containing a comma
+is a literal value, not an integer CSV list.

@@ -104,9 +104,11 @@ func coerceInt(value interface{}) (int, bool) {
 	case int64:
 		return int(actual), true
 	case float32:
-		return int(actual), true
+		parsed := int(actual)
+		return parsed, float32(parsed) == actual
 	case float64:
-		return int(actual), true
+		parsed := int(actual)
+		return parsed, float64(parsed) == actual
 	case string:
 		text := strings.TrimSpace(actual)
 		if text == "" {
@@ -129,11 +131,29 @@ func coerceIntSlice(value interface{}) ([]int, bool) {
 	case []interface{}:
 		result := make([]int, 0, len(actual))
 		for _, item := range actual {
+			if text, ok := item.(string); ok {
+				parsed, valid := coerceIntSlice(text)
+				if !valid {
+					return nil, false
+				}
+				result = append(result, parsed...)
+				continue
+			}
 			parsed, ok := coerceInt(item)
 			if !ok {
 				return nil, false
 			}
 			result = append(result, parsed)
+		}
+		return result, true
+	case []string:
+		result := make([]int, 0, len(actual))
+		for _, item := range actual {
+			parsed, ok := coerceIntSlice(item)
+			if !ok {
+				return nil, false
+			}
+			result = append(result, parsed...)
 		}
 		return result, true
 	case string:
