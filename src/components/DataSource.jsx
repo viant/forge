@@ -86,6 +86,15 @@ export default function DataSource({context}) {
     const {input, collection, selection, collectionInfo, metrics, form, control} = signals
     const {getUniqueKeyValue, setSelected, setLoading, setError, setInactive} = handlers.dataSource
     const events = dataSourceEvents(context, dataSource);
+    const notifyFetchError = (error, phase) => {
+        try {
+            if (events.onError && events.onError.isDefined()) {
+                log.debug(`[${phase}] onError:execute`, {ds: context?.identity?.dataSourceRef});
+                events.onError.execute({error});
+            }
+        } catch (_) {
+        }
+    };
     const resourceModelRef = resourceModelRefForDataSource(context, dataSource.resourceModelRef);
     const selectionMode = dataSource.selectionMode || 'single';
     useEffect(() => {
@@ -423,19 +432,17 @@ export default function DataSource({context}) {
             }
         } catch (err) {
             if (!mountedRef.current || !authorizationIsCurrent()) return;
-            if (isDataSourceLocalDenial(err, context)) { clearDeniedDataSourceState(identity.dataSourceId, err); return; }
+            if (isDataSourceLocalDenial(err, context)) {
+                clearDeniedDataSourceState(identity.dataSourceId, err);
+                notifyFetchError(err, 'refreshRecords');
+                return;
+            }
             if (isProtectedUpstreamDenial(context, err)) {
                 denyProtectedWindow(identity.windowId, Number(err.status));
                 return;
             }
             setError(err);
-            try {
-                if (events.onError && events.onError.isDefined()) {
-                    log.debug('[refreshRecords] onError:execute', {ds: context?.identity?.dataSourceRef});
-                    events.onError.execute({error: err});
-                }
-            } catch (_) {
-            }
+            notifyFetchError(err, 'refreshRecords');
         } finally {
             if (mountedRef.current && authorizationIsCurrent()) setLoading(false);
         }
@@ -677,7 +684,11 @@ export default function DataSource({context}) {
                 try { log.debug('[doFetchRecords] ignored stale binding error', {ds: context?.identity?.dataSourceRef, bindingGeneration}); } catch (_) {}
                 return;
             }
-            if (isDataSourceLocalDenial(err, context)) { clearDeniedDataSourceState(identity.dataSourceId, err); return; }
+            if (isDataSourceLocalDenial(err, context)) {
+                clearDeniedDataSourceState(identity.dataSourceId, err);
+                notifyFetchError(err, 'doFetchRecords');
+                return;
+            }
             if (isProtectedUpstreamDenial(context, err)) {
                 denyProtectedWindow(identity.windowId, Number(err.status));
                 return;
@@ -685,14 +696,7 @@ export default function DataSource({context}) {
             log.warn('doFetchRecords error', err)
             setError(err);
 
-            // Fire DS-level onError if defined
-            try {
-                if (events.onError && events.onError.isDefined()) {
-                    log.debug('[doFetchRecords] onError:execute', {ds: context?.identity?.dataSourceRef});
-                    events.onError.execute({error: err});
-                }
-            } catch (_) {
-            }
+            notifyFetchError(err, 'doFetchRecords');
         } finally {
             if (!authorizationIsCurrent()) return;
             const bindingIsCurrent = isCurrentBindingGeneration(input.peek()?.bindingGeneration, bindingGeneration);
