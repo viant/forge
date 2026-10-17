@@ -2,6 +2,13 @@ export function shouldRefreshDialogDataSourceOnOpen(dataSource = {}) {
     return dataSource?.preserveDialogStateOnReopen !== true;
 }
 
+// A dialog can own its read even when its content is rendered from the same
+// datasource. Explicit ownership avoids a second fetch by the content panel.
+export function shouldFetchDialogOnOpen(dialog = {}) {
+    if (typeof dialog?.fetchOnOpen === 'boolean') return dialog.fetchOnOpen;
+    return dialog?.content?.fetchData !== false;
+}
+
 export function shouldRefreshDialogDataSourceForMount(dataSource = {}, focusRequest = 0, lastHandledFocusRequest = null) {
     if (dataSource?.preserveDialogStateOnReopen !== true) return true;
     const revision = Number(focusRequest || 0);
