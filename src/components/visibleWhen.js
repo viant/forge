@@ -174,6 +174,8 @@ export const trackVisibleWhen = (visibleWhen, context) => {
 };
 
 export const isContainerVisible = (container, baseContext) => {
+    const explicitRef = String(container?.dataSourceRef || '').trim();
+    if (explicitRef && !baseContext?.metadata?.dataSource?.[explicitRef]) return false;
     const visibleWhen = getDashboardVisibleWhen(container);
     const scopedContext = resolveChildContext(baseContext, container?.dataSourceRef || baseContext?.identity?.dataSourceRef);
     const visible = !visibleWhen ? true : scopedContext?.dashboardKey
@@ -187,6 +189,8 @@ export const isContainerVisible = (container, baseContext) => {
 };
 
 export const trackContainerVisibility = (container, baseContext) => {
+    const explicitRef = String(container?.dataSourceRef || '').trim();
+    if (explicitRef && !baseContext?.metadata?.dataSource?.[explicitRef]) return;
     const visibleWhen = getDashboardVisibleWhen(container);
     if (!visibleWhen && !container?.hiddenWhen) {
         return;

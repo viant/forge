@@ -60,3 +60,18 @@ it('omits a missing datasource region while the healthy root and sibling control
  expect(requests).not.toContain('missingHistory');
  expect(errors.filter(message=>message.includes('MissingDataSourceReferenceError'))).toHaveLength(0);
 });
+it('keeps the tab rail and healthy tab when an inactive tab definition is absent',async()=>{
+ const def=metadata();def.view.content.containers=[{id:'sections',tabs:{defaultSelectedTabId:'properties',renderActiveTabPanelOnly:true},containers:[
+  {id:'properties',title:'Properties',dataSourceRef:'record',items:[{id:'title',type:'label',value:'Healthy properties'}]},
+  {id:'history',title:'History',dataSourceRef:'missingHistory',items:[{id:'history-value',type:'label',value:'Missing history'}]},
+ ]}];
+ const errors=[];const original=console.error;console.error=(...args)=>errors.push(args.join(' '));
+ let requests;
+ try {({requests}=await mount(def));} finally {console.error=original;}
+ expect(host.textContent).toContain('Properties');
+ expect(host.textContent).toContain('Healthy properties');
+ expect(host.textContent).not.toContain('Missing history');
+ expect(host.querySelector('button[aria-label="Category"]')).not.toBeNull();
+ expect(requests).not.toContain('missingHistory');
+ expect(errors.filter(message=>message.includes('MissingDataSourceReferenceError'))).toHaveLength(0);
+});
