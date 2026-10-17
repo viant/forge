@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {lowerReportBuilderPredicates} from "./reportBuilderPredicates.js";
 
 import { applyReportBuilderRuntimeFieldCatalog } from "./reportBuilderRuntimeFieldCatalog.js";
 import {
@@ -137,3 +138,13 @@ assert.deepEqual(
     labelClamp: { lines: 2, maxCharacters: 36 },
   },
 );
+
+const campaignConfig = choices => applyReportBuilderRuntimeFieldCatalog({runtimeFieldCatalog:{enabled:true}}, {reportDefinition:{fieldCatalog:{columns:[{name:'campaignId',role:'dimension',type:'integer'}],allowedFilters:['campaignIds'],parameters:[{name:'campaignIds',choices}]}}}).predicates[0];
+assert.equal(campaignConfig(undefined).manualEntry,false);
+assert.deepEqual(campaignConfig(undefined).options,[]);
+assert.deepEqual(campaignConfig([]).options,[]);
+assert.deepEqual(campaignConfig([{value:12,label:'Synthetic display'},{value:12,label:'Duplicate'},{value:0,label:'Invalid'},{value:'15',label:'Untyped'},{value:14,label:'Synthetic video'}]).options,[{value:12,label:'Synthetic display'},{value:14,label:'Synthetic video'}]);
+
+const loweredChoices=lowerReportBuilderPredicates({predicates:[campaignConfig([{value:12,label:'Synthetic display'}])]});
+assert.deepEqual(loweredChoices.staticFilters[0].options,[{value:12,label:'Synthetic display'}]);
+assert.equal(loweredChoices.staticFilters[0].multiple,true);

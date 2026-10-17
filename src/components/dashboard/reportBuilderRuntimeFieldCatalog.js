@@ -142,16 +142,25 @@ export function applyReportBuilderRuntimeFieldCatalog(config = {}, windowForm = 
     });
   }
   if (allowedFilters.has("campaignIds")) {
+    const parameter = (Array.isArray(catalog?.parameters) ? catalog.parameters : [])
+      .find(item => item?.name === "campaignIds");
+    const choices = Array.isArray(parameter?.choices) ? parameter.choices : [];
+    const seen = new Set();
+    const options = choices.filter(choice => {
+      if (!Number.isSafeInteger(choice?.value) || choice.value <= 0 || seen.has(choice.value)) return false;
+      seen.add(choice.value);return true;
+    }).map(choice => ({value:choice.value,label:normalizeString(choice.label) || `Campaign ${choice.value}`}));
     predicates.push({
       id: "campaignIds",
       label: "Campaign",
-      bucket: "scope",
+      pinned: true,
       paramPath: "filters.campaignIds",
       multiple: true,
       emitArray: true,
-      manualEntry: true,
-      manualValueType: "int",
-      manualPlaceholder: "Enter campaign id",
+      // Choices are presentation metadata. The producer must reauthorize IDs
+      // on execution; missing/empty choices never enable free-form identifiers.
+      manualEntry: false,
+      options,
       prefill: ["campaignIds", "campaignId"],
     });
   }

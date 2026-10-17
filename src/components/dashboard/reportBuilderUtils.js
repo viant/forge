@@ -114,6 +114,7 @@ function normalizeFieldIdArray(values = []) {
 }
 
 export function shouldAutoCollapseReportBuilderFilters({
+    editingFilters = false,
     canShowResults = false,
     hasCompletedCurrentRun = false,
     manualRunSequence = 0,
@@ -121,7 +122,8 @@ export function shouldAutoCollapseReportBuilderFilters({
 } = {}) {
     const runSequence = Number(manualRunSequence || 0);
     const lastCollapsed = Number(collapsedRunSequence || 0);
-    return !!canShowResults
+    return !editingFilters
+        && !!canShowResults
         && !!hasCompletedCurrentRun
         && Number.isFinite(runSequence)
         && runSequence > 0

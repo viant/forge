@@ -199,10 +199,21 @@ func Materialize(ctx context.Context, spec json.RawMessage, datasets map[string]
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	size := len(spec)
+	for _, raw := range datasets {
+		size += len(raw)
+	}
+	if size > 16<<20 {
+		return nil, fmt.Errorf("report materialization input limit")
+	}
+	normalized, err := normalizeDatasetResults(spec, datasets)
+	if err != nil {
+		return nil, err
+	}
 	raw, err := json.Marshal(struct {
 		Spec     json.RawMessage            `json:"reportSpec"`
 		Datasets map[string]json.RawMessage `json:"datasets"`
-	}{spec, datasets})
+	}{spec, normalized})
 	if err != nil {
 		return nil, err
 	}
