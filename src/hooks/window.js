@@ -278,6 +278,9 @@ function sameWorkspaceNavigationTarget(currentWindow = null, target = null) {
 }
 
 export function buildWorkspaceNavigationTrail(currentWindow = null, target = null) {
+    if (Array.isArray(target?.navigationTrail)) {
+        return target.navigationTrail.map((entry) => cloneNavigationValue(entry)).filter(Boolean);
+    }
     const existing = Array.isArray(currentWindow?.navigationTrail)
         ? currentWindow.navigationTrail.map((entry) => cloneNavigationValue(entry)).filter(Boolean)
         : [];
