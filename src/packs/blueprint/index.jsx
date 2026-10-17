@@ -9,6 +9,7 @@ import './theme.css';
  * ---------------------------------------------------------------------- */
 
 import React from 'react';
+import {batch} from '@preact/signals-react';
 import {fileToMCPBlob} from './fileBlob.js';
 import {createPortal} from 'react-dom';
 import {
@@ -176,47 +177,55 @@ export function DateRangePresetInput({
     );
     const start = String(windowForm[startField] || '');
     const end = String(windowForm[endField] || '');
-    const invalid = !!start && !!end && start > end;
+    const [customDraft, setCustomDraft] = React.useState(() => ({start, end}));
+    const invalid = !!customDraft.start && !!customDraft.end && customDraft.start > customDraft.end;
     const includePartialData = windowForm[includePartialDataField] !== false;
     const selected = options.find((option) => String(option.value) === String(value));
     const selectedLabel = selected?.label || item?.label || 'Select period';
     const triggerLabel = start && end
         ? `${selectedLabel}: ${formatDateRangeDay(start)} – ${formatDateRangeDay(end)}`
         : selectedLabel;
-    const setDraftFields = (patch) => {
+    const setAppliedFields = (patch) => {
         if (!context?.signals?.windowForm) return;
         const previous = context.signals.windowForm.peek?.() || context.signals.windowForm.value || {};
         context.signals.windowForm.value = {...previous, ...patch};
     };
-    const setDraftField = (field, nextValue) => setDraftFields({[field]: nextValue});
+    const setAppliedField = (field, nextValue) => setAppliedFields({[field]: nextValue});
     React.useLayoutEffect(() => {
         if (String(value).toLowerCase() === 'custom') return;
         const resolved = resolveDateRangePreset(value, new Date(), resolvedLifetimeStart, resolvedTimeZone);
         if (!resolved) return;
         const current = context?.signals?.windowForm?.peek?.() || context?.signals?.windowForm?.value || {};
         const patch = resolveDateRangePresetSyncPatch(current, resolved, {startField, endField, granularityField});
-        if (patch) setDraftFields(patch);
+        if (patch) setAppliedFields(patch);
     }, [value, context, startField, endField, granularityField, resolvedLifetimeStart, resolvedTimeZone]);
     const choosePreset = (option) => {
         if (String(option?.value).toLowerCase() === 'custom') return;
         const resolved = resolveDateRangePreset(option?.value, new Date(), resolvedLifetimeStart, resolvedTimeZone);
-        if (resolved) {
-            setDraftFields({
-                [startField]: resolved.start,
-                [endField]: resolved.end,
-                [granularityField]: resolved.granularity,
-            });
-        }
-        onChange?.(option?.value);
+        batch(() => {
+            if (resolved) {
+                setAppliedFields({
+                    [startField]: resolved.start,
+                    [endField]: resolved.end,
+                    [granularityField]: resolved.granularity,
+                });
+            }
+            onChange?.(option?.value);
+        });
         setOpen(false);
     };
     const applyCustom = () => {
-        if (!customApplyEnabled || !start || !end || invalid) return;
-        const startDate = new Date(`${start}T00:00:00Z`);
-        const endDate = new Date(`${end}T00:00:00Z`);
+        if (!customApplyEnabled || !customDraft.start || !customDraft.end || invalid) return;
+        const startDate = new Date(`${customDraft.start}T00:00:00Z`);
+        const endDate = new Date(`${customDraft.end}T00:00:00Z`);
         const durationDays = Math.floor((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
-        setDraftField(granularityField, durationDays <= 2 ? 'hour' : 'day');
-        onChange?.('custom');
+        // Draft typing must not update datasource parameters or be reset by
+        // the still-selected preset. Publish a coherent range only on Apply.
+        batch(() => {
+            setAppliedFields({[startField]: customDraft.start, [endField]: customDraft.end,
+                [granularityField]: durationDays <= 2 ? 'hour' : 'day'});
+            onChange?.('custom');
+        });
         setOpen(false);
     };
     const updatePopupPosition = React.useCallback(() => {
@@ -248,7 +257,10 @@ export function DateRangePresetInput({
                 aria-haspopup="dialog"
                 aria-expanded={open}
                 disabled={readOnly || disabled}
-                onClick={() => setOpen((current) => !current)}
+                onClick={() => {
+                    if (!open) setCustomDraft({start, end});
+                    setOpen((current) => !current);
+                }}
                 style={{width: '100%', justifyContent: 'space-between'}}
             >
                 {triggerLabel}
@@ -294,9 +306,9 @@ export function DateRangePresetInput({
                                 className="bp6-input"
                                 type="date"
                                 aria-label="Custom start date"
-                                value={start}
-                                max={end || undefined}
-                                onChange={(event) => setDraftField(startField, event.target.value)}
+                                value={customDraft.start}
+                                max={customDraft.end || undefined}
+                                onChange={(event) => setCustomDraft(previous => ({...previous, start: event.target.value}))}
                             />
                         </label>
                         <label style={{display: 'grid', gap: 4, fontSize: 11, color: '#596579'}}>
@@ -305,9 +317,9 @@ export function DateRangePresetInput({
                                 className="bp6-input"
                                 type="date"
                                 aria-label="Custom end date"
-                                value={end}
-                                min={start || undefined}
-                                onChange={(event) => setDraftField(endField, event.target.value)}
+                                value={customDraft.end}
+                                min={customDraft.start || undefined}
+                                onChange={(event) => setCustomDraft(previous => ({...previous, end: event.target.value}))}
                             />
                         </label>
                     </div>
@@ -318,11 +330,11 @@ export function DateRangePresetInput({
                                 className="forge-blueprint-checkbox-compat"
                                 checked={includePartialData}
                                 label="Include today's partial data"
-                                onChange={(event) => setDraftField(includePartialDataField, event.target.checked)}
+                                onChange={(event) => setAppliedField(includePartialDataField, event.target.checked)}
                             />
                             {customApplyEnabled ? null : customDisabledMessage}
                         </span>
-                        <Button type="button" intent="primary" disabled={!customApplyEnabled || !start || !end || invalid} onClick={applyCustom}>
+                        <Button type="button" intent="primary" disabled={!customApplyEnabled || !customDraft.start || !customDraft.end || invalid} onClick={applyCustom}>
                             Apply dates
                         </Button>
                     </div>
@@ -808,7 +820,16 @@ export function registerPack() {
             value = [],
             onChange,
             onItemSelect,
+            onOptionsRequest,
+            optionsFetchStatus,
+            onFocus,
+            onClick,
+            onKeyDown,
+            id,
+            'aria-label': ariaLabel,
+            'aria-labelledby': ariaLabelledBy,
             readOnly,
+            disabled,
             options = [],
             appearance,
             placeholder,
@@ -816,10 +837,18 @@ export function registerPack() {
             context,
             ...rest
         }) {
+            const unavailable = !!(readOnly || disabled);
+            const requestOptions = reason => { if (!unavailable) onOptionsRequest?.(reason); };
+            const lazyGroup = onOptionsRequest ? {id, role: 'group', 'aria-label': ariaLabel,
+                'aria-labelledby': ariaLabelledBy, tabIndex: unavailable ? -1 : 0,
+                onFocusCapture: () => requestOptions('focus'), onClick: () => requestOptions('open')} : {id};
             const selectedValues = normalizeMultiValues(value);
             const selectedSet = new Set(selectedValues);
             const normalizedOptions = permittedOptions(options, context);
-            const selectedItems = normalizedOptions.filter((opt) => selectedSet.has(`${opt?.value ?? ''}`));
+            const selectedItems = onOptionsRequest
+                ? selectedValues.map(selected => normalizedOptions.find(opt => String(opt?.value ?? '') === selected)
+                    || {value: selected, label: selected})
+                : normalizedOptions.filter((opt) => selectedSet.has(`${opt?.value ?? ''}`));
             const toggle = (option) => {
                 const optionValue = `${option?.value ?? ''}`;
                 if (!optionValue) return;
@@ -840,20 +869,20 @@ export function registerPack() {
                     ...(style || {}),
                 };
                 return (
-                    <div style={checkboxContainerStyle} className="forge-checkboxes-container">
+                    <div {...lazyGroup} style={checkboxContainerStyle} className="forge-checkboxes-container">
                         {normalizedOptions.map((opt) => {
                             const optionValue = `${opt?.value ?? ''}`;
                             const optionLabel = opt?.label || optionValue;
                             return (
                                 <label
                                     key={optionValue}
-                                    style={{display: 'flex', alignItems: 'center', gap: 8, minWidth: 128, cursor: readOnly ? 'default' : 'pointer'}}
+                                    style={{display: 'flex', alignItems: 'center', gap: 8, minWidth: 128, cursor: unavailable ? 'default' : 'pointer'}}
                                 >
                                     <input
                                         type="checkbox"
                                         aria-label={optionLabel}
                                         checked={selectedSet.has(optionValue)}
-                                        disabled={readOnly}
+                                        disabled={unavailable}
                                         style={{width: 16, height: 16, margin: 0, accentColor: '#2563eb'}}
                                         onChange={() => toggle(opt)}
                                     />
@@ -874,7 +903,7 @@ export function registerPack() {
                     ...(style || {}),
                 };
                 return (
-                    <div style={pillContainerStyle} className="forge-pills-container">
+                    <div {...lazyGroup} style={pillContainerStyle} className="forge-pills-container">
                         {normalizedOptions.map((opt) => {
                             const optionValue = `${opt?.value ?? ''}`;
                             const selected = selectedSet.has(optionValue);
@@ -886,7 +915,7 @@ export function registerPack() {
                                     aria-pressed={selected}
                                     data-selected={selected ? 'true' : 'false'}
                                     small
-                                    disabled={readOnly}
+                                    disabled={unavailable}
                                     outlined={false}
                                     minimal={!selected}
                                     intent="none"
@@ -921,9 +950,12 @@ export function registerPack() {
                     {...rest}
                     items={normalizedOptions}
                     selectedItems={selectedItems}
-                    disabled={readOnly}
+                    disabled={unavailable}
                     fill
                     resetOnSelect
+                    noResults={optionsFetchStatus === 'loading' || optionsFetchStatus === 'error'
+                        ? <MenuItem disabled text={optionsFetchStatus === 'loading' ? 'Loading options…' : 'Options could not be loaded. Open again to retry.'}/>
+                        : rest.noResults}
                     itemRenderer={(item, { handleClick, modifiers }) => (
                         <MenuItem
                             key={`${item?.value ?? ''}`}
@@ -936,15 +968,22 @@ export function registerPack() {
                     )}
                     tagRenderer={(item) => item?.label || `${item?.value ?? ''}`}
                     tagInputProps={{
-                        disabled: readOnly,
+                        disabled: unavailable,
                         style: style || undefined,
                         inputProps: {
+                            id, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy,
+                            onFocus: event => { requestOptions('focus'); onFocus?.(event); },
+                            onClick: event => { requestOptions('open'); onClick?.(event); },
+                            onKeyDown: event => {
+                                if (['Enter', ' ', 'ArrowDown'].includes(event.key)) requestOptions('open');
+                                onKeyDown?.(event);
+                            },
                             placeholder: selectedItems.length ? '' : (placeholder || 'Select...'),
                         },
                     }}
                     onItemSelect={toggle}
                     onRemove={remove}
-                    popoverProps={{ minimal: true, matchTargetWidth: true, placement: 'bottom-start' }}
+                    popoverProps={{ minimal: true, matchTargetWidth: true, placement: 'bottom-start', onOpening: () => requestOptions('open') }}
                 />
             );
         },

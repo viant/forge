@@ -150,7 +150,7 @@ func (f *confinedWindowFS) check() error { f.mu.Lock(); defer f.mu.Unlock(); ret
 func (f *confinedWindowFS) fail(err error) error {
 	if err != nil {
 		f.mu.Lock()
-		if f.failure == nil {
+		if f.failure == nil || errors.Is(f.failure, fs.ErrNotExist) && !errors.Is(err, fs.ErrNotExist) {
 			f.failure = err
 		}
 		f.mu.Unlock()
