@@ -174,3 +174,45 @@ false, including nested containers and target overrides. Go constructors that
 intend a policy must pass a bool pointer. Published components compiled by an
 older bool/omitempty model must be recompiled and republished; deploying only the
 new renderer cannot restore an already omitted field.
+
+## Initial filter state
+
+`initialFilter` supplies typed defaults for a newly initialized UI datasource:
+
+```yaml
+id: records
+initialFilter:
+  IncludeArchived: false
+filterMode: server
+paginationMode: server
+filterSet:
+  - name: quick
+    default: true
+    template:
+      - {id: IncludeArchived, label: Include archived, type: boolean, operator: equal}
+```
+
+Forge clones this map into the datasource input signal only when that signal has
+no `filter` property. A signal created before metadata arrives can still receive
+the initial filter. Existing filters—including restored state and an explicitly
+empty `{}`—take precedence. Remounting or resolving the context again does not
+reapply the defaults after the user edits or clears them.
+
+This is UI initialization, not a server constraint. User filters remain editable
+and the producer still owns authorization. Use pinned backend arguments only for
+constraints callers must not override. Request parameter defaults are a different
+layer and should not be used to continually overwrite a filter control's state.
+
+Verification: `src/core/store/signals.test.js` covers one-time seeding, metadata
+cloning, user edits, explicit clearing, and restored filters. Typed metadata is
+represented by `DataSource.InitialFilter` in `backend/types/model.go`.
+
+## Integer-array filter inputs
+
+Declared `int[]` filters normalize native form CSV (`"1,2"`) and the `in`
+control's wrapped form (`["1,2"]`) into integer arrays before MCP dispatch.
+Already typed integer arrays retain their values/order. Invalid tokens, nested
+arrays and fractional IDs remain uncoerced for normal producer validation;
+normalization never dispatches only a valid subset or truncates fractional IDs.
+String-array values remain distinct: an already typed string containing a comma
+is a literal value, not an integer CSV list.

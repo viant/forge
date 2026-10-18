@@ -2,6 +2,11 @@ function isPlainObject(value) {
     return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
+function isResourcePayload(value) {
+    return isPlainObject(value) && typeof value.modelRef === 'string' &&
+        (Object.hasOwn(value, 'source') || Object.hasOwn(value, 'fields'));
+}
+
 function cloneValue(value) {
     if (Array.isArray(value)) {
         return value.map((item) => cloneValue(item));
@@ -191,7 +196,10 @@ function resolveValue(node, targetContext = {}) {
         return node;
     }
 
-    if (!matchesTarget(node.target, targetContext)) {
+    // Mutation payload.target is an MCP input path (for example "$" or
+    // "Data"), not a renderer platform gate.
+    const resourcePayload = isResourcePayload(node);
+    if (!resourcePayload && !matchesTarget(node.target, targetContext)) {
         return undefined;
     }
 
@@ -201,7 +209,7 @@ function resolveValue(node, targetContext = {}) {
         working = deepMerge(working, override);
     }
 
-    if (normalizeTargetSpec(working.target)) {
+    if (!resourcePayload && normalizeTargetSpec(working.target)) {
         delete working.target;
     }
     if (

@@ -250,3 +250,44 @@ Selected values remain visible as their bound IDs before labels arrive; loaded
 producer labels replace those fallback tags without changing the selection.
 Disabled/read-only variants do not request choices. No per-window fetch JavaScript
 is needed.
+
+### Conditional filter controls
+
+Table filter sets, template fields and option entries support `visibleWhen` and
+`hiddenWhen` using the existing table context and condition evaluator. Conditions
+react while the dialog is open. Hidden predicates and selected options that are
+no longer displayed are omitted on Apply; unrelated draft values remain intact.
+These are UI display rules, not authorization, and issue no permission request.
+The producer still authorizes every datasource operation. Dialog spacing and
+stacking use `--forge-filter-dialog-spacing` / `--forge-filter-dialog-z-index`
+and scoped `forge-filter-dialog__*` classes.
+
+A `link` can build an external URL from a scoped value without an application
+JavaScript handler. `hrefTemplateSource` accepts the same scopes as link parameter
+bindings (`row`, the default, or `metrics`, `form`, `windowForm`, `input`, `value`,
+`filter`, `selection`). This is useful for standalone fields, which have no table
+row. It changes only URL interpolation, not the displayed label or window identity.
+
+```yaml
+id: recordAudit
+label: View audit log
+type: link
+scope: metrics
+dataField: id
+className: record-header__audit
+link:
+  kind: external
+  hrefTemplate: records/{{id}}/audit
+  hrefTemplateSource: metrics
+  baseUrl: https://example.test
+  baseUrlSelector: ExternalBaseUrl
+  baseUrlSource: windowForm
+  text: View audit log
+  target: _blank
+  rel: noopener noreferrer
+```
+
+`baseUrlSelector` optionally overrides the default `baseUrl`; an invalid or
+non-HTTP(S) base produces no resolved destination. Existing row-based templates
+retain their behavior when `hrefTemplateSource` is omitted. Use the owning CSS
+class and workspace tokens for appearance.

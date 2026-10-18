@@ -72,3 +72,19 @@ green surface with red border. Focus is blue. Use `--forge-lookup-*`,
 For the complete host manifest/token contract, see
 [agently-core workspace CSS](https://github.com/viant/agently-core/blob/main/workspace-css.md). Native token support is
 explicit; arbitrary web CSS does not apply to native renderers.
+
+## Switch appearance
+
+The Blueprint pack's native `switch` keeps its ARIA switch/button behavior and
+uses `.forge-switch`, `.forge-switch__thumb`, `.forge-switch-field`, and
+`.forge-switch-field__state` for appearance. Authored IDs/classes are forwarded;
+no colors, dimensions, or thumb position are emitted as inline appearance.
+
+Workspace CSS can override `--forge-switch-width`, `--forge-switch-height`,
+`--forge-switch-padding`, `--forge-switch-border-width`,
+`--forge-switch-thumb-size`, `--forge-switch-on-background`,
+`--forge-switch-off-background`, matching on/off border and label-color roles,
+`--forge-switch-thumb-background`, `--forge-switch-thumb-shadow`,
+`--forge-switch-label-gap`, and `--forge-switch-disabled-opacity` on an owned
+class. Defaults preserve the uncustomized native shell. This is a widget skin;
+its data binding and change adapter remain the existing Blueprint pack contract.

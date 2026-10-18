@@ -183,6 +183,7 @@ type Dialog struct {
 	Id              string                            `json:"id" yaml:"id"`
 	Title           string                            `json:"title" yaml:"title"`
 	DataSourceRef   string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	FetchOnOpen     *bool                             `json:"fetchOnOpen,omitempty" yaml:"fetchOnOpen,omitempty"`
 	Content         *Container                        `json:"content" yaml:"content"`
 	ClassName       string                            `json:"className,omitempty" yaml:"className,omitempty"`
 	Style           *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
@@ -1386,6 +1387,7 @@ type TableLink struct {
 	Kind                string                 `json:"kind,omitempty" yaml:"kind,omitempty"`
 	Href                string                 `json:"href,omitempty" yaml:"href,omitempty"`
 	HrefTemplate        string                 `json:"hrefTemplate,omitempty" yaml:"hrefTemplate,omitempty"`
+	HrefTemplateSource  string                 `json:"hrefTemplateSource,omitempty" yaml:"hrefTemplateSource,omitempty"`
 	KindSelector        string                 `json:"kindSelector,omitempty" yaml:"kindSelector,omitempty"`
 	KindSource          string                 `json:"kindSource,omitempty" yaml:"kindSource,omitempty"`
 	BaseURL             string                 `json:"baseUrl,omitempty" yaml:"baseUrl,omitempty"`
@@ -1678,6 +1680,8 @@ type Option struct {
 }
 
 type DataSource struct {
+	// InitialFilter seeds UI filter state once; restored/user filters take precedence.
+	InitialFilter                           map[string]interface{}            `json:"initialFilter,omitempty" yaml:"initialFilter,omitempty"`
 	Service                                 *Service                          `json:"service,omitempty" yaml:"service,omitempty"`
 	DataSourceRef                           string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
 	ResourceModelRef                        string                            `json:"resourceModelRef,omitempty" yaml:"resourceModelRef,omitempty"`
@@ -1690,6 +1694,8 @@ type DataSource struct {
 	Selectors                               *Selectors                        `json:"selectors,omitempty" yaml:"selectors,omitempty"`
 	SelectionPreserveAcrossPages            bool                              `json:"selectionPreserveAcrossPages,omitempty" yaml:"selectionPreserveAcrossPages,omitempty"`
 	SelectionMode                           *SelectionMode                    `json:"selectionMode,omitempty" yaml:"selectionMode,omitempty"`
+	// SelectionRetention "pages" keeps selected rows when only the server page changes.
+	SelectionRetention                      string                            `json:"selectionRetention,omitempty" yaml:"selectionRetention,omitempty"`
 	Paging                                  *PagingConfig                     `json:"paging,omitempty" yaml:"paging,omitempty"`
 	FilterSet                               []Filter                          `json:"filterSet,omitempty" yaml:"filterSet,omitempty"`
 	AutoSelect                              *bool                             `json:"autoSelect,omitempty" yaml:"autoSelect,omitempty"`
@@ -1743,6 +1749,9 @@ type PagingConfig struct {
 	Size              int                `json:"size" yaml:"size"`
 	Enabled           bool               `json:"enabled" yaml:"enabled"`
 	OpenEnded         bool               `json:"openEnded,omitempty" yaml:"openEnded,omitempty"`
+	// Aggregate collects bounded server pages before publishing one complete collection.
+	Aggregate         bool               `json:"aggregate,omitempty" yaml:"aggregate,omitempty"`
+	MaxPages          int                `json:"maxPages,omitempty" yaml:"maxPages,omitempty"`
 	Parameters        *PagingParameters  `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 	DataInfoSelectors *DataInfoSelectors `json:"dataInfoSelectors,omitempty" yaml:"dataInfoSelectors,omitempty"`
 }

@@ -60,6 +60,7 @@ function stableColumnsSignature(columns = []) {
             hiddenWhen: col?.hiddenWhen,
             multiSelect: col?.multiSelect,
             nonExcludable: col?.nonExcludable,
+            selectionDisabledWhen: col?.selectionDisabledWhen,
         }))
     );
 }

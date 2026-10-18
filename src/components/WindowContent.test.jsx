@@ -265,6 +265,24 @@ describe('resolveRequiredDataSourceRefs', () => {
     ]);
   });
 
+  it('defers inactive stable tab datasources until selection', () => {
+    const metadata = {
+      dataSource: {line_properties: {}, line_performance: {}, line_creatives: {}},
+      view: {content: {id: 'root', containers: [{
+        id: 'lineWorkspaceBody',
+        stableTabs: {defaultSelectedTabId: 'lineProperties', renderActiveTabPanelOnly: true, keepVisitedTabPanelsMounted: true},
+        containers: [
+          {id: 'lineProperties', dataSourceRef: 'line_properties'},
+          {id: 'linePerformance', dataSourceRef: 'line_performance'},
+          {id: 'lineCreatives', dataSourceRef: 'line_creatives'},
+        ],
+      }]}}
+    };
+    expect(resolveRequiredDataSourceRefs(metadata, '', {}, {})).toEqual(['line_properties']);
+    expect(resolveRequiredDataSourceRefs(metadata, '', {}, {tabs: {lineWorkspaceBody: 'lineCreatives'}}))
+      .toEqual(['line_creatives']);
+  });
+
   it('preserves all-tab datasource mounting unless active mode is explicitly requested', () => {
     const metadata = {
       dataSource: { properties: {}, campaigns: {}, orders: {} },

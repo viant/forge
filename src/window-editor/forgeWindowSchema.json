@@ -677,6 +677,9 @@
         "timeZone": {
           "type": "string"
         },
+        "timeZoneBinding": {
+          "$ref": "#/$defs/Binding"
+        },
         "timeZoneSelector": {
           "type": "string"
         },
@@ -1908,6 +1911,11 @@
           },
           "type": "array"
         },
+        "initialFilter": {
+          "additionalProperties": {},
+          "description": "InitialFilter seeds UI filter state once; restored/user filters take precedence.",
+          "type": "object"
+        },
         "on": {
           "items": {
             "$ref": "#/$defs/Execute"
@@ -1949,6 +1957,10 @@
         },
         "selectionMode": {
           "$ref": "#/$defs/SelectionMode"
+        },
+        "selectionRetention": {
+          "description": "SelectionRetention \"pages\" keeps selected rows when only the server page changes.",
+          "type": "string"
         },
         "selectors": {
           "$ref": "#/$defs/Selectors"
@@ -2275,6 +2287,9 @@
         "dataSourceRef": {
           "type": "string"
         },
+        "fetchOnOpen": {
+          "type": "boolean"
+        },
         "id": {
           "type": "string"
         },
@@ -2431,6 +2446,12 @@
         "validWhen": {
           "additionalProperties": {},
           "type": "object"
+        },
+        "validate": {
+          "type": "string"
+        },
+        "wrapContent": {
+          "type": "boolean"
         }
       },
       "type": "object"
@@ -2916,6 +2937,9 @@
         "optionsDataSourceRef": {
           "type": "string"
         },
+        "optionsFetchMode": {
+          "type": "string"
+        },
         "placement": {
           "type": "string"
         },
@@ -2962,6 +2986,9 @@
           "type": "object"
         },
         "widget": {
+          "type": "string"
+        },
+        "wrapper": {
           "type": "string"
         }
       },
@@ -3031,6 +3058,9 @@
         },
         "labels": {
           "$ref": "#/$defs/Labels"
+        },
+        "minColumnWidth": {
+          "type": "string"
         },
         "orientation": {
           "type": "string"
@@ -3503,11 +3533,18 @@
     "PagingConfig": {
       "additionalProperties": true,
       "properties": {
+        "aggregate": {
+          "description": "Aggregate collects bounded server pages before publishing one complete collection.",
+          "type": "boolean"
+        },
         "dataInfoSelectors": {
           "$ref": "#/$defs/DataInfoSelectors"
         },
         "enabled": {
           "type": "boolean"
+        },
+        "maxPages": {
+          "type": "integer"
         },
         "mode": {
           "description": "Mode opts into explicit upstream page/offset/cursor semantics; empty retains legacy behavior.",
@@ -4784,6 +4821,15 @@
         "awaitResult": {
           "type": "boolean"
         },
+        "baseUrl": {
+          "type": "string"
+        },
+        "baseUrlSelector": {
+          "type": "string"
+        },
+        "baseUrlSource": {
+          "type": "string"
+        },
         "chipIcon": {
           "type": "string"
         },
@@ -4816,6 +4862,12 @@
           "type": "boolean"
         },
         "kind": {
+          "type": "string"
+        },
+        "kindSelector": {
+          "type": "string"
+        },
+        "kindSource": {
           "type": "string"
         },
         "label": {
@@ -5682,6 +5734,12 @@
         "method": {
           "type": "string"
         },
+        "methodVariants": {
+          "items": {
+            "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.MCPMethodVariant"
+          },
+          "type": "array"
+        },
         "ownership": {
           "description": "Ownership=provider retains execution at the selected resource provider.",
           "type": "string"
@@ -5915,6 +5973,30 @@
       },
       "type": "object"
     },
+    "github.com/viant/forge/backend/datasource/contract.MCPMethodCondition": {
+      "additionalProperties": true,
+      "properties": {
+        "nonEmpty": {
+          "type": "boolean"
+        },
+        "parameter": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "github.com/viant/forge/backend/datasource/contract.MCPMethodVariant": {
+      "additionalProperties": true,
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "when": {
+          "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.MCPMethodCondition"
+        }
+      },
+      "type": "object"
+    },
     "github.com/viant/forge/backend/datasource/contract.MCPRequestBinding": {
       "additionalProperties": true,
       "properties": {
@@ -6090,13 +6172,14 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "f5fae310ed5ad13e54f8e3a02438a92f95d2d7f3",
+    "baseCommit": "e97d0cf74e368b1f1d4dcb7f97d585381ace1b97",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "datasource_projection.go": "854b7858c0e997ea0e84bb3a91c9805c8ed728c39a8b740713e524cc43529ec9",
       "form.go": "aa2114822f1e688942aa4b63ec51c4b4c0f728b44b6d82b8b04fbf95efa807f0",
-      "github.com/viant/forge/backend/datasource/contract.datasource.go": "597d1879ea032c9a94f0797ce2f40b566ac96abea729f7875a8881ec3a590293",
+      "github.com/viant/forge/backend/datasource/contract.datasource.go": "33d3c236e21caef143a61306ce173d4cdf36ef56fd516a6591f093df42e57783",
       "github.com/viant/forge/backend/datasource/contract.denial.go": "33f9f5fd666591f7b90392b410efe982051197652fa18881f8f2a238b7e24d05",
+      "github.com/viant/forge/backend/datasource/contract.method_variants.go": "e4aa1178a31ee0f8ebd15dfd83c512dc8a8d84afb8ba5e6a856cc993870e682c",
       "github.com/viant/forge/backend/provider/contract.catalog.go": "570746519947177f2681e7ce63da4461173f129149bdfdcb4d22eaf12d6fc1d7",
       "github.com/viant/forge/backend/provider/contract.datasource.go": "a29fb4c0208c3036e572d9bd952e3df0ef6c99362a85249ce5067f1d2820c932",
       "github.com/viant/forge/backend/provider/contract.lifecycle.go": "e4ffdcd8a6660bc325a894206df8f0162b88cd677d1f4ecd01f81c3d7b471bda",
@@ -6117,12 +6200,12 @@
       "github.com/viant/forge/backend/window/contract.presentation.go": "239b91f0d3dd60a87b46d1b33ac8e45d15beb7b94d2b0aed01e2fa14d464250a",
       "github.com/viant/forge/backend/window/contract.resource.go": "3d405993972615d81f63d4f8fdf1ed99539af092353f20e7b80005fd196fc467",
       "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
-      "model.go": "3da975c78d17da28d5cbafddba4df37cd282e703f80307f14f0bf60ca6839d5b",
-      "presentation_primitives.go": "69ece4b1e8d7ddc365d6b618069406d4f4e8be0fcfb708cceb5a48d323610ea4",
+      "model.go": "298a5969e3d01467d935202b3636a81c02c55acda2a0cc3e7fb9f233e8600aac",
+      "presentation_primitives.go": "11284bb93f78ea0883c5871fc1c72c1046876566a044df9dc1eb59f054730900",
       "resource_model.go": "2d09c19334a806ae9879b9e022e403640cc5ca0f7cabe494b38aaa86881cd610",
       "resource_model_validation.go": "be1cb0525d5f0a2f609775e46b2fe2cb7a3f74dd4160fed26764bfd3a9fa8fb4",
       "window_compiled_resource.go": "4ef03d542848c1d062238e59cb84b99c33e51007a021690412e53a85232f4905",
-      "window_descriptor.go": "bfb7555db206ad6122b8dcdf7b805bec2a98ca2a18c167716554ff1803994d5d",
+      "window_descriptor.go": "99170237b79c06523e72302b7917e0f573ef5f54bbc4bf0b8a4625915274c789",
       "window_resource.go": "e4df4c63255a775d4aab5cd8dcfd171c697ad76f4c1e90691c4f33dad9cf424f",
       "window_target_proof.go": "53605c132aae2b8c8d6e377daaae416f347e0ff8c48a39fb2a0f15f95ad5faeb",
       "workflow_primitives.go": "13b3ab4a61ba77144e639c282208b892794f0c0a3c58a2f5b829826de9614d79"

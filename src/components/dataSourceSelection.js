@@ -7,6 +7,17 @@ function safeUniqueKey(getUniqueKeyValue, value) {
     }
 }
 
+export function pageSelectionPolicy(previousSignature = '', currentSignature = '') {
+    if (!previousSignature || !currentSignature) return {retainMissing: false, clear: false};
+    const previous = JSON.parse(previousSignature);
+    const current = JSON.parse(currentSignature);
+    const sameScope = JSON.stringify({...previous, page: null}) === JSON.stringify({...current, page: null});
+    return {
+        retainMissing: sameScope && Number(previous.page || 1) !== Number(current.page || 1),
+        clear: !sameScope,
+    };
+}
+
 export function reconcileMultiSelection(currentSelection = {}, records = [], getUniqueKeyValue, options = {}) {
     const rowsByKey = new Map();
     for (const row of Array.isArray(records) ? records : []) {
@@ -18,7 +29,7 @@ export function reconcileMultiSelection(currentSelection = {}, records = [], get
     for (const row of Array.isArray(currentSelection?.selection) ? currentSelection.selection : []) {
         const key = safeUniqueKey(getUniqueKeyValue, row);
         if (key && rowsByKey.has(key)) selected.push(rowsByKey.get(key));
-        else if (key && options.preserveOffPage && (options.pageChanged || !previousKeys.has(key))) selected.push(row);
+        else if (key && (options.retainMissing || (options.preserveOffPage && (options.pageChanged || !previousKeys.has(key))))) selected.push(row);
     }
     return {selection: selected};
 }

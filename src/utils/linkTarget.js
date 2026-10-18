@@ -242,7 +242,9 @@ export function resolveLinkTarget({ linkConfig = null, row = null, value = null,
 
     let href = normalizeString(
         linkConfig?.hrefTemplate
-            ? resolveTemplateText(linkConfig.hrefTemplate, row || {})
+            ? resolveTemplateText(linkConfig.hrefTemplate, linkConfig.hrefTemplateSource
+                ? resolveContextSourceValue({source: linkConfig.hrefTemplateSource, context, row, value})
+                : row || {})
             : linkConfig?.href
                 ? resolveKey(row || {}, linkConfig.href)
                 : objectValue?.href ?? ''

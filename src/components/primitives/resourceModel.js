@@ -54,7 +54,11 @@ function coerceScalar(value, schema = {}, binding = {}, path = 'value') {
 }
 
 function emptyValue(value, binding = {}) {
-  const empty = value === undefined || value === '' || value === null;
+  // Missing and explicitly cleared are different sparse-write states.
+  // An empty:null policy applies to an authored empty value, never to an
+  // omitted field that the producer must leave unchanged.
+  if (value === undefined) return undefined;
+  const empty = value === '' || value === null;
   if (!empty) return value;
   const declaredPolicy = Object.prototype.hasOwnProperty.call(binding, 'empty') && binding.empty === null ? 'null' : binding.empty;
   switch (String(declaredPolicy || 'preserve').toLowerCase()) {

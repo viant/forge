@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {consumeDialogFocusRevision, dialogFreshFormSeed, inlineDialogSeedRows, shouldRefreshDialogDataSourceForMount, shouldRefreshDialogDataSourceOnOpen} from './viewDialogFreshState.js';
+import {consumeDialogFocusRevision, dialogFreshFormSeed, inlineDialogSeedRows, shouldFetchDialogOnOpen, shouldRefreshDialogDataSourceForMount, shouldRefreshDialogDataSourceOnOpen} from './viewDialogFreshState.js';
+
+assert.equal(shouldFetchDialogOnOpen({content: {fetchData: false}}), false);
+assert.equal(shouldFetchDialogOnOpen({content: {fetchData: true}}), true);
+assert.equal(shouldFetchDialogOnOpen({fetchOnOpen: true, content: {fetchData: false}}), true);
+assert.equal(shouldFetchDialogOnOpen({fetchOnOpen: false, content: {fetchData: true}}), false);
 
 assert.equal(shouldRefreshDialogDataSourceOnOpen({backend: {kind: 'inline'}}), true);
 assert.equal(shouldRefreshDialogDataSourceOnOpen({backend: {kind: 'INLINE'}}), true);

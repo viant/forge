@@ -75,6 +75,12 @@ export function beginDataSourceFetch(control = {}) {
     return {...(control || {}), loading: true, loaded: false, error: null, stale: false};
 }
 
+export function suppressRepeatedFailedFetch(control = {}, signature = '', cache = null) {
+    return !!control?.error && !!signature
+        && control.failedRequestSignature === signature
+        && cache?.bypassCache !== true;
+}
+
 export function consumeDataSourceFetchRequest(input = {}, request = "fetch") {
     const current = isPlainObject(input) ? input : {};
     const requestedFlag = request === "refresh" ? "refresh" : "fetch";

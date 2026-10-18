@@ -43,3 +43,21 @@ func TestConfigurableLinkFields(t *testing.T) {
 		t.Fatalf("lost configurable link fields: %s", data)
 	}
 }
+
+func TestLinkTemplateSourceSurvivesYAMLAndJSON(t *testing.T) {
+	var link TableLink
+	if err := yaml.Unmarshal([]byte("kind: external\nhrefTemplate: campaigns/{{id}}\nhrefTemplateSource: metrics\n"), &link); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roundTrip TableLink
+	if err = json.Unmarshal(raw, &roundTrip); err != nil {
+		t.Fatal(err)
+	}
+	if roundTrip.HrefTemplateSource != "metrics" || roundTrip.HrefTemplate != "campaigns/{{id}}" {
+		t.Fatalf("lost scoped link template: %s", raw)
+	}
+}
