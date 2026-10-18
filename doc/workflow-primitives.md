@@ -255,6 +255,8 @@ For a hidden complete-replacement baseline, use bounded page aggregation:
 
 ```yaml
 paging: {enabled: true, size: 25, aggregate: true, maxPages: 100, parameters: {page: Page, size: Limit}}
+# Use explicit offsets when the producer does not implement page numbers:
+# paging: {enabled: true, mode: offset, size: 25, aggregate: true, maxPages: 100, parameters: {page: Offset, size: Limit}}
 ```
 
 Forge requests producer pages sequentially, rejects duplicate identities and
