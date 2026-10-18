@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 
-import {evaluatePlainVisibleWhen, isContainerVisible, resolveChildContext} from './visibleWhen.js';
+import {evaluatePlainVisibleWhen, isContainerVisible, resolveChildContext, trackVisibleWhen} from './visibleWhen.js';
 
 const metricsContext = (metrics, overrides = {}) => ({
+    metadata: {dataSource: {base: {}, profile: {}}},
     identity: {
         windowId: 'W1',
         dataSourceRef: 'base',
@@ -196,3 +197,20 @@ assert.equal(evaluatePlainVisibleWhen(
 ), false);
 
 console.log('visibleWhen ✓');
+
+let tracked=0;
+const control={loaded:true,loading:false,error:null};
+const readySignal={peek:()=>control,get value(){tracked++;return control;}};
+const baselineContext={identity:{dataSourceRef:'baseline'},signals:{control:readySignal}};
+const invokingContext={identity:{dataSourceRef:'table'},Context:ref=>ref==='baseline'?baselineContext:undefined,signals:{control:{peek:()=>({loaded:false})}}};
+const readyWhen={all:[
+ {source:'control',dataSourceRef:'baseline',field:'loaded',equals:true},
+ {source:'control',dataSourceRef:'baseline',field:'loading',notEquals:true},
+ {source:'control',dataSourceRef:'baseline',field:'error',empty:true},
+]};
+assert.equal(evaluatePlainVisibleWhen(readyWhen,invokingContext),true);
+trackVisibleWhen(readyWhen,invokingContext);assert.equal(tracked,3,'track only the explicitly referenced datasource control');
+control.loading=true;assert.equal(evaluatePlainVisibleWhen(readyWhen,invokingContext),false);
+control.loading=false;control.error='last page failed';assert.equal(evaluatePlainVisibleWhen(readyWhen,invokingContext),false);
+assert.equal(evaluatePlainVisibleWhen({source:'control',dataSourceRef:'missing',field:'loaded',equals:true},invokingContext),false);
+console.log('visibleWhen ✓ scoped datasource readiness and signal tracking');

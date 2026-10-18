@@ -12,6 +12,7 @@ import {arrayEquals} from "../utils/equal.js";
 import { getLogger } from "../utils/logger.js";
 import equal from 'fast-deep-equal';
 import { mapParameters } from '../utils/parameterMapper.js';
+import {resolveParameters} from './parameters.js';
 import {isDataSourceLocalDenial, isWindowAuthorizationFailure} from '../components/dataSourceAuthorization.js';
 import { normalizeDataSourceError } from '../utils/dataSourceError.js';
 import {beginDataSourceRequest, settleDataSourceRequest} from '../components/dataSourceRequestLifecycle.js';
@@ -1013,6 +1014,15 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
     const fetchCollection = (props) => {
         const previous = input.peek() || {};
         const newValue = buildFetchCollectionSignal(previous, props);
+        // Lazy dialog/tab sources may mount after root parameter priming.
+        // Resolve their own window-form bindings only when they are fetched.
+        const windowParameters = (dataSource.parameters || []).filter(parameter => parameter.in === 'windowForm');
+        if (windowParameters.length > 0) {
+            const resolved = resolveParameters(windowParameters, {signals});
+            newValue.parameters = windowParameters.some(parameter => parameter.name === '...')
+                ? resolved
+                : {...(previous.parameters || {}), ...resolved};
+        }
         const previousRequestId = previous.bindingGeneration || previous.invocationId;
         const requestId = newValue.bindingGeneration || newValue.invocationId;
         if (previousRequestId && requestId && String(previousRequestId) !== String(requestId)) {

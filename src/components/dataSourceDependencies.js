@@ -50,6 +50,13 @@ export function hasResolvedDependencies(parameters = [], values = {}, filter = {
             assignPath(filter, paramDef.name, paramDef.location);
             continue;
         }
+        // A spread binding resolves into the top-level parameter object. It
+        // does not create a literal "..." property in that object.
+        if (paramDef?.name === '...') {
+            if (paramDef.required === false) continue;
+            if (Object.values(values || {}).some(isMeaningfulDependencyValue)) continue;
+            return false;
+        }
         if (hasDefinedPath(values, paramDef.name) && isMeaningfulDependencyValue(resolvedPathValue(values, paramDef.name))) continue;
         if ('default' in paramDef) {
             assignPath(values, paramDef.name, paramDef.default);

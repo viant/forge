@@ -2,6 +2,8 @@ import React, {useEffect, useRef, useMemo, useState} from 'react';
 import {Dialog, DialogBody, DialogFooter, Button, Classes, InputGroup} from '@blueprintjs/core';
 import LayoutRenderer from './LayoutRenderer';
 import DataSource from './DataSource.jsx';
+import DataSourceContainer from './WindowContentDataSourceContainer.jsx';
+import {dialogDataSourceRefs} from './dialogDataSourceRefs.js';
 import MessageBus from './MessageBus.jsx';
 import {useSignalEffect, useSignals} from '@preact/signals-react/runtime';
 import {dialogHandlers} from "../hooks/index.js";
@@ -544,6 +546,9 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                 {dsCtx ? (<>
                     <DataSource context={dsCtx} />
                     <MessageBus context={dsCtx} />
+                    {dialogDataSourceRefs(dialog, context?.metadata?.dataSource, resolvedDataSourceRef).map(ref => (
+                        <DataSourceContainer key={ref} windowContext={dsCtx} dsKey={ref} suppressAutomaticFetch />
+                    ))}
                 </>) : null}
                 {/* Inline quick-search input above the content for a friendlier UX */}
                 <DialogQuickSearch dsCtx={dsCtx} dialog={dialog} quickFilterSpecs={quickFilterSpecs} />
