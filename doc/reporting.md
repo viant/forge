@@ -23,6 +23,21 @@ This document covers:
 - persistence, execution, export, and UI events
 - cross-surface verification expectations
 
+## Server dataset execution
+
+The Go report engine executes datasets serially by default. A host with a
+concurrency-safe `ResourceDatasetExecutor` can set
+`reporting.Options.ResourceDatasetConcurrency` (for example, `4`) to fetch
+independent datasets concurrently. The engine caps this at eight workers and
+keeps pagination within each dataset sequential. Authored report metadata cannot
+change the host's concurrency limit.
+
+A failed fetch cancels sibling work and prevents partial report publication.
+The engine retains each dataset's exact descriptor and request, checks the
+resource lease around fetches, and revalidates the original resource and dependency
+pins before releasing the completed report. Parallel execution does not extend
+an authorization lease or cache a permission decision across report operations.
+
 ## Architecture And Ownership
 
 Forge owns generic reporting behavior:
