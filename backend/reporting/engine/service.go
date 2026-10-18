@@ -10,6 +10,10 @@ import (
 const SourceKindReportSpec = "reportSpec"
 
 type Options struct {
+	// ResourceDatasetConcurrency bounds independent dataset fetches. Zero keeps
+	// serial execution; hosts opting in must provide a concurrency-safe executor.
+	// Pagination within each dataset remains sequential. Values are capped at 8.
+	ResourceDatasetConcurrency int
 	Compiler                   Compiler
 	ReportCatalog              catalog.Provider
 	ResourceResolver           ResourceResolver
@@ -27,6 +31,7 @@ type Service struct {
 	resourceDependencyResolver ResourceDependencyResolver
 	resourceDependencyProof    types.WindowTargetProof
 	resourceDatasetExecutor    ResourceDatasetExecutor
+	resourceDatasetConcurrency int
 	now                        func() time.Time
 	audit                      AuditSink
 	actorID                    func(context.Context) string
@@ -39,7 +44,7 @@ func New(o Options) *Service {
 	if o.ActorID == nil {
 		o.ActorID = func(context.Context) string { return "" }
 	}
-	return &Service{compiler: o.Compiler, reportCatalog: o.ReportCatalog, resourceResolver: o.ResourceResolver, resourceDependencyResolver: o.ResourceDependencyResolver, resourceDependencyProof: o.ResourceDependencyProof, now: o.Now, audit: o.Audit, actorID: o.ActorID}
+	return &Service{resourceDatasetConcurrency: o.ResourceDatasetConcurrency, compiler: o.Compiler, reportCatalog: o.ReportCatalog, resourceResolver: o.ResourceResolver, resourceDependencyResolver: o.ResourceDependencyResolver, resourceDependencyProof: o.ResourceDependencyProof, now: o.Now, audit: o.Audit, actorID: o.ActorID}
 }
 func (s *Service) recordAudit(ctx context.Context, event *AuditEvent) {
 	if s != nil && s.audit != nil && event != nil {

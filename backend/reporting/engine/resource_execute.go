@@ -233,30 +233,48 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 	if err != nil {
 		return nil, err
 	}
-	results := map[string]*dsproto.FetchResult{}
-	payloads := map[string]json.RawMessage{}
-	for _, plan := range plans {
-		if err = check(); err != nil {
-			return nil, err
+	fetched := make([]*dsproto.FetchResult, len(plans))
+	fetchedPayloads := make([]json.RawMessage, len(plans))
+	err = runReportDatasetPlans(ctx, len(plans), s.resourceDatasetConcurrency, func(datasetCtx context.Context, index int) error {
+		plan := plans[index]
+		checkPage := func() error {
+			if err := datasetCtx.Err(); err != nil {
+				return err
+			}
+			return check()
 		}
-		result, err := fetchCompleteResourceDataset(ctx, plan.descriptor, plan.args, check, func(exact *dsproto.DataSource, pageArgs map[string]interface{}) (*dsproto.FetchResult, error) {
-			datasetContext := context.WithValue(ctx, admittedReportDefinitionKey{}, admittedReportDefinition{service: s, pin: *pin, definition: envelope})
-			return s.resourceDatasetExecutor(requestctx.WithResourceDependencies(requestctx.WithResolvedResource(datasetContext, *pin), *pin, compiled.DependencyPins), *pin, exact, pageArgs)
+		if err := checkPage(); err != nil {
+			return err
+		}
+		result, err := fetchCompleteResourceDataset(datasetCtx, plan.descriptor, plan.args, checkPage, func(exact *dsproto.DataSource, pageArgs map[string]interface{}) (*dsproto.FetchResult, error) {
+			admittedContext := context.WithValue(datasetCtx, admittedReportDefinitionKey{}, admittedReportDefinition{service: s, pin: *pin, definition: envelope})
+			return s.resourceDatasetExecutor(requestctx.WithResourceDependencies(requestctx.WithResolvedResource(admittedContext, *pin), *pin, compiled.DependencyPins), *pin, exact, pageArgs)
 		})
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if result == nil {
-			return nil, fmt.Errorf("report datasource returned no result")
+			return fmt.Errorf("report datasource returned no result")
 		}
-		if err = check(); err != nil {
-			return nil, err
+		if err := checkPage(); err != nil {
+			return err
 		}
-		results[plan.id] = result
-		payloads[plan.id], err = json.Marshal(result)
+		payload, err := json.Marshal(result)
 		if err != nil {
-			return nil, err
+			return err
 		}
+		fetched[index], fetchedPayloads[index] = result, payload
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	// Publish no partial result: collect only after all admitted fetches finish.
+	results := map[string]*dsproto.FetchResult{}
+	payloads := map[string]json.RawMessage{}
+	for index, plan := range plans {
+		results[plan.id] = fetched[index]
+		payloads[plan.id] = fetchedPayloads[index]
 	}
 	artifacts, err := materializer.Materialize(ctx, effectiveSpec, payloads)
 	if err != nil {
