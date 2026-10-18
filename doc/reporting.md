@@ -23,6 +23,15 @@ This document covers:
 - persistence, execution, export, and UI events
 - cross-surface verification expectations
 
+## Inline preview cancellation
+
+The builder passes an AbortSignal to primary-row connector requests as well as
+its dataset fan-out. A replacement request, disabled preview, or unmount cancels
+obsolete row work. Ordinary rerenders retain the active request; React Strict
+Mode effect replay restarts work cancelled by cleanup. Cancelled responses cannot
+replace the current result or trigger a deferred-cache retry. Cancellation does
+not extend resource authority or change the report's requested filters.
+
 ## Server dataset execution
 
 The Go report engine executes datasets serially by default. A host with a

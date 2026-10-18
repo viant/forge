@@ -300,3 +300,27 @@ assert.deepEqual(staleRowsResult, { cancelled: true, nextState: null });
 assert.equal(staleRowsFetchCount, 1, "a stale key or unmounted hook cannot issue the recovery fetch");
 
 console.log("useReportRuntimePreviewRows ✓ builds deterministic runtime preview request keys");
+
+// Superseded preview rows must stop at the connector boundary, including a
+// cancellation while a deferred cache result is being recovered.
+const abortedRows = new AbortController();
+let forwardedRowsSignal;
+const abortedLifecycle = reportRuntimePreviewRowsModule.executeReportRuntimePreviewRowsFetchLifecycle({
+  signal: abortedRows.signal,
+  fetchRecords: ({signal}) => {
+    forwardedRowsSignal = signal;
+    return new Promise((_,reject) => signal.addEventListener('abort',()=>reject(signal.reason),{once:true}));
+  },
+  resolveFetchResult: () => assert.fail('cancelled rows must never be resolved'),
+});
+abortedRows.abort();
+assert.equal(forwardedRowsSignal,abortedRows.signal);
+assert.deepEqual(await abortedLifecycle,{cancelled:true,nextState:null});
+let abandonedCalls = 0;
+const ignoredAbort = new AbortController();
+const abandonedResult = await reportRuntimePreviewRowsModule.fetchReportRuntimePreviewRowsFreshResult({
+  signal:ignoredAbort.signal,
+  fetchRecords:async()=>{abandonedCalls++;ignoredAbort.abort();return {rows:[]};},
+});
+assert.deepEqual(abandonedResult,{cancelled:true,body:null});
+assert.equal(abandonedCalls,1,'a cancelled response must not trigger a freshness retry');

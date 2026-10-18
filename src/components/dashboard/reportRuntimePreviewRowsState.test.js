@@ -422,3 +422,13 @@ assert.deepEqual(resolveReportRuntimePreviewRowsStateTransition({
 
 console.log("reportRuntimePreviewRowsState ✓ models authored runtime preview fetch state transitions deterministically");
 console.log("reportRuntimePreviewRowsState ✓ seeds the first-drill pending state from resolved-collection rows instead of collapsing to empty");
+
+const replayPending = buildPendingReportRuntimePreviewRowsState({fingerprint:'replay',requestKey:'replay'});
+assert.equal(resolveReportRuntimePreviewRowsStateTransition({
+  enabled:true,canRun:true,hasModel:true,hasRequest:true,fetchAvailable:true,
+  fingerprint:'replay',requestKey:'replay',currentState:replayPending,inFlightRequestKey:'',
+}).type,'start','effect replay must restart cancelled work rather than retain a permanently pending state');
+assert.equal(resolveReportRuntimePreviewRowsStateTransition({
+  enabled:true,canRun:true,hasModel:true,hasRequest:true,fetchAvailable:true,
+  fingerprint:'replay',requestKey:'replay',currentState:replayPending,inFlightRequestKey:'replay',
+}).type,'noop','ordinary rerenders must retain genuinely active work');
