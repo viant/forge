@@ -70,3 +70,14 @@ func TestNormalizeNumericFilterDoesNotTruncateFraction(t *testing.T) {
 		t.Fatalf("fractional number changed: %#v", got["Cost"])
 	}
 }
+
+func TestProducerSearchKeepsNumericIDAndNameTermsRaw(t *testing.T) {
+	ds := &types.DataSource{FilterSet: []types.Filter{{Template: []types.TemplateItem{{ID: "Search", Operator: "producer"}}}}}
+	for _, term := range []string{"3700", "Creative-21"} {
+		input := map[string]interface{}{"Search": term, "Page": 1}
+		got := normalizeFilterSemantics(input, ds)
+		if got["Search"] != term || got["Page"] != 1 || input["Search"] != term {
+			t.Fatalf("producer predicate term must be passed through: input=%#v got=%#v", input, got)
+		}
+	}
+}
