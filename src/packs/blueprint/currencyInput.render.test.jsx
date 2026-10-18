@@ -18,6 +18,13 @@ assert.equal(emptyNullableNumber.props.min, undefined);
 let clearedNumber = 'not-cleared';
 NumberInput({value: '', nullable: true, min: 1, onValueChange: (value) => { clearedNumber = value; }}).props.onValueChange(NaN, '');
 assert.equal(clearedNumber, null);
+let clearedRequiredNumber = 'not-cleared';
+NumberInput({value: 101, onValueChange: value => { clearedRequiredNumber = value; }}).props.onValueChange(NaN, '');
+assert.equal(clearedRequiredNumber, '', 'required number edits retain an empty draft instead of publishing NaN');
+NumberInput({value: 101, onValueChange: value => { clearedRequiredNumber = value; }}).props.onValueChange(NaN, 'NaN');
+assert.equal(clearedRequiredNumber, '', 'Blueprint NaN text must not poison a required number draft');
+NumberInput({value: 101, onValueChange: value => { clearedRequiredNumber = value; }}).props.onValueChange(NaN, '-');
+assert.equal(clearedRequiredNumber, '-', 'partial negative numeric text remains editable');
 
 const defaultStepElement = CurrencyInput({value: 12.34, stepSize: 0.01, currency: 'USD'});
 assert.equal(defaultStepElement.props.stepSize, 0.01);
@@ -36,6 +43,11 @@ assert.equal(explicitStepElement.props.majorStepSize, 1);
 const emptyNullableCurrency = CurrencyInput({value: '', nullable: true, min: 0.01, currency: 'USD'});
 assert.equal(emptyNullableCurrency.props.value, '');
 assert.equal(emptyNullableCurrency.props.min, undefined);
+let clearedRequiredCurrency = 'not-cleared';
+CurrencyInput({value: 101, currency: 'USD', onValueChange: value => { clearedRequiredCurrency = value; }}).props.onValueChange(NaN, '');
+assert.equal(clearedRequiredCurrency, '', 'required currency edits retain an empty draft instead of publishing NaN');
+CurrencyInput({value: 101, currency: 'USD', onValueChange: value => { clearedRequiredCurrency = value; }}).props.onValueChange(NaN, 'NaN');
+assert.equal(clearedRequiredCurrency, '', 'Blueprint NaN text must not poison a required currency draft');
 
 const validationErrors = [];
 const originalError = console.error;
