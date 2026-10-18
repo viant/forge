@@ -1,4 +1,36 @@
 /* Built-in Forge appearance, used when no workspace theme is selected. */
+.forge-segmented-control {
+    display: inline-flex;
+    overflow: hidden;
+    gap: var(--forge-segmented-gap, 2px);
+    padding: var(--forge-segmented-padding, 3px);
+    border: 1px solid var(--forge-segmented-border, #d0d9ea);
+    border-radius: var(--forge-segmented-radius, 10px);
+    background: var(--forge-segmented-background, #eef2f8);
+}
+.forge-segmented-control__option {
+    min-height: var(--forge-segmented-option-height, 30px);
+    padding: var(--forge-segmented-option-padding, 4px 16px);
+    border: 0;
+    border-radius: var(--forge-segmented-option-radius, 7px);
+    background: transparent;
+    color: var(--forge-segmented-option-color, #607089);
+    font-family: inherit;
+    font-size: var(--forge-segmented-option-font-size, 13px);
+    font-weight: var(--forge-segmented-option-weight, 500);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.forge-segmented-control__option[aria-pressed="true"] {
+    background: var(--forge-segmented-active-background, #ffffff);
+    color: var(--forge-segmented-active-color, #1e3f8a);
+    font-weight: var(--forge-segmented-active-weight, 700);
+    box-shadow: var(--forge-segmented-active-shadow, 0 1px 5px rgba(30, 63, 138, 0.14), 0 0 0 1px rgba(200, 216, 240, 0.6));
+}
+.forge-segmented-control__option:disabled {
+    cursor: not-allowed;
+}
 .agently-workspace:not([data-forge-theme]) {
     --forge-type-caption-size: 11px;
     --forge-type-caption-line-height: 16px;
