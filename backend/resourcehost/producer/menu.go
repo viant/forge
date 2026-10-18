@@ -23,6 +23,8 @@ type MenuActionVisibility func(context.Context, identity.VerifiedActor, identity
 
 // ValidateMenu validates the portable navigation envelope. Node fields remain
 // lossless JSON so host title/icon/parameters/action contracts survive delivery.
+// A leaf without an action must explicitly set disabled to true. Such a label
+// does not grant access to a destination; authored actions always need visibility.
 func ValidateMenu(version int64, raw json.RawMessage) error {
 	if len(raw) > 4<<20 {
 		return fmt.Errorf("menu definition exceeds size limit")
@@ -103,7 +105,13 @@ func filterMenuNodes(ctx context.Context, nodes []json.RawMessage, visible func(
 				return nil, err
 			}
 		} else if _, hasAction := node["action"]; !hasAction {
-			return nil, identity.ErrResource
+			// A disabled label can describe an unavailable destination without
+			// inventing an executable action. Actions, when present, still pass
+			// the visibility check above even if presentation is disabled.
+			var disabled bool
+			if json.Unmarshal(node["disabled"], &disabled) != nil || !disabled {
+				return nil, identity.ErrResource
+			}
 		}
 		encoded, err := json.Marshal(node)
 		if err != nil {
