@@ -101,6 +101,10 @@ type AssignmentPicker struct {
 }
 
 type StatusWorkflow struct {
+	Appearance  string                     `json:"appearance,omitempty" yaml:"appearance,omitempty"`
+	Label       string                     `json:"label,omitempty" yaml:"label,omitempty"`
+	ActiveState interface{}                `json:"activeState,omitempty" yaml:"activeState,omitempty"`
+	StateLabels map[string]string          `json:"stateLabels,omitempty" yaml:"stateLabels,omitempty"`
 	StateField  string                     `json:"stateField" yaml:"stateField"`
 	Transitions []StatusWorkflowTransition `json:"transitions" yaml:"transitions"`
 }
