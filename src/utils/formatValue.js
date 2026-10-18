@@ -25,6 +25,15 @@ export const formatDisplayValue = (value, format, locale = 'en-US', options = {}
         return String(value);
     }
 
+    if (format === 'code' || format === 'json') {
+        if (typeof value === 'string') return value;
+        try {
+            return JSON.stringify(value, null, 2) ?? String(value);
+        } catch (_) {
+            return String(value);
+        }
+    }
+
     if (format === 'dimensions' && typeof value === 'object' && !Array.isArray(value)) {
         const width = Number(value?.width);
         const height = Number(value?.height);
