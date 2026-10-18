@@ -6300,7 +6300,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "4000b50e3ed22e2abc7d98dd8194c6fd009221c1",
+    "baseCommit": "48d38337a938aece80a6aed4695fc33ae31d58c6",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "datasource_projection.go": "854b7858c0e997ea0e84bb3a91c9805c8ed728c39a8b740713e524cc43529ec9",
@@ -6328,7 +6328,7 @@
       "github.com/viant/forge/backend/window/contract.presentation.go": "239b91f0d3dd60a87b46d1b33ac8e45d15beb7b94d2b0aed01e2fa14d464250a",
       "github.com/viant/forge/backend/window/contract.resource.go": "3d405993972615d81f63d4f8fdf1ed99539af092353f20e7b80005fd196fc467",
       "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
-      "model.go": "1f2018cc1df324769130a365f52fae31ea599fe5898e1a270a4135144fde9f8b",
+      "model.go": "f1ee67063372bda80a831405f226c36694775ac6ace48b874a7d2c73f4c15b39",
       "presentation_primitives.go": "89be7b5723b17e57cfbaab70136f79f11bd87bc1958000e7b2d2ce491ca867a3",
       "resource_model.go": "2d09c19334a806ae9879b9e022e403640cc5ca0f7cabe494b38aaa86881cd610",
       "resource_model_validation.go": "be1cb0525d5f0a2f609775e46b2fe2cb7a3f74dd4160fed26764bfd3a9fa8fb4",
