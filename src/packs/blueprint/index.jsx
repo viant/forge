@@ -61,6 +61,12 @@ import {normalizeLifetimeStart, resolveDateRangePreset, resolveDateRangePresetSy
 import {commitSelectOption, isSelectOptionDisabled} from './selectOptionModel.js';
 import {resolveNumericInputMinorStepSize} from './numericInputSteps.js';
 
+const numericInputValue = (valueAsNumber, valueAsString, nullable) => {
+    const text = String(valueAsString ?? '').trim();
+    if (!text || text === 'NaN') return nullable ? null : '';
+    return Number.isFinite(valueAsNumber) ? valueAsNumber : text;
+};
+
 /* ------------------------ Widget implementation ----------------------- */
 
 const mergeClassNames = (...classNames) => classNames.filter(Boolean).join(' ') || undefined;
@@ -460,7 +466,7 @@ export function registerPack() {
                     value={empty ? '' : (value ?? '')}
                     min={nullable ? undefined : min}
                     onValueChange={(valueAsNumber, valueAsString) => {
-                        onValueChange?.(nullable && String(valueAsString || '').trim() === '' ? null : valueAsNumber);
+                        onValueChange?.(numericInputValue(valueAsNumber, valueAsString, nullable));
                     }}
                     readOnly={readOnly}
                     stepSize={stepSize}
@@ -1098,7 +1104,7 @@ export function registerPack() {
                     value={empty ? '' : (value ?? '')}
                     min={nullable ? undefined : min}
                     onValueChange={(valueAsNumber, valueAsString) => {
-                        onValueChange?.(nullable && String(valueAsString || '').trim() === '' ? null : valueAsNumber);
+                        onValueChange?.(numericInputValue(valueAsNumber, valueAsString, nullable));
                     }}
                     readOnly={readOnly}
                     leftIcon={currencyInputIcon(currency)}
