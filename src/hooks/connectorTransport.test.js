@@ -38,3 +38,16 @@ test('transport preserves authored paging inputs and target without enabling pag
  assert.deepEqual(requests.at(-1).options.inputParameters,{request:{filter:'opaque'},continuation:{opaque:'token'}});
  assert.equal(requests.at(-1).targetContext,targetContext);
 });
+
+test('transport maps an exact-ID quick filter into the cube body before offset paging',async()=>{
+ const requests=[];
+ const dataSource={id:'exchange',paging:{enabled:true,mode:'offset',size:10,parameters:{page:'offset',size:'limit'}},
+  parameters:[{name:'filters.publisherIds',in:'filter',location:'Id',codec:{name:'int[]'}}]};
+ const connector=createTransportConnector(dataSource,{transport:async request=>{requests.push(request);return {data:[]};}});
+ const filter={Id:'174',Status:'active'};
+ await connector.get({page:3,filter,inputParameters:{filters:{audienceIds:[11],orderIds:[22],period:'month'},orderBy:['total_spend:desc']}});
+ assert.deepEqual(requests[0].options.filter,{Status:'active'});
+ assert.deepEqual(requests[0].options.inputParameters,{filters:{audienceIds:[11],orderIds:[22],period:'month',publisherIds:[174]},
+  orderBy:['total_spend:desc'],offset:20,limit:10});
+ assert.deepEqual(filter,{Id:'174',Status:'active'},'caller filter is immutable');
+});
