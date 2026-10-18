@@ -30,7 +30,7 @@ func TestStandaloneProtectedHTTPMCPMenus(t *testing.T) {
 	var revoked, expired atomic.Bool
 	uri, _ := identity.ParseResourceURI("navigation://tenant/navigation")
 	source := &identity.LocalResource{URI: uri, Load: func(context.Context) (json.RawMessage, error) {
-		return json.RawMessage(`{"schemaVersion":1,"applications":[{"id":"workspace","title":"Workspace","menus":[{"id":"allowed","action":{"type":"window","windowKey":"advertiserList","parameters":{"page":1}}},{"id":"nested","menus":[{"id":"denied","action":{"type":"window","windowKey":"deniedTarget"}}]}]}]}`), nil
+		return json.RawMessage(`{"schemaVersion":1,"applications":[{"id":"workspace","title":"Workspace","menus":[{"id":"pending","title":"Pending destination","disabled":true,"description":"Unavailable","iconSvg":{"viewBox":[0,0,24,24],"paths":["M1 1L2 2"]}},{"id":"allowed","action":{"type":"window","windowKey":"advertiserList","parameters":{"page":1},"parameterBindings":{"AccountId":{"from":["accountId"]}}}},{"id":"nested","menus":[{"id":"denied","action":{"type":"window","windowKey":"deniedTarget"}}]}]}]}`), nil
 	}}
 	p, err := producer.NewLocalProvider(producer.LocalConfig{ProviderIdentity: "standalone", Actor: func(ctx context.Context) (identity.VerifiedActor, error) {
 		a, ok := ctx.Value(actorKey{}).(identity.VerifiedActor)
@@ -147,6 +147,11 @@ func TestStandaloneProtectedHTTPMCPMenus(t *testing.T) {
 	}
 	if !strings.Contains(string(result.MenuProjection.DefinitionBytes), "advertiserList") || strings.Contains(string(result.MenuProjection.DefinitionBytes), "deniedTarget") {
 		t.Fatal("invalid visible projection")
+	}
+	for _, retained := range []string{`"id":"pending"`, `"disabled":true`, `"iconSvg":`, `"parameterBindings":`} {
+		if !strings.Contains(string(result.MenuProjection.DefinitionBytes), retained) {
+			t.Fatalf("portable menu field lost over protected MCP: %s", retained)
+		}
 	}
 	if identity.ContentFingerprint(result.MenuProjection.DefinitionBytes) != result.MenuProjection.ContentFingerprint {
 		t.Fatal("invalid projection hash")
