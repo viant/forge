@@ -14,6 +14,7 @@ export default defineConfig({
       'src/components/WindowContent.lazyOptions.render.test.jsx',
       'src/components/DataSource.spread.render.test.jsx',
       'src/components/DataSource.aggregateOffset.render.test.jsx',
+      'src/components/primitives/EditableCollection.readiness.render.test.jsx',
       'src/components/primitives/StatusWorkflow.switch.render.test.jsx',
     ],
     setupFiles: ['./scripts/react-runtime-test-setup.js'],

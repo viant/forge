@@ -554,3 +554,10 @@ receiving `{context, form}` and returning an empty string/true for valid data or
 error message/false for invalid data. Missing or asynchronous validators fail closed.
 The validation is UX feedback; the resource model/writer must still validate writes.
 Reset uses the latest clean baseline, including asynchronously loaded reader data.
+
+Readiness predicates can reference a specific datasource without a JavaScript
+window-state mirror. For example,
+`{source: control, dataSourceRef: baseline, field: loaded, equals: true}`
+reads and subscribes to that datasource's control signal. Combine it with
+`loading: false` and an empty `error` predicate before a full-replacement
+mutation. Other leaf scopes also honor an explicit `dataSourceRef`.
