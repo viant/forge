@@ -1,6 +1,7 @@
+import SwitchControl from '../SwitchControl.jsx';
 import React from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
-import {ButtonGroup, Tag, Switch} from '@blueprintjs/core';
+import {ButtonGroup, Tag} from '@blueprintjs/core';
 import {resolveSelector} from '../../utils/selector.js';
 import {availableStatusTransitions} from './workflowModels.js';
 import MutationCommand from './MutationCommand.jsx';
@@ -17,7 +18,7 @@ export default function StatusWorkflow({container, context}) {
     const label = spec.label || 'Status';
     const checked = spec.activeState !== undefined && current != null && String(current) === String(spec.activeState);
     const caption = spec.stateLabels?.[String(current)] || String(current ?? 'Unknown');
-    const trigger = ({invoke, disabled = true}) => <Switch role="switch" aria-label={label} checked={checked} disabled={disabled} onChange={invoke}><span className="forge-status-workflow__label">{label}</span> <span className="forge-status-workflow__value">{caption}</span></Switch>;
+    const trigger = ({invoke, disabled = true}) => <span className="forge-status-workflow__control"><span className="forge-status-workflow__label">{label}</span> <SwitchControl aria-label={label} value={checked} disabled={disabled} onChange={invoke} trueLabel={caption} falseLabel={caption}/></span>;
     // A switch has one unambiguous next state. Unknown/ambiguous states remain
     // readable without presenting an arbitrary mutation.
     if (spec.activeState === undefined || transitions.length !== 1) return <div className="forge-status-workflow forge-status-workflow--switch" data-forge-primitive="statusWorkflow">{trigger({})}</div>;

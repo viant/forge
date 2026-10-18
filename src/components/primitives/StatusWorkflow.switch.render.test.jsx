@@ -22,13 +22,13 @@ it('uses the shared writer lifecycle and authoritative readback for a status swi
  const settle=async action=>act(async()=>{action?.();for(let n=0;n<15;n++)await Promise.resolve()});
  try{
   await settle(()=>root.render(<><StatusWorkflow context={context} container={{id:'status',statusWorkflow:spec}}/><DraftForm context={context} container={{id:'properties',draftForm:{submit:command}}}><input aria-label="Name" defaultValue="Unchanged"/></DraftForm></>));
-  const input=()=>host.querySelector('input[role="switch"]');
-  expect(input().checked).toBe(true);expect(host.textContent).toContain('Active');
+  const input=()=>host.querySelector('button[role="switch"]');
+  expect(input().getAttribute('aria-checked')).toBe('true');expect(host.textContent).toContain('Active');
   await settle(()=>input().click());expect(calls).toBe(1);expect(inputs.to).toBe(0);expect(input().disabled).toBe(true);expect(host.querySelector('fieldset').disabled).toBe(true);
   await settle(()=>input().click());expect(calls).toBe(1);
-  await settle(()=>finishWriter());expect(input().checked).toBe(false);expect(input().disabled).toBe(true);expect(host.querySelector('fieldset').disabled).toBe(true);
+  await settle(()=>finishWriter());expect(input().getAttribute('aria-checked')).toBe('false');expect(input().disabled).toBe(true);expect(host.querySelector('fieldset').disabled).toBe(true);
   await settle(()=>finishReadback());expect(input().disabled).toBe(false);expect(host.textContent).toContain('Inactive');expect(host.querySelector('fieldset').disabled).toBe(false);
   await settle(()=>{selected.value={selected:{id:7,status:'ARCHIVED'}}});
-  expect(input().disabled).toBe(true);expect(input().checked).toBe(false);
+  expect(input().disabled).toBe(true);expect(input().getAttribute('aria-checked')).toBe('false');
  }finally{await settle(()=>root.unmount());host.remove()}
 });
