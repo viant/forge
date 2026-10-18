@@ -130,6 +130,7 @@ const normalizedContext = {
   },
 };
 assert.deepEqual(marshalResource({id: '4', count: null, note: '   ', child: null}, normalizedContext, 'root'), {Id: 4, Count: 5, Note: null, Child: null});
+assert.deepEqual(marshalResource({id: 4}, normalizedContext, 'root', null, 'full'), {Id: 4, Count: 5}, 'an omitted nullable field must not become an explicit clear');
 assert.deepEqual(validateResource({id: 1, child: null}, normalizedContext.metadata.schemas.root, normalizedContext.metadata.schemas), []);
 const invalidEmptyContext = structuredClone(normalizedContext);
 delete invalidEmptyContext.metadata.resourceModels.root.fields.count.default;

@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import './index.jsx';
+import {getWidget} from '../../runtime/widgetRegistry.jsx';
+const NativeSwitch=getWidget('switch');
+let changed;
+const input=NativeSwitch({value:false,id:'custom-switch',className:'custom-skin',onChange:value=>{changed=value;}});
+assert.equal(input.props.id,'custom-switch');assert.match(input.props.className,/custom-skin/);assert.equal(input.props.role,'switch');
+assert.equal(input.props['aria-checked'],false);input.props.onClick();assert.equal(changed,true);
+const markup=renderToStaticMarkup(<NativeSwitch value={true} item={{id:'status',label:'Status'}} trueLabel="Active" falseLabel="Inactive" readOnly/>);
+assert.match(markup,/id="status"/);assert.match(markup,/aria-checked="true"/);assert.match(markup,/disabled/);assert.match(markup,/forge-switch__thumb/);assert.match(markup,/>Active</);assert.doesNotMatch(markup,/style=/);
+console.log('PASS: switch keeps ARIA/readonly/toggle behavior, forwards stable identity/classes and uses no inline appearance');

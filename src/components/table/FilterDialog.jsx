@@ -4,6 +4,7 @@ import {useSignals} from '@preact/signals-react/runtime';
 import {evaluatePlainVisibleWhen, trackVisibleWhen} from '../visibleWhen.js';
 import './FilterDialog.css';
 import { Button, Checkbox, Classes, Dialog, DialogBody, DialogFooter, HTMLSelect, InputGroup } from "@blueprintjs/core";
+import {normalizeSubmittedFilterValue} from './filterValue.js';
 
 const FilterDialog = ({
                           isOpen,
@@ -55,11 +56,14 @@ const FilterDialog = ({
 
     const handleApplyFilters = () => {
         const appliedFilter = {};
+        const filterMode = context?.dataSource?.filterMode
+            || context?.metadata?.dataSource?.[context?.identity?.dataSourceRef]?.filterMode
+            || '';
         for (const field of visibleTemplate) {
             const value = filterValues[field.id];
             if (value === '' || value === undefined) continue;
             if (Array.isArray(field.options) && !field.options.some(option => String(option.value) === String(value))) continue;
-            appliedFilter[field.id] = value;
+            appliedFilter[field.id] = normalizeSubmittedFilterValue(field, value, filterMode);
         }
         onApplyFilters({...activeSet, filter: appliedFilter});
         onClose();

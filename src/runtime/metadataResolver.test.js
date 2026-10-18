@@ -377,6 +377,26 @@ const resolvedLinkMetadata = resolveMetadataForTarget(linkMetadata, {platform: '
 assert.equal(resolvedLinkMetadata.view.content.items[0].link.target, '_blank');
 assert.equal(resolvedLinkMetadata.view.content.items[0].link.hrefTemplate, 'https://example.test/records/{{id}}');
 
+const mutationPayloadMetadata = {
+    dialogs: [{
+        id: 'deleteFlight',
+        content: {containers: [{
+            id: 'deleteCommand',
+            mutationCommand: {
+                dataSourceRef: 'flight_delete',
+                payload: {modelRef: 'flightDelete', target: '$', mode: 'full', source: {scope: 'form', dataSourceRef: 'flight_delete_draft'}},
+            },
+        }]},
+    }],
+    view: {content: {containers: [{id: 'androidOnly', target: 'android'}]}},
+};
+for (const platform of ['web', 'android']) {
+    const resolved = resolveMetadataForTarget(mutationPayloadMetadata, {platform});
+    assert.equal(resolved.dialogs[0].content.containers[0].mutationCommand.payload.target, '$');
+    assert.equal(resolved.dialogs[0].content.containers[0].mutationCommand.payload.modelRef, 'flightDelete');
+    assert.equal(resolved.view.content.containers.length, platform === 'android' ? 1 : 0);
+}
+
 const formatting = {formattingRules: [
   {field:'daysRemaining',operator:'between',values:[0,7],target:'cell',className:'warning'},
   {field:'daysRemaining',operator:'lte',value:5,target:'row',className:'danger'},

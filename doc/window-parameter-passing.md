@@ -198,3 +198,16 @@ A shim converts legacy Parameter rows to the new shape:
 
 Thus existing projects continue to run unmodified while new metadata can
 adopt the clearer five-field syntax immediately.
+
+## Return and replacement targets
+
+`window.openTarget` normally extends the current navigation history. A target
+may provide an explicit `navigationTrail` array to replace that history; an empty
+array removes back links to a view whose workflow has finished. Entries are
+copied so subsequent caller edits do not mutate the window's history.
+
+Hosts may present ordinary links as adjacent tabs. They should honor an explicit
+`replaceHostedRegion: true` target instead of forcing it to remain owned by the
+old tab. Native hosted replacement carries the stable parent scope; a completed
+owner can then close without making the target disappear. These options control
+presentation and lifetime, not data authorization.

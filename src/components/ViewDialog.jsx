@@ -10,7 +10,7 @@ import { getLogger } from '../utils/logger.js';
 import { buildQuickFilterSeed, mergeQuickFilterValue, withoutQuickFilterParameters } from './viewDialogQuickFilters.js';
 import {evaluatePlainVisibleWhen, trackVisibleWhen} from './visibleWhen.js';
 import {dialogCloseDisabledWhen, isDialogCloseDisabled} from './dialogClose.js';
-import {consumeDialogFocusRevision, dialogFreshFormSeed, shouldRefreshDialogDataSourceForMount} from './viewDialogFreshState.js';
+import {consumeDialogFocusRevision, dialogFreshFormSeed, shouldFetchDialogOnOpen, shouldRefreshDialogDataSourceForMount} from './viewDialogFreshState.js';
 import MutationCommand from './primitives/MutationCommand.jsx';
 import DisabledActionShell from './DisabledActionShell.jsx';
 
@@ -246,7 +246,7 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
     const log = getLogger('dialog');
     const {handlers} = context
     const resolvedDataSourceRef = dialog?.dataSourceRef || context?.identity?.dataSourceRef || '';
-    const fetchOnOpen = dialog?.content?.fetchData !== false;
+    const fetchOnOpen = shouldFetchDialogOnOpen(dialog);
     const callerProps = handlers.dialog.callerProps?.() || {};
     const selectionModeOverride = resolveDialogSelectionMode(dialog, callerProps);
 

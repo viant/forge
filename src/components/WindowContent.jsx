@@ -358,12 +358,16 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
 
     if (Array.isArray(node.containers)) {
         let children = node.containers;
-        if (node.tabs?.renderActiveTabPanelOnly === true && children.length > 0) {
+        const tabs = node.stableTabs || node.tabs;
+        // stableTabs uses the same active/visited mount policy as tabs. During
+        // initial collection, only the selected panel exists; visited panels
+        // are represented by mounted contexts after navigation.
+        if (tabs?.renderActiveTabPanelOnly === true && children.length > 0) {
             const panelId = String(node.id || children[0]?.id || 'root').trim();
             const selectedId = String(
                 viewState?.tabs?.[panelId]
-                || node.tabs?.selectedTabId
-                || node.tabs?.defaultSelectedTabId
+                || tabs?.selectedTabId
+                || tabs?.defaultSelectedTabId
                 || children[0]?.id
                 || ''
             ).trim();

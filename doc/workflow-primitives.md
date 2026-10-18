@@ -210,6 +210,29 @@ table: {columns: [{id: id, name: ID}, {id: name, name: Name}]}
 
 Each editable operation may override the collection-level `selection` contract. This allows one list to combine exactly-one Edit with independently bounded bulk operations. `selection.every`, `selection.any`, and `selection.none` apply the normal predicate operators to each selected row and fail closed before dispatch.
 
+For a server-paginated multi-select datasource, opt in to `selectionRetention: pages`
+when a bulk operation may span pages. Only changing `page` retains selected rows
+from earlier pages. Changing the filter, sort, page size, or parent parameters
+clears them. A successful mutation should use `clearSelection: true` on its
+list refresh so stale off-page rows cannot be reused after the write. The
+default datasource behavior still reconciles selection to the current page.
+
+For a hidden complete-replacement baseline, use bounded page aggregation:
+
+```yaml
+paging: {enabled: true, size: 25, aggregate: true, maxPages: 100, parameters: {page: Page, size: Limit}}
+```
+
+Forge requests producer pages sequentially, rejects duplicate identities and
+an exhausted page bound, and publishes the collection only after a short or
+empty final page proves completion. A later-page failure never exposes a
+partial replacement baseline. Keep visible lists on ordinary server paging;
+this opt-in is for commands that require the complete relation set.
+Only enable it after proving the producer's Page/Limit continuation and total
+against representative multi-page data. A producer that falsely reports a
+short or empty page can make any client aggregator believe a partial baseline
+is complete; the consumer must not use that producer for replacement writes.
+
 ### Workflow primitive reference
 
 | Primitive | Required | Important optional fields | Runtime responsibility |

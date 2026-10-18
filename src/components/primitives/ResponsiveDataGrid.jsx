@@ -39,7 +39,10 @@ export function responsiveGridStyle(state = {}) {
 
 export function projectResponsiveColumns(authoredColumns = [], columnIDs = []) {
   const authored = Array.isArray(authoredColumns) ? authoredColumns : [];
-  const requested = Array.isArray(columnIDs) ? columnIDs.filter((id) => id !== '__select__') : [];
+  const hasAuthoredSelection = authored.some((column) => column?.id === '__select__');
+  const requested = Array.isArray(columnIDs)
+    ? columnIDs.filter((id) => id !== '__select__' || hasAuthoredSelection)
+    : [];
   if (!requested.length) return authored;
   const byID = new Map(authored.map((column) => [column.id || column.dataField || column.field, column]));
   return requested.map((id) => byID.get(id)).filter(Boolean);

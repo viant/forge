@@ -3,8 +3,9 @@ import React, {useEffect, useState} from "react";
 import {getLogger} from "../utils/logger.js";
 import {useSignals} from '@preact/signals-react/runtime';
 import { extractData, isDeferredCacheHitEnvelope } from "./dataSourceExtract.js";
-import { beginDataSourceFetch, consumeDataSourceFetchRequest, reconcileRestoredPendingFetch, recoverInterruptedFetchOnMount, resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, withFetchedPageInfo, snapshotFetchedPageResult } from "./dataSourceFetchState.js";
-import {reconcileMultiSelection, reconcileSingleSelection} from "./dataSourceSelection.js";
+import {collectPagedCollection} from "./pagedCollectionAggregate.js";
+import { beginDataSourceFetch, consumeDataSourceFetchRequest, reconcileRestoredPendingFetch, recoverInterruptedFetchOnMount, resolveFetchPage, shouldReplayPendingFetchOnMount, snapshotFilter, suppressRepeatedFailedFetch, withFetchedPageInfo, snapshotFetchedPageResult } from "./dataSourceFetchState.js";
+import {pageSelectionPolicy, reconcileMultiSelection, reconcileSingleSelection} from "./dataSourceSelection.js";
 import {applyFetchTransform} from "./dataSourceTransform.js";
 import {hasResolvedDependencies} from "./dataSourceDependencies.js";
 import {bindingFinalizationAction, isCurrentBindingGeneration} from "./primitives/bindingGeneration.js";
@@ -87,6 +88,15 @@ export default function DataSource({context}) {
     const {input, collection, selection, collectionInfo, metrics, form, control} = signals
     const {getUniqueKeyValue, setSelected, setLoading, setError, setInactive} = handlers.dataSource
     const events = dataSourceEvents(context, dataSource);
+    const notifyFetchError = (error, phase) => {
+        try {
+            if (events.onError && events.onError.isDefined()) {
+                log.debug(`[${phase}] onError:execute`, {ds: context?.identity?.dataSourceRef});
+                events.onError.execute({error});
+            }
+        } catch (_) {
+        }
+    };
     const resourceModelRef = resourceModelRefForDataSource(context, dataSource.resourceModelRef);
     const selectionMode = dataSource.selectionMode || 'single';
     useEffect(() => {
@@ -424,19 +434,17 @@ export default function DataSource({context}) {
             }
         } catch (err) {
             if (!mountedRef.current || !authorizationIsCurrent()) return;
-            if (isDataSourceLocalDenial(err, context)) { clearDeniedDataSourceState(identity.dataSourceId, err); return; }
+            if (isDataSourceLocalDenial(err, context)) {
+                clearDeniedDataSourceState(identity.dataSourceId, err);
+                notifyFetchError(err, 'refreshRecords');
+                return;
+            }
             if (isProtectedUpstreamDenial(context, err)) {
                 denyProtectedWindow(identity.windowId, Number(err.status));
                 return;
             }
             setError(err);
-            try {
-                if (events.onError && events.onError.isDefined()) {
-                    log.debug('[refreshRecords] onError:execute', {ds: context?.identity?.dataSourceRef});
-                    events.onError.execute({error: err});
-                }
-            } catch (_) {
-            }
+            notifyFetchError(err, 'refreshRecords');
         } finally {
             if (mountedRef.current && authorizationIsCurrent()) setLoading(false);
         }
@@ -495,6 +503,13 @@ export default function DataSource({context}) {
         // we optimistically clear.
         // ------------------------------------------------------------------
         const requestSig = JSON.stringify({filter, parameters, page, pageSize: requestPaging?.size, sort});
+        const previousFailure = control.peek() || {};
+        if (suppressRepeatedFailedFetch(previousFailure, requestSig, cache)) {
+            flagReadDone();
+            setLoading(false);
+            settleDataSourceRequest(requestDataSourceId, requestId, previousFailure.error);
+            return;
+        }
         // const queryChanged = requestSig !== prevQuerySig.current;
         // if (queryChanged) {
         //     setSelected({selected: null, rowIndex: -1});
@@ -529,15 +544,30 @@ export default function DataSource({context}) {
             const currentSelection = {...selection.peek()};
 
             // 3) Perform GET
-            const payload = await connector.get({
+            const aggregate = requestPaging?.aggregate === true;
+            if (aggregate && (!pagingEnabled || cursorMode || requestPaging?.mode === 'offset')) {
+                throw new Error('Aggregated paging requires bounded page-number requests.');
+            }
+            const fetchPage = requestedPage => connector.get({
                 filter: finalFilter,
-                page,
+                page: requestedPage,
                 pageSize: requestPaging?.size,
                 ...(cursorRequest ? {cursor: cursorRequest.cursor} : {}),
                 inputParameters: {...(parameters || {}), ...(sort?.length ? {sort} : {})},
                 cache,
                 invocationId,
             });
+            const collected = aggregate ? await collectPagedCollection({
+                pageSize: Number(requestPaging.size),
+                maxPages: Number(requestPaging.maxPages),
+                fetchPage,
+                extractPage: payload => extractData(selectors, requestPaging, payload),
+                keyForRow: getUniqueKeyValue,
+                shouldContinue: () => authorizationIsCurrent() && mountedRef.current
+                    && isCurrentBindingGeneration(input.peek()?.bindingGeneration, bindingGeneration),
+            }) : null;
+            if (aggregate) page = 1;
+            const payload = aggregate ? collected.payload : await fetchPage(page);
             if (!authorizationIsCurrent()) return;
             if (!mountedRef.current) {
                 settleDataSourceRequest(requestDataSourceId, requestId, new Error('Datasource unmounted before request completion.'));
@@ -557,12 +587,14 @@ export default function DataSource({context}) {
             } catch (_) {
             }
 
-            let {records, info, stats} = extractData(selectors, requestPaging, payload);
+            let {records, info, stats} = aggregate
+                ? collected
+                : extractData(selectors, requestPaging, payload);
             if (cursorRequest) {
                 info = cursorSessionRef.current.finish(cursorRequest, info);
                 if (!info) return;
             }
-            const deferredCacheHit = isDeferredCacheHitEnvelope(payload);
+            const deferredCacheHit = !aggregate && isDeferredCacheHitEnvelope(payload);
             if (deferredCacheHit && records.length === 0) {
                 const previousRecords = Array.isArray(collection.peek()) ? collection.peek() : [];
                 if (previousRecords.length > 0) {
@@ -599,22 +631,33 @@ export default function DataSource({context}) {
                 });
             } catch (_) {
             }
-            collectionInfo.value = cursorRequest ? markCompletedCursorAssociation({...info, returnedCount: records.length, pageSize: requestPaging?.size}, cursorRequest.signature) : withFetchedPageInfo(info, page, pagingEnabled, {
+            collectionInfo.value = aggregate ? info : cursorRequest ? markCompletedCursorAssociation({...info, returnedCount: records.length, pageSize: requestPaging?.size}, cursorRequest.signature) : withFetchedPageInfo(info, page, pagingEnabled, {
                 ...fetchedPageResult,
                 mode: paging?.mode,
                 hasMoreSelector: paging?.dataInfoSelectors?.hasMore,
             });
             metrics.value = stats;
-            control.value = { ...control.peek(), loaded: true, error: null, stale: false };
+            control.value = { ...control.peek(), loaded: true, error: null, stale: false, failedRequestSignature: null };
             if (selectionMode === 'multi') {
-                const selectionParameters = {...parameters};
-                for (const key of [paging?.parameters?.page,paging?.parameters?.size]) if(key) delete selectionParameters[key];
-                const scope = JSON.stringify({filter,parameters:selectionParameters,sort});
-                const previous = selectionPageRef.current;
-                const preserve = dataSource.selectionPreserveAcrossPages === true && pagingEnabled && previous?.scope === scope;
-                const scopedSelection = dataSource.selectionPreserveAcrossPages === true && previous && previous.scope !== scope ? {selection:[]} : currentSelection;
-                const reconciledSelection = reconcileMultiSelection(scopedSelection, records, getUniqueKeyValue, {preserveOffPage:preserve,pageChanged:previous?.page!==page,previousRecords:previousPageRecords});
-                selectionPageRef.current = {scope,page};
+                let reconciledSelection;
+                if (dataSource.selectionRetention === 'pages') {
+                    const policy = pageSelectionPolicy(prevQuerySig.current, requestSig);
+                    const nextSelection = policy.clear ? {selection: []} : currentSelection;
+                    reconciledSelection = reconcileMultiSelection(nextSelection, records, getUniqueKeyValue,
+                        {retainMissing: policy.retainMissing});
+                } else {
+                    // Retain the existing opt-in's same-page refresh behavior:
+                    // remove missing visible rows without losing off-page choices.
+                    const selectionParameters = {...parameters};
+                    for (const key of [paging?.parameters?.page, paging?.parameters?.size]) if (key) delete selectionParameters[key];
+                    const scope = JSON.stringify({filter, parameters: selectionParameters, sort});
+                    const previous = selectionPageRef.current;
+                    const preserve = dataSource.selectionPreserveAcrossPages === true && pagingEnabled && previous?.scope === scope;
+                    const scopedSelection = dataSource.selectionPreserveAcrossPages === true && previous && previous.scope !== scope ? {selection: []} : currentSelection;
+                    reconciledSelection = reconcileMultiSelection(scopedSelection, records, getUniqueKeyValue,
+                        {preserveOffPage: preserve, pageChanged: previous?.page !== page, previousRecords: previousPageRecords});
+                    selectionPageRef.current = {scope, page};
+                }
                 if (stableSnapshotSignature(currentSelection?.selection) !== stableSnapshotSignature(reconciledSelection.selection)) {
                     setSelected(reconciledSelection);
                 }
@@ -686,22 +729,20 @@ export default function DataSource({context}) {
                 try { log.debug('[doFetchRecords] ignored stale binding error', {ds: context?.identity?.dataSourceRef, bindingGeneration}); } catch (_) {}
                 return;
             }
-            if (isDataSourceLocalDenial(err, context)) { clearDeniedDataSourceState(identity.dataSourceId, err); return; }
+            if (isDataSourceLocalDenial(err, context)) {
+                clearDeniedDataSourceState(identity.dataSourceId, err);
+                notifyFetchError(err, 'doFetchRecords');
+                return;
+            }
             if (isProtectedUpstreamDenial(context, err)) {
                 denyProtectedWindow(identity.windowId, Number(err.status));
                 return;
             }
             log.warn('doFetchRecords error', err)
             setError(err);
+            control.value = {...control.peek(), failedRequestSignature: requestSig};
 
-            // Fire DS-level onError if defined
-            try {
-                if (events.onError && events.onError.isDefined()) {
-                    log.debug('[doFetchRecords] onError:execute', {ds: context?.identity?.dataSourceRef});
-                    events.onError.execute({error: err});
-                }
-            } catch (_) {
-            }
+            notifyFetchError(err, 'doFetchRecords');
         } finally {
             if (!authorizationIsCurrent()) return;
             const bindingIsCurrent = isCurrentBindingGeneration(input.peek()?.bindingGeneration, bindingGeneration);
