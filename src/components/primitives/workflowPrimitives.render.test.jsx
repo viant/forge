@@ -95,3 +95,15 @@ if (warnedControl.loaded !== true || warnedControl.error !== null || warnedContr
 if (nextDerivedControl(warnedControl, {ready: true, warnings: optionalFailure.warnings, preservePrimary: true}) !== warnedControl) throw new Error('terminal optional source state was not idempotent');
 
 console.log('workflow primitive render contracts passed');
+
+const invalidWizardHTML=renderToStaticMarkup(<Wizard context={{...root,lookupHandler:()=>()=> 'Name required'}} container={{wizard:{steps:[{id:'last',label:'Last',validate:'required'}],submit:{commandId:'wizard-create',label:'Create Resource'}}}} renderStep={()=> <div>Last step</div>}/>);
+assert.match(invalidWizardHTML,/Create Resource/);
+assert.match(invalidWizardHTML,/Name required/);
+assert.doesNotMatch(invalidWizardHTML,/>Next</);
+assert.match(invalidWizardHTML,/<button[^>]*disabled[^>]*aria-label="Create Resource"|<button[^>]*aria-label="Create Resource"[^>]*disabled/);
+
+const externalWizardHTML=renderToStaticMarkup(<Wizard context={root} container={{wizard:{steps:[{id:'edit',label:'Edit',externalAdvance:true},{id:'copy',label:'Copy',terminal:true}]}}} renderStep={()=> <div>Editor</div>}/>);
+assert.doesNotMatch(externalWizardHTML,/>Next</);
+const completeWizardHTML=renderToStaticMarkup(<Wizard context={root} container={{wizard:{steps:[{id:'copy',label:'Copy',terminal:true}],submit:{commandId:'no-repeat',label:'Create Again'}}}} renderStep={()=> <div>Saved code</div>}/>);
+assert.match(completeWizardHTML,/Saved code/);
+assert.doesNotMatch(completeWizardHTML,/forge-wizard__actions|Create Again|>Back</);

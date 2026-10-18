@@ -138,11 +138,14 @@ type WizardSpec struct {
 }
 
 type WizardStep struct {
-	ID          string                 `json:"id" yaml:"id"`
-	Label       string                 `json:"label" yaml:"label"`
-	ContainerID string                 `json:"containerId,omitempty" yaml:"containerId,omitempty"`
-	VisibleWhen map[string]interface{} `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
-	ValidWhen   map[string]interface{} `json:"validWhen,omitempty" yaml:"validWhen,omitempty"`
+	ExternalAdvance bool                   `json:"externalAdvance,omitempty" yaml:"externalAdvance,omitempty"`
+	Terminal        bool                   `json:"terminal,omitempty" yaml:"terminal,omitempty"`
+	Validate        string                 `json:"validate,omitempty" yaml:"validate,omitempty"`
+	ID              string                 `json:"id" yaml:"id"`
+	Label           string                 `json:"label" yaml:"label"`
+	ContainerID     string                 `json:"containerId,omitempty" yaml:"containerId,omitempty"`
+	VisibleWhen     map[string]interface{} `json:"visibleWhen,omitempty" yaml:"visibleWhen,omitempty"`
+	ValidWhen       map[string]interface{} `json:"validWhen,omitempty" yaml:"validWhen,omitempty"`
 }
 
 type UploadCollectionSpec struct {

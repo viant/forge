@@ -3,7 +3,7 @@ import { Icon, Tooltip, Position } from "@blueprintjs/core";
 
 const TableHeader = ({ context,
                        fillerWidth = 0, columns, tableTitle, sortConfig }) => {
-    const { onSort, sortColumnId, sortDirection } = sortConfig;
+    const { onSort, sortColumnId, sortDirection, disabled = false } = sortConfig;
     const handlers = context?.handlers || {};
     const dataSourceConfig = context?.dataSource || {};
     const dataSourceHandlers = handlers.dataSource || {};
@@ -34,7 +34,7 @@ const TableHeader = ({ context,
     }, [selection, collection, selectionMode]);
 
     const handleSort = (col) => {
-        if (col.sortable) {
+        if (col.sortable && !disabled) {
             onSort(col.id);
         }
     };
@@ -99,14 +99,14 @@ const TableHeader = ({ context,
                 const { id, sortable, minWidth, align } = col;
 //                console.log('col =>',col)
                 const style = {
-                    cursor: sortable ? "pointer" : "default",
+                    cursor: sortable && !disabled ? "pointer" : "default",
                     textAlign: align || "left",
                     ...(minWidth && { width: minWidth }),
                     ...(String(col?.sticky || '').toLowerCase() === 'left' ? {left: col.stickyOffset || 0} : {}),
                 };
                 return (
                     <th key={id} className={`${String(col?.sticky || '').toLowerCase() === 'left' ? 'is-sticky-left' : ''}${col?.stickyEdge ? ' is-sticky-edge' : ''}`} style={style} title={[col.multiSelect ? 'Select all rows' : col.displayName || col.name, col.tooltip].filter(Boolean).join(' — ') || undefined} aria-sort={sortable ? sortColumnId === id ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none' : undefined}>
-                        {sortable ? <button type="button" className="forge-table-header-sort" aria-label={`Sort by ${col.displayName || col.name || col.id}`} onClick={() => handleSort(col)}>{renderHeaderContent(col)}</button> : renderHeaderContent(col)}
+                        {sortable ? <button type="button" disabled={disabled} className="forge-table-header-sort" aria-label={`Sort by ${col.displayName || col.name || col.id}`} onClick={() => handleSort(col)}>{renderHeaderContent(col)}</button> : renderHeaderContent(col)}
                     </th>
                 );
             })}

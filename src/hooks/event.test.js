@@ -1,4 +1,5 @@
 import { dataSourceEvents, dialogHandlers, useControlEvents, useToolbarControlEvents } from './event.js';
+import assert from 'node:assert/strict';
 
 const createContext = (calls) => {
     const context = {
@@ -60,6 +61,26 @@ const createContext = (calls) => {
     };
     return context;
 };
+
+{
+    const received = [];
+    const context = createContext([]);
+    context.lookupHandler = id => args => received.push({id, args});
+    const item = {id: 'rails', type: 'cardRailGroup', scope: 'windowForm', dataField: 'sections', on: [
+        {event: 'onTagClick', handler: 'catalog.filter'},
+        {event: 'onCountClick', handler: 'catalog.inventory'},
+    ]};
+    const {events} = useControlEvents(context, [item]).rails;
+    const tag = {target: {value: 6}, detail: {tag: {kind: 'channel', id: 6}, section: {id: 'premium'}}};
+    const count = {detail: {section: {id: 'premium'}}};
+    events.onTagClick(tag);
+    events.onCountClick(count);
+    assert.deepEqual(received.map(call => call.id), ['catalog.filter', 'catalog.inventory']);
+    assert.equal(received[0].args.event, tag);
+    assert.equal(received[0].args.value, 6);
+    assert.equal(received[1].args.event, count);
+    assert.deepEqual(context.signals.windowForm.value, {}, 'Actions do not replace bound collections');
+}
 
 {
     const context = createContext([]);
@@ -187,4 +208,18 @@ const createContext = (calls) => {
         console.error(`expected datasource lifecycle events, got ${calls.join(',')}`);
         process.exitCode = 1;
     }
+}
+
+// Blueprint boolean widgets emit values; legacy controls emit DOM events.
+for (const type of ['checkbox', 'toggle']) {
+    const context = createContext([]);
+    const lookup = context.lookupHandler;
+    context.lookupHandler = id => id === 'dataSource.setWindowFormField' ? ({item, value}) => {context.signals.windowForm.value = {...context.signals.windowForm.value, [item.dataField]: value};} : lookup(id);
+    const control = useControlEvents(context, [{id: 'history', type, scope: 'windowForm', dataField: 'history'}]).history;
+    control.events.onChange(true);
+    assert.equal(context.signals.windowForm.value.history, true);
+    control.events.onChange(false);
+    assert.equal(context.signals.windowForm.value.history, false);
+    control.events.onChange({target: {checked: true}});
+    assert.equal(context.signals.windowForm.value.history, true);
 }

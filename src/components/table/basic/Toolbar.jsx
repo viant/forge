@@ -247,6 +247,7 @@ const Toolbar = ({
                      exportPageRows = [],
                      exportColumns = [],
                      density = '',
+                     queryDisabled = false,
                      layout = '',
                      className = '',
                      style,
@@ -269,7 +270,7 @@ const Toolbar = ({
         if (!toolbarItemShouldRender(item, context, isVisible)) return null;
         const isReadonly = stateEvents?.onReadonly ? stateEvents.onReadonly() : false;
         if (item.type === 'quickSearch') {
-            return <QuickSearch key={item.id} context={context} item={item} disabled={item.disabled === true || disabled} onCommit={events.onChange}/>;
+            return <QuickSearch key={item.id} context={context} item={item} disabled={queryDisabled || toolbarItemShouldDisable(item, context) || disabled} onCommit={events.onChange}/>;
         }
         if (item.id === 'refresh' && !item.on?.length) {
             return <RefreshAction key={item.id} context={context} item={item} disabled={toolbarItemShouldDisable(item,context,isReadonly) || disabled}/>;
@@ -395,7 +396,7 @@ const Toolbar = ({
         if (item.type === 'pagination' || item.id === 'pagination') {
             return (
                 <span key={`pagination-${align}`} style={align === 'center' ? { margin: "0 10px" } : (align === 'right' ? { marginLeft: "10px" } : { marginRight: "10px" })}>
-                    <PaginationBar context={context} pagination={item.pagination || {}} />
+                    <PaginationBar context={context} disabled={queryDisabled} pagination={item.pagination || {}} />
                 </span>
             );
         }

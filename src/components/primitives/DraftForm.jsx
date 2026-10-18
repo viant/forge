@@ -3,19 +3,19 @@ import {Alert, Button} from '@blueprintjs/core';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import MutationCommand, {useMutationCommandState} from './MutationCommand.jsx';
 import {usePredicateSignals} from './usePredicateSignals.js';
-import {draftSnapshot, resetDraft, validateDraft} from './draftFormModel.js';
+import {draftSnapshot, resetDraft, validateDraft, retainedDraftBaseline, retainDraftBaseline} from './draftFormModel.js';
 
 export default function DraftForm({container, context, children}) {
   const spec = container.draftForm || {};
   const ref = spec.dataSourceRef || container.dataSourceRef;
   const dataContext = !ref || context.identity?.dataSourceRef === ref ? context : context.Context?.(ref) || context;
-  usePredicateSignals(dataContext, [spec.dirtyWhen, spec.validWhen]);
+  usePredicateSignals(dataContext, [spec.dirtyWhen, spec.validWhen, spec.submitWhen]);
   const form = dataContext?.signals?.form?.value || dataContext?.handlers?.dataSource?.getFormData?.() || {};
   const formStatus = dataContext?.signals?.formStatus?.value || {};
   const snapshot = draftSnapshot(form);
-  const [baseline, setBaseline] = React.useState(snapshot);
   const baselineOwner = dataContext?.signals?.form || dataContext;
-  const acceptedBaseline = React.useRef({owner: baselineOwner, version: formStatus.version});
+  const [baseline, setBaseline] = React.useState(() => retainedDraftBaseline(baselineOwner,snapshot));
+  const acceptedBaseline = React.useRef({owner: baselineOwner, version: undefined});
   const [confirmReset, setConfirmReset] = React.useState(false);
   const command = {...spec.submit, commandId: spec.submit?.commandId || `${container.id || 'draft'}:submit`, label: spec.saveLabel || spec.submit?.label || 'Save'};
   const commandState = useMutationCommandState(dataContext, command);
@@ -27,6 +27,7 @@ export default function DraftForm({container, context, children}) {
     // datasource version (load/reset/save) may replace the reset baseline.
     if (typeof formStatus.version === 'number' && previous.owner === baselineOwner && previous.version === formStatus.version) return;
     acceptedBaseline.current = {owner: baselineOwner, version: formStatus.version};
+    retainDraftBaseline(baselineOwner,snapshot,formStatus.version);
     setBaseline(snapshot);
   }, [formStatus.dirty, formStatus.version, baselineOwner, snapshot]);
   const dirty = spec.dirtyWhen ? evaluatePlainVisibleWhen(spec.dirtyWhen, dataContext) : typeof formStatus.dirty === 'boolean' ? formStatus.dirty : snapshot !== baseline;
@@ -42,7 +43,7 @@ export default function DraftForm({container, context, children}) {
   const body = children ? <fieldset className="forge-draft-form__fields" data-forge-part="draft-fields" disabled={busy} style={{border: 0, padding: 0, margin: 0, minWidth: 0}}>{children}</fieldset> : null;
   return <div className={`forge-draft-form${children ? ' forge-draft-form--editor' : ''}`} data-forge-primitive="draftForm" aria-busy={busy || undefined}>
     <div className="forge-draft-form__actions" data-forge-part="draft-actions">
-      {spec.submit ? <MutationCommand command={command} context={dataContext} extras={{data: form}} disabled={!dirty || !valid} onSettled={({status}) => {
+      {spec.submit && (!spec.submitWhen || evaluatePlainVisibleWhen(spec.submitWhen, dataContext)) ? <MutationCommand command={command} context={dataContext} extras={{data: form}} disabled={!dirty || !valid} onSettled={({status}) => {
         if (status !== 'succeeded') return;
         // A child editor is locked for the full command, including synchronization.
         // Standalone draft toolbars must also preserve programmatic edits made in flight.

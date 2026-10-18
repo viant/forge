@@ -81,5 +81,9 @@ const pendingDraft = renderToStaticMarkup(<DraftForm context={guardedContext} co
 assert.match(pendingDraft, /<fieldset[^>]*disabled/);
 assert.match(pendingDraft, /aria-busy="true"/);
 assert.match(pendingDraft, /forge-draft-form--editor/);
+const hiddenPendingDraft=renderToStaticMarkup(<DraftForm context={guardedContext} container={{id:'guarded-hidden',draftForm:{submit:guardedCommand,saveLabel:'Create Resource',submitWhen:{source:'windowForm',field:'step',equals:'final'}}}}><input aria-label="Editable field"/></DraftForm>);
+assert.doesNotMatch(hiddenPendingDraft,/aria-label="Create Resource"/);
+assert.match(hiddenPendingDraft,/<fieldset[^>]*disabled/);
+assert.match(hiddenPendingDraft,/>Reset</);
 finishDraftWrite();
 await saving;

@@ -21,11 +21,11 @@ import {resolveTableCellText, resolveTableLink} from "../../utils/tableLink.js";
 import {resolveKey} from "../../utils/selector.js";
 import {filterEmptyStateToolbarItems, resolveTableEmptyState, shouldRenderTableEmptyState} from "./tableEmptyState.js";
 import {tableTrailingSpace, tableSurfaceWidth, tableRowSlots, preserveDeclaredColumnWidths, scrollableTableWidth, tableBackfillCount, withStickyColumnOffsets} from './tableSizing.js';
-import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
+import {evaluatePlainVisibleWhen, trackVisibleWhen} from '../visibleWhen.js';
 import {resolveClientPagination, usesClientPaginationInfo} from './clientPagination.js';
 import {requestServerTableSort} from './serverSort.js';
 import {useSignals} from '@preact/signals-react/runtime';
-import {useTableColumnTimeZones} from './columnFormatting.js';
+import {useTableColumnTimeZones, withBoundColumnTimeZones} from './columnFormatting.js';
 import {applyClientFilters} from './clientFilters.js';
 import {resetPaginationScroll} from './paginationScroll.js';
 import PaginationBar from './basic/PaginationBar.jsx';
@@ -142,6 +142,8 @@ export function reconcileConfiguredColumns(savedColumns = [], sourceColumns = []
 
 const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, columns, pagination, children, renderRows }) => {
     useSignals();
+    trackVisibleWhen(container?.table?.queryDisabledWhen, context);
+    const queryDisabled = !!container?.table?.queryDisabledWhen && evaluatePlainVisibleWhen(container.table.queryDisabledWhen, context);
     const {services = {}, connectorConfig = {}} = useSetting();
     const preferenceKey = context.tableSettingKey?.(container.id || 'table') || [context.identity?.windowId,context.identity?.dataSourceRef,container.id || 'table'].filter(Boolean).join(':');
     const tablePreferences = useTablePreferences({services,config:connectorConfig.tablePreferences || {},key:preferenceKey});
@@ -259,6 +261,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
     }, [resolvedColumns, tablePreferences.preferences, container.id]);
 
     useEffect(() => {
+        if (queryDisabled) return;
         const savedSort = tablePreferences.preferences?.sort;
         const known = savedSort && resolvedColumns.some(column => column.id === savedSort.columnId && column.sortable);
         const columnId = known ? savedSort.columnId : initialSortColumnId;
@@ -266,7 +269,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
         if(columnId === sortColumnId && direction === sortDirection) return;
         if(columnId && String(dataSource?.sortMode || '').toLowerCase() === 'server') requestServerTableSort({dataSource,handlers,columnId,direction});
         setSortColumnId(columnId);setSortDirection(direction);
-    }, [tablePreferences.preferences?.sort, initialSortColumnId, initialSortDirection, resolvedColumns]);
+    }, [tablePreferences.preferences?.sort, initialSortColumnId, initialSortDirection, resolvedColumns, queryDisabled]);
 
     // Ensure non-excludable columns are always visible
     const visibleColumns = useMemo(
@@ -424,6 +427,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
     };
 
     const columnTimeZones = useTableColumnTimeZones(columnsToUse, context);
+    const exportColumns = useMemo(() => withBoundColumnTimeZones(columnsToUse, columnTimeZones), [columnsToUse, columnTimeZones]);
 
     // Use useMemo to compute preparedData from the active server/client page.
     const preparedData = useMemo(() => {
@@ -504,6 +508,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
     };
 
     const handleSort = (columnId) => {
+        if (queryDisabled) return;
         let newDirection = "asc";
         if (sortColumnId === columnId) {
             newDirection = sortDirection === "asc" ? "desc" : "asc";
@@ -629,13 +634,14 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                 >
                     <Toolbar
                         context={toolbarContext}
+                        queryDisabled={queryDisabled}
                         toolbarItems={primaryToolbarItems}
                         leftContent={toolbarActions}
-                        centerContent={<PaginationBar context={toolbarContext} pagingEnabled={!!pagingEnabled && pagingSize > 0} pageSize={pagingSize} pageSizeOptions={pagination?.pageSizeOptions}/>}
+                        centerContent={<PaginationBar context={toolbarContext} disabled={queryDisabled} pagingEnabled={!!pagingEnabled && pagingSize > 0} pageSize={pagingSize} pageSizeOptions={pagination?.pageSizeOptions}/>}
                         className="has-table-navigation"
                         exportRows={sortedCollection}
                         exportPageRows={renderedCollection}
-                        exportColumns={columnsToUse}
+                        exportColumns={exportColumns}
                         density={tablePreferences.preferences?.density || toolbarConfig.density}
                         layout={toolbarConfig.layout}
                     />
@@ -662,7 +668,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                         context={context}
                         columns={columnsToUse}
                         tableTitle={tableTitle}
-                        sortConfig={{ onSort: handleSort, sortColumnId, sortDirection }}
+                        sortConfig={{ onSort: handleSort, sortColumnId, sortDirection, disabled: queryDisabled }}
                     />
 
                     {/* Table Body */}

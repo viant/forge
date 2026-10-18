@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
+import {withBoundColumnTimeZones} from '../columnFormatting.js';
 import {assertTableExportBounds, assertTableExportPracticalBounds, buildTableCsv, buildTableXlsx, createTableExport, tableExportByteLimit, tableExportColumns, tableExportFormats, tableExportRows} from './tableExport.js';
 
 const columns = [
@@ -112,7 +113,12 @@ assert.throws(() => buildTableXlsx([{value: 'x'.repeat(32768)}], [{id: 'value', 
 const basicSource = readFileSync(new URL('../Basic.jsx', import.meta.url), 'utf8');
 assert.match(basicSource, /exportRows=\{sortedCollection\}/, 'default export scope must use all filtered and sorted loaded rows');
 assert.match(basicSource, /exportPageRows=\{renderedCollection\}/, 'page export scope must use only the rendered page');
-assert.match(basicSource, /exportColumns=\{columnsToUse\}/, 'export must use current user-visible columns');
+const datedColumns = Object.freeze([Object.freeze({id: 'at', name: 'At', format: 'dateTime24'})]);
+const datedRows = [{at: '2026-01-15T12:00:00Z', zone: 'America/Los_Angeles'}];
+assert.equal(buildTableCsv(datedRows, withBoundColumnTimeZones(datedColumns, ['America/New_York'])), '"At"\n"Jan 15, 2026, 07:00"');
+assert.equal(buildTableCsv(datedRows, withBoundColumnTimeZones(datedColumns, ['UTC'])), '"At"\n"Jan 15, 2026, 12:00"');
+assert.equal(buildTableCsv(datedRows, withBoundColumnTimeZones([{...datedColumns[0], timeZoneSelector: 'zone'}], ['UTC'])), '"At"\n"Jan 15, 2026, 04:00"');
+assert.equal(datedColumns[0].boundTimeZone, undefined, 'export must not mutate authored columns');
 
 const csvResult = createTableExport({rows, columns, format: 'csv', filename: 'sample.xlsx'});
 assert.equal(csvResult.filename, 'sample.csv');

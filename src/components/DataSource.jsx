@@ -74,6 +74,7 @@ export default function DataSource({context}) {
     const log = getLogger('ds');
     try { log.debug('[mount]', { ds: context?.identity?.dataSourceRef }); } catch (_) {}
     const prevFilterRef = useRef({});
+    const selectionPageRef = useRef(null);
     const cursorSessionRef = useRef(null);
     const prevQuerySig = useRef('');
     const lastResolvedParametersRef = useRef({});
@@ -589,6 +590,7 @@ export default function DataSource({context}) {
                 } catch (_) {
                 }
             }
+            const previousPageRecords = collection.peek() || [];
             collection.value = records;
             try {
                 log.debug('[doFetchRecords] set collection', {
@@ -605,7 +607,14 @@ export default function DataSource({context}) {
             metrics.value = stats;
             control.value = { ...control.peek(), loaded: true, error: null, stale: false };
             if (selectionMode === 'multi') {
-                const reconciledSelection = reconcileMultiSelection(currentSelection, records, getUniqueKeyValue);
+                const selectionParameters = {...parameters};
+                for (const key of [paging?.parameters?.page,paging?.parameters?.size]) if(key) delete selectionParameters[key];
+                const scope = JSON.stringify({filter,parameters:selectionParameters,sort});
+                const previous = selectionPageRef.current;
+                const preserve = dataSource.selectionPreserveAcrossPages === true && pagingEnabled && previous?.scope === scope;
+                const scopedSelection = dataSource.selectionPreserveAcrossPages === true && previous && previous.scope !== scope ? {selection:[]} : currentSelection;
+                const reconciledSelection = reconcileMultiSelection(scopedSelection, records, getUniqueKeyValue, {preserveOffPage:preserve,pageChanged:previous?.page!==page,previousRecords:previousPageRecords});
+                selectionPageRef.current = {scope,page};
                 if (stableSnapshotSignature(currentSelection?.selection) !== stableSnapshotSignature(reconciledSelection.selection)) {
                     setSelected(reconciledSelection);
                 }

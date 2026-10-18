@@ -1,5 +1,5 @@
 import {resolveCategoryColor} from './chartTheme.js';
-import {normalizeChartExtent} from './chartExtent.js';
+import {normalizeChartExtent, resolveChartMargins} from './chartExtent.js';
 import React, {useState, useEffect, useMemo} from "react";
 import {useSignals} from '@preact/signals-react/runtime';
 import {
@@ -741,11 +741,12 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         : authoredCategoryLabelConfig;
     const categoryLabelBottomOffset = categoryLabelConfig?.lines === 2 ? 14 : 0;
     const cartesianAxisTitleBottomMargin = !embedded && String(xAxis?.label || "").trim() ? 64 : 0;
-    const chartMargin = isHorizontalBar
+    const defaultChartMargin = isHorizontalBar
         ? horizontalBarLayout.margin
         : (embedded
             ? {top: 24, right: 12, left: 6, bottom: 34 + categoryLabelBottomOffset}
             : {top: 24, right: 60, left: 14, bottom: Math.max(42 + categoryLabelBottomOffset, cartesianAxisTitleBottomMargin, responsiveCivilDateAxis.bottomMargin)});
+    const chartMargin = resolveChartMargins(chart?.margin, defaultChartMargin);
     const horizontalLegendSeriesCount = directSeriesChart
         ? seriesDefinitions.length
         : availableDataKeys.length;
@@ -768,7 +769,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         : (embedded ? {fontSize: chartTypography.captionSize, fill: "var(--forge-chart-text-muted, #5f6b7c)", fontFamily: chartTypography.family} : undefined);
     const gridStroke = "var(--forge-chart-grid, rgba(152,162,179,0.22))";
     const showEmbeddedSeriesSelector = embedded && !isPieChart && availableDataKeys.length > 1;
-    const showChartLegend = !showEmbeddedSeriesSelector && (embedded || !controlsVisible);
+    const showChartLegend = chart?.showLegend !== false && !showEmbeddedSeriesSelector && (embedded || !controlsVisible);
 
     const seriesToggleOptions = useMemo(() => availableDataKeys.map((dataKey, index) => {
         const seriesDef = seriesDefinitions.find((entry) => entry.value === dataKey);
@@ -923,6 +924,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         buildRuntimeChartAnnotationElements(normalizeChartAnnotations(chart), { embedded })
     ), [chart, embedded]);
 
+    const configuredBarSize = typeof chart?.barSize === "number" && Number.isFinite(chart.barSize) && chart.barSize > 0 ? chart.barSize : undefined;
+
     const cartesianSeriesElements = renderableSeriesDefinitions.map((entry, seriesIndex) => {
         const defaultLineDash = renderableSeriesDefinitions.length > 1 && (entry.type === "line" || entry.type === "area")
             ? [undefined, "8 4", "3 3", "10 3 2 3"][seriesIndex % 4]
@@ -944,7 +947,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
 
         if (entry.type === "bar") {
             return (
-                <Bar key={entry.value} {...commonProps} stackId={entry.stackId} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
+                <Bar key={entry.value} {...commonProps} barSize={configuredBarSize} stackId={entry.stackId} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                     {entry.pointColorMode === "bySign"
                         ? normalizedChartData.map((row, index) => (
                             <Cell key={`${entry.value}-cell-${index}`} fill={resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} />
@@ -1093,7 +1096,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
 
         const activePalette = (palette && palette.length > 0) ? palette : defaultCategoricalPalette();
         const categoryWidth = horizontalBarLayout.categoryWidth;
-        const barSize = embedded ? 10 : 12;
+        const barSize = configuredBarSize ?? (embedded ? 10 : 12);
         const showHorizontalDataLabels = shouldRenderSeriesDataLabels(primarySeries, responsiveChartType, normalizedChartData.length, embedded);
         const primaryDataLabelFormatter = buildDataLabelFormatter(primarySeries.format || leftAxis.format);
 
@@ -1125,7 +1128,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     formatter={(value) => tooltipFormatterForFormat(primarySeries.format || leftAxis.format)(value)}
                     contentStyle={embedded ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.family, color: "var(--forge-chart-text, #30404d)", background: "var(--forge-chart-surface, #ffffff)", borderRadius: "8px", border: "1px solid var(--forge-chart-border, #d8e1e8)"} : undefined}
                 />
-                {selectedSeriesDefinitions.length > 1 ? <Legend {...legendProps} {...(interactiveLegendContent ? { content: interactiveLegendContent } : {})} /> : null}
+                {chart?.showLegend !== false && selectedSeriesDefinitions.length > 1 ? <Legend {...legendProps} {...(interactiveLegendContent ? { content: interactiveLegendContent } : {})} /> : null}
                 {selectedSeriesDefinitions.length === 1 ? (
                     <Bar
                         dataKey={primarySeries.value}
