@@ -135,6 +135,7 @@ export function resolveReportRuntimePreviewRowsStateTransition({
   requestKey = "",
   fetchAvailable = false,
   currentState = {},
+  inFlightRequestKey = null,
   unavailableError = null,
   seedRows = null,
   seedHasMore = false,
@@ -176,7 +177,8 @@ export function resolveReportRuntimePreviewRowsStateTransition({
       }),
     };
   }
-  if (normalizedCurrentState.loading && normalizedCurrentState.requestKey === normalizedRequestKey) {
+  if (normalizedCurrentState.loading && normalizedCurrentState.requestKey === normalizedRequestKey
+    && (inFlightRequestKey === null || normalizeString(inFlightRequestKey) === normalizedRequestKey)) {
     return {
       type: "noop",
       nextState: normalizedCurrentState,

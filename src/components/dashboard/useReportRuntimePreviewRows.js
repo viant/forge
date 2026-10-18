@@ -91,12 +91,15 @@ export async function fetchReportRuntimePreviewRowsFreshResult({
   requestKind = "runtimePreview",
   requestKey = "",
   shouldContinue = null,
+  signal = null,
 } = {}) {
   if (typeof fetchRecords !== "function") {
     throw new Error("A runtime preview row fetch function is required.");
   }
-  const fetchCurrentRows = () => fetchRecords({ parameters: request, requestKind });
+  if (signal?.aborted) return { cancelled: true, body: null };
+  const fetchCurrentRows = () => fetchRecords({ parameters: request, requestKind, ...(signal ? {signal} : {}) });
   let body = await fetchCurrentRows();
+  if (signal?.aborted) return { cancelled: true, body: null };
   let recoveryPlan = resolveReportRuntimePreviewFreshnessRecovery({
     deferred: isDeferredCacheHitEnvelope(body),
     requestKey,
@@ -106,6 +109,7 @@ export async function fetchReportRuntimePreviewRowsFreshResult({
       return { cancelled: true, body: null };
     }
     body = await fetchCurrentRows();
+    if (signal?.aborted) return { cancelled: true, body: null };
     recoveryPlan = resolveReportRuntimePreviewFreshnessRecovery({
       deferred: isDeferredCacheHitEnvelope(body),
       requestKey,
@@ -131,6 +135,7 @@ export async function executeReportRuntimePreviewRowsFetchLifecycle({
   hydrateRows = null,
   getCurrentState = null,
   shouldContinue = null,
+  signal = null,
 } = {}) {
   const currentState = () => (
     typeof getCurrentState === "function" ? getCurrentState() : {}
@@ -140,6 +145,7 @@ export async function executeReportRuntimePreviewRowsFetchLifecycle({
       fetchRecords,
       request,
       requestKind,
+      signal,
       requestKey,
       shouldContinue,
     });
@@ -166,6 +172,7 @@ export async function executeReportRuntimePreviewRowsFetchLifecycle({
         console.warn("reportRuntime preview row hydration failed", hydrationError);
       }
     }
+    if (signal?.aborted) return { cancelled: true, nextState: null };
     return {
       cancelled: false,
       nextState: resolveReportRuntimePreviewRowsFetchState({
@@ -178,6 +185,7 @@ export async function executeReportRuntimePreviewRowsFetchLifecycle({
       }),
     };
   } catch (fetchError) {
+    if (signal?.aborted) return { cancelled: true, nextState: null };
     return {
       cancelled: false,
       nextState: buildRejectedReportRuntimePreviewRowsState({
@@ -213,6 +221,7 @@ export function useReportRuntimePreviewRows({
   const seedHasMoreRef = React.useRef(seedHasMore);
   seedHasMoreRef.current = seedHasMore;
   const mountedRef = React.useRef(true);
+  const activeControllerRef = React.useRef(null);
   const currentRequestKeyRef = React.useRef(requestKey);
   currentRequestKeyRef.current = requestKey;
   const generationRef = React.useRef(0);
@@ -226,6 +235,10 @@ export function useReportRuntimePreviewRows({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      activeControllerRef.current?.abort();
+      activeControllerRef.current = null;
+      inFlightRequestKeyRef.current = "";
+      generationRef.current += 1;
     };
   }, []);
 
@@ -239,6 +252,7 @@ export function useReportRuntimePreviewRows({
       requestKey,
       fetchAvailable: typeof fetchRecords === "function" && typeof resolveFetchResult === "function",
       currentState: stateRef.current,
+      inFlightRequestKey: inFlightRequestKeyRef.current,
       unavailableError,
       seedRows: seedRowsRef.current,
       seedHasMore: seedHasMoreRef.current,
@@ -254,22 +268,27 @@ export function useReportRuntimePreviewRows({
     }
     generationRef.current = dispatchPlan.nextGeneration;
     inFlightRequestKeyRef.current = dispatchPlan.nextInFlightRequestKey;
+    activeControllerRef.current?.abort();
+    activeControllerRef.current = null;
     setState(transition.nextState);
     if (!dispatchPlan.issueFetch) {
       return undefined;
     }
     const requestedRequestKey = requestKey;
     const requestGeneration = dispatchPlan.requestGeneration;
+    const controller = new AbortController();
+    activeControllerRef.current = controller;
     executeReportRuntimePreviewRowsFetchLifecycle({
       fetchRecords,
       request,
       requestKind,
+      signal: controller.signal,
       requestKey: requestedRequestKey,
       fingerprint,
       resolveFetchResult,
       hydrateRows,
       getCurrentState: () => stateRef.current,
-      shouldContinue: () => resolveReportRuntimePreviewRowsSettlementPlan({
+      shouldContinue: () => !controller.signal.aborted && resolveReportRuntimePreviewRowsSettlementPlan({
         mounted: mountedRef.current,
         currentRequestKey: currentRequestKeyRef.current,
         requestedRequestKey,
