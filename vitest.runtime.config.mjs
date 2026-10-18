@@ -12,6 +12,7 @@ export default defineConfig({
       'src/components/optionsFetchOwnership.test.jsx',
       'src/components/WindowContent.fetchQueue.test.jsx',
       'src/components/WindowContent.lazyOptions.render.test.jsx',
+      'src/components/DataSource.spread.render.test.jsx',
     ],
     setupFiles: ['./scripts/react-runtime-test-setup.js'],
     maxWorkers: 2,

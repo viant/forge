@@ -21,6 +21,8 @@ assert.equal(filter.filters.period, 'month');
 assert.equal(hasResolvedDependencies([{name: 'filters.optional', required: false}], {filters: {}}), true);
 assert.equal(hasResolvedDependencies([{name: 'From'}, {name: 'To'}], {From: null, To: null}), false);
 assert.equal(hasResolvedDependencies([{name: 'From'}, {name: 'To'}], {From: '', To: '2026-09-07'}), false);
+assert.equal(hasResolvedDependencies([{name: '...', in: 'windowForm', location: 'lineForecastRequest', required: true}], {From: '2026-10-17', To: '2026-10-17'}), true);
+assert.equal(hasResolvedDependencies([{name: '...', in: 'windowForm', location: 'lineForecastRequest', required: true}], {}), false);
 
 const scopedParameters = [
     {name: 'AdvertiserId', required: false},
