@@ -1,6 +1,7 @@
 package types
 
 type DraftFormSpec struct {
+	SubmitWhen     map[string]interface{} `json:"submitWhen,omitempty" yaml:"submitWhen,omitempty"`
 	WrapContent    bool                   `json:"wrapContent,omitempty" yaml:"wrapContent,omitempty"`
 	Validate       string                 `json:"validate,omitempty" yaml:"validate,omitempty"`
 	DataSourceRef  string                 `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`

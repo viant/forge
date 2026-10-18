@@ -25,7 +25,11 @@ function fixture(metricsValue){
 }
 it('formats a bound timezone and reacts only to relevant metadata changes without fetching',async()=>{
  const f=fixture({timeZone:{ianaTimezoneStr:'UTC'},contact:'Original'});await f.render();
- expect(f.cell()).toBe('Jan 1, 2026, 00:00');const before=f.commits();
+ expect(f.cell()).toBe('Jan 1, 2026, 00:00');
+ // Finish the table's scheduled viewport measurement before counting commits
+ // caused by a metadata edit; that initial layout work is unrelated to it.
+ await act(async()=>{await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
+ const before=f.commits();
  await act(async()=>{f.header.signals.metrics.value={timeZone:{ianaTimezoneStr:'UTC'},contact:'Edited'};});
  expect(f.commits()).toBe(before);
  await act(async()=>{f.header.signals.metrics.value={timeZone:{ianaTimezoneStr:'America/New_York'},contact:'Edited'};});

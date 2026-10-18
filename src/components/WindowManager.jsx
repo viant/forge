@@ -1,7 +1,9 @@
 import {WindowContentMount, PersistentWindowContent} from './WindowContentMount.jsx';
 import {useState, useCallback, useEffect, useRef} from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
-import {Tabs, Tab, Card} from '@blueprintjs/core';
+import {Tabs, Tab, Card, Alert} from '@blueprintjs/core';
+import {getWindowContext} from '../core/context/registry.js';
+import {windowCloseDecision, preventDirtyWindowUnload} from './windowCloseDecision.js';
 import WindowContent from './WindowContent';
 import {selectedWindowId, getWindowStatusSignal, appStatusSignal} from '../core';
 import {
@@ -20,7 +22,18 @@ import { resolveTabWindows, resolveVisibleTabId } from './windowManagerState.js'
 
 const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false, windowFilter, onCloseWindow}) => {
     useSignals();
-    const closeWindow = typeof onCloseWindow === "function" ? onCloseWindow : removeWindow;
+    const performClose = typeof onCloseWindow === "function" ? onCloseWindow : removeWindow;
+    const [pendingClose,setPendingClose]=useState(null);
+    const closeWindow = windowId => {
+        const decision=windowCloseDecision(getWindowContext(windowId));
+        if(decision.requiresConfirmation){setPendingClose({windowId,message:decision.message});return false;}
+        performClose(windowId);return true;
+    };
+    useEffect(()=>{
+        const beforeUnload=event=>preventDirtyWindowUnload(event,(activeWindows.peek() || []).map(win=>getWindowContext(win.windowId)));
+        window.addEventListener('beforeunload',beforeUnload);
+        return ()=>window.removeEventListener('beforeunload',beforeUnload);
+    },[]);
     const windows = (activeWindows.value || []).filter(win => typeof windowFilter !== "function" || windowFilter(win) !== false);
     const tabId = selectedTabId.value || null;
     const containerRef = useRef(null);
@@ -379,6 +392,7 @@ const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false
                     </div>
                 </Rnd>
             ))}
+            <Alert isOpen={!!pendingClose} intent="warning" confirmButtonText="Discard and close" cancelButtonText="Keep editing" onCancel={()=>setPendingClose(null)} onConfirm={()=>{const id=pendingClose?.windowId;setPendingClose(null);if(id)performClose(id);}}>{pendingClose?.message}</Alert>
             {windows.map(win=><PersistentWindowContent key={win.windowId} host={contentHosts[win.windowId]}>{renderContent(win,win.inTab !== false)}</PersistentWindowContent>)}
         </div>
     );

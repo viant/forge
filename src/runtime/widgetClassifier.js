@@ -153,6 +153,8 @@ registerClassifier((item) => {
             return 'contentCarousel';
         case 'cardRail':
             return 'cardRail';
+        case 'cardRailGroup':
+            return 'cardRailGroup';
         case 'filterChips':
             return 'filterChips';
         case 'chipList':

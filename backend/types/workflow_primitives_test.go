@@ -215,3 +215,21 @@ scheduleEditor:
 		t.Fatalf("editableCollection selection status metadata was not retained: %#v", editable)
 	}
 }
+
+func TestWizardStepValidationRoundTrip(t *testing.T) {
+	var input WizardStep
+	if err := yaml.Unmarshal([]byte("id: basics\nlabel: Basics\nvalidate: Workspace.validateBasics\n"), &input); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output map[string]interface{}
+	if err = json.Unmarshal(data, &output); err != nil {
+		t.Fatal(err)
+	}
+	if output["validate"] != "Workspace.validateBasics" {
+		t.Fatalf("lost step validation: %s", data)
+	}
+}

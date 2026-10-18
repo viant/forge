@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import Toolbar from './Toolbar.jsx';
+import TableHeader from './TableHeader.jsx';
+import PaginationBar from './PaginationBar.jsx';
+const signal=value=>({value,peek(){return this.value;}});
+const context={identity:{dataSourceRef:'rows'},signals:{control:signal({inactive:false}),formStatus:signal({dirty:true}),selection:signal({}),windowForm:signal({}),form:signal({})},handlers:{dataSource:{getCollectionInfo:()=>({pageCount:3}),isInactive:()=>false}},Context(){return this;}};
+const search={id:'name',type:'quickSearch',properties:{field:'Name',label:'Pixel name'}};
+const button=html=>html.match(/<button[^>]*aria-label="Search: Pixel name"[^>]*>/)?.[0]||'';
+assert.match(button(renderToStaticMarkup(<Toolbar context={context} queryDisabled toolbarItems={[search]}/>)),/disabled/);
+assert.doesNotMatch(button(renderToStaticMarkup(<Toolbar context={context} toolbarItems={[search]}/>)),/disabled/);
+assert.match(button(renderToStaticMarkup(<Toolbar context={context} toolbarItems={[{...search,disabledWhen:{source:'formStatus',field:'dirty',equals:true}}]}/>)),/disabled/);
+const header=renderToStaticMarkup(<TableHeader context={context} columns={[{id:'name',name:'Name',sortable:true}]} sortConfig={{onSort(){},disabled:true}}/>);
+assert.match(header,/<button[^>]*disabled=""[^>]*class="forge-table-header-sort"/);
+const paging=renderToStaticMarkup(<PaginationBar context={context} disabled pageSize={25} pageSizeOptions={[25,50]}/>);
+assert.match(paging.match(/<select[^>]*aria-label="Rows per page"[^>]*>/)?.[0]||'',/disabled=""/);
+console.log('query guard rendering passed');

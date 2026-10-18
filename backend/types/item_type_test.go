@@ -222,12 +222,16 @@ func TestContainerUnmarshal_PreservesExtendedChartFields(t *testing.T) {
 	input := []byte(`
 id: performanceTab
 chart:
+  margin: {top: 8, right: 10, bottom: 0, left: 0}
+  showControls: false
+  showLegend: false
   dataSourceRefSelector: periodView
   dataSourceRefSource: windowForm
   dataSourceRefs:
     today: order_performance_period_today
     yesterday: order_performance_period_yesterday
   type: composed
+  barSize: 12
   xAxis:
     dataKey: advertiserTime
     tickFormat: ha
@@ -260,6 +264,15 @@ chart:
 	}
 	if c.Chart == nil {
 		t.Fatalf("expected chart to be present")
+	}
+	if c.Chart.BarSize != 12 {
+		t.Fatal("chart bar size must survive unmarshalling")
+	}
+	if c.Chart.Margin["top"] != 8 || c.Chart.Margin["bottom"] != 0 {
+		t.Fatal("chart margins must survive unmarshalling")
+	}
+	if c.Chart.ShowControls == nil || *c.Chart.ShowControls || c.Chart.ShowLegend == nil || *c.Chart.ShowLegend {
+		t.Fatal("explicit chart controls/legend visibility must survive unmarshalling")
 	}
 	if c.Chart.DataSourceRefSelector != "periodView" {
 		t.Fatalf("expected dataSourceRefSelector to survive, got %#v", c.Chart)

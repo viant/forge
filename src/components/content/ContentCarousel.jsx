@@ -3,7 +3,7 @@ import ContentImage from './ContentImage.jsx';
 import {contentRecords, contentAction} from './contentModel.js';
 import './content.css';
 
-export default function ContentCarousel({id, value = [], onClick, disabled, autoRotateMs = 0, className = '', style, 'aria-label': ariaLabel = 'Featured content'}) {
+export default function ContentCarousel({id, value = [], onClick, disabled, autoRotateMs = 0, wholeSlideAction = false, className = '', style, 'aria-label': ariaLabel = 'Featured content'}) {
     const slides = useMemo(() => contentRecords(value), [value]), generatedId = useId();
     const [activeId, setActiveId] = useState(null), [hovered, setHovered] = useState(false), [focused, setFocused] = useState(false), [paused, setPaused] = useState(false);
     const [reducedMotion, setReducedMotion] = useState(false);
@@ -31,6 +31,8 @@ export default function ContentCarousel({id, value = [], onClick, disabled, auto
         onKeyDown={event => {if (!disabled && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {event.preventDefault();choose(index + (event.key === 'ArrowRight' ? 1 : -1));}}}>
         <article id={panelId} className="forge-content-carousel__slide" role="group" aria-roledescription="slide" aria-label={`${index + 1} of ${slides.length}`}>
             <ContentImage src={active.image} alt={active.imageAlt || ''} className="forge-content-carousel__image"/>
+            {active.graphicImage ? <div className="forge-content-carousel__graphic" aria-hidden="true"><ContentImage src={active.graphicImage} className="forge-content-carousel__graphic-image"/></div> : null}
+            {wholeSlideAction ? <button type="button" className="forge-content-carousel__open" aria-label={`Open ${active.title || 'featured item'}`} disabled={disabled || active.disabled} onClick={event => onClick?.(contentAction(active,event))}/> : null}
             <div className="forge-content-carousel__copy">
                 <h2>{active.title}</h2>{active.description ? <p>{active.description}</p> : null}
                 {active.actionLabel ? <button type="button" className="forge-content-action" disabled={disabled || active.disabled} onClick={event => onClick?.(contentAction(active, event))}>{active.actionLabel}</button> : null}

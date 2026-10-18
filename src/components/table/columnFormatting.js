@@ -2,6 +2,14 @@ import {useMemo} from 'react';
 import {computed} from '@preact/signals-react';
 import {resolveStateAdapter} from '../../runtime/binding.js';
 
+// Export uses the same resolved binding as the rendered cells. Keep explicit
+// per-column/per-row timezone overrides authoritative in the shared formatter.
+export function withBoundColumnTimeZones(columns, timeZones) {
+    return columns.map((column, index) => timeZones[index]
+        ? {...column, boundTimeZone: timeZones[index]}
+        : column);
+}
+
 // Presentation only: read an existing bound value; never fetch or mutate data.
 export function resolveColumnTimeZone(column, context) {
     const binding = column?.timeZoneBinding;

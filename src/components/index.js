@@ -51,4 +51,5 @@ export {ForgeThemeProvider, ForgeThemeBoundary} from './ThemeBoundary.jsx';
 
 export {default as ContentCarousel} from './content/ContentCarousel.jsx';
 export {default as CardRail} from './content/CardRail.jsx';
+export {default as CardRailGroup} from './content/CardRailGroup.jsx';
 export {default as FilterChips} from './content/FilterChips.jsx';

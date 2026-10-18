@@ -1,0 +1,13 @@
+import React from 'react';
+import assert from 'node:assert/strict';
+import {renderToStaticMarkup} from 'react-dom/server';
+import RuleEditor from './RuleEditor.jsx';
+const signal=value=>({value,peek(){return this.value;}});
+const context={identity:{dataSourceRef:'events'},signals:{form:signal({rule:{id:1,op:8,rules:[{id:2,op:4,key:null,value:'example.test'},{id:3,op:7,rules:[{id:4,op:3,key:1,value:'100'}]}]}}),windowForm:signal({editable:true})}};
+const spec={field:'rule',childrenField:'rules',operatorField:'op',parameterField:'key',valueField:'value',readOnlyWhen:{source:'windowForm',field:'editable',notEquals:true},groups:[{value:8,label:'Any'},{value:7,label:'All'}],fields:[{value:null,label:'URL',operators:[4]},{value:1,label:'Revenue',operators:[3]}],operators:[{value:4,label:'Contains'},{value:3,label:'Greater Than'}],defaultRule:{id:0,op:4,key:null,value:''}};
+let html=renderToStaticMarkup(<RuleEditor context={context} container={{ruleEditor:spec}}/>);
+for(const label of ['Rule group root','Rule 1 parameter','Rule 1 value','Rule group 2','Rule 2.1 operator','Remove group 2','Remove rule 2.1'])assert.ok(html.includes(label),label);
+assert.ok(html.includes('example.test'));assert.ok(html.includes('Add group'));assert.doesNotMatch(html,/fieldset[^>]*disabled/);
+context.signals.windowForm.value={editable:false};html=renderToStaticMarkup(<RuleEditor context={context} container={{ruleEditor:spec}}/>);assert.match(html,/fieldset[^>]*disabled/);
+context.signals.form.value={};html=renderToStaticMarkup(<RuleEditor context={context} container={{ruleEditor:spec}}/>);assert.ok(html.includes('Select a record'));
+console.log('rule editor rendering passed');

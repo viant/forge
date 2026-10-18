@@ -12,6 +12,7 @@ import AssignmentPicker from "./primitives/AssignmentPicker.jsx";
 import DerivedDataSource from "./primitives/DerivedDataSource.jsx";
 import MutationCommand from "./primitives/MutationCommand.jsx";
 import StatusWorkflow from "./primitives/StatusWorkflow.jsx";
+import RuleEditor from "./primitives/RuleEditor.jsx";
 import TreeEditor from "./primitives/TreeEditor.jsx";
 import Wizard from "./primitives/Wizard.jsx";
 import UploadCollection from "./primitives/UploadCollection.jsx";
@@ -238,6 +239,7 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
     const statusWorkflowPanel = container.statusWorkflow
         ? <StatusWorkflow container={container} context={effectiveContext}/>
         : null;
+    const ruleEditorPanel = container.ruleEditor ? <RuleEditor container={container} context={effectiveContext}/> : null;
     const treeEditorPanel = container.treeEditor
         ? <TreeEditor container={container} context={effectiveContext}/>
         : null;
@@ -453,7 +455,7 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
         !!InstalledContainerRenderer || container?.kind === 'mcpApp' ||
         (visualItems?.length || 0) > 0 ||
         !!container.toolbar ||
-        tablePanel || assignmentPanel || derivedDataSourcePanel || mutationCommandPanel || statusWorkflowPanel || treeEditorPanel || wizardPanel || uploadCollectionPanel || historyDiffPanel || scheduleEditorPanel || container.draftForm || queryToolbarPanel || resourceHeaderPanel || relationDrillPanel || notificationRulesPanel || metricSummaryPanel || detailViewPanel || masterDetailPanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || treeBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
+        tablePanel || assignmentPanel || derivedDataSourcePanel || mutationCommandPanel || statusWorkflowPanel || ruleEditorPanel || treeEditorPanel || wizardPanel || uploadCollectionPanel || historyDiffPanel || scheduleEditorPanel || container.draftForm || queryToolbarPanel || resourceHeaderPanel || relationDrillPanel || notificationRulesPanel || metricSummaryPanel || detailViewPanel || masterDetailPanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || treeBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
     if (!hasVisual && !shouldSkipGenericNonVisualEarlyReturn(container)) {
         return (
             <>
@@ -618,6 +620,7 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
     };
 
     const shouldAllocateChartRemainder =
+        sizingMode === 'fill' &&
         !!chartPanel &&
         !tablePanel &&
         !chatPanel &&
@@ -789,6 +792,7 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
                 {assignmentPanel}
                 {mutationCommandPanel}
                 {statusWorkflowPanel}
+                {ruleEditorPanel}
                 {treeEditorPanel}
                 {wizardPanel}
                 {uploadCollectionPanel}

@@ -1,0 +1,8 @@
+.forge-rule-editor {border:0; margin:0; padding:0; min-width:0; width:100%;}
+.forge-rule-editor legend {font-weight:600; margin-bottom:8px;}
+.forge-rule-editor__group {border:1px solid var(--forge-border-color, #d8dee6); border-radius:4px; padding:10px; min-width:0;}
+.forge-rule-editor__row {display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:6px 0; min-width:0;}
+.forge-rule-editor__children {margin-left:12px; min-width:0;}
+.forge-rule-editor__select {font:inherit; color:inherit; background:var(--forge-surface-color, white); border:1px solid var(--forge-border-color, #d8dee6); border-radius:3px; min-height:30px; max-width:100%;}
+.forge-rule-editor__row > .bp5-input-group,.forge-rule-editor__row > .bp6-input-group {flex:1 1 180px; min-width:100px;}
+@media(max-width:600px) {.forge-rule-editor__children{margin-left:4px}.forge-rule-editor__row>.forge-rule-editor__select{flex:1 1 40%}}

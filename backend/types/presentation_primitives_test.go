@@ -146,3 +146,21 @@ func TestResponsiveCardGridRoundTrip(t *testing.T) {
 		t.Fatal("responsive grid width was lost")
 	}
 }
+
+func TestDraftSubmitWhenRoundTrip(t *testing.T) {
+	var input DraftFormSpec
+	if err := yaml.Unmarshal([]byte("submitWhen: {source: windowForm, field: step, equals: final}\n"), &input); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output DraftFormSpec
+	if err = json.Unmarshal(data, &output); err != nil {
+		t.Fatal(err)
+	}
+	if output.SubmitWhen["field"] != "step" || output.SubmitWhen["equals"] != "final" {
+		t.Fatalf("lost submit visibility: %s", data)
+	}
+}

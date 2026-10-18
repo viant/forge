@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {retainedDraftBaseline,retainDraftBaseline,resetDraft} from './draftFormModel.js';
+const owner={},other={};
+retainDraftBaseline(owner,'{"name":"Original"}',1);
+assert.equal(retainedDraftBaseline(owner,'{"name":"Unsaved"}'),'{"name":"Original"}');
+assert.equal(retainedDraftBaseline(other,'{"name":"Other"}'),'{"name":"Other"}');
+let restored;resetDraft({handlers:{dataSource:{setFormData:({values})=>restored=values,resetFormDirty(){}}}},retainedDraftBaseline(owner,'{}'),false);
+assert.deepEqual(restored,{name:'Original'});
+retainDraftBaseline(owner,'{"name":"Saved"}',2);assert.equal(retainedDraftBaseline(owner,'{}'),'{"name":"Saved"}');
+console.log('Draft baseline survives remount and stays isolated by form signal');

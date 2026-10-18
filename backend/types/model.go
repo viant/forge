@@ -92,25 +92,29 @@ func targetStringList(values []string) []string {
 }
 
 type Chart struct {
-	Type                  string            `json:"type" yaml:"type"`
-	DataSourceRef         string            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
-	DataSourceRefSelector string            `json:"dataSourceRefSelector,omitempty" yaml:"dataSourceRefSelector,omitempty"`
-	DataSourceRefSource   string            `json:"dataSourceRefSource,omitempty" yaml:"dataSourceRefSource,omitempty"`
-	DataSourceRefs        map[string]string `json:"dataSourceRefs,omitempty" yaml:"dataSourceRefs,omitempty"`
-	XAxis                 ChartXAxis        `json:"xAxis" yaml:"xAxis"`
-	YAxis                 ChartYAxis        `json:"yAxis" yaml:"yAxis"`
-	Axes                  *ChartAxes        `json:"axes,omitempty" yaml:"axes,omitempty"`
-	CartesianGrid         CartesianGrid     `json:"cartesianGrid,omitempty" yaml:"cartesianGrid,omitempty"`
-	Width                 string            `json:"width" yaml:"width"`
-	Height                string            `json:"height" yaml:"height"`
-	EmptyHeight           string            `json:"emptyHeight,omitempty" yaml:"emptyHeight,omitempty"`
-	HideControlsWhenEmpty bool              `json:"hideControlsWhenEmpty,omitempty" yaml:"hideControlsWhenEmpty,omitempty"`
-	CategoryKey           string            `json:"categoryKey,omitempty" yaml:"categoryKey,omitempty"`
-	ValueKey              string            `json:"valueKey,omitempty" yaml:"valueKey,omitempty"`
-	Format                string            `json:"format,omitempty" yaml:"format,omitempty"`
-	Palette               []string          `json:"palette,omitempty" yaml:"palette,omitempty"`
-	Series                ChartSeries       `json:"series" yaml:"series"`
-	On                    []*Execute        `json:"on,omitempty" yaml:"on,omitempty"`
+	BarSize               float64            `json:"barSize,omitempty" yaml:"barSize,omitempty"`
+	Margin                map[string]float64 `json:"margin,omitempty" yaml:"margin,omitempty"`
+	ShowControls          *bool              `json:"showControls,omitempty" yaml:"showControls,omitempty"`
+	ShowLegend            *bool              `json:"showLegend,omitempty" yaml:"showLegend,omitempty"`
+	Type                  string             `json:"type" yaml:"type"`
+	DataSourceRef         string             `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	DataSourceRefSelector string             `json:"dataSourceRefSelector,omitempty" yaml:"dataSourceRefSelector,omitempty"`
+	DataSourceRefSource   string             `json:"dataSourceRefSource,omitempty" yaml:"dataSourceRefSource,omitempty"`
+	DataSourceRefs        map[string]string  `json:"dataSourceRefs,omitempty" yaml:"dataSourceRefs,omitempty"`
+	XAxis                 ChartXAxis         `json:"xAxis" yaml:"xAxis"`
+	YAxis                 ChartYAxis         `json:"yAxis" yaml:"yAxis"`
+	Axes                  *ChartAxes         `json:"axes,omitempty" yaml:"axes,omitempty"`
+	CartesianGrid         CartesianGrid      `json:"cartesianGrid,omitempty" yaml:"cartesianGrid,omitempty"`
+	Width                 string             `json:"width" yaml:"width"`
+	Height                string             `json:"height" yaml:"height"`
+	EmptyHeight           string             `json:"emptyHeight,omitempty" yaml:"emptyHeight,omitempty"`
+	HideControlsWhenEmpty bool               `json:"hideControlsWhenEmpty,omitempty" yaml:"hideControlsWhenEmpty,omitempty"`
+	CategoryKey           string             `json:"categoryKey,omitempty" yaml:"categoryKey,omitempty"`
+	ValueKey              string             `json:"valueKey,omitempty" yaml:"valueKey,omitempty"`
+	Format                string             `json:"format,omitempty" yaml:"format,omitempty"`
+	Palette               []string           `json:"palette,omitempty" yaml:"palette,omitempty"`
+	Series                ChartSeries        `json:"series" yaml:"series"`
+	On                    []*Execute         `json:"on,omitempty" yaml:"on,omitempty"`
 }
 
 type ChartXAxis struct {
@@ -295,8 +299,10 @@ type AuthorizationBehavior struct {
 }
 
 type WindowSettings struct {
-	TitleBinding *WindowTitleBinding `json:"titleBinding,omitempty" yaml:"titleBinding,omitempty"`
-	On           []*Execute          `json:"on,omitempty" yaml:"on,omitempty"`
+	ConfirmDiscardOnClose string              `json:"confirmDiscardOnClose,omitempty" yaml:"confirmDiscardOnClose,omitempty"`
+	DirtyDataSourceRefs   []string            `json:"dirtyDataSourceRefs,omitempty" yaml:"dirtyDataSourceRefs,omitempty"`
+	TitleBinding          *WindowTitleBinding `json:"titleBinding,omitempty" yaml:"titleBinding,omitempty"`
+	On                    []*Execute          `json:"on,omitempty" yaml:"on,omitempty"`
 }
 
 type WindowTitleBinding struct {
@@ -560,6 +566,7 @@ type Container struct {
 	EditableCollection *EditableCollection               `json:"editableCollection,omitempty" yaml:"editableCollection,omitempty"`
 	AssignmentPicker   *AssignmentPicker                 `json:"assignmentPicker,omitempty" yaml:"assignmentPicker,omitempty"`
 	StatusWorkflow     *StatusWorkflow                   `json:"statusWorkflow,omitempty" yaml:"statusWorkflow,omitempty"`
+	RuleEditor         *RuleEditorSpec                   `json:"ruleEditor,omitempty" yaml:"ruleEditor,omitempty"`
 	TreeEditor         *TreeEditorSpec                   `json:"treeEditor,omitempty" yaml:"treeEditor,omitempty"`
 	Wizard             *WizardSpec                       `json:"wizard,omitempty" yaml:"wizard,omitempty"`
 	UploadCollection   *UploadCollectionSpec             `json:"uploadCollection,omitempty" yaml:"uploadCollection,omitempty"`
@@ -1335,6 +1342,8 @@ type Card struct {
 }
 
 type Table struct {
+	// QueryDisabledWhen disables built-in search, paging and sorting controls.
+	QueryDisabledWhen    map[string]interface{}            `json:"queryDisabledWhen,omitempty" yaml:"queryDisabledWhen,omitempty"`
 	FillRemainingWidth   bool                              `json:"fillRemainingWidth,omitempty" yaml:"fillRemainingWidth,omitempty"`
 	MinRows              int                               `json:"minRows,omitempty" yaml:"minRows,omitempty"`
 	RowHeight            int                               `json:"rowHeight,omitempty" yaml:"rowHeight,omitempty"`
@@ -1679,6 +1688,7 @@ type DataSource struct {
 	On                                      []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
 	Cardinality                             string                            `json:"cardinality" yaml:"cardinality"`
 	Selectors                               *Selectors                        `json:"selectors,omitempty" yaml:"selectors,omitempty"`
+	SelectionPreserveAcrossPages            bool                              `json:"selectionPreserveAcrossPages,omitempty" yaml:"selectionPreserveAcrossPages,omitempty"`
 	SelectionMode                           *SelectionMode                    `json:"selectionMode,omitempty" yaml:"selectionMode,omitempty"`
 	Paging                                  *PagingConfig                     `json:"paging,omitempty" yaml:"paging,omitempty"`
 	FilterSet                               []Filter                          `json:"filterSet,omitempty" yaml:"filterSet,omitempty"`

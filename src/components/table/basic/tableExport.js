@@ -75,7 +75,7 @@ export function tableExportValue(row = {}, column = {}) {
     const raw = resolveKey(row, column.id);
     if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
     if (typeof raw === 'boolean') return raw;
-    return resolveTableCellText({row, column, value: raw});
+    return resolveTableCellText({row, column, value: raw, timeZone: column.boundTimeZone});
 }
 
 export function tableExportMatrix(rows = [], columns = [], limits = {}) {

@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {changeRule,removeRule,newEditorRule,ruleOperators} from './ruleEditorModel.js';
+const spec={childrenField:'rules',operatorField:'op',parameterField:'key',valueField:'value',defaultRule:{id:0,op:4,key:null,value:''}};
+const original={id:1,op:8,rules:[{id:2,op:4,key:null,value:'old'},{id:3,op:7,rules:[{id:4,op:3,key:1,value:'10'}]}]};
+const saved=JSON.stringify(original);
+const changed=changeRule(original,[1,0],node=>({...node,value:'20'}),spec);
+assert.equal(changed.rules[1].rules[0].id,4);assert.equal(changed.rules[1].rules[0].value,'20');assert.equal(JSON.stringify(original),saved);
+const removed=removeRule(changed,[0],spec);assert.equal(removed.rules[0].id,3);assert.equal(removed.rules[0].rules[0].id,4);
+assert.throws(()=>removeRule(original,[],spec));assert.throws(()=>changeRule(original,[10],x=>x,spec));
+const options={groups:[{value:8,label:'Any'},{value:7,label:'All'}],fields:[{value:null,operators:[4]},{value:1,operators:[1,2,3]}],operators:[{value:1},{value:3},{value:4}]};
+assert.deepEqual(ruleOperators({key:1},spec,options).map(x=>x.value),[1,3]);assert.deepEqual(ruleOperators({key:null},spec,options).map(x=>x.value),[4]);
+const group=newEditorRule(spec,options,true);assert.equal(group.op,8);assert.equal(group.rules[0].id,0);group.rules[0].value='new';assert.equal(spec.defaultRule.value,'');
+console.log('rule editor model passed');

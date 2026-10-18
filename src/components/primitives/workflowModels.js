@@ -1,5 +1,6 @@
 import {resolveSelector} from '../../utils/selector.js';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
+import {validateDraft} from './draftFormModel.js';
 
 export const primitiveIdentity = (row = {}, fields = ['id']) => fields.map((field) => String(resolveSelector(row, field) ?? '')).join('\u001f');
 
@@ -53,8 +54,15 @@ export function wizardState(wizard = {}, context = {}, currentStep = 0) {
   const currentIndex = typeof currentStep === 'string' ? visible.findIndex((step) => step.id === currentStep) : Number(currentStep);
   const index = Math.max(0, Math.min(currentIndex, Math.max(visible.length - 1, 0)));
   const current = visible[index] || null;
-  const valid = !!current && (!current.validWhen || evaluatePlainVisibleWhen(current.validWhen, context));
-  return {steps: visible, index, current, valid, canBack: index > 0, canNext: valid && index < visible.length - 1, canSubmit: valid && index === visible.length - 1};
+  const form = context?.handlers?.dataSource?.getFormData?.() || context?.signals?.form?.value || {};
+  let validationMessage = '';
+  const valid = !!current && visible.slice(0, index + 1).every(step => {
+    const message = validateDraft(step, context, form);
+    if (message) {validationMessage = message; return false;}
+    return !step.validWhen || evaluatePlainVisibleWhen(step.validWhen, context);
+  });
+  const isLast = !!current && index === visible.length - 1;
+  return {steps: visible, index, current, valid, validationMessage, isLast, canBack: index > 0 && !current?.terminal, canNext: valid && !isLast && !current?.externalAdvance && !current?.terminal, canSubmit: valid && isLast && !current?.terminal};
 }
 
 function acceptedFileType(file, accept = []) {

@@ -70,3 +70,18 @@ assert.equal(validateSchedule([{start: '2026-01-01', end: '2026-01-02'}, {start:
 assert.deepEqual(validateSchedule([{start: '2026-01-01T00:00:00Z', end: '2026-01-01T00:30:00Z'}], {minDuration: '1h'}).errors, [{index: 0, code: 'min_duration'}]);
 
 console.log('workflow primitive models passed');
+
+const validatedWizard = {steps:[{id:'basics',validate:'checkName'},{id:'details',validate:'checkDetails'}]};
+let wizardForm={name:'',details:'ready'};
+const validatedContext={handlers:{dataSource:{getFormData:()=>wizardForm}},lookupHandler:name=>name==='checkName'?({form})=>form.name?'':'Name required':()=>''};
+let invalidFinal=wizardState(validatedWizard,validatedContext,'details');
+assert.equal(invalidFinal.isLast,true);assert.equal(invalidFinal.canSubmit,false);assert.equal(invalidFinal.canBack,true);assert.equal(invalidFinal.validationMessage,'Name required');
+wizardForm.name='Ready';assert.equal(wizardState(validatedWizard,validatedContext,'details').canSubmit,true);
+assert.match(wizardState({steps:[{id:'only',validate:'missing'}]},{},0).validationMessage,/unavailable/);
+assert.match(wizardState({steps:[{id:'only',validate:'async'}]},{lookupHandler:()=>()=>Promise.resolve('')},0).validationMessage,/synchronous/);
+
+const savedWizard = {steps: [{id: 'edit', externalAdvance: true}, {id: 'copy', terminal: true}]};
+assert.equal(wizardState(savedWizard, {}, 'edit').canNext, false);
+assert.equal(wizardState(savedWizard, {}, 'copy').canBack, false);
+assert.equal(wizardState(savedWizard, {}, 'copy').canNext, false);
+assert.equal(wizardState(savedWizard, {}, 'copy').canSubmit, false);

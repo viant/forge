@@ -14,6 +14,7 @@ const buttonProperties = {
 
 const PaginationBar = ({
                            context,
+                           disabled = false,
                            showBoundaryButtons = true,
                            pagingEnabled = true,
                            pageSize = 0,
@@ -77,13 +78,13 @@ const PaginationBar = ({
         handlers.dataSource.setPage(totalPages);
     };
 
-    const renderActionButton = (actionKey, onClick, disabled = false) => {
+    const renderActionButton = (actionKey, onClick, actionDisabled = false) => {
         const properties = buttonProperties[actionKey] || {};
         return (
             <Button
                 {...properties}
                 onClick={onClick}
-                disabled={disabled}
+                disabled={disabled || actionDisabled}
                 minimal={true}
                 small={true}
                 aria-label={properties.label}
@@ -114,7 +115,7 @@ const PaginationBar = ({
                     {pagingEnabled && sizeOptions.length > 1 ? (
                         <label style={{display: 'inline-flex', alignItems: 'center', gap: 6, marginInline: 8}}>
                             Rows per page
-                            <HTMLSelect aria-label="Rows per page" value={pageSize} disabled={busy || inactive}
+                            <HTMLSelect aria-label="Rows per page" value={pageSize} disabled={disabled || busy || inactive}
                                 onChange={event => handlers.dataSource.setPageSize?.(Number(event.target.value))}
                                 options={sizeOptions.map(size => ({value: size, label: String(size)}))}/>
                         </label>

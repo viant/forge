@@ -4,6 +4,8 @@ import React, {act} from 'react';
 import {createRoot} from 'react-dom/client';
 import ContentCarousel from './ContentCarousel.jsx';
 import CardRail from './CardRail.jsx';
+import CardRailGroup from './CardRailGroup.jsx';
+import ContentImage from './ContentImage.jsx';
 import FilterChips from './FilterChips.jsx';
 import {classify} from '../../runtime/widgetClassifier.js';
 
@@ -58,7 +60,39 @@ await click(button('Scroll right'));assert.equal(track.scrollLeft, 340);assert.e
 await click(button('Scroll right'));await click(button('Scroll right'));assert.equal(button('Scroll right').disabled, true);
 await click(document.querySelector('.forge-content-card__open'));assert.equal(selected.id, 7);
 await render(<CardRail value={[]} heading="Empty"/>);assert.equal(document.querySelector('[role=status]').textContent, 'No items match these filters.');
-for (const type of ['contentCarousel', 'cardRail', 'filterChips']) assert.equal(classify({type}), type);
+for (const type of ['contentCarousel', 'cardRail', 'cardRailGroup', 'filterChips']) assert.equal(classify({type}), type);
+await render(<ContentCarousel value={[{id: 1, title: 'Layered', image: '/background.png', graphicImage: '/graphic.png', actionLabel: 'Learn More'}]} wholeSlideAction onClick={event => selected = event.detail.item}/>);
+assert.equal(document.querySelectorAll('img').length, 2);
+await click(button('Open Layered'));assert.equal(selected.id, 1);
+assert.equal(document.querySelector('button button'), null);
+
+await render(<ContentImage src="/missing.png" fallbackSrc="/fallback.png"/>);
+await act(async () => document.querySelector('img').dispatchEvent(new window.Event('error')));
+assert.equal(document.querySelector('img').getAttribute('src'), '/fallback.png');
+await act(async () => document.querySelector('img').dispatchEvent(new window.Event('error')));
+assert.equal(document.querySelector('img'), null);
+await render(<ContentImage src="/replacement.png" fallbackSrc="javascript:bad()"/>);
+assert.equal(document.querySelector('img').getAttribute('src'), '/replacement.png');
+await act(async () => document.querySelector('img').dispatchEvent(new window.Event('error')));
+assert.equal(document.querySelector('img'), null);
+
+let opened = 0, tagged, counted, copied;
+const richCard = {id: 9, title: 'Rich card', copyValue: '9', copyLabel: 'Deal ID', tags: [{kind: 'channel', id: 6, label: 'CTV', selected: true}]};
+const sections = [{id: 'premium', heading: 'Premium', totalCount: 42, countHint: 'See All Inventory', value: [richCard]}];
+await render(<CardRailGroup value={sections} onClick={() => opened++} onTagClick={event => tagged = event.detail} onCountClick={event => counted = event.detail}/>);
+assert.equal(document.querySelector('.forge-card-rail__count').textContent, '42');
+assert.equal(button('CTV').getAttribute('aria-pressed'), 'true');
+await click(button('CTV'));assert.equal(tagged.section.id, 'premium');assert.equal(tagged.item.id, 9);assert.equal(tagged.tag.id, 6);assert.equal(opened, 0);
+await click(button('See All Inventory'));assert.equal(counted.section.id, 'premium');
+const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+Object.defineProperty(globalThis, 'navigator', {configurable: true, value: {clipboard: {writeText: async value => {copied = value;}}}});
+await click(button('Copy Deal ID'));assert.equal(copied, '9');assert.equal(document.querySelector('[role=status]').textContent, 'Copied Deal ID');assert.equal(opened, 0);
+globalThis.navigator.clipboard.writeText = async () => {throw Error('Clipboard denied');};
+await click(button('Copy Deal ID'));assert.equal(document.querySelector('[role=status]').textContent, 'Could not copy Deal ID');
+if (navigatorDescriptor) Object.defineProperty(globalThis, 'navigator', navigatorDescriptor);else delete globalThis.navigator;
+await click(button('Rich card'));assert.equal(opened, 1);
+assert.equal(document.querySelector('button button'), null);
+await render(<div/>);
 // Verify authored metadata reaches the registered widgets and state/event adapters.
 const {registerPack} = await import('../../packs/blueprint/index.jsx');
 const {default: WidgetRenderer} = await import('../../runtime/WidgetRenderer.jsx');
@@ -70,6 +104,12 @@ await click(button('One'));
 assert.deepEqual(context.signals.windowForm.peek().selected, [1]);
 await render(<WidgetRenderer context={context} item={{id: 'feature', type: 'contentCarousel', scope: 'windowForm', dataField: 'featured', wrapper: 'none'}} events={{onClick: event => selected = event.detail.item}}/>);
 await click(button('Open'));assert.equal(selected.id, 10);
+await act(async () => {context.signals.windowForm.value = {...context.signals.windowForm.peek(), sections};});
+await render(<WidgetRenderer context={context} item={{id: 'rails', type: 'cardRailGroup', scope: 'windowForm', dataField: 'sections', wrapper: 'none'}} events={{onTagClick: event => tagged = event.detail, onCountClick: event => counted = event.detail, onClick: event => selected = event.detail.item}}/>);
+await click(button('CTV'));assert.equal(tagged.section.id, 'premium');
+await click(button('See All Inventory'));assert.equal(counted.section.id, 'premium');
+await click(button('Rich card'));assert.equal(selected.id, 9);
+assert.deepEqual(context.signals.windowForm.peek().sections, sections, 'Content actions preserve their bound collection');
 
 // A refreshed collection of the same length must replace the timer's records.
 const originalSetInterval = globalThis.setInterval, originalClearInterval = globalThis.clearInterval;

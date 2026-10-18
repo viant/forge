@@ -287,8 +287,10 @@ export const useControlEvents = (context, items = [], state) => {
                 switch (key) {
 
                     case "onClick":
-                        events["onClick"] = (event) => {
-                            const value = event.target?.value;
+                    case "onTagClick":
+                    case "onCountClick":
+                        events[key] = (event) => {
+                            const value = event?.target?.value;
                             return handlers[key].execute({event, item, value, state, context});
                         };
                         break;
@@ -306,7 +308,7 @@ export const useControlEvents = (context, items = [], state) => {
                             case "checkbox":
                             case "toggle":
                                 events["onChange"] = (event) => {
-                                    const value = event.target?.checked;
+                                    const value = typeof event === 'boolean' ? event : event?.target?.checked;
                                     return handlers[key].execute({event, item, value, state, context});
                                 };
                                 break;

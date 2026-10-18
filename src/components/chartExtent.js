@@ -11,3 +11,13 @@ export function normalizeChartExtent(value, fallback) {
     }
     return normalized;
 }
+
+// Explicit margins allow compact authored charts without changing other charts.
+export function resolveChartMargins(authored, fallback) {
+    const result = {...fallback};
+    for (const side of ['top', 'right', 'bottom', 'left']) {
+        const value = authored?.[side];
+        if (typeof value === 'number' && Number.isFinite(value) && value >= 0) result[side] = value;
+    }
+    return result;
+}

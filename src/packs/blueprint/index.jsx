@@ -51,6 +51,7 @@ import { permittedOptions } from './permittedOptions.js';
 import ChipList from '../../components/ChipList.jsx';
 import ContentCarousel from '../../components/content/ContentCarousel.jsx';
 import CardRail from '../../components/content/CardRail.jsx';
+import CardRailGroup from '../../components/content/CardRailGroup.jsx';
 import FilterChips from '../../components/content/FilterChips.jsx';
 import {currencyInputIcon} from '../../utils/currency.js';
 import MediaPreview from '../../components/MediaPreview.jsx';
@@ -587,8 +588,11 @@ export function registerPack() {
     registerWidget('chipList', (props) => <ChipList {...props}/>, { framework: 'blueprint' });
     registerWidget('contentCarousel', props => <ContentCarousel {...props}/>, {framework: 'blueprint'});
     registerWidget('cardRail', props => <CardRail {...props}/>, {framework: 'blueprint'});
+    registerWidget('cardRailGroup', props => <CardRailGroup {...props}/>, {framework: 'blueprint'});
     registerWidget('filterChips', props => <FilterChips {...props}/>, {framework: 'blueprint'});
-    for (const key of ['contentCarousel', 'cardRail']) registerEventAdapter(key, {onClick: () => () => {}});
+    for (const key of ['contentCarousel', 'cardRail', 'cardRailGroup']) registerEventAdapter(key, {
+        onClick: () => () => {}, onTagClick: () => () => {}, onCountClick: () => () => {}
+    });
     registerEventAdapter('filterChips', {onChange: ({adapter}) => values => adapter.set(values)});
 
     const checkboxChangeHandler = ({ adapter }) => (arg) => {
