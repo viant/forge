@@ -19,6 +19,8 @@ assert.equal(mapDisplayValue('unknown', {known: 'Known'}), 'unknown');
 assert.equal(resolveEmptyDisplayText({properties: {emptyText: 'Auto'}}), 'Auto');
 assert.equal(resolveEmptyDisplayText({}), 'No data');
 assert.equal(formatDisplayValue({width: 300, height: 250}, 'dimensions'), '300x250');
+assert.equal(formatDisplayValue({maxBid: 27}, 'code'), '{\n  "maxBid": 27\n}');
+assert.equal(formatDisplayValue('[1,2]', 'code'), '[1,2]');
 assert.equal(formatDisplayValue({width: 0, height: 0}, 'dimensions'), '0x0');
 
 console.log('formatValue ✓ 24-hour date-time rendering');
