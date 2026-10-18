@@ -96,6 +96,7 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
     const tabAppearance = String(container?.tabs?.appearance || '').trim().toLowerCase();
     const compactTabs = container?.tabs?.compact === true;
     const fillSectionTabs = container?.tabs?.fill === true;
+    const fillAvailableHeight = fillSectionTabs && sizingMode === 'fill';
     const childDataSourceFetchMode = resolveDataSourceFetchMode(
         container?.tabs?.dataSourceFetchMode,
         dataSourceFetchMode,
@@ -127,7 +128,7 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
             ? visibleContainers.filter((tab) => shouldRenderTabPanel(tab.id))
             : [selected];
         return (
-            <div className={`form-panel forge-form-panel-section-tabs${compactTabs ? ' is-compact' : ''}${fillSectionTabs ? ' is-fill' : ''}`}>
+            <div className={`form-panel forge-form-panel-section-tabs${compactTabs ? ' is-compact' : ''}${fillAvailableHeight ? ' is-fill' : ''}`}>
                 <SectionTabRail
                     items={visibleContainers.map((tab,index) => ({id: tab.id, label: tab.title, icon: tab.icon, panelId:`${tabDOMPrefix}-panel-${index}`}))}
                     selectedId={selected?.id}
@@ -146,7 +147,7 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
                             className="forge-form-panel-section-tabs__panel" role="tabpanel"
                             aria-labelledby={`${tabDOMPrefix}-tab-${tabIndex}`}
                             hidden={!active} style={!active ? {display: 'none'} : undefined}>
-                            <Container context={context} container={tab} sizingMode={fillSectionTabs ? 'fill' : 'content'} isActive={active} suppressTitle dataSourceFetchMode={childDataSourceFetchMode} />
+                            <Container context={context} container={tab} sizingMode={fillAvailableHeight ? 'fill' : 'content'} isActive={active} suppressTitle dataSourceFetchMode={childDataSourceFetchMode} />
                         </div>
                     );
                 })}
