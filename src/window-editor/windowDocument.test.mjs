@@ -66,6 +66,7 @@ for (const field of [
   "schemaBasedForm",
   "scheduleEditor",
   "permissionBoundary",
+  "ruleEditor",
 ])
   assert.ok(contentSchema.properties[field], field);
 assert.equal(
@@ -77,6 +78,12 @@ assert.equal(
   schemaAtPath(["dataSource", "records"], {}).properties.cardinality.type,
   "string"
 );
+assert.equal(schemaAtPath(["view", "content", "ruleEditor"], {}).properties.field.type, "string");
+assert.equal(schemaAtPath(["view", "content", "chart"], {}).properties.barSize.type, "number");
+assert.equal(schemaAtPath(["view", "content", "chart"], {}).properties.showLegend.type, "boolean");
+assert.equal(schemaAtPath(["dataSource", "records"], {}).properties.selectionPreserveAcrossPages.type, "boolean");
+assert.equal(schemaAtPath(["view", "content", "wizard", "steps", 0], {}).properties.externalAdvance.type, "boolean");
+assert.equal(schemaAtPath(["view", "content", "wizard", "steps", 0], {}).properties.terminal.type, "boolean");
 assert.ok(resolveSchema(canonicalSchema).properties.resourceModels);
 assert.ok(readDocument("view: [unterminated").errors.length);
 assert.deepEqual(readDocument(changed).errors, []);

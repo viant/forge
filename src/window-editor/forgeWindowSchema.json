@@ -267,6 +267,9 @@
         "axes": {
           "$ref": "#/$defs/ChartAxes"
         },
+        "barSize": {
+          "type": "number"
+        },
         "cartesianGrid": {
           "$ref": "#/$defs/CartesianGrid"
         },
@@ -300,6 +303,12 @@
         "hideControlsWhenEmpty": {
           "type": "boolean"
         },
+        "margin": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
+        },
         "on": {
           "items": {
             "$ref": "#/$defs/Execute"
@@ -314,6 +323,12 @@
         },
         "series": {
           "$ref": "#/$defs/ChartSeries"
+        },
+        "showControls": {
+          "type": "boolean"
+        },
+        "showLegend": {
+          "type": "boolean"
         },
         "type": {
           "type": "string"
@@ -888,6 +903,9 @@
         },
         "rowSpan": {
           "type": "integer"
+        },
+        "ruleEditor": {
+          "$ref": "#/$defs/RuleEditorSpec"
         },
         "scheduleEditor": {
           "$ref": "#/$defs/ScheduleEditorSpec"
@@ -1958,6 +1976,9 @@
         "selectionMode": {
           "$ref": "#/$defs/SelectionMode"
         },
+        "selectionPreserveAcrossPages": {
+          "type": "boolean"
+        },
         "selectionRetention": {
           "description": "SelectionRetention \"pages\" keeps selected rows when only the server page changes.",
           "type": "string"
@@ -2442,6 +2463,10 @@
         },
         "submit": {
           "$ref": "#/$defs/MutationCommand"
+        },
+        "submitWhen": {
+          "additionalProperties": {},
+          "type": "object"
         },
         "validWhen": {
           "additionalProperties": {},
@@ -4281,6 +4306,79 @@
       },
       "type": "object"
     },
+    "RuleEditorChoice": {
+      "additionalProperties": true,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "operators": {
+          "items": {},
+          "type": "array"
+        },
+        "value": {}
+      },
+      "type": "object"
+    },
+    "RuleEditorSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "childrenField": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "defaultRule": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "field": {
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/RuleEditorChoice"
+          },
+          "type": "array"
+        },
+        "groups": {
+          "items": {
+            "$ref": "#/$defs/RuleEditorChoice"
+          },
+          "type": "array"
+        },
+        "label": {
+          "type": "string"
+        },
+        "maxValueLength": {
+          "type": "integer"
+        },
+        "operatorField": {
+          "type": "string"
+        },
+        "operators": {
+          "items": {
+            "$ref": "#/$defs/RuleEditorChoice"
+          },
+          "type": "array"
+        },
+        "optionsHandler": {
+          "type": "string"
+        },
+        "parameterField": {
+          "type": "string"
+        },
+        "readOnlyWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "valueField": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "ScheduleEditorSpec": {
       "additionalProperties": true,
       "properties": {
@@ -4705,6 +4803,11 @@
         "presentation": {
           "type": "string"
         },
+        "queryDisabledWhen": {
+          "additionalProperties": {},
+          "description": "QueryDisabledWhen disables built-in search, paging and sorting controls.",
+          "type": "object"
+        },
         "rowHeight": {
           "type": "integer"
         },
@@ -4850,6 +4953,9 @@
           "type": "string"
         },
         "hrefTemplate": {
+          "type": "string"
+        },
+        "hrefTemplateSource": {
           "type": "string"
         },
         "identityParameters": {
@@ -5532,6 +5638,15 @@
     "WindowSettings": {
       "additionalProperties": true,
       "properties": {
+        "confirmDiscardOnClose": {
+          "type": "string"
+        },
+        "dirtyDataSourceRefs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "on": {
           "items": {
             "$ref": "#/$defs/Execute"
@@ -5651,15 +5766,24 @@
         "containerId": {
           "type": "string"
         },
+        "externalAdvance": {
+          "type": "boolean"
+        },
         "id": {
           "type": "string"
         },
         "label": {
           "type": "string"
         },
+        "terminal": {
+          "type": "boolean"
+        },
         "validWhen": {
           "additionalProperties": {},
           "type": "object"
+        },
+        "validate": {
+          "type": "string"
         },
         "visibleWhen": {
           "additionalProperties": {},
@@ -6172,7 +6296,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "e97d0cf74e368b1f1d4dcb7f97d585381ace1b97",
+    "baseCommit": "4000b50e3ed22e2abc7d98dd8194c6fd009221c1",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "datasource_projection.go": "854b7858c0e997ea0e84bb3a91c9805c8ed728c39a8b740713e524cc43529ec9",
@@ -6200,15 +6324,16 @@
       "github.com/viant/forge/backend/window/contract.presentation.go": "239b91f0d3dd60a87b46d1b33ac8e45d15beb7b94d2b0aed01e2fa14d464250a",
       "github.com/viant/forge/backend/window/contract.resource.go": "3d405993972615d81f63d4f8fdf1ed99539af092353f20e7b80005fd196fc467",
       "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
-      "model.go": "298a5969e3d01467d935202b3636a81c02c55acda2a0cc3e7fb9f233e8600aac",
-      "presentation_primitives.go": "11284bb93f78ea0883c5871fc1c72c1046876566a044df9dc1eb59f054730900",
+      "model.go": "1f2018cc1df324769130a365f52fae31ea599fe5898e1a270a4135144fde9f8b",
+      "presentation_primitives.go": "89be7b5723b17e57cfbaab70136f79f11bd87bc1958000e7b2d2ce491ca867a3",
       "resource_model.go": "2d09c19334a806ae9879b9e022e403640cc5ca0f7cabe494b38aaa86881cd610",
       "resource_model_validation.go": "be1cb0525d5f0a2f609775e46b2fe2cb7a3f74dd4160fed26764bfd3a9fa8fb4",
+      "rule_editor.go": "3eda2833f57c5a64adec603e42213423907151451998fa4ba538fe258273f6e6",
       "window_compiled_resource.go": "4ef03d542848c1d062238e59cb84b99c33e51007a021690412e53a85232f4905",
       "window_descriptor.go": "99170237b79c06523e72302b7917e0f573ef5f54bbc4bf0b8a4625915274c789",
       "window_resource.go": "e4df4c63255a775d4aab5cd8dcfd171c697ad76f4c1e90691c4f33dad9cf424f",
       "window_target_proof.go": "53605c132aae2b8c8d6e377daaae416f347e0ff8c48a39fb2a0f15f95ad5faeb",
-      "workflow_primitives.go": "13b3ab4a61ba77144e639c282208b892794f0c0a3c58a2f5b829826de9614d79"
+      "workflow_primitives.go": "8753a760e7eb7f1caea772849f2933df0252f82e129b5f1d8dc28f9ce93855ec"
     },
     "sourceNote": "Generated from committed canonical Forge authored model and Forge-owned public contracts; SHA-256 identifies every parsed source file."
   }
