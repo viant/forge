@@ -208,6 +208,40 @@ table: {columns: [{id: id, name: ID}, {id: name, name: Name}]}
 
 `mutationCommand` can also be placed directly on a container. It provides a standalone trigger and lifecycle presentation while delegating validation, confirmation, writer invocation, reconciliation, and refresh to `CommandExecutor`. `assignmentPicker` declares available/assigned datasources plus assign/unassign command definitions. `statusWorkflow` declares allowed `from` states, destination state, predicates, and command shorthand that is normalized into the shared command definition.
 
+For a two-state status control, `statusWorkflow.appearance: switch` reuses the
+same mutation executor, confirmation, validation, duplicate-submit guard, and
+authoritative refresh as the default transition buttons. Set `activeState` to
+the reader's active value and optionally map reader values with `stateLabels`.
+The switch is disabled when no single legal next transition exists, including
+unknown or terminal states. Use the **same `commandId` in both directions** so
+a readback changing the current state cannot release the pending guard early.
+`to` is passed through command extras and can use a different writer encoding
+from the reader's state value.
+
+```yaml
+statusWorkflow:
+  appearance: switch
+  label: User Status
+  stateField: status
+  activeState: ENABLED
+  stateLabels: {ENABLED: Active, DISABLED: Inactive}
+  transitions:
+    - id: deactivate
+      from: [ENABLED]
+      to: 0
+      command:
+        commandId: user-status
+        dataSourceRef: status_patch
+        refresh: [{dataSourceRef: record, bypassCache: true}]
+    - id: activate
+      from: [DISABLED]
+      to: 1
+      command:
+        commandId: user-status
+        dataSourceRef: status_patch
+        refresh: [{dataSourceRef: record, bypassCache: true}]
+```
+
 Each editable operation may override the collection-level `selection` contract. This allows one list to combine exactly-one Edit with independently bounded bulk operations. `selection.every`, `selection.any`, and `selection.none` apply the normal predicate operators to each selected row and fail closed before dispatch.
 
 For a server-paginated multi-select datasource, opt in to `selectionRetention: pages`

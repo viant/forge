@@ -21,7 +21,7 @@ export function useMutationCommandState(context, command) {
   return state;
 }
 
-export default function MutationCommand({command, context, extras = {}, disabled = false, children, onSettled}) {
+export default function MutationCommand({command, context, extras = {}, disabled = false, children, onSettled, renderTrigger}) {
   usePredicateSignals(context, [command?.validateWhen]);
   const state = useMutationCommandState(context, command);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
@@ -52,7 +52,8 @@ export default function MutationCommand({command, context, extras = {}, disabled
   React.useEffect(() => () => confirmResolver.current?.(false), []);
   return (
     <DisabledActionShell reason={blockedExplanation} label={command?.label || 'Action'} className="forge-mutation-command">
-      <Button className={command?.className} data-forge-part="button" icon={command?.icon || undefined} aria-label={command?.label || 'Save'} title={!valid ? command.invalidMessage || 'This action is not currently valid.' : command?.label || undefined} intent={command?.intent || undefined} loading={state.phase === 'pending'} disabled={blocked || busy} onClick={invoke}>{command?.hideLabel ? null : children || command?.label || 'Save'}</Button>
+      {renderTrigger ? renderTrigger({invoke, disabled: blocked || busy, pending: state.phase === 'pending'}) :
+        <Button className={command?.className} data-forge-part="button" icon={command?.icon || undefined} aria-label={command?.label || 'Save'} title={!valid ? command.invalidMessage || 'This action is not currently valid.' : command?.label || undefined} intent={command?.intent || undefined} loading={state.phase === 'pending'} disabled={blocked || busy} onClick={invoke}>{command?.hideLabel ? null : children || command?.label || 'Save'}</Button>}
       <span className="forge-mutation-command__status" data-command-phase={state.phase || 'idle'} aria-live="polite">{statusMessage}</span>
       <Alert isOpen={confirmOpen} intent={command?.intent === 'danger' ? 'danger' : 'primary'} confirmButtonText={children || command?.label || 'Confirm'} cancelButtonText="Cancel" onCancel={() => settleConfirmation(false)} onConfirm={() => settleConfirmation(true)}>{confirmMessage}</Alert>
     </DisabledActionShell>
