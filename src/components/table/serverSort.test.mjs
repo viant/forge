@@ -69,3 +69,13 @@ assert.equal(requestServerTableSort({
     columnId: 'created', direction: 'asc',
 }), true);
 assert.deepEqual(tieBreakCalls[0].value, ['created:asc', 'id:asc']);
+
+const duplicateTieBreakCalls = [];
+assert.equal(requestServerTableSort({
+    dataSource: {sortMode: 'server', backend: {kind: 'mcp_tool'},
+        sortMapping: {parameter: 'OrderBy', template: '{{field}}:{{direction}}',
+            fields: {recommendationId: 'recommendationId'}, thenBy: ['recommendationId:{{direction}}']}},
+    handlers: {dataSource: {setSort: input => duplicateTieBreakCalls.push(input)}},
+    columnId: 'recommendationId', direction: 'asc',
+}), true);
+assert.deepEqual(duplicateTieBreakCalls[0].value, ['recommendationId:asc']);
