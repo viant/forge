@@ -67,6 +67,11 @@ func normalizeFilterSemantics(inputs map[string]interface{}, ds *types.DataSourc
 	}
 
 	for field, op := range operators {
+		// A producer-owned search interprets its own raw term. For example,
+		// Creative.Search matches names and parses a plain integer as an ID.
+		if op == "producer" {
+			continue
+		}
 		if op != "contains" {
 			continue
 		}

@@ -207,7 +207,25 @@ Verification: `src/core/store/signals.test.js` covers one-time seeding, metadata
 cloning, user edits, explicit clearing, and restored filters. Typed metadata is
 represented by `DataSource.InitialFilter` in `backend/types/model.go`.
 
+## Producer-owned search terms
+
+For a producer that interprets its own search term, use `operator: producer`
+in a server filter template. Forge passes the term unchanged. In contrast,
+`operator: contains` adds `%` wildcards before invoking the producer. A
+combined name-or-ID search needs the raw form so the producer can recognize
+an integer as an exact ID:
+
+```yaml
+filterMode: server
+filterSet:
+  - name: quick
+    default: true
+    template:
+      - {id: Search, label: Creative name or exact ID, operator: producer}
+```
+
 ## Integer-array filter inputs
+
 
 Declared `int[]` filters normalize native form CSV (`"1,2"`) and the `in`
 control's wrapped form (`["1,2"]`) into integer arrays before MCP dispatch.
