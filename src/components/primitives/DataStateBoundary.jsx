@@ -39,17 +39,16 @@ export default function DataStateBoundary({sizingMode = 'fill', container, conte
   // Dataset denial belongs to the datasource notification, not the window shell.
   // Keep fields, tabs, filters and unrelated content mounted.
   if (state.kind === 'error' && state.errors.every(error => isDataSourceLocalDenial(error))) return <>{children}</>;
-  if (state.kind === 'loading' && !tableOwnsLoading) return <div className="forge-data-state" data-forge-primitive="dataStateBoundary"><Spinner size={24}/><span>{spec.loadingMessage || 'Loading…'}</span></div>;
-  if (state.kind === 'error' && spec.suppressErrorWhen && evaluatePlainVisibleWhen(spec.suppressErrorWhen, context)) return null;
+  if (state.kind === 'loading' && !tableOwnsLoading) return <div style={containerSizingStyle(container,sizingMode,{chrome:true})} data-forge-primitive="dataStateBoundary" aria-busy="true"><div className="forge-data-state" role="status"><Spinner size={24}/><span>{spec.loadingMessage || 'Loading…'}</span></div>{children}</div>;
+  if (state.kind === 'error' && spec.suppressErrorWhen && evaluatePlainVisibleWhen(spec.suppressErrorWhen, context)) return <>{children}</>;
   if (state.kind === 'error') {
     const errorContent=<div className="forge-data-error" role="alert" data-forge-primitive="dataStateBoundary">
     <Icon icon="error" aria-hidden="true"/>
     <div><strong>Unable to load data</strong><div>{String(spec.errorMessage || '').trim() || formatDataSourceError(state.errors[0]) || 'Please retry. If the problem continues, check the connection.'}</div></div>
     {errorAction ? <Button minimal icon={errorAction.icon || 'refresh'} onClick={retryError} aria-label={errorAction.label || 'Retry'} title={errorAction.label || 'Retry'}/> : null}
     </div>;
-    // The table suppresses rows on error and retains its filter/refresh toolbar.
-    // Unmounting it here prevents users from correcting a failed filter.
-    return container.table ? <>{errorContent}{children}</> : errorContent;
+    // Preserve filters, tabs and sibling loaders when one datasource fails.
+    return <div style={containerSizingStyle(container,sizingMode,{chrome:true})} data-forge-primitive="dataStateBoundary">{errorContent}{children}</div>;
   }
   if (state.kind === 'empty' && !renderEmptyContent) return <NonIdealState icon="search" title={spec.emptyMessage || 'No data'}/>;
   if (state.kind === 'stale_empty' && !renderEmptyContent) return <div style={containerSizingStyle(container,sizingMode,{chrome:true})} data-forge-primitive="dataStateBoundary"><Callout intent="warning">{spec.staleMessage || 'Cached data may be stale.'}</Callout><NonIdealState icon="search" title={spec.emptyMessage || 'No data'}/></div>;

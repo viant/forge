@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: [
+      'src/components/primitives/DataStateBoundary.runtime.test.jsx',
       'src/components/ThemeBoundary.portal.test.jsx',
       'src/runtime/optionsFetch.render.test.jsx',
       'src/components/table/Basic.timeZoneBinding.render.test.jsx',
