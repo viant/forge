@@ -510,7 +510,9 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 	if sharedContract || configuredOwner != "" {
 		listRequest = struct{}{}
 	}
+	listTiming := observe.Start(ctx, "gateway.namespaces.list", observe.Labels{Provider: name})
 	listedRaw, e := toolRaw(ctx, c, "namespaces/list", listRequest)
+	listTiming.End(observe.OutcomeFor(e), observe.CacheUnknown)
 	if e != nil {
 		return capabilities{}, e
 	}
@@ -524,7 +526,9 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 			cursor := (*string)(nil)
 			seen := map[string]bool{}
 			for page := 0; page < 100; page++ {
+				toolsTiming := observe.Start(ctx, "gateway.tools.list", observe.Labels{Provider: name})
 				tools, err := c.ListTools(ctx, cursor)
+				toolsTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 				if err != nil {
 					return capabilities{}, err
 				}

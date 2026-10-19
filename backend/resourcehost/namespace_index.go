@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	primitive "github.com/viant/forge/backend/provider/contract"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	identity "github.com/viant/forge/backend/resource"
 	namespaces "github.com/viant/mcp-protocol/extension/namespaces"
 	"github.com/viant/mcp-protocol/schema"
@@ -165,7 +166,9 @@ func (g *Gateway) discoverNamespaceIndex(ctx context.Context, c mcpclient.Interf
 	return result, nil
 }
 
-func (g *Gateway) readNamespaceIndex(ctx context.Context, c mcpclient.Interface, namespace namespaces.Namespace, resources map[string]primitive.ResourceState) error {
+func (g *Gateway) readNamespaceIndex(ctx context.Context, c mcpclient.Interface, namespace namespaces.Namespace, resources map[string]primitive.ResourceState) (resultErr error) {
+	span := observe.Start(ctx, "gateway.namespace.index", observe.Labels{})
+	defer func() { span.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	if resourceFiltersSupported(ctx, c) {
 		return g.readFilteredNamespaceIndex(ctx, c, namespace, resources)
 	}
