@@ -51,7 +51,7 @@ func (g *Gateway) discoverNamespaceIndex(ctx context.Context, c mcpclient.Interf
 	result.sharedIndex = true
 	result.standardResources = standardRead
 	result.indexedResources = map[string]primitive.ResourceState{}
-	if !result.installed[namespaces.ListToolName] || !result.installed[namespaces.GetToolName] {
+	if !result.installed[namespaces.ListToolName] || !result.installed[namespaces.GetToolName] && !resourceFiltersSupported(ctx, c) {
 		return result, ErrUnavailable
 	}
 	seenNS := map[string]bool{}
@@ -155,6 +155,9 @@ func (g *Gateway) discoverNamespaceIndex(ctx context.Context, c mcpclient.Interf
 }
 
 func (g *Gateway) readNamespaceIndex(ctx context.Context, c mcpclient.Interface, namespace namespaces.Namespace, resources map[string]primitive.ResourceState) error {
+	if resourceFiltersSupported(ctx, c) {
+		return g.readFilteredNamespaceIndex(ctx, c, namespace, resources)
+	}
 	seenCursor := map[string]bool{}
 	for cursor, page := (*string)(nil), 0; page < 100; page++ {
 		raw, err := toolRaw(ctx, c, namespaces.GetToolName, namespaces.GetRequest{URI: namespace.URI, Cursor: cursor})
