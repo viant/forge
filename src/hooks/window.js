@@ -7,6 +7,7 @@ import {
 import { getWindowContext } from "../core/context/registry.js";
 import { resolveSelector } from "../utils/selector.js";
 import { resolveParameters } from './parameters.js';
+import { resolveScopedWindowKey } from '../utils/windowResourceKey.js';
 import {buildStandaloneDashboardDocument, downloadDashboardHtml} from "../core/ui/dashboardExport.js";
 import {getBusSignal, getDashboardFilterSignal, getDashboardSelectionSignal} from "../core/store/signals.js";
 import {buildDashboardDefaultFilters, setDashboardSelectionState} from "../components/dashboard/dashboardUtils.js";
@@ -338,7 +339,7 @@ export function useWindowHandlers(windowId) {
             }
         }
 
-        const windowKey   = rawArgs[0];
+        const requestedWindowKey = rawArgs[0];
         const windowTitle = rawArgs[1] ?? '';
         const windowData  = rawArgs.length > 2 ? rawArgs[2] : '';
         const inTabOverride = rawArgs.length > 3 ? rawArgs[3] : inTab;
@@ -384,6 +385,8 @@ export function useWindowHandlers(windowId) {
 
         const activeOwnerWindow = activeWindows.peek().find(entry => entry.windowId === windowId);
         const ownerWindow = activeOwnerWindow || props.context?.windowState || getWindowContext(windowId)?.windowState;
+        const ownerURI = getWindowContext(windowId)?.metadata?.resource?.uri || ownerWindow?.windowKey;
+        const windowKey = resolveScopedWindowKey(requestedWindowKey, ownerURI);
         console.debug('[window.open][owner]', JSON.stringify({ownerFound:!!activeOwnerWindow,scopedAtCreation:!!windowScopeAtCreation,scopedContext:!!ownerWindow?.windowScopeId,picker:!!options.pickerDialogId,canonicalRef:!!options.resourceRef?.uri}));
         // A late callback from a disposed scoped owner cannot recreate leaked windows.
         if ((windowScopeAtCreation || ownerWindow?.windowScopeId) && !activeOwnerWindow) return undefined;

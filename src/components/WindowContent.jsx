@@ -471,6 +471,11 @@ export function shouldPrimeDataSourceFetch(dataSource = {}, prevInput = {}, coll
     // DataSource owns serialization; clearing fetch here loses the new range
     // when an empty result lets the next user action happen immediately.
     if (paramsChanged) return true;
+    // DataSource already consumed this request and is waiting for missing
+    // dependencies. Re-priming an empty inactive source on every render makes
+    // the consumer and primer continually toggle fetch until React aborts.
+    // Changed bindings or an explicit fetch above can wake it again.
+    if (control?.inactive === true) return false;
     if (control?.loading === true) return false;
     if (control?.error) return false;
     const hasCollection = Array.isArray(collection) && collection.length > 0;

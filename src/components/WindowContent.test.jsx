@@ -526,6 +526,14 @@ describe('resolveFetcherOwnedDataSourceRefs', () => {
 });
 
 describe('shouldPrimeDataSourceFetch', () => {
+  it('leaves a consumed request inactive until its bindings change or an explicit fetch wakes it', () => {
+    const waiting = {inactive: true, loading: false, loaded: false};
+    for (let render = 0; render < 100; render++) {
+      expect(shouldPrimeDataSourceFetch({}, {fetch: false}, [], false, waiting)).toBe(false);
+    }
+    expect(shouldPrimeDataSourceFetch({}, {fetch: false}, [], true, waiting)).toBe(true);
+    expect(shouldPrimeDataSourceFetch({}, {fetch: true}, [], false, waiting)).toBe(true);
+  });
     it('does not re-prime an in-flight empty datasource', () => {
       expect(shouldPrimeDataSourceFetch({}, {fetch: false}, [], false, {loaded: false, loading: true})).toBe(false);
     });
