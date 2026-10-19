@@ -19,6 +19,28 @@ func (g *Gateway) ConnectionForProvider(ctx context.Context, owner string) (Conn
 func (g *Gateway) ConnectionForResource(ctx context.Context, uri identity.ResourceURI, owner string) (result Connection, resultErr error) {
 	span := observe.Start(ctx, "gateway.routing", observe.Labels{Kind: uri.Kind})
 	defer func() { span.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
+	if connection, found, err := g.configuredOwnerConnection(ctx, owner); owner != "" && (found || err != nil) {
+		if err != nil {
+			return Connection{}, err
+		}
+		actor, err := g.actor(ctx)
+		if err != nil {
+			return Connection{}, err
+		}
+		binding, err := g.resolveReadBinding(ctx, actor, connection.Name)
+		if err != nil {
+			return Connection{}, err
+		}
+		if _, known := g.knownResourceCapabilities(ctx, actor, binding, connection, uri); known {
+			if err := g.checkReadBinding(ctx, actor, binding); err != nil {
+				return Connection{}, err
+			}
+			if err := g.final(ctx, actor); err != nil {
+				return Connection{}, err
+			}
+			return connection, nil
+		}
+	}
 	if connection, found, err := g.declaredOwnerConnection(ctx, owner); found || err != nil {
 		if err != nil {
 			return Connection{}, err

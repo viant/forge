@@ -971,9 +971,12 @@ func get[T any](ctx context.Context, g *Gateway, connection Connection, ref iden
 	if e != nil {
 		return nil, e
 	}
-	c, e := g.discover(ctx, a, connection.Name, binding)
-	if e != nil {
-		return nil, e
+	c, known := g.knownResourceCapabilities(ctx, a, binding, connection, uri)
+	if !known {
+		c, e = g.discover(ctx, a, connection.Name, binding)
+		if e != nil {
+			return nil, e
+		}
 	}
 	if c.connection != connection || !supports(c, uri.Namespace, uri.Kind, "get") {
 		return nil, identity.ErrResourceDenied
