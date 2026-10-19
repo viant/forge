@@ -10,6 +10,7 @@ import (
 	service "github.com/viant/forge/backend/provider"
 	primitive "github.com/viant/forge/backend/provider/contract"
 	"github.com/viant/forge/backend/provider/contract/observe"
+	"github.com/viant/forge/backend/requestctx"
 	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
 	"strings"
@@ -237,6 +238,7 @@ func (c *WindowCatalog) getForProvider(ctx context.Context, explicitOwner string
 		}
 		ref = *input.Resource
 	}
+	ctx = requestctx.WithWindowTarget(ctx, input.Target)
 	result, e := GetWithCodec[*types.CompiledWindowResource](ctx, c.Gateway, loc.Connection, ref, input.ResolvedResource, DefinitionCodec[*types.CompiledWindowResource]{ID: "forge.window.resource.v1", Parse: types.CompileWindowResource})
 	if e != nil {
 		return nil, fmt.Errorf("window read/select: %w", e)

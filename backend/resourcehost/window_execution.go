@@ -8,6 +8,7 @@ import (
 	dsproto "github.com/viant/forge/backend/datasource/contract"
 	primitive "github.com/viant/forge/backend/provider/contract"
 	"github.com/viant/forge/backend/provider/contract/observe"
+	"github.com/viant/forge/backend/requestctx"
 	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
 )
@@ -94,6 +95,7 @@ func (c *WindowCatalog) verifyDependencyReads(ctx context.Context, parent identi
 }
 
 func (c *WindowCatalog) ResolveDatasource(ctx context.Context, parent identity.ResolvedResource, target *types.WindowTarget, id string) (out *dsproto.DataSource, err error) {
+	ctx = requestctx.WithWindowTarget(ctx, target)
 	defer func() { poisonReadSequence(ctx, err) }()
 	if !c.AuthzReady() {
 		return nil, identity.ErrResourceDenied

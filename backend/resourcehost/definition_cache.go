@@ -68,6 +68,15 @@ func (g *Gateway) cachedDefinitionGet(ctx context.Context, actor identity.Verifi
 	// resource. Private keys retain the existing credential/conversation scope.
 	key := fmt.Sprintf("primitive-definitions:%p:%s:%d:%s:%s:%s", g, binding.name, g.generation(binding.name), uri.Namespace, uri.Kind, scopeKey)
 	entry := ref.URI + "\x00" + ref.Revision
+	if uri.Kind == "window" {
+		if target := presentationWindowTarget(ctx); target != nil {
+			raw, err := json.Marshal(target)
+			if err != nil {
+				return primitive.GetResult{}, nil, err
+			}
+			entry += "\x00" + string(raw)
+		}
+	}
 	value, err := g.Manager.VisibleCatalogEntryInPartition(ctx, key, partition, entry, func(ctx context.Context) (json.RawMessage, time.Time, error) {
 		result, err := load(ctx)
 		if err != nil {
