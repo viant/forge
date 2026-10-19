@@ -1174,6 +1174,9 @@ function WindowContentInner({window, metadata, services}) {
                 overflow: shouldFillParent ? 'hidden' : 'visible',
             }}
         >
+            {metadata.resourceWarnings?.length > 0 ? <div role="status" className="bp6-callout bp6-intent-warning">
+                Some window resources are unavailable: {metadata.resourceWarnings.map(warning => warning.resource).join(', ')}
+            </div> : null}
             {!defaultDataSourceRef && context.signals ? <MessageBus context={context} /> : null}
             {renderDataSources()}
             {renderDialogs()}
@@ -1306,16 +1309,23 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
         if (deliveredMetadata) {
             // A completed selected GET may deliver a generic or signed definition.
             // This rendering input is not an authorization grant for data calls.
-            try {
-                const admittedMetadata = compilePermissionAppliedMetadata(deliveredMetadata,
+            const publish = (definition) => {
+                if (cancelled) return;
+                const admittedMetadata = compilePermissionAppliedMetadata(definition,
                     targetContext, window?.parameters || {}, admittedBinding);
                 injectActions(admittedMetadata);
                 metadataSignalHandle.value = {...admittedMetadata, __windowKey: baseKey,
                     __targetKey: targetKey, __provisionalInline: false};
-            } catch (error) {
-                setFetchError(error);
+            };
+            if (services.resourceFS) {
+                setLoading(true);
+                services.resourceFS.loadWindow(deliveredMetadata).then(publish)
+                    .catch(error => { if (!cancelled) setFetchError(error); })
+                    .finally(() => { if (!cancelled) setLoading(false); });
+            } else {
+                try { publish(deliveredMetadata); } catch (error) { setFetchError(error); }
+                setLoading(false);
             }
-            setLoading(false);
             return () => { cancelled = true; };
         }
 
@@ -1341,7 +1351,10 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             .then(async (resp) => {
                 if (cancelled || expired) return;
                 setFetchError(null);
-                const completeMetadata = resolveWindowMetadataForTarget(resp.data, targetContext);
+                const selectedDefinition = resolveWindowMetadataForTarget(resp.data, targetContext);
+                const completeMetadata = services.resourceFS
+                    ? await services.resourceFS.loadWindow(selectedDefinition) : selectedDefinition;
+                if (cancelled || expired) return;
                 fetchedProtectedMetadata = isProtectedWindowMetadata(completeMetadata);
                 // A signed delivery is emitted only after host OPEN admission. Its
                 // snapshot is a rendering hint, not a data-operation preflight.
@@ -1386,7 +1399,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey, auth, selectedMetadata, metadataRetryVersion]);
+    }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey, auth, selectedMetadata, metadataRetryVersion, services.resourceFS]);
 
     useEffect(() => {
         const metadata = metadataSignalHandle?.value;

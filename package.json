@@ -9,6 +9,7 @@
     "./window": "./src/components/WindowContent.jsx",
     "./packs/blueprint": "./src/packs/blueprint/index.jsx",
     "./settings": "./src/core/context/Setting.jsx",
+    "./resources": "./src/resources/ResourceFS.js",
     "./report-designer": {
       "types": "./src/components/dashboard/ReportDesigner.d.ts",
       "default": "./src/components/dashboard/ReportDesigner.jsx"

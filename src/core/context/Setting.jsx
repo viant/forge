@@ -1,4 +1,4 @@
-import React, {createContext, useContext, useLayoutEffect, useRef} from 'react';
+import React, {createContext, useContext, useEffect, useLayoutEffect, useRef} from 'react';
 import { maybeAutoStartUIBridge } from '../ui/autostart.js';
 import { ensureUIBridgeClientId } from '../ui/bridge.js';
 
@@ -8,6 +8,10 @@ const NoopAuthContext = createContext({});
 const EMPTY_SETTINGS = Object.freeze({});
 
 export const SettingProvider = ({endpoints, connectorConfig, authContext, services=EMPTY_SETTINGS, targetContext = EMPTY_SETTINGS, children}) => {
+
+    // Hosts install a scope-bound resource adapter after authentication. Start
+    // its shared archive pulls before any window asks for a definition.
+    useEffect(() => { services.resourceFS?.preload?.(); }, [services.resourceFS]);
 
     const safeAuthContext = authContext || NoopAuthContext;
     const useAuth = () => useContext(safeAuthContext);

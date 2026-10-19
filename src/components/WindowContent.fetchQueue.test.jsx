@@ -61,3 +61,20 @@ it('executes a primitive-only writer once after clicking, never while mounting t
         await React.act(async()=>root.unmount());host.remove();removeSignalsForKey(windowId);globalThis.IS_REACT_ACT_ENVIRONMENT=previousAct;
     }
 });
+
+it('waits for a declared archive then renders a nonfatal missing-resource warning',async()=>{
+ const previousAct=globalThis.IS_REACT_ACT_ENVIRONMENT;globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const React=await import('react');const {createRoot}=await import('react-dom/client');
+ const {default:WindowContent}=await import('./WindowContent.jsx');const {SettingProvider}=await import('../core/context/Setting.jsx');
+ const {ResourceFS}=await import('../resources/ResourceFS.js');const {removeSignalsForKey}=await import('../core/store/signals.js');
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const windowId='archive-missing-warning';let releaseDialog;
+ const resourceFS=new ResourceFS({namespace:'example',scopeKey:'test-user',loadArchive:({kind})=>kind==='dialog'?new Promise(resolve=>releaseDialog=resolve):Promise.resolve({schemaVersion:1,namespace:'example',kind,catalogRevision:'1',complete:true,entries:[]})});
+ const metadata={resources:{dialogs:['missing']},dataSource:{},view:{content:{id:'root',title:'Available controls',items:[]}}};
+ const settle=async(action)=>React.act(async()=>{action?.();for(let i=0;i<40;i++)await Promise.resolve();});
+ try {
+  await settle(()=>root.render(<SettingProvider connectorConfig={{window:{service:{uri:'/window'}}}} services={{resourceFS}}><WindowContent window={{windowId,windowKey:'archive-test'}} selectedMetadata={metadata}/></SettingProvider>));
+  expect(releaseDialog).toBeTypeOf('function');expect(host.querySelector('[data-window-id]')).toBeNull();
+  await settle(()=>releaseDialog({schemaVersion:1,namespace:'example',kind:'dialog',catalogRevision:'1',complete:true,entries:[]}));
+  expect(host.querySelector('[data-window-id]')).toBeTruthy();expect(host.querySelector('[role="status"]')?.textContent).toContain('dialog://example/missing');
+ } finally {await settle(()=>root.unmount());host.remove();removeSignalsForKey(windowId);globalThis.IS_REACT_ACT_ENVIRONMENT=previousAct;}
+});
