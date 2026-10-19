@@ -780,10 +780,13 @@ type TreeBrowser struct {
 }
 
 type Editor struct {
-	Title          string           `json:"title" yaml:"title"`
-	EditorSelector *EditorSelector  `json:"selector" yaml:"selector"`
-	Style          *StyleProperties `json:"style,omitempty" yaml:"style,omitempty"`
-	On             []*Execute       `json:"on,omitempty" yaml:"on,omitempty"`
+	Language       string                 `json:"language,omitempty" yaml:"language,omitempty"`
+	ReadOnly       bool                   `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
+	ReadOnlyWhen   map[string]interface{} `json:"readOnlyWhen,omitempty" yaml:"readOnlyWhen,omitempty"`
+	Title          string                 `json:"title" yaml:"title"`
+	EditorSelector *EditorSelector        `json:"selector" yaml:"selector"`
+	Style          *StyleProperties       `json:"style,omitempty" yaml:"style,omitempty"`
+	On             []*Execute             `json:"on,omitempty" yaml:"on,omitempty"`
 }
 
 type EditorSelector struct {

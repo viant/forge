@@ -1,3 +1,5 @@
+import {resolveSelector} from '../utils/selector.js';
+import {evaluatePlainVisibleWhen} from './visibleWhen.js';
 import React, {useMemo, useState} from "react";
 import {Card, Elevation} from "@blueprintjs/core";
 import {oneDark} from "@codemirror/theme-one-dark";
@@ -47,25 +49,24 @@ const BoundEditor = ({context, container}) => {
 
     const [source, setSource] = useState("");
     const [location, setLocation] = useState("");
-    const [extensions, setExtensions] = useState([]);
+    const [language, setLanguage] = useState('');
+    const [readOnly, setReadOnly] = useState(false);
 
 
     useSignalEffect(() => {
         const data = handlers.dataSource.getFormData();
         if (data) {
-            setSource(data[selector.source||'source']);
-            setLocation(data[selector.location||'location']);
-            const extensionValue = data[selector.extension||'extension']
-            let values = []
-            if(languages[extensionValue]) {
-                values = [languages[extensionValue], baseSyntax, accessibleSyntax]
-            }
-            setExtensions(values);
+            setSource(resolveSelector(data, selector.source || 'source') ?? '');
+            setLocation(resolveSelector(data, selector.location || 'location'));
+            setReadOnly(editor.readOnly === true || (!!editor.readOnlyWhen && evaluatePlainVisibleWhen(editor.readOnlyWhen, context)));
+            const extensionValue = editor.language || resolveSelector(data, selector.extension || 'extension')
+            setLanguage(extensionValue || '');
         }
     });
 
 
     const handleChange = (value) => {
+        if (readOnly) return;
         handlers.dataSource.setFormField({item: {dataField: selector.source || 'source'}, value});
     };
 
@@ -74,28 +75,24 @@ const BoundEditor = ({context, container}) => {
 
     return (
         <>
-            <CodeMirror
-                value={source}
-                height={height}
-                width={width}
-                extensions={extensions}
-                onChange={handleChange}
-            />
+            <ControlledEditor value={source} language={language} readOnly={readOnly}
+                height={height} width={width} onChange={handleChange} ariaLabel={editor.title}/>
+
         </>
     );
 };
 
-function ControlledEditor({value, onChange, language, height, readOnly = false, ariaLabel}) {
+function ControlledEditor({value, onChange, language, height, width, readOnly = false, ariaLabel}) {
     // Keep the language/facet identities stable while unrelated form state
     // changes. Reconfiguring a multi-megabyte YAML document on every render
     // repeatedly restarts parsing and can stall the editor's browser tab.
     const extensions = useMemo(() => [
-        ...(languages[language || 'sql'] ? [languages[language || 'sql']] : []),
+        ...(languages[language ?? 'sql'] ? [languages[language ?? 'sql']] : []),
         baseSyntax,
         accessibleSyntax,
         ...(ariaLabel ? [EditorView.contentAttributes.of({'aria-label': ariaLabel})] : []),
     ], [language, ariaLabel]);
-    return <CodeMirror value={value || ''} height={height || '280px'} extensions={extensions} onChange={onChange} readOnly={readOnly} />;
+    return <CodeMirror value={value || ''} height={height || '280px'} width={width} extensions={extensions} onChange={onChange} readOnly={readOnly} />;
 }
 
 const Editor = props => props.value !== undefined

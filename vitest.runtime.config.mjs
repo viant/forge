@@ -10,6 +10,7 @@ export default defineConfig({
       'src/components/table/FilterDialog.visibility.test.jsx',
       'src/packs/blueprint/dateRangePresetDraft.render.test.jsx',
       'src/components/optionsFetchOwnership.test.jsx',
+      'src/components/Editor.formBinding.render.test.jsx',
       'src/components/WindowContent.fetchQueue.test.jsx',
       'src/components/WindowContent.lazyOptions.render.test.jsx',
       'src/components/DataSource.spread.render.test.jsx',
