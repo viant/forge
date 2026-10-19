@@ -78,6 +78,8 @@ func TestStandardWindowTargetMetadataAndCachePartition(t *testing.T) {
 					want = form
 				}
 				require.Equal(t, want, body.Title)
+				_, err = Get[json.RawMessage](ctx, g, rows[0].Connection, identity.ResourceRef{URI: rows[0].Resource.URI, Revision: got.ResolvedResource.Selector()}, got.ResolvedResource)
+				require.NoError(t, err, "pinned revalidation must reuse the same target partition")
 				require.Equal(t, []string{"z", "a", "a"}, target.Capabilities)
 				require.Equal(t, "must-not-leak", target.SelectionToken)
 			}
