@@ -332,6 +332,28 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
     addRef(node.dashboard?.reportBuilder?.definitionDataSourceRef);
     addRef(resolveMappedRef(node), node.fetchData === false);
 
+    // Commands execute through datasource signals. Their contexts must be
+    // mounted, but declaring a writer must never invoke it on window open.
+    const addCommand = (command) => {
+        if (!command || typeof command !== 'object') return;
+        addRef(command.dataSourceRef, true);
+        for (const refresh of command.refresh || []) addRef(refresh?.dataSourceRef, true);
+        addRef(command.reconcile?.dataSourceRef, true);
+    };
+    addCommand(node.mutationCommand);
+    addCommand(node.editableCollection?.mutation);
+    for (const operation of node.editableCollection?.operations || []) addCommand(operation?.mutation);
+    for (const transition of node.statusWorkflow?.transitions || []) addCommand(transition?.command);
+    addCommand(node.treeEditor?.mutation);
+    addCommand(node.scheduleEditor?.mutation);
+    addCommand(node.wizard?.submit);
+    addCommand(node.draftForm?.submit);
+    addCommand(node.uploadCollection?.upload);
+    for (const action of node.resourceHeader?.actions || []) addCommand(action?.mutation);
+    for (const rule of node.notificationRules?.rules || []) addCommand(rule?.action?.mutation);
+    addCommand(node.assignmentPicker?.assign);
+    addCommand(node.assignmentPicker?.unassign);
+
     // Match the rendered lifecycle of persistent collapsed sections. Their
     // header can retain its own datasource, but unmounted content must not
     // initialize reporting/child datasources until the user expands it.
@@ -348,6 +370,7 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
         for (const item of node.items) {
             if (!visibleInWindowForm(item)) continue;
             addRef(item?.dataSourceRef, item?.fetchData === false);
+            addCommand(item?.mutationCommand);
             addRef(item?.optionsDataSourceRef, usesLazyOptions(item));
             addRef(item?.fallbackOptionsDataSourceRef);
             addRef(resolveMappedRef(item), item?.fetchData === false);
