@@ -89,7 +89,9 @@ func GetWithCodec[T any](ctx context.Context, g *Gateway, connection Connection,
 	parsed := false
 	parse := func(data json.RawMessage) (T, error) { parsed = true; return codec.Parse(data) }
 	var definition T
-	if raw.definitionCache == nil {
+	// Navigation projections are computed for the current reader. They are not
+	// the immutable definition stored in the representation cache.
+	if raw.definitionCache == nil || raw.MenuProjection != nil {
 		definition, err = parse(raw.Definition)
 	} else {
 		reference := raw.definitionCache

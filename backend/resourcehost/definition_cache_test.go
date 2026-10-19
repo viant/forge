@@ -137,6 +137,22 @@ func TestGenericDefinitionCachePublicImmutableWindowAndPrivateWorkingMenu(t *tes
 	require.Equal(t, 3, source.count(menuURI), "changed credential isolates private metadata")
 	get(cacheUser("alice", "alice-token", "another-conversation"), menuURI)
 	require.Equal(t, 3, source.count(menuURI), "logical conversations reuse the same user metadata partition")
+	// A codec must consume the current user's projection, not the intentionally
+	// absent immutable source definition. Warm codec reads retain the user cache.
+	for _, subject := range []string{"alice", "bob", "alice"} {
+		ctx := cacheUser(subject, subject+"-token", "browser-codec")
+		connection, err := g.ConnectionForResource(ctx, mustCacheURI(t, menuURI), source.owner)
+		require.NoError(t, err)
+		value, err := GetWithCodec(ctx, g, connection, identity.ResourceRef{URI: menuURI, Revision: identity.WorkingCandidate}, nil, DefinitionCodec[map[string]any]{ID: "fixture.navigation", Parse: func(raw json.RawMessage) (map[string]any, error) {
+			var document map[string]any
+			err := json.Unmarshal(raw, &document)
+			return document, err
+		}})
+		require.NoError(t, err)
+		apps := value.Definition["applications"].([]any)
+		require.Equal(t, subject, apps[0].(map[string]any)["id"])
+	}
+	require.Equal(t, 3, source.count(menuURI), "codec reads must not refetch warm user projections")
 	mgr.CloseConversation("")
 	get(alice, windowURI)
 	require.Equal(t, 2, source.count(windowURI), "reconnect invalidates existing metadata slots")
