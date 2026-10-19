@@ -1,4 +1,5 @@
 import {parseDocument} from 'yaml';
+import {decodeResourceArchive} from './resourceArchive.js';
 
 const kinds = ['datasource', 'dialog'];
 const clone = value => structuredClone(value);
@@ -136,13 +137,16 @@ export class ResourceFS {
 
 // The host supplies its existing authenticated MCP resources/read adapter.
 // HTTP decompression belongs to that transport; no parallel REST API is used.
-export function createMCPResourceFS({readResource, ...options}) {
+export function createMCPResourceFS({readResource, archiveFormat = 'json', ...options}) {
   if (typeof readResource !== 'function') throw new Error('MCP resource reader required');
+  if (!['json', 'tar.gz'].includes(archiveFormat)) throw new Error('Unsupported archive format');
   return new ResourceFS({...options, loadArchive: async ({kind, namespace}) => {
-    const uri = `resource-archive://${namespace}/${kind === 'datasource' ? 'datasources' : 'dialogs'}`;
+    const uri = `resource-archive://${namespace}/${kind === 'datasource' ? 'datasources' : 'dialogs'}${archiveFormat === 'tar.gz' ? '.tar.gz' : ''}`;
     const response = await readResource({uri});
     const result = response?.result || response;
-    if (!Array.isArray(result?.contents) || result.contents.length !== 1 || result.contents[0].uri !== uri || typeof result.contents[0].text !== 'string') throw new Error('Invalid archive resource response');
+    if (!Array.isArray(result?.contents) || result.contents.length !== 1 || result.contents[0].uri !== uri) throw new Error('Invalid archive resource response');
+    if (archiveFormat === 'tar.gz') return decodeResourceArchive(result.contents[0]);
+    if (typeof result.contents[0].text !== 'string') throw new Error('Invalid archive text response');
     return JSON.parse(result.contents[0].text);
   }});
 }
