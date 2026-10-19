@@ -147,6 +147,12 @@
     scrollbar-color: #9aabc0 #edf2f7;
 }
 
+/* Overlay scrollbars must not cover actions in the final row. */
+.basic-table-wrapper.has-table-overflow-left .basic-table-scroll,
+.basic-table-wrapper.has-table-overflow-right .basic-table-scroll {
+    padding-bottom: var(--forge-table-scrollbar-clearance, 20px);
+}
+
 
 .basic-table-scroll::-webkit-scrollbar {
     width: 9px;
