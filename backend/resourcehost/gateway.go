@@ -478,10 +478,7 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 
 	}
 	filteredResources := resourceFiltersSupported(ctx, c)
-	if filteredResources {
-		sharedContract = true
-	}
-	if sharedContract {
+	if sharedContract || filteredResources {
 		for _, method := range []string{"namespaces/list", "namespaces/get", "resource/get"} {
 			if seenTools[method] {
 				installed[method] = true
@@ -517,7 +514,7 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 	if e != nil {
 		return capabilities{}, e
 	}
-	if sharedContract && !sharedNamespaceIndex(listedRaw) {
+	if sharedContract && !filteredResources && !sharedNamespaceIndex(listedRaw) {
 		return capabilities{}, identity.ErrResource
 	}
 	if sharedNamespaceIndex(listedRaw) {
@@ -604,6 +601,13 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 				result.publicResourceMetadata = true
 				break
 			}
+		}
+		if filteredResources {
+			result, e = g.discoverNamespaceIndex(ctx, c, listedRaw, result, allowed, true, owner)
+			if e != nil {
+				return capabilities{}, e
+			}
+			return g.publishDiscovery(ctx, a, name, binding, key, generation, resourceVersion, force, result)
 		}
 		// Namespace metadata is notification-bound unless the managing actor supplies a real deadline.
 		seen := map[string]bool{}
