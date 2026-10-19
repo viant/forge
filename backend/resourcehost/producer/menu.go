@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/viant/forge/backend/provider/contract/observe"
 	"reflect"
+	"strings"
 
 	primitive "github.com/viant/forge/backend/provider/contract"
 	identity "github.com/viant/forge/backend/resource"
@@ -37,8 +38,16 @@ func ValidateMenu(version int64, raw json.RawMessage) error {
 		return identity.ErrResource
 	}
 	for key := range envelope {
-		if key != "schemaVersion" && key != "applications" {
+		if key != "schemaVersion" && key != "applications" && key != "name" && key != "icon" {
 			return identity.ErrResource
+		}
+	}
+	for _, field := range []string{"name", "icon"} {
+		if raw, exists := envelope[field]; exists {
+			var value string
+			if json.Unmarshal(raw, &value) != nil || strings.TrimSpace(value) == "" || len(value) > 256 || strings.ContainsAny(value, "\x00\r\n") {
+				return identity.ErrResource
+			}
 		}
 	}
 	var schemaVersion int
@@ -208,7 +217,7 @@ func menuProjectionSubset(original, visible json.RawMessage) bool {
 	if json.Unmarshal(original, &source) != nil || json.Unmarshal(visible, &target) != nil {
 		return false
 	}
-	if !reflect.DeepEqual(source["schemaVersion"], target["schemaVersion"]) {
+	if !reflect.DeepEqual(source["schemaVersion"], target["schemaVersion"]) || !reflect.DeepEqual(source["name"], target["name"]) || !reflect.DeepEqual(source["icon"], target["icon"]) {
 		return false
 	}
 	var subset func(json.RawMessage, json.RawMessage) bool
