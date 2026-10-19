@@ -20,6 +20,7 @@ type filteredIndexClient struct {
 	mcpclient.Interface
 	t                                     *testing.T
 	lists, reads, namespaceGets, toolGets int
+	legacyOwner                           string
 	repeatCursor                          bool
 }
 
@@ -39,6 +40,9 @@ func (c *filteredIndexClient) CallTool(_ context.Context, r *schema.CallToolRequ
 		c.t.Fatal("standard read must be preferred")
 	}
 	require.Equal(c.t, "namespaces/list", r.Name)
+	if c.legacyOwner != "" {
+		return &schema.CallToolResult{StructuredContent: map[string]any{"providerIdentity": c.legacyOwner, "complete": true, "management": map[string]any{"canCreate": true}, "namespaces": []any{map[string]any{"uri": "ns://opaque_collection", "name": "remote", "kinds": []string{"window"}, "supportedKinds": []any{}}}}}, nil
+	}
 	return &schema.CallToolResult{StructuredContent: map[string]any{"namespaces": []any{map[string]any{"uri": "ns://opaque_collection", "name": "Display name only"}}}}, nil
 }
 func (c *filteredIndexClient) ListResourcesWithParams(_ context.Context, r *schema.ListResourcesRequestParams, _ ...mcpclient.RequestOption) (*schema.ListResourcesResult, error) {
@@ -92,4 +96,46 @@ func TestFilterCapabilityRequiresActualMetadataTransport(t *testing.T) {
 	client := &filteredIndexClient{t: t}
 	wrapped := &gatewayAuthClient{Interface: struct{ mcpclient.Interface }{client}}
 	require.False(t, resourceFiltersSupported(context.Background(), wrapped), "older transports must keep the working legacy path")
+}
+
+func TestFilteredLegacyNamespaceIndex(t *testing.T) {
+	for _, tc := range []struct {
+		name, owner   string
+		restrictions  []string
+		wantRows      int
+		wantCollision bool
+	}{
+		{name: "standard read", owner: "producer", wantRows: 1},
+		{name: "allowed name", owner: "producer", restrictions: []string{"remote"}, wantRows: 1},
+		{name: "restricted name", owner: "producer", restrictions: []string{"other"}},
+		{name: "owner mismatch", owner: "other", wantCollision: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &filteredIndexClient{t: t, legacyOwner: tc.owner}
+			mgr, err := manager.New(nil)
+			require.NoError(t, err)
+			require.NoError(t, mgr.RegisterLocal(context.Background(), "filtered", &cfg.MCPClient{ClientOptions: &mcp.ClientOptions{}, PrimitiveProviderIdentity: "producer", PrimitiveNamespaces: tc.restrictions}, func(context.Context) (mcpclient.Interface, error) { return client, nil }))
+			defer mgr.CloseConversation("")
+			actor, verify := PublicReadActors()
+			gateway := NewGateway(mgr, actor, verify, "consumer")
+			defer gateway.Close()
+			rows, err := gateway.List(context.Background(), "window", "remote")
+			if tc.wantCollision {
+				require.ErrorIs(t, err, ErrCollision)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, rows, tc.wantRows)
+			if tc.wantRows > 0 {
+				require.Equal(t, "producer", rows[0].Connection.ProviderIdentity)
+				_, err = gateway.Get(context.Background(), rows[0].Connection, identity.ResourceRef{URI: rows[0].Resource.URI}, nil)
+				require.NoError(t, err)
+				require.Positive(t, client.reads)
+			} else {
+				require.Zero(t, client.lists)
+			}
+			require.Zero(t, client.namespaceGets)
+			require.Zero(t, client.toolGets)
+		})
+	}
 }

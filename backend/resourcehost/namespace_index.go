@@ -47,7 +47,7 @@ func decodeNamespaceIndex[T any](raw json.RawMessage, required string) (T, error
 	return result, nil
 }
 
-func (g *Gateway) discoverNamespaceIndex(ctx context.Context, c mcpclient.Interface, first json.RawMessage, result capabilities, allowed map[string]bool, standardRead bool) (capabilities, error) {
+func (g *Gateway) discoverNamespaceIndex(ctx context.Context, c mcpclient.Interface, first json.RawMessage, result capabilities, allowed map[string]bool, standardRead bool, legacyOwner ...string) (capabilities, error) {
 	result.sharedIndex = true
 	result.standardResources = standardRead
 	result.indexedResources = map[string]primitive.ResourceState{}
@@ -61,12 +61,16 @@ func (g *Gateway) discoverNamespaceIndex(ctx context.Context, c mcpclient.Interf
 		raw := first
 		if page > 0 {
 			var err error
-			raw, err = toolRaw(ctx, c, namespaces.ListToolName, namespaces.ListRequest{Cursor: cursor})
+			var request any = namespaces.ListRequest{Cursor: cursor}
+			if len(legacyOwner) > 0 {
+				request = primitive.NamespaceListRequest{Cursor: *cursor, Limit: 100}
+			}
+			raw, err = toolRaw(ctx, c, namespaces.ListToolName, request)
 			if err != nil {
 				return result, err
 			}
 		}
-		listed, err := decodeNamespaceIndex[namespaces.ListResult](raw, "namespaces")
+		listed, err := decodeCollectionIndex(raw, legacyOwner)
 		if err != nil {
 			return result, err
 		}
@@ -77,7 +81,11 @@ func (g *Gateway) discoverNamespaceIndex(ctx context.Context, c mcpclient.Interf
 			seenNS[namespace.URI] = true
 			// Restrictions use exact collection locators in this contract, never display
 			// names or guessed correspondence with resource URI authorities.
-			if len(allowed) > 0 && !allowed[namespace.URI] {
+			restriction := namespace.URI
+			if len(legacyOwner) > 0 {
+				restriction = namespace.Name
+			}
+			if len(allowed) > 0 && !allowed[restriction] {
 				continue
 			}
 			collections = append(collections, namespace)
@@ -140,6 +148,9 @@ func (g *Gateway) discoverNamespaceIndex(ctx context.Context, c mcpclient.Interf
 		for _, kind := range sorted {
 			operations := []string{"list"}
 			methods := map[string]string{"list": namespaces.GetToolName}
+			if resourceFiltersSupported(ctx, c) {
+				methods["list"] = schema.MethodResourcesList
+			}
 			if standardRead {
 				operations = append(operations, "get")
 				methods["get"] = schema.MethodResourcesRead
@@ -216,4 +227,53 @@ func indexedDefinitionGet(ctx context.Context, c mcpclient.Interface, caps capab
 	// This is a host metadata locator, not an owning-server authorization receipt.
 	pin := &identity.ResolvedResource{URI: ref.URI, ProviderIdentity: caps.connection.ProviderIdentity, ResourceCandidate: identity.ResourceCandidate{Kind: identity.WorkingCandidate, ContentFingerprint: resource.ContentFingerprint}}
 	return primitive.GetResult{Resource: &resource, ResolvedResource: pin}, nil
+}
+
+// Legacy authoring indexes identify collections by their explicit namespace name.
+// Their provider receipt remains validated even when resources/list replaces get.
+func decodeCollectionIndex(raw json.RawMessage, legacyOwner []string) (namespaces.ListResult, error) {
+	if len(legacyOwner) == 0 {
+		return decodeNamespaceIndex[namespaces.ListResult](raw, "namespaces")
+	}
+	var listed struct {
+		ProviderIdentity string `json:"providerIdentity"`
+		Namespaces       []struct {
+			primitive.Namespace
+			URI string `json:"uri"`
+		} `json:"namespaces"`
+		NextCursor string `json:"nextCursor"`
+		Complete   bool   `json:"complete"`
+	}
+	var shape map[string]json.RawMessage
+	if json.Unmarshal(raw, &shape) != nil || shape["namespaces"] == nil || bytes.Equal(bytes.TrimSpace(shape["namespaces"]), []byte("null")) {
+		return namespaces.ListResult{}, identity.ErrResource
+	}
+	if err := json.Unmarshal(raw, &listed); err != nil {
+		return namespaces.ListResult{}, err
+	}
+	if listed.ProviderIdentity != "" && listed.ProviderIdentity != legacyOwner[0] {
+		return namespaces.ListResult{}, ErrCollision
+	}
+	if listed.Complete && listed.NextCursor != "" || !listed.Complete && listed.NextCursor == "" {
+		return namespaces.ListResult{}, identity.ErrResource
+	}
+	result := namespaces.ListResult{}
+	if listed.NextCursor != "" {
+		result.NextCursor = &listed.NextCursor
+	}
+	for _, ns := range listed.Namespaces {
+		uri := ns.URI
+		if uri == "" {
+			var err error
+			uri, err = namespaces.URI(ns.Name)
+			if err != nil {
+				return namespaces.ListResult{}, err
+			}
+		}
+		if _, err := namespaces.ParseURI(uri); err != nil {
+			return namespaces.ListResult{}, err
+		}
+		result.Namespaces = append(result.Namespaces, namespaces.Namespace{URI: uri, Name: ns.Name})
+	}
+	return result, nil
 }
