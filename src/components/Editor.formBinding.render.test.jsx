@@ -47,3 +47,23 @@ it('binds nested CSS and respects read-only state without changing revision meta
  expect(handlers.getFormData().definition.css).toBe('body { color: blue; }');
  expect(handlers.getFormData().etag).toBe(9);
 });
+
+it('edits structured definitions without losing invalid local text or writing malformed values',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ host=document.createElement('div');document.body.append(host);root=createRoot(host);
+ const signals={form:signal({definition:{css:'body {}'},validationError:'',etag:5}),formStatus:signal({dirty:false,version:0}),control:signal({}),selection:signal({selected:null,rowIndex:-1}),collection:signal([]),input:signal({}),collectionInfo:signal({})};
+ const identity={windowId:'editor-structured',dataSourceRef:'draft',dataSourceId:'editor-structured-draft'};
+ const handlers=useDataSourceHandlers(identity,signals,{draft:{id:'draft'}},{});const context={identity,signals,handlers:{dataSource:handlers}};
+ await act(async()=>root.render(<Editor context={context} container={{editor:{language:'json',valueFormat:'json',errorField:'validationError',selector:{source:'definition'}}}}/>));
+ const view=EditorView.findFromDOM(host.querySelector('.cm-editor'));
+ await act(async()=>view.dispatch({changes:{from:0,to:view.state.doc.length,insert:'{"css":'}}));
+ expect(handlers.getFormData().definition).toEqual({css:'body {}'});
+ expect(handlers.getFormData().validationError).toBe('Enter valid JSON.');
+ expect(view.state.doc.toString()).toBe('{"css":');
+ await act(async()=>handlers.setFormField({item:{dataField:'busy'},value:true}));
+ expect(view.state.doc.toString()).toBe('{"css":');
+ await act(async()=>view.dispatch({changes:{from:0,to:view.state.doc.length,insert:'{"css":"body {color:red}"}'}}));
+ expect(handlers.getFormData().definition).toEqual({css:'body {color:red}'});
+ expect(handlers.getFormData().validationError).toBe('');
+ expect(handlers.getFormData().etag).toBe(5);
+});

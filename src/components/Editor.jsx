@@ -1,7 +1,8 @@
+import {formatEditorValue, parseEditorValue} from './editorValue.js';
 import {resolveSelector} from '../utils/selector.js';
 import {evaluatePlainVisibleWhen} from './visibleWhen.js';
-import React, {useMemo, useState} from "react";
-import {Card, Elevation} from "@blueprintjs/core";
+import React, {useMemo, useRef, useState} from "react";
+import {Card, Elevation, Callout} from "@blueprintjs/core";
 import {oneDark} from "@codemirror/theme-one-dark";
 
 import CodeMirror from "@uiw/react-codemirror";
@@ -51,13 +52,20 @@ const BoundEditor = ({context, container}) => {
     const [location, setLocation] = useState("");
     const [language, setLanguage] = useState('');
     const [readOnly, setReadOnly] = useState(false);
+    const [parseError, setParseError] = useState('');
+    const previous = useRef({source: undefined, location: undefined});
 
 
     useSignalEffect(() => {
         const data = handlers.dataSource.getFormData();
         if (data) {
-            setSource(resolveSelector(data, selector.source || 'source') ?? '');
-            setLocation(resolveSelector(data, selector.location || 'location'));
+            const nextSource = formatEditorValue(resolveSelector(data, selector.source || 'source'), editor.valueFormat);
+            const nextLocation = resolveSelector(data, selector.location || 'location');
+            if (nextSource !== previous.current.source || nextLocation !== previous.current.location) {
+                setSource(nextSource);setParseError('');
+                previous.current = {source: nextSource, location: nextLocation};
+            }
+            setLocation(nextLocation);
             setReadOnly(editor.readOnly === true || (!!editor.readOnlyWhen && evaluatePlainVisibleWhen(editor.readOnlyWhen, context)));
             const extensionValue = editor.language || resolveSelector(data, selector.extension || 'extension')
             setLanguage(extensionValue || '');
@@ -67,7 +75,17 @@ const BoundEditor = ({context, container}) => {
 
     const handleChange = (value) => {
         if (readOnly) return;
-        handlers.dataSource.setFormField({item: {dataField: selector.source || 'source'}, value});
+        setSource(value);
+        try {
+            const parsed = parseEditorValue(value, editor.valueFormat);
+            previous.current.source = formatEditorValue(parsed, editor.valueFormat);
+            handlers.dataSource.setFormField({item: {dataField: selector.source || 'source'}, value: parsed});
+            setParseError('');
+            if (editor.errorField) handlers.dataSource.setFormField({item: {dataField: editor.errorField}, value: ''});
+        } catch (error) {
+            setParseError(error.message);
+            if (editor.errorField) handlers.dataSource.setFormField({item: {dataField: editor.errorField}, value: error.message});
+        }
     };
 
     const style = editor.style || {}
@@ -77,6 +95,7 @@ const BoundEditor = ({context, container}) => {
         <>
             <ControlledEditor value={source} language={language} readOnly={readOnly}
                 height={height} width={width} onChange={handleChange} ariaLabel={editor.title}/>
+            {parseError && <Callout intent="warning" role="alert">{parseError}</Callout>}
 
         </>
     );
