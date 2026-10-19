@@ -66,7 +66,7 @@ const BoundEditor = ({context, container}) => {
 
 
     const handleChange = (value) => {
-        handlers.dataSource.setFormField({item: selector.source || 'source', value});
+        handlers.dataSource.setFormField({item: {dataField: selector.source || 'source'}, value});
     };
 
     const style = editor.style || {}
