@@ -1,8 +1,16 @@
 import {toUTC, fromUTC, getZoneOffset, timeAt} from "../utils/datetime.js";
 import {format, parse, parseISO} from "date-fns";
+import {parseDocument} from "yaml";
 
 
 const utilities = {
+    yaml: {
+        parse(source) {
+            const document = parseDocument(source, {uniqueKeys: true});
+            if (document.errors.length) throw new Error(document.errors[0].message);
+            return document.toJS();
+        },
+    },
     date: {
         toUTC,
         fromUTC,
