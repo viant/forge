@@ -87,3 +87,9 @@ func TestFilteredNamespaceRejectsRepeatedCursor(t *testing.T) {
 	err := g.readFilteredNamespaceIndex(context.Background(), client, namespaces.Namespace{URI: "ns://opaque_collection", Name: "Display"}, map[string]primitive.ResourceState{})
 	require.ErrorIs(t, err, identity.ErrResource)
 }
+
+func TestFilterCapabilityRequiresActualMetadataTransport(t *testing.T) {
+	client := &filteredIndexClient{t: t}
+	wrapped := &gatewayAuthClient{Interface: struct{ mcpclient.Interface }{client}}
+	require.False(t, resourceFiltersSupported(context.Background(), wrapped), "older transports must keep the working legacy path")
+}
