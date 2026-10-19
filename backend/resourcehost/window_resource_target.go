@@ -22,6 +22,9 @@ func presentationWindowTarget(ctx context.Context) *types.WindowTarget {
 	if err != nil {
 		return nil
 	}
+	if target.Platform == "" && target.FormFactor == "" && target.Surface == "" && len(target.Capabilities) == 0 {
+		return nil
+	}
 	return &target
 }
 
