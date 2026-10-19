@@ -198,3 +198,20 @@ func (c *managedClient) Elicit(ctx context.Context, params *mcpschema.ElicitRequ
 	defer release()
 	return client.Elicit(ctx, params, options...)
 }
+
+// ListResourcesWithParams forwards per-request catalog filters without changing
+// the shared client's defaults or authentication scope.
+func (c *managedClient) ListResourcesWithParams(ctx context.Context, params *mcpschema.ListResourcesRequestParams, options ...mcpclient.RequestOption) (*mcpschema.ListResourcesResult, error) {
+	client, release, err := c.use()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	filtered, ok := client.(interface {
+		ListResourcesWithParams(context.Context, *mcpschema.ListResourcesRequestParams, ...mcpclient.RequestOption) (*mcpschema.ListResourcesResult, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("managed MCP client does not support resource list parameters")
+	}
+	return filtered.ListResourcesWithParams(ctx, params, options...)
+}

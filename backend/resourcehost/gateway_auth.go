@@ -43,3 +43,11 @@ func (c *gatewayAuthClient) ReadResource(ctx context.Context, params *schema.Rea
 func (c *gatewayAuthClient) CallTool(ctx context.Context, params *schema.CallToolRequestParams, options ...mcpclient.RequestOption) (*schema.CallToolResult, error) {
 	return c.Interface.CallTool(c.manager.WithAuthTokenContext(ctx, c.name), params, options...)
 }
+
+func (c *gatewayAuthClient) ListResourcesWithParams(ctx context.Context, params *schema.ListResourcesRequestParams, options ...mcpclient.RequestOption) (*schema.ListResourcesResult, error) {
+	filtered, ok := c.Interface.(filteredResourceClient)
+	if !ok {
+		return nil, ErrUnavailable
+	}
+	return filtered.ListResourcesWithParams(c.manager.WithAuthTokenContext(ctx, c.name), params, options...)
+}

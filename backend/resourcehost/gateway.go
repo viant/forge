@@ -477,6 +477,10 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 		}
 
 	}
+	filteredResources := resourceFiltersSupported(ctx, c)
+	if filteredResources {
+		sharedContract = true
+	}
 	if sharedContract {
 		for _, method := range []string{"namespaces/list", "namespaces/get", "resource/get"} {
 			if seenTools[method] {
@@ -484,7 +488,7 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 			}
 		}
 	}
-	if !installed["namespaces/list"] || !installed["namespaces/get"] {
+	if !installed["namespaces/list"] || !installed["namespaces/get"] && !filteredResources {
 		standardCapable := standardResourceReadSupported(ctx, c)
 		if standardCapable {
 			standard, supported, standardErr := g.discoverStandardResources(ctx, a, name, binding, options, c, generation, resourceVersion)
@@ -563,7 +567,7 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 				break
 			}
 		}
-		standardRead := !installed[namespaces.ResourceGetToolName] && standardResourceReadSupported(ctx, c)
+		standardRead := filteredResources || !installed[namespaces.ResourceGetToolName] && standardResourceReadSupported(ctx, c)
 		result, e = g.discoverNamespaceIndex(ctx, c, listedRaw, result, allowed, standardRead)
 		if e != nil {
 			return capabilities{}, e
