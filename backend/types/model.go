@@ -780,6 +780,8 @@ type TreeBrowser struct {
 }
 
 type Editor struct {
+	ValueFormat    string                 `json:"valueFormat,omitempty" yaml:"valueFormat,omitempty"`
+	ErrorField     string                 `json:"errorField,omitempty" yaml:"errorField,omitempty"`
 	Language       string                 `json:"language,omitempty" yaml:"language,omitempty"`
 	ReadOnly       bool                   `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
 	ReadOnlyWhen   map[string]interface{} `json:"readOnlyWhen,omitempty" yaml:"readOnlyWhen,omitempty"`
