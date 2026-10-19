@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	primitive "github.com/viant/forge/backend/provider/contract"
 	identity "github.com/viant/forge/backend/resource"
 )
 
@@ -105,4 +106,27 @@ func MaterializeWindowReferences(manifest WindowResourceVariant, definitions map
 		}
 	}
 	return &result, nil
+}
+
+// MaterializeWindowDatasource resolves one local binding without waiting for
+// any sibling definition. The returned descriptor is detached from its inputs.
+func MaterializeWindowDatasource(manifest WindowResourceVariant, id string, raw json.RawMessage) (json.RawMessage, error) {
+	ref, ok := manifest.DataSourceResources[id]
+	if !ok || manifest.Window == nil {
+		return nil, fmt.Errorf("unknown datasource: %s", id)
+	}
+	binding, ok := manifest.Window.DataSource[id]
+	if !ok {
+		return nil, fmt.Errorf("missing local binding: %s", id)
+	}
+	window := *manifest.Window
+	window.Resource, window.ResourceTarget, window.SelectionBinding = nil, nil, nil
+	window.DataSource = map[string]DataSource{id: binding}
+	window.ResourceDependencies = map[string]string{id: manifest.Window.ResourceDependencies[id]}
+	subset := WindowResourceVariant{Window: &window, DataSourceResources: map[string]primitive.DataSourceReference{id: ref}}
+	result, err := MaterializeWindowReferences(subset, map[string]json.RawMessage{id: raw})
+	if err != nil {
+		return nil, err
+	}
+	return result.DataSources[id], nil
 }

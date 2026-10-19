@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -33,9 +34,10 @@ type dependencyResource struct {
 type dependencyMCPProvider struct {
 	fixtureNotificationPort
 	mcpclient.Interface
-	owner    string
-	items    map[string]*dependencyResource
-	listName string
+	owner           string
+	items           map[string]*dependencyResource
+	listName        string
+	datasourceReads atomic.Int64
 }
 
 func (p *dependencyMCPProvider) ListResources(context.Context, *string, ...mcpclient.RequestOption) (*schema.ListResourcesResult, error) {
@@ -60,6 +62,9 @@ func (p *dependencyMCPProvider) ListTools(context.Context, *string, ...mcpclient
 func (p *dependencyMCPProvider) CallTool(_ context.Context, request *schema.CallToolRequestParams, _ ...mcpclient.RequestOption) (*schema.CallToolResult, error) {
 	if request == nil {
 		return dependencyToolError(identity.ErrResource), nil
+	}
+	if request.Name == "datasources/get" {
+		p.datasourceReads.Add(1)
 	}
 	var value any
 	switch request.Name {
