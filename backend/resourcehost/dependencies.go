@@ -72,26 +72,17 @@ func (g *Gateway) configuredOwnerConnection(ctx context.Context, owner string) (
 	if g == nil || g.Manager == nil || owner == "" || ctx == nil || ctx.Err() != nil {
 		return Connection{}, true, identity.ErrResourceDenied
 	}
-	names, err := g.Manager.Names(ctx)
+	names, err := g.Manager.CatalogProviderNames(ctx, owner)
 	if err != nil {
 		return Connection{}, true, err
 	}
-	selected := ""
-	for _, name := range names {
-		options, err := g.Manager.Options(ctx, name)
-		if err != nil {
-			return Connection{}, true, err
-		}
-		if options != nil && options.PrimitiveProviderIdentity == owner {
-			if selected != "" {
-				return Connection{}, true, fmt.Errorf("%w: owner %q configured by %q and %q", ErrCollision, owner, selected, name)
-			}
-			selected = name
-		}
+	if len(names) > 1 {
+		return Connection{}, true, fmt.Errorf("%w: owner %q configured by %q", ErrCollision, owner, names)
 	}
-	if selected == "" {
+	if len(names) == 0 {
 		return Connection{}, false, nil
 	}
+	selected := names[0]
 	return Connection{Name: selected, ProviderIdentity: owner, Generation: g.generation(selected)}, true, nil
 }
 

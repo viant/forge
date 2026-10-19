@@ -72,7 +72,7 @@ func (g *Gateway) readFilteredNamespaceIndex(ctx context.Context, client mcpclie
 				continue
 			}
 			if entry.Name == "" || resources[entry.Uri].URI != "" {
-				return fmt.Errorf("%w: duplicate or invalid indexed resource", ErrCollision)
+				return fmt.Errorf("%w: duplicate or invalid indexed resource %q in %q page %d", ErrCollision, entry.Uri, namespace.URI, page)
 			}
 			state := primitive.ResourceState{URI: entry.Uri, Kind: uri.Kind, Namespace: uri.Namespace, Name: uri.Name, Title: entry.Name}
 			if entry.Title != nil && *entry.Title != "" {

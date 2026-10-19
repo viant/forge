@@ -42,3 +42,27 @@ func supportsWindowTarget(ctx context.Context, client mcpclient.Interface) bool 
 	}
 	return json.Unmarshal(raw, &capability) == nil && capability.SchemaVersion == 1
 }
+
+func supportsIndependentWindowDefinitions(ctx context.Context, client mcpclient.Interface) bool {
+	initialized, err := client.Initialize(ctx)
+	if err != nil || initialized == nil {
+		return false
+	}
+	raw, err := json.Marshal(initialized.Capabilities.Extensions[types.WindowDeliveryExtension])
+	if err != nil {
+		return false
+	}
+	var capability struct {
+		SchemaVersion int      `json:"schemaVersion"`
+		Modes         []string `json:"modes"`
+	}
+	if json.Unmarshal(raw, &capability) != nil || capability.SchemaVersion != 1 {
+		return false
+	}
+	for _, mode := range capability.Modes {
+		if mode == "references" {
+			return true
+		}
+	}
+	return false
+}

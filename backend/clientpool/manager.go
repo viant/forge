@@ -364,6 +364,10 @@ func (m *Manager) CatalogNames(ctx context.Context) ([]string, error) {
 	if m == nil {
 		return nil, errors.New("mcp manager: provider not configured")
 	}
+	return m.memoInventory(ctx, "catalog-roots", func() ([]string, error) { return m.catalogNames(ctx) })
+}
+
+func (m *Manager) catalogNames(ctx context.Context) ([]string, error) {
 	if lister, ok := m.prov.(interface {
 		CatalogNames(context.Context) ([]string, error)
 	}); ok {
@@ -374,6 +378,55 @@ func (m *Manager) CatalogNames(ctx context.Context) ([]string, error) {
 		return m.mergeInventoryNames(ctx, names)
 	}
 	return m.Names(ctx)
+}
+
+// CatalogProviderNames reuses routing claims within the existing request
+// inventory snapshot. It does not perform authorization or create clients.
+func (m *Manager) CatalogProviderNames(ctx context.Context, owner string) ([]string, error) {
+	if m == nil {
+		return nil, errors.New("mcp manager: provider not configured")
+	}
+	return m.memoInventory(ctx, "catalog-owner:"+owner, func() ([]string, error) {
+		names, err := m.CatalogNames(ctx)
+		if err != nil {
+			return nil, err
+		}
+		var selected []string
+		for _, name := range names {
+			options, err := m.Options(ctx, name)
+			if err != nil {
+				return nil, err
+			}
+			if options != nil && options.PrimitiveProviderIdentity == owner {
+				selected = append(selected, name)
+			}
+		}
+		return selected, nil
+	})
+}
+
+func (m *Manager) memoInventory(ctx context.Context, kind string, read func() ([]string, error)) ([]string, error) {
+	memo := namesMemoFromContext(ctx)
+	if memo == nil {
+		return read()
+	}
+	scope, _, err := m.CatalogScopeForResources(ctx, "", nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	generation := ""
+	if provider, ok := m.prov.(interface{ DefinitionGeneration(context.Context) string }); ok {
+		generation = provider.DefinitionGeneration(ctx)
+	}
+	key := kind + "\x00" + generation
+	if names, ok := memo.get(m, scope, key); ok {
+		return names, nil
+	}
+	names, err := read()
+	if err == nil {
+		memo.put(m, scope, key, names)
+	}
+	return names, err
 }
 
 func (m *Manager) mergeInventoryNames(ctx context.Context, names []string) ([]string, error) {

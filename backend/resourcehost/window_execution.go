@@ -112,6 +112,9 @@ func (c *WindowCatalog) ResolveDatasource(ctx context.Context, parent identity.R
 	if e != nil {
 		return nil, e
 	}
+	if definition.Definition.IndependentDefinitions() {
+		return c.resolveIndependentDatasource(ctx, connection, definition, parent, target, id, variant)
+	}
 	reads, e := c.verifyDependencyReads(ctx, parent, target, variant, sequenceFromContext(ctx) != nil)
 	if e != nil {
 		return nil, e

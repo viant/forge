@@ -12,6 +12,7 @@ import (
 
 	primitive "github.com/viant/forge/backend/provider/contract"
 	identity "github.com/viant/forge/backend/resource"
+	"github.com/viant/forge/backend/types"
 	"github.com/viant/jsonrpc"
 	"github.com/viant/mcp-protocol/schema"
 	mcpclient "github.com/viant/mcp/client"
@@ -142,6 +143,9 @@ func standardDefinitionGet(ctx context.Context, client mcpclient.Interface, caps
 		metadata[primitive.RevisionMeta] = ref.Revision
 	}
 	if resource.Kind == "window" {
+		if supportsIndependentWindowDefinitions(ctx, client) {
+			metadata[types.WindowDeliveryExtension] = "references"
+		}
 		if target := presentationWindowTarget(ctx); target != nil && supportsWindowTarget(ctx, client) {
 			metadata[windowTargetExtension] = target
 		}
@@ -178,9 +182,11 @@ func standardDefinitionGet(ctx context.Context, client mcpclient.Interface, caps
 	pin := &identity.ResolvedResource{URI: ref.URI, ProviderIdentity: caps.connection.ProviderIdentity, ResourceCandidate: identity.ResourceCandidate{Kind: identity.WorkingCandidate, ContentFingerprint: resource.ContentFingerprint}}
 	if supplied, ok := read.Contents[0].Meta["resource"]; ok {
 		encoded, err := json.Marshal(supplied)
-		if err != nil || json.Unmarshal(encoded, pin) != nil || pin.URI != ref.URI || pin.ProviderIdentity != caps.connection.ProviderIdentity || !pin.ResourceCandidate.Valid() {
+		var returned identity.ResolvedResource
+		if err != nil || json.Unmarshal(encoded, &returned) != nil || returned.URI != ref.URI || returned.ProviderIdentity != caps.connection.ProviderIdentity || !returned.ResourceCandidate.Valid() {
 			return primitive.GetResult{}, identity.ErrResource
 		}
+		pin = &returned
 		resource.ContentFingerprint = pin.ContentFingerprint
 		resource.Revision = pin.Selector()
 		resource.Lifecycle = pin.Kind

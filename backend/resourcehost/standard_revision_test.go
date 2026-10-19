@@ -40,4 +40,7 @@ func TestStandardResourceRevisionUsesSharedMetadataAndReturnedPin(t *testing.T) 
 	require.ErrorIs(t, err, identity.ErrResourceStale)
 	_, err = standardDefinitionGet(context.Background(), c, caps, identity.ResourceRef{URI: uri})
 	require.NoError(t, err, "ordinary MCP resources need no custom metadata")
+	c.pin = &identity.ResolvedResource{}
+	_, err = standardDefinitionGet(context.Background(), c, caps, identity.ResourceRef{URI: uri})
+	require.ErrorIs(t, err, identity.ErrResource, "incomplete advertised metadata cannot inherit synthesized identity fields")
 }
