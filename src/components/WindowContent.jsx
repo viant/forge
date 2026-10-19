@@ -186,11 +186,9 @@ export async function applyWindowPermissionMetadata(completeMetadata, {
     conversationId = '',
     targetContext = null,
 } = {}) {
-    // Canonical windows require original OPEN admission even without a business
-    // authorization declaration. Managing MCP still owns datasource operations.
-    const canonicalWindow = typeof completeMetadata?.resource?.uri === 'string'
-        && completeMetadata.resource.uri.startsWith('window://');
-    if (!completeMetadata?.authorization && !canonicalWindow) return completeMetadata;
+    // A canonical resource URI is not an authorization declaration. The
+    // managing MCP already selected this metadata for the current user.
+    if (!completeMetadata?.authorization) return completeMetadata;
     if (typeof services?.applyPermission !== 'function') {
         throw Object.assign(new Error('Permission service is unavailable'), {status: 503});
     }
