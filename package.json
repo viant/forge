@@ -6,6 +6,9 @@
     "./core": "./src/core/index.js",
     "./hooks": "./src/hooks/index.js",
     "./components": "./src/components/index.js",
+    "./window": "./src/components/WindowContent.jsx",
+    "./packs/blueprint": "./src/packs/blueprint/index.jsx",
+    "./settings": "./src/core/context/Setting.jsx",
     "./report-designer": {
       "types": "./src/components/dashboard/ReportDesigner.d.ts",
       "default": "./src/components/dashboard/ReportDesigner.jsx"
