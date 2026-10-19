@@ -764,7 +764,7 @@ func (g *Gateway) discoverExcept(ctx context.Context, excludedLocal string) (out
 			return nil, ErrCollision
 		}
 		if prior := owners[c.connection.ProviderIdentity]; prior != "" && prior != name {
-			return nil, ErrCollision
+			return nil, fmt.Errorf("%w: owner %q advertised by %q and %q", ErrCollision, c.connection.ProviderIdentity, prior, name)
 		}
 		owners[c.connection.ProviderIdentity] = name
 		// Export detached contract maps; caller mutation must not alter the

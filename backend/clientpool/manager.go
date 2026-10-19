@@ -355,6 +355,28 @@ func (m *Manager) names(ctx context.Context) ([]string, error) {
 			return nil, err
 		}
 	}
+	return m.mergeInventoryNames(ctx, names)
+}
+
+// CatalogNames lists discovery roots. Published tool connections remain in
+// Names, but do not implicitly become new resource catalog roots.
+func (m *Manager) CatalogNames(ctx context.Context) ([]string, error) {
+	if m == nil {
+		return nil, errors.New("mcp manager: provider not configured")
+	}
+	if lister, ok := m.prov.(interface {
+		CatalogNames(context.Context) ([]string, error)
+	}); ok {
+		names, err := lister.CatalogNames(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return m.mergeInventoryNames(ctx, names)
+	}
+	return m.Names(ctx)
+}
+
+func (m *Manager) mergeInventoryNames(ctx context.Context, names []string) ([]string, error) {
 	seen := map[string]bool{}
 	for _, name := range names {
 		seen[name] = true
