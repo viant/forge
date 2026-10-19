@@ -219,6 +219,21 @@ func (r *MCPReferenceReader) List(ctx context.Context) ([]string, error) {
 	sort.Strings(names)
 	return names, nil
 }
+
+// CatalogNames preserves configured discovery roots without promoting every
+// datasource's published MCP backend into a second resource provider.
+func (r *MCPReferenceReader) CatalogNames(ctx context.Context) ([]string, error) {
+	rows, err := r.inventory(r.metadataContext(ctx), false)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(rows))
+	for _, row := range rows {
+		names = append(names, row.Resource.Name)
+	}
+	sort.Strings(names)
+	return names, nil
+}
 func (r *MCPReferenceReader) Load(ctx context.Context, name string) (*mcpcfg.MCPClient, error) {
 	ctx = r.metadataContext(ctx)
 	if r.reserved[name] {

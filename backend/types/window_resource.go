@@ -62,9 +62,6 @@ func (t WindowTarget) Normalize() (WindowTarget, error) {
 	if len(t.Capabilities) == 0 {
 		t.Capabilities = nil
 	}
-	if len(t.DependencyPins) > 128 {
-		return WindowTarget{}, fmt.Errorf("invalid dependency pins")
-	}
 	if len(t.DependencyPins) > 0 {
 		pins := make(map[string]identity.ResolvedResource, len(t.DependencyPins))
 		for id, pin := range t.DependencyPins {

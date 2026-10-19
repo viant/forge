@@ -24,7 +24,7 @@ func ListPageFrom[T any](ctx context.Context, g *Gateway, roots []Connection, ki
 func (g *Gateway) catalogConnectionNames(ctx context.Context) ([]string, error) {
 	roots, ok := ctx.Value(catalogRootsKey{}).([]Connection)
 	if !ok {
-		return g.Manager.Names(ctx)
+		return g.Manager.CatalogNames(ctx)
 	}
 	seen := map[string]bool{}
 	names := make([]string, 0, len(roots))

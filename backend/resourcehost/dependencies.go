@@ -5,6 +5,7 @@ package resource
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	primitive "github.com/viant/forge/backend/provider/contract"
 	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
@@ -83,7 +84,7 @@ func (g *Gateway) configuredOwnerConnection(ctx context.Context, owner string) (
 		}
 		if options != nil && options.PrimitiveProviderIdentity == owner {
 			if selected != "" {
-				return Connection{}, true, ErrCollision
+				return Connection{}, true, fmt.Errorf("%w: owner %q configured by %q and %q", ErrCollision, owner, selected, name)
 			}
 			selected = name
 		}
@@ -103,7 +104,7 @@ func (g *Gateway) ResolveDependencyPins(ctx context.Context, parent Connection, 
 }
 
 func (g *Gateway) resolveDependencyReads(ctx context.Context, parent Connection, parentPin identity.ResolvedResource, refs map[string]primitive.DataSourceReference, descriptors map[string]json.RawMessage, existing map[string]identity.ResolvedResource, collect bool) (map[string]identity.ResolvedResource, []selectedResourceRead, error) {
-	if len(refs) > 128 || existing != nil && len(existing) != len(refs) {
+	if existing != nil && len(existing) != len(refs) {
 		return nil, nil, identity.ErrResourceDenied
 	}
 	result := make(map[string]identity.ResolvedResource, len(refs))
@@ -127,7 +128,7 @@ func (g *Gateway) resolveDependencyReads(ctx context.Context, parent Connection,
 		}
 		child, e := Get[json.RawMessage](ctx, g, connection, ref.Resource, original)
 		if e != nil {
-			return nil, nil, e
+			return nil, nil, fmt.Errorf("dependency %q (%s): %w", id, ref.Resource.URI, e)
 		}
 		if child.ResolvedResource.ContentFingerprint != ref.ContentFingerprint || child.ResolvedResource.ProviderIdentity != ref.ProviderIdentity {
 			return nil, nil, identity.ErrResourceDenied
