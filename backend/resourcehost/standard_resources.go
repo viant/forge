@@ -139,7 +139,13 @@ func standardDefinitionGet(ctx context.Context, client mcpclient.Interface, caps
 	if !ok {
 		return primitive.GetResult{}, identity.ErrResourceDenied
 	}
-	read, err := client.ReadResource(ctx, &schema.ReadResourceRequestParams{Uri: ref.URI})
+	params := &schema.ReadResourceRequestParams{Uri: ref.URI}
+	if resource.Kind == "window" {
+		if target := presentationWindowTarget(ctx); target != nil && supportsWindowTarget(ctx, client) {
+			params.Meta.AdditionalProperties = map[string]any{windowTargetExtension: target}
+		}
+	}
+	read, err := client.ReadResource(ctx, params)
 	if err != nil {
 		return primitive.GetResult{}, err
 	}

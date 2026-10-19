@@ -995,9 +995,9 @@ func get[T any](ctx context.Context, g *Gateway, connection Connection, ref iden
 	}
 	if e == nil && !found {
 		if c.standardResources {
-			// A standard resource read has no provider revision receipt or cache lease.
-			// Keep the owning MCP authoritative on each selected read.
-			result, e = standardDefinitionGet(ctx, ext, c, ref)
+			// Preserve existing explicit cache scopes for standard reads too.
+			// Without a declaration, mutable/default definitions remain fresh.
+			result, cacheReference, e = g.cachedDefinitionGet(ctx, a, binding, c, uri, ref, func(ctx context.Context) (primitive.GetResult, error) { return standardDefinitionGet(ctx, ext, c, ref) })
 		} else {
 			result, cacheReference, e = g.cachedDefinitionGet(ctx, a, binding, c, uri, ref, func(ctx context.Context) (primitive.GetResult, error) {
 				if c.sharedIndex {

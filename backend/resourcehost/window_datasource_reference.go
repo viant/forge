@@ -8,11 +8,13 @@ import (
 	"reflect"
 
 	dsproto "github.com/viant/forge/backend/datasource/contract"
+	"github.com/viant/forge/backend/requestctx"
 	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
 )
 
 func (c *WindowCatalog) fetchReferencedDatasource(ctx context.Context, parent identity.ResolvedResource, target *types.WindowTarget, child identity.ResolvedResource, expected *dsproto.DataSource, inputs map[string]interface{}) (json.RawMessage, error) {
+	ctx = requestctx.WithWindowTarget(ctx, target)
 	deadline := identity.MinimumMetadataExpiry(parent.ValidUntil, child.ValidUntil)
 	ctx, cancel := identity.WithMetadataExpiry(ctx, deadline)
 	defer cancel()
