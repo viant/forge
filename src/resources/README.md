@@ -35,3 +35,12 @@ This adapter must not be installed on a first-load critical path until archive
 production meets its latency budget or preload has already completed. The initial
 live archive producer still performs too many per-resource reads; CPU indexing
 benchmarks do not establish end-to-end archive readiness.
+
+For binary archives, pass `archiveFormat: 'tar.gz'` to `createMCPResourceFS`.
+The same standard reads use `/datasources.tar.gz` and `/dialogs.tar.gz` and return
+MCP blob content with `application/gzip`. POSIX tar contains `manifest.json` and
+regular files at `resources/<contentFingerprint>.json`. Manifest entries carry
+`path` instead of `definitionText`; multiple resource identities may share one
+content-addressed path. The decoder never extracts files to disk. It rejects
+unsafe paths, links, duplicates, truncated blocks, checksum failures and orphan
+entries, then reuses the existing per-definition fingerprint check and cache.
