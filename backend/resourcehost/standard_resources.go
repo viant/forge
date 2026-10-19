@@ -132,18 +132,22 @@ func standardResourceReadSupported(ctx context.Context, client mcpclient.Interfa
 }
 
 func standardDefinitionGet(ctx context.Context, client mcpclient.Interface, caps capabilities, ref identity.ResourceRef) (primitive.GetResult, error) {
-	if ref.Revision != "" && ref.Revision != identity.WorkingCandidate {
-		return primitive.GetResult{}, identity.ErrResource
-	}
 	resource, ok := caps.indexedResources[ref.URI]
 	if !ok {
 		return primitive.GetResult{}, identity.ErrResourceDenied
 	}
 	params := &schema.ReadResourceRequestParams{Uri: ref.URI}
+	metadata := map[string]any{}
+	if ref.Revision != "" {
+		metadata[primitive.RevisionMeta] = ref.Revision
+	}
 	if resource.Kind == "window" {
 		if target := presentationWindowTarget(ctx); target != nil && supportsWindowTarget(ctx, client) {
-			params.Meta.AdditionalProperties = map[string]any{windowTargetExtension: target}
+			metadata[windowTargetExtension] = target
 		}
+	}
+	if len(metadata) > 0 {
+		params.Meta.AdditionalProperties = metadata
 	}
 	read, err := client.ReadResource(ctx, params)
 	if err != nil {
@@ -172,5 +176,17 @@ func standardDefinitionGet(ctx context.Context, client mcpclient.Interface, caps
 	resource.ContentFingerprint = identity.ContentFingerprint(raw)
 	resource.Lifecycle = identity.WorkingCandidate
 	pin := &identity.ResolvedResource{URI: ref.URI, ProviderIdentity: caps.connection.ProviderIdentity, ResourceCandidate: identity.ResourceCandidate{Kind: identity.WorkingCandidate, ContentFingerprint: resource.ContentFingerprint}}
+	if supplied, ok := read.Contents[0].Meta["resource"]; ok {
+		encoded, err := json.Marshal(supplied)
+		if err != nil || json.Unmarshal(encoded, pin) != nil || pin.URI != ref.URI || pin.ProviderIdentity != caps.connection.ProviderIdentity || !pin.ResourceCandidate.Valid() {
+			return primitive.GetResult{}, identity.ErrResource
+		}
+		resource.ContentFingerprint = pin.ContentFingerprint
+		resource.Revision = pin.Selector()
+		resource.Lifecycle = pin.Kind
+	}
+	if ref.Revision != "" && ref.Revision != pin.Selector() {
+		return primitive.GetResult{}, identity.ErrResourceStale
+	}
 	return primitive.GetResult{Resource: &resource, ResolvedResource: pin}, nil
 }
