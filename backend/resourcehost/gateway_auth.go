@@ -51,3 +51,11 @@ func (c *gatewayAuthClient) ListResourcesWithParams(ctx context.Context, params 
 	}
 	return filtered.ListResourcesWithParams(c.manager.WithAuthTokenContext(ctx, c.name), params, options...)
 }
+
+func (c *gatewayAuthClient) ResourceListParamsSupported(ctx context.Context) bool {
+	if capability, ok := c.Interface.(interface{ ResourceListParamsSupported(context.Context) bool }); ok {
+		return capability.ResourceListParamsSupported(ctx)
+	}
+	_, ok := c.Interface.(filteredResourceClient)
+	return ok
+}

@@ -22,6 +22,9 @@ type filteredResourceClient interface {
 // Namespace discovery supplies the opaque collection locator; display names
 // never become resource authorities or transport identities.
 func resourceFiltersSupported(ctx context.Context, client mcpclient.Interface) bool {
+	if capability, ok := client.(interface{ ResourceListParamsSupported(context.Context) bool }); ok && !capability.ResourceListParamsSupported(ctx) {
+		return false
+	}
 	if _, ok := client.(filteredResourceClient); !ok {
 		return false
 	}

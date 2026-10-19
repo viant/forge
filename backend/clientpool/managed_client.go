@@ -215,3 +215,18 @@ func (c *managedClient) ListResourcesWithParams(ctx context.Context, params *mcp
 	}
 	return filtered.ListResourcesWithParams(ctx, params, options...)
 }
+
+// ResourceListParamsSupported checks the actual pooled transport. An older
+// client remains usable through its legacy catalog instead of falsely claiming
+// it can forward per-request filter metadata.
+func (c *managedClient) ResourceListParamsSupported(ctx context.Context) bool {
+	client, release, err := c.use()
+	if err != nil {
+		return false
+	}
+	defer release()
+	_, ok := client.(interface {
+		ListResourcesWithParams(context.Context, *mcpschema.ListResourcesRequestParams, ...mcpclient.RequestOption) (*mcpschema.ListResourcesResult, error)
+	})
+	return ok
+}
