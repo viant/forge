@@ -65,6 +65,7 @@ func (m *Manager) InvalidateVisibleCatalogPartition(partition VisibleCatalogPart
 }
 
 type visibleCatalog struct {
+	lastUsed    time.Time
 	sources     map[string]bool
 	receiver    [32]byte
 	partition   VisibleCatalogPartition
@@ -197,6 +198,7 @@ func (m *Manager) VisibleCatalogInPartition(ctx context.Context, key string, par
 		}
 		now := time.Now()
 		if held := m.visibleCatalogs[key]; held != nil {
+			held.lastUsed = now
 			if held.ready != nil {
 				ready := held.ready
 				m.mu.Unlock()
@@ -224,7 +226,7 @@ func (m *Manager) VisibleCatalogInPartition(ctx context.Context, key string, par
 				delete(m.visibleCatalogs, k)
 			}
 		}
-		if len(m.visibleCatalogs) >= 128 {
+		if !m.makeVisibleCatalogRoomLocked() {
 			m.mu.Unlock()
 			lookup.End(observe.Error, observe.CacheBypass)
 			return nil, fmt.Errorf("visible catalog cache capacity exceeded")
@@ -232,7 +234,7 @@ func (m *Manager) VisibleCatalogInPartition(ctx context.Context, key string, par
 		if !until.After(now) {
 			until = time.Time{}
 		}
-		pending := &visibleCatalog{partition: partition, ready: make(chan struct{}), receiver: receiver}
+		pending := &visibleCatalog{lastUsed: now, partition: partition, ready: make(chan struct{}), receiver: receiver}
 		if partition.sources != nil {
 			pending.sources = *partition.sources
 		}

@@ -57,11 +57,11 @@ func (m *Manager) VisibleCatalogEntryInPartition(ctx context.Context, key string
 					delete(m.visibleCatalogs, name)
 				}
 			}
-			if len(m.visibleCatalogs) >= 128 {
+			if !m.makeVisibleCatalogRoomLocked() {
 				m.mu.Unlock()
 				return nil, fmt.Errorf("visible catalog cache capacity exceeded")
 			}
-			slot = &visibleCatalog{partition: partition, receiver: receiver}
+			slot = &visibleCatalog{lastUsed: now, partition: partition, receiver: receiver}
 			if partition.sources != nil {
 				slot.sources = *partition.sources
 			}
@@ -70,6 +70,7 @@ func (m *Manager) VisibleCatalogEntryInPartition(ctx context.Context, key string
 			m.mu.Unlock()
 			return nil, primitive.ErrCatalogCursor
 		}
+		slot.lastUsed = time.Now()
 		index := sort.Search(len(slot.entries), func(i int) bool { return slot.entries[i].key >= entryKey })
 		var entry *visibleCatalogEntry
 		if index < len(slot.entries) && slot.entries[index].key == entryKey {
