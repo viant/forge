@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"sort"
+	"time"
 
 	primitive "github.com/viant/forge/backend/provider/contract"
 )
@@ -34,6 +35,7 @@ func (m *Manager) VisibleCatalogRepresentation(ctx context.Context, key, entryKe
 			m.mu.Unlock()
 			return nil, primitive.ErrCatalogCursor
 		}
+		slot.lastUsed = time.Now()
 		index := sort.Search(len(slot.entries), func(i int) bool { return slot.entries[i].key >= entryKey })
 		if index >= len(slot.entries) || slot.entries[index].key != entryKey {
 			m.mu.Unlock()
