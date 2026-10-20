@@ -175,6 +175,7 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
                             <Container
                                 context={context}
                                 container={tab}
+                                sizingMode={sizingMode}
                                 isActive={selectedTabId === tab.id}
                                 suppressTitle={true}
                                 dataSourceFetchMode={childDataSourceFetchMode}
