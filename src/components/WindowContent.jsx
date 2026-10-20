@@ -352,6 +352,19 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
     addCommand(node.scheduleEditor?.mutation);
     addCommand(node.wizard?.submit);
     addCommand(node.draftForm?.submit);
+    if(node.predicateCompositionEditor) addRef(node.predicateCompositionEditor.dataSourceRef || node.dataSourceRef,true);
+    if(node.gateRequirementsEditor) {
+        addRef(node.gateRequirementsEditor.dataSourceRef || node.dataSourceRef,true);
+        for(const ref of Object.values(node.gateRequirementsEditor.operations||{}))addRef(ref,true);
+    }
+    if (node.readerWorkbench) {
+        addRef(node.readerWorkbench.dataSourceRef || node.dataSourceRef,true);
+        for (const binding of [...Object.values(node.readerWorkbench.operations || {}),...Object.values(node.readerWorkbench.lookups || {})]) addRef(binding.dataSourceRef,true);
+    }
+    if (node.resourcePolicyEditor) {
+        addRef(node.resourcePolicyEditor.dataSourceRef || node.dataSourceRef, true);
+        for (const ref of Object.values(node.resourcePolicyEditor.operations || {})) addRef(ref, true);
+    }
     if (node.resultPreview) addRef(node.resultPreview.dataSourceRef || node.dataSourceRef, true);
     if (node.workspaceSummary) {
         addRef(node.workspaceSummary.stateDataSourceRef, true);

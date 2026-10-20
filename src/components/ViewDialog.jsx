@@ -421,6 +421,11 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
         previousOpenRef.current = isDialogOpen;
     }, [dialogOpen, handlers, resolvedDataSourceRef, selectionModeOverride, context, dialog, events, quickFilterSpecs, fetchOnOpen, focusRequest, log]);
 
+    React.useEffect(()=>{
+        context.services?.hostWindow?.setDialogOpen?.(dialog.id,Boolean(dialogOpen));
+        return ()=>context.services?.hostWindow?.setDialogOpen?.(dialog.id,false);
+    },[context,dialog.id,dialogOpen]);
+
     const handleClose = () => {
         if (isDialogCloseDisabled(dialog, dsCtx)) return false;
         const close = () => { handlers.dialog.close(); return true; };

@@ -12,8 +12,10 @@ export default function WorkspaceSummary({container, context}) {
   const invoke = (action, item, ref) => scoped(ref).lookupHandler?.(action.handler)?.({context:scoped(ref), action, item});
   const actionButton = action => <Button key={action.id} icon={action.icon} intent={action.intent} onClick={() => invoke(action)}>{action.label}</Button>;
   const state = scoped(spec.stateDataSourceRef)?.signals?.form?.value || {};
-  return <section className="forge-workspace-summary" data-forge-primitive="workspaceSummary" aria-label={spec.title || container.title || undefined}>
-    {(spec.title || spec.description || spec.actions?.length > 0) && <header className="forge-workspace-summary__header"><div>{spec.title && <h1>{spec.title}</h1>}{spec.description && <p>{spec.description}</p>}</div><div className="forge-workspace-summary__actions">{(spec.actions || []).map(actionButton)}</div></header>}
+  const title=spec.titleField?resolveSelector(state,spec.titleField)||spec.title:spec.title;
+  const description=spec.descriptionField?resolveSelector(state,spec.descriptionField)||spec.description:spec.description;
+  return <section className="forge-workspace-summary" data-forge-primitive="workspaceSummary" aria-label={title || container.title || undefined}>
+    {(title || description || spec.actions?.length > 0) && <header className="forge-workspace-summary__header"><div>{title && <h1>{title}</h1>}{description && <p>{description}</p>}</div><div className="forge-workspace-summary__actions">{(spec.actions || []).map(actionButton)}</div></header>}
     {state[spec.errorField] && <Callout intent="warning" role="alert">{state[spec.errorField]}</Callout>}
     <div className="forge-workspace-summary__sections">{(spec.sections || []).map(section => {
       const rows = scoped(section.dataSourceRef)?.signals?.collection?.value || [];

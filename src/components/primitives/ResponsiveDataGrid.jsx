@@ -1,3 +1,4 @@
+import {tableCellPolicy} from '../table/basic/tableCellPolicy.js';
 import {containerSizingStyle} from '../containerSizing.js';
 import React from 'react';
 import {Button} from '@blueprintjs/core';
@@ -72,6 +73,7 @@ function readCardState(stateEvents, name, fallback) {
 }
 
 function ResponsiveCardField({row, rowIndex, column, colIndex, context, columnHandlers, onRowClick}) {
+  useSignals();
   const field = column.dataField || column.field || column.id;
   const cellSelection = {row, rowIndex, col: column, colIndex};
   const {events, stateEvents} = useCellEvents({
@@ -80,7 +82,8 @@ function ResponsiveCardField({row, rowIndex, column, colIndex, context, columnHa
     columnHandlers: columnHandlers?.[column.id] || {},
     onRowClick,
   });
-  if (readCardState(stateEvents, 'onVisible', true) === false) return null;
+  const policy=tableCellPolicy(column,row,context);
+  if (!policy.visible || readCardState(stateEvents, 'onVisible', true) === false) return null;
   let value = mapDisplayValue(resolveSelector(row, field), column.valueMap);
   const computed = readCardState(stateEvents, 'onValue', undefined);
   if (computed !== undefined) value = computed;
@@ -97,7 +100,7 @@ function ResponsiveCardField({row, rowIndex, column, colIndex, context, columnHa
       ...(column.cellProperties || {}),
       ...events,
     }, stateEvents);
-    if (readCardState(stateEvents, 'onReadonly', false)) properties.disabled = true;
+    if (policy.disabled || policy.readOnly || readCardState(stateEvents, 'onReadonly', false)) properties.disabled = true;
     return <div className="forge-responsive-grid__field forge-responsive-grid__field--action" key={field}><dt>{label}</dt><dd><Button
       {...isolateButtonCellProps(properties)}
       icon={resolveButtonIcon(column, value, properties.icon)}

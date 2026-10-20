@@ -31,7 +31,18 @@
     },
     "./parameter-editor": "./src/components/primitives/ParameterEditor.jsx",
     "./result-preview": "./src/components/primitives/ResultPreview.jsx",
-    "./result-preview/model": "./src/components/primitives/resultPreviewModel.js"
+    "./result-preview/model": "./src/components/primitives/resultPreviewModel.js",
+    "./resource-policy-editor": "./src/components/primitives/ResourcePolicyEditor.jsx",
+    "./resource-policy-editor/model": "./src/components/primitives/resourcePolicyReview.js",
+    "./resource-window": "./src/components/ResourceWindow.jsx",
+    "./reader-workbench": "./src/components/readerWorkbench/index.js",
+    "./reader-workbench/editor": "./src/components/readerWorkbench/LazyEditor.jsx",
+    "./editor": "./src/components/Editor.jsx",
+    "./resource-window/metadata": "./src/runtime/resourceWindowMetadata.js",
+    "./gate-requirements-editor": "./src/components/primitives/GateRequirementsEditor.jsx",
+    "./gate-requirements-editor/contract": "./src/components/primitives/gateContractAPI.js",
+    "./preview-workbench": "./src/components/primitives/PreviewWorkbench.jsx",
+    "./reader-workbench/models/*": "./src/components/readerWorkbench/*.js"
   },
   "scripts": {
     "test:widget-pairing": "node --no-warnings src/components/primitives/nativeWidgetContract.test.js",
