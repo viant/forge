@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: [
+      'src/components/ViewDialog.closeContract.render.test.jsx',
       'src/components/primitives/WorkspaceSummary.render.test.jsx',
       'src/components/primitives/DataStateBoundary.runtime.test.jsx',
       'src/components/ThemeBoundary.portal.test.jsx',
