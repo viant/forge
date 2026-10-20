@@ -42,3 +42,21 @@ func TestDialogCloseGuardRoundTrip(t *testing.T) {
 		t.Fatal(string(encoded))
 	}
 }
+
+func TestResultPreviewMetadataRoundTrip(t *testing.T) {
+	var container Container
+	if err := json.Unmarshal([]byte(`{"resultPreview":{"dataSourceRef":"query","dataField":"payload","label":"Query result"}}`), &container); err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(container)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var restored Container
+	if err = json.Unmarshal(encoded, &restored); err != nil {
+		t.Fatal(err)
+	}
+	if restored.ResultPreview == nil || restored.ResultPreview.DataField != "payload" {
+		t.Fatal(string(encoded))
+	}
+}

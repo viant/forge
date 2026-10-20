@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: [
+      'src/packs/blueprint/selectCloseFocus.render.test.jsx',
+      'src/components/primitives/ResultPreview.render.test.jsx',
       'src/components/ViewDialog.closeContract.render.test.jsx',
       'src/components/primitives/WorkspaceSummary.render.test.jsx',
       'src/components/primitives/DataStateBoundary.runtime.test.jsx',

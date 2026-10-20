@@ -57,3 +57,5 @@ export {default as FilterChips} from './content/FilterChips.jsx';
 export {default as ParameterEditor} from './primitives/ParameterEditor.jsx';
 
 export {default as WorkspaceSummary} from './primitives/WorkspaceSummary.jsx';
+
+export {default as ResultPreviewPanel, ResultPreview, NestedDataGrid} from './primitives/ResultPreview.jsx';
