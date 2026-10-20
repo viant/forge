@@ -3511,6 +3511,11 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const authoredReportBlocksConfigured = Array.isArray(state?.reportDocumentBlocks) && state.reportDocumentBlocks.length > 0;
     const authoredTabGroupConfigured = authoredReportBlocksConfigured
         && state.reportDocumentBlocks.some((block) => String(block?.kind || "").trim() === "tabGroupBlock");
+    const selectedVisualProfile = String(rootWindowFormValue?.reportDefinition?.fieldCatalog?.visualProfile || "").trim();
+    const authoredProfileHasTabs = !!selectedVisualProfile && (Array.isArray(displayConfig?.presentationProfiles)
+        ? displayConfig.presentationProfiles : []).some((catalog) => (Array.isArray(catalog?.views) ? catalog.views : [])
+        .some((view) => String(view?.visualProfile || "").trim() === selectedVisualProfile
+            && Array.isArray(view?.tabs) && view.tabs.length > 0));
     const runtimePreviewEnabled = useMemo(() => {
         if (typeof runtimePreviewConfig === "boolean") {
             return runtimePreviewConfig;
@@ -3685,7 +3690,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         // A complete authored tab graph uses the runtime dataset fetchers.
         // The generic builder collection would read the primary datasource
         // even when that dataset belongs only to an inactive section.
-        if (authoredTabGroupConfigured) return;
+        if (authoredTabGroupConfigured || authoredProfileHasTabs) return;
         if (!currentRequestFingerprint || matchesReportBuilderDatasourceDispatch({
             fingerprint: currentRequestDispatchFingerprint, previousFingerprint: requestFingerprintRef.current,
             paging: builderContext?.dataSource?.paging, page: state.page, previousPage: cursorDispatchedPageRef.current,
@@ -3710,7 +3715,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         requestFingerprintRef.current = currentRequestDispatchFingerprint;
         cursorDispatchedPageRef.current = state.page;
         dispatchReportBuilderDatasourceRequest(builderContext, currentRequest, currentRequestShouldFetch, state.page);
-    }, [authoredTabGroupConfigured, builderContext, currentPrefillSignature, currentRequest, currentRequestDispatchFingerprint, currentRequestFingerprint, currentRequestShouldFetch, hostedReportActivationCurrent, hostedReportStarterId, state]);
+    }, [authoredProfileHasTabs, authoredTabGroupConfigured, builderContext, currentPrefillSignature, currentRequest, currentRequestDispatchFingerprint, currentRequestFingerprint, currentRequestShouldFetch, hostedReportActivationCurrent, hostedReportStarterId, state]);
 
     useEffect(() => {
         if (!pendingScrollRowId) {
@@ -10186,11 +10191,6 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         () => reportRuntimeSectionDatasets(authoredRuntimePreviewModel?.document, authoredRuntimePreviewModel?.reportSpec, activeRuntimeSectionId),
         [activeRuntimeSectionId, authoredRuntimePreviewModel?.document, authoredRuntimePreviewModel?.reportSpec],
     );
-    const selectedVisualProfile = String(rootWindowFormValue?.reportDefinition?.fieldCatalog?.visualProfile || "").trim();
-    const authoredProfileHasTabs = !!selectedVisualProfile && (Array.isArray(displayConfig?.presentationProfiles)
-        ? displayConfig.presentationProfiles : []).some((catalog) => (Array.isArray(catalog?.views) ? catalog.views : [])
-        .some((view) => String(view?.visualProfile || "").trim() === selectedVisualProfile
-            && Array.isArray(view?.tabs) && view.tabs.length > 0));
     const awaitingAuthoredPresentation = authoredProfileHasTabs && !runtimePreviewSectionSelection;
     const runtimePreviewPrimaryRequired = !runtimePreviewSectionSelection
         || runtimePreviewSectionSelection.datasetIds.includes(String(runtimePreviewPrimaryDataset?.id || "primary"));
@@ -20717,7 +20717,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
 
     useEffect(() => {
         if (frozenRestore || restoreBlocked) return;
-        if (authoredTabGroupConfigured) return;
+        if (authoredTabGroupConfigured || authoredProfileHasTabs) return;
         if (embeddedMode || reportFiltersNeedApply || pendingReportWorkspaceRunRef.current) {
             return;
         }
@@ -20795,6 +20795,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         hostedExecuteOnOpen,
         loading,
         reportWorkspaceMode,
+        authoredProfileHasTabs,
         authoredTabGroupConfigured,
         showAuthoredReportSurface,
         state,
