@@ -195,6 +195,12 @@ function RuleEditor({ rule, onChange, choices, disabled, path = 'rule', depth = 
         <option value="">Choose from provider</option>
         {optionsWithCurrent.filter(item => optionValue(item) === value || `${item.label} ${item.id || ''} ${item.entity?.type || ''}`.toLowerCase().includes(query.toLowerCase())).map(item => <option key={optionValue(item)} value={optionValue(item)}>{item.label || item.id}{rule.kind === 'entity' ? ` (${item.entity.type}: ${item.entity.id})` : ''}</option>)}
       </HTMLSelect>
+      {(rule.kind === 'role' || rule.kind === 'exposure') && <InputGroup
+        aria-label={`Custom ${rule.kind === 'role' ? 'role' : 'feature exposure'}`}
+        placeholder={`Enter an exact ${rule.kind === 'role' ? 'role' : 'feature exposure'} name`}
+        value={value}
+        onChange={event => onChange({kind: rule.kind, value: event.target.value})}
+      />}
       {!options.length && <small>Provider choices are unavailable. Existing rules are preserved.</small>}
     </div>}
   </fieldset>;
