@@ -28,7 +28,8 @@
     "./window-editor": {
       "types": "./src/window-editor/WindowYamlEditor.d.ts",
       "default": "./src/window-editor/WindowYamlEditor.jsx"
-    }
+    },
+    "./parameter-editor": "./src/components/primitives/ParameterEditor.jsx"
   },
   "scripts": {
     "test:widget-pairing": "node --no-warnings src/components/primitives/nativeWidgetContract.test.js",
