@@ -10180,10 +10180,12 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         () => reportRuntimeSectionDatasets(authoredRuntimePreviewModel?.document, authoredRuntimePreviewModel?.reportSpec, activeRuntimeSectionId),
         [activeRuntimeSectionId, authoredRuntimePreviewModel?.document, authoredRuntimePreviewModel?.reportSpec],
     );
-    const awaitingAuthoredPresentation = (
-        Array.isArray(displayConfig?.presentationProfileRefs) && displayConfig.presentationProfileRefs.length > 0
-        || Array.isArray(displayConfig?.presentationProfiles) && displayConfig.presentationProfiles.length > 0
-    ) && !authoredReportBlocksConfigured;
+    const selectedVisualProfile = String(rootWindowFormValue?.reportDefinition?.fieldCatalog?.visualProfile || "").trim();
+    const authoredProfileHasTabs = !!selectedVisualProfile && (Array.isArray(displayConfig?.presentationProfiles)
+        ? displayConfig.presentationProfiles : []).some((catalog) => (Array.isArray(catalog?.views) ? catalog.views : [])
+        .some((view) => String(view?.visualProfile || "").trim() === selectedVisualProfile
+            && Array.isArray(view?.tabs) && view.tabs.length > 0));
+    const awaitingAuthoredPresentation = authoredProfileHasTabs && !runtimePreviewSectionSelection;
     const runtimePreviewPrimaryRequired = !runtimePreviewSectionSelection
         || runtimePreviewSectionSelection.datasetIds.includes(String(runtimePreviewPrimaryDataset?.id || "primary"));
     const runtimePreviewCanonicalRequest = useMemo(
