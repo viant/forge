@@ -1,4 +1,3 @@
-const ReaderWorkbenchPanel = React.lazy(() => import("./readerWorkbench/ReaderWorkbenchPanel.jsx"));
 import MissingDataSourceBoundary from './MissingDataSourceBoundary.jsx';
 import {hasContainerClass, containerSurfaceClass} from './containerClasses.js';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
@@ -74,6 +73,8 @@ import {resolveDynamicDataSourceRef} from '../runtime/dataSourceRef.js';
 import {isPureBoundLabelSection} from './containerEmptyState.js';
 import {containerAnchorProps} from './containerAnchor.js';
 import {containerSizingStyle, resolveContainerSizing} from './containerSizing.js';
+
+const ReaderWorkbenchPanel = React.lazy(() => import("./readerWorkbench/ReaderWorkbenchPanel.jsx"));
 
 const wrapContainerChrome = (container, content, suppressTitle = false, sectionPropertiesOverride = null, sizingMode = 'fill') => {
     if (!container?.section && !container?.card) {
