@@ -129,15 +129,17 @@ type MCPRequestBinding struct {
 
 // MCPCall describes one call in a fixed MCP composite or a fanout stage.
 type MCPCall struct {
-	ID             string                            `json:"id,omitempty" yaml:"id,omitempty"`
-	Service        string                            `json:"service,omitempty" yaml:"service,omitempty"`
-	Method         string                            `json:"method,omitempty" yaml:"method,omitempty"`
-	Args           map[string]string                 `json:"args,omitempty" yaml:"args,omitempty"`
-	Pinned         map[string]interface{}            `json:"pinned,omitempty" yaml:"pinned,omitempty"`
-	FieldMap       map[string]string                 `json:"fieldMap,omitempty" yaml:"fieldMap,omitempty"`
-	Constants      map[string]interface{}            `json:"constants,omitempty" yaml:"constants,omitempty"`
-	ValueMaps      map[string]map[string]interface{} `json:"valueMaps,omitempty" yaml:"valueMaps,omitempty"`
-	IgnoreNotFound bool                              `json:"ignoreNotFound,omitempty" yaml:"ignoreNotFound,omitempty"`
+	ID        string                            `json:"id,omitempty" yaml:"id,omitempty"`
+	Service   string                            `json:"service,omitempty" yaml:"service,omitempty"`
+	Method    string                            `json:"method,omitempty" yaml:"method,omitempty"`
+	Args      map[string]string                 `json:"args,omitempty" yaml:"args,omitempty"`
+	Pinned    map[string]interface{}            `json:"pinned,omitempty" yaml:"pinned,omitempty"`
+	FieldMap  map[string]string                 `json:"fieldMap,omitempty" yaml:"fieldMap,omitempty"`
+	Constants map[string]interface{}            `json:"constants,omitempty" yaml:"constants,omitempty"`
+	ValueMaps map[string]map[string]interface{} `json:"valueMaps,omitempty" yaml:"valueMaps,omitempty"`
+	// EmptyOnForbidden treats a typed upstream 403 as no rows for an explicitly opted-in legacy lookup.
+	EmptyOnForbidden bool `json:"emptyOnForbidden,omitempty" yaml:"emptyOnForbidden,omitempty"`
+	IgnoreNotFound   bool `json:"ignoreNotFound,omitempty" yaml:"ignoreNotFound,omitempty"`
 }
 
 type SortField struct {
