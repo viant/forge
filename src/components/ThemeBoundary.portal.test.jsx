@@ -22,3 +22,17 @@ it('inherits host portal ownership, permits explicit overrides and preserves cal
   expect(parent.childElementCount).toBe(0);expect(override.childElementCount).toBe(0);
  }finally {host.remove();parent.remove();override.remove();}
 });
+
+it('keeps provider namespace markers aligned between each window and its portal',async()=>{
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try {
+  const render=namespace=><ForgeThemeProvider><ForgeThemeBoundary windowKey="records" resource={{providerIdentity:'studio',uri:`window://${namespace}/records`}}><span>Records</span></ForgeThemeBoundary></ForgeThemeProvider>;
+  await act(async()=>root.render(render('first')));
+  expect(host.querySelector('[data-forge-resource-namespace="first"]')).not.toBeNull();
+  const portal=document.body.querySelector('[data-forge-theme-portal][data-forge-resource-provider="studio"]');
+  expect(portal.dataset.forgeResourceNamespace).toBe('first');
+  await act(async()=>root.render(render('second')));
+  expect(portal.dataset.forgeResourceNamespace).toBe('second');
+  expect(host.querySelector('[data-forge-resource-namespace="first"]')).toBeNull();
+ } finally {await act(async()=>root.unmount());host.remove();}
+});

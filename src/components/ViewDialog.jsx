@@ -2,6 +2,8 @@ import React, {useEffect, useRef, useMemo, useState} from 'react';
 import {Dialog, DialogBody, DialogFooter, Button, Classes, InputGroup} from '@blueprintjs/core';
 import LayoutRenderer from './LayoutRenderer';
 import DataSource from './DataSource.jsx';
+import DataSourceContainer from './WindowContentDataSourceContainer.jsx';
+import {dialogDataSourceRefs} from './dialogDataSourceRefs.js';
 import MessageBus from './MessageBus.jsx';
 import {useSignalEffect, useSignals} from '@preact/signals-react/runtime';
 import {dialogHandlers} from "../hooks/index.js";
@@ -431,10 +433,18 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
         previousOpenRef.current = isDialogOpen;
     }, [dialogOpen, handlers, resolvedDataSourceRef, selectionModeOverride, context, dialog, events, quickFilterSpecs, fetchOnOpen, focusRequest, log]);
 
+    React.useEffect(()=>{
+        context.services?.hostWindow?.setDialogOpen?.(dialog.id,Boolean(dialogOpen));
+        return ()=>context.services?.hostWindow?.setDialogOpen?.(dialog.id,false);
+    },[context,dialog.id,dialogOpen]);
+
     const handleClose = () => {
         if (isDialogCloseDisabled(dialog, dsCtx)) return false;
-        handlers.dialog.close();
-        return true;
+        const close = () => { handlers.dialog.close(); return true; };
+        if (!events.onClose.isDefined()) return close();
+        const result = events.onClose.execute({context: dsCtx, dialog});
+        if (result && typeof result.then === 'function') return result.then(value => value === false || value === null ? false : close());
+        return result === false || result === null ? false : close();
     };
 
     // An unresolved local definition omits this dialog without an end-user
@@ -556,6 +566,9 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                 {dsCtx ? (<>
                     <DataSource context={dsCtx} />
                     <MessageBus context={dsCtx} />
+                    {dialogDataSourceRefs(dialog, context?.metadata?.dataSource, resolvedDataSourceRef).map(ref => (
+                        <DataSourceContainer key={ref} windowContext={dsCtx} dsKey={ref} suppressAutomaticFetch />
+                    ))}
                 </>) : null}
                 {/* Inline quick-search input above the content for a friendlier UX */}
                 <DialogQuickSearch dsCtx={dsCtx} dialog={dialog} quickFilterSpecs={quickFilterSpecs} />

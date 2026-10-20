@@ -9,9 +9,19 @@ import (
 	"net/url"
 
 	dsproto "github.com/viant/forge/backend/datasource/contract"
+	primitive "github.com/viant/forge/backend/provider/contract"
 	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
 )
+
+func projectIndependentDatasourceTransport(window *types.Window, references map[string]primitive.DataSourceReference) {
+	for id := range references {
+		entry := window.DataSource[id]
+		entry.Service = &types.Service{Endpoint: "agentlyAPI", URI: "/v1/api/datasources/" + url.PathEscape(id) + "/fetch", Method: "POST"}
+		entry.Selectors = &types.Selectors{Data: "rows", DataInfo: "dataInfo", Metrics: "metrics"}
+		window.DataSource[id] = entry
+	}
+}
 
 // ErrUnsupportedWindowTransport rejects unregistered browser HTTP transports.
 var ErrUnsupportedWindowTransport = errors.New("window datasource HTTP transport requires a host-registered native source")

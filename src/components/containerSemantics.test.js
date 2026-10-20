@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import {isDashboardRootContainer, isSemanticDashboardBlock, shouldSkipGenericNonVisualEarlyReturn} from './containerSemantics.js';
+import {isDashboardRootContainer, isSemanticDashboardBlock, shouldSkipGenericNonVisualEarlyReturn, isDataSourceBindingContainer} from './containerSemantics.js';
 
 assert.equal(isSemanticDashboardBlock({kind: 'dashboard.report'}), true);
 assert.equal(isSemanticDashboardBlock({kind: 'dashboard.timeline'}), true);
@@ -23,5 +23,9 @@ assert.equal(
 assert.equal(shouldSkipGenericNonVisualEarlyReturn({kind: 'dashboard.report'}), true);
 assert.equal(shouldSkipGenericNonVisualEarlyReturn({kind: 'dashboard.summary'}), true);
 assert.equal(shouldSkipGenericNonVisualEarlyReturn({kind: 'container'}), false);
+assert.equal(isDataSourceBindingContainer({id:'bindings',containers:[{id:'lookup',dataSourceRef:'lookup',fetchData:false}]}),true);
+assert.equal(isDataSourceBindingContainer({id:'table',dataSourceRef:'rows',table:{columns:[]}}),false);
+assert.equal(isDataSourceBindingContainer({id:'placeholder'}),false);
+assert.equal(isDataSourceBindingContainer({id:'host',kind:'host.widget',dataSourceRef:'state'}),false);
 
 console.log('containerSemantics ✓');

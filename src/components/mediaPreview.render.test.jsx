@@ -8,4 +8,9 @@ await act(async()=>view.root.findByType('img').props.onError());assert.ok(view.r
 await act(async()=>view.update(<MediaPreview value={{kind:'image',url:'https://example.invalid/new.png'}}/>));assert.equal(view.root.findByType('img').props.src,'https://example.invalid/new.png');
 await act(async()=>view.update(<MediaPreview value={{kind:'image',url:'javascript:alert(1)'}}/>));assert.equal(view.root.findAllByType('img').length,0);assert.equal(view.root.findAllByType('a').length,0);
 await act(async()=>view.update(<MediaPreview value={{kind:'audio',url:'http://127.0.0.1/audio.mp3'}}/>));assert.equal(view.root.findByType('audio').props.controls,true);
+const pixel='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aH1sAAAAASUVORK5CYII=';
+await act(async()=>view.update(<MediaPreview value={{kind:'image',image:{mimeType:'image/png',payload:pixel},alt:'Embedded synthetic pixel'}}/>));
+assert.equal(view.root.findByType('img').props.src,`data:image/png;base64,${pixel}`);assert.equal(view.root.findByType('img').props.alt,'Embedded synthetic pixel');
+await act(async()=>view.root.findByType('img').props.onError());assert.equal(view.root.findAllByType('a').length,0);
+await act(async()=>view.update(<MediaPreview value={{kind:'image',image:{mimeType:'image/svg+xml',payload:pixel}}}/>));assert.equal(view.root.findAllByType('img').length,0);
 await act(async()=>view.unmount());console.log('MediaPreview renders original HTTP media, keeps failed-load fallback/recovery, and rejects executable URLs.');

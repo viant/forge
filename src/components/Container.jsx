@@ -12,6 +12,14 @@ import AssignmentPicker from "./primitives/AssignmentPicker.jsx";
 import DerivedDataSource from "./primitives/DerivedDataSource.jsx";
 import MutationCommand from "./primitives/MutationCommand.jsx";
 import StatusWorkflow from "./primitives/StatusWorkflow.jsx";
+import PreviewWorkbenchPanel from "./primitives/PreviewWorkbench.jsx";
+import PredicateCompositionPanel from "./primitives/PredicateCompositionEditor.jsx";
+import GateRequirementsEditorPanel from "./primitives/GateRequirementsEditor.jsx";
+import ResourcePolicyEditorPanel from "./primitives/ResourcePolicyEditor.jsx";
+import HostContent from "./primitives/HostContent.jsx";
+import ResultPreviewPanel from "./primitives/ResultPreview.jsx";
+import WorkspaceSummary from "./primitives/WorkspaceSummary.jsx";
+import ParameterEditor from "./primitives/ParameterEditor.jsx";
 import RuleEditor from "./primitives/RuleEditor.jsx";
 import TreeEditor from "./primitives/TreeEditor.jsx";
 import Wizard from "./primitives/Wizard.jsx";
@@ -51,7 +59,7 @@ import {createDashboardContext, getDashboardVisibleWhen, seedDashboardDefaultFil
 import { findDashboardFilterSignal, findDashboardSelectionSignal, getDashboardSelectionSignal } from "../core/store/signals.js";
 import {getViewSignal} from '../core/index.js';
 import {useViewPartition} from './useViewPartition.js';
-import {isDashboardRootContainer, isSemanticDashboardBlock, shouldSkipGenericNonVisualEarlyReturn} from "./containerSemantics.js";
+import {isDashboardRootContainer, isSemanticDashboardBlock, shouldSkipGenericNonVisualEarlyReturn, isDataSourceBindingContainer} from "./containerSemantics.js";
 import {isContainerVisible, resolveChildContext, trackContainerVisibility} from "./visibleWhen.js";
 import {
     mergeSectionOpenState,
@@ -65,6 +73,8 @@ import {resolveDynamicDataSourceRef} from '../runtime/dataSourceRef.js';
 import {isPureBoundLabelSection} from './containerEmptyState.js';
 import {containerAnchorProps} from './containerAnchor.js';
 import {containerSizingStyle, resolveContainerSizing} from './containerSizing.js';
+
+const ReaderWorkbenchPanel = React.lazy(() => import("./readerWorkbench/ReaderWorkbenchPanel.jsx"));
 
 const wrapContainerChrome = (container, content, suppressTitle = false, sectionPropertiesOverride = null, sizingMode = 'fill') => {
     if (!container?.section && !container?.card) {
@@ -248,6 +258,15 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
     const statusWorkflowPanel = container.statusWorkflow
         ? <StatusWorkflow container={container} context={effectiveContext}/>
         : null;
+    const readerWorkbenchPanel = container.readerWorkbench ? <React.Suspense fallback={<div role="status">Loading component editor…</div>}><ReaderWorkbenchPanel container={container} context={effectiveContext}/></React.Suspense> : null;
+    const previewWorkbenchPanel = container.previewWorkbench ? <PreviewWorkbenchPanel container={container}/> : null;
+    const predicateCompositionPanel = container.predicateCompositionEditor ? <PredicateCompositionPanel container={container} context={effectiveContext}/> : null;
+    const gateRequirementsEditorPanel = container.gateRequirementsEditor ? <GateRequirementsEditorPanel container={container} context={effectiveContext}/> : null;
+    const resourcePolicyEditorPanel = container.resourcePolicyEditor ? <ResourcePolicyEditorPanel container={container} context={effectiveContext}/> : null;
+    const hostContentPanel = container.hostContent ? <HostContent container={container} context={effectiveContext}/> : null;
+    const resultPreviewPanel = container.resultPreview ? <ResultPreviewPanel container={container} context={effectiveContext}/> : null;
+    const workspaceSummaryPanel = container.workspaceSummary ? <WorkspaceSummary container={container} context={effectiveContext}/> : null;
+    const parameterEditorPanel = container.parameterEditor ? <ParameterEditor container={container} context={effectiveContext}/> : null;
     const ruleEditorPanel = container.ruleEditor ? <RuleEditor container={container} context={effectiveContext}/> : null;
     const treeEditorPanel = container.treeEditor
         ? <TreeEditor container={container} context={effectiveContext}/>
@@ -464,7 +483,7 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
         !!InstalledContainerRenderer || container?.kind === 'mcpApp' ||
         (visualItems?.length || 0) > 0 ||
         !!container.toolbar ||
-        tablePanel || assignmentPanel || derivedDataSourcePanel || mutationCommandPanel || statusWorkflowPanel || ruleEditorPanel || treeEditorPanel || wizardPanel || uploadCollectionPanel || historyDiffPanel || scheduleEditorPanel || container.draftForm || queryToolbarPanel || resourceHeaderPanel || relationDrillPanel || notificationRulesPanel || metricSummaryPanel || detailViewPanel || masterDetailPanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || treeBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
+        previewWorkbenchPanel || predicateCompositionPanel || gateRequirementsEditorPanel || readerWorkbenchPanel || resourcePolicyEditorPanel || hostContentPanel || resultPreviewPanel || workspaceSummaryPanel || tablePanel || assignmentPanel || derivedDataSourcePanel || mutationCommandPanel || statusWorkflowPanel || parameterEditorPanel || ruleEditorPanel || treeEditorPanel || wizardPanel || uploadCollectionPanel || historyDiffPanel || scheduleEditorPanel || container.draftForm || queryToolbarPanel || resourceHeaderPanel || relationDrillPanel || notificationRulesPanel || metricSummaryPanel || detailViewPanel || masterDetailPanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || treeBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
     if (!hasVisual && !shouldSkipGenericNonVisualEarlyReturn(container)) {
         return (
             <>
@@ -591,6 +610,9 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
         }
 
         const isHorizontal = orientation === 'horizontal';
+        containers.forEach(child => trackContainerVisibility(child, effectiveContext));
+        const visualChildren = containers.filter(child => !isDataSourceBindingContainer(child) && isContainerVisible(child, effectiveContext));
+        const lastVisual = visualChildren.at(-1);
         return (
             <div
                 style={{
@@ -603,11 +625,14 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
                 }}
             >
                 {containers.map((subContainer, index) => {
-                    const isLast = index === containers.length - 1;
+                    const isLast = subContainer === lastVisual;
+                    const visible = visualChildren.includes(subContainer);
+                    const authoredWidth = isHorizontal ? subContainer.style?.width : null;
+                    const fixedWidth = authoredWidth != null && !['auto', '100%'].includes(String(authoredWidth));
                     const childStyle = {
-                        display: 'flex',
+                        display: visible ? 'flex' : 'none',
                         flexDirection: 'column',
-                        flex: resolveContainerSizing(subContainer, sizingMode === 'fill' && (isHorizontal || isLast) ? 'fill' : 'content') === 'fill' ? '1 1 0' : '0 0 auto',
+                        flex: fixedWidth ? `0 0 ${typeof authoredWidth === 'number' ? authoredWidth+'px' : authoredWidth}` : resolveContainerSizing(subContainer, sizingMode === 'fill' && (isHorizontal || isLast) ? 'fill' : 'content') === 'fill' ? '1 1 0' : '0 0 auto',
                         minHeight: 0,
                         minWidth: 0,
                         overflow: 'visible',
@@ -803,6 +828,15 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
                 {assignmentPanel}
                 {mutationCommandPanel}
                 {statusWorkflowPanel}
+                {previewWorkbenchPanel}
+                {predicateCompositionPanel}
+                {gateRequirementsEditorPanel}
+                {readerWorkbenchPanel}
+                {resourcePolicyEditorPanel}
+                {hostContentPanel}
+                {resultPreviewPanel}
+                {workspaceSummaryPanel}
+                {parameterEditorPanel}
                 {ruleEditorPanel}
                 {treeEditorPanel}
                 {wizardPanel}

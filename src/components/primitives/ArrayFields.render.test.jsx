@@ -7,10 +7,10 @@ import ArrayFields from './ArrayFields.jsx';
 it('edits and removes only eligible rows while preserving unbound row fields',async()=>{
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;
  const host=document.createElement('div');document.body.append(host);const root=createRoot(host),change=vi.fn();
- const rows=[{id:1,name:'Locked',status:4,metadata:{keep:true}},{id:2,name:'Scheduled',status:3,metadata:{keep:true}}];
+ const rows=[{id:1,name:'Locked',status:'locked',metadata:{keep:true}},{id:2,name:'Editable',status:'open',metadata:{keep:true}}];
  try{
   await act(async()=>root.render(<ArrayFields value={rows} fields={[{field:'name',label:'Name'}]} onChange={change} minRows={1}
-   rowReadOnlyWhen={{source:'row',field:'status',in:[4]}} removeWhen={{source:'row',field:'status',equals:3}} newRow={{name:''}}/>));
+   rowReadOnlyWhen={{source:'row',field:'status',in:['locked']}} removeWhen={{source:'row',field:'status',equals:'open'}} newRow={{name:''}}/>));
   expect(host.querySelector('[aria-label="Name 1"]').readOnly).toBe(true);
   expect(host.querySelector('[aria-label="Remove row 1"]')).toBeNull();
   await act(async()=>host.querySelector('[aria-label="Remove row 2"]').click());

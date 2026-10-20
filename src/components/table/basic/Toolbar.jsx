@@ -14,7 +14,7 @@ import { useToolbarControlEvents } from '../../../hooks/event.js';
 import { DateRangePresetInput } from '../../../packs/blueprint/index.jsx';
 import {dispatchToolbarSelectChange, toolbarSelectLabel} from './toolbarSelect.js';
 import {resolveSelector, setSelector} from '../../../utils/selector.js';
-import {evaluatePlainVisibleWhen} from '../../visibleWhen.js';
+import {evaluatePlainVisibleWhen,trackVisibleWhen} from '../../visibleWhen.js';
 import {toolbarBooleanField, toolbarBooleanValue, updateToolbarBoolean} from './toolbarBoolean.js';
 import {downloadTableExport, tableExportColumns, tableExportFormats, tableExportRows} from './tableExport.js';
 import DisabledActionShell from '../../DisabledActionShell.jsx';
@@ -265,6 +265,8 @@ const Toolbar = ({
 
     const renderToolbarItem = (item, align) => {
         item = workspaceToolbarItem(item, workspace);
+        const guardContext=item.dataSourceRef?context.Context(item.dataSourceRef):context;
+        [item.visibleWhen,item.hiddenWhen,item.disabledWhen,item.readOnlyWhen].forEach(guard=>trackVisibleWhen(guard,guardContext));
         const {events = {}, stateEvents} = toolbarEvents[item.id] || {};
         const isVisible = stateEvents?.onVisible ? stateEvents.onVisible() : true;
         if (!toolbarItemShouldRender(item, context, isVisible)) return null;

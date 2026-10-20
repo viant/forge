@@ -48,6 +48,10 @@ assignmentPicker:
   assign: {dataSourceRef: assignment_patch}
   unassign: {dataSourceRef: assignment_patch}
 statusWorkflow:
+  appearance: switch
+  label: User Status
+  activeState: active
+  stateLabels: {active: Active, inactive: Inactive}
   stateField: status
   transitions:
     - {id: activate, from: [inactive], to: active, label: Activate, command: {dataSourceRef: status_patch}}
@@ -162,6 +166,9 @@ scheduleEditor:
 	}
 	if container.AssignmentPicker == nil || container.StatusWorkflow == nil || container.TreeEditor == nil || container.Wizard == nil {
 		t.Fatal("assignment/status/tree/wizard primitives were truncated")
+	}
+	if workflow := container.StatusWorkflow; workflow.Appearance != "switch" || workflow.ActiveState != "active" || workflow.Label != "User Status" || workflow.StateLabels["inactive"] != "Inactive" {
+		t.Fatalf("status switch presentation was truncated: %#v", workflow)
 	}
 	if container.TreeEditor.SelectedField != "targeting.include" || container.TreeEditor.ExcludedField != "targeting.exclude" {
 		t.Fatal("tree hydration selectors missing")

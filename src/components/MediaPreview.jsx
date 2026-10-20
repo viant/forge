@@ -15,7 +15,7 @@ export default function MediaPreview({value, style, className = ''}) {
     if (failed || preview.kind === 'unsupported') {
         return <div className={frameClass} style={style} role="status">
             <span>{failed ? 'Preview failed to load.' : preview.message}</span>
-            {preview.url ? <a href={preview.url} target="_blank" rel="noopener noreferrer" className="forge-media-preview__source">Open source</a> : null}
+            {preview.url && !preview.embedded ? <a href={preview.url} target="_blank" rel="noopener noreferrer" className="forge-media-preview__source">Open source</a> : null}
         </div>;
     }
     if (preview.kind === 'audio') {

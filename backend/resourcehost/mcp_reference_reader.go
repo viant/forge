@@ -179,20 +179,16 @@ func (r *MCPReferenceReader) inventory(ctx context.Context, external bool) ([]Lo
 			rows = append(rows, additional...)
 		}
 	}
-	aliases := map[string]string{}
 	uris := map[string]string{}
 	for _, row := range rows {
-		if r.reserved[row.Resource.Name] {
+		if row.Connection.Name == r.internal.ConnectionName && r.reserved[row.Resource.Name] {
 			return nil, fmt.Errorf("%w: MCP alias collides with a reserved local connection", ErrCollision)
 		}
 		origin := row.Connection.Name + "\x00" + row.Connection.ProviderIdentity + "\x00" + row.Resource.URI
-		if previous := aliases[row.Resource.Name]; previous != "" && previous != origin {
-			return nil, fmt.Errorf("%w: ambiguous MCP alias", ErrCollision)
-		}
 		if previous := uris[row.Resource.URI]; previous != "" && previous != origin {
 			return nil, fmt.Errorf("%w: ambiguous MCP URI", ErrCollision)
 		}
-		aliases[row.Resource.Name], uris[row.Resource.URI] = origin, origin
+		uris[row.Resource.URI] = origin
 	}
 	return rows, nil
 }
@@ -209,6 +205,25 @@ func (r *MCPReferenceReader) metadataContext(ctx context.Context) context.Contex
 func (r *MCPReferenceReader) List(ctx context.Context) ([]string, error) {
 	ctx = r.metadataContext(ctx)
 	rows, err := r.inventory(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(rows))
+	for _, row := range rows {
+		name := row.Resource.Name
+		if row.Connection.Name != r.internal.ConnectionName {
+			name = row.Resource.URI
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names, nil
+}
+
+// CatalogNames preserves configured discovery roots without promoting every
+// datasource's published MCP backend into a second resource provider.
+func (r *MCPReferenceReader) CatalogNames(ctx context.Context) ([]string, error) {
+	rows, err := r.inventory(r.metadataContext(ctx), false)
 	if err != nil {
 		return nil, err
 	}
@@ -274,6 +289,10 @@ func (r *MCPReferenceReader) Load(ctx context.Context, name string) (*mcpcfg.MCP
 	if err != nil {
 		return nil, err
 	}
-	result.Definition.ResolvedIdentity = &mcpcfg.ResolvedServiceIdentity{ServiceName: selected.Resource.Name, ResourceURI: selected.Resource.URI, ProviderIdentity: selected.Connection.ProviderIdentity}
+	serviceName := selected.Resource.Name
+	if selected.Connection.Name != r.internal.ConnectionName {
+		serviceName = selected.Resource.URI
+	}
+	result.Definition.ResolvedIdentity = &mcpcfg.ResolvedServiceIdentity{ServiceName: serviceName, ResourceURI: selected.Resource.URI, ProviderIdentity: selected.Connection.ProviderIdentity}
 	return r.effectiveOptions(ctx, selected.Connection, selected.Resource.Namespace, result.Definition)
 }

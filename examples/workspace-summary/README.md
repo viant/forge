@@ -1,0 +1,5 @@
+# Workspace summary and catalog tables
+
+`container.workspaceSummary` presents metadata-owned collections as full-width actionable lists. Declare a title, description, labelled actions (`id`, `label`, `icon`, `intent`, `handler`) and sections. Each section declares `dataSourceRef`, `labelField`, `detailFields`, optional `statusField` and `statuses` (intent/icon), `dateField`, `handler`, `emptyText`, and `fullWidth`. Row handlers receive the clicked record as `item`; no selection prerequisite is needed. Optional `stateDataSourceRef` and `errorField` show an alert only when populated. Datasources and handlers remain host-owned.
+
+For ordinary tables, set `table.presentation: catalog` and `fullWidth: true`. This preserves the existing table datasource, sorting, paging, cell badges, and button column handlers, with readable automatic column widths and catalog spacing. Pagination appears only when another page may exist. Use `Column.badge` for statuses and `type: button` columns for accessible row actions. Other table presentations are unchanged.

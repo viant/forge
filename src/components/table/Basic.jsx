@@ -143,6 +143,7 @@ export function reconcileConfiguredColumns(savedColumns = [], sourceColumns = []
 
 const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, columns, pagination, children, renderRows }) => {
     useSignals();
+    const catalogPresentation = container.table?.presentation === 'catalog';
     trackVisibleWhen(container?.table?.queryDisabledWhen, context);
     const queryDisabled = !!container?.table?.queryDisabledWhen && evaluatePlainVisibleWhen(container.table.queryDisabledWhen, context);
     const {services = {}, connectorConfig = {}} = useSetting();
@@ -619,10 +620,10 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
 
     return (
         <div
-            className={`basic-table-wrapper${container.table?.fullWidth !== true && !container.table?.width ? ' is-content-width' : ''}${rowSlots.rowHeight ? ' has-fixed-row-slots' : ''}${String(effectiveDensity || '').toLowerCase() === 'compact' ? " is-compact-density" : ""}${loadingMode === 'refresh' ? " is-refreshing" : ""}${showEmptyState ? " has-metadata-empty-state" : ""}${horizontalOverflow.left ? " has-table-overflow-left" : ""}${horizontalOverflow.right ? " has-table-overflow-right" : ""}`}
+            className={`basic-table-wrapper${catalogPresentation ? ' is-catalog-presentation' : ''}${!catalogPresentation && container.table?.fullWidth !== true && !container.table?.width ? ' is-content-width' : ''}${rowSlots.rowHeight ? ' has-fixed-row-slots' : ''}${String(effectiveDensity || '').toLowerCase() === 'compact' ? " is-compact-density" : ""}${loadingMode === 'refresh' ? " is-refreshing" : ""}${showEmptyState ? " has-metadata-empty-state" : ""}${horizontalOverflow.left ? " has-table-overflow-left" : ""}${horizontalOverflow.right ? " has-table-overflow-right" : ""}`}
             style={{
                 flex: sizingMode === 'fill' && !rowSlots.rowHeight ? '0 1 auto' : '0 0 auto',
-                width: tableDisplayWidth,
+                width: catalogPresentation ? '100%' : tableDisplayWidth,
                 boxSizing: "border-box",
                 '--forge-table-available-height': availableHeight ? `${availableHeight}px` : undefined,
                 '--forge-table-row-height': rowSlots.rowHeight ? `${rowSlots.rowHeight}px` : undefined,
@@ -638,7 +639,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                         queryDisabled={queryDisabled}
                         toolbarItems={primaryToolbarItems}
                         leftContent={toolbarActions}
-                        centerContent={<PaginationBar context={toolbarContext} disabled={queryDisabled} pagingEnabled={!!pagingEnabled && pagingSize > 0} pageSize={pagingSize} pageSizeOptions={pagination?.pageSizeOptions}/>}
+                        centerContent={(!catalogPresentation || (pagingEnabled && (collection.length >= pagingSize || Number(context?.signals?.input?.value?.page || 1) > 1 || Number(context?.signals?.input?.value?.offset || 0) > 0))) && <PaginationBar context={toolbarContext} disabled={queryDisabled} pagingEnabled={!!pagingEnabled && pagingSize > 0} pageSize={pagingSize} pageSizeOptions={pagination?.pageSizeOptions}/>}
                         className="has-table-navigation"
                         exportRows={sortedCollection}
                         exportPageRows={renderedCollection}
@@ -661,7 +662,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
                         columnHandlers: columnsHandlers,
                         onRowClick: events.onRowSelect.execute,
                     }) : (
-                    <HTMLTable style={{width: resolvedTableWidth, minWidth: resolvedTableWidth, tableLayout: "fixed"}}>
+                    <HTMLTable style={{width: catalogPresentation ? '100%' : resolvedTableWidth, minWidth: catalogPresentation ? '100%' : resolvedTableWidth, tableLayout: catalogPresentation ? 'auto' : 'fixed'}}>
                     {trailingSpace ? <colgroup>{trailingSpace.widths.map((width,index)=><col key={columnsToUse[index].id || index} style={{width}}/>)}{fillerWidth>0 ? <col style={{width:fillerWidth}}/> : null}</colgroup> : null}
                     {/* Table Header */}
                     <TableHeader

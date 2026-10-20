@@ -545,8 +545,8 @@ export default function DataSource({context}) {
 
             // 3) Perform GET
             const aggregate = requestPaging?.aggregate === true;
-            if (aggregate && (!pagingEnabled || cursorMode || requestPaging?.mode === 'offset')) {
-                throw new Error('Aggregated paging requires bounded page-number requests.');
+            if (aggregate && (!pagingEnabled || cursorMode)) {
+                throw new Error('Aggregated paging requires bounded page or offset requests.');
             }
             const fetchPage = requestedPage => connector.get({
                 filter: finalFilter,

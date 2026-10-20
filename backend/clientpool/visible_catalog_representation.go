@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"sort"
 
 	primitive "github.com/viant/forge/backend/provider/contract"
@@ -63,6 +64,7 @@ func (m *Manager) VisibleCatalogRepresentation(ctx context.Context, key, entryKe
 		raw := bytes.Clone(entry.value)
 		m.mu.Unlock()
 		value, err := parse(raw)
+		rejected := err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded)
 		if err == nil {
 			err = ctx.Err()
 		}
@@ -70,9 +72,25 @@ func (m *Manager) VisibleCatalogRepresentation(ctx context.Context, key, entryKe
 		if m.visibleCatalogs[key] != slot && err == nil {
 			err = primitive.ErrCatalogCursor
 		}
+		if entry.invalidated && err == nil {
+			err = primitive.ErrCatalogCursor
+		}
 		if err == nil {
 			pending.value = value
 		} else {
+			if rejected && m.visibleCatalogs[key] == slot {
+				// Do not retain raw bytes rejected by their trusted schema. Remove
+				// just this payload and its revision aliases; other entries survive.
+				kept := slot.entries[:0]
+				for _, candidate := range slot.entries {
+					if candidate.representations[codec] == pending {
+						candidate.invalidated = true
+						continue
+					}
+					kept = append(kept, candidate)
+				}
+				slot.entries = kept
+			}
 			delete(entry.representations, codec)
 		}
 		close(pending.ready)

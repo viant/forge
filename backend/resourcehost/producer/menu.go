@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/viant/forge/backend/provider/contract/observe"
 	"reflect"
+	"strings"
 
 	primitive "github.com/viant/forge/backend/provider/contract"
 	identity "github.com/viant/forge/backend/resource"
@@ -23,6 +24,8 @@ type MenuActionVisibility func(context.Context, identity.VerifiedActor, identity
 
 // ValidateMenu validates the portable navigation envelope. Node fields remain
 // lossless JSON so host title/icon/parameters/action contracts survive delivery.
+// A leaf without an action must explicitly set disabled to true. Such a label
+// does not grant access to a destination; authored actions always need visibility.
 func ValidateMenu(version int64, raw json.RawMessage) error {
 	if len(raw) > 4<<20 {
 		return fmt.Errorf("menu definition exceeds size limit")
@@ -35,8 +38,16 @@ func ValidateMenu(version int64, raw json.RawMessage) error {
 		return identity.ErrResource
 	}
 	for key := range envelope {
-		if key != "schemaVersion" && key != "applications" {
+		if key != "schemaVersion" && key != "applications" && key != "name" && key != "icon" {
 			return identity.ErrResource
+		}
+	}
+	for _, field := range []string{"name", "icon"} {
+		if raw, exists := envelope[field]; exists {
+			var value string
+			if json.Unmarshal(raw, &value) != nil || strings.TrimSpace(value) == "" || len(value) > 256 || strings.ContainsAny(value, "\x00\r\n") {
+				return identity.ErrResource
+			}
 		}
 	}
 	var schemaVersion int
@@ -103,7 +114,13 @@ func filterMenuNodes(ctx context.Context, nodes []json.RawMessage, visible func(
 				return nil, err
 			}
 		} else if _, hasAction := node["action"]; !hasAction {
-			return nil, identity.ErrResource
+			// A disabled label can describe an unavailable destination without
+			// inventing an executable action. Actions, when present, still pass
+			// the visibility check above even if presentation is disabled.
+			var disabled bool
+			if json.Unmarshal(node["disabled"], &disabled) != nil || !disabled {
+				return nil, identity.ErrResource
+			}
 		}
 		encoded, err := json.Marshal(node)
 		if err != nil {
@@ -200,7 +217,7 @@ func menuProjectionSubset(original, visible json.RawMessage) bool {
 	if json.Unmarshal(original, &source) != nil || json.Unmarshal(visible, &target) != nil {
 		return false
 	}
-	if !reflect.DeepEqual(source["schemaVersion"], target["schemaVersion"]) {
+	if !reflect.DeepEqual(source["schemaVersion"], target["schemaVersion"]) || !reflect.DeepEqual(source["name"], target["name"]) || !reflect.DeepEqual(source["icon"], target["icon"]) {
 		return false
 	}
 	var subset func(json.RawMessage, json.RawMessage) bool

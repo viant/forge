@@ -324,3 +324,18 @@ const copiedTrail=buildWorkspaceNavigationTrail({windowId:'completed'},{navigati
 copiedTrail[0].parameters.RecordId[0]=9;
 assert.equal(explicitTrail[0].parameters.RecordId[0],7,'explicit navigation must be detached from caller state');
 console.log('explicit window navigation trail can replace automatic history without sharing mutable state ✓');
+
+setWindowContext('published-list', {
+  metadata: {resource: {uri: 'window://example/list'}},
+  Context() {return this;},
+});
+const publishedHandlers = useWindowHandlers('published-list');
+publishedHandlers.openWindow({execution: {args: ['detail', 'Detail']}, parameters: {RecordId: [7]}});
+const publishedDetail = activeWindows.peek().find(entry => entry.windowKey === 'window://example/detail');
+assert.ok(publishedDetail, 'a published window resolves relative destinations in its own namespace');
+assert.deepEqual(publishedDetail.parameters, {RecordId: [7]});
+publishedHandlers.openWindow({execution: {args: ['window://other/detail', 'Other']}});
+assert.ok(activeWindows.peek().some(entry => entry.windowKey === 'window://other/detail'));
+removeWindow(publishedDetail.windowId);
+clearWindowContext('published-list');
+console.log('openWindow ✓ resolves published relative links without altering parameters or explicit destinations');

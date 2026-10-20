@@ -1,5 +1,8 @@
-import React, {useMemo, useState} from "react";
-import {Card, Elevation} from "@blueprintjs/core";
+import {formatEditorValue, parseEditorValue} from './editorValue.js';
+import {resolveSelector} from '../utils/selector.js';
+import {evaluatePlainVisibleWhen} from './visibleWhen.js';
+import React, {useMemo, useRef, useState} from "react";
+import {Card, Elevation, Callout} from "@blueprintjs/core";
 import {oneDark} from "@codemirror/theme-one-dark";
 
 import CodeMirror from "@uiw/react-codemirror";
@@ -47,55 +50,72 @@ const BoundEditor = ({context, container}) => {
 
     const [source, setSource] = useState("");
     const [location, setLocation] = useState("");
-    const [extensions, setExtensions] = useState([]);
+    const [language, setLanguage] = useState('');
+    const [readOnly, setReadOnly] = useState(false);
+    const [parseError, setParseError] = useState('');
+    const previous = useRef({source: undefined, location: undefined});
 
 
     useSignalEffect(() => {
         const data = handlers.dataSource.getFormData();
         if (data) {
-            setSource(data[selector.source||'source']);
-            setLocation(data[selector.location||'location']);
-            const extensionValue = data[selector.extension||'extension']
-            let values = []
-            if(languages[extensionValue]) {
-                values = [languages[extensionValue], baseSyntax, accessibleSyntax]
+            const nextSource = formatEditorValue(resolveSelector(data, selector.source || 'source'), editor.valueFormat);
+            const nextLocation = resolveSelector(data, selector.location || 'location');
+            if (nextSource !== previous.current.source || nextLocation !== previous.current.location) {
+                setSource(nextSource);setParseError('');
+                previous.current = {source: nextSource, location: nextLocation};
             }
-            setExtensions(values);
+            setLocation(nextLocation);
+            setReadOnly(editor.readOnly === true || (!!editor.readOnlyWhen && evaluatePlainVisibleWhen(editor.readOnlyWhen, context)));
+            const extensionValue = editor.language || resolveSelector(data, selector.extension || 'extension')
+            setLanguage(extensionValue || '');
         }
     });
 
 
     const handleChange = (value) => {
-        handlers.dataSource.setFormField({item: selector.source || 'source', value});
+        if (readOnly) return;
+        setSource(value);
+        try {
+            const parsed = parseEditorValue(value, editor.valueFormat);
+            previous.current.source = formatEditorValue(parsed, editor.valueFormat);
+            handlers.dataSource.setFormField({item: {dataField: selector.source || 'source'}, value: parsed});
+            setParseError('');
+            for (const execute of editor.on || []) {
+                if (execute.event === 'onChange' && execute.handler) context.lookupHandler?.(execute.handler)?.({context, value:parsed, execution:execute});
+            }
+            if (editor.errorField) handlers.dataSource.setFormField({item: {dataField: editor.errorField}, value: ''});
+        } catch (error) {
+            setParseError(error.message);
+            if (editor.errorField) handlers.dataSource.setFormField({item: {dataField: editor.errorField}, value: error.message});
+        }
     };
 
     const style = editor.style || {}
     const {width= '100%', height = '70vh'} = style
 
-    return (
+    const content = (
         <>
-            <CodeMirror
-                value={source}
-                height={height}
-                width={width}
-                extensions={extensions}
-                onChange={handleChange}
-            />
+            <ControlledEditor value={source} language={language} readOnly={readOnly}
+                height={height} width={width} onChange={handleChange} ariaLabel={editor.title}/>
+            {parseError && <Callout intent="warning" role="alert">{parseError}</Callout>}
+
         </>
     );
+    return height === '100%' ? <div className="forge-editor-fill" style={{display:'flex',flexDirection:'column',flex:'1 1 0',minHeight:0,width}}>{content}</div> : content;
 };
 
-function ControlledEditor({value, onChange, language, height, readOnly = false, ariaLabel}) {
+function ControlledEditor({value, onChange, language, height, width, readOnly = false, ariaLabel}) {
     // Keep the language/facet identities stable while unrelated form state
     // changes. Reconfiguring a multi-megabyte YAML document on every render
     // repeatedly restarts parsing and can stall the editor's browser tab.
     const extensions = useMemo(() => [
-        ...(languages[language || 'sql'] ? [languages[language || 'sql']] : []),
+        ...(languages[language ?? 'sql'] ? [languages[language ?? 'sql']] : []),
         baseSyntax,
         accessibleSyntax,
         ...(ariaLabel ? [EditorView.contentAttributes.of({'aria-label': ariaLabel})] : []),
     ], [language, ariaLabel]);
-    return <CodeMirror value={value || ''} height={height || '280px'} extensions={extensions} onChange={onChange} readOnly={readOnly} />;
+    return <CodeMirror value={value || ''} height={height || '280px'} width={width} style={height==='100%'?{height:'100%',minHeight:0,width:'100%'}:undefined} extensions={extensions} onChange={onChange} readOnly={readOnly} />;
 }
 
 const Editor = props => props.value !== undefined

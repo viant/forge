@@ -1,0 +1,8 @@
+.forge-parameter-editor { min-width: 0; width: 100%; color: var(--forge-text-primary, #202b33); }
+.forge-parameter-editor__body { border: 0; margin: 0; padding: 0; min-width: 0; }
+.forge-parameter-editor__content > h3 { padding: 0; margin-bottom: 12px; font-size: 1rem; font-weight: 600; }
+.forge-parameter-editor__fields { min-width: 0; }
+.forge-parameter-editor__section { border-top: 1px solid var(--forge-border-color, #dce2e8); padding-top: 12px; margin-top: 12px; }
+.forge-parameter-editor__section > summary { cursor: pointer; padding: 4px 0 10px; font-weight: 600; }
+.forge-parameter-editor__section > summary:focus-visible { outline: 2px solid var(--forge-focus-color, #2b6cb0); outline-offset: 3px; }
+.forge-parameter-editor__body:disabled { opacity: .75; }

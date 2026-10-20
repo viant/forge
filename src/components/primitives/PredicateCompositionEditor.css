@@ -1,0 +1,10 @@
+.forge-predicate-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 11px; border-bottom: 1px solid #e4e7ec; background: #f8fafc; }
+.forge-predicate-group-heading > div { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.forge-predicate-group-heading span { color: #667085; font-size: 11px; }
+.forge-predicate-composition { border: 1px solid #cfe0f5; border-radius: 7px; background: #f8fbff; overflow: hidden; }
+.forge-predicate-composition-terms { display: grid; }
+.forge-predicate-composition-terms > div { display: grid; grid-template-columns: auto minmax(145px,.55fr) minmax(190px,.75fr) minmax(120px,1fr); align-items: center; gap: 8px; padding: 8px 11px; border-bottom: 1px solid #e4edf7; }
+.forge-predicate-composition-terms > div > span { color: #667085; font-size: 10px; font-weight: 700; }
+.forge-predicate-composition-terms code { overflow: hidden; color: #344054; text-overflow: ellipsis; white-space: nowrap; }
+.forge-predicate-composition-footer { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 9px 11px; }
+.forge-predicate-composition-footer .bp6-form-group, .forge-predicate-composition-footer .bp5-form-group { margin: 0; }

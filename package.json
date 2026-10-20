@@ -6,6 +6,11 @@
     "./core": "./src/core/index.js",
     "./hooks": "./src/hooks/index.js",
     "./components": "./src/components/index.js",
+    "./window": "./src/components/WindowContent.jsx",
+    "./packs/blueprint": "./src/packs/blueprint/index.jsx",
+    "./settings": "./src/core/context/Setting.jsx",
+    "./resources": "./src/resources/ResourceFS.js",
+    "./resources/scopedStyles": "./src/resources/scopedStyles.js",
     "./report-designer": {
       "types": "./src/components/dashboard/ReportDesigner.d.ts",
       "default": "./src/components/dashboard/ReportDesigner.jsx"
@@ -23,7 +28,21 @@
     "./window-editor": {
       "types": "./src/window-editor/WindowYamlEditor.d.ts",
       "default": "./src/window-editor/WindowYamlEditor.jsx"
-    }
+    },
+    "./parameter-editor": "./src/components/primitives/ParameterEditor.jsx",
+    "./result-preview": "./src/components/primitives/ResultPreview.jsx",
+    "./result-preview/model": "./src/components/primitives/resultPreviewModel.js",
+    "./resource-policy-editor": "./src/components/primitives/ResourcePolicyEditor.jsx",
+    "./resource-policy-editor/model": "./src/components/primitives/resourcePolicyReview.js",
+    "./resource-window": "./src/components/ResourceWindow.jsx",
+    "./reader-workbench": "./src/components/readerWorkbench/index.js",
+    "./reader-workbench/editor": "./src/components/readerWorkbench/LazyEditor.jsx",
+    "./editor": "./src/components/Editor.jsx",
+    "./resource-window/metadata": "./src/runtime/resourceWindowMetadata.js",
+    "./gate-requirements-editor": "./src/components/primitives/GateRequirementsEditor.jsx",
+    "./gate-requirements-editor/contract": "./src/components/primitives/gateContractAPI.js",
+    "./preview-workbench": "./src/components/primitives/PreviewWorkbench.jsx",
+    "./reader-workbench/models/*": "./src/components/readerWorkbench/*.js"
   },
   "scripts": {
     "test:widget-pairing": "node --no-warnings src/components/primitives/nativeWidgetContract.test.js",
@@ -100,6 +119,7 @@
     "@tanstack/react-virtual": "^3.13.10",
     "@uiw/react-codemirror": "^4.23.8",
     "@vitejs/plugin-react": "^4.3.4",
+    "css-tree": "3.2.1",
     "d3-dsv": "^3.0.1",
     "fast-deep-equal": "^3.1.3",
     "immutability-helper": "^3.1.1",

@@ -8,6 +8,7 @@ import (
 	dsproto "github.com/viant/forge/backend/datasource/contract"
 	primitive "github.com/viant/forge/backend/provider/contract"
 	"github.com/viant/forge/backend/provider/contract/observe"
+	"github.com/viant/forge/backend/requestctx"
 	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
 )
@@ -18,6 +19,28 @@ func (g *Gateway) ConnectionForProvider(ctx context.Context, owner string) (Conn
 func (g *Gateway) ConnectionForResource(ctx context.Context, uri identity.ResourceURI, owner string) (result Connection, resultErr error) {
 	span := observe.Start(ctx, "gateway.routing", observe.Labels{Kind: uri.Kind})
 	defer func() { span.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
+	if connection, found, err := g.configuredOwnerConnection(ctx, owner); owner != "" && (found || err != nil) {
+		if err != nil {
+			return Connection{}, err
+		}
+		actor, err := g.actor(ctx)
+		if err != nil {
+			return Connection{}, err
+		}
+		binding, err := g.resolveReadBinding(ctx, actor, connection.Name)
+		if err != nil {
+			return Connection{}, err
+		}
+		if _, known := g.knownResourceCapabilities(ctx, actor, binding, connection, uri); known {
+			if err := g.checkReadBinding(ctx, actor, binding); err != nil {
+				return Connection{}, err
+			}
+			if err := g.final(ctx, actor); err != nil {
+				return Connection{}, err
+			}
+			return connection, nil
+		}
+	}
 	if connection, found, err := g.declaredOwnerConnection(ctx, owner); found || err != nil {
 		if err != nil {
 			return Connection{}, err
@@ -94,11 +117,16 @@ func (c *WindowCatalog) verifyDependencyReads(ctx context.Context, parent identi
 }
 
 func (c *WindowCatalog) ResolveDatasource(ctx context.Context, parent identity.ResolvedResource, target *types.WindowTarget, id string) (out *dsproto.DataSource, err error) {
+	ctx = requestctx.WithWindowTarget(ctx, target)
 	defer func() { poisonReadSequence(ctx, err) }()
 	if !c.AuthzReady() {
 		return nil, identity.ErrResourceDenied
 	}
-	connection, e := c.Gateway.ConnectionForProvider(ctx, parent.ProviderIdentity)
+	uri, e := identity.ParseResourceURI(parent.URI)
+	if e != nil {
+		return nil, e
+	}
+	connection, e := c.Gateway.ConnectionForResource(ctx, uri, parent.ProviderIdentity)
 	if e != nil {
 		return nil, e
 	}
@@ -109,6 +137,9 @@ func (c *WindowCatalog) ResolveDatasource(ctx context.Context, parent identity.R
 	variant, e := definition.Definition.Select(target)
 	if e != nil {
 		return nil, e
+	}
+	if definition.Definition.IndependentDefinitions() {
+		return c.resolveIndependentDatasource(ctx, connection, definition, parent, target, id, variant)
 	}
 	reads, e := c.verifyDependencyReads(ctx, parent, target, variant, sequenceFromContext(ctx) != nil)
 	if e != nil {
