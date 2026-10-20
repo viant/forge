@@ -129,11 +129,12 @@ export default function GateRequirementsEditorPanel({container,context}) {
  useSignals();const spec=container.gateRequirementsEditor||{},ref=spec.dataSourceRef||container.dataSourceRef;
  const scoped=ref?context.Context(ref):context,form=scoped.signals.form.value||{};
  const resource=resolveSelector(form,spec.resourceField||'resource'),action=resolveSelector(form,spec.actionField||'action');
+ const latestContext=React.useRef(context);latestContext.current=context;
  const api=React.useMemo(()=>gateContractAPI(async(operation,input)=>{
   const sourceRef=spec.operations?.[operation];if(!sourceRef)throw new Error('Gate operation is not configured.');
-  const raw=await context.Context(sourceRef).handlers.dataSource.fetchRecords({parameters:input});return raw?.rows?.[0]??raw;
- }),[context,spec.operations]);
- const changed=React.useCallback(value=>{if(spec.onStateChange)context.lookupHandler?.(spec.onStateChange)?.({context,value});},[context,spec.onStateChange]);
+  const raw=await latestContext.current.Context(sourceRef).handlers.dataSource.fetchRecords({parameters:input});return raw?.rows?.[0]??raw;
+ }),[spec.operations]);
+ const changed=React.useCallback(value=>{const current=latestContext.current;if(spec.onStateChange)current.lookupHandler?.(spec.onStateChange)?.({context:current,value});},[spec.onStateChange]);
  if(!resource||!action)return null;
  return <GateRequirementsEditor api={api} resource={resource} action={action} previewSelection={resolveSelector(form,spec.previewSelectionField||'previewSelection')||[]} readOnly={spec.readOnly===true||form.readOnly===true} onStateChange={changed}/>;
 }

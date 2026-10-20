@@ -212,10 +212,11 @@ export default function ResourcePolicyEditorPanel({container,context}) {
  useSignals();const spec=container.resourcePolicyEditor||{};
  const ref=spec.dataSourceRef||container.dataSourceRef,scoped=ref?context.Context(ref):context;
  const form=scoped.signals.form.value||{},resource=resolveSelector(form,spec.resourceField||'resource');
+ const latestContext=React.useRef(context);latestContext.current=context;
  const api=React.useMemo(()=>{
   const invoke=async(operation,input,field)=>{
    const sourceRef=spec.operations?.[operation];if(!sourceRef)throw new Error('Policy operation is not configured.');
-   const result=await context.Context(sourceRef).handlers.dataSource.fetchRecords({parameters:input});
+   const result=await latestContext.current.Context(sourceRef).handlers.dataSource.fetchRecords({parameters:input});
    const payload=result?.rows?.[0]??result;
    const value=field?payload?.[field]:payload;if(!value||typeof value!=='object')throw new Error('Policy response is missing.');return value;
   };
@@ -229,8 +230,8 @@ export default function ResourcePolicyEditorPanel({container,context}) {
     catch(error){if(error.status===403||error.code==='forbidden')return {effect:'deny',bounded:false,entities:[]};throw error;}
    }:undefined,
   };
- },[context,spec.operations]);
- const changed=React.useCallback(value=>{if(spec.onStateChange)context.lookupHandler?.(spec.onStateChange)?.({context,value});},[context,spec.onStateChange]);
+ },[spec.operations]);
+ const changed=React.useCallback(value=>{const current=latestContext.current;if(spec.onStateChange)current.lookupHandler?.(spec.onStateChange)?.({context:current,value});},[spec.onStateChange]);
  const contracts=(spec.actionsByKindField?resolveSelector(form,spec.actionsByKindField):null)??spec.actionsByKind;
  const choices=(spec.choicesField?resolveSelector(form,spec.choicesField):null)??spec.choices;
  const actions=spec.actions||contracts?.[resource?.kind]||[];
