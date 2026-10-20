@@ -10180,6 +10180,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         () => reportRuntimeSectionDatasets(authoredRuntimePreviewModel?.document, authoredRuntimePreviewModel?.reportSpec, activeRuntimeSectionId),
         [activeRuntimeSectionId, authoredRuntimePreviewModel?.document, authoredRuntimePreviewModel?.reportSpec],
     );
+    const awaitingAuthoredPresentation = (
+        Array.isArray(displayConfig?.presentationProfileRefs) && displayConfig.presentationProfileRefs.length > 0
+        || Array.isArray(displayConfig?.presentationProfiles) && displayConfig.presentationProfiles.length > 0
+    ) && !authoredReportBlocksConfigured;
     const runtimePreviewPrimaryRequired = !runtimePreviewSectionSelection
         || runtimePreviewSectionSelection.datasetIds.includes(String(runtimePreviewPrimaryDataset?.id || "primary"));
     const runtimePreviewCanonicalRequest = useMemo(
@@ -10242,6 +10246,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     }), [builderContext, displayConfig]);
     const fetchedRuntimePreviewRowsState = useReportRuntimePreviewRows({
         enabled: !frozenRestore && !restoreBlocked && !embeddedMode && !reportFiltersNeedApply && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
+            && !awaitingAuthoredPresentation
             && runtimePreviewPrimaryRequired
             && !hostedReportActivationPending
             && hostedReportStarterReady
@@ -10305,11 +10310,14 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             .filter((dataset) => dataset.id && dataset.dataSourceRef && dataset.request);
     }, [frozenRestore, authoredDatasetOptionIndex, authoredRuntimePreviewModel?.reportSpec?.datasets, authoredRuntimePreviewModel?.staticDatasetPayloads, builderContext, displayConfig, runtimePreviewPrimaryDataset?.id, runtimePreviewSectionSelection, state]);
     const runtimePreviewPublishedDatasetsRequestKey = useMemo(() => JSON.stringify({
-        previewRequestKey: runtimePreviewRequestKey,
         datasets: runtimePreviewPublishedDatasets,
-    }), [runtimePreviewPublishedDatasets, runtimePreviewRequestKey]);
+        manualRunSequence,
+        recovery: runtimePreviewRecoveryToken,
+        extract: runtimePreviewExtractConfigFingerprint,
+    }), [manualRunSequence, runtimePreviewExtractConfigFingerprint, runtimePreviewPublishedDatasets, runtimePreviewRecoveryToken]);
     const fetchedRuntimePreviewDatasetPayloadState = useReportRuntimePreviewDatasetPayloads({
         enabled: !frozenRestore && !restoreBlocked && !embeddedMode && !reportFiltersNeedApply && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
+            && !awaitingAuthoredPresentation
             && !hostedReportActivationPending
             && hostedReportStarterReady
             && !shouldDeferReportBuilderRequestForPrefill({
