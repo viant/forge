@@ -2847,6 +2847,8 @@ export default function ReportRuntime({
   hostIntent = null,
   presentationMode = "preview",
   sectionPresentation = "tabs",
+  selectedSectionId = "",
+  onSectionChange = null,
   showContextSummary = true,
   suppressFilterBarBlocks = false,
   suppressFilterBarBlockDatasetRefs = [],
@@ -3362,7 +3364,12 @@ export default function ReportRuntime({
   const visibleRuntimeBlocks = runtimeSections.flatMap((section) => (
     section.block ? [section.block, ...section.items] : section.items
   ));
-  const resolvedActiveSectionId = normalizeString(activeSectionId || runtimeTabGroup?.defaultSectionId || runtimeSections[0]?.id);
+  const resolvedActiveSectionId = normalizeString(selectedSectionId || activeSectionId || runtimeTabGroup?.defaultSectionId || runtimeSections[0]?.id);
+  const changeSection = useCallback((sectionId) => {
+    const selected = normalizeString(sectionId);
+    setActiveSectionId(selected);
+    onSectionChange?.(selected);
+  }, [onSectionChange]);
 
   useEffect(() => {
     if (!Array.isArray(runtimeSections) || runtimeSections.length === 0) {
@@ -3498,7 +3505,7 @@ export default function ReportRuntime({
           <SectionTabRail
             items={runtimeSections.map((section) => ({id: section.id, label: section.navigationLabel}))}
             selectedId={resolvedActiveSectionId}
-            onChange={setActiveSectionId}
+            onChange={changeSection}
             ariaLabel="Report sections"
           />
           {runtimeSections.map((section) => {
