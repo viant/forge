@@ -28,6 +28,8 @@ func (e *compositeExecutor) Execute(_ context.Context, name string, args map[str
 		return `{"data":[{"id":2,"name":"Beta"}]}`, nil
 	case "platform:second":
 		return `{"data":[{"sourceId":1,"label":"Alpha"}]}`, nil
+	case "platform:forbidden":
+		return "", &dsproto.UpstreamAuthorizationError{Status: 403}
 	case "platform:missing":
 		return "", fmt.Errorf("not found or access denied")
 	case "platform:seed":
@@ -177,5 +179,29 @@ fanout:
 	}
 	if backend.Kind != dsproto.BackendMCPFanout || backend.Fanout == nil || backend.Fanout.Seed.Method != "seed" || len(backend.Fanout.ValueSets) != 1 || !backend.Fanout.IncludeUnresolved || !backend.Fanout.UnmappedAsUnresolved {
 		t.Fatalf("composite metadata was not retained: %s", encoded)
+	}
+}
+
+func TestFetchCompositeForbiddenFallbackKeepsOtherProviderRows(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		store := datasource.NewMemoryStore()
+		store.Put(&dsproto.DataSource{ID: "legacy-segments", Backend: &dsproto.Backend{Kind: dsproto.BackendMCPTools, Calls: []dsproto.MCPCall{
+			{Service: "platform", Method: "forbidden", EmptyOnForbidden: enabled},
+			{Service: "platform", Method: "first", FieldMap: map[string]string{"id": "id", "name": "name"}},
+		}}})
+		service := datasource.New(datasource.Options{Store: store, Executor: &compositeExecutor{}})
+		got, err := service.Fetch(aliceCtx(), "legacy-segments", nil, datasource.FetchOptions{})
+		if !enabled {
+			if err == nil {
+				t.Fatal("403 must remain an error without explicit opt-in")
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got.Rows) != 1 || got.Rows[0]["name"] != "Beta" {
+			t.Fatalf("other provider rows lost: %#v", got.Rows)
+		}
 	}
 }

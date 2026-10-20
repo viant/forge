@@ -5,6 +5,7 @@ package datasource
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -29,7 +30,7 @@ func (s *Service) runMCPTools(ctx context.Context, backend *dsproto.Backend, inp
 			call := backend.Calls[index]
 			payload, err := s.executeCompositeCall(ctx, call, compositeCallArgs(call, inputs, nil, nil, nil), backend.RequestMetadata)
 			if err != nil {
-				if call.IgnoreNotFound && isCompositeNotFound(err) {
+				if compositeEmptyOnError(call, err) {
 					results[index] = []map[string]interface{}{}
 					return
 				}
@@ -50,12 +51,21 @@ func (s *Service) runMCPTools(ctx context.Context, backend *dsproto.Backend, inp
 			return nil, err
 		}
 	}
-	var rows []map[string]interface{}
+	rows := make([]map[string]interface{}, 0)
 	for _, part := range results {
 		rows = append(rows, part...)
 	}
 	sortCompositeRows(rows, backend.Sort)
 	return rows, nil
+}
+
+// Only trusted numeric upstream provenance can enable the legacy 403 fallback.
+func compositeEmptyOnError(call dsproto.MCPCall, err error) bool {
+	var upstream *dsproto.UpstreamAuthorizationError
+	if call.EmptyOnForbidden && errors.As(err, &upstream) && upstream.Status == 403 {
+		return true
+	}
+	return call.IgnoreNotFound && isCompositeNotFound(err)
 }
 
 func isCompositeNotFound(err error) bool {
