@@ -16,8 +16,8 @@ metadata.actions={code:`({initialize:()=>context.Context('input_draft').handlers
 function Preview(){
  const [saved,setSaved]=React.useState(null);
  const services=React.useMemo(()=>({dataConnectorTransport:async({dataSourceRef,options})=>{
-  if(dataSourceRef==='input_kinds')return {data:{items:[{value:'query',label:'Query'},{value:'header',label:'Header'},{value:'body',label:'Body'}]}};
-  if(dataSourceRef==='codecs')return {data:{items:[{name:'',description:'No codec'},{name:'example.codec.Normalize',description:'Normalize text'}]}};
+  if(dataSourceRef==='input_kinds')return {items:[{value:'query',label:'Query'},{value:'header',label:'Header'},{value:'body',label:'Body'}]};
+  if(dataSourceRef==='codecs')return {items:[{name:'',description:'No codec'},{name:'example.codec.Normalize',description:'Normalize text'}]};
   if(dataSourceRef==='input_save'){setSaved(options?.inputParameters||{});return {data:{saved:true}};}
   return {data:[]};
  }}),[]);
