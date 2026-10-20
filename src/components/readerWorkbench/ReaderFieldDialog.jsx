@@ -1,5 +1,5 @@
 import {WorkbenchDialog as Dialog} from './WorkbenchMutationContext.jsx';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button, ButtonGroup, Callout, Code, Dialog as BlueprintDialog, DialogBody, DialogFooter, FormGroup, HTMLSelect, HTMLTable, InputGroup, Tag } from '@blueprintjs/core';
 
 // Column authoring uses Datly Reader Builder's atomic setColumnContract
@@ -21,6 +21,7 @@ export function ReaderFieldDialog({ isOpen, node, columnContracts = [], onClose,
   const [newColumn, setNewColumn] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const draft = useRef({identity:'',dirty:false});
   const declaring = columns.length === 0 || newColumn;
   const selected = newColumn ? null : columns.find((item) => columnIdentity(item) === columnName);
   const contract = columnContract(columnContracts, node?.name, columnName);
@@ -30,7 +31,7 @@ export function ReaderFieldDialog({ isOpen, node, columnContracts = [], onClose,
   const currentPage = Math.min(page, pages - 1);
   const visibleColumns = filtered.slice(currentPage * pageSize, currentPage * pageSize + pageSize);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isOpen) return;
     const initial = node?.column ? columnIdentity(node.column) : columnIdentity(columns[0]);
     setShowCatalog(!node?.column);
@@ -39,14 +40,19 @@ export function ReaderFieldDialog({ isOpen, node, columnContracts = [], onClose,
     setQuery(''); setPage(0); setSaving(false); setError(''); setTagName(''); setTagValue('');
   }, [isOpen, node?.name, node?.column?.source, node?.column?.name]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const identity = JSON.stringify([isOpen, node?.name, newColumn ? 'new-column' : columnName]);
+    if (draft.current.identity !== identity) draft.current = {identity, dirty:false};
+    // Inspection can refresh after the user starts editing. Keep that draft,
+    // and seed a new selection before its controls become interactive.
+    if (draft.current.dirty) return;
     const next = columnContract(columnContracts, node?.name, columnName);
     setRole(columnRole(selected, next));
     setVisibility(columnVisibility(next));
     setPublicName(publicFieldName(next));
     setCastType(next?.castType || '');
     setAdvancedTags(Object.fromEntries(Object.entries(next?.tags ?? {}).filter(([name]) => !['groupable','internal','json','format'].includes(name))));
-  }, [isOpen, columnName, node?.name, JSON.stringify(contract || null), selected?.groupable]);
+  }, [isOpen, columnName, newColumn, node?.name, JSON.stringify(contract || null), selected?.groupable]);
 
   const selectColumn = (value) => { setNewColumn(false); setColumnName(value); setError(''); };
   const apply = async (column) => {
@@ -71,9 +77,9 @@ export function ReaderFieldDialog({ isOpen, node, columnContracts = [], onClose,
   const saveAdvancedTag = () => {
     const name = tagName.trim();
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) { setError('Advanced tag name must be an identifier.'); return; }
-    setAdvancedTags((current)=>({...current,[name]:tagValue}));setTagName('');setTagValue('');setError('');
+    draft.current.dirty=true;setAdvancedTags((current)=>({...current,[name]:tagValue}));setTagName('');setTagValue('');setError('');
   };
-  const removeTag = (name) => setAdvancedTags((current)=>{const next={...current};delete next[name];return next;});
+  const removeTag = (name) => {draft.current.dirty=true;setAdvancedTags((current)=>{const next={...current};delete next[name];return next;});};
 
   return <Dialog portalClassName="forge-reader-workbench-dialog" className="studio-connector-dialog studio-column-dialog" isOpen={isOpen} onClose={onClose} title={`Column contracts · ${node?.label || ''}`} icon="properties" canOutsideClickClose={!saving}>
     <DialogBody>
@@ -94,8 +100,8 @@ export function ReaderFieldDialog({ isOpen, node, columnContracts = [], onClose,
         </>}
         <section className="studio-column-contract" aria-label="Selected column contract">
           <div className="studio-column-contract-heading"><div><h3>{selected?.name || columnName}</h3><p><Code>{node?.name}.{columnName}</Code> · {selected?.databaseType || 'database type inferred'}</p></div><div><Tag minimal>{contract?.castType || selected?.type?.name || 'inferred Go type'}</Tag>{node?.column&&<Button small minimal icon={showCatalog?'chevron-up':'list'} onClick={()=>setShowCatalog((value)=>!value)}>{showCatalog?'Hide columns':'Choose another column'}</Button>}</div></div>
-          <div className="studio-form-grid"><FormGroup label="Output visibility" labelFor="column-visibility" helperText="Internal remains SQL-mapped; hidden is omitted from JSON."><HTMLSelect id="column-visibility" value={visibility} onChange={(event) => setVisibility(event.target.value)} fill disabled={saving}><option value="public">Public output</option><option value="internal">Internal backing field</option><option value="hidden">Hidden from JSON</option></HTMLSelect></FormGroup><FormGroup label="Cube role" labelFor="column-role"><HTMLSelect id="column-role" value={role} onChange={(event) => setRole(event.target.value)} fill disabled={saving}><option value="dimension">Dimension</option><option value="measure">Measure / field</option></HTMLSelect></FormGroup></div>
-          <div className="studio-form-grid"><FormGroup label="Go cast" labelFor="column-cast" helperText="Clear to remove the explicit CAST."><InputGroup id="column-cast" value={castType} onChange={(event) => setCastType(event.target.value)} placeholder="model.Money or string" disabled={saving}/></FormGroup><FormGroup label="Public field name" labelFor="column-public-name" helperText="Exact response field name; leave empty to use the default."><InputGroup id="column-public-name" value={publicName} onChange={(event) => setPublicName(event.target.value)} placeholder="customerName" disabled={saving}/></FormGroup></div>
+          <div className="studio-form-grid"><FormGroup label="Output visibility" labelFor="column-visibility" helperText="Internal remains SQL-mapped; hidden is omitted from JSON."><HTMLSelect id="column-visibility" value={visibility} onChange={(event) => {draft.current.dirty=true;setVisibility(event.target.value);}} fill disabled={saving}><option value="public">Public output</option><option value="internal">Internal backing field</option><option value="hidden">Hidden from JSON</option></HTMLSelect></FormGroup><FormGroup label="Cube role" labelFor="column-role"><HTMLSelect id="column-role" value={role} onChange={(event) => {draft.current.dirty=true;setRole(event.target.value);}} fill disabled={saving}><option value="dimension">Dimension</option><option value="measure">Measure / field</option></HTMLSelect></FormGroup></div>
+          <div className="studio-form-grid"><FormGroup label="Go cast" labelFor="column-cast" helperText="Clear to remove the explicit CAST."><InputGroup id="column-cast" value={castType} onChange={(event) => {draft.current.dirty=true;setCastType(event.target.value);}} placeholder="model.Money or string" disabled={saving}/></FormGroup><FormGroup label="Public field name" labelFor="column-public-name" helperText="Exact response field name; leave empty to use the default."><InputGroup id="column-public-name" value={publicName} onChange={(event) => {draft.current.dirty=true;setPublicName(event.target.value);}} placeholder="customerName" disabled={saving}/></FormGroup></div>
         </section>
         <section className="studio-column-authoring-section studio-column-authoring-advanced"><h3>Advanced metadata tags</h3><p>Use registered Datly/SQLX tag keys. Changes are staged with the contract and applied only when you choose Save column contract.</p><div className="studio-current-tags">{Object.entries(advancedTags).map(([name, value]) => <Tag key={name} minimal onRemove={saving ? undefined : () => removeTag(name)}>{name}: {value || 'empty'}</Tag>)}</div><div className="studio-function-form"><InputGroup aria-label="Advanced tag name" value={tagName} onChange={(event) => setTagName(event.target.value)} placeholder="codec" disabled={saving}/><InputGroup aria-label="Advanced tag value" value={tagValue} onChange={(event) => setTagValue(event.target.value)} placeholder="registered codec options" disabled={saving}/><Button icon="tag" disabled={saving} onClick={saveAdvancedTag}>Stage tag</Button></div></section>
       </>}

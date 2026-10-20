@@ -94,7 +94,7 @@ const BoundEditor = ({context, container}) => {
     const style = editor.style || {}
     const {width= '100%', height = '70vh'} = style
 
-    return (
+    const content = (
         <>
             <ControlledEditor value={source} language={language} readOnly={readOnly}
                 height={height} width={width} onChange={handleChange} ariaLabel={editor.title}/>
@@ -102,6 +102,7 @@ const BoundEditor = ({context, container}) => {
 
         </>
     );
+    return height === '100%' ? <div className="forge-editor-fill" style={{display:'flex',flexDirection:'column',flex:'1 1 0',minHeight:0,width}}>{content}</div> : content;
 };
 
 function ControlledEditor({value, onChange, language, height, width, readOnly = false, ariaLabel}) {
@@ -114,7 +115,7 @@ function ControlledEditor({value, onChange, language, height, width, readOnly = 
         accessibleSyntax,
         ...(ariaLabel ? [EditorView.contentAttributes.of({'aria-label': ariaLabel})] : []),
     ], [language, ariaLabel]);
-    return <CodeMirror value={value || ''} height={height || '280px'} width={width} extensions={extensions} onChange={onChange} readOnly={readOnly} />;
+    return <CodeMirror value={value || ''} height={height || '280px'} width={width} style={height==='100%'?{height:'100%',minHeight:0,width:'100%'}:undefined} extensions={extensions} onChange={onChange} readOnly={readOnly} />;
 }
 
 const Editor = props => props.value !== undefined

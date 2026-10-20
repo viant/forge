@@ -8,6 +8,7 @@ export default defineConfig({
       'src/components/FormPanel.sizing.render.test.jsx',
       'src/components/table/basic/Toolbar.crossSource.render.test.jsx',
       'src/components/readerWorkbench/ReaderWorkbenchPanel.render.test.jsx',
+      'src/components/readerWorkbench/ReaderFieldDialog.draft.render.test.jsx',
       'src/components/ResourceWindow.scope.render.test.jsx',
       'src/packs/blueprint/selectCloseFocus.render.test.jsx',
       'src/components/primitives/ResultPreview.render.test.jsx',

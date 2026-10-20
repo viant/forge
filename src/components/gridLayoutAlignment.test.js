@@ -6,18 +6,18 @@ import {
     resolveGridAlignment,
 } from './gridLayoutAlignment.js';
 
-assert.deepEqual(GRID_ALIGNMENT_VALUES, ['baseline', 'center', 'start']);
+assert.deepEqual(GRID_ALIGNMENT_VALUES, ['baseline', 'center', 'start', 'end']);
 assert.equal(normalizeGridAlignment('baseline'), 'baseline');
 assert.equal(normalizeGridAlignment(' CENTER '), 'center');
 assert.equal(normalizeGridAlignment('Start'), 'start');
-assert.equal(normalizeGridAlignment('end'), undefined);
+assert.equal(normalizeGridAlignment('end'), 'end');
 assert.equal(normalizeGridAlignment(0), undefined);
 assert.equal(normalizeGridAlignment(null), undefined);
 
 assert.equal(resolveGridAlignment({}, 'left'), 'baseline');
 assert.equal(resolveGridAlignment({}, 'left', 'cell'), 'baseline');
 
-for (const align of ['baseline', 'center', 'start']) {
+for (const align of ['baseline', 'center', 'start', 'end']) {
     assert.equal(resolveGridAlignment({align}, 'left'), align);
     assert.equal(resolveGridAlignment({align}, 'left', 'cell'), align);
 }
@@ -27,8 +27,8 @@ assert.equal(resolveGridAlignment({}, 'top', 'cell'), 'center');
 assert.equal(resolveGridAlignment({}, 'none'), 'start');
 assert.equal(resolveGridAlignment({}, 'none', 'cell'), 'center');
 assert.equal(resolveGridAlignment({align: ' CENTER '}, 'left'), 'center');
-assert.equal(resolveGridAlignment({align: 'end'}, 'left'), 'baseline');
-assert.equal(resolveGridAlignment({align: 'end'}, 'top'), 'start');
-assert.equal(resolveGridAlignment({align: 'end'}, 'top', 'cell'), 'center');
+assert.equal(resolveGridAlignment({align: 'invalid'}, 'left'), 'baseline');
+assert.equal(resolveGridAlignment({align: 'invalid'}, 'top'), 'start');
+assert.equal(resolveGridAlignment({align: 'invalid'}, 'top', 'cell'), 'center');
 
 console.log('grid layout alignment contract passed');

@@ -3,6 +3,9 @@
 .forge-workspace-summary__header h1 { font-size:26px; line-height:1.25; margin:0 0 8px; color:var(--forge-heading-color, #1d2939); }
 .forge-workspace-summary__header p { margin:0; color:var(--forge-muted-color, #667085); }
 .forge-workspace-summary__actions { display:flex; gap:8px; flex-shrink:0; }
+.forge-workspace-summary.is-empty { display:flex; flex:1; flex-direction:column; justify-content:center; align-items:center; min-height:240px; padding:32px; text-align:center; }
+.forge-workspace-summary.is-empty .forge-workspace-summary__header { display:block; max-width:52ch; margin:0; }
+.forge-workspace-summary.is-empty .forge-workspace-summary__header h1 { font-size:20px; }
 .forge-workspace-summary__sections { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(320px,.85fr); gap:26px 20px; }
 .forge-workspace-summary__section { min-width:0; }
 .forge-workspace-summary__section.is-full-width { grid-column:1 / -1; }

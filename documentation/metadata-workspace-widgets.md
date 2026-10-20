@@ -96,3 +96,16 @@ Go window compilation preserves these specs in `backend/types`. Add compile
 round-trip coverage when extending a spec and rendered coverage for behavior.
 Consumer applications should test real format-3 resources with WindowContent;
 mocked DTO tests alone do not prove that the declared data sources are mounted.
+
+### Layout ownership
+
+Datasource-only container branches remain mounted without reserving visual space.
+Hidden branches also release their flex allocation, and the last visible child
+receives the remaining space. Horizontal containers honor a child’s authored
+`style.width`, while definite `style.height` values retain their own height in a
+content-sized host. `editor.style.height: '100%'` fills the allocated editor pane.
+
+Use `layout.labels.align: end` to align standalone actions with the bottom of
+labeled controls. `workspaceSummary.appearance: empty` centers a compact empty
+state in the available pane. Catalog table headers retain an opaque surface when
+scrolling; `table.density: compact` provides a denser explorer presentation.
