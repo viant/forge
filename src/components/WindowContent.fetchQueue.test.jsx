@@ -78,3 +78,16 @@ it('waits for a declared archive then renders a nonfatal missing-resource warnin
   expect(host.querySelector('[data-window-id]')).toBeTruthy();expect(host.querySelector('[role="status"]')?.textContent).toContain('dialog://example/missing');
  } finally {await settle(()=>root.unmount());host.remove();removeSignalsForKey(windowId);globalThis.IS_REACT_ACT_ENVIRONMENT=previousAct;}
 });
+
+it('keeps authored styling keys when navigation uses a full resource URI',async()=>{
+ const previousAct=globalThis.IS_REACT_ACT_ENVIRONMENT;globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const React=await import('react');const {createRoot}=await import('react-dom/client');const {default:WindowContent}=await import('./WindowContent.jsx');
+ const {SettingProvider}=await import('../core/context/Setting.jsx');const {ForgeThemeProvider}=await import('./ThemeBoundary.jsx');const {removeSignalsForKey}=await import('../core/store/signals.js');
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host),windowId='canonical-styling-key';
+ const metadata={windowKey:'advertiser',resource:{uri:'window://example/advertiser',providerIdentity:'publisher'},dataSource:{},view:{content:{id:'root',items:[]}}};
+ try {
+  await React.act(async()=>{root.render(<ForgeThemeProvider><SettingProvider connectorConfig={{window:{service:{uri:'/window'}}}}><WindowContent window={{windowId,windowKey:'window://example/advertiser'}} selectedMetadata={metadata}/></SettingProvider></ForgeThemeProvider>);for(let i=0;i<40;i++)await Promise.resolve();});
+  expect(host.querySelector('[data-forge-window-key="advertiser"][data-forge-resource-provider="publisher"]')).not.toBeNull();
+  expect(document.body.querySelector('[data-forge-theme-portal][data-forge-window-key="advertiser"][data-forge-resource-namespace="example"]')).not.toBeNull();
+ }finally{await React.act(async()=>root.unmount());host.remove();removeSignalsForKey(windowId);globalThis.IS_REACT_ACT_ENVIRONMENT=previousAct;}
+});

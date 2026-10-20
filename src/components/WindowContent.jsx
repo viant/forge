@@ -1204,7 +1204,7 @@ function WindowContentInner({window, metadata, services}) {
 export default function WindowContent(props) {
     useSignals();
     const metadata = props.selectedMetadata || (props.window?.windowId ? getMetadataSignal(props.window.windowId).value : null);
-    return <ForgeThemeBoundary windowKey={props.window?.windowKey} resource={metadata?.resource}><WindowContentRuntime {...props} /></ForgeThemeBoundary>;
+    return <ForgeThemeBoundary windowKey={metadata?.windowKey || props.window?.windowKey} resource={metadata?.resource}><WindowContentRuntime {...props} /></ForgeThemeBoundary>;
 }
 
 function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}) {
