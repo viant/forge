@@ -55,3 +55,5 @@ export {default as CardRailGroup} from './content/CardRailGroup.jsx';
 export {default as FilterChips} from './content/FilterChips.jsx';
 
 export {default as ParameterEditor} from './primitives/ParameterEditor.jsx';
+
+export {default as WorkspaceSummary} from './primitives/WorkspaceSummary.jsx';
