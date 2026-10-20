@@ -54,3 +54,10 @@ test('conflicting defaults and duplicate revisions reject the snapshot',async()=
   assert.equal(await fs.ensure('dialog'),false);assert.equal(fs.indexes.has('dialog'),false);
  }
 });
+test('complete supplied definitions do not wait for archives or create missing warnings',async()=>{
+ const fs=new ResourceFS({namespace:'example',scopeKey:'alice',loadArchive:async({kind})=>snapshot(kind,[])});
+ const original={resources:{dataSources:['orders'],dialogs:['picker']},dataSource:{orders:{service:{uri:'/existing'},parameters:[{name:'ID'}]}},dialogs:[{id:'picker',content:{id:'body'}}]};
+ const loaded=await fs.loadWindow(original);
+ assert.deepEqual(loaded.dataSource,original.dataSource);assert.deepEqual(loaded.dialogs,original.dialogs);
+ assert.equal(loaded.resourceWarnings?.length||0,0);
+});

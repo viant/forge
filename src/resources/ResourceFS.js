@@ -119,8 +119,12 @@ export class ResourceFS {
     if (!window || typeof window !== 'object' || Array.isArray(window)) throw new Error('Window definition required');
     const result = clone(window);
     const assigned = result.resources || {};
-    const sources = assigned.dataSources || [];
-    const dialogs = assigned.dialogs || [];
+    const sources = (assigned.dataSources || []).filter(id => {
+      const existing = result.dataSource?.[id];
+      return !existing?.service?.uri && !existing?.backend?.kind;
+    });
+    const suppliedDialogs = new Set((result.dialogs || []).map(dialog => dialog.id));
+    const dialogs = (assigned.dialogs || []).filter(id => !suppliedDialogs.has(id));
     // Start both pulls together. Rendering waits only for referenced kinds.
     this.preload();
     const [loadedSources, loadedDialogs] = await Promise.all([
