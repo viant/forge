@@ -179,34 +179,36 @@ type NavigationItem struct {
 
 // Dialog represents a dialog with a title, content, actions, and on events.
 type Dialog struct {
-	SelectionMode   string                            `json:"selectionMode,omitempty" yaml:"selectionMode,omitempty"`
-	Id              string                            `json:"id" yaml:"id"`
-	Title           string                            `json:"title" yaml:"title"`
-	DataSourceRef   string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
-	FetchOnOpen     *bool                             `json:"fetchOnOpen,omitempty" yaml:"fetchOnOpen,omitempty"`
-	Content         *Container                        `json:"content" yaml:"content"`
-	ClassName       string                            `json:"className,omitempty" yaml:"className,omitempty"`
-	Style           *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
-	Properties      *DialogProperties                 `json:"properties,omitempty" yaml:"properties,omitempty"`
-	Actions         []Item                            `json:"actions" yaml:"actions"`
-	On              []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
-	Target          *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
-	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
+	CloseDisabledWhen map[string]interface{}            `json:"closeDisabledWhen,omitempty" yaml:"closeDisabledWhen,omitempty"`
+	SelectionMode     string                            `json:"selectionMode,omitempty" yaml:"selectionMode,omitempty"`
+	Id                string                            `json:"id" yaml:"id"`
+	Title             string                            `json:"title" yaml:"title"`
+	DataSourceRef     string                            `json:"dataSourceRef,omitempty" yaml:"dataSourceRef,omitempty"`
+	FetchOnOpen       *bool                             `json:"fetchOnOpen,omitempty" yaml:"fetchOnOpen,omitempty"`
+	Content           *Container                        `json:"content" yaml:"content"`
+	ClassName         string                            `json:"className,omitempty" yaml:"className,omitempty"`
+	Style             *StyleProperties                  `json:"style,omitempty" yaml:"style,omitempty"`
+	Properties        *DialogProperties                 `json:"properties,omitempty" yaml:"properties,omitempty"`
+	Actions           []Item                            `json:"actions" yaml:"actions"`
+	On                []*Execute                        `json:"on,omitempty" yaml:"on,omitempty"`
+	Target            *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
+	TargetOverrides   map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
 }
 
 // DialogProperties holds optional flags that tweak dialog UI behavior.
 // Example: properties.searchable: false hides the quick-search input in the dialog header.
 type DialogProperties struct {
-	ResolveInput     string                   `json:"resolveInput,omitempty" yaml:"resolveInput,omitempty"`
-	Searchable       *bool                    `json:"searchable,omitempty" yaml:"searchable,omitempty"`
-	ClassName        string                   `json:"className,omitempty" yaml:"className,omitempty"`
-	BodyClassName    string                   `json:"bodyClassName,omitempty" yaml:"bodyClassName,omitempty"`
-	BodyStyle        map[string]interface{}   `json:"bodyStyle,omitempty" yaml:"bodyStyle,omitempty"`
-	ContentClassName string                   `json:"contentClassName,omitempty" yaml:"contentClassName,omitempty"`
-	ContentStyle     map[string]interface{}   `json:"contentStyle,omitempty" yaml:"contentStyle,omitempty"`
-	QuickSearch      *DialogQuickSearchConfig `json:"quickSearch,omitempty" yaml:"quickSearch,omitempty"`
-	QuickFilter      *QuickFilterSpec         `json:"quickFilter,omitempty" yaml:"quickFilter,omitempty"`
-	QuickFilters     []QuickFilterSpec        `json:"quickFilters,omitempty" yaml:"quickFilters,omitempty"`
+	CloseDisabledWhen map[string]interface{}   `json:"closeDisabledWhen,omitempty" yaml:"closeDisabledWhen,omitempty"`
+	ResolveInput      string                   `json:"resolveInput,omitempty" yaml:"resolveInput,omitempty"`
+	Searchable        *bool                    `json:"searchable,omitempty" yaml:"searchable,omitempty"`
+	ClassName         string                   `json:"className,omitempty" yaml:"className,omitempty"`
+	BodyClassName     string                   `json:"bodyClassName,omitempty" yaml:"bodyClassName,omitempty"`
+	BodyStyle         map[string]interface{}   `json:"bodyStyle,omitempty" yaml:"bodyStyle,omitempty"`
+	ContentClassName  string                   `json:"contentClassName,omitempty" yaml:"contentClassName,omitempty"`
+	ContentStyle      map[string]interface{}   `json:"contentStyle,omitempty" yaml:"contentStyle,omitempty"`
+	QuickSearch       *DialogQuickSearchConfig `json:"quickSearch,omitempty" yaml:"quickSearch,omitempty"`
+	QuickFilter       *QuickFilterSpec         `json:"quickFilter,omitempty" yaml:"quickFilter,omitempty"`
+	QuickFilters      []QuickFilterSpec        `json:"quickFilters,omitempty" yaml:"quickFilters,omitempty"`
 }
 
 type DialogQuickSearchConfig struct {

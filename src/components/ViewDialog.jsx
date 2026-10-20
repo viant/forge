@@ -423,8 +423,11 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
 
     const handleClose = () => {
         if (isDialogCloseDisabled(dialog, dsCtx)) return false;
-        handlers.dialog.close();
-        return true;
+        const close = () => { handlers.dialog.close(); return true; };
+        if (!events.onClose.isDefined()) return close();
+        const result = events.onClose.execute({context: dsCtx, dialog});
+        if (result && typeof result.then === 'function') return result.then(value => value === false || value === null ? false : close());
+        return result === false || result === null ? false : close();
     };
 
     // An unresolved local definition omits this dialog without an end-user
