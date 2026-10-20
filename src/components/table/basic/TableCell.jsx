@@ -1,3 +1,5 @@
+import {useSignals} from '@preact/signals-react/runtime';
+import {tableCellPolicy} from './tableCellPolicy.js';
 import EditableTextCell from "./EditableTextCell.jsx";
 import ImageLabelCell from "./ImageLabelCell.jsx";
 import React, {useEffect, useRef, useState} from "react";
@@ -50,6 +52,7 @@ const TableCell = ({
                        onShowFullContent,
                        rowSelectionDisabled = false,
                    }) => {
+    useSignals();
     let {displayedText, value, align} = cell;
     const dataSource = context?.handlers?.dataSource || {};
     const isSelected = typeof dataSource.isSelected === "function"
@@ -59,12 +62,14 @@ const TableCell = ({
     const {cellProperties = {}} = col;
     const cellEvents = useCellEvents({context, cellSelection, columnHandlers, onRowClick});
     const {events, stateEvents} = cellEvents;
+    const policy=tableCellPolicy(col,row,context);
+    let visible=policy.visible;
     // Column-level visibility (per-row)
     if (stateEvents.onVisible) {
         try {
             const vis = stateEvents.onVisible();
             if (vis === false) {
-                return <td className="row"/>;
+                visible=false;
             }
         } catch (_) { /* ignore */ }
     }
@@ -76,6 +81,10 @@ const TableCell = ({
         {...defaultCellProperties(col), ...filteredProps, ...events},
         stateEvents,
     );
+    if(policy.disabled || policy.readOnly) {
+        if(col.type === 'editableText') cellProps.readOnly=true;
+        else cellProps.disabled=true;
+    }
     // Allow dynamic readonly/disabled
     if (stateEvents.onReadonly) {
         try {
@@ -114,6 +123,8 @@ const TableCell = ({
             setShowMoreButton(false);
         }
     }, [displayedText, enforceCellSize]);
+
+    if(!visible)return <td className="row"/>;
 
     const handleMoreClick = (event) => {
         event.stopPropagation();

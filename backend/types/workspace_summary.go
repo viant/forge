@@ -2,6 +2,8 @@ package types
 
 // WorkspaceSummarySpec presents metadata-owned collections as actionable lists.
 type WorkspaceSummarySpec struct {
+	TitleField         string                    `json:"titleField,omitempty" yaml:"titleField,omitempty"`
+	DescriptionField   string                    `json:"descriptionField,omitempty" yaml:"descriptionField,omitempty"`
 	Title              string                    `json:"title,omitempty" yaml:"title,omitempty"`
 	Description        string                    `json:"description,omitempty" yaml:"description,omitempty"`
 	StateDataSourceRef string                    `json:"stateDataSourceRef,omitempty" yaml:"stateDataSourceRef,omitempty"`

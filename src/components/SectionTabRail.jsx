@@ -75,9 +75,11 @@ export default function SectionTabRail({items = [], selectedId = '', onChange, o
         if (!rail) return;
         rail.scrollTo({left: rail.scrollLeft + direction * Math.max(180, rail.clientWidth * 0.65), behavior: 'smooth'});
     };
-    const activateAt = (index) => {
+    const activateAt = (index, direction = 1) => {
         if (items.length === 0) return;
-        const normalized = (index + items.length) % items.length;
+        let normalized = (index + items.length) % items.length;
+        for(let visited=0;visited<items.length && items[normalized]?.disabled;visited++)normalized=(normalized+direction+items.length)%items.length;
+        if(items[normalized]?.disabled)return;
         onChange?.(items[normalized]?.id);
         requestAnimationFrame(() => tabRefs.current[normalized]?.focus());
     };
@@ -87,13 +89,13 @@ export default function SectionTabRail({items = [], selectedId = '', onChange, o
             activateAt(index + 1);
         } else if (event.key === 'ArrowLeft') {
             event.preventDefault();
-            activateAt(index - 1);
+            activateAt(index - 1, -1);
         } else if (event.key === 'Home') {
             event.preventDefault();
             activateAt(0);
         } else if (event.key === 'End') {
             event.preventDefault();
-            activateAt(items.length - 1);
+            activateAt(items.length - 1, -1);
         }
     };
     const showLeftCue = overflow.left && selectedIndex > 0;
@@ -115,7 +117,7 @@ export default function SectionTabRail({items = [], selectedId = '', onChange, o
                     }} />;
                 return (
                     <button key={item.id} ref={(node) => { tabRefs.current[index] = node; }} id={`${baseId}-tab-${index}`}
-                        type="button" role="tab" aria-selected={selected} aria-controls={item.panelId || panelId || undefined}
+                        type="button" role="tab" disabled={item.disabled === true} aria-selected={selected} aria-controls={item.panelId || panelId || undefined}
                         tabIndex={selected || (selectedId === '' && index === selectedIndex) ? 0 : -1}
                         className={`forge-section-tab${selected ? ' is-selected' : ''}`}
                         title={onRename && item.editable !== false ? 'Double-click or press F2 to rename. Drag or Alt+Arrow to reorder.' : undefined}

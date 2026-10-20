@@ -8,7 +8,7 @@ import {
 import Container from './Container';
 import {useSignals} from '@preact/signals-react/runtime';
 import {findBusSignal, getViewSignal} from "../core/index.js";
-import {isContainerVisible, trackContainerVisibility} from "./visibleWhen.js";
+import {isContainerVisible, trackContainerVisibility, trackVisibleWhen, evaluatePlainVisibleWhen} from "./visibleWhen.js";
 import {initialBusMessageState, mergeSelectedTab, nextBusMessage, resolveDataSourceFetchMode} from './FormPanelState';
 import SectionTabRail from './SectionTabRail.jsx';
 import {useViewPartition} from './useViewPartition.js';
@@ -17,7 +17,8 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
     useSignals();
     const workspacePresentation = useWorkspacePresentation();
     const containers = container.containers || [];
-    containers.forEach((entry) => trackContainerVisibility(entry, context));
+    containers.forEach((entry) => {trackContainerVisibility(entry, context);trackVisibleWhen(entry.disabledWhen, context);});
+    const tabDisabled = tab => !!tab?.disabledWhen && evaluatePlainVisibleWhen(tab.disabledWhen, context);
     const visibleContainers = containers.filter((entry) => isContainerVisible(entry, context));
     const windowId = context?.identity?.windowId;
     const panelId = container?.id || visibleContainers[0]?.id || containers[0]?.id || 'root';
@@ -60,10 +61,15 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
     const shouldRenderTabPanel = (tabId) => renderAllTabPanels
         || (!keepVisitedTabPanelsMounted ? String(tabId) === String(selectedTabId) : String(tabId) === String(selectedTabId) || visitedTabIds.includes(tabId));
     const handleTabChange = (newTabId) => {
+        const target=visibleContainers.find(tab=>String(tab.id)===String(newTabId));
+        if (!target || tabDisabled(target)) return false;
         if (viewSignal) {
             const previous = viewSignal.peek?.() || {};
             const next = mergeSelectedTab(previous, panelId, newTabId);
-            if (next.changed) viewSignal.value = next.value;
+            if (next.changed) {
+                viewSignal.value = next.value;
+                for (const execute of container.on || []) if (execute.event === 'onTabChange' && execute.handler) context.lookupHandler?.(execute.handler)?.({context,tabId:newTabId,execution:execute});
+            }
         }
     };
 
@@ -78,7 +84,7 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
         const targetPanelId = String(last?.containerId || '').trim();
         if (last?.type === 'selectTab' && last?.tabId && (!targetPanelId || targetPanelId === panelId)) {
             const target = visibleContainers.find(c => c.id === last.tabId);
-            if (target) {
+            if (target && !tabDisabled(target)) {
                 if (viewSignal) {
                     const previous = viewSignal.peek?.() || {};
                     const next = mergeSelectedTab(previous, panelId, last.tabId);
@@ -130,7 +136,7 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
         return (
             <div className={`form-panel forge-form-panel-section-tabs${compactTabs ? ' is-compact' : ''}${fillAvailableHeight ? ' is-fill' : ''}`}>
                 <SectionTabRail
-                    items={visibleContainers.map((tab,index) => ({id: tab.id, label: tab.title, icon: tab.icon, panelId:`${tabDOMPrefix}-panel-${index}`}))}
+                    items={visibleContainers.map((tab,index) => ({id: tab.id, label: tab.title, icon: tab.icon, disabled:tabDisabled(tab), panelId:`${tabDOMPrefix}-panel-${index}`}))}
                     selectedId={selected?.id}
                     onChange={handleTabChange}
                     ariaLabel={container?.tabs?.ariaLabel || (workspacePresentation?.kind === 'report' ? 'Report sections' : 'Resource sections')}
@@ -162,6 +168,7 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
                     <Tab
                         key={tab.id}
                         id={tab.id}
+                        disabled={tabDisabled(tab)}
                         panelClassName="forge-form-panel-tabs__panel"
                         title={tab.icon ? <span className="forge-form-panel-tab-title"><Icon icon={tab.icon} size={14}/><span>{tab.title}</span></span> : tab.title}
                         panel={shouldRenderTabPanel(tab.id) ? (
