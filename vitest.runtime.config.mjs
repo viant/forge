@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: [
+      'src/components/FormPanel.sizing.render.test.jsx',
       'src/components/table/basic/Toolbar.crossSource.render.test.jsx',
       'src/components/readerWorkbench/ReaderWorkbenchPanel.render.test.jsx',
       'src/components/ResourceWindow.scope.render.test.jsx',
