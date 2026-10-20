@@ -14,7 +14,7 @@ export default function WorkspaceSummary({container, context}) {
   const state = scoped(spec.stateDataSourceRef)?.signals?.form?.value || {};
   const title=spec.titleField?resolveSelector(state,spec.titleField)||spec.title:spec.title;
   const description=spec.descriptionField?resolveSelector(state,spec.descriptionField)||spec.description:spec.description;
-  return <section className="forge-workspace-summary" data-forge-primitive="workspaceSummary" aria-label={title || container.title || undefined}>
+  return <section className={`forge-workspace-summary${spec.appearance==='empty'?' is-empty':''}`} data-forge-primitive="workspaceSummary" aria-label={title || container.title || undefined}>
     {(title || description || spec.actions?.length > 0) && <header className="forge-workspace-summary__header"><div>{title && <h1>{title}</h1>}{description && <p>{description}</p>}</div><div className="forge-workspace-summary__actions">{(spec.actions || []).map(actionButton)}</div></header>}
     {state[spec.errorField] && <Callout intent="warning" role="alert">{state[spec.errorField]}</Callout>}
     <div className="forge-workspace-summary__sections">{(spec.sections || []).map(section => {

@@ -59,7 +59,7 @@ import {createDashboardContext, getDashboardVisibleWhen, seedDashboardDefaultFil
 import { findDashboardFilterSignal, findDashboardSelectionSignal, getDashboardSelectionSignal } from "../core/store/signals.js";
 import {getViewSignal} from '../core/index.js';
 import {useViewPartition} from './useViewPartition.js';
-import {isDashboardRootContainer, isSemanticDashboardBlock, shouldSkipGenericNonVisualEarlyReturn} from "./containerSemantics.js";
+import {isDashboardRootContainer, isSemanticDashboardBlock, shouldSkipGenericNonVisualEarlyReturn, isDataSourceBindingContainer} from "./containerSemantics.js";
 import {isContainerVisible, resolveChildContext, trackContainerVisibility} from "./visibleWhen.js";
 import {
     mergeSectionOpenState,
@@ -612,6 +612,9 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
         }
 
         const isHorizontal = orientation === 'horizontal';
+        containers.forEach(child => trackContainerVisibility(child, effectiveContext));
+        const visualChildren = containers.filter(child => !isDataSourceBindingContainer(child) && isContainerVisible(child, effectiveContext));
+        const lastVisual = visualChildren.at(-1);
         return (
             <div
                 style={{
@@ -624,11 +627,14 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
                 }}
             >
                 {containers.map((subContainer, index) => {
-                    const isLast = index === containers.length - 1;
+                    const isLast = subContainer === lastVisual;
+                    const visible = visualChildren.includes(subContainer);
+                    const authoredWidth = isHorizontal ? subContainer.style?.width : null;
+                    const fixedWidth = authoredWidth != null && !['auto', '100%'].includes(String(authoredWidth));
                     const childStyle = {
-                        display: 'flex',
+                        display: visible ? 'flex' : 'none',
                         flexDirection: 'column',
-                        flex: resolveContainerSizing(subContainer, sizingMode === 'fill' && (isHorizontal || isLast) ? 'fill' : 'content') === 'fill' ? '1 1 0' : '0 0 auto',
+                        flex: fixedWidth ? `0 0 ${typeof authoredWidth === 'number' ? authoredWidth+'px' : authoredWidth}` : resolveContainerSizing(subContainer, sizingMode === 'fill' && (isHorizontal || isLast) ? 'fill' : 'content') === 'fill' ? '1 1 0' : '0 0 auto',
                         minHeight: 0,
                         minWidth: 0,
                         overflow: 'visible',

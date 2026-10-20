@@ -1,4 +1,4 @@
-export const GRID_ALIGNMENT_VALUES = Object.freeze(['baseline', 'center', 'start']);
+export const GRID_ALIGNMENT_VALUES = Object.freeze(['baseline', 'center', 'start', 'end']);
 
 const gridAlignmentValues = new Set(GRID_ALIGNMENT_VALUES);
 
