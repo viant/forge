@@ -207,11 +207,10 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 		entry := &ReportCatalogEntry{ReportCatalogCandidate: candidate, Namespace: uri.Namespace, Name: uri.Name, OwnedByCurrentUser: candidate.OwnerID != "" && candidate.OwnerID == actor.Subject, Resource: pin, Capabilities: capabilities}
 		return entry, nil
 	}
-	batchSize := 8
-	if limit+1 < batchSize {
-		batchSize = limit + 1
-	}
-	for start := 0; start < len(candidates) && len(result.Reports) <= limit; start += batchSize {
+	for start := 0; start < len(candidates) && len(result.Reports) <= limit; {
+		// Never start candidates beyond the page's remaining lookahead. A
+		// failure there must not fail a page the serial reader already completed.
+		batchSize := min(8, limit+1-len(result.Reports))
 		end := start + batchSize
 		if end > len(candidates) {
 			end = len(candidates)
@@ -240,6 +239,10 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 				break
 			}
 		}
+		if result.NextCursor != "" {
+			break
+		}
+		start = end
 	}
 	fresh, err := s.Identity(ctx)
 	if err != nil || !fresh.Valid(time.Now()) || fresh.Subject != actor.Subject || fresh.Issuer != actor.Issuer || fresh.TenantID != actor.TenantID || fresh.AccountID != actor.AccountID || fresh.IdentityRevision != actor.IdentityRevision {

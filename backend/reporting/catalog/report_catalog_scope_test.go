@@ -79,9 +79,13 @@ func TestReportCatalogExactResourceFilterSkipsUnrelatedResolution(t *testing.T) 
 type concurrentCatalogSource struct {
 	raw             json.RawMessage
 	active, maximum atomic.Int32
+	failURI         string
 }
 
 func (s *concurrentCatalogSource) Candidates(_ context.Context, uri identity.ResourceURI) ([]identity.ResourceCandidate, error) {
+	if uri.String() == s.failURI {
+		return nil, errors.New("fixture metadata failure")
+	}
 	current := s.active.Add(1)
 	for previous := s.maximum.Load(); current > previous && !s.maximum.CompareAndSwap(previous, current); previous = s.maximum.Load() {
 	}
@@ -116,5 +120,37 @@ func TestReportCatalogPagesAuthorizedResourcesInBoundedParallelOrder(t *testing.
 		if entry.URI != fmt.Sprintf("report://ar/%02d", i) {
 			t.Fatalf("report order[%d]=%s", i, entry.URI)
 		}
+	}
+}
+
+func TestParallelReportPageDoesNotReadPastLookahead(t *testing.T) {
+	for _, failure := range []struct {
+		uri       string
+		wantError bool
+	}{{"report://ar/15", false}, {"report://ar/03", true}} {
+		t.Run(failure.uri, func(t *testing.T) {
+			actor := identity.VerifiedActor{Subject: "alice", Issuer: "issuer", TenantID: "tenant", AccountID: "account", IdentityRevision: "one", ValidUntil: time.Now().Add(time.Minute)}
+			source := &concurrentCatalogSource{raw: json.RawMessage(`{"schemaVersion":1,"reportDocument":{}}`), failURI: failure.uri}
+			resolver := &identity.ResourceResolver{Source: source, Policy: catalogScopePolicy(func(_ context.Context, _ identity.ResourceRef, candidates []identity.ResourceCandidate) (identity.ResourceDecision, error) {
+				return identity.ResourceDecision{Candidate: candidates[0], AuthorityBinding: "actor", ValidUntil: actor.ValidUntil}, nil
+			})}
+			service := &ReportCatalogService{Identity: func(context.Context) (identity.VerifiedActor, error) { return actor, nil }, Resolver: func(context.Context) (*identity.ResourceResolver, error) { return resolver, nil }, Inventories: []ReportInventory{ReportInventoryFunc(func(context.Context, identity.VerifiedActor) ([]ReportCatalogCandidate, error) {
+				var out []ReportCatalogCandidate
+				for i := 0; i < 16; i++ {
+					out = append(out, ReportCatalogCandidate{URI: fmt.Sprintf("report://ar/%02d", i), Title: "Report"})
+				}
+				return out, nil
+			})}}
+			result, err := service.List(context.Background(), ReportCatalogQuery{Namespace: "ar", Limit: 10})
+			if failure.wantError {
+				if err == nil {
+					t.Fatal("required candidate failure was hidden")
+				}
+				return
+			}
+			if err != nil || len(result.Reports) != 10 || result.NextCursor == "" {
+				t.Fatalf("valid page failed due to later candidate: result=%+v err=%v", result, err)
+			}
+		})
 	}
 }
