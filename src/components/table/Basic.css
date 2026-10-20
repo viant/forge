@@ -952,3 +952,7 @@
 .is-catalog-presentation table tbody tr:nth-child(odd) { background:var(--forge-table-stripe, #f4f6f8); }
 .is-catalog-presentation table tbody tr:hover { background:var(--forge-table-row-hover, #eaf2fc); }
 .is-catalog-presentation table .selected-row { font-weight:400; }
+
+.forge-catalog-search [data-forge-part="fields"] { display:grid; grid-template-columns:minmax(240px,1fr) 170px auto auto !important; gap:10px; align-items:end; }
+.forge-catalog-search .bp6-form-group { margin-bottom:0; }
+@media(max-width:800px) { .forge-catalog-search [data-forge-part="fields"] { grid-template-columns:minmax(0,1fr) !important; } }
