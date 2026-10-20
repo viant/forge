@@ -22,13 +22,13 @@ describe('applyWindowPermissionMetadata', () => {
     const permitted = {authorizationSnapshot: {resources: {'42': {id: 42}}}, view: {content: {id: 'root'}}};
     const result = await applyWindowPermissionMetadata(completeMetadata, {
       services: {applyPermission: async (input) => { calls.push(input); return permitted; }},
-      windowKey: 'document',
+      windowId: 'document-42', windowKey: 'document',
       resource: {DocumentId: [42]},
       windowParams: {DocumentId: [42]},
     });
     expect(result).toBe(permitted);
     expect(calls).toEqual([expect.objectContaining({
-      windowKey: 'document', completeMetadata, resource: {DocumentId: [42]},
+      windowId: 'document-42', windowKey: 'document', completeMetadata, resource: {DocumentId: [42]},
     })]);
   });
 
