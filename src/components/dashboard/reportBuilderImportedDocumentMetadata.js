@@ -155,9 +155,17 @@ export function backfillImportedDocumentMetadata(document = null, reportSpec = n
   const reportSpecBinding = isPlainObject(reportSpec?.binding)
     ? cloneValue(reportSpec.binding)
     : null;
-  const embeddedSemanticSummary = resolveEmbeddedReportBuilderSemanticSummary(nextDocument);
-  const embeddedScope = resolveEmbeddedReportBuilderScope(nextDocument);
-  const embeddedBinding = resolveEmbeddedReportBuilderBinding(nextDocument);
+  const embeddedSemanticSummary = !isPlainObject(nextDocument?.semanticSummary)
+    && !hasSemanticSummaryContent(reportSpecSemanticSummary)
+    ? resolveEmbeddedReportBuilderSemanticSummary(nextDocument)
+    : null;
+  const embeddedScope = !isPlainObject(nextDocument?.scope)
+    ? resolveEmbeddedReportBuilderScope(nextDocument)
+    : null;
+  const embeddedBinding = !isPlainObject(nextDocument?.binding)
+    && !hasBindingContent(reportSpecBinding)
+    ? resolveEmbeddedReportBuilderBinding(nextDocument)
+    : null;
   if (!isPlainObject(nextDocument?.semanticSummary) && (reportSpecSemanticSummary || embeddedSemanticSummary)) {
     nextDocument.semanticSummary = hasSemanticSummaryContent(reportSpecSemanticSummary)
       ? reportSpecSemanticSummary
