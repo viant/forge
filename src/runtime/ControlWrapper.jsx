@@ -54,7 +54,7 @@ export default function ControlWrapper({ item, container, context, framework = '
     const span = Math.min(item?.columnSpan || 1, columns);
 
     const style = {
-        gridColumn: `span ${span}`,
+        ...(span > 1 ? {gridColumn: `span ${span}`} : {}),
         ...(item?.style || {}),
     };
 

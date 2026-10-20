@@ -54,7 +54,9 @@ import CardRail from '../../components/content/CardRail.jsx';
 import CardRailGroup from '../../components/content/CardRailGroup.jsx';
 import FilterChips from '../../components/content/FilterChips.jsx';
 import {currencyInputIcon} from '../../utils/currency.js';
+import MediaPreviewPopover from '../../components/MediaPreviewPopover.jsx';
 import MediaPreview from '../../components/MediaPreview.jsx';
+import ArrayFields from '../../components/primitives/ArrayFields.jsx';
 import {formatPercentFraction2Input, parsePercentFraction2Input} from './percentFractionInput.js';
 import {resolveSelector} from '../../utils/selector.js';
 import {normalizeLifetimeStart, resolveDateRangePreset, resolveDateRangePresetSyncPatch} from './dateRangePreset.js';
@@ -387,12 +389,20 @@ export function registerPack() {
 
     /* -------------------- Local file selector -------------------- */
     registerWidget('file', ({onChange, readOnly, disabled, value, item, style, context, adapter, options, ...rest}) => {
-        const selectedName = value && typeof value === 'object' ? value.name : String(value || '');
+        const fileInputRef = React.useRef(null);
+        const multiple = item?.multiple === true || item?.properties?.multiple === true;
+        const selectedName = Array.isArray(value) ? value.map(file => file?.filename || file?.name).filter(Boolean).join(', ') : value && typeof value === 'object' ? value.name : String(value || '');
+        React.useEffect(() => {
+            if (!selectedName && fileInputRef.current) {
+                fileInputRef.current.value = '';
+                fileInputRef.current.forgeFileSelection = (fileInputRef.current.forgeFileSelection || 0) + 1;
+            }
+        }, [selectedName]);
         return (
-            <div style={{display: 'flex', alignItems: 'center', gap: 6, width: '100%', minWidth: 0, ...(style || {})}}>
+            <div className="forge-file-control" style={style}>
                 <FileInput
                     fill
-                    style={{minWidth: 0, flex: '1 1 auto'}}
+                    className="forge-file-control__input"
                     text={selectedName || 'No file selected'}
                     buttonText="Browse"
                     hasSelection={!!selectedName}
@@ -400,6 +410,8 @@ export function registerPack() {
                     inputProps={{
                         ...rest,
                         accept: rest.accept || item?.accept || item?.properties?.accept || '.csv',
+                        multiple,
+                        ref: fileInputRef,
                     }}
                     onInputChange={onChange}
                 />
@@ -411,7 +423,13 @@ export function registerPack() {
                         aria-label="Clear selected file"
                         title="Clear selected file"
                         disabled={disabled || readOnly}
-                        onClick={() => adapter?.set?.(null)}
+                        onClick={() => {
+                            if (fileInputRef.current) { fileInputRef.current.value = ''; fileInputRef.current.forgeFileSelection = (fileInputRef.current.forgeFileSelection || 0) + 1; }
+                            adapter?.set?.(multiple ? [] : null);
+                            // Use the same encoded-state/authored-event pipeline
+                            // as a file selection so dependent validation refreshes.
+                            if (fileInputRef.current) onChange?.({target: fileInputRef.current});
+                        }}
                     />
                 ) : null}
             </div>
@@ -420,8 +438,13 @@ export function registerPack() {
 
     registerEventAdapter('file', {
         onChange: ({adapter}) => async (event) => {
-            const file = event?.target?.files?.[0];
-            adapter.set(await fileToMCPBlob(file));
+            const input = event?.target;
+            if (!input) return;
+            const generation = (input.forgeFileSelection || 0) + 1;
+            input.forgeFileSelection = generation;
+            const files = Array.from(input.files || []);
+            const encoded = input.multiple ? await Promise.all(files.map(fileToMCPBlob)) : await fileToMCPBlob(files[0]);
+            if (input.forgeFileSelection === generation) adapter.set(encoded);
         },
     });
 
@@ -440,6 +463,7 @@ export function registerPack() {
 
     // Basic onChange → adapter.set mapping
     registerEventAdapter('text', {
+        onBlur: () => () => {},
         onChange: ({ adapter }) => (e) => {
             const val = e?.target?.value ?? e;
             adapter.set(val);
@@ -484,20 +508,22 @@ export function registerPack() {
     /* -------------------- TextArea ---------------------------------- */
     registerWidget(
         'textarea',
-        ({ value = '', onChange, readOnly, style, ...rest }) => (
+        ({ value = '', onChange, readOnly, style, className, ...rest }) => (
             <TextArea
                 {...rest}
                 fill
                 value={value}
                 onChange={(e) => onChange?.(e.target.value)}
                 readOnly={readOnly}
-                style={{ minHeight: 96, resize: 'vertical', ...(style || {}) }}
+                className={['forge-textarea', className].filter(Boolean).join(' ')}
+                style={style}
             />
         ),
         { framework: 'blueprint' }
     );
 
     registerEventAdapter('textarea', {
+        onBlur: () => () => {},
         onChange: ({ adapter }) => (e) => {
             const val = e?.target?.value ?? e;
             adapter.set(val);
@@ -520,13 +546,13 @@ export function registerPack() {
     /* -------------------- Checkbox / Toggle ------------------------- */
     registerWidget(
         'checkbox',
-        ({ value = false, onChange, readOnly, className, ...rest }) => (
+        ({ value = false, onChange, readOnly, disabled, className, ...rest }) => (
             <Checkbox
                 {...rest}
                 className={[className, 'forge-blueprint-checkbox-compat'].filter(Boolean).join(' ')}
                 checked={!!value}
                 onChange={(e) => onChange?.(e.target.checked)}
-                disabled={readOnly}
+                disabled={readOnly || disabled}
             />
         ),
         { framework: 'blueprint' }
@@ -1123,6 +1149,10 @@ export function registerPack() {
         onValueChange: ({ adapter }) => (v) => adapter.set(v),
     });
 
+    registerWidget('arrayFields', props => <ArrayFields {...props}/>, {framework: 'blueprint'});
+    registerEventAdapter('arrayFields', {onChange: ({adapter}) => value => adapter.set(value)});
+
+    registerWidget('mediaPreviewPopover', (props) => <MediaPreviewPopover {...props} />, {framework: 'blueprint'});
     registerWidget('mediaPreview', (props) => <MediaPreview {...props} />, {framework: 'blueprint'});
 
     /* -------------------- Fractional percent input ----------------- */
@@ -1371,40 +1401,18 @@ export function registerPack() {
 
     /* -------------------- Button ------------------------------------ */
     registerWidget('button', ({ onClick, readOnly, disabled, intent, children, className, style, title, item, icon, hideLabel, ...rest }) => {
-        const iconAction = String(className || '').split(/\s+/).includes('forge-action-icon');
         const unavailable = readOnly === true || disabled === true;
-        const intentColors = {
-            primary: { background: '#2f6de1', border: '#2f6de1', color: '#fff' },
-            success: { background: '#0f9960', border: '#0f9960', color: '#fff' },
-            warning: { background: '#d9822b', border: '#d9822b', color: '#fff' },
-            danger: { background: '#db3737', border: '#db3737', color: '#fff' },
-        };
-        const palette = intentColors[String(intent || '').trim().toLowerCase()] || null;
+        const variant = String(intent || '').trim().toLowerCase();
+        const intentClass = ['primary','success','warning','danger'].includes(variant) ? `forge-button--${variant}` : '';
+        const buttonClass = ['forge-button', hideLabel ? 'forge-button--icon-only' : '', intentClass, className].filter(Boolean).join(' ');
         return (
             <button
                 type="button"
-                className={className}
+                className={buttonClass}
                 disabled={unavailable}
                 title={title}
                 onClick={onClick}
-                style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    minHeight: iconAction ? undefined : 'var(--forge-control-height, 30px)',
-                    minWidth: !iconAction && hideLabel ? 30 : undefined,
-                    padding: iconAction ? undefined : hideLabel ? '0 7px' : '0 var(--forge-control-padding-inline, 12px)',
-                    borderRadius: 'var(--forge-control-radius, 8px)',
-                    border: `1px solid ${palette?.border || '#d0daea'}`,
-                    background: unavailable ? `var(--forge-disabled-bg, ${palette?.background || '#f5f8fd'})` : (palette?.background || 'var(--forge-button-bg, #f5f8fd)'),
-                    color: unavailable ? `var(--forge-disabled-text, ${palette?.color || '#2d5a9e'})` : (palette?.color || 'var(--forge-button-text, #2d5a9e)'),
-                    cursor: unavailable ? 'default' : 'pointer',
-                    font: 'inherit',
-                    fontWeight: 600,
-                    lineHeight: 1.2,
-                    ...(style || {}),
-                }}
+                style={style}
                 {...rest}
             >
                 {icon ? <Icon icon={icon} size={14}/> : null}

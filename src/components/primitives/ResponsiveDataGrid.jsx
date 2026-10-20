@@ -1,3 +1,5 @@
+import MediaPreviewPopover from "../MediaPreviewPopover.jsx";
+import {normalizeMediaPreview} from "../mediaPreview.js";
 import {containerSizingStyle} from '../containerSizing.js';
 import React from 'react';
 import {Button} from '@blueprintjs/core';
@@ -88,6 +90,7 @@ function ResponsiveCardField({row, rowIndex, column, colIndex, context, columnHa
   const timeZone = (column.timeZoneSelector ? resolveSelector(row, column.timeZoneSelector) || column.timeZone : column.timeZone) || context?.resource?.timeZone;
   const display = value == null || value === '' ? column.emptyText || '—' : formatDisplayValue(value, column.format || 'raw', 'en-US', {currency, timeZone});
   const label = column.name || column.label || column.cellProperties?.['aria-label'] || field;
+  if(column.type==='mediaPreview' && normalizeMediaPreview(value).kind==='imagecard') return <div className="forge-responsive-grid__field forge-responsive-grid__field--action" key={field}><dt>{label}</dt><dd><MediaPreviewPopover value={value} {...column.preview}/></dd></div>;
   if (column.type === 'button') {
     const properties = applyDynamicCellProperties({
       icon: column.icon,

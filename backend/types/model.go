@@ -1433,6 +1433,27 @@ type Toolbar struct {
 	TargetOverrides map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
 }
 
+// MediaPreviewValue is a reusable media value; imageCard adds escaped text and
+// an optional external destination around an image. Runtime validates URLs.
+type MediaPreviewValue struct {
+	Kind        string `json:"kind" yaml:"kind"`
+	URL         string `json:"url,omitempty" yaml:"url,omitempty"`
+	Alt         string `json:"alt,omitempty" yaml:"alt,omitempty"`
+	Title       string `json:"title,omitempty" yaml:"title,omitempty"`
+	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+	Caption     string `json:"caption,omitempty" yaml:"caption,omitempty"`
+	Href        string `json:"href,omitempty" yaml:"href,omitempty"`
+	Identity    string `json:"identity,omitempty" yaml:"identity,omitempty"`
+}
+
+// MediaPreviewOptions configures the shared table/card preview trigger.
+type MediaPreviewOptions struct {
+	Label            string `json:"label,omitempty" yaml:"label,omitempty"`
+	AriaLabel        string `json:"ariaLabel,omitempty" yaml:"ariaLabel,omitempty"`
+	ClassName        string `json:"className,omitempty" yaml:"className,omitempty"`
+	PopoverClassName string `json:"popoverClassName,omitempty" yaml:"popoverClassName,omitempty"`
+}
+
 type Column struct {
 	ID                    string                 `json:"id" yaml:"id"`
 	Name                  string                 `json:"name" yaml:"name"`
@@ -1461,6 +1482,7 @@ type Column struct {
 	Link                  *TableLink             `json:"link,omitempty" yaml:"link,omitempty"`
 	Badge                 *TableCellBadge        `json:"badge,omitempty" yaml:"badge,omitempty"`
 	Badges                []*TableCellBadge      `json:"badges,omitempty" yaml:"badges,omitempty"`
+	Preview               *MediaPreviewOptions   `json:"preview,omitempty" yaml:"preview,omitempty"`
 	CellProperties        map[string]interface{} `json:"cellProperties,omitempty" yaml:"cellProperties,omitempty"`
 	HeadProperties        map[string]interface{} `json:"headProperties,omitempty" yaml:"headProperties,omitempty"`
 	Progress              *Progress              `json:"progress,omitempty" yaml:"progress,omitempty"`

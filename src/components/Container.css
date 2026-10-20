@@ -514,3 +514,12 @@
 @media (pointer: coarse) { .forge-action-icon, button.forge-action-icon[data-forge-part="button"] { width: 44px; height: 44px; min-width: 44px; min-height: 44px; } }
 
 .forge-container-card.is-compact { padding: var(--forge-card-compact-padding, 8px 12px); }
+
+/* Single-column field defaults stay overridable by authored resource classes. */
+.forge-fields-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    margin-bottom: var(--forge-fields-margin-bottom, 4px);
+    gap: var(--forge-fields-gap, 1rem);
+}

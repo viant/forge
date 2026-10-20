@@ -106,17 +106,15 @@ const wrapContainerChrome = (container, content, suppressTitle = false, sectionP
 };
 
 const buildGridStyle = (style, columns, layout) => {
-    const display = (style && Object.prototype.hasOwnProperty.call(style, 'display')) ? style.display : 'grid';
-
+    // Default field-grid appearance belongs to CSS so authored classes can
+    // override it. Keep explicit layout values and legacy style compatibility.
+    const {width, marginBottom, gridTemplateColumns, gap, ...custom} = style || {};
     return {
-        ...style,
-        width: '100%',
-        display,
-        gridTemplateColumns: `repeat(${columns}, 1fr)`,
-        marginBottom: '4px',
-        gap: layout?.gap ?? '1rem',
-        rowGap: layout?.rowGap,
-        columnGap: layout?.columnGap,
+        ...custom,
+        ...(columns > 1 ? {gridTemplateColumns: `repeat(${columns}, 1fr)`} : {}),
+        ...(layout?.gap != null ? {gap: layout.gap} : {}),
+        ...(layout?.rowGap != null ? {rowGap: layout.rowGap} : {}),
+        ...(layout?.columnGap != null ? {columnGap: layout.columnGap} : {}),
     };
 };
 
@@ -770,7 +768,7 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
                             style={style}
                         />
                     ) : (
-                        <div data-forge-part="fields" style={gridStyle}>
+                        <div className="forge-fields-grid" data-forge-part="fields" style={gridStyle}>
                             {visualItems.map((item) => {
                                 const subCtx = resolveChildContext(effectiveContext, item.dataSourceRef || dataSourceRef)
                                 return (

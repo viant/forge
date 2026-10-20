@@ -171,6 +171,7 @@ assert.match(quietSectionHtml, /aria-expanded="true"/);
 
 const signal = (value) => ({value, peek: () => value});
 const integrationContext = {
+    metadata: {dataSource: {fixture: {id: 'fixture', cardinality: 'many'}}},
     identity: {dataSourceRef: 'fixture'},
     signals: {message: signal([])},
     handlers: {dataSource: {}},

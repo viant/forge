@@ -7,6 +7,7 @@ export const normalizeMediaPreview = (value = {}, {trustedBlob = false} = {}) =>
     const candidate = value && typeof value === 'object' ? value : {url: value};
     const kind = String(candidate.kind || '').trim().toLowerCase();
     const url = safeUrl(candidate.url, trustedBlob);
+    if (kind === 'imagecard') return {kind:'imagecard',url,alt:String(candidate.alt||'Preview image'),title:String(candidate.title||''),description:String(candidate.description||''),caption:String(candidate.caption||''),href:safeUrl(candidate.href),identity:String(candidate.identity||'')};
     const supported = ['image', 'audio', 'video'].includes(kind) && !!url;
     return {
         kind: supported ? kind : 'unsupported',
