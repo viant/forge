@@ -17,6 +17,7 @@ export function buildDateProps(item, { readOnly, properties = {} } = {}) {
             merged.inputProps = {
                 name: item.id,
                 placeholder: placeholderProp || 'Select a time...',
+                ...properties.inputProps,
             };
             delete merged.placeholder;
             break;
@@ -25,6 +26,7 @@ export function buildDateProps(item, { readOnly, properties = {} } = {}) {
             merged.inputProps = {
                 name: item.id,
                 placeholder: placeholderProp || 'Select a date...',
+                ...properties.inputProps,
             };
             break;
     }

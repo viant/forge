@@ -60,3 +60,25 @@ export function tableTrailingSpace(columns = [], viewportWidth = 0) {
     const naturalWidth = widths.reduce((sum,width)=>sum+width,0);
     return {widths, naturalWidth, fillerWidth: Math.max(0,(Number(viewportWidth)||0)-naturalWidth)};
 }
+
+// Nested tables must fit the scrollport that contains them, including dialog
+// bodies whose footer sits above the browser's bottom edge.
+export function tableAvailableHeight(element, viewportBottom, readStyle = getComputedStyle) {
+    let bottom = viewportBottom - 16;
+    for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+        const style = readStyle(ancestor);
+        if (!['auto', 'scroll', 'hidden', 'clip'].includes(style.overflowY) || ancestor.clientHeight <= 0) continue;
+        const box = ancestor.getBoundingClientRect();
+        const padding = Number.parseFloat(style.paddingBottom) || 0;
+        // A max-height body is content-sized until rows arrive. Measuring its
+        // current height would feed the table's previous cap back into itself.
+        const maximum = /px$/.test(style.maxHeight) ? Number.parseFloat(style.maxHeight) : NaN;
+        const borders = (Number.parseFloat(style.borderTopWidth) || 0) + (Number.parseFloat(style.borderBottomWidth) || 0);
+        const paddingTop = Number.parseFloat(style.paddingTop) || 0;
+        const height = Number.isFinite(maximum)
+            ? style.boxSizing === 'border-box' ? maximum - borders : maximum + paddingTop + padding
+            : ancestor.clientHeight;
+        bottom = Math.min(bottom, box.top + (ancestor.clientTop || 0) + height - padding);
+    }
+    return Math.max(160, bottom - element.getBoundingClientRect().top);
+}

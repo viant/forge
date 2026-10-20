@@ -40,7 +40,7 @@ export default function DraftForm({container, context, children}) {
       if (typeof handler === 'function') handler({context: dataContext, values: JSON.parse(baseline)});
     }
   };
-  const body = children ? <fieldset className="forge-draft-form__fields" data-forge-part="draft-fields" disabled={busy} style={{border: 0, padding: 0, margin: 0, minWidth: 0}}>{children}</fieldset> : null;
+  const body = children ? <fieldset className="forge-draft-form__fields" data-forge-part="draft-fields" disabled={busy}>{children}</fieldset> : null;
   return <div className={`forge-draft-form${children ? ' forge-draft-form--editor' : ''}`} data-forge-primitive="draftForm" aria-busy={busy || undefined}>
     <div className="forge-draft-form__actions" data-forge-part="draft-actions">
       {spec.submit && (!spec.submitWhen || evaluatePlainVisibleWhen(spec.submitWhen, dataContext)) ? <MutationCommand command={command} context={dataContext} extras={{data: form}} disabled={!dirty || !valid} onSettled={({status}) => {

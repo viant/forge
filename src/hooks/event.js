@@ -238,7 +238,7 @@ export const useControlEvents = (context, items = [], state) => {
                 }
             }
 
-            if (handlers.onChange) {
+            if (handlers.onChange && item.type !== 'file') {
                 handlers.onChange.isDefined() ? handlers.onChange.prepend(execution) : handlers.onChange.push(execution);
             }
             if (handlers.onValueChange) {
@@ -262,7 +262,7 @@ export const useControlEvents = (context, items = [], state) => {
                     changeHandler = 'dataSource.setFormField';
                     break;
             }
-            if (handlers.onChange) {
+            if (handlers.onChange && item.type !== 'file') {
                 const execution = {id: changeHandler};
                 handlers.onChange.isDefined() ? handlers.onChange.prepend(execution) : handlers.onChange.push(execution);
             }
@@ -286,6 +286,7 @@ export const useControlEvents = (context, items = [], state) => {
                 }
                 switch (key) {
 
+                    case "onBlur":
                     case "onClick":
                     case "onTagClick":
                     case "onCountClick":

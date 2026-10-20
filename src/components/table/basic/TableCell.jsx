@@ -1,3 +1,5 @@
+import MediaPreviewPopover from "../../MediaPreviewPopover.jsx";
+import {normalizeMediaPreview} from "../../mediaPreview.js";
 import EditableTextCell from "./EditableTextCell.jsx";
 import ImageLabelCell from "./ImageLabelCell.jsx";
 import React, {useEffect, useRef, useState} from "react";
@@ -85,7 +87,7 @@ const TableCell = ({
             }
         } catch (_) { /* ignore */ }
     }
-    const {type} = col;
+    let {type} = col;
     let tdClass = ["row", rowClassName, cell.className].filter(Boolean).join(" ");
     if (isSelected({...cellSelection})) {
         tdClass += " selected-cell";
@@ -123,7 +125,11 @@ const TableCell = ({
     };
 
     let cellContent = null;
+    if(type === "mediaPreview" && normalizeMediaPreview(value).kind !== "imagecard") type="link";
     switch (type) {
+        case "mediaPreview":
+            cellContent=<MediaPreviewPopover value={value} {...col.preview}/>;
+            break;
         case "editableText":
             cellContent = <EditableTextCell {...cellProps} value={value} label={`${col.name || col.id} ${cellSelection.row?.id ?? cellSelection.rowIndex ?? ""}`.trim()} readOnly={cellProps.readOnly === true} onChange={events.onChange}/>;
             break;

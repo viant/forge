@@ -13,3 +13,5 @@ assert.equal(normalizeMediaPreview({kind:'image',url:'data:image/svg+xml,<svg/>'
 assert.equal(normalizeMediaPreview({kind:'image',url:'blob:http://localhost/owned'}).kind,'unsupported');
 assert.equal(normalizeMediaPreview({kind:'image',url:'blob:http://localhost/owned'},{trustedBlob:true}).kind,'image');
 console.log('media preview tests passed');
+const card=normalizeMediaPreview({kind:'imageCard',url:'https://example.test/image.png',title:'<script>text</script>',description:'Caption',caption:'Sponsor',href:'javascript:alert(1)',identity:42});
+assert.equal(card.kind,'imagecard');assert.equal(card.href,'');assert.equal(card.identity,'42');assert.equal(card.title,'<script>text</script>');assert.equal(normalizeMediaPreview({kind:'imageCard',title:'No image'}).kind,'imagecard');

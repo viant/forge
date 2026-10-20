@@ -20,7 +20,7 @@ import {matchingRules, mergeClassNames, mergeStyles, normalizeRuleList} from "./
 import {resolveTableCellText, resolveTableLink} from "../../utils/tableLink.js";
 import {resolveKey} from "../../utils/selector.js";
 import {filterEmptyStateToolbarItems, resolveTableEmptyState, shouldRenderTableEmptyState} from "./tableEmptyState.js";
-import {tableTrailingSpace, tableSurfaceWidth, tableRowSlots, preserveDeclaredColumnWidths, scrollableTableWidth, tableBackfillCount, withStickyColumnOffsets} from './tableSizing.js';
+import {tableAvailableHeight, tableTrailingSpace, tableSurfaceWidth, tableRowSlots, preserveDeclaredColumnWidths, scrollableTableWidth, tableBackfillCount, withStickyColumnOffsets} from './tableSizing.js';
 import {evaluatePlainVisibleWhen, trackVisibleWhen} from '../visibleWhen.js';
 import {resolveClientPagination, usesClientPaginationInfo} from './clientPagination.js';
 import {requestServerTableSort} from './serverSort.js';
@@ -394,7 +394,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
             // doing so feeds the table's previous cap back into its next measure.
             const viewport = window.visualViewport;
             const bottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
-            setAvailableHeight(Math.max(160, bottom - div.getBoundingClientRect().top - 16));
+            setAvailableHeight(tableAvailableHeight(div, bottom));
         };
         const resizeObserver = new ResizeObserver(measure);
         resizeObserver.observe(div);

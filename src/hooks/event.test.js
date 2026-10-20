@@ -223,3 +223,13 @@ for (const type of ['checkbox', 'toggle']) {
     control.events.onChange({target: {checked: true}});
     assert.equal(context.signals.windowForm.value.history, true);
 }
+
+// The file adapter already stores encoded Blob objects. An authored callback
+// must not replace those with the native input's fake path string.
+{
+ const encoded=[{filename:'a.mp4',data:'AQ=='}];let current=encoded,observed;
+ const context={signals:{message:{value:[],peek:()=>[]}},lookupHandler:id=>id==='dataSource.setFormField'?()=>{current='overwritten'}:id==='file.changed'?()=>{observed=current}:()=>true};
+ const handlers=useControlEvents(context,[{id:'files',type:'file',dataField:'files',scope:'form',on:[{event:'onChange',handler:'file.changed'}]}]);
+ handlers.files.events.onChange({target:{value:'C:\\fakepath\\a.mp4'}});
+ assert.equal(current,encoded);assert.equal(observed,encoded);
+}

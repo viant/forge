@@ -260,6 +260,16 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
     const dialogOpen = handlers.dialog.isOpen();
     const focusClassName = `forge-dialog-focus-${String(context?.identity?.windowId || 'window').replace(/[^a-zA-Z0-9_-]/g, '-')}-${String(dialog?.id || 'dialog').replace(/[^a-zA-Z0-9_-]/g, '-')}`;
     const previousOpenRef = useRef(false);
+    // WindowContent removes closed dialogs, so a close can unmount this view
+    // before the open-state effect observes the transition.
+    const closeEventRef = useRef(null);
+    closeEventRef.current = () => {
+        if (previousOpenRef.current && !handlers.dialog.isOpen()) {
+            previousOpenRef.current = false;
+            if (events.onClose.isDefined()) events.onClose.execute({context, dialog});
+        }
+    };
+    useEffect(() => () => closeEventRef.current?.(), []);
     useEffect(() => {
         if (!dialogOpen || Number(focusRequest || 0) <= 0 || typeof document === 'undefined') return;
         const timer = setTimeout(() => {
@@ -415,6 +425,8 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
             if (events.onOpen.isDefined()) {
                 events.onOpen.execute({ context, dialog });
             }
+        } else if (wasOpen && !isDialogOpen && events.onClose.isDefined()) {
+            events.onClose.execute({ context, dialog });
         }
         previousOpenRef.current = isDialogOpen;
     }, [dialogOpen, handlers, resolvedDataSourceRef, selectionModeOverride, context, dialog, events, quickFilterSpecs, fetchOnOpen, focusRequest, log]);

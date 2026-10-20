@@ -1,34 +1,28 @@
 import React, {useEffect, useState} from 'react';
 import {normalizeMediaPreview} from './mediaPreview.js';
+import './mediaPreview.css';
 
-export default function MediaPreview({value, style = {}, className = ''}) {
+export default function MediaPreview({value, style, className = ''}) {
     const preview = normalizeMediaPreview(value);
     const [failed, setFailed] = useState(false);
-    useEffect(() => setFailed(false), [preview.kind, preview.url]);
+    useEffect(() => setFailed(false), [preview.kind, preview.url, preview.identity]);
 
-    const frameStyle = {
-        minHeight: 160,
-        width: '100%',
-        border: '1px solid #d8e1ea',
-        borderRadius: 8,
-        background: '#f8fafc',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 12,
-        ...style,
-    };
+    if (preview.kind === 'imagecard') {
+        const content=<>{preview.url && !failed ? <img src={preview.url} alt={preview.alt} onError={()=>setFailed(true)} className="forge-media-preview__card-image"/> : null}<div className="forge-media-preview__card-caption">{preview.caption}</div></>;
+        return <div className={['forge-media-preview-card',className].filter(Boolean).join(' ')}><div className="forge-media-preview__card-title">{preview.title}</div><div className="forge-media-preview__card-description">{preview.description}</div>{preview.href?<a href={preview.href} target="_blank" rel="noopener noreferrer" className="forge-media-preview__card-link">{content}</a>:<div>{content}</div>}</div>;
+    }
+    const frameClass = ['forge-media-preview', className].filter(Boolean).join(' ');
     if (failed || preview.kind === 'unsupported') {
-        return <div className={className} style={frameStyle} role="status">
+        return <div className={frameClass} style={style} role="status">
             <span>{failed ? 'Preview failed to load.' : preview.message}</span>
-            {preview.url ? <a href={preview.url} target="_blank" rel="noopener noreferrer" style={{marginLeft: 8}}>Open source</a> : null}
+            {preview.url ? <a href={preview.url} target="_blank" rel="noopener noreferrer" className="forge-media-preview__source">Open source</a> : null}
         </div>;
     }
     if (preview.kind === 'audio') {
-        return <div className={className} style={frameStyle}><audio controls src={preview.url} onError={() => setFailed(true)}>Audio preview unavailable.</audio></div>;
+        return <div className={frameClass} style={style}><audio controls src={preview.url} onError={() => setFailed(true)}>Audio preview unavailable.</audio></div>;
     }
     if (preview.kind === 'video') {
-        return <div className={className} style={frameStyle}><video controls src={preview.url} onError={() => setFailed(true)} style={{maxWidth: '100%', maxHeight: 360}}>Video preview unavailable.</video></div>;
+        return <div className={frameClass} style={style}><video controls src={preview.url} onError={() => setFailed(true)} className="forge-media-preview__media">Video preview unavailable.</video></div>;
     }
-    return <div className={className} style={frameStyle}><img src={preview.url} alt={preview.alt} onError={() => setFailed(true)} style={{maxWidth: '100%', maxHeight: 360, objectFit: 'contain'}} /></div>;
+    return <div className={frameClass} style={style}><img src={preview.url} alt={preview.alt} onError={() => setFailed(true)} className="forge-media-preview__media forge-media-preview__image" /></div>;
 }

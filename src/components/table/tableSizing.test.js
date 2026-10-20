@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import {tableTrailingSpace, tableSurfaceWidth, tableRowSlots, preserveDeclaredColumnWidths, scrollableTableWidth, tableBackfillCount, withStickyColumnOffsets} from './tableSizing.js';
+import {tableAvailableHeight, tableTrailingSpace, tableSurfaceWidth, tableRowSlots, preserveDeclaredColumnWidths, scrollableTableWidth, tableBackfillCount, withStickyColumnOffsets} from './tableSizing.js';
 
 const columns = preserveDeclaredColumnWidths([{id: 'id', width: 90}, {id: 'name', width: 320}, {id: 'type', width: 150}]);
 assert.deepEqual(columns.map((column) => column.minWidth), ['90px', '320px', '150px']);
@@ -42,3 +42,25 @@ assert.equal(tableSurfaceWidth({fullWidth:false},[{width:600}],1000),'min(100%, 
 assert.deepEqual(tableTrailingSpace([{width:80},{width:220}],1000),{widths:[80,220],naturalWidth:300,fillerWidth:700});
 assert.equal(tableTrailingSpace([{width:900},{width:900}],1000).fillerWidth,0);
 assert.equal(tableSurfaceWidth({fillRemainingWidth:true},[{width:80}],1000),'100%');
+
+// A 390×844 companion picker has a footer below its 688px body. The
+// viewport-only cap was 738px, leaving the last checkbox behind that footer.
+const body = {parentElement:null, clientTop:0, clientHeight:688,
+    getBoundingClientRect:()=>({top:98}), style:{overflowY:'auto',paddingBottom:'16px',maxHeight:'688px',boxSizing:'border-box'}};
+const table = {parentElement:body,getBoundingClientRect:()=>({top:114})};
+assert.equal(tableAvailableHeight(table,844,node=>node.style),656);
+const content = {parentElement:body,clientHeight:750,getBoundingClientRect:()=>({top:114}),style:{overflowY:'visible'}};
+table.parentElement=content;
+assert.equal(tableAvailableHeight(table,844,node=>node.style),656,'content-sized layout wrappers do not create a cap');
+body.clientHeight=500;body.style.maxHeight='500px';
+assert.equal(tableAvailableHeight(table,844,node=>node.style),468,'a resized dialog tightens the cap');
+table.parentElement=null;
+assert.equal(tableAvailableHeight(table,844,node=>node.style),714,'standalone tables keep the viewport margin');
+
+body.clientHeight=100;body.style.maxHeight='688px';table.parentElement=body;
+assert.equal(tableAvailableHeight(table,844,node=>node.style),656,'an empty dialog can grow as rows arrive without feeding back its old table cap');
+
+body.style.maxHeight='100%';body.clientHeight=500;
+assert.equal(tableAvailableHeight(table,844,node=>node.style),468,'unresolved percentages are not interpreted as pixel heights');
+body.style.maxHeight='500px';body.style.boxSizing='content-box';body.style.paddingTop='16px';
+assert.equal(tableAvailableHeight(table,844,node=>node.style),500,'content-box maxima include padding in the scrollport');
