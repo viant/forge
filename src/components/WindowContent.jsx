@@ -1230,11 +1230,15 @@ function WindowContentInner({window, metadata, services}) {
  * only a stable set of hooks so React never complains about ordering.
  * ------------------------------------------------------------------ */
 
-export default function WindowContent(props) {
+function WindowContent(props) {
     useSignals();
     const metadata = props.selectedMetadata || (props.window?.windowId ? getMetadataSignal(props.window.windowId).value : null);
     return <ForgeThemeBoundary windowKey={metadata?.windowKey || props.window?.windowKey} resource={metadata?.resource}><WindowContentRuntime {...props} /></ForgeThemeBoundary>;
 }
+
+// Local signal subscriptions still update their own window. This boundary only
+// skips unrelated parent renders when the window's props retain their identity.
+export default React.memo(WindowContent);
 
 function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}) {
     useSignals();
