@@ -53,3 +53,23 @@ func TestReportMetadataScopeBuffersProjectionAndChecksRelease(t *testing.T) {
 		t.Fatalf("metadata returned after release denial=%+v %v", result, err)
 	}
 }
+
+func TestReportCatalogExactResourceFilterSkipsUnrelatedResolution(t *testing.T) {
+	ctx := context.Background()
+	uri, _ := identity.ParseResourceURI("report://shared/Sales")
+	raw := json.RawMessage(`{"schemaVersion":1,"format":"forge.authoredReport","reportDocument":{}}`)
+	actor := identity.VerifiedActor{Subject: "alice", Issuer: "issuer", TenantID: "tenant", AccountID: "account", IdentityRevision: "one", ValidUntil: time.Now().Add(time.Minute)}
+	resolver := &identity.ResourceResolver{Source: &identity.LocalResource{URI: uri, Load: func(context.Context) (json.RawMessage, error) { return raw, nil }}, Policy: catalogScopePolicy(func(context.Context, identity.ResourceRef, []identity.ResourceCandidate) (identity.ResourceDecision, error) {
+		return identity.ResourceDecision{Candidate: identity.ResourceCandidate{Kind: identity.WorkingCandidate, ContentFingerprint: identity.ContentFingerprint(raw)}, AuthorityBinding: "alice-account", ValidUntil: actor.ValidUntil}, nil
+	})}
+	service := &ReportCatalogService{Identity: func(context.Context) (identity.VerifiedActor, error) { return actor, nil }, Resolver: func(context.Context) (*identity.ResourceResolver, error) { return resolver, nil }, Inventories: []ReportInventory{ReportInventoryFunc(func(context.Context, identity.VerifiedActor) ([]ReportCatalogCandidate, error) {
+		return []ReportCatalogCandidate{{URI: "report://shared/Other", Title: "Other"}, {URI: uri.String(), Title: "Sales"}}, nil
+	})}}
+	result, err := service.List(ctx, ReportCatalogQuery{Namespace: "shared", ResourceURI: uri.String()})
+	if err != nil || len(result.Reports) != 1 || result.Reports[0].URI != uri.String() {
+		t.Fatalf("exact report filter=%+v %v", result, err)
+	}
+	if _, err = service.List(ctx, ReportCatalogQuery{Namespace: "shared", ResourceURI: "window://shared/Sales"}); !errors.Is(err, identity.ErrResource) {
+		t.Fatalf("invalid exact report filter: %v", err)
+	}
+}

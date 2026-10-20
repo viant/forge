@@ -52,6 +52,7 @@ type ReportCatalogEntry struct {
 }
 type ReportCatalogQuery struct {
 	Namespace       string `json:"namespace,omitempty"`
+	ResourceURI     string `json:"resourceUri,omitempty"`
 	CurrentUserOnly bool   `json:"currentUserOnly,omitempty"`
 	Cursor          string `json:"cursor,omitempty"`
 	Limit           int    `json:"limit,omitempty"`
@@ -107,6 +108,12 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 	if s == nil || s.Identity == nil || s.Resolver == nil || len(s.Inventories) == 0 || ctx == nil || ctx.Err() != nil || input.Limit < 0 || input.Limit > 1000 {
 		return nil, identity.ErrResourceDenied
 	}
+	if input.ResourceURI != "" {
+		uri, err := identity.ParseResourceURI(input.ResourceURI)
+		if err != nil || uri.Kind != "report" || input.Namespace != "" && input.Namespace != uri.Namespace || input.Cursor != "" {
+			return nil, identity.ErrResource
+		}
+	}
 	actor, err := s.Identity(ctx)
 	if err != nil || !actor.Valid(time.Now()) {
 		return nil, identity.ErrResourceDenied
@@ -143,7 +150,7 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 				return nil, fmt.Errorf("invalid or conflicting report catalog identity")
 			}
 			seen[entry.URI] = true
-			if input.Namespace != "" && input.Namespace != uri.Namespace || entry.URI <= after || input.CurrentUserOnly && entry.OwnerID != actor.Subject {
+			if input.Namespace != "" && input.Namespace != uri.Namespace || input.ResourceURI != "" && entry.URI != input.ResourceURI || entry.URI <= after || input.CurrentUserOnly && entry.OwnerID != actor.Subject {
 				continue
 			}
 			candidates = append(candidates, entry)
