@@ -39,3 +39,18 @@ test('MCP adapter makes one standard read per archive with no window or business
  await fs.preload();await fs.preload();
  assert.deepEqual(calls.sort(),['resource-archive://example/datasources','resource-archive://example/dialogs']);
 });
+test('exact revisions coexist with one provider-selected default',async()=>{
+ const old={...entry('datasource','orders',{id:'orders',value:'old'}),selected:false};
+ const current={...entry('datasource','orders',{id:'orders',value:'current'}),revision:'2',selected:true};
+ const fs=new ResourceFS({namespace:'example',scopeKey:'alice',loadArchive:async()=>snapshot('datasource',[old,current])});
+ assert.equal((await fs.read('orders',{kind:'datasource'})).value,'current');
+ assert.equal((await fs.read('orders',{kind:'datasource',revision:'1'})).value,'old');
+ assert.equal(JSON.parse(await fs.readFile('orders',{kind:'datasource',revision:'1'})).value,'old');
+ assert.equal(await fs.read('orders',{kind:'datasource',revision:'3'}),undefined);
+});
+test('conflicting defaults and duplicate revisions reject the snapshot',async()=>{
+ for(const entries of [[{...entry('dialog','pick',{id:'pick'}),selected:true},{...entry('dialog','pick',{id:'pick'}),revision:'2',selected:true}],[entry('dialog','pick',{id:'pick'}),entry('dialog','pick',{id:'pick'})]]){
+  const fs=new ResourceFS({namespace:'example',scopeKey:'alice',loadArchive:async()=>snapshot('dialog',entries)});
+  assert.equal(await fs.ensure('dialog'),false);assert.equal(fs.indexes.has('dialog'),false);
+ }
+});

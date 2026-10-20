@@ -59,13 +59,19 @@ export class ResourceFS {
       const index = new Map();
       for (const entry of snapshot.entries) {
         const uri = parseURI(entry.uri);
-        if (uri.kind !== kind || uri.namespace !== this.namespace || resolveResourcePath(entry.uri) !== entry.uri || !entry.revision || index.has(entry.uri) || typeof entry.definitionText !== 'string' || !/^[a-f0-9]{64}$/.test(entry.contentFingerprint || '')) throw new Error('Invalid or duplicate archive entry');
+        if (uri.kind !== kind || uri.namespace !== this.namespace || resolveResourcePath(entry.uri) !== entry.uri || !entry.revision || typeof entry.definitionText !== 'string' || !/^[a-f0-9]{64}$/.test(entry.contentFingerprint || '') || entry.selected != null && typeof entry.selected !== 'boolean') throw new Error('Invalid archive entry');
+        const revisions = index.get(entry.uri) || {versions: new Map(), selected: null, explicit: false};
+        const revision = String(entry.revision);
+        if (revisions.versions.has(revision) || entry.selected === true && revisions.selected !== null) throw new Error('Duplicate archive revision or selection');
         const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(entry.definitionText));
         const hash = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
         if (hash !== entry.contentFingerprint) throw new Error('Resource fingerprint mismatch');
         const definition = JSON.parse(entry.definitionText);
         if (!definition || typeof definition !== 'object' || Array.isArray(definition)) throw new Error('Invalid resource definition');
-        index.set(entry.uri, {revision: String(entry.revision), definitionText: entry.definitionText, definition});
+        revisions.versions.set(revision, {revision, definitionText: entry.definitionText, definition});
+        if (entry.selected === true) revisions.selected = revision;
+        if (entry.selected != null) revisions.explicit = true;
+        index.set(entry.uri, revisions);
       }
       if (generation !== this.generation) return false;
       this.indexes.set(kind, index);
@@ -83,19 +89,25 @@ export class ResourceFS {
     if (parsed.namespace !== this.namespace) throw new Error('Resource belongs to another scoped adapter');
     const generation = this.generation;
     if (!await this.ensure(parsed.kind) || generation !== this.generation) return undefined;
-    const entry = this.indexes.get(parsed.kind)?.get(uri);
-    if (!entry || revision != null && String(revision) !== entry.revision) {
+    const entry = this.selectedEntry(parsed.kind, uri, revision);
+    if (!entry) {
       this.warning('resource_missing', uri, 'Resource is unavailable in the completed snapshot');
       return undefined;
     }
     return clone(entry.definition);
   }
   invalidate() { this.generation++; this.pending.clear(); this.indexes.clear(); this.warnings.clear(); this.warningDetails.clear(); }
+  selectedEntry(kind, uri, revision) {
+    const choices = this.indexes.get(kind)?.get(uri);
+    if (!choices) return undefined;
+    const selected = revision != null ? String(revision) : choices.selected ?? (!choices.explicit && choices.versions.size === 1 ? choices.versions.keys().next().value : undefined);
+    return choices.versions.get(selected);
+  }
   async readFile(reference, options = {}) {
     const value = await this.read(reference, options);
     if (value === undefined) return undefined;
     const uri = resolveResourcePath(reference, {kind: options.kind, namespace: this.namespace, from: options.from});
-    return this.indexes.get(parseURI(uri).kind)?.get(uri)?.definitionText;
+    return this.selectedEntry(parseURI(uri).kind, uri, options.revision)?.definitionText;
   }
   async loadWindow(source) {
     let window = source;
