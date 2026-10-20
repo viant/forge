@@ -14560,7 +14560,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     );
     useEffect(() => {
         let cancelled = false;
-        if (typeof reportStoreHandler?.listReports !== "function") {
+        // A hosted report can render its selected definition without opening
+        // the saved-report inventory. Fetch that inventory only when its panel
+        // is visible (including the design workspace, where it is always shown).
+        if (!showImportedArtifactSummaryPanels || typeof reportStoreHandler?.listReports !== "function") {
             return undefined;
         }
         async function loadStoredReports() {
@@ -14582,7 +14585,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         return () => {
             cancelled = true;
         };
-    }, [reportStoreHandler]);
+    }, [reportStoreHandler, showImportedArtifactSummaryPanels]);
     const hydratedImportedSourceIdentity = useMemo(
         () => buildHydratedReportDocumentImportedSourceIdentity(hydratedReportDocumentSession),
         [hydratedReportDocumentSession],
