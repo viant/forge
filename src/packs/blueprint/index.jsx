@@ -554,18 +554,18 @@ export function registerPack() {
                 className={[className, 'forge-blueprint-checkbox-compat'].filter(Boolean).join(' ')}
                 checked={!!value}
                 onChange={(e) => onChange?.(e.target.checked)}
-                disabled={readOnly || disabled}
+                disabled={disabled || readOnly}
             />
         ),
         { framework: 'blueprint' }
     );
 
-    registerWidget('toggle', ({ value = false, onChange, readOnly, type: _type, widget: _widget, ...rest }) => (
+    registerWidget('toggle', ({ value = false, onChange, readOnly, disabled, type: _type, widget: _widget, ...rest }) => (
         <Switch
             {...rest}
             checked={!!value}
             onChange={(e) => onChange?.(e.target.checked)}
-            disabled={readOnly}
+            disabled={disabled || readOnly}
         />
     ), { framework: 'blueprint' });
 
@@ -1291,7 +1291,7 @@ export function registerPack() {
     });
 
     /* -------------------- Radio group ------------------------------- */
-    registerWidget('radio', ({ value, onChange, readOnly, options = [], appearance, ...rest }) => {
+    registerWidget('radio', ({ value, onChange, readOnly, disabled, options = [], appearance, ...rest }) => {
         if (String(appearance || '').toLowerCase() === 'segmented') {
             return (
                 <div
@@ -1304,10 +1304,10 @@ export function registerPack() {
                             <button
                                 key={opt.value}
                                 type="button"
-                                disabled={readOnly}
+                                disabled={disabled || readOnly}
                                 aria-pressed={isActive}
                                 className="forge-segmented-control__option"
-                                onClick={() => !readOnly && onChange?.(opt.value)}
+                                onClick={() => !disabled && !readOnly && onChange?.(opt.value)}
                             >
                                 {opt.label || opt.value}
                             </button>
@@ -1319,7 +1319,7 @@ export function registerPack() {
         return (
             <RadioGroup
                 {...rest}
-                disabled={readOnly}
+                disabled={disabled || readOnly}
                 selectedValue={`${value}`}
                 onChange={(e) => onChange?.(e)}
             >
