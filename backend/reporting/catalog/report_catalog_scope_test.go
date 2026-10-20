@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -71,5 +73,48 @@ func TestReportCatalogExactResourceFilterSkipsUnrelatedResolution(t *testing.T) 
 	}
 	if _, err = service.List(ctx, ReportCatalogQuery{Namespace: "shared", ResourceURI: "window://shared/Sales"}); !errors.Is(err, identity.ErrResource) {
 		t.Fatalf("invalid exact report filter: %v", err)
+	}
+}
+
+type concurrentCatalogSource struct {
+	raw             json.RawMessage
+	active, maximum atomic.Int32
+}
+
+func (s *concurrentCatalogSource) Candidates(_ context.Context, uri identity.ResourceURI) ([]identity.ResourceCandidate, error) {
+	current := s.active.Add(1)
+	for previous := s.maximum.Load(); current > previous && !s.maximum.CompareAndSwap(previous, current); previous = s.maximum.Load() {
+	}
+	defer s.active.Add(-1)
+	time.Sleep(10 * time.Millisecond)
+	return []identity.ResourceCandidate{{Kind: identity.WorkingCandidate, ContentFingerprint: identity.ContentFingerprint(s.raw)}}, nil
+}
+func (s *concurrentCatalogSource) ReadCandidate(context.Context, identity.ResourceURI, identity.ResourceCandidate) (json.RawMessage, error) {
+	return s.raw, nil
+}
+
+func TestReportCatalogPagesAuthorizedResourcesInBoundedParallelOrder(t *testing.T) {
+	ctx := context.Background()
+	raw := json.RawMessage(`{"schemaVersion":1,"reportDocument":{}}`)
+	actor := identity.VerifiedActor{Subject: "alice", Issuer: "issuer", TenantID: "tenant", AccountID: "account", IdentityRevision: "one", ValidUntil: time.Now().Add(time.Minute)}
+	source := &concurrentCatalogSource{raw: raw}
+	resolver := &identity.ResourceResolver{Source: source, Policy: catalogScopePolicy(func(_ context.Context, _ identity.ResourceRef, candidates []identity.ResourceCandidate) (identity.ResourceDecision, error) {
+		return identity.ResourceDecision{Candidate: candidates[0], AuthorityBinding: "actor", ValidUntil: actor.ValidUntil}, nil
+	})}
+	service := &ReportCatalogService{Identity: func(context.Context) (identity.VerifiedActor, error) { return actor, nil }, Resolver: func(context.Context) (*identity.ResourceResolver, error) { return resolver, nil }, Inventories: []ReportInventory{ReportInventoryFunc(func(context.Context, identity.VerifiedActor) ([]ReportCatalogCandidate, error) {
+		var entries []ReportCatalogCandidate
+		for i := 15; i >= 0; i-- {
+			entries = append(entries, ReportCatalogCandidate{URI: fmt.Sprintf("report://ar/%02d", i), Title: "Report"})
+		}
+		return entries, nil
+	})}}
+	result, err := service.List(ctx, ReportCatalogQuery{Namespace: "ar", Limit: 16})
+	if err != nil || len(result.Reports) != 16 || source.maximum.Load() < 2 || source.maximum.Load() > 8 {
+		t.Fatalf("bounded report list: count=%d max=%d err=%v", len(result.Reports), source.maximum.Load(), err)
+	}
+	for i, entry := range result.Reports {
+		if entry.URI != fmt.Sprintf("report://ar/%02d", i) {
+			t.Fatalf("report order[%d]=%s", i, entry.URI)
+		}
 	}
 }
