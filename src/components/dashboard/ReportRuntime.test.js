@@ -3289,6 +3289,21 @@ assert.ok(sectionTabsRuntimeHtml.includes(">Details<"));
 assert.ok(sectionTabsRuntimeHtml.includes(">Overview<"));
 assert.ok(!sectionTabsRuntimeHtml.includes("Unsupported Block"));
 
+const selectedSectionRuntimeHtml = renderToStaticMarkup(React.createElement(ReportRuntime, {
+  reportSpec: {title: "Selected section", layoutIntent: {blockOrder: ["tabs", "first", "firstBody", "second", "secondBody"]}, blocks: [], datasets: []},
+  reportFill: {diagnostics: [], datasets: [], blocks: [
+    {id: "tabs", kind: "tabGroupBlock", sectionIds: ["first", "second"], defaultSectionId: "first", includeUnlistedSections: false},
+    {id: "first", kind: "sectionBlock", title: "First", blockIds: ["firstBody"]},
+    {id: "firstBody", kind: "markdownBlock", content: {markdown: "First section body"}},
+    {id: "second", kind: "sectionBlock", title: "Second", blockIds: ["secondBody"]},
+    {id: "secondBody", kind: "markdownBlock", content: {markdown: "Second section body"}},
+  ]},
+  selectedSectionId: "second",
+  presentationMode: "report",
+}));
+assert.match(selectedSectionRuntimeHtml, /Second section body/);
+assert.doesNotMatch(selectedSectionRuntimeHtml, /First section body/);
+
 const compositeRuntimeHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
     reportSpec: {

@@ -33,6 +33,7 @@ type ExecuteResourceRequest struct {
 	Resource         *identity.ResourceRef                `json:"resource,omitempty"`
 	ResolvedResource *identity.ResolvedResource           `json:"resolvedResource,omitempty"`
 	Parameters       map[string]interface{}               `json:"parameters,omitempty"`
+	DatasetIDs       []string                             `json:"datasetIds,omitempty"`
 }
 type ExecuteResourceResult struct {
 	DependencyPins  map[string]identity.ResolvedResource `json:"dependencyPins,omitempty"`
@@ -199,6 +200,19 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 	}
 	plans := make([]plannedDataset, 0, len(spec.Datasets))
 	seen := map[string]bool{}
+	var selected map[string]bool
+	if request.DatasetIDs != nil {
+		if len(request.DatasetIDs) == 0 || len(request.DatasetIDs) > len(spec.Datasets) {
+			return nil, identity.ErrResourceDenied
+		}
+		selected = make(map[string]bool, len(request.DatasetIDs))
+		for _, id := range request.DatasetIDs {
+			if id == "" || selected[id] {
+				return nil, identity.ErrResourceDenied
+			}
+			selected[id] = true
+		}
+	}
 	var specRoot map[string]json.RawMessage
 	_ = json.Unmarshal(compiled.ReportSpec, &specRoot)
 	var effectiveDatasets []map[string]interface{}
@@ -220,7 +234,12 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 			return nil, err
 		}
 		effectiveDatasets[index]["request"] = args
-		plans = append(plans, plannedDataset{dataset.ID, descriptor, args})
+		if selected == nil || selected[dataset.ID] {
+			plans = append(plans, plannedDataset{dataset.ID, descriptor, args})
+		}
+	}
+	if selected != nil && len(plans) != len(selected) {
+		return nil, identity.ErrResourceDenied
 	}
 	specRoot["datasets"], err = json.Marshal(effectiveDatasets)
 	if err != nil {
