@@ -334,6 +334,8 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
     addRef(node.definitionDataSourceRef);
     addRef(node.runtime?.definitionDataSourceRef);
     addRef(node.dashboard?.reportBuilder?.definitionDataSourceRef);
+    addRef(node.reportBuilder?.campaignChoicesDataSourceRef, true);
+    addRef(node.dashboard?.reportBuilder?.campaignChoicesDataSourceRef, true);
     addRef(resolveMappedRef(node), node.fetchData === false);
 
     // Commands execute through datasource signals. Their contexts must be

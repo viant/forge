@@ -2,7 +2,7 @@
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {beforeEach,afterEach,expect,it,vi} from 'vitest';
-import WindowContent from './WindowContent.jsx';
+import WindowContent,{resolveRequiredDataSourceRefs} from './WindowContent.jsx';
 import {SettingProvider} from '../core/context/Setting.jsx';
 import {removeSignalsForKey} from '../core/store/signals.js';
 import {getWindowContext} from '../core/context/registry.js';
@@ -11,6 +11,10 @@ let root,host,windowId,serial=0;
 beforeEach(()=>{globalThis.IS_REACT_ACT_ENVIRONMENT=true;windowId='lazy-options-mounted-'+(++serial);host=document.createElement('div');document.body.append(host);root=createRoot(host);HTMLElement.prototype.scrollIntoView ||= function(){};});
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();removeSignalsForKey(windowId);});
 const pick={id:'pick',type:'select',label:'Category',scope:'form',dataField:'category',optionsDataSourceRef:'choices',optionsFetchMode:'onFocus',optionValueField:'caption',optionLabelField:'caption'};
+it('mounts a report builder campaign-choice datasource without fetching it on open',()=>{
+ const def=metadata();def.view.content={id:'builder',kind:'dashboard.reportBuilder',dashboard:{reportBuilder:{campaignChoicesDataSourceRef:'choices'}},dataSourceRef:'record'};
+ expect(resolveRequiredDataSourceRefs(def,'record')).toContain('choices');
+});
 function metadata(){return {dataSource:{record:{id:'record',service:{uri:'mcp://fixture/record'},selectionMode:'single'},choices:{id:'choices',service:{uri:'mcp://fixture/choices'},selectionMode:'none'}},view:{content:{id:'root',dataSourceRef:'record',items:[pick]}}};}
 async function mount(def){const requests=[];const transport=vi.fn(async request=>{requests.push(request.dataSourceRef);if(request.dataSourceRef==='record')return {data:[{id:1,category:'Existing caption'}]};if(request.dataSourceRef==='choices')return {data:[{caption:'Existing caption'},{caption:'Another caption'}]};throw new Error('Unexpected startup metadata request');});await act(async()=>{root.render(<SettingProvider endpoints={{}} connectorConfig={{window:{service:{uri:"/window"}}}} services={{dataConnectorTransport:transport}}><WindowContent window={{windowId,windowKey:'mcp://fixture/lazy'}} selectedMetadata={def}/></SettingProvider>);for(let i=0;i<15;i++)await Promise.resolve();});return {requests,transport};}
 async function settle(action){await act(async()=>{action?.();for(let i=0;i<15;i++)await Promise.resolve();});}
