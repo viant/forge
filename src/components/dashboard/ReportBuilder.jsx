@@ -27,6 +27,7 @@ import { useSignals } from "@preact/signals-react/runtime";
 
 import Chart from "../Chart.jsx";
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
+import { reportRuntimeSectionDatasets } from "./reportRuntimeSectionDatasets.js";
 import {
     resolveReportBuilderDefinitionDataSourceRef,
     resolveReportBuilderDefinitionInitialization,
@@ -2499,6 +2500,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const [designRecentlyAddedId, setDesignRecentlyAddedId] = useState("");
     const [designPreviewOpen, setDesignPreviewOpen] = useState(false);
     const [designSectionId, setDesignSectionId] = useState("");
+    const [activeRuntimeSectionId, setActiveRuntimeSectionId] = useState("");
     useEffect(() => {
         if (embeddedMode && embedded.selectedSectionId) setDesignSectionId(embedded.selectedSectionId);
     }, [embeddedMode, embedded?.selectedSectionId]);
@@ -10174,6 +10176,12 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             : null),
         [runtimePreviewFetchReportSpec],
     );
+    const runtimePreviewSectionSelection = useMemo(
+        () => reportRuntimeSectionDatasets(authoredRuntimePreviewModel?.document, authoredRuntimePreviewModel?.reportSpec, activeRuntimeSectionId),
+        [activeRuntimeSectionId, authoredRuntimePreviewModel?.document, authoredRuntimePreviewModel?.reportSpec],
+    );
+    const runtimePreviewPrimaryRequired = !runtimePreviewSectionSelection
+        || runtimePreviewSectionSelection.datasetIds.includes(String(runtimePreviewPrimaryDataset?.id || "primary"));
     const runtimePreviewCanonicalRequest = useMemo(
         () => (runtimePreviewPrimaryDataset?.request && typeof runtimePreviewPrimaryDataset.request === "object"
             ? runtimePreviewPrimaryDataset.request
@@ -10234,6 +10242,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     }), [builderContext, displayConfig]);
     const fetchedRuntimePreviewRowsState = useReportRuntimePreviewRows({
         enabled: !frozenRestore && !restoreBlocked && !embeddedMode && !reportFiltersNeedApply && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
+            && runtimePreviewPrimaryRequired
             && !hostedReportActivationPending
             && hostedReportStarterReady
             && !shouldDeferReportBuilderRequestForPrefill({
@@ -10259,6 +10268,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         const datasets = Array.isArray(authoredRuntimePreviewModel?.reportSpec?.datasets)
             ? authoredRuntimePreviewModel.reportSpec.datasets
             : [];
+        const selectedIds = runtimePreviewSectionSelection ? new Set(runtimePreviewSectionSelection.datasetIds) : null;
+        const primaryId = String(runtimePreviewPrimaryDataset?.id || "primary").trim();
         const staticDatasetIds = new Set(
             authoredRuntimePreviewModel?.staticDatasetPayloads && typeof authoredRuntimePreviewModel.staticDatasetPayloads === "object" && !Array.isArray(authoredRuntimePreviewModel.staticDatasetPayloads)
                 ? Object.keys(authoredRuntimePreviewModel.staticDatasetPayloads).map((datasetId) => normalizeString(datasetId)).filter(Boolean)
@@ -10267,7 +10278,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         return datasets
             .filter((dataset) => {
                 const datasetId = normalizeString(dataset?.id);
-                return datasetId && !staticDatasetIds.has(datasetId);
+                return datasetId && !staticDatasetIds.has(datasetId)
+                    && (!selectedIds || selectedIds.has(datasetId) && datasetId !== primaryId);
             })
             .map((dataset) => {
                 const canonicalRequest = dataset?.request && typeof dataset.request === "object" && !Array.isArray(dataset.request)
@@ -10291,7 +10303,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 };
             })
             .filter((dataset) => dataset.id && dataset.dataSourceRef && dataset.request);
-    }, [frozenRestore, authoredDatasetOptionIndex, authoredRuntimePreviewModel?.reportSpec?.datasets, authoredRuntimePreviewModel?.staticDatasetPayloads, builderContext, displayConfig, state]);
+    }, [frozenRestore, authoredDatasetOptionIndex, authoredRuntimePreviewModel?.reportSpec?.datasets, authoredRuntimePreviewModel?.staticDatasetPayloads, builderContext, displayConfig, runtimePreviewPrimaryDataset?.id, runtimePreviewSectionSelection, state]);
     const runtimePreviewPublishedDatasetsRequestKey = useMemo(() => JSON.stringify({
         previewRequestKey: runtimePreviewRequestKey,
         datasets: runtimePreviewPublishedDatasets,
@@ -10446,7 +10458,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         }),
         [currentReportMaterialization, currentRequest],
     );
-    const currentPrimaryRuntimeResultFresh = (
+    const currentPrimaryRuntimeResultFresh = !runtimePreviewPrimaryRequired || (
         !!runtimePreviewRequestKey
         && runtimePreviewRowsState.requestKey === runtimePreviewRequestKey
         && runtimePreviewRowsState.freshResultRequestKey === runtimePreviewRequestKey
@@ -20578,6 +20590,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                             reportSpec={previewStateForDisplay.runtimeConfig.reportSpec}
                             reportDocument={previewArtifactForDisplay?.document || null}
                             reportFill={previewStateForDisplay.runtimeConfig.reportFill}
+                            selectedSectionId={runtimePreviewSectionSelection?.sectionId || ""}
+                            onSectionChange={runtimePreviewSectionSelection ? setActiveRuntimeSectionId : null}
                             title={previewArtifactForDisplay?.runtimeBlock?.title || ""}
                             subtitle={previewArtifactForDisplay?.runtimeBlock?.subtitle || ""}
                             locale={locale}
