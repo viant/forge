@@ -1,4 +1,4 @@
-import React,{useLayoutEffect,useRef,useState} from 'react';
+import React,{useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 
 export function WindowContentMount({windowId,register}) {
@@ -20,4 +20,12 @@ export function PersistentWindowContent({host,children}) {
         return ()=>{if(node.parentNode)node.parentNode.removeChild(node);};
     },[host,node]);
     return node && mounted.current ? createPortal(children,node) : null;
+}
+
+// Restored windows load on their first visit. Once visited, keep their state and
+// effects alive while the host hides them, so switching tabs preserves drafts.
+export function RetainedWindowContent({active=true,children}) {
+    const [visited,setVisited]=useState(active);
+    useEffect(()=>{if(active)setVisited(true);},[active]);
+    return active || visited ? children : null;
 }

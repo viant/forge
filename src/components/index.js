@@ -61,3 +61,5 @@ export {default as WorkspaceSummary} from './primitives/WorkspaceSummary.jsx';
 export {default as ResultPreviewPanel, ResultPreview, NestedDataGrid} from './primitives/ResultPreview.jsx';
 
 export {default as ResourcePolicyEditorPanel, ResourceAccessEditor} from './primitives/ResourcePolicyEditor.jsx';
+
+export {RetainedWindowContent} from './WindowContentMount.jsx';
