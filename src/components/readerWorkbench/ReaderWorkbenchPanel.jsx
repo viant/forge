@@ -10,7 +10,13 @@ export default function ReaderWorkbenchPanel({container,context}) {
  const scoped=ref?context.Context(ref):context,form=scoped.signals.form.value||{};
  const [pending,setPending]=React.useState(0),[external,setExternal]=React.useState({}),[local,setLocal]=React.useState({dirty:false,busy:false});
  const localChanged=React.useCallback(value=>setLocal(current=>current.dirty===value.dirty&&current.busy===value.busy?current:value),[]);
- const api=React.useMemo(()=>createWorkbenchAPI(context,spec,{onPendingChange:setPending}),[context,spec]);
+ // Container contexts can be re-scoped when host navigation guards update.
+ // Keep semantic API identity stable so a dirty notification cannot reload the
+ // reader and unmount a SQL draft. Calls always use the current context.
+ const latestContext=React.useRef(context);latestContext.current=context;
+ const operationContext=React.useMemo(()=>({Context:(...args)=>latestContext.current.Context(...args),get services(){return latestContext.current.services;}}),[]);
+ const api=React.useMemo(()=>createWorkbenchAPI(operationContext,spec,{onPendingChange:setPending}),[operationContext,spec]);
+ api.windowServices=context.services;
  api.namespaceId=resolveSelector(form,spec.namespaceField||'namespaceId');
  const busy=pending>0||local.busy||Object.values(external).some(Boolean);
  const setExternalBusy=React.useCallback((key,value)=>setExternal(current=>current[key]===value?current:{...current,[key]:value}),[]);

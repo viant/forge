@@ -12,6 +12,9 @@ it('binds live report state and declared operations while propagating dirty and 
  const container={readerWorkbench:{dataSourceRef:'state',resourceNamespace:'custom',operations:{save:{dataSourceRef:'writer',mutation:true,parameters:{id:{arg:0},input:{arg:1}}}},onBack:'actions.back'}};
  try{
   await act(async()=>root.render(<ReaderWorkbenchPanel container={container} context={context}/>));
+  const originalAPI=props.api;
+  await act(async()=>root.render(<ReaderWorkbenchPanel container={container} context={{...context}}/>));
+  expect(props.api).toBe(originalAPI);
   expect(calls).toEqual([]);expect(props.report.id).toBe('reader-a');expect(props.api.namespaceId).toBe('tenant-a');expect(props.api.resourceNamespace).toBe('custom');
   await act(async()=>props.onStateChange({dirty:true,busy:false}));expect(dirty).toHaveBeenLastCalledWith(true);
   await act(async()=>props.onStateChange({dirty:false,busy:false}));expect(dirty).toHaveBeenLastCalledWith(false);
