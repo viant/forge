@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: [
+      'src/components/table/basic/Toolbar.crossSource.render.test.jsx',
       'src/components/readerWorkbench/ReaderWorkbenchPanel.render.test.jsx',
       'src/components/ResourceWindow.scope.render.test.jsx',
       'src/packs/blueprint/selectCloseFocus.render.test.jsx',
