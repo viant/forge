@@ -1,7 +1,8 @@
 import {parseDocument} from 'yaml';
 import {decodeResourceArchive} from './resourceArchive.js';
 
-const kinds = ['datasource', 'dialog'];
+const archiveNames = Object.freeze({datasource: 'datasources', dialog: 'dialogs', window: 'windows', report: 'reports', lookup: 'lookups', style: 'styles'});
+const defaultPreloadKinds = ['datasource', 'dialog'];
 const clone = value => structuredClone(value);
 const parseURI = value => {
   const match = /^([a-z][a-z0-9-]*):\/\/([^/?#]+)(?:\/(.*))?$/.exec(value);
@@ -31,11 +32,13 @@ export function resolveResourcePath(reference, {kind, namespace, from} = {}) {
 // adapter owns MCP transport/compression; this is the shared definition cache,
 // not a cache of business data. Replace the instance on account changes.
 export class ResourceFS {
-  constructor({namespace, scopeKey, loadArchive, prepareDataSource = value => value, warn = () => {}}) {
+  constructor({namespace, scopeKey, loadArchive, preloadKinds = defaultPreloadKinds, prepareDataSource = value => value, warn = () => {}}) {
     if (!namespace || !scopeKey || typeof loadArchive !== 'function') throw new Error('Resource scope and archive adapter required');
     this.namespace = namespace;
     this.scopeKey = scopeKey;
     this.loadArchive = loadArchive;
+    if (!Array.isArray(preloadKinds) || preloadKinds.some(kind => !Object.hasOwn(archiveNames, kind))) throw new Error('Unsupported preload kind');
+    this.preloadKinds = [...new Set(preloadKinds)];
     this.prepareDataSource = prepareDataSource;
     this.warn = warn;
     this.generation = 0;
@@ -48,9 +51,9 @@ export class ResourceFS {
     const key = `${code}:${resource}`;
     if (!this.warnings.has(key)) { const detail = {code, resource, message}; this.warnings.add(key); this.warningDetails.set(key, detail); this.warn(detail); }
   }
-  preload() { return Promise.all(kinds.map(kind => this.ensure(kind))); }
+  preload() { return Promise.all(this.preloadKinds.map(kind => this.ensure(kind))); }
   ensure(kind) {
-    if (!kinds.includes(kind)) return Promise.reject(new Error('Unsupported archive kind'));
+    if (!Object.hasOwn(archiveNames, kind)) return Promise.reject(new Error('Unsupported archive kind'));
     if (this.pending.has(kind)) return this.pending.get(kind);
     const generation = this.generation;
     const pending = Promise.resolve().then(() => this.loadArchive({kind, namespace: this.namespace, scopeKey: this.scopeKey})).then(async snapshot => {
@@ -157,7 +160,7 @@ export function createMCPResourceFS({readResource, archiveFormat = 'json', ...op
   if (typeof readResource !== 'function') throw new Error('MCP resource reader required');
   if (!['json', 'tar.gz'].includes(archiveFormat)) throw new Error('Unsupported archive format');
   return new ResourceFS({...options, loadArchive: async ({kind, namespace}) => {
-    const uri = `resource-archive://${namespace}/${kind === 'datasource' ? 'datasources' : 'dialogs'}${archiveFormat === 'tar.gz' ? '.tar.gz' : ''}`;
+    const uri = `resource-archive://${namespace}/${archiveNames[kind]}${archiveFormat === 'tar.gz' ? '.tar.gz' : ''}`;
     const response = await readResource({uri});
     const result = response?.result || response;
     if (!Array.isArray(result?.contents) || result.contents.length !== 1 || result.contents[0].uri !== uri) throw new Error('Invalid archive resource response');

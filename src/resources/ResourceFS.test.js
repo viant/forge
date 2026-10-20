@@ -61,3 +61,21 @@ test('complete supplied definitions do not wait for archives or create missing w
  assert.deepEqual(loaded.dataSource,original.dataSource);assert.deepEqual(loaded.dialogs,original.dialogs);
  assert.equal(loaded.resourceWarnings?.length||0,0);
 });
+test('windows reports lookups and styles share the same archive cache and configured preload',async()=>{
+ const calls=[];const kinds=['window','report','lookup','style'];
+ const fs=createForKinds();
+ function createForKinds(){return new ResourceFS({namespace:'example',scopeKey:'alice',preloadKinds:kinds,loadArchive:async({kind})=>{calls.push(kind);return snapshot(kind,[entry(kind,'sample',{id:'sample',kind})])}})}
+ await fs.preload();assert.deepEqual(calls,kinds);
+ for(const kind of kinds)assert.equal((await fs.read(`${kind}://example/sample`)).kind,kind);
+ assert.equal(calls.length,4,'repeated reads must not pull new archives');
+ assert.throws(()=>new ResourceFS({namespace:'example',scopeKey:'a',preloadKinds:['unsupported'],loadArchive:()=>{}}),/Unsupported/);
+});
+test('standard MCP reads use separate kind archives without business tool calls',async()=>{
+ const {createMCPResourceFS}=await import('./ResourceFS.js');const calls=[];
+ const fs=createMCPResourceFS({namespace:'example',scopeKey:'alice',preloadKinds:['window','report','lookup','style'],readResource:async({uri})=>{
+ calls.push(uri);const kind={'windows':'window','reports':'report','lookups':'lookup','styles':'style'}[uri.split('/').pop()];
+ return {contents:[{uri,text:JSON.stringify(snapshot(kind,[entry(kind,'sample',{id:'sample'})]))}]};
+ }});
+ await fs.preload();assert.deepEqual(calls,['windows','reports','lookups','styles'].map(name=>`resource-archive://example/${name}`));
+ assert.equal((await fs.read('report://example/sample')).id,'sample');assert.equal(calls.length,4);
+});

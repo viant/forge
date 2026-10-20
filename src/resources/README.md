@@ -44,3 +44,13 @@ regular files at `resources/<contentFingerprint>.json`. Manifest entries carry
 content-addressed path. The decoder never extracts files to disk. It rejects
 unsafe paths, links, duplicates, truncated blocks, checksum failures and orphan
 entries, then reuses the existing per-definition fingerprint check and cache.
+
+### Additional definition kinds
+
+`preloadKinds` selects the archives a provider actually supports. It defaults to
+`['datasource', 'dialog']`; it can also include `window`, `report`, `lookup`, and
+`style`. Each kind uses its own `resource-archive://<namespace>/<plural>.tar.gz`
+resource and the same scoped revision index. Unsupported provider kinds should
+be omitted from preload configuration. `read(uri, {revision})` resolves an exact
+stamp; without a revision it uses the publisher's `selected: true` entry.
+These archives contain definitions, never report result rows or mutation output.
