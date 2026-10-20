@@ -3509,6 +3509,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     );
     const runtimePreviewConfig = config?.result?.runtimePreview;
     const authoredReportBlocksConfigured = Array.isArray(state?.reportDocumentBlocks) && state.reportDocumentBlocks.length > 0;
+    const authoredTabGroupConfigured = authoredReportBlocksConfigured
+        && state.reportDocumentBlocks.some((block) => String(block?.kind || "").trim() === "tabGroupBlock");
     const runtimePreviewEnabled = useMemo(() => {
         if (typeof runtimePreviewConfig === "boolean") {
             return runtimePreviewConfig;
@@ -3680,6 +3682,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
      frozenRestore]);
 
     useEffect(() => {
+        // A complete authored tab graph uses the runtime dataset fetchers.
+        // The generic builder collection would read the primary datasource
+        // even when that dataset belongs only to an inactive section.
+        if (authoredTabGroupConfigured) return;
         if (!currentRequestFingerprint || matchesReportBuilderDatasourceDispatch({
             fingerprint: currentRequestDispatchFingerprint, previousFingerprint: requestFingerprintRef.current,
             paging: builderContext?.dataSource?.paging, page: state.page, previousPage: cursorDispatchedPageRef.current,
@@ -3704,7 +3710,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         requestFingerprintRef.current = currentRequestDispatchFingerprint;
         cursorDispatchedPageRef.current = state.page;
         dispatchReportBuilderDatasourceRequest(builderContext, currentRequest, currentRequestShouldFetch, state.page);
-    }, [builderContext, currentPrefillSignature, currentRequest, currentRequestDispatchFingerprint, currentRequestFingerprint, currentRequestShouldFetch, hostedReportActivationCurrent, hostedReportStarterId, state]);
+    }, [authoredTabGroupConfigured, builderContext, currentPrefillSignature, currentRequest, currentRequestDispatchFingerprint, currentRequestFingerprint, currentRequestShouldFetch, hostedReportActivationCurrent, hostedReportStarterId, state]);
 
     useEffect(() => {
         if (!pendingScrollRowId) {
@@ -20711,6 +20717,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
 
     useEffect(() => {
         if (frozenRestore || restoreBlocked) return;
+        if (authoredTabGroupConfigured) return;
         if (embeddedMode || reportFiltersNeedApply || pendingReportWorkspaceRunRef.current) {
             return;
         }
@@ -20788,6 +20795,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         hostedExecuteOnOpen,
         loading,
         reportWorkspaceMode,
+        authoredTabGroupConfigured,
         showAuthoredReportSurface,
         state,
      frozenRestore, restoreBlocked]);
