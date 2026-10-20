@@ -568,6 +568,7 @@ type Container struct {
 	EditableCollection *EditableCollection               `json:"editableCollection,omitempty" yaml:"editableCollection,omitempty"`
 	AssignmentPicker   *AssignmentPicker                 `json:"assignmentPicker,omitempty" yaml:"assignmentPicker,omitempty"`
 	StatusWorkflow     *StatusWorkflow                   `json:"statusWorkflow,omitempty" yaml:"statusWorkflow,omitempty"`
+	WorkspaceSummary   *WorkspaceSummarySpec             `json:"workspaceSummary,omitempty" yaml:"workspaceSummary,omitempty"`
 	ParameterEditor    *ParameterEditorSpec              `json:"parameterEditor,omitempty" yaml:"parameterEditor,omitempty"`
 	RuleEditor         *RuleEditorSpec                   `json:"ruleEditor,omitempty" yaml:"ruleEditor,omitempty"`
 	TreeEditor         *TreeEditorSpec                   `json:"treeEditor,omitempty" yaml:"treeEditor,omitempty"`
