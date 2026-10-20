@@ -11,6 +11,7 @@ export default defineConfig({
       'src/components/readerWorkbench/ReaderFieldDialog.draft.render.test.jsx',
       'src/components/ResourceWindow.scope.render.test.jsx',
       'src/packs/blueprint/selectCloseFocus.render.test.jsx',
+      'src/packs/blueprint/selectionDisabled.render.test.jsx',
       'src/components/primitives/ResultPreview.render.test.jsx',
       'src/components/ViewDialog.closeContract.render.test.jsx',
       'src/components/primitives/WorkspaceSummary.render.test.jsx',
