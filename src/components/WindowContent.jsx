@@ -78,6 +78,10 @@ function useStableRuntimeIdentity(dependencies = []) {
 
 function collectInitialWindowFormItemValues(node, initial) {
     if (!node || typeof node !== 'object') return;
+    if (node.parameterEditor) {
+        collectInitialWindowFormItemValues({items:node.parameterEditor.fields}, initial);
+        for (const section of node.parameterEditor.sections || []) collectInitialWindowFormItemValues({items:section.fields}, initial);
+    }
     if (Array.isArray(node.items)) {
         for (const item of node.items) {
             if (!item || typeof item !== 'object') continue;
@@ -348,6 +352,13 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
     addCommand(node.scheduleEditor?.mutation);
     addCommand(node.wizard?.submit);
     addCommand(node.draftForm?.submit);
+    if (node.parameterEditor) {
+        addRef(node.parameterEditor.dataSourceRef, true);
+        addCommand(node.parameterEditor.draft?.submit);
+        collectRequiredDataSourceRefs({items:node.parameterEditor.fields}, scope, refs, viewState, fetchUsage);
+        for (const section of node.parameterEditor.sections || []) collectRequiredDataSourceRefs({items:section.fields,visibleWhen:section.visibleWhen}, scope, refs, viewState, fetchUsage);
+    }
+
     addCommand(node.uploadCollection?.upload);
     for (const action of node.resourceHeader?.actions || []) addCommand(action?.mutation);
     for (const rule of node.notificationRules?.rules || []) addCommand(rule?.action?.mutation);

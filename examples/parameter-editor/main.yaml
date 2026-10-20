@@ -1,0 +1,65 @@
+window:
+  windowKey: parameter-editor-example
+  view:
+    content:
+      id: input-editor
+      dataSourceRef: input_draft
+      fetchData: false
+      parameterEditor:
+        label: Input parameter
+        readOnlyWhen: {source: authorization, selector: resource.capabilities.write, equals: false}
+        fields:
+          - {id: name, dataField: name, label: Name, type: text}
+          - {id: type, dataField: type, label: Type, type: text}
+          - id: kind
+            dataField: kind
+            label: Kind
+            type: select
+            optionsDataSourceRef: input_kinds
+            optionValueField: value
+            optionLabelField: label
+          - {id: source, dataField: source, label: Kind source, type: text}
+        sections:
+          - id: codec
+            label: Codec
+            fields:
+              - id: codecName
+                dataField: codec.name
+                label: Codec
+                type: select
+                optionsDataSourceRef: codecs
+                optionsFetchMode: onFocus
+                optionValueField: name
+                optionLabelField: description
+              - {id: codecArgs, dataField: codec.arguments, label: Arguments, type: text}
+          - id: error
+            label: Error response
+            fields:
+              - {id: errorCode, dataField: error.code, label: Error code, type: number}
+              - {id: errorMessage, dataField: error.message, label: Error message, type: text}
+        draft:
+          saveLabel: Save parameter
+          resetLabel: Reset
+          confirmDiscard: Discard parameter edits?
+          submit:
+            commandId: save-parameter
+            dataSourceRef: input_save
+dataSources:
+  input_draft:
+    id: input_draft
+    cardinality: object
+    backend: {kind: inline, rows: []}
+  input_kinds:
+    id: input_kinds
+    cardinality: collection
+    backend: {kind: mcp_tool, method: example.input_kinds.list}
+    selectors: {data: items}
+  codecs:
+    id: codecs
+    cardinality: collection
+    backend: {kind: mcp_tool, method: example.codecs.list}
+    selectors: {data: items}
+  input_save:
+    id: input_save
+    cardinality: object
+    backend: {kind: mcp_tool, method: example.parameters.save}
