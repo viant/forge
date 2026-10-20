@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	identity "github.com/viant/forge/backend/resource"
 )
 
@@ -162,10 +164,10 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 	if limit == 0 {
 		limit = 1000
 	}
-	for _, candidate := range candidates {
+	resolveCandidate := func(ctx context.Context, candidate ReportCatalogCandidate) (*ReportCatalogEntry, error) {
 		pin, err := resolver.Resolve(ctx, identity.ResourceRef{URI: candidate.URI})
 		if errors.Is(err, identity.ErrResourceDenied) {
-			continue
+			return nil, nil
 		}
 		if err != nil {
 			return nil, err
@@ -202,11 +204,41 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 			}
 		}
 		uri, _ := identity.ParseResourceURI(candidate.URI)
-		result.Reports = append(result.Reports, ReportCatalogEntry{ReportCatalogCandidate: candidate, Namespace: uri.Namespace, Name: uri.Name, OwnedByCurrentUser: candidate.OwnerID != "" && candidate.OwnerID == actor.Subject, Resource: pin, Capabilities: capabilities})
-		if len(result.Reports) > limit {
-			result.Reports = result.Reports[:limit]
-			result.NextCursor = base64.RawURLEncoding.EncodeToString([]byte(result.Reports[limit-1].URI))
-			break
+		entry := &ReportCatalogEntry{ReportCatalogCandidate: candidate, Namespace: uri.Namespace, Name: uri.Name, OwnedByCurrentUser: candidate.OwnerID != "" && candidate.OwnerID == actor.Subject, Resource: pin, Capabilities: capabilities}
+		return entry, nil
+	}
+	batchSize := 8
+	if limit+1 < batchSize {
+		batchSize = limit + 1
+	}
+	for start := 0; start < len(candidates) && len(result.Reports) <= limit; start += batchSize {
+		end := start + batchSize
+		if end > len(candidates) {
+			end = len(candidates)
+		}
+		batch := make([]*ReportCatalogEntry, end-start)
+		group, groupCtx := errgroup.WithContext(ctx)
+		for index := start; index < end; index++ {
+			index := index
+			group.Go(func() error {
+				entry, err := resolveCandidate(groupCtx, candidates[index])
+				batch[index-start] = entry
+				return err
+			})
+		}
+		if err := group.Wait(); err != nil {
+			return nil, err
+		}
+		for _, entry := range batch {
+			if entry == nil {
+				continue
+			}
+			result.Reports = append(result.Reports, *entry)
+			if len(result.Reports) > limit {
+				result.Reports = result.Reports[:limit]
+				result.NextCursor = base64.RawURLEncoding.EncodeToString([]byte(result.Reports[limit-1].URI))
+				break
+			}
 		}
 	}
 	fresh, err := s.Identity(ctx)
