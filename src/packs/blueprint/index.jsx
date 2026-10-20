@@ -1,3 +1,5 @@
+import {preserveSelectExternalFocus} from './selectCloseFocus.js';
+import SwitchControl from '../../components/SwitchControl.jsx';
 import ForgeFormGroup from './ForgeFormGroup.jsx';
 import './theme.css';
 /* -------------------------------------------------------------------------
@@ -569,37 +571,7 @@ export function registerPack() {
 
     // Explicit switch uses a small native button shell so it remains visually
     // stable even when host and embedded Blueprint CSS versions differ.
-    registerWidget('switch', ({ value = false, onChange, readOnly, disabled, id, className, 'aria-label': ariaLabel, item, title, trueLabel, falseLabel }) => {
-        const checked = !!value;
-        const unavailable = readOnly || disabled;
-        const controlId = id || item?.id;
-        const control = (
-            <button
-                id={controlId}
-                className={['forge-switch', className].filter(Boolean).join(' ')}
-                data-forge-widget="switch"
-                data-forge-control-id={controlId}
-                data-forge-part="switch-control"
-                type="button"
-                role="switch"
-                aria-checked={checked}
-                aria-label={ariaLabel || item?.ariaLabel || item?.label || 'Toggle'}
-                title={title || item?.label}
-                disabled={unavailable}
-                onClick={() => onChange?.(!checked)}
-            >
-                <span aria-hidden="true" className="forge-switch__thumb"/>
-            </button>
-        );
-        const stateLabel = checked ? trueLabel : falseLabel;
-        if (!stateLabel) return control;
-        return (
-            <span className={['forge-switch-field', className].filter(Boolean).join(' ')}>
-                {control}
-                <span className="forge-switch-field__state">{stateLabel}</span>
-            </span>
-        );
-    }, { framework: 'blueprint' });
+    registerWidget('switch', SwitchControl, { framework: 'blueprint' });
     registerWidget('booleanPill', (props) => <BooleanPill {...props}/>, { framework: 'blueprint' });
     registerWidget('chipList', (props) => <ChipList {...props}/>, { framework: 'blueprint' });
     registerWidget('contentCarousel', props => <ContentCarousel {...props}/>, {framework: 'blueprint'});
@@ -675,6 +647,7 @@ export function registerPack() {
             'data-forge-field-track-control': fieldTrackControl,
             ...rest
         }) {
+            const triggerRef = React.useRef(null);
             const visibleOptions = permittedOptions(options, context);
             const selected = visibleOptions.find((o) => String(o.value) === String(value));
             const isFieldTrack = isFieldTrackControl(fieldTrackControl);
@@ -714,6 +687,10 @@ export function registerPack() {
                 ),
             } : (popoverProps === undefined ? defaultPopoverProps : popoverProps);
             const lazyPopoverProps = onOptionsRequest ? {...resolvedPopoverProps, onOpening: opening} : resolvedPopoverProps;
+            const focusSafePopoverProps = {...lazyPopoverProps, onClosing: node => {
+                preserveSelectExternalFocus(node, triggerRef.current);
+                lazyPopoverProps?.onClosing?.(node);
+            }};
             const resolvedPopoverTargetProps = isFieldTrack ? {
                 ...popoverTargetProps,
                 className: mergeClassNames(
@@ -793,12 +770,13 @@ export function registerPack() {
                     inputProps={resolvedInputProps}
                     menuProps={resolvedMenuProps}
                     popoverContentProps={popoverContentProps}
-                    popoverProps={lazyPopoverProps}
+                    popoverProps={focusSafePopoverProps}
                     popoverTargetProps={resolvedPopoverTargetProps}
                     placeholder={placeholder}
                     onItemSelect={(item) => commitSelectOption(item, onChange)}
                 >
                     <Button
+                        ref={triggerRef}
                         id={id}
                         aria-label={ariaLabel}
                         aria-labelledby={fieldTrackControl ? ariaLabelledBy : undefined}

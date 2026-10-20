@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	identity "github.com/viant/forge/backend/resource"
 )
 
@@ -52,6 +54,7 @@ type ReportCatalogEntry struct {
 }
 type ReportCatalogQuery struct {
 	Namespace       string `json:"namespace,omitempty"`
+	ResourceURI     string `json:"resourceUri,omitempty"`
 	CurrentUserOnly bool   `json:"currentUserOnly,omitempty"`
 	Cursor          string `json:"cursor,omitempty"`
 	Limit           int    `json:"limit,omitempty"`
@@ -107,6 +110,12 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 	if s == nil || s.Identity == nil || s.Resolver == nil || len(s.Inventories) == 0 || ctx == nil || ctx.Err() != nil || input.Limit < 0 || input.Limit > 1000 {
 		return nil, identity.ErrResourceDenied
 	}
+	if input.ResourceURI != "" {
+		uri, err := identity.ParseResourceURI(input.ResourceURI)
+		if err != nil || uri.Kind != "report" || input.Namespace != "" && input.Namespace != uri.Namespace || input.Cursor != "" {
+			return nil, identity.ErrResource
+		}
+	}
 	actor, err := s.Identity(ctx)
 	if err != nil || !actor.Valid(time.Now()) {
 		return nil, identity.ErrResourceDenied
@@ -143,7 +152,7 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 				return nil, fmt.Errorf("invalid or conflicting report catalog identity")
 			}
 			seen[entry.URI] = true
-			if input.Namespace != "" && input.Namespace != uri.Namespace || entry.URI <= after || input.CurrentUserOnly && entry.OwnerID != actor.Subject {
+			if input.Namespace != "" && input.Namespace != uri.Namespace || input.ResourceURI != "" && entry.URI != input.ResourceURI || entry.URI <= after || input.CurrentUserOnly && entry.OwnerID != actor.Subject {
 				continue
 			}
 			candidates = append(candidates, entry)
@@ -155,10 +164,10 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 	if limit == 0 {
 		limit = 1000
 	}
-	for _, candidate := range candidates {
+	resolveCandidate := func(ctx context.Context, candidate ReportCatalogCandidate) (*ReportCatalogEntry, error) {
 		pin, err := resolver.Resolve(ctx, identity.ResourceRef{URI: candidate.URI})
 		if errors.Is(err, identity.ErrResourceDenied) {
-			continue
+			return nil, nil
 		}
 		if err != nil {
 			return nil, err
@@ -195,12 +204,45 @@ func (s *ReportCatalogService) list(ctx context.Context, input ReportCatalogQuer
 			}
 		}
 		uri, _ := identity.ParseResourceURI(candidate.URI)
-		result.Reports = append(result.Reports, ReportCatalogEntry{ReportCatalogCandidate: candidate, Namespace: uri.Namespace, Name: uri.Name, OwnedByCurrentUser: candidate.OwnerID != "" && candidate.OwnerID == actor.Subject, Resource: pin, Capabilities: capabilities})
-		if len(result.Reports) > limit {
-			result.Reports = result.Reports[:limit]
-			result.NextCursor = base64.RawURLEncoding.EncodeToString([]byte(result.Reports[limit-1].URI))
+		entry := &ReportCatalogEntry{ReportCatalogCandidate: candidate, Namespace: uri.Namespace, Name: uri.Name, OwnedByCurrentUser: candidate.OwnerID != "" && candidate.OwnerID == actor.Subject, Resource: pin, Capabilities: capabilities}
+		return entry, nil
+	}
+	for start := 0; start < len(candidates) && len(result.Reports) <= limit; {
+		// Never start candidates beyond the page's remaining lookahead. A
+		// failure there must not fail a page the serial reader already completed.
+		batchSize := min(8, limit+1-len(result.Reports))
+		end := start + batchSize
+		if end > len(candidates) {
+			end = len(candidates)
+		}
+		batch := make([]*ReportCatalogEntry, end-start)
+		group, groupCtx := errgroup.WithContext(ctx)
+		for index := start; index < end; index++ {
+			index := index
+			group.Go(func() error {
+				entry, err := resolveCandidate(groupCtx, candidates[index])
+				batch[index-start] = entry
+				return err
+			})
+		}
+		if err := group.Wait(); err != nil {
+			return nil, err
+		}
+		for _, entry := range batch {
+			if entry == nil {
+				continue
+			}
+			result.Reports = append(result.Reports, *entry)
+			if len(result.Reports) > limit {
+				result.Reports = result.Reports[:limit]
+				result.NextCursor = base64.RawURLEncoding.EncodeToString([]byte(result.Reports[limit-1].URI))
+				break
+			}
+		}
+		if result.NextCursor != "" {
 			break
 		}
+		start = end
 	}
 	fresh, err := s.Identity(ctx)
 	if err != nil || !fresh.Valid(time.Now()) || fresh.Subject != actor.Subject || fresh.Issuer != actor.Issuer || fresh.TenantID != actor.TenantID || fresh.AccountID != actor.AccountID || fresh.IdentityRevision != actor.IdentityRevision {

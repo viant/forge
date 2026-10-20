@@ -477,14 +477,15 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 		}
 
 	}
-	if sharedContract {
+	filteredResources := resourceFiltersSupported(ctx, c)
+	if sharedContract || filteredResources {
 		for _, method := range []string{"namespaces/list", "namespaces/get", "resource/get"} {
 			if seenTools[method] {
 				installed[method] = true
 			}
 		}
 	}
-	if !installed["namespaces/list"] || !installed["namespaces/get"] {
+	if !installed["namespaces/list"] || !installed["namespaces/get"] && !filteredResources {
 		standardCapable := standardResourceReadSupported(ctx, c)
 		if standardCapable {
 			standard, supported, standardErr := g.discoverStandardResources(ctx, a, name, binding, options, c, generation, resourceVersion)
@@ -509,11 +510,13 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 	if sharedContract || configuredOwner != "" {
 		listRequest = struct{}{}
 	}
+	listTiming := observe.Start(ctx, "gateway.namespaces.list", observe.Labels{Provider: name})
 	listedRaw, e := toolRaw(ctx, c, "namespaces/list", listRequest)
+	listTiming.End(observe.OutcomeFor(e), observe.CacheUnknown)
 	if e != nil {
 		return capabilities{}, e
 	}
-	if sharedContract && !sharedNamespaceIndex(listedRaw) {
+	if sharedContract && !filteredResources && !sharedNamespaceIndex(listedRaw) {
 		return capabilities{}, identity.ErrResource
 	}
 	if sharedNamespaceIndex(listedRaw) {
@@ -523,7 +526,9 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 			cursor := (*string)(nil)
 			seen := map[string]bool{}
 			for page := 0; page < 100; page++ {
+				toolsTiming := observe.Start(ctx, "gateway.tools.list", observe.Labels{Provider: name})
 				tools, err := c.ListTools(ctx, cursor)
+				toolsTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 				if err != nil {
 					return capabilities{}, err
 				}
@@ -563,7 +568,7 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 				break
 			}
 		}
-		standardRead := !installed[namespaces.ResourceGetToolName] && standardResourceReadSupported(ctx, c)
+		standardRead := filteredResources || !installed[namespaces.ResourceGetToolName] && standardResourceReadSupported(ctx, c)
 		result, e = g.discoverNamespaceIndex(ctx, c, listedRaw, result, allowed, standardRead)
 		if e != nil {
 			return capabilities{}, e
@@ -600,6 +605,13 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 				result.publicResourceMetadata = true
 				break
 			}
+		}
+		if filteredResources {
+			result, e = g.discoverNamespaceIndex(ctx, c, listedRaw, result, allowed, true, owner)
+			if e != nil {
+				return capabilities{}, e
+			}
+			return g.publishDiscovery(ctx, a, name, binding, key, generation, resourceVersion, force, result)
 		}
 		// Namespace metadata is notification-bound unless the managing actor supplies a real deadline.
 		seen := map[string]bool{}
@@ -756,7 +768,7 @@ func (g *Gateway) discoverExcept(ctx context.Context, excludedLocal string) (out
 			return nil, ErrCollision
 		}
 		if prior := owners[c.connection.ProviderIdentity]; prior != "" && prior != name {
-			return nil, ErrCollision
+			return nil, fmt.Errorf("%w: owner %q advertised by %q and %q", ErrCollision, c.connection.ProviderIdentity, prior, name)
 		}
 		owners[c.connection.ProviderIdentity] = name
 		// Export detached contract maps; caller mutation must not alter the
@@ -959,9 +971,12 @@ func get[T any](ctx context.Context, g *Gateway, connection Connection, ref iden
 	if e != nil {
 		return nil, e
 	}
-	c, e := g.discover(ctx, a, connection.Name, binding)
-	if e != nil {
-		return nil, e
+	c, known := g.knownResourceCapabilities(ctx, a, binding, connection, uri)
+	if !known {
+		c, e = g.discover(ctx, a, connection.Name, binding)
+		if e != nil {
+			return nil, e
+		}
 	}
 	if c.connection != connection || !supports(c, uri.Namespace, uri.Kind, "get") {
 		return nil, identity.ErrResourceDenied
@@ -987,9 +1002,9 @@ func get[T any](ctx context.Context, g *Gateway, connection Connection, ref iden
 	}
 	if e == nil && !found {
 		if c.standardResources {
-			// A standard resource read has no provider revision receipt or cache lease.
-			// Keep the owning MCP authoritative on each selected read.
-			result, e = standardDefinitionGet(ctx, ext, c, ref)
+			// Preserve existing explicit cache scopes for standard reads too.
+			// Without a declaration, mutable/default definitions remain fresh.
+			result, cacheReference, e = g.cachedDefinitionGet(ctx, a, binding, c, uri, ref, func(ctx context.Context) (primitive.GetResult, error) { return standardDefinitionGet(ctx, ext, c, ref) })
 		} else {
 			result, cacheReference, e = g.cachedDefinitionGet(ctx, a, binding, c, uri, ref, func(ctx context.Context) (primitive.GetResult, error) {
 				if c.sharedIndex {

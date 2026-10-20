@@ -47,7 +47,7 @@ items:
 	if got := c.Items[0].Widget; got != "label" {
 		t.Fatalf("expected item widget label, got %q (item=%#v)", got, c.Items[0])
 	}
-	if !c.Items[0].HideLabel {
+	if c.Items[0].HideLabel == nil || !*c.Items[0].HideLabel {
 		t.Fatalf("expected hideLabel to be preserved, got %#v", c.Items[0])
 	}
 	if c.VisibleWhen["source"] != "windowForm" {

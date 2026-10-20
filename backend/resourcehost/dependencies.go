@@ -5,6 +5,7 @@ package resource
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	primitive "github.com/viant/forge/backend/provider/contract"
 	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
@@ -71,26 +72,17 @@ func (g *Gateway) configuredOwnerConnection(ctx context.Context, owner string) (
 	if g == nil || g.Manager == nil || owner == "" || ctx == nil || ctx.Err() != nil {
 		return Connection{}, true, identity.ErrResourceDenied
 	}
-	names, err := g.Manager.Names(ctx)
+	names, err := g.Manager.CatalogProviderNames(ctx, owner)
 	if err != nil {
 		return Connection{}, true, err
 	}
-	selected := ""
-	for _, name := range names {
-		options, err := g.Manager.Options(ctx, name)
-		if err != nil {
-			return Connection{}, true, err
-		}
-		if options != nil && options.PrimitiveProviderIdentity == owner {
-			if selected != "" {
-				return Connection{}, true, ErrCollision
-			}
-			selected = name
-		}
+	if len(names) > 1 {
+		return Connection{}, true, fmt.Errorf("%w: owner %q configured by %q", ErrCollision, owner, names)
 	}
-	if selected == "" {
+	if len(names) == 0 {
 		return Connection{}, false, nil
 	}
+	selected := names[0]
 	return Connection{Name: selected, ProviderIdentity: owner, Generation: g.generation(selected)}, true, nil
 }
 
@@ -103,7 +95,7 @@ func (g *Gateway) ResolveDependencyPins(ctx context.Context, parent Connection, 
 }
 
 func (g *Gateway) resolveDependencyReads(ctx context.Context, parent Connection, parentPin identity.ResolvedResource, refs map[string]primitive.DataSourceReference, descriptors map[string]json.RawMessage, existing map[string]identity.ResolvedResource, collect bool) (map[string]identity.ResolvedResource, []selectedResourceRead, error) {
-	if len(refs) > 128 || existing != nil && len(existing) != len(refs) {
+	if existing != nil && len(existing) != len(refs) {
 		return nil, nil, identity.ErrResourceDenied
 	}
 	result := make(map[string]identity.ResolvedResource, len(refs))
@@ -127,7 +119,7 @@ func (g *Gateway) resolveDependencyReads(ctx context.Context, parent Connection,
 		}
 		child, e := Get[json.RawMessage](ctx, g, connection, ref.Resource, original)
 		if e != nil {
-			return nil, nil, e
+			return nil, nil, fmt.Errorf("dependency %q (%s): %w", id, ref.Resource.URI, e)
 		}
 		if child.ResolvedResource.ContentFingerprint != ref.ContentFingerprint || child.ResolvedResource.ProviderIdentity != ref.ProviderIdentity {
 			return nil, nil, identity.ErrResourceDenied

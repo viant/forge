@@ -62,9 +62,6 @@ func (t WindowTarget) Normalize() (WindowTarget, error) {
 	if len(t.Capabilities) == 0 {
 		t.Capabilities = nil
 	}
-	if len(t.DependencyPins) > 128 {
-		return WindowTarget{}, fmt.Errorf("invalid dependency pins")
-	}
 	if len(t.DependencyPins) > 0 {
 		pins := make(map[string]identity.ResolvedResource, len(t.DependencyPins))
 		for id, pin := range t.DependencyPins {
@@ -130,7 +127,7 @@ type WindowResourceEnvelope struct {
 }
 
 func (e *WindowResourceEnvelope) Validate() error {
-	if e == nil || !(e.SchemaVersion == 2 && e.Format == WindowBundleFormat || e.SchemaVersion == 3 && e.Format == WindowReferencesFormat) || len(e.Targets) == 0 || len(e.Targets) > 128 || len(e.Variants) == 0 || len(e.Variants) > 128 {
+	if e == nil || !(e.SchemaVersion == 2 && e.Format == WindowBundleFormat || (e.SchemaVersion == 3 || e.SchemaVersion == 4) && e.Format == WindowReferencesFormat) || len(e.Targets) == 0 || len(e.Targets) > 128 || len(e.Variants) == 0 || len(e.Variants) > 128 {
 		return fmt.Errorf("invalid window bundle")
 	}
 	seen, used := map[string]bool{}, map[string]bool{}
@@ -158,6 +155,12 @@ func (e *WindowResourceEnvelope) Validate() error {
 		return fmt.Errorf("window bundle requires explicit default and no orphan variants")
 	}
 	for _, v := range e.Variants {
+		if e.SchemaVersion == 4 {
+			if err := validateWindowReferenceManifest(v); err != nil {
+				return err
+			}
+			continue
+		}
 		if len(v.DataSourceResources) > 0 && e.SchemaVersion != 3 {
 			return fmt.Errorf("datasource resource references require window format 3")
 		}

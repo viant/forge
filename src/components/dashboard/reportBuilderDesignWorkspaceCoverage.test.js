@@ -418,7 +418,7 @@ assert.equal(
 
 assert.equal(
   source.includes("canShowResults: authoredRuntimePreviewState?.canRenderRuntime")
-    && source.includes("const shouldCollapseHostedExecution = hostedExecuteOnOpen"),
+    && source.includes("const shouldCollapseHostedExecution = !reportFilterRailOpen && !filtersDrawerOpen && hostedExecuteOnOpen"),
   true,
   "ReportBuilder should collapse live filters after authored runtime datasets complete, not only after primary collection rows render.",
 );

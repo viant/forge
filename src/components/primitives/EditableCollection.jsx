@@ -1,3 +1,4 @@
+import {trackVisibleWhen} from '../visibleWhen.js';
 import {actionIconOnly, actionAccessibleName} from '../table/basic/actionPresentation.js';
 import {containerSizingStyle} from '../containerSizing.js';
 import React from 'react';
@@ -23,6 +24,11 @@ export default function EditableCollection({sizingMode = 'fill', container, cont
   const dataContext = ref && context?.identity?.dataSourceRef !== ref ? context?.Context?.(ref) : context;
   const selection = dataContext?.signals?.selection?.value || {};
   const operations = Array.isArray(spec.operations) ? spec.operations : [];
+  for (const operation of operations) {
+    trackVisibleWhen(operation.visibleWhen, dataContext);
+    trackVisibleWhen(operation.disabledWhen, dataContext);
+    trackVisibleWhen((operation.selection || spec.selection)?.disabledWhen, dataContext);
+  }
   const selectedRows = editableCollectionRows(selection);
 
   const invoke = (operation) => {

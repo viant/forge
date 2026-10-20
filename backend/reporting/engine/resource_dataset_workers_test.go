@@ -104,6 +104,28 @@ func TestParallelResourceDatasetExecutionIsBounded(t *testing.T) {
 	}
 }
 
+func TestReportExecutionSelectsOnlyDeclaredDatasets(t *testing.T) {
+	var allowed atomic.Bool
+	allowed.Store(true)
+	var calls atomic.Int32
+	service, request := parallelReportFixture(t, 4, &allowed, func(context.Context) error {
+		calls.Add(1)
+		return nil
+	})
+	request.DatasetIDs = []string{"primary"}
+	result, err := service.ExecuteResource(context.Background(), request)
+	if err != nil || result == nil || len(result.Datasets) != 1 || result.Datasets["primary"] == nil || calls.Load() != 1 || len(result.ReportFill) == 0 {
+		t.Fatalf("selected report dataset did not execute alone: result=%v err=%v calls=%d", result != nil, err, calls.Load())
+	}
+	for _, ids := range [][]string{{"missing"}, {"primary", "primary"}, {}} {
+		before := calls.Load()
+		request.DatasetIDs = ids
+		if result, err := service.ExecuteResource(context.Background(), request); !errors.Is(err, identity.ErrResourceDenied) || result != nil || calls.Load() != before {
+			t.Fatalf("invalid dataset selection reached a producer: ids=%v err=%v", ids, err)
+		}
+	}
+}
+
 func TestParallelResourceDatasetFailureCancelsSibling(t *testing.T) {
 	var allowed atomic.Bool
 	allowed.Store(true)

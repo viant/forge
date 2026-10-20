@@ -38,6 +38,7 @@ export const evaluatePlainVisibleWhen = (visibleWhen, context, row = undefined) 
     if (visibleWhen.not) {
         return !evaluatePlainVisibleWhen(visibleWhen.not, context, row);
     }
+    if (visibleWhen.dataSourceRef) context = resolveChildContext(context, visibleWhen.dataSourceRef) || {};
     const source = String(visibleWhen.source || 'form').toLowerCase();
     const field = visibleWhen.field || visibleWhen.selector || visibleWhen.key;
 
@@ -64,6 +65,9 @@ export const evaluatePlainVisibleWhen = (visibleWhen, context, row = undefined) 
             break;
         case 'collection':
             scope = context.signals?.collection?.peek?.() || [];
+            break;
+        case 'control':
+            scope = context.signals?.control?.peek?.() || context.signals?.control?.value || {};
             break;
         case 'formstatus':
             scope = context.signals?.formStatus?.peek?.() || context.signals?.formStatus?.value || {};
@@ -139,6 +143,7 @@ export const trackVisibleWhen = (visibleWhen, context) => {
         nested.forEach((condition) => trackVisibleWhen(condition, context));
         return;
     }
+    if (visibleWhen.dataSourceRef) context = resolveChildContext(context, visibleWhen.dataSourceRef) || {};
     const source = String(visibleWhen.source || 'form').toLowerCase();
     switch (source) {
         case 'authorization':
@@ -162,6 +167,9 @@ export const trackVisibleWhen = (visibleWhen, context) => {
             break;
         case 'collection':
             context?.signals?.collection?.value;
+            break;
+        case 'control':
+            context?.signals?.control?.value;
             break;
         case 'formstatus':
             context?.signals?.formStatus?.value;

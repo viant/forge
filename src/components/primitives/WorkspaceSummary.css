@@ -1,0 +1,26 @@
+.forge-workspace-summary { width:100%; min-width:0; max-width:1500px; color:var(--forge-text-color, #344054); }
+.forge-workspace-summary__header { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:26px; }
+.forge-workspace-summary__header h1 { font-size:26px; line-height:1.25; margin:0 0 8px; color:var(--forge-heading-color, #1d2939); }
+.forge-workspace-summary__header p { margin:0; color:var(--forge-muted-color, #667085); }
+.forge-workspace-summary__actions { display:flex; gap:8px; flex-shrink:0; }
+.forge-workspace-summary.is-empty { display:flex; flex:1; flex-direction:column; justify-content:center; align-items:center; min-height:240px; padding:32px; text-align:center; }
+.forge-workspace-summary.is-empty .forge-workspace-summary__header { display:block; max-width:52ch; margin:0; }
+.forge-workspace-summary.is-empty .forge-workspace-summary__header h1 { font-size:20px; }
+.forge-workspace-summary__sections { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(320px,.85fr); gap:26px 20px; }
+.forge-workspace-summary__section { min-width:0; }
+.forge-workspace-summary__section.is-full-width { grid-column:1 / -1; }
+.forge-workspace-summary__section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:32px; margin-bottom:10px; }
+.forge-workspace-summary__section-heading h2 { margin:0; font-size:18px; font-weight:600; }
+.forge-workspace-summary__list { border:1px solid var(--forge-border-color, #d8e1ec); border-radius:10px; overflow:hidden; background:var(--forge-surface-color, #fff); }
+.forge-workspace-summary__list > button, .forge-workspace-summary__row { display:flex; align-items:center; gap:12px; width:100%; min-width:0; padding:14px; border:0; border-bottom:1px solid var(--forge-border-color, #e4e7ec); background:transparent; color:inherit; text-align:left; font:inherit; }
+.forge-workspace-summary__list > button { cursor:pointer; }
+.forge-workspace-summary__list > :last-child { border-bottom:0; }
+.forge-workspace-summary__list > button:hover { background:var(--forge-hover-color, #f3f7fc); }
+.forge-workspace-summary__list > button:focus-visible { outline:2px solid #2d72d2; outline-offset:-2px; }
+.forge-workspace-summary__identity { flex:1; min-width:0; }
+.forge-workspace-summary__identity strong, .forge-workspace-summary__identity small { display:block; overflow-wrap:anywhere; }
+.forge-workspace-summary__identity small { margin-top:4px; color:var(--forge-muted-color, #667085); font-size:12px; line-height:1.45; }
+.forge-workspace-summary__list time { max-width:125px; font-size:12px; color:var(--forge-muted-color, #667085); font-variant-numeric:tabular-nums; }
+.forge-workspace-summary__empty { padding:18px; margin:0; color:var(--forge-muted-color, #667085); }
+@media(max-width:900px) { .forge-workspace-summary__sections { grid-template-columns:minmax(0,1fr); } .forge-workspace-summary__header { flex-wrap:wrap; } }
+@media(max-width:480px) { .forge-workspace-summary__list > button { flex-wrap:wrap; } .forge-workspace-summary__list time { max-width:none; } }

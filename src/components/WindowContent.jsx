@@ -78,6 +78,10 @@ function useStableRuntimeIdentity(dependencies = []) {
 
 function collectInitialWindowFormItemValues(node, initial) {
     if (!node || typeof node !== 'object') return;
+    if (node.parameterEditor) {
+        collectInitialWindowFormItemValues({items:node.parameterEditor.fields}, initial);
+        for (const section of node.parameterEditor.sections || []) collectInitialWindowFormItemValues({items:section.fields}, initial);
+    }
     if (Array.isArray(node.items)) {
         for (const item of node.items) {
             if (!item || typeof item !== 'object') continue;
@@ -186,11 +190,9 @@ export async function applyWindowPermissionMetadata(completeMetadata, {
     conversationId = '',
     targetContext = null,
 } = {}) {
-    // Canonical windows require original OPEN admission even without a business
-    // authorization declaration. Managing MCP still owns datasource operations.
-    const canonicalWindow = typeof completeMetadata?.resource?.uri === 'string'
-        && completeMetadata.resource.uri.startsWith('window://');
-    if (!completeMetadata?.authorization && !canonicalWindow) return completeMetadata;
+    // A canonical resource URI is not an authorization declaration. The
+    // managing MCP already selected this metadata for the current user.
+    if (!completeMetadata?.authorization) return completeMetadata;
     if (typeof services?.applyPermission !== 'function') {
         throw Object.assign(new Error('Permission service is unavailable'), {status: 503});
     }
@@ -334,6 +336,53 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
     addRef(node.dashboard?.reportBuilder?.definitionDataSourceRef);
     addRef(resolveMappedRef(node), node.fetchData === false);
 
+    // Commands execute through datasource signals. Their contexts must be
+    // mounted, but declaring a writer must never invoke it on window open.
+    const addCommand = (command) => {
+        if (!command || typeof command !== 'object') return;
+        addRef(command.dataSourceRef, true);
+        for (const refresh of command.refresh || []) addRef(refresh?.dataSourceRef, true);
+        addRef(command.reconcile?.dataSourceRef, true);
+    };
+    addCommand(node.mutationCommand);
+    addCommand(node.editableCollection?.mutation);
+    for (const operation of node.editableCollection?.operations || []) addCommand(operation?.mutation);
+    for (const transition of node.statusWorkflow?.transitions || []) addCommand(transition?.command);
+    addCommand(node.treeEditor?.mutation);
+    addCommand(node.scheduleEditor?.mutation);
+    addCommand(node.wizard?.submit);
+    addCommand(node.draftForm?.submit);
+    if(node.predicateCompositionEditor) addRef(node.predicateCompositionEditor.dataSourceRef || node.dataSourceRef,true);
+    if(node.gateRequirementsEditor) {
+        addRef(node.gateRequirementsEditor.dataSourceRef || node.dataSourceRef,true);
+        for(const ref of Object.values(node.gateRequirementsEditor.operations||{}))addRef(ref,true);
+    }
+    if (node.readerWorkbench) {
+        addRef(node.readerWorkbench.dataSourceRef || node.dataSourceRef,true);
+        for (const binding of [...Object.values(node.readerWorkbench.operations || {}),...Object.values(node.readerWorkbench.lookups || {})]) addRef(binding.dataSourceRef,true);
+    }
+    if (node.resourcePolicyEditor) {
+        addRef(node.resourcePolicyEditor.dataSourceRef || node.dataSourceRef, true);
+        for (const ref of Object.values(node.resourcePolicyEditor.operations || {})) addRef(ref, true);
+    }
+    if (node.resultPreview) addRef(node.resultPreview.dataSourceRef || node.dataSourceRef, true);
+    if (node.workspaceSummary) {
+        addRef(node.workspaceSummary.stateDataSourceRef, true);
+        for (const section of node.workspaceSummary.sections || []) addRef(section.dataSourceRef, true);
+    }
+    if (node.parameterEditor) {
+        addRef(node.parameterEditor.dataSourceRef, true);
+        addCommand(node.parameterEditor.draft?.submit);
+        collectRequiredDataSourceRefs({items:node.parameterEditor.fields}, scope, refs, viewState, fetchUsage);
+        for (const section of node.parameterEditor.sections || []) collectRequiredDataSourceRefs({items:section.fields,visibleWhen:section.visibleWhen}, scope, refs, viewState, fetchUsage);
+    }
+
+    addCommand(node.uploadCollection?.upload);
+    for (const action of node.resourceHeader?.actions || []) addCommand(action?.mutation);
+    for (const rule of node.notificationRules?.rules || []) addCommand(rule?.action?.mutation);
+    addCommand(node.assignmentPicker?.assign);
+    addCommand(node.assignmentPicker?.unassign);
+
     // Match the rendered lifecycle of persistent collapsed sections. Their
     // header can retain its own datasource, but unmounted content must not
     // initialize reporting/child datasources until the user expands it.
@@ -350,6 +399,7 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
         for (const item of node.items) {
             if (!visibleInWindowForm(item)) continue;
             addRef(item?.dataSourceRef, item?.fetchData === false);
+            addCommand(item?.mutationCommand);
             addRef(item?.optionsDataSourceRef, usesLazyOptions(item));
             addRef(item?.fallbackOptionsDataSourceRef);
             addRef(resolveMappedRef(item), item?.fetchData === false);
@@ -473,6 +523,11 @@ export function shouldPrimeDataSourceFetch(dataSource = {}, prevInput = {}, coll
     // DataSource owns serialization; clearing fetch here loses the new range
     // when an empty result lets the next user action happen immediately.
     if (paramsChanged) return true;
+    // DataSource already consumed this request and is waiting for missing
+    // dependencies. Re-priming an empty inactive source on every render makes
+    // the consumer and primer continually toggle fetch until React aborts.
+    // Changed bindings or an explicit fetch above can wake it again.
+    if (control?.inactive === true) return false;
     if (control?.loading === true) return false;
     if (control?.error) return false;
     const hasCollection = Array.isArray(collection) && collection.length > 0;
@@ -1148,6 +1203,9 @@ function WindowContentInner({window, metadata, services}) {
                 overflow: shouldFillParent ? 'hidden' : 'visible',
             }}
         >
+            {metadata.resourceWarnings?.length > 0 ? <div role="status" className="bp6-callout bp6-intent-warning">
+                Some window resources are unavailable: {metadata.resourceWarnings.map(warning => warning.resource).join(', ')}
+            </div> : null}
             {!defaultDataSourceRef && context.signals ? <MessageBus context={context} /> : null}
             {renderDataSources()}
             {renderDialogs()}
@@ -1173,7 +1231,9 @@ function WindowContentInner({window, metadata, services}) {
  * ------------------------------------------------------------------ */
 
 export default function WindowContent(props) {
-    return <ForgeThemeBoundary windowKey={props.window?.windowKey}><WindowContentRuntime {...props} /></ForgeThemeBoundary>;
+    useSignals();
+    const metadata = props.selectedMetadata || (props.window?.windowId ? getMetadataSignal(props.window.windowId).value : null);
+    return <ForgeThemeBoundary windowKey={metadata?.windowKey || props.window?.windowKey} resource={metadata?.resource}><WindowContentRuntime {...props} /></ForgeThemeBoundary>;
 }
 
 function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}) {
@@ -1280,16 +1340,23 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
         if (deliveredMetadata) {
             // A completed selected GET may deliver a generic or signed definition.
             // This rendering input is not an authorization grant for data calls.
-            try {
-                const admittedMetadata = compilePermissionAppliedMetadata(deliveredMetadata,
+            const publish = (definition) => {
+                if (cancelled) return;
+                const admittedMetadata = compilePermissionAppliedMetadata(definition,
                     targetContext, window?.parameters || {}, admittedBinding);
                 injectActions(admittedMetadata);
                 metadataSignalHandle.value = {...admittedMetadata, __windowKey: baseKey,
                     __targetKey: targetKey, __provisionalInline: false};
-            } catch (error) {
-                setFetchError(error);
+            };
+            if (services.resourceFS) {
+                setLoading(true);
+                services.resourceFS.loadWindow(deliveredMetadata).then(publish)
+                    .catch(error => { if (!cancelled) setFetchError(error); })
+                    .finally(() => { if (!cancelled) setLoading(false); });
+            } else {
+                try { publish(deliveredMetadata); } catch (error) { setFetchError(error); }
+                setLoading(false);
             }
-            setLoading(false);
             return () => { cancelled = true; };
         }
 
@@ -1315,7 +1382,10 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             .then(async (resp) => {
                 if (cancelled || expired) return;
                 setFetchError(null);
-                const completeMetadata = resolveWindowMetadataForTarget(resp.data, targetContext);
+                const selectedDefinition = resolveWindowMetadataForTarget(resp.data, targetContext);
+                const completeMetadata = services.resourceFS
+                    ? await services.resourceFS.loadWindow(selectedDefinition) : selectedDefinition;
+                if (cancelled || expired) return;
                 fetchedProtectedMetadata = isProtectedWindowMetadata(completeMetadata);
                 // A signed delivery is emitted only after host OPEN admission. Its
                 // snapshot is a rendering hint, not a data-operation preflight.
@@ -1360,7 +1430,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
 
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey, auth, selectedMetadata, metadataRetryVersion]);
+    }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey, auth, selectedMetadata, metadataRetryVersion, services.resourceFS]);
 
     useEffect(() => {
         const metadata = metadataSignalHandle?.value;

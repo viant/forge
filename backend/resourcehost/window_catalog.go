@@ -10,6 +10,7 @@ import (
 	service "github.com/viant/forge/backend/provider"
 	primitive "github.com/viant/forge/backend/provider/contract"
 	"github.com/viant/forge/backend/provider/contract/observe"
+	"github.com/viant/forge/backend/requestctx"
 	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
 	"strings"
@@ -237,6 +238,7 @@ func (c *WindowCatalog) getForProvider(ctx context.Context, explicitOwner string
 		}
 		ref = *input.Resource
 	}
+	ctx = requestctx.WithWindowTarget(ctx, input.Target)
 	result, e := GetWithCodec[*types.CompiledWindowResource](ctx, c.Gateway, loc.Connection, ref, input.ResolvedResource, DefinitionCodec[*types.CompiledWindowResource]{ID: "forge.window.resource.v1", Parse: types.CompileWindowResource})
 	if e != nil {
 		return nil, fmt.Errorf("window read/select: %w", e)
@@ -287,7 +289,7 @@ func (c *WindowCatalog) getForProvider(ctx context.Context, explicitOwner string
 		return nil, identity.ErrResourceDenied
 	}
 	var dependencyPins map[string]identity.ResolvedResource
-	if len(selected.DataSourceResources) > 0 {
+	if len(selected.DataSourceResources) > 0 && !result.Definition.IndependentDefinitions() {
 		var existing map[string]identity.ResolvedResource
 		if input.Target != nil && input.Target.SelectionToken != "" {
 			if e = c.TargetProof.Verify(ctx, pin, *input.Target, selected.Fingerprint, input.Target.SelectionToken); e != nil {
@@ -343,6 +345,9 @@ func (c *WindowCatalog) getForProvider(ctx context.Context, explicitOwner string
 	nativeConnection.Generation = 0
 	if err := projectWindowDatasourceTransport(definition, selected.DataSources, c.nativeHTTPWindows[nativeConnection][loc.URI]); err != nil {
 		return nil, err
+	}
+	if result.Definition.IndependentDefinitions() {
+		projectIndependentDatasourceTransport(definition, selected.DataSourceResources)
 	}
 	if c.Gateway.generation(loc.Connection.Name) != loc.Connection.Generation {
 		return nil, identity.ErrResourceStale

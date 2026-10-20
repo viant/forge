@@ -189,3 +189,30 @@ func TestVisibleCatalogRepresentationParserCannotMutateCachedDefinition(t *testi
 	_, err = mgr.VisibleCatalogRepresentation(ctx, "namespace", "uri", "schema", nil)
 	require.ErrorIs(t, err, primitive.ErrCatalogCursor)
 }
+
+func TestRejectedRepresentationEvictsOnlyItsRawPayloadAndAliases(t *testing.T) {
+	mgr, err := New(nil)
+	require.NoError(t, err)
+	ctx := context.Background()
+	partition := mgr.PublicCatalogPartition("window")
+	loads := 0
+	load := func(context.Context) (json.RawMessage, time.Time, error) {
+		loads++
+		return json.RawMessage(`{"repaired":true}`), time.Time{}, nil
+	}
+	_, err = mgr.VisibleCatalogEntryInPartition(ctx, "namespace", partition, "broken", func(context.Context) (json.RawMessage, time.Time, error) {
+		return json.RawMessage(`{"invalid":true}`), time.Time{}, nil
+	}, func(json.RawMessage) []string { return []string{"broken@working"} })
+	require.NoError(t, err)
+	_, err = mgr.VisibleCatalogEntryInPartition(ctx, "namespace", partition, "healthy", load)
+	require.NoError(t, err)
+	_, err = mgr.VisibleCatalogRepresentation(ctx, "namespace", "broken", "window.schema", func(json.RawMessage) (any, error) { return nil, fmt.Errorf("invalid target binding") })
+	require.Error(t, err)
+	_, err = mgr.VisibleCatalogEntryInPartition(ctx, "namespace", partition, "healthy", load)
+	require.NoError(t, err)
+	require.Equal(t, 1, loads, "a different valid definition must remain cached")
+	raw, err := mgr.VisibleCatalogEntryInPartition(ctx, "namespace", partition, "broken@working", load)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"repaired":true}`, string(raw))
+	require.Equal(t, 2, loads, "the rejected revision alias must fetch corrected provider bytes")
+}

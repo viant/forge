@@ -13,6 +13,10 @@ type CompiledWindowResource struct {
 	envelope   WindowResourceEnvelope
 }
 
+func (c *CompiledWindowResource) IndependentDefinitions() bool {
+	return c != nil && c.envelope.SchemaVersion == WindowReferenceSchemaVersion
+}
+
 func CompileWindowResource(raw json.RawMessage) (*CompiledWindowResource, error) {
 	var header struct {
 		Format string `json:"format"`

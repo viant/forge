@@ -13,20 +13,22 @@ export function ForgeThemeProvider({themeId = '', mode = 'light', scopeClassName
     return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
-export function themeBoundaryProps(theme, windowKey) {
+export function themeBoundaryProps(theme, windowKey, resource) {
     if (!theme) return {};
     return {
         className: [theme.scopeClassName, theme.themeId && theme.mode === 'dark' ? Classes.DARK : ''].filter(Boolean).join(' '),
         'data-forge-window-key': String(windowKey || '').split('?')[0],
         'data-forge-theme': theme.themeId || undefined,
         'data-forge-color-mode': theme.themeId ? theme.mode : undefined,
+        'data-forge-resource-provider': resource?.providerIdentity || undefined,
+        'data-forge-resource-namespace': /^window:\/\/([^/]+)\//.exec(resource?.uri || '')?.[1],
     };
 }
 
-export function ForgeThemeBoundary({windowKey, portalContainer, children}) {
+export function ForgeThemeBoundary({windowKey, resource, portalContainer, children}) {
     const theme = useContext(ThemeContext);
     const [portal, setPortal] = useState(null);
-    const props = themeBoundaryProps(theme, windowKey);
+    const props = themeBoundaryProps(theme, windowKey, resource);
     const parent = portalContainer ?? theme?.portalContainer ?? (typeof document === 'undefined' ? null : document.body);
     useClientLayoutEffect(() => {
         if (!theme || typeof document === 'undefined') return;
@@ -46,11 +48,11 @@ export function ForgeThemeBoundary({windowKey, portalContainer, children}) {
     useClientLayoutEffect(() => {
         if (!portal) return;
         portal.className = props.className || '';
-        for (const name of ['data-forge-window-key', 'data-forge-theme', 'data-forge-color-mode']) {
+        for (const name of ['data-forge-window-key', 'data-forge-theme', 'data-forge-color-mode', 'data-forge-resource-provider', 'data-forge-resource-namespace']) {
             if (props[name] === undefined) portal.removeAttribute(name);
             else portal.setAttribute(name, props[name]);
         }
-    }, [portal, props.className, props['data-forge-window-key'], props['data-forge-theme'], props['data-forge-color-mode']]);
+    }, [portal, props.className, props['data-forge-window-key'], props['data-forge-theme'], props['data-forge-color-mode'], props['data-forge-resource-provider'], props['data-forge-resource-namespace']]);
     if (!theme) return children;
     return <PortalProvider portalContainer={portal || undefined}>
         <div {...props} style={{display: 'flex', flexDirection: 'column', flex: '1 1 auto', minWidth: 0, minHeight: 0, height: '100%'}}>

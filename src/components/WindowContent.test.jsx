@@ -32,25 +32,24 @@ describe('applyWindowPermissionMetadata', () => {
     })]);
   });
 
-  it('admits a canonical window without an authorization declaration and preserves the issued binding', async () => {
-    const completeMetadata = {resource: {uri: 'window://example/recordList'}, view: {content: {id: 'root'}}};
+  it('renders a published canonical window without another permission decision', async () => {
+    const binding = {token: 'synthetic-existing-binding', parametersDigest: 'synthetic-digest'};
+    const completeMetadata = {resource: {uri: 'window://example/recordList'}, selectionBinding: binding, view: {content: {id: 'root'}}};
     const parameters = {Selected: [42]};
     const calls = [];
-    const binding = {token: 'synthetic-signed-binding', parametersDigest: 'synthetic-digest'};
-    const admitted = {...completeMetadata, selectionBinding: binding};
     const result = await applyWindowPermissionMetadata(completeMetadata, {
-      services: {applyPermission: async input => {calls.push(input); return admitted;}},
+      services: {applyPermission: async input => {calls.push(input); throw new Error('Duplicate resource permission check');}},
       windowKey: 'recordList', windowParams: parameters,
     });
-    expect(calls).toEqual([expect.objectContaining({windowKey: 'recordList', completeMetadata, windowParams: parameters})]);
-    expect(result).toBe(admitted);
+    expect(calls).toEqual([]);
+    expect(result).toBe(completeMetadata);
     expect(result.selectionBinding).toBe(binding);
     expect(result.authorization).toBeUndefined();
   });
 
-  it('requires the existing OPEN service for canonical windows without adding a local grant', async () => {
-    await expect(applyWindowPermissionMetadata({resource: {uri: 'window://example/list'}}, {services: {}}))
-      .rejects.toMatchObject({status: 503});
+  it('does not require a permission service just because the resource uses window://', async () => {
+    const metadata = {resource: {uri: 'window://example/list'}};
+    expect(await applyWindowPermissionMetadata(metadata, {services: {}})).toBe(metadata);
   });
 
   it('leaves unpinned metadata and other resource kinds unchanged', async () => {
@@ -527,6 +526,14 @@ describe('resolveFetcherOwnedDataSourceRefs', () => {
 });
 
 describe('shouldPrimeDataSourceFetch', () => {
+  it('leaves a consumed request inactive until its bindings change or an explicit fetch wakes it', () => {
+    const waiting = {inactive: true, loading: false, loaded: false};
+    for (let render = 0; render < 100; render++) {
+      expect(shouldPrimeDataSourceFetch({}, {fetch: false}, [], false, waiting)).toBe(false);
+    }
+    expect(shouldPrimeDataSourceFetch({}, {fetch: false}, [], true, waiting)).toBe(true);
+    expect(shouldPrimeDataSourceFetch({}, {fetch: true}, [], false, waiting)).toBe(true);
+  });
     it('does not re-prime an in-flight empty datasource', () => {
       expect(shouldPrimeDataSourceFetch({}, {fetch: false}, [], false, {loaded: false, loading: true})).toBe(false);
     });
