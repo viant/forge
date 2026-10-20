@@ -184,6 +184,7 @@ export function resolveWindowMetadataDisplayState({loading, signalsReady, metada
 
 export async function applyWindowPermissionMetadata(completeMetadata, {
     services,
+    windowId = '',
     windowKey,
     resource = {},
     windowParams = {},
@@ -197,6 +198,7 @@ export async function applyWindowPermissionMetadata(completeMetadata, {
         throw Object.assign(new Error('Permission service is unavailable'), {status: 503});
     }
     return services.applyPermission({
+        windowId,
         windowKey,
         completeMetadata,
         resource,
@@ -1400,6 +1402,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                 const selectionBinding = canonicalSelectionBinding(window);
                 const permissionAppliedMetadata = selectionBinding ? completeMetadata : await applyWindowPermissionMetadata(completeMetadata, {
                     services,
+                    windowId,
                     windowKey: baseKey,
                     resource: window?.resource || window?.parameters || {},
                     windowParams: window?.parameters || {},
