@@ -10335,6 +10335,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         builderContext,
         datasets: runtimePreviewPublishedDatasets,
         requestKey: runtimePreviewPublishedDatasetsRequestKey,
+        retainResolvedRequests: !!runtimePreviewSectionSelection,
         fetcherOptions: {
             preferDataSourceRoute: true,
         },
