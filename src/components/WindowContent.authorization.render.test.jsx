@@ -46,6 +46,28 @@ function definition(withRows = false) {
     view:{content:{id:'authorized-root',kind:'test.authorized', ...(withRows ? {dataSourceRef:'rows'} : {})}}};
 }
 
+it('prepares the metadata request with the concrete rendered window instance', async () => {
+  const originalFetch = globalThis.fetch;
+  const prepared = [];
+  const publicMetadata = {dataSource:{},view:{content:{id:'public-root',kind:'test.authorized'}}};
+  globalThis.fetch = vi.fn(async () => new Response(JSON.stringify({data:publicMetadata}), {
+    status:200, headers:{'Content-Type':'application/json'},
+  }));
+  try {
+    await mount({prepareDataConnectorRequest: request => {
+      prepared.push(request.windowState);
+      request.queryParams.set('windowId', request.windowState.windowId);
+    }}, {windowId,windowKey:'records',conversationId:'current-conversation',parameters:{RecordId:[321]}});
+    await flush();
+    expect(element.querySelector('[data-authorized-renderer]')).not.toBeNull();
+    expect(prepared).toHaveLength(1);
+    expect(prepared[0]).toMatchObject({windowId,windowKey:'records',conversationId:'current-conversation',parameters:{RecordId:[321]}});
+    expect(globalThis.fetch.mock.calls[0][0]).toContain(`windowId=${windowId}`);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 it('updates a floating picker footer when its selection changes', async () => {
   const metadata={dataSource:{rows:{selectionMode:'single',cardinality:'many',autoFetch:false,parameters:[]}},
     view:{content:{id:'picker-root',kind:'test.authorized',dataSourceRef:'rows'}}};

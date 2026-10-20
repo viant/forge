@@ -36,7 +36,7 @@ import ViewDialog from './ViewDialog.jsx';
 import {openWindowPickerDialog} from './windowPickerDialog.js';
 import DataSourceContainer from './WindowContentDataSourceContainer.jsx';
 
-import useDataConnector from '../hooks/dataconnector.js';
+import {createDataConnector} from '../hooks/dataconnector.js';
 import { mergeWindowFormValues } from '../hooks/dataSource.js';
 import {usesLazyOptions} from '../runtime/optionsFetch.js';
 import {resolveSectionOpenState, resolveSectionProperties} from './containerChrome.js';
@@ -1305,7 +1305,11 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
         },
     }), [reportBuilderServices, runtimeWindow, endpoints, targetContext, auth, prepareConnectorRequest]);
     const config  = {service: {...service, uri: windowMetadataEndpoint(service.uri, baseKey, runtimeWindow), includeTargetContext: true}};
-    const connector = useDataConnector(config);
+    const connector = createDataConnector(config, {
+        endpoints, targetContext, auth,
+        transport: services.dataConnectorTransport,
+        prepareRequest: prepareConnectorRequest,
+    });
 
     useEffect(() => {
         const existingSignal = findMetadataSignal(windowId);

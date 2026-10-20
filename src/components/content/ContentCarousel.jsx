@@ -1,15 +1,49 @@
 import React, {useEffect, useId, useMemo, useState} from 'react';
+import {useSignals} from '@preact/signals-react/runtime';
+import {getViewSignal} from '../../core/store/signals.js';
+import {useViewPartition} from '../useViewPartition.js';
 import ContentImage from './ContentImage.jsx';
 import {contentRecords, contentAction} from './contentModel.js';
 import './content.css';
 
-export default function ContentCarousel({id, value = [], onClick, disabled, autoRotateMs = 0, wholeSlideAction = false, className = '', style, 'aria-label': ariaLabel = 'Featured content'}) {
+export default function ContentCarousel({id, context, value = [], onClick, disabled, autoRotateMs = 0, wholeSlideAction = false, className = '', style, 'aria-label': ariaLabel = 'Featured content'}) {
+    useSignals();
     const slides = useMemo(() => contentRecords(value), [value]), generatedId = useId();
     const [activeId, setActiveId] = useState(null), [hovered, setHovered] = useState(false), [focused, setFocused] = useState(false), [paused, setPaused] = useState(false);
     const [reducedMotion, setReducedMotion] = useState(false);
-    const found = slides.findIndex((slide, i) => (slide.id ?? i) === activeId);
+    const controlId = id || generatedId;
+    const viewSignal = context?.identity?.windowId ? getViewSignal(context.identity.windowId) : null;
+    const selection = useViewPartition(viewSignal, 'carousels', controlId).value;
+    const selectedId = viewSignal ? selection?.itemId : activeId;
+    const found = slides.findIndex((slide, i) => (slide.id ?? i) === selectedId);
     const index = found >= 0 ? found : 0, active = slides[index];
-    const choose = next => setActiveId(slides[(next + slides.length) % slides.length]?.id ?? ((next + slides.length) % slides.length));
+    const publish = position => {
+        const slide = slides[position];
+        if (!viewSignal) {setActiveId(slide?.id ?? position);return;}
+        const previous = viewSignal.peek() || {};
+        const carousels = {...previous.carousels};
+        if (slide) {
+            const next = {itemId: slide.id ?? position, title: slide.title || '', index: position, total: slides.length};
+            const current = carousels[controlId];
+            if (current && Object.keys(next).every(key => current[key] === next[key])) return;
+            carousels[controlId] = next;
+        } else {
+            if (!(controlId in carousels)) return;
+            delete carousels[controlId];
+        }
+        viewSignal.value = {...previous, carousels};
+    };
+    const choose = next => {if (slides.length) publish((next + slides.length) % slides.length);};
+    // The shared view partition is the selection source; derive its descriptive
+    // fields from the current collection rather than retaining stale records.
+    useEffect(() => {if (viewSignal) publish(index);}, [viewSignal, controlId, selectedId, index, active?.id, active?.title, slides.length]);
+    useEffect(() => () => {
+        if (!viewSignal) return;
+        const previous = viewSignal.peek() || {}, carousels = {...previous.carousels};
+        if (!(controlId in carousels)) return;
+        delete carousels[controlId];
+        viewSignal.value = {...previous, carousels};
+    }, [viewSignal, controlId]);
     useEffect(() => {
         const query = window.matchMedia?.('(prefers-reduced-motion: reduce)');
         if (!query) return;
