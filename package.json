@@ -29,7 +29,9 @@
       "types": "./src/window-editor/WindowYamlEditor.d.ts",
       "default": "./src/window-editor/WindowYamlEditor.jsx"
     },
-    "./parameter-editor": "./src/components/primitives/ParameterEditor.jsx"
+    "./parameter-editor": "./src/components/primitives/ParameterEditor.jsx",
+    "./result-preview": "./src/components/primitives/ResultPreview.jsx",
+    "./result-preview/model": "./src/components/primitives/resultPreviewModel.js"
   },
   "scripts": {
     "test:widget-pairing": "node --no-warnings src/components/primitives/nativeWidgetContract.test.js",

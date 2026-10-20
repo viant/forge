@@ -352,6 +352,7 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
     addCommand(node.scheduleEditor?.mutation);
     addCommand(node.wizard?.submit);
     addCommand(node.draftForm?.submit);
+    if (node.resultPreview) addRef(node.resultPreview.dataSourceRef || node.dataSourceRef, true);
     if (node.workspaceSummary) {
         addRef(node.workspaceSummary.stateDataSourceRef, true);
         for (const section of node.workspaceSummary.sections || []) addRef(section.dataSourceRef, true);

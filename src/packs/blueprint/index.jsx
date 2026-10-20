@@ -1,3 +1,4 @@
+import {preserveSelectExternalFocus} from './selectCloseFocus.js';
 import SwitchControl from '../../components/SwitchControl.jsx';
 import ForgeFormGroup from './ForgeFormGroup.jsx';
 import './theme.css';
@@ -620,6 +621,7 @@ export function registerPack() {
             'data-forge-field-track-control': fieldTrackControl,
             ...rest
         }) {
+            const triggerRef = React.useRef(null);
             const visibleOptions = permittedOptions(options, context);
             const selected = visibleOptions.find((o) => String(o.value) === String(value));
             const isFieldTrack = isFieldTrackControl(fieldTrackControl);
@@ -659,6 +661,10 @@ export function registerPack() {
                 ),
             } : (popoverProps === undefined ? defaultPopoverProps : popoverProps);
             const lazyPopoverProps = onOptionsRequest ? {...resolvedPopoverProps, onOpening: opening} : resolvedPopoverProps;
+            const focusSafePopoverProps = {...lazyPopoverProps, onClosing: node => {
+                preserveSelectExternalFocus(node, triggerRef.current);
+                lazyPopoverProps?.onClosing?.(node);
+            }};
             const resolvedPopoverTargetProps = isFieldTrack ? {
                 ...popoverTargetProps,
                 className: mergeClassNames(
@@ -738,12 +744,13 @@ export function registerPack() {
                     inputProps={resolvedInputProps}
                     menuProps={resolvedMenuProps}
                     popoverContentProps={popoverContentProps}
-                    popoverProps={lazyPopoverProps}
+                    popoverProps={focusSafePopoverProps}
                     popoverTargetProps={resolvedPopoverTargetProps}
                     placeholder={placeholder}
                     onItemSelect={(item) => commitSelectOption(item, onChange)}
                 >
                     <Button
+                        ref={triggerRef}
                         id={id}
                         aria-label={ariaLabel}
                         aria-labelledby={fieldTrackControl ? ariaLabelledBy : undefined}

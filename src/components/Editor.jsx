@@ -81,6 +81,9 @@ const BoundEditor = ({context, container}) => {
             previous.current.source = formatEditorValue(parsed, editor.valueFormat);
             handlers.dataSource.setFormField({item: {dataField: selector.source || 'source'}, value: parsed});
             setParseError('');
+            for (const execute of editor.on || []) {
+                if (execute.event === 'onChange' && execute.handler) context.lookupHandler?.(execute.handler)?.({context, value:parsed, execution:execute});
+            }
             if (editor.errorField) handlers.dataSource.setFormField({item: {dataField: editor.errorField}, value: ''});
         } catch (error) {
             setParseError(error.message);
