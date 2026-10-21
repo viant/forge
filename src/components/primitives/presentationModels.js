@@ -4,14 +4,17 @@ import {resolveLinkTarget} from '../../utils/linkTarget.js';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import {primitiveIdentity} from './workflowModels.js';
 
-export function dataBoundaryState(states = [], collections = [], allowPartial = false) {
-  const loading = states.some((state) => state?.loading === true || state?.loaded !== true);
+export function dataBoundaryState(states = [], collections = [], allowPartial = false, ignoreIdle = false) {
+  // A producer may finish an aggregate without dispatching an optional read
+  // (for example, an enrichment query with no parent IDs). An explicit boundary
+  // condition can release that idle dependency, never an active read or error.
+  const loading = states.some((state) => state?.loading === true || (!ignoreIdle && state?.loaded !== true));
   const errors = states.map((state) => state?.error).filter(Boolean);
   const stale = states.some((state) => state?.stale === true);
   const hasRows = collections.some((rows) => Array.isArray(rows) && rows.length > 0);
   if (errors.length && !(allowPartial && hasRows)) return {kind: 'error', errors};
   if (loading && !(allowPartial && hasRows)) return {kind: 'loading', errors};
-  if (!hasRows && states.every((state) => state?.loaded === true)) return {kind: stale ? 'stale_empty' : 'empty', errors};
+  if (!hasRows && states.every((state) => state?.loaded === true || (ignoreIdle && state?.loading !== true))) return {kind: stale ? 'stale_empty' : 'empty', errors};
   if (errors.length || loading) return {kind: 'partial', errors};
   if (stale) return {kind: 'stale', errors};
   return {kind: 'ready', errors};

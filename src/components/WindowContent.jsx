@@ -1,4 +1,6 @@
+import {useWorkspaceRefresh,workspaceRefreshScopeIdentity} from '../runtime/useWorkspaceRefresh.js';
 import {windowFillsAllocatedSpace, showWindowSelectionFooter} from './windowPresentationPolicy.js';
+import {beginWindowStateAdoption, windowStateAdoptionCleared, completeWindowStateAdoption, rejectWindowStateAdoption} from '../runtime/windowStateAdoption.js';
 import {ForgeThemeBoundary} from './ThemeBoundary.jsx';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
@@ -294,7 +296,7 @@ export function resolveWindowRootContainer(content = null, parameters = {}) {
     return next;
 }
 
-function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchUsage = null) {
+function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchUsage = null, fetcherOwned = null) {
     if (!node || typeof node !== 'object') return;
 
     const isWindowFormPredicate = (condition) => {
@@ -305,11 +307,18 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
         return String(condition.source || '').toLowerCase() === 'windowform';
     };
     const visibleInWindowForm = (entry) => {
-        if (!entry?.visibleWhen || !isWindowFormPredicate(entry.visibleWhen)) return true;
-        return evaluatePlainVisibleWhen(entry.visibleWhen, {signals: {windowForm: {peek: () => scope || {}}}});
+        const context = {signals: {windowForm: {peek: () => scope || {}}}};
+        if (entry?.visibleWhen && isWindowFormPredicate(entry.visibleWhen)
+            && !evaluatePlainVisibleWhen(entry.visibleWhen, context)) return false;
+        if (entry?.hiddenWhen && isWindowFormPredicate(entry.hiddenWhen)
+            && evaluatePlainVisibleWhen(entry.hiddenWhen, context)) return false;
+        return true;
     };
 
     if (!visibleInWindowForm(node)) return;
+    if (node.fetchData === true && String(node.dataSourceRef || '').trim()) {
+        fetcherOwned?.add(String(node.dataSourceRef).trim());
+    }
 
     const addRef = (ref, deferred = false) => {
         const value = String(ref || '').trim();
@@ -375,8 +384,8 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
     if (node.parameterEditor) {
         addRef(node.parameterEditor.dataSourceRef, true);
         addCommand(node.parameterEditor.draft?.submit);
-        collectRequiredDataSourceRefs({items:node.parameterEditor.fields}, scope, refs, viewState, fetchUsage);
-        for (const section of node.parameterEditor.sections || []) collectRequiredDataSourceRefs({items:section.fields,visibleWhen:section.visibleWhen}, scope, refs, viewState, fetchUsage);
+        collectRequiredDataSourceRefs({items:node.parameterEditor.fields}, scope, refs, viewState, fetchUsage, fetcherOwned);
+        for (const section of node.parameterEditor.sections || []) collectRequiredDataSourceRefs({items:section.fields,visibleWhen:section.visibleWhen}, scope, refs, viewState, fetchUsage, fetcherOwned);
     }
 
     addCommand(node.uploadCollection?.upload);
@@ -411,10 +420,14 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
     if (Array.isArray(node.containers)) {
         let children = node.containers;
         const tabs = node.stableTabs || node.tabs;
-        // stableTabs uses the same active/visited mount policy as tabs. During
-        // initial collection, only the selected panel exists; visited panels
-        // are represented by mounted contexts after navigation.
-        if (tabs?.renderActiveTabPanelOnly === true && children.length > 0) {
+        // FormPanel renders only the selected panel by default, including
+        // legacy renderActiveTabPanelOnly:false. Visited panels retain local
+        // state, but their inactive implicit consumers must not prime reads.
+        // Only the explicit all policy intentionally mounts every panel.
+        const mountPolicy = String(tabs?.mountPolicy || '').trim().toLowerCase();
+        if (tabs && mountPolicy !== 'all' && children.length > 0) {
+            // Match FormPanel's visible fallback before selecting a default.
+            children = children.filter(visibleInWindowForm);
             const panelId = String(node.id || children[0]?.id || 'root').trim();
             const selectedId = String(
                 viewState?.tabs?.[panelId]
@@ -427,24 +440,11 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
             children = selected ? [selected] : [];
         }
         for (const child of children) {
-            collectRequiredDataSourceRefs(child, scope, refs, viewState, fetchUsage);
+            collectRequiredDataSourceRefs(child, scope, refs, viewState, fetchUsage, fetcherOwned);
         }
     }
 }
 
-function collectFetcherOwnedDataSourceRefs(node, refs) {
-    if (!node || typeof node !== "object") return;
-
-    if (node.fetchData === true && String(node.dataSourceRef || "").trim()) {
-        refs.add(String(node.dataSourceRef).trim());
-    }
-
-    if (Array.isArray(node.containers)) {
-        for (const child of node.containers) {
-            collectFetcherOwnedDataSourceRefs(child, refs);
-        }
-    }
-}
 
 function expandRequiredDataSourceRefs(metadata, refs) {
     const all = metadata?.dataSource || {};
@@ -506,9 +506,9 @@ export function resolveDeferredDataSourceRefs(metadata, defaultRef = '', scope =
 // Compatibility for callers of the original lazy-options ownership helper.
 export const resolveLazyOptionsDataSourceRefs = resolveDeferredDataSourceRefs;
 
-export function resolveFetcherOwnedDataSourceRefs(metadata) {
+export function resolveFetcherOwnedDataSourceRefs(metadata, scope = {}, viewState = {}) {
     const refs = new Set();
-    collectFetcherOwnedDataSourceRefs(metadata?.view?.content || null, refs);
+    collectRequiredDataSourceRefs(metadata?.view?.content || null, scope, new Set(), viewState, null, refs);
     return Array.from(refs);
 }
 
@@ -991,8 +991,8 @@ function WindowContentInner({window, metadata, services}) {
         [metadata, defaultDataSourceRef, windowFormSnapshot, liveWindowView],
     );
     const fetcherOwnedDataSourceRefs = useMemo(
-        () => new Set(resolveFetcherOwnedDataSourceRefs(metadata)),
-        [metadata],
+        () => new Set(resolveFetcherOwnedDataSourceRefs(metadata, windowFormSnapshot, liveWindowView)),
+        [metadata, windowFormSnapshot, liveWindowView],
     );
 
     useEffect(() => {
@@ -1333,6 +1333,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             return () => { cancelled = true; };
         }
         const existingMetadata = metadataSignalHandle.peek?.();
+        const adoption = beginWindowStateAdoption(window, existingMetadata);
         const targetKey = normalizeTargetKey(targetContext);
         // Registered windows always fetch fresh metadata and authorization.
         // A compiled protected tree may no longer retain enough markers to be
@@ -1344,9 +1345,10 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
         if (isProtectedWindowMetadata(existingMetadata)) {
             clearProtectedWindowState(windowId);
         }
+        windowStateAdoptionCleared(adoption);
 
         const admittedBinding = canonicalSelectionBinding(window);
-        const deliveredMetadata = selectedMetadata?.view ? selectedMetadata : admittedBinding && window?.inlineMetadata?.view ? window.inlineMetadata : null;
+        const deliveredMetadata = adoption ? null : selectedMetadata?.view ? selectedMetadata : admittedBinding && window?.inlineMetadata?.view ? window.inlineMetadata : null;
         if (deliveredMetadata) {
             // A completed selected GET may deliver a generic or signed definition.
             // This rendering input is not an authorization grant for data calls.
@@ -1372,7 +1374,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
 
         let hasInlineFallback = false;
         let fetchedProtectedMetadata = false;
-        if (window && canUseInlineMetadataFallback(window.inlineMetadata)) {
+        if (!adoption && window && canUseInlineMetadataFallback(window.inlineMetadata)) {
             try {
                 const resolvedMetadata = resolveWindowMetadataForTarget(window.inlineMetadata, targetContext);
                 injectActions(resolvedMetadata);
@@ -1415,6 +1417,11 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                     throw Object.assign(new Error('Resource not found or access denied'), {status: 403});
                 }
                 injectActions(resolvedMetadata);
+                if (adoption) {
+                    const freshScopeMetadata = compilePermissionAppliedMetadata(permissionAppliedMetadata, targetContext,
+                        window?.parameters || {}, canonicalSelectionBinding(permissionAppliedMetadata));
+                    completeWindowStateAdoption(adoption, freshScopeMetadata);
+                }
                 const heldMetadata = {
                     ...resolvedMetadata,
                     __windowKey: baseKey,
@@ -1424,6 +1431,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                 metadataSignalHandle.value = heldMetadata;
             }))
             .catch((err) => {
+                rejectWindowStateAdoption(adoption);
                 if (Number(err?.status) === 504) expired = true;
                 if (!cancelled) {
                     const protectedRequest = fetchedProtectedMetadata || isProtectedWindowMetadata(existingMetadata) || isProtectedWindowMetadata(window?.inlineMetadata);
@@ -1439,7 +1447,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                 }
             });
 
-        return () => { cancelled = true; };
+        return () => { cancelled = true; rejectWindowStateAdoption(adoption); };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [windowId, baseKey, metadataSignalHandle, metadataFetchKey, auth, selectedMetadata, metadataRetryVersion, services.resourceFS]);
 
@@ -1481,6 +1489,27 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             prepareRequest: runtimePrepareRequest,
         },
     }), [resolvedServices, runtimeWindow, metadata?.authorizationSnapshot, runtimePrepareRequest, contextRuntimeIdentity]);
+
+    useWorkspaceRefresh({window:runtimeWindow,metadata,host:services.workspaceRefresh,
+        loadMetadata:async()=>{
+            // A signal bypasses only the connector's concurrent GET sharing;
+            // this remains the normal host-selected definition/admission path.
+            const controller=new AbortController();
+            const response=await connector.get({signal:controller.signal,fresh:true,cache:{bypassCache:true}});
+            const selected=resolveWindowMetadataForTarget(response.data,targetContext);
+            return services.resourceFS?services.resourceFS.loadWindow(selected):selected;
+        },
+        prepareMetadata:async definition=>{
+            const binding=canonicalSelectionBinding(runtimeWindow);
+            const applied=binding?definition:await applyWindowPermissionMetadata(definition,{services,windowId,windowKey:baseKey,
+                resource:window.resource || window.parameters || {},windowParams:window.parameters || {},conversationId:window.conversationId || '',targetContext});
+            if(workspaceRefreshScopeIdentity(applied)!==workspaceRefreshScopeIdentity(definition))throw new Error('Workspace admission changed the held resource scope');
+            // Scope equality is verified against unmodified producer output by
+            // the refresh hook before this compilation can retain delivery hints.
+            const prepared=compilePermissionAppliedMetadata(applied,targetContext,window.parameters || {},binding);
+            return {...prepared,__windowKey:baseKey,__targetKey:normalizeTargetKey(targetContext),__provisionalInline:false};
+        },publishMetadata:definition=>{injectActions(definition);metadataSignalHandle.value=definition;},
+    });
 
     useEffect(() => {
         if (!window?.workspaceObject || (displayState !== 'ready' && displayState !== 'error')) return;

@@ -205,6 +205,21 @@ function WidgetRendererContent({
     }
 
 
+    // Add a strict variant to the same registered callbacks. This is explicit,
+    // per invocation and promise-aware; it never affects overlapping human UI.
+    for(const [key,external] of Object.entries(externalEvents)) {
+        const mapped=allowedEventKeys.has(key)?key:key==='onItemSelect'&&allowedEventKeys.has('onChange')?'onChange':null;
+        if(!mapped || typeof mergedEvents[mapped]!=='function')continue;
+        const internal=events[mapped];
+        mergedEvents[mapped].operate=async(...args)=>{
+            const invokeExternal=external.operate || external;
+            if(widgetKey==='file' && mapped==='onChange') {await internal?.(...args);return await invokeExternal?.(...args);}
+            const result=await invokeExternal?.(...args);
+            if(result===false)throw new Error('normal UI handler rejected the action');
+            return await internal?.(...args);
+        };
+    }
+
     const lazyOptions = lazyOptionsState(item, resolvedContext);
     const options = item.options || (lazyOptions && !lazyOptions.current && !item.fallbackOptionsDataSourceRef ? [] : resolveDataSourceOptions(item, resolvedContext, adapter.getOptions()));
 
@@ -327,7 +342,7 @@ function WidgetRendererContent({
             intent: item.intent || item.mutationCommand.intent,
         };
         return (
-            <ControlWrapper item={item} container={container} context={resolvedContext} framework={framework} disabled={widgetProps.disabled === true} readOnly={widgetProps.readOnly === true}>
+            <ControlWrapper item={item} container={container} context={resolvedContext} framework={framework} widgetKey={widgetKey} disabled={widgetProps.disabled === true} readOnly={widgetProps.readOnly === true}>
                 <MutationCommand command={command} context={resolvedContext} disabled={widgetProps.disabled === true}/>
             </ControlWrapper>
         );
@@ -360,7 +375,7 @@ function WidgetRendererContent({
         widgetProps.className = [widgetProps.className, 'forge-widget-readonly'].filter(Boolean).join(' ');
     }
     return (
-        <ControlWrapper item={itemWithError} container={container} context={resolvedContext} framework={framework} disabled={widgetProps.disabled === true} readOnly={widgetProps.readOnly === true}>
+        <ControlWrapper item={itemWithError} container={container} context={resolvedContext} framework={framework} widgetKey={widgetKey} disabled={widgetProps.disabled === true} readOnly={widgetProps.readOnly === true}>
             <Widget { ...widgetProps} />
         </ControlWrapper>
     );

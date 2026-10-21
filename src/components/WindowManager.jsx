@@ -1,7 +1,9 @@
+import WorkspaceRuntimeSurface from './WorkspaceRuntimeSurface.jsx';
+import {registerControlActions,invalidateControlActionState,isLiveControlVisible} from '../core/ui/controlActions.js';
 import {WindowContentMount, PersistentWindowContent} from './WindowContentMount.jsx';
-import {useState, useCallback, useEffect, useRef} from 'react';
+import React, {useState, useCallback, useEffect, useRef} from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
-import {Tabs, Tab, Card, Alert} from '@blueprintjs/core';
+import {Card, Alert} from '@blueprintjs/core';
 import {getWindowContext} from '../core/context/registry.js';
 import {windowCloseDecision, preventDirtyWindowUnload} from './windowCloseDecision.js';
 import WindowContent from './WindowContent';
@@ -20,14 +22,14 @@ import WindowControls from './WindowControls';
 import './WindowManager.css';
 import { resolveTabWindows, resolveVisibleTabId } from './windowManagerState.js';
 
-const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false, windowFilter, onCloseWindow}) => {
+const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false, windowFilter, onCloseWindow, workspaceRuntime = {}}) => {
     useSignals();
     const performClose = typeof onCloseWindow === "function" ? onCloseWindow : removeWindow;
     const [pendingClose,setPendingClose]=useState(null);
     const closeWindow = windowId => {
         const decision=windowCloseDecision(getWindowContext(windowId));
         if(decision.requiresConfirmation){setPendingClose({windowId,message:decision.message});return false;}
-        performClose(windowId);return true;
+        const result=performClose(windowId);return result && typeof result.then==='function'?result.then(()=>true):true;
     };
     useEffect(()=>{
         const beforeUnload=event=>preventDirtyWindowUnload(event,(activeWindows.peek() || []).map(win=>getWindowContext(win.windowId)));
@@ -93,6 +95,24 @@ const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false
     );
     const visibleTabId = resolveVisibleTabId(tabWindows, tabId);
 
+    const frameOperation = useRef(null);
+    const confirmClose = () => {const id=pendingClose?.windowId;setPendingClose(null);const result=id?performClose(id):null;return result && typeof result.then==='function'?result.then(()=>({status:'closed',accepted:true})):{status:'closed',accepted:true};};
+    const cancelClose = () => {setPendingClose(null);return {status:'cancelled',accepted:false};};
+    frameOperation.current={pendingClose,closeWindow,confirmClose,cancelClose};
+    const frameWindowIds=[...new Set([...tabWindows,...floatingWindows].map(win=>win.windowId))].sort().join('|');
+    useEffect(()=>{
+        const cleanups=[];
+        for(const windowId of frameWindowIds.split('|').filter(Boolean)) {
+            const current=()=>frameOperation.current;
+            const meta={windowId,controlId:'window:close',type:'windowAction'};
+            cleanups.push(registerControlActions(meta,()=>({visible:isLiveControlVisible(containerRef.current),disabled:false,readOnly:false,actions:{click:async()=>await current().closeWindow(windowId)?{status:'closed',accepted:true}:{status:'awaiting_confirmation',pendingConfirmation:true,accepted:false}}})));
+            cleanups.push(registerControlActions({...meta,controlId:'window:close:confirm'},()=>({visible:current().pendingClose?.windowId===windowId&&isLiveControlVisible(containerRef.current),disabled:current().pendingClose?.windowId!==windowId,readOnly:false,actions:{click:()=>current().confirmClose()}})));
+            cleanups.push(registerControlActions({...meta,controlId:'window:close:cancel'},()=>({visible:current().pendingClose?.windowId===windowId&&isLiveControlVisible(containerRef.current),disabled:current().pendingClose?.windowId!==windowId,readOnly:false,actions:{click:()=>current().cancelClose()}})));
+        }
+        return ()=>cleanups.forEach(cleanup=>cleanup());
+    },[frameWindowIds]);
+    useEffect(()=>{for(const windowId of frameWindowIds.split('|').filter(Boolean))invalidateControlActionState(windowId);},[frameWindowIds,pendingClose?.windowId]);
+
     const handleTabChange = (newTabId) => {
         selectedTabId.value = newTabId || null;
         if (newTabId) {
@@ -154,46 +174,16 @@ const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false
             style={{flex: 1, minHeight: 0, width: '100%', position: 'relative', display: 'flex', flexDirection: 'column'}}
         >
             {/* Tabs for windows in tabbed mode */}
-            <Tabs
-                id="window-manager-tabs"
-                selectedTabId={visibleTabId}
-                onChange={handleTabChange}
-                renderActiveTabPanelOnly
-                animate={false}
-                large
-                className="forge-window-manager-tabs"
-            >
-                {tabWindows.map((win) => (
-                    <Tab
-                        id={win.windowId}
-                        panelClassName="forge-window-manager-tabs__panel"
-                        key={win.windowId}
-                        style={{paddingLeft: '3px'}}
-                        title={
-                            <div style={{display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr) auto', gap: '8px', alignItems: 'center', width: '100%'}}>
-                                <div style={{justifySelf: 'start'}}>
-                                    <WindowControls
-                                        onClose={(e) => handleTabClose(win.windowId, e)}
-                                        onMaximize={(e) => {
-                                            e.stopPropagation();
-                                            undockWindow(win.windowId);
-                                        }}
-                                        showMinimize={false}
-                                        showMaximize={true}
-                                    />
-                                </div>
-                                <span style={{textAlign: 'center', fontWeight: 600}}>{resolveDisplayWindowTitle(win)}</span>
-                                <div />
-                            </div>
-                        }
-                        panel={
-                            win.windowId === visibleTabId ? (
-                                <WindowContentMount windowId={win.windowId} register={registerContentHost}/>
-                            ) : null
-                        }
-                    />
-                ))}
-            </Tabs>
+            <WorkspaceRuntimeSurface className="forge-window-manager-tabs" style={{flex:1,minHeight:0}}
+                tabProps={{id:'window-manager-tabs',tabIdFor:(id,windowId)=>`bp6-tab-title_${id}_${windowId}`,panelIdFor:(id,windowId)=>`bp6-tab-panel_${id}_${windowId}`,entries:tabWindows,selectedId:visibleTabId,onSelect:handleTabChange,onClose:closeWindow,
+                    onRuntimeEvent:workspaceRuntime.onRuntimeEvent,className:'bp6-tab-list',itemClassName:'forge-window-manager-tab',tabClassName:'bp6-tab',ariaLabel:'Open windows',
+                    renderLabel:resolveDisplayWindowTitle,
+                    renderLeading:(win,{close})=><WindowControls onClose={close} onMaximize={event=>{event.stopPropagation();undockWindow(win.windowId);}} showMinimize={false} showMaximize/>,
+                    renderClose:()=>null}}
+                panelProps={{id:'window-manager-tabs',tabIdFor:(id,windowId)=>`bp6-tab-title_${id}_${windowId}`,panelIdFor:(id,windowId)=>`bp6-tab-panel_${id}_${windowId}`,entries:tabWindows,selectedId:visibleTabId,className:'forge-window-manager-tabs__panel',
+                    getPresentation:workspaceRuntime.getPresentation || (win=>({label:resolveDisplayWindowTitle(win),kind:'window'})),onLifecycle:workspaceRuntime.onLifecycle,onRuntimeEvent:workspaceRuntime.onRuntimeEvent,
+                    renderContent:win=><WindowContentMount windowId={win.windowId} register={registerContentHost}/>}}/>
+
 
             {/* Floating windows */}
             {/* Modal backdrop: render under the top-most modal floating window */}
@@ -392,7 +382,7 @@ const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false
                     </div>
                 </Rnd>
             ))}
-            <Alert isOpen={!!pendingClose} intent="warning" confirmButtonText="Discard and close" cancelButtonText="Keep editing" onCancel={()=>setPendingClose(null)} onConfirm={()=>{const id=pendingClose?.windowId;setPendingClose(null);if(id)performClose(id);}}>{pendingClose?.message}</Alert>
+            <Alert isOpen={!!pendingClose} intent="warning" confirmButtonText="Discard and close" cancelButtonText="Keep editing" onCancel={cancelClose} onConfirm={confirmClose}>{pendingClose?.message}</Alert>
             {windows.map(win=><PersistentWindowContent key={win.windowId} host={contentHosts[win.windowId]}>{renderContent(win,win.inTab !== false)}</PersistentWindowContent>)}
         </div>
     );

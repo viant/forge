@@ -5,6 +5,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"github.com/viant/forge/backend/httptransport"
 	"log"
 	"net/http"
 	"sync"
@@ -42,7 +43,7 @@ func (h *Hub) ServeHTTPRPC(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	handler := h.httpStreamable()
-	handler.ServeHTTP(w, r)
+	httptransport.DecodeRequestEncoding(handler).ServeHTTP(w, r)
 }
 
 func (h *Hub) httpStreamable() http.Handler {
@@ -220,7 +221,7 @@ func (h *uiRPCHandler) handle(ctx context.Context, method string, params json.Ra
 		// round-trips rather than transport notifications. Keep the
 		// client/session registration, but do not bind a notifier here.
 		h.bridge.bindSession(ctx, p.ClientID, ns, nil, receiver)
-		return mustJSON(map[string]any{"ok": true, "clientId": p.ClientID}), nil
+		return mustJSON(map[string]any{"ok": true, "clientId": p.ClientID, "capabilities": map[string]any{"snapshotRequestEncodings": []string{"gzip"}, "maxInflatedSnapshotBytes": httptransport.MaxInflatedRequestBytes}}), nil
 	case "ui.snapshot":
 		var p struct {
 			ClientID string          `json:"clientId"`

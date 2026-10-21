@@ -1,3 +1,4 @@
+import {useControlDOMIdentity,ControlDOMIdentityProvider} from '../runtime/controlDOMIdentity.jsx';
 import SchemaFormChoices from './SchemaFormChoices.jsx';
 import { validateSchemaFormFields } from './schemaFormValidation.js';
 // SchemaBasedForm.jsx – renders a form based on either an explicit list of
@@ -50,6 +51,8 @@ const SchemaBasedForm = (props) => {
         style,
         showSubmit = true, // allow hiding the submit button
     } = props;
+    const authoredFormId=props.item?.id || formId;
+    const formDOMIdentity=useControlDOMIdentity({windowId:context?.identity?.windowId,formId:authoredFormId || dataSourceRef,controlId:'form',independent:true});
     // Determine rendering context & adapter (must be before hooks that use it)
     let renderContext = context;
     let stateArg = null;
@@ -258,7 +261,7 @@ const SchemaBasedForm = (props) => {
         const formValues = scope === 'form'
             ? (renderContext?.handlers?.dataSource?.getFormData?.() || {})
             : values;
-        const formContainer = {layout: fieldTracksLayout};
+        const formContainer = {id:authoredFormId,layout: fieldTracksLayout};
         const fieldTrackItems = derivedFields.map((field) => {
             const fieldId = field.id || field.name;
             const columnSpan = field.columnSpan || (
@@ -277,7 +280,7 @@ const SchemaBasedForm = (props) => {
         });
 
         return (
-            <form id={formId} onSubmit={submit} {...schemaFormAttributes(fieldTracksLayout)}>
+            <ControlDOMIdentityProvider value={null}><form id={formDOMIdentity.controlId} data-forge-form-id={authoredFormId} onSubmit={submit} {...schemaFormAttributes(fieldTracksLayout)}>
                 <GridLayoutRenderer
                     context={context || renderContext}
                     container={formContainer}
@@ -341,12 +344,12 @@ const SchemaBasedForm = (props) => {
                         </button>
                     </div>
                 )}
-            </form>
+            </form></ControlDOMIdentityProvider>
         );
     }
 
     return (
-        <form
+        <ControlDOMIdentityProvider value={null}><form
             onSubmit={submit}
             style={{
                 display: 'grid',
@@ -395,7 +398,7 @@ const SchemaBasedForm = (props) => {
                     <WidgetRenderer
                         key={field.name}
                         item={{ ...field, scope, columnSpan: colSpan }}
-                        container={{ layout: { columns: 2 } }}
+                        container={{id:authoredFormId, layout: { columns: 2 } }}
                         state={stateArg}
                         context={renderContext}
                     />
@@ -417,7 +420,7 @@ const SchemaBasedForm = (props) => {
                     {isLinkOnlyForm ? 'Accept' : 'Submit'}
                 </button>
             )}
-        </form>
+        </form></ControlDOMIdentityProvider>
     );
 };
 

@@ -12,7 +12,9 @@ import (
 // ProjectNativeDataSource is the native browser fetch-envelope projection.
 // Producer backend/cache and access provenance are not browser bindings.
 func ProjectNativeDataSource(id string, source DataSource) DataSource {
-	if source.Service != nil {
+	// A local view reads its parent's selected row, not an HTTP envelope.
+	// Preserve its row-relative selectors and leave transport with the owner.
+	if source.Service != nil || strings.TrimSpace(source.DataSourceRef) != "" {
 		return source
 	}
 	source.Service = &Service{Endpoint: "agentlyAPI", URI: "/v1/api/datasources/" + id + "/fetch", Method: "POST"}

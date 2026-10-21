@@ -190,3 +190,8 @@ it('does not turn an untyped403 or401 into a dataset marker',async()=>{
  const connector=createDataConnector({service:{URL:'/v1/api/datasources/rows/fetch'}});
  await expect(connector.get({})).rejects.toMatchObject({status:403,isUnauthorized:true});
 });
+it('explicit fresh metadata reads bypass pending GET sharing and browser response caches',async()=>{
+ const completions=[];global.fetch=vi.fn(()=>new Promise(resolve=>completions.push(()=>resolve({ok:true,json:async()=>({fresh:true})}))));
+ const connector=createDataConnector({service:{URL:'/v1/workspace/metadata',method:'GET'}},{endpoints:{},targetContext:{},auth:{}});
+ const normal=connector.get({}),fresh=connector.get({fresh:true});expect(global.fetch).toHaveBeenCalledTimes(2);expect(global.fetch.mock.calls[0][1]).not.toHaveProperty('cache');expect(global.fetch.mock.calls[1][1].cache).toBe('no-store');for(const complete of completions)complete();await normal;await fresh;
+});

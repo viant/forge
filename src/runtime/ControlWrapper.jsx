@@ -1,7 +1,13 @@
+import {useControlDOMIdentity} from './controlDOMIdentity.jsx';
 // Minimal ControlWrapper used by WidgetRenderer (Phase 1 – placeholder)
 import React, { useEffect, useRef, useId } from 'react';
 import { getWrapper } from './wrapperRegistry.js';
-import { registerControlTarget, unregisterControlTarget } from '../core/ui/registry.js';
+import {registerControlActions, invalidateControlActionState, isLiveControlVisible, widgetControlActions, validateWidgetControlValue} from '../core/ui/controlActions.js';
+import {evaluatePlainVisibleWhen} from '../components/visibleWhen.js';
+import {runDynamicEvaluators} from './binding.js';
+import {evaluateOperationGuard} from './operationGuards.js';
+import {resolveSelector} from '../utils/selector.js';
+import { registerControlTarget, unregisterControlTarget, focusControl } from '../core/ui/registry.js';
 
 const findFocusable = (root) => {
     if (!root) return null;
@@ -19,25 +25,30 @@ const findFocusable = (root) => {
     return node;
 };
 
-export default function ControlWrapper({ item, container, context, framework = 'core', disabled = false, readOnly = false, children }) {
+export default function ControlWrapper({ item, container, context, framework = 'core', widgetKey, disabled = false, readOnly = false, children }) {
     const generatedId = useId();
-    const controlId = children?.props?.id || item?.id || generatedId;
-    const helperId = `${generatedId}-help`;
+    const accessibility = useControlDOMIdentity({windowId:context?.identity?.windowId,formId:container?.id || context?.identity?.dataSourceRef,controlId:children?.props?.id || item?.id || generatedId});
+    const controlId=accessibility.controlId;
+    const helperId=item?.validationError?accessibility.errorId:accessibility.helperId;
+    const remapReferences=value=>typeof value==='string'?value.split(/\s+/).map(id=>id===item?.id?controlId:id===`${item?.id}-label`?accessibility.labelId:id===`${item?.id}-help`||id===`${item?.id}-error`?(hasHelper?helperId:id):id).join(' '):value;
     const helperText = item?.validationError || item?.helperText || item?.description;
     const controlOnly = item?.wrapper === 'control-only';
     const bypassHelper = item?.wrapper === 'none' || (framework === 'blueprint' && item?.isStandalone);
     const hasHelper = bypassHelper ? !!item?.validationError : !!helperText;
     const child = React.isValidElement(children) ? React.cloneElement(children, {
         id: controlId,
-        'aria-describedby': [children.props['aria-describedby'], hasHelper ? helperId : null].filter(Boolean).join(' ') || undefined,
+        ...(widgetKey==='radio'?{name:`${controlId}-options`}:{}),
+        ...(children.props['aria-labelledby']?{'aria-labelledby':remapReferences(children.props['aria-labelledby'])}:{}),
+        ...(item?.validationError?{'aria-errormessage':accessibility.errorId}:{}),
+        'aria-describedby': [...new Set([remapReferences(children.props['aria-describedby']), hasHelper ? helperId : null].filter(Boolean).flatMap(value=>value.split(/\s+/)))].join(' ') || undefined,
         ...(controlOnly && (item?.required || item?.properties?.required)
             ? {'aria-required': children.props['aria-required'] ?? true}
             : {}),
         ...(controlOnly && (item?.validationError || item?.requiredState === 'invalid' || item?.requiredState === 'missing')
             ? {'aria-invalid': children.props['aria-invalid'] ?? true}
             : {}),
-        ...(controlOnly && item?.id && item?.label
-            ? {'aria-labelledby': children.props['aria-labelledby'] ?? `${item.id}-label`}
+        ...(controlOnly && item?.id && item?.label && accessibility.labelOwned
+            ? {'aria-labelledby': remapReferences(children.props['aria-labelledby']) ?? accessibility.labelId}
             : {}),
         ...(controlOnly
             ? {'data-forge-field-track-control': children.props['data-forge-field-track-control'] ?? 'true'}
@@ -46,6 +57,40 @@ export default function ControlWrapper({ item, container, context, framework = '
 
     const wrapperRef = useRef(null);
     const regKeyRef = useRef(null);
+    const operationRef = useRef(null);
+    operationRef.current = {item, context, widgetKey, disabled, readOnly, props: child?.props || {}};
+    useEffect(() => {
+        if (!context?.identity?.windowId || !item?.id || item?.wrapper === 'none' || item?.mutationCommand || item?.lookup || widgetKey==='dateRangePreset') return;
+        return registerControlActions({windowId: context.identity.windowId, dataSourceRef: context.identity.dataSourceRef || null,
+            controlId: item.id, scope: item.scope || 'form', bindingPath: item.bindingPath || item.id, dataField: item.dataField}, () => {
+            const current = operationRef.current, {item, context, props} = current;
+            const operationItem={...item,widget:current.widgetKey || item.widget};
+            const node = wrapperRef.current?.querySelector?.('input,textarea,select,button,[role=button]');
+            const currentForm=context?.handlers?.dataSource?.getFormData?.() || context?.signals?.form?.peek?.() || {};
+            const value = resolveSelector(currentForm,item.dataField || item.bindingPath || item.id) ?? props.value;
+            const declared=(name,candidate=value)=>evaluateOperationGuard(name,item,context,candidate);
+            const dynamic = name => declared(name) ?? runDynamicEvaluators(name, {item, context, value});
+            const condition = name => item[name] && evaluatePlainVisibleWhen(item[name], context);
+            return {visible: isLiveControlVisible(wrapperRef.current) && dynamic('onVisible') !== false
+                    && (!item.visibleWhen || condition('visibleWhen')) && !condition('hiddenWhen'),
+                disabled: current.disabled || props.disabled === true || node?.disabled === true || node?.matches?.(':disabled') === true || dynamic('onDisabled') === true || condition('disabledWhen'),
+                readOnly: current.readOnly || props.readOnly === true || node?.readOnly === true || dynamic('onReadonly') === true || condition('readOnlyWhen'),
+                sensitive: item.sensitive === true || item.properties?.sensitive === true || /password|token|secret|credential/i.test(`${item.type || ''} ${item.widget || ''} ${props.type || ''} ${props.inputType || ''}`),
+                actions: {...widgetControlActions({item:operationItem, props}),...(findFocusable(wrapperRef.current)?{focus:()=>focusControl({windowId:context.identity.windowId,dataSourceRef:context.identity.dataSourceRef,controlId:item.id}) && wrapperRef.current?.contains?.(document.activeElement)===true}:{})},
+                validate: value => validateWidgetControlValue(value, {item:operationItem, props}) || declared('onValidate',value) || runDynamicEvaluators('onValidate', {item, context, value}),
+            };
+        }, () => {
+            const current=operationRef.current,{item,props}=current;const operationItem={...item,widget:current.widgetKey || item.widget};
+            const node=wrapperRef.current?.querySelector?.('input,textarea,select,button,[role=button]');
+            return {visible:isLiveControlVisible(wrapperRef.current),disabled:current.disabled||props.disabled===true||node?.disabled===true||node?.matches?.(':disabled')===true,
+                readOnly:current.readOnly||props.readOnly===true||node?.readOnly===true,
+                sensitive:item.sensitive===true||item.properties?.sensitive===true||/password/i.test(`${item.type || ''} ${item.widget || ''} ${props.type || ''} ${props.inputType || ''}`),
+                value:props.value,options:props.options,actions:{...widgetControlActions({item:operationItem,props}),...(findFocusable(wrapperRef.current)?{focus:()=>focusControl({windowId:current.context.identity.windowId,dataSourceRef:current.context.identity.dataSourceRef,controlId:item.id}) && wrapperRef.current?.contains?.(document.activeElement)===true}:{})},
+                constraints:{...(current.widgetKey==='file'?{requiresTrustedFileInput:true,requiresUserInteraction:true}:{}),...Object.fromEntries(['required','min','max','minLength','maxLength','pattern','minItems','maxItems'].filter(key=>props[key]!==undefined||item[key]!==undefined).map(key=>[key,props[key]??item[key]]))}};
+        });
+    }, [context?.identity?.windowId, context?.identity?.dataSourceRef, item?.id, item?.wrapper, widgetKey]);
+
+    useEffect(() => {if(context?.identity?.windowId)invalidateControlActionState(context.identity.windowId);}, [context?.identity?.windowId, disabled, readOnly, child?.props?.disabled, child?.props?.readOnly]);
 
     const custom = getWrapper(framework);
 
@@ -136,7 +181,7 @@ export default function ControlWrapper({ item, container, context, framework = '
                 data-forge-control-id={item?.id || undefined}
                 {...accessibilityProps}
             >
-                {custom(item, container, child, context, {controlId, helperId, disabled, readOnly})}
+                {custom(item, container, child, context, {controlId, labelId:accessibility.labelId, helperId, disabled, readOnly})}
             </div>
         );
     }
@@ -152,6 +197,7 @@ export default function ControlWrapper({ item, container, context, framework = '
             {item?.label && !item.hideLabel && !isLabelWidget && (
                 <label
                     data-forge-part="label"
+                    id={accessibility.labelId}
                     htmlFor={controlId}
                     style={{ display: inline ? 'inline-block' : 'block', marginRight: inline ? 8 : 0 }}
                     title={item.tooltip || undefined}

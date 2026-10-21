@@ -24,7 +24,8 @@ describe('lazy options startup ownership',()=>{
   expect([...resolveLazyOptionsDataSourceRefs(metadata)]).toEqual(['choices','baseChoices']);
   expect([...resolveLazyOptionsDataSourceRefs(metadata,'',{}, {tabs:{tabs:'eager'}})]).toEqual([]);
   expect(resolveRequiredDataSourceRefs(metadata,'',{}, {tabs:{tabs:'eager'}})).toEqual(['choices','baseChoices']);
-  metadata.view.content.tabs.renderActiveTabPanelOnly=false;expect([...resolveLazyOptionsDataSourceRefs(metadata)]).toEqual([]);
+  metadata.view.content.tabs.renderActiveTabPanelOnly=false;expect([...resolveLazyOptionsDataSourceRefs(metadata)]).toEqual(['choices','baseChoices']);
+  metadata.view.content.tabs.mountPolicy='all';expect([...resolveLazyOptionsDataSourceRefs(metadata)]).toEqual([]);
  });
  it('unrequested opt-in does not change ordinary select or fallback source behavior',()=>{
   expect([...resolveLazyOptionsDataSourceRefs(fixture([{type:'select',optionsDataSourceRef:'choices'}]))]).toEqual([]);

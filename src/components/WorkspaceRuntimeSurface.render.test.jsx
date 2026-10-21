@@ -1,0 +1,22 @@
+import React,{act,useState,useEffect} from 'react';
+import {Simulate} from 'react-dom/test-utils';
+import {createRoot} from 'react-dom/client';
+import {it,expect,vi} from 'vitest';
+import WorkspaceRuntimeSurface,{requestWorkspaceClose} from './WorkspaceRuntimeSurface.jsx';
+it('shares roving keyboard focus, capability-aware close and retained drafts without reloading',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;const host=document.createElement('div');document.body.append(host);const root=createRoot(host),mounted=vi.fn(),closed=vi.fn(),events=vi.fn();
+ function Draft({id}){const [draft,setDraft]=useState('');useEffect(()=>{mounted(id);},[]);return <input aria-label={id} value={draft} onChange={e=>setDraft(e.target.value)}/>;}
+ function App(){const [selected,setSelected]=useState('a');return <WorkspaceRuntimeSurface tabProps={{entries:[{windowId:'a',label:'A'},{windowId:'blocked',label:'Blocked',disabled:true},{windowId:'b',label:'B',closable:false}],selectedId:selected,onSelect:setSelected,onClose:closed,onRuntimeEvent:events}} panelProps={{entries:[{windowId:'a'},{windowId:'b'}],selectedId:selected,renderContent:entry=><Draft id={entry.windowId}/>}}/>;}
+ try{await act(async()=>root.render(<App/>));expect(mounted.mock.calls).toEqual([['a']]);const input=host.querySelector('input[aria-label=a]');await act(async()=>Simulate.change(input,{target:{value:'unsaved draft'}}));expect(input.value).toBe('unsaved draft');const first=host.querySelector('[role=tab]');first.focus();await act(async()=>first.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true})));expect(document.activeElement.textContent).toBe('B');expect(mounted.mock.calls).toEqual([['a'],['b']]);expect(host.querySelector('input[aria-label=a]').closest('[role=tabpanel]').hidden).toBe(true);expect(host.querySelector('input[aria-label=a]').closest('[role=tabpanel]').hasAttribute('inert')).toBe(true);
+ const b=document.activeElement;await act(async()=>b.dispatchEvent(new KeyboardEvent('keydown',{key:'Delete',bubbles:true})));expect(closed).not.toHaveBeenCalled();await act(async()=>b.dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true})));expect(document.activeElement.textContent).toBe('A');expect(mounted).toHaveBeenCalledTimes(2);expect(host.querySelector('input[aria-label=a]')).toBe(input);expect(input.value).toBe('unsaved draft');await act(async()=>document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Delete',bubbles:true})));expect(closed).toHaveBeenCalledWith('a',expect.anything());expect(host.querySelector('input[aria-label=a]')).not.toBeNull();expect(events).toHaveBeenCalledWith(expect.objectContaining({type:'select_requested',windowId:'b',keyboard:true}));
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+it('generic host close admission may await confirmation, decline or reject without discarding retained content',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;const host=document.createElement('div');document.body.append(host);const root=createRoot(host);let admit,pending;const close=vi.fn(()=>{pending=new Promise(resolve=>{admit=resolve;});return pending;});const entry={windowId:'neutral-document',label:'Document',kind:'document'};
+ const adapter={onClose:close};
+ try{await act(async()=>root.render(<WorkspaceRuntimeSurface tabProps={{entries:[entry],selectedId:entry.windowId,...adapter,tabIdFor:(_id,key)=>`host-tab-${key}`,panelIdFor:(_id,key)=>`host-panel-${key}`}} panelProps={{entries:[entry],selectedId:entry.windowId,tabIdFor:(_id,key)=>`host-tab-${key}`,panelIdFor:(_id,key)=>`host-panel-${key}`,renderContent:()=> <textarea defaultValue="local draft"/>}}/>));
+ const draft=host.querySelector('textarea');draft.value='edited draft';await act(async()=>{host.querySelector('[aria-label="Close Document"]').click();});expect(close).toHaveBeenCalledTimes(1);expect(host.querySelector('textarea')).toBe(draft);admit(false);await expect(pending).resolves.toBe(false);expect(draft.value).toBe('edited draft');expect(host.querySelector('[role=tab]').getAttribute('aria-controls')).toBe('host-panel-neutral-document');
+ const failure=new Error('host close admission unavailable');await expect(requestWorkspaceClose(entry,{onClose:async()=>{throw failure;}})).rejects.toBe(failure);expect(host.querySelector('textarea')).toBe(draft);expect(draft.value).toBe('edited draft');
+ }finally{await act(async()=>root.unmount());host.remove();}
+});

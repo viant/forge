@@ -4,10 +4,12 @@ package service
 
 import (
 	"github.com/viant/forge/backend/reporting/catalog"
+	"github.com/viant/forge/backend/uicontext"
 )
 
 // Config configures the Forge UI bridge service.
 type Config struct {
+	LocalStateOwnerResolver uicontext.LocalStateOwnerResolver
 	// NamespaceResolver is a trusted server callback. Configured auth mode must
 	// resolve identity before UI registration; client token hints never select it.
 	NamespaceResolver       NamespaceResolver

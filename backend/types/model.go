@@ -236,7 +236,9 @@ type QuickFilterSpec struct {
 }
 
 type Window struct {
-	Resources *ResourceAssignment `json:"resources,omitempty" yaml:"resources,omitempty"`
+	// LocalStateOwner is trusted host lifecycle scope, never business authority.
+	LocalStateOwner *LocalStateOwner    `json:"localStateOwner,omitempty" yaml:"-"`
+	Resources       *ResourceAssignment `json:"resources,omitempty" yaml:"resources,omitempty"`
 	// Title is the original authored display title; namespace is routing metadata.
 	Title string `json:"title,omitempty" yaml:"title,omitempty"`
 	// SelectionBinding is emitted only after trusted OPEN admission.

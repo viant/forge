@@ -1,3 +1,6 @@
+import {useRegisteredControlActions} from '../../runtime/useRegisteredControlActions.js';
+import {isLiveControlVisible} from '../../core/ui/controlActions.js';
+import {isRowSelectionDisabled} from './rowSelection.js';
 import {useSetting} from '../../core/context/Setting.jsx';
 import {applyTableColumnPreferences,sanitizeTablePreferences} from '../../core/preferences/tablePreferences.js';
 import {useTablePreferences} from './useTablePreferences.js';
@@ -191,6 +194,32 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
     );
 
     const events = tableHandlers(context, container);
+
+    useRegisteredControlActions({windowId:context?.identity?.windowId,dataSourceRef:context?.identity?.dataSourceRef,controlId:container.id || 'table',type:'table'},()=>({
+        visible:isLiveControlVisible(tableRef.current),disabled:loading||!!error||!selectionEnabled||queryDisabled,readOnly:false,
+        actions:{refresh:()=>context?.handlers?.dataSource?.fetchCollection?.(),applyFilter:({patch})=>{
+            const fields=new Set((context?.handlers?.dataSource?.getFilterSets?.() || dataSource?.filterSet || []).flatMap(set=>(set.template || []).map(field=>field.id)));
+            if(!patch || typeof patch!=='object' || Array.isArray(patch) || Object.keys(patch).some(field=>!fields.has(field)))throw new Error('filter is not declared by the current UI table');
+            return events.onApplyFilter.executeStrict({filter:{...(context?.signals?.input?.peek?.()?.filter || {}),...patch}});
+        },selectRows:async({rows=[]})=>{
+            const current=context?.handlers?.dataSource?.getSelection?.() || context?.signals?.selection?.peek?.() || {};
+            const selected=Array.isArray(current)?current:current.selection || (current.selected?[current.selected]:[]);
+            const all=context?.signals?.collection?.peek?.() || [];
+            const multi=dataSource?.selectionMode==='multi';
+            const key=row=>context?.handlers?.dataSource?.getUniqueKeyValue?.(row) ?? JSON.stringify(row);
+            const same=(left,right)=>key(left)===key(right);
+            const changes=multi?[...selected.filter(row=>!rows.some(value=>same(row,value))),...rows.filter(row=>!selected.some(value=>same(row,value)))]:rows.filter(row=>!selected.some(value=>same(row,value)));
+            const selectionColumn=(columns || []).find(column=>column?.multiSelect===true);
+            for(const row of changes) {
+                if(!all.includes(row)&&!selected.includes(row))throw new Error('selection row is not in the current or retained UI collection');
+                if(isRowSelectionDisabled(selectionColumn?.selectionDisabledWhen,row,context))throw new Error('row selection is disabled');
+            }
+            for(const row of changes)if(await events.onRowSelect.executeStrict({row,rowIndex:all.indexOf(row),event:{type:'click',preventDefault(){},stopPropagation(){}}})===false)throw new Error('normal row handler rejected selection');
+            const observed=context?.signals?.selection?.peek?.() || {};
+            const actual=observed.selection || (observed.selected?[observed.selected]:[]);
+            if(actual.length!==rows.length || rows.some(row=>!actual.some(value=>same(row,value))))throw new Error('normal row handler did not establish requested selection; inspect current UI before retrying');
+        }}
+    }),`${loading}:${!!error}:${selectionEnabled}:${queryDisabled}`);
 
     const filterSets = handlers?.dataSource?.getFilterSets?.()
         || handlers?.dataSource?.getFilterSet?.()

@@ -60,6 +60,7 @@ type ResourceHeaderAction struct {
 type DataStateBoundarySpec struct {
 	DataSourceRefs     []string               `json:"dataSourceRefs,omitempty" yaml:"dataSourceRefs,omitempty"`
 	AllowPartial       bool                   `json:"allowPartial,omitempty" yaml:"allowPartial,omitempty"`
+	IgnoreIdleWhen     map[string]interface{} `json:"ignoreIdleWhen,omitempty" yaml:"ignoreIdleWhen,omitempty"`
 	RenderEmptyContent bool                   `json:"renderEmptyContent,omitempty" yaml:"renderEmptyContent,omitempty"`
 	LoadingMessage     string                 `json:"loadingMessage,omitempty" yaml:"loadingMessage,omitempty"`
 	EmptyMessage       string                 `json:"emptyMessage,omitempty" yaml:"emptyMessage,omitempty"`

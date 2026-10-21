@@ -9,5 +9,6 @@ export * from './ui/index.js';
 export * from './context/WorkspacePresentation.jsx';
 
 export * from './preferences/tablePreferences.js';
+export {captureWindowStateAdoption, waitForWindowStateAdoption} from '../runtime/windowStateAdoption.js';
 
 export {registerContainerRenderer} from '../runtime/containerRendererRegistry.js';
