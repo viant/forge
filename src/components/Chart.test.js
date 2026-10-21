@@ -372,4 +372,4 @@ const nullableSeries = aggregateDirectSeriesData([
 assert.equal(nullableSeries[0].metric,null);
 assert.equal(nullableSeries[1].metric,0);
 assert.equal(nullableSeries[2].metric,2);
-assert.deepEqual(buildPieChartData([{category:'Missing',metric:null},{category:'Zero',metric:0},{category:'Blank',metric:''}], 'category', 'metric').map(x=>({name:x.name,value:x.value})),[{name:'Zero',value:0}]);
+assert.deepEqual(buildPieChartData([{category:'Missing',metric:null},{category:'Zero',metric:0},{category:'Blank',metric:''}], 'category', 'metric').map(x=>({name:x.name,value:x.value})),[]);
