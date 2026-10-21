@@ -62,4 +62,6 @@ export {default as ResultPreviewPanel, ResultPreview, NestedDataGrid} from './pr
 
 export {default as ResourcePolicyEditorPanel, ResourceAccessEditor} from './primitives/ResourcePolicyEditor.jsx';
 
-export {RetainedWindowContent} from './WindowContentMount.jsx';
+export {RetainedWindowContent, PersistentWindowContent, WindowContentMount} from './WindowContentMount.jsx';
+
+export {default as WorkspaceRuntimeSurface, WorkspaceRuntimeTabs, WorkspaceRuntimePanels} from './WorkspaceRuntimeSurface.jsx';

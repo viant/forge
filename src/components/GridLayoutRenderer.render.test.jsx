@@ -79,8 +79,8 @@ assert.match(fieldTracksHtml, /class="forge-grid-collapse-phone"/);
 assert.equal((fieldTracksHtml.match(/data-forge-part="label"/g) || []).length, 2);
 assert.equal((fieldTracksHtml.match(/data-forge-part="control"/g) || []).length, 2);
 assert.equal((fieldTracksHtml.match(/data-forge-field-id="firstName"/g) || []).length, 2);
-assert.match(fieldTracksHtml, /<label[^>]*for="firstName"[^>]*data-forge-field-id="firstName"/);
-assert.match(fieldTracksHtml, /<input id="firstName"/);
+const firstNameDOMId=fieldTracksHtml.match(/<label[^>]*for="([^"]+)"[^>]*data-forge-field-id="firstName"/)[1];
+assert.match(fieldTracksHtml, new RegExp(`<input id="${firstNameDOMId}"`));
 assert.doesNotMatch(fieldTracksHtml, /data-forge-layout-appearance="field-tracks"/);
 
 function requiredTextMarkup(value) {
@@ -107,8 +107,8 @@ function requiredTextMarkup(value) {
 
 const emptyRequiredTextHtml = requiredTextMarkup('');
 const filledRequiredTextHtml = requiredTextMarkup('AISTUDIO Site List Parity QA');
-const emptyRequiredTextInput = emptyRequiredTextHtml.match(/<input\b[^>]*id="siteListName"[^>]*>/)?.[0];
-const filledRequiredTextInput = filledRequiredTextHtml.match(/<input\b[^>]*id="siteListName"[^>]*>/)?.[0];
+const emptyRequiredTextInput = emptyRequiredTextHtml.match(/<input\b[^>]*id="forge-control-[^"]+"[^>]*>/)?.[0];
+const filledRequiredTextInput = filledRequiredTextHtml.match(/<input\b[^>]*id="forge-control-[^"]+"[^>]*>/)?.[0];
 assert.ok(emptyRequiredTextInput, emptyRequiredTextHtml);
 assert.ok(filledRequiredTextInput, filledRequiredTextHtml);
 assert.match(emptyRequiredTextHtml, /forge-required-input/);

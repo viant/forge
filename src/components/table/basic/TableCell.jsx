@@ -1,3 +1,5 @@
+import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
+import {navigateNativeLink} from '../../../runtime/nativeNavigation.js';
 import MediaPreviewPopover from "../../MediaPreviewPopover.jsx";
 import {normalizeMediaPreview} from "../../mediaPreview.js";
 import {useSignals} from '@preact/signals-react/runtime';
@@ -62,6 +64,8 @@ const TableCell = ({
         : () => false;
     const {col, row} = cellSelection;
     const {cellProperties = {}} = col;
+    const operationControlId=`${context?.identity?.dataSourceRef || 'table'}:row:${dataSource.getUniqueKeyValue?.(row) ?? cellSelection.rowIndex}:${col.id}`;
+    const operationState=()=>{const current=tableCellPolicy(col,row,context);return {visible:current.visible,disabled:current.disabled,readOnly:current.readOnly};};
     const cellEvents = useCellEvents({context, cellSelection, columnHandlers, onRowClick});
     const {events, stateEvents} = cellEvents;
     const policy=tableCellPolicy(col,row,context);
@@ -142,7 +146,7 @@ const TableCell = ({
             cellContent=<MediaPreviewPopover value={value} {...col.preview}/>;
             break;
         case "editableText":
-            cellContent = <EditableTextCell {...cellProps} value={value} label={`${col.name || col.id} ${cellSelection.row?.id ?? cellSelection.rowIndex ?? ""}`.trim()} readOnly={cellProps.readOnly === true} onChange={events.onChange}/>;
+            cellContent = <EditableTextCell {...cellProps} value={value} label={`${col.name || col.id} ${cellSelection.row?.id ?? cellSelection.rowIndex ?? ""}`.trim()} readOnly={cellProps.readOnly === true} onChange={events.onChange} operationContext={context} operationItem={{...col,label:col.name || col.id}} operationControlId={operationControlId} operationRow={row} operationState={operationState}/>;
             break;
         case "image":
             cellContent = <ImageLabelCell value={value} emptyText={col.emptyText}/>;
@@ -223,7 +227,7 @@ const TableCell = ({
                         onClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
-                            context?.handlers?.window?.openTarget?.({ target: link, context });
+                            return context?.handlers?.window?.openTarget?.({ target: link, context });
                         }}
                     >
                         {col?.format === 'relationCount' ? displayedText : link.text}
@@ -241,7 +245,7 @@ const TableCell = ({
                         onClick={(event) => {
                             event.preventDefault();
                             event.stopPropagation();
-                            context?.handlers?.window?.openDialog?.({
+                            return context?.handlers?.window?.openDialog?.({
                                 context,
                                 execution: {args: [link.dialogId, {awaitResult: link.awaitResult}]},
                                 parameters: link.parameters,
@@ -260,7 +264,7 @@ const TableCell = ({
                     rel={link.rel}
                     title={link.title || link.text}
                     className="forge-table-link"
-                    onClick={(event) => event.stopPropagation()}
+                    onClick={(event) => {event.preventDefault();event.stopPropagation();return navigateNativeLink(link);}}
                 >
                     {link.text}
                 </a>
@@ -376,6 +380,18 @@ const TableCell = ({
                 {supplemental.map((badge, index) => renderBadge(badge, `supplemental-${index}`))}
             </div>
         );
+    }
+
+    if(React.isValidElement(cellContent) && ['button','link','checkbox'].includes(type)) {
+        const props=cellContent.props,actions={};
+        if(typeof props.onClick==='function' && type!=='checkbox')actions.click=({event})=>(props.onClick.operate || props.onClick)(event);
+        if(type==='checkbox' && col.multiSelect===true && typeof props.onChange==='function')actions.setValue=({value:checked})=>{
+            if(typeof checked!=='boolean')throw new Error('boolean selection required');
+            if(checked===isSelected({...cellSelection}))return;
+            return props.onChange({stopPropagation(){},target:{checked},currentTarget:{checked}});
+        };
+        cellContent=<NativeControlTarget context={context} controlId={operationControlId} item={{...col,label:col.name || col.id}} row={row} value={type==='checkbox'&&col.multiSelect?isSelected({...cellSelection}):value}
+            disabled={props.disabled===true || rowSelectionDisabled && type==='checkbox'} readOnly={props.readOnly===true || policy.readOnly} invokeState={operationState} actions={actions}>{cellContent}</NativeControlTarget>;
     }
 
     const tdStyle = {

@@ -1,3 +1,4 @@
+import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
 // src/components/table/basic/PaginationBar.jsx
 
 import React, {useState} from "react";
@@ -55,19 +56,19 @@ const PaginationBar = ({
 
     const onFirstPage = () => {
         setCurrentPage(1);
-        handlers.dataSource.setPage(1);
+        return handlers.dataSource.setPage(1);
     };
 
     const onNextPage = () => {
         const newPage = currentPage + 1;
-        handlers.dataSource.setPage(newPage);
         setCurrentPage(newPage);
+        return handlers.dataSource.setPage(newPage);
     };
 
     const onPreviousPage = () => {
         const newPage = currentPage - 1;
-        handlers.dataSource.setPage(newPage);
         setCurrentPage(newPage);
+        return handlers.dataSource.setPage(newPage);
     };
 
     const onLastPage = () => {
@@ -75,13 +76,13 @@ const PaginationBar = ({
             return;
         }
         setCurrentPage(totalPages);
-        handlers.dataSource.setPage(totalPages);
+        return handlers.dataSource.setPage(totalPages);
     };
 
     const renderActionButton = (actionKey, onClick, actionDisabled = false) => {
         const properties = buttonProperties[actionKey] || {};
         return (
-            <Button
+            <NativeControlTarget context={context} item={{id:actionKey,type:'button',label:properties.label}} disabled={disabled||actionDisabled} actions={{click:onClick}}><Button
                 {...properties}
                 onClick={onClick}
                 disabled={disabled || actionDisabled}
@@ -89,7 +90,7 @@ const PaginationBar = ({
                 small={true}
                 aria-label={properties.label}
                 title={actionKey === 'pagination.last' && totalPages == null ? 'Last page unavailable' : properties.label}
-            />
+            /></NativeControlTarget>
         );
     };
 
@@ -115,9 +116,9 @@ const PaginationBar = ({
                     {pagingEnabled && sizeOptions.length > 1 ? (
                         <label style={{display: 'inline-flex', alignItems: 'center', gap: 6, marginInline: 8}}>
                             Rows per page
-                            <HTMLSelect aria-label="Rows per page" value={pageSize} disabled={disabled || busy || inactive}
+                            <NativeControlTarget context={context} item={{id:'pagination.pageSize',type:'select',label:'Rows per page'}} disabled={disabled||busy||inactive} value={pageSize} options={sizeOptions.map(value=>({value,label:String(value)}))} validate={value=>sizeOptions.includes(value)?null:'Page size unavailable'} actions={{setValue:({value})=>handlers.dataSource.setPageSize?.(value)}}><HTMLSelect aria-label="Rows per page" value={pageSize} disabled={disabled || busy || inactive}
                                 onChange={event => handlers.dataSource.setPageSize?.(Number(event.target.value))}
-                                options={sizeOptions.map(size => ({value: size, label: String(size)}))}/>
+                                options={sizeOptions.map(size => ({value: size, label: String(size)}))}/></NativeControlTarget>
                         </label>
                     ) : null}
 

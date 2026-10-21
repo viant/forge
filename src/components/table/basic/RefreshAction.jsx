@@ -1,3 +1,4 @@
+import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
 import React, {useRef, useState} from 'react';
 import {Button} from '@blueprintjs/core';
 import {useSignals} from '@preact/signals-react/runtime';
@@ -8,7 +9,7 @@ export default function RefreshAction({context, item, disabled = false}) {
     const pending = useRef(false);
     const [requested, setRequested] = useState(false);
     const busy = requested || context?.signals?.control?.value?.loading === true;
-    const refresh = async () => {
+    const refresh = async (strict=false) => {
         if (disabled || pending.current || context?.signals?.control?.peek?.()?.loading) return;
         pending.current = true;
         setRequested(true);
@@ -19,13 +20,14 @@ export default function RefreshAction({context, item, disabled = false}) {
             });
         } catch (error) {
             if (!context?.signals?.control?.peek?.()?.error) context.handlers.dataSource.setError?.(error);
+            if(strict===true)throw error;
         } finally {
             pending.current = false;
             setRequested(false);
         }
     };
-    return <Button type="button" icon="refresh" minimal
+    return <NativeControlTarget context={context} item={{...item,type:'button'}} disabled={disabled||busy} actions={{click:()=>refresh(true)}}><Button type="button" icon="refresh" minimal
         className={['forge-toolbar-action is-icon-only',item.className].filter(Boolean).join(' ')}
         aria-label={item.ariaLabel || 'Refresh data'} title={item.tooltip || 'Refresh data'}
-        loading={busy} disabled={disabled || busy} onClick={refresh}/>;
+        loading={busy} disabled={disabled || busy} onClick={()=>refresh()}/></NativeControlTarget>;
 }

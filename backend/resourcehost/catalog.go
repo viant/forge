@@ -189,6 +189,7 @@ func (g *Gateway) catalogCapability(ctx context.Context, actor identity.Verified
 		return capabilities{}, ErrUnavailable
 	}
 	if found && present && cached.connection.Name == name && cached.connection.Generation == g.generation(name) && cached.resourceVersion == g.Manager.ResourceCatalogGeneration(ctx, name) && identity.MetadataExpiryValid(discoveryCacheUntil(cached), g.now()) {
+		g.touchDiscovery(hint.cacheKey)
 		probe.End(observe.OK, observe.CacheHit)
 		return cached, nil
 	}

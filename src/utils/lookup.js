@@ -219,7 +219,7 @@ function lookupDisplayValue(item, record, patch) {
     }).trim();
 }
 
-export function applyLookupSelection({ item, context, adapter, outputs = [], record }) {
+export function applyLookupSelection({ item, context, adapter, outputs = [], record, strict = false }) {
     const formSignal = context?.signals?.form;
     const dataSourceHandlers = context?.handlers?.dataSource;
     const currentForm = dataSourceHandlers?.getFormData?.() || formSignal?.peek?.();
@@ -277,6 +277,11 @@ export function applyLookupSelection({ item, context, adapter, outputs = [], rec
     const applied = { form: formObj, value: selfVal };
     const callback = Array.isArray(item?.on) ? item.on.find((entry) => entry?.event === 'onLookup') : null;
     if (callback?.handler && typeof context?.lookupHandler === 'function') {
+        if(strict) {
+            const handler=context.lookupHandler(callback.handler);
+            if(typeof handler!=='function')throw new Error('Lookup authored callback is unavailable');
+            return Promise.resolve(handler({item,context,value:selfVal,record,applied})).then(()=>applied);
+        }
         try {
             context.lookupHandler(callback.handler)?.({item, context, value: selfVal, record, applied});
         } catch (error) {
@@ -316,7 +321,7 @@ export async function resolveLookupValue({ item, value }) {
     return rows[0];
 }
 
-export async function openLookup({ item, context, adapter, value, signal }) {
+export async function openLookup({ item, context, adapter, value, signal, strict = false }) {
     if (!item?.lookup) return;
     log.debug('open', {
         fieldId: item?.id,
@@ -333,5 +338,6 @@ export async function openLookup({ item, context, adapter, value, signal }) {
         adapter,
         outputs: item.lookup.outputs || [],
         record: selected,
+        strict,
     });
 }

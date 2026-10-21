@@ -7,13 +7,29 @@ import LookupSelectionInput from '../components/lookup/LookupSelectionInput.jsx'
 import {getWidget} from '../runtime/widgetRegistry.jsx';
 import SchemaBasedForm from './SchemaBasedForm.jsx';
 
+// Inspect component output under a real React hook dispatcher; widgets may
+// use focus/loading hooks even when this contract checks their presentation.
+function inspectWidget(Widget,props) {
+    let output;
+    function Probe(){output=Widget(props);return null;}
+    renderToStaticMarkup(<Probe/>);
+    return output;
+}
+function scopedControlID(html,id) {
+    const suffix=/-(group|end)$/.exec(id);
+    const field=suffix?id.slice(0,-suffix[0].length):id;
+    const label=html.match(new RegExp(`<label[^>]*for="([^"]+)"[^>]*data-forge-field-id="${field}"`));
+    return label?label[1]+(suffix?suffix[0]:''):id;
+}
 function elementTag(html, tagName, id) {
+    id=scopedControlID(html,id);
     const tag = html.match(new RegExp(`<${tagName}\\b[^>]*id="${id}"[^>]*>`))?.[0];
     assert.ok(tag, `Missing <${tagName}> with id="${id}" in ${html}`);
     return tag;
 }
 
 function assertAttribute(tag, name, value) {
+    if(name==='aria-labelledby' && value.endsWith('-label')) value=tag.match(/\bid="([^"]+)"/)[1].replace(/-(group|end)$/,'')+'-label';
     assert.match(tag, new RegExp(`${name}="${value}"`));
 }
 
@@ -98,7 +114,7 @@ const fieldTracksHtml = renderToStaticMarkup(
     />,
 );
 
-assert.match(fieldTracksHtml, /^<form\b[^>]*id="campaign-form"/);
+assert.match(fieldTracksHtml, /^<form\b[^>]*id="forge-control-[^"]+"[^>]*data-forge-form-id="campaign-form"/);
 assert.match(fieldTracksHtml, /^<form\b[^>]*data-forge-part="form"/);
 assert.match(fieldTracksHtml, /^<form\b[^>]*data-forge-form-appearance="field-tracks"/);
 assert.match(fieldTracksHtml, /data-forge-part="grid"/);
@@ -107,7 +123,7 @@ assert.match(fieldTracksHtml, /grid-template-columns:repeat\(2, 1fr\)/);
 assert.equal((fieldTracksHtml.match(/data-forge-part="label"/g) || []).length, 6);
 assert.equal((fieldTracksHtml.match(/data-forge-part="control"/g) || []).length, 6);
 assert.equal((fieldTracksHtml.match(/data-forge-field-id="advertiserId"/g) || []).length, 2);
-assert.match(fieldTracksHtml, /<label[^>]*id="advertiserId-label"[^>]*for="advertiserId"[^>]*data-forge-field-id="advertiserId"/);
+assert.match(fieldTracksHtml, new RegExp(`<label[^>]*id="${scopedControlID(fieldTracksHtml,'advertiserId')}-label"[^>]*for="${scopedControlID(fieldTracksHtml,'advertiserId')}"[^>]*data-forge-field-id="advertiserId"`));
 const advertiserTag = elementTag(fieldTracksHtml, 'button', 'advertiserId');
 assert.match(advertiserTag, /class="[^"]*forge-lookup-selection-input__trigger/);
 assertAttribute(advertiserTag, 'aria-label', 'Advertiser');
@@ -123,8 +139,9 @@ assert.doesNotMatch(fieldTracksHtml, /<input[^>]*id="advertiserId"/);
 assert.doesNotMatch(fieldTracksHtml, /forge-lookup-selection-input__end-button/);
 
 for (const id of ['objective', 'totalBudget', 'flight', 'adultOnly', 'productURL']) {
-    assert.match(fieldTracksHtml, new RegExp(`<label[^>]*id="${id}-label"[^>]*for="${id}"`));
-    assert.match(fieldTracksHtml, new RegExp(`id="${id}"`));
+    const scoped=scopedControlID(fieldTracksHtml,id);
+    assert.match(fieldTracksHtml, new RegExp(`<label[^>]*id="${scoped}-label"[^>]*for="${scoped}"`));
+    assert.match(fieldTracksHtml, new RegExp(`id="${scoped}"`));
 }
 const objectiveTag = elementTag(fieldTracksHtml, 'button', 'objective');
 assertAttribute(objectiveTag, 'aria-labelledby', 'objective-label');
@@ -209,7 +226,7 @@ const scopedFormHtml = renderToStaticMarkup(
         showSubmit={false}
     />,
 );
-assert.match(scopedFormHtml, /<input[^>]*id="objective"[^>]*value="awareness"/);
+assert.match(elementTag(scopedFormHtml,'input','objective'),/value="awareness"/);
 assert.doesNotMatch(scopedFormHtml, /value=""/);
 
 const erroredLookupHtml = renderToStaticMarkup(
@@ -222,7 +239,7 @@ const erroredLookupHtml = renderToStaticMarkup(
         showSubmit={false}
     />,
 );
-assert.match(erroredLookupHtml, /<button[^>]*id="advertiserId"[^>]*aria-describedby="[^"]+"/);
+assert.match(elementTag(erroredLookupHtml,'button','advertiserId'),/aria-describedby="[^"]+"/);
 assert.match(erroredLookupHtml, /<button[^>]*aria-invalid="true"/);
 assert.match(erroredLookupHtml, /class="forge-lookup-selection-input is-invalid"/);
 assert.match(erroredLookupHtml, /data-forge-part="validation-message"/);
@@ -264,7 +281,7 @@ const erroredSelectHtml = renderToStaticMarkup(
         showSubmit={false}
     />,
 );
-assert.match(erroredSelectHtml, /<button[^>]*id="objective"[^>]*aria-describedby="[^"]+"/);
+assert.match(elementTag(erroredSelectHtml,'button','objective'),/aria-describedby="[^"]+"/);
 assert.match(erroredSelectHtml, /<button[^>]*aria-invalid="true"/);
 assert.match(erroredSelectHtml, /data-forge-part="validation-message"/);
 assert.match(erroredSelectHtml, /role="alert">Choose a supported objective\.<\/div>/);
@@ -392,7 +409,7 @@ const searchableOptions = Array.from({length: 10}, (_, index) => ({
 }));
 const onOpening = () => {};
 const onKeyDown = () => {};
-const searchableSelect = SelectInput({
+const searchableSelect = inspectWidget(SelectInput,{
     value: 'objective-2',
     options: searchableOptions,
     'aria-label': 'Objective',
@@ -448,14 +465,14 @@ assert.equal(searchableSelect.props.noResults.props.text, 'No matching options')
 assert.equal(searchableSelect.props.itemPredicate('objective 2', searchableOptions[1]), true);
 assert.equal(searchableSelect.props.itemPredicate('not present', searchableOptions[1]), false);
 
-const compactFieldTrackSelect = SelectInput({
+const compactFieldTrackSelect = inspectWidget(SelectInput,{
     options: searchableOptions.slice(0, 9),
     'data-forge-field-track-control': 'true',
 });
 assert.equal(compactFieldTrackSelect.props.filterable, false);
 assert.equal(compactFieldTrackSelect.props.noResults, undefined);
 
-const optedOutSelect = SelectInput({
+const optedOutSelect = inspectWidget(SelectInput,{
     options: searchableOptions,
     fill: false,
     filterable: false,
@@ -465,7 +482,7 @@ assert.equal(optedOutSelect.props.fill, false);
 assert.equal(optedOutSelect.props.children.props.fill, false);
 assert.equal(optedOutSelect.props.filterable, false);
 
-const legacySelect = SelectInput({options: searchableOptions});
+const legacySelect = inspectWidget(SelectInput,{options: searchableOptions});
 assert.equal(legacySelect.props.fill, undefined);
 assert.equal(legacySelect.props.filterable, false);
 assert.equal(legacySelect.props.popoverTargetProps, undefined);
@@ -478,7 +495,7 @@ assert.equal(legacySelect.props.itemRenderer(searchableOptions[0], {
     modifiers: {active: false},
 }).props.roleStructure, undefined);
 
-const disabledLegacySelect = SelectInput({options: searchableOptions, disabled: true});
+const disabledLegacySelect = inspectWidget(SelectInput,{options: searchableOptions, disabled: true});
 assert.equal(disabledLegacySelect.props.disabled, true);
 assert.equal(disabledLegacySelect.props.children.props.disabled, true);
 

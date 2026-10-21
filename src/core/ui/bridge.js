@@ -1,3 +1,4 @@
+import { encodeSnapshotRequest } from './snapshotRequestEncoding.js';
 import { buildUISnapshot } from './snapshot.js';
 import { runUICommand } from './commands.js';
 import { restoreWindowsFromSnapshot } from '../store/signals.js';
@@ -299,6 +300,8 @@ export function startUIBridgeHTTP(options = {}) {
   let snapshotStatusTimer = null;
   let lastSnapshotText = '';
   let sessionId = null;
+  let snapshotGzip = false;
+  let maxInflatedSnapshotBytes = 32 * 1024 * 1024;
   const transportContext = () => !stopped && readyToPublish && sessionId ? { url, clientId, sessionHeader, sessionId } : null;
   activeHTTPTransportContext = transportContext;
   let lastEventId = null;
@@ -360,10 +363,16 @@ export function startUIBridgeHTTP(options = {}) {
     const requestTimer = controller ? setTimeout(() => controller.abort(), requestTimeoutMs) : null;
     registerRPC(controller);
     try {
+      const requestText = JSON.stringify(body);
+      const encoded = method === 'ui.snapshot'
+        ? await encodeSnapshotRequest(requestText, {enabled: snapshotGzip, maxInflatedBytes: maxInflatedSnapshotBytes, signal: controller?.signal}) : {body: requestText};
+      requireCurrent(scope);
+      if (controller?.signal.aborted) throw controller.signal.reason || new Error('UI bridge request cancelled');
+      if (encoded.contentEncoding) headers['Content-Encoding'] = encoded.contentEncoding;
       const res = await fetch(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(body),
+        body: encoded.body,
         signal: controller?.signal,
       });
       if (!current(scope)) {
@@ -587,6 +596,7 @@ export function startUIBridgeHTTP(options = {}) {
     if (stopped) return;
     generation++;
     sessionId = null;
+    snapshotGzip = false;
     readyToPublish = false;
     readyToPoll = false;
     lastSnapshotText = '';
@@ -708,7 +718,12 @@ export function startUIBridgeHTTP(options = {}) {
 
   const start = async (scope) => {
     try {
-      await rpc('ui.hello', { clientId, token: options.token || undefined }, 1, scope);
+      const hello = await rpc('ui.hello', { clientId, token: options.token || undefined }, 1, scope);
+      requireCurrent(scope);
+      snapshotGzip = Array.isArray(hello?.capabilities?.snapshotRequestEncodings) && hello.capabilities.snapshotRequestEncodings.includes('gzip');
+      const advertisedLimit = hello?.capabilities?.maxInflatedSnapshotBytes;
+      maxInflatedSnapshotBytes = Number.isSafeInteger(advertisedLimit) && advertisedLimit > 0
+        ? Math.min(advertisedLimit, 32 * 1024 * 1024) : 32 * 1024 * 1024;
       await restoreSnapshot(scope);
       requireCurrent(scope);
       await waitForStartupReady();
@@ -760,6 +775,7 @@ export function startUIBridgeHTTP(options = {}) {
     generation++;
     if (activeHTTPTransportContext === transportContext) activeHTTPTransportContext = null;
     sessionId = null;
+    snapshotGzip = false;
     try { detachListeners?.(); } catch (_) {}
     detachListeners = null;
     try { detachLifecycle?.(); } catch (_) {}
