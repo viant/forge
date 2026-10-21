@@ -1,3 +1,4 @@
+import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
 import React, { useRef } from 'react';
 import { Button } from '@blueprintjs/core';
 import { resolveQuickFilterSet, isQuickFiltersActive } from './QuickFilterHelpers.js';
@@ -28,21 +29,21 @@ export default function QuickFilterToggle({ context }) {
             const cleared = { ...currentFilter };
             filters.forEach((f) => (cleared[f.field] = ''));
             setSilentVals(cleared);
-            fetch();
+            return fetch();
         } else {
             const restored = { ...currentFilter, ...cacheRef.current };
             setSilentVals(restored);
-            fetch();
+            return fetch();
         }
     };
 
     return (
-        <Button
+        <NativeControlTarget context={context} item={{id:'quickFilterToggle',type:'button',label:'Toggle quick filters'}} actions={{click:toggle}}><Button
             icon={active ? 'filter-remove' : 'filter'}
             minimal
             small
             onClick={toggle}
             title={active ? 'Disable quick filters' : 'Enable quick filters'}
-        />
+        /></NativeControlTarget>
     );
 }

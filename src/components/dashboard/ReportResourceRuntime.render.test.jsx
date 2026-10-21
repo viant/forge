@@ -17,7 +17,7 @@ const deferred = () => {let resolve, reject; const promise=new Promise((yes,no)=
 async function mount(runReport, parameters={}) {
     globalThis.IS_REACT_ACT_ENVIRONMENT=true;
     const host=document.createElement('div'), root=createRoot(host);
-    const handlers={reportStore:{runReport}, reportRuns:{begin:vi.fn(),complete:vi.fn()},dataSource:{fetchCollection:vi.fn()}};
+    const handlers={reportStore:{runReport}, reportRuns:{capabilities:{browserSnapshots:false},begin:vi.fn(),complete:vi.fn()},dataSource:{fetchCollection:vi.fn()}};
     const render = async (changes={}) => {parameters={...parameters,...changes};await act(async()=>root.render(
         <StrictMode><ReportResourceRuntime container={{parameters:{reportResource:pin,reportCapabilities:{run:true},...parameters}}} context={{handlers}}/></StrictMode>));};
     await render();
@@ -59,6 +59,8 @@ it('rejects authority mismatch and surfaces producer denial without materializin
         run.mockRejectedValueOnce(new Error('Report denied'));
         await act(async()=>view.host.querySelector('button').click());
         expect(view.host.textContent).toContain('Report denied');
+        expect(view.handlers.reportRuns.begin).not.toHaveBeenCalled();
+        expect(view.handlers.dataSource.fetchCollection).not.toHaveBeenCalled();
     } finally {await view.close();}
 });
 it('discards stale selection results and ignores settlement after close',async()=>{

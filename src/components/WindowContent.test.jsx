@@ -282,7 +282,7 @@ describe('resolveRequiredDataSourceRefs', () => {
       .toEqual(['line_creatives']);
   });
 
-  it('preserves all-tab datasource mounting unless active mode is explicitly requested', () => {
+  it('defaults to the selected panel and preserves explicit all-panel mounting', () => {
     const metadata = {
       dataSource: { properties: {}, campaigns: {}, orders: {} },
       view: {content: {
@@ -295,6 +295,8 @@ describe('resolveRequiredDataSourceRefs', () => {
         ],
       }},
     };
+    expect(resolveRequiredDataSourceRefs(metadata, '', {}, {})).toEqual(['properties']);
+    metadata.view.content.tabs.mountPolicy = 'all';
     expect(resolveRequiredDataSourceRefs(metadata, '', {}, {})).toEqual(['properties', 'campaigns', 'orders']);
   });
 

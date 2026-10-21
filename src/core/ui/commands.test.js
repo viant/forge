@@ -1,8 +1,15 @@
+import {registerControlActions} from './controlActions.js';
 import assert from 'node:assert/strict';
 
-import { addWindow, activeWindows, selectedTabId, selectedWindowId, getBusSignal, getInputSignal, getCollectionSignal, getDashboardFilterSignal, getDashboardSelectionSignal, getFormSignal, getMetadataSignal, getMetricsSignal, getSelectionSignal, getViewSignal } from '../store/signals.js';
+import { removeWindow, addWindow, activeWindows, selectedTabId, selectedWindowId, getBusSignal, getInputSignal, getCollectionSignal, getDashboardFilterSignal, getDashboardSelectionSignal, getFormSignal, getMetadataSignal, getMetricsSignal, getSelectionSignal, getViewSignal } from '../store/signals.js';
 import { runUICommand } from './commands.js';
 import { registerControlTarget, unregisterControlTarget } from './registry.js';
+
+async function closeTestWindow(windowId) {
+ if(!activeWindows.peek().some(window=>window.windowId===windowId))return; // Cleanup of already-replaced test windows.
+ const cleanup=registerControlActions({windowId,controlId:'window:close'},()=>({visible:true,disabled:false,readOnly:false,actions:{click:()=>{removeWindow(windowId);return {status:'closed'};}}}));
+ try{return await runUICommand({method:'ui.window.close',params:{windowId}});}finally{cleanup();}
+}
 
 activeWindows.value = [{
   windowId: 'chat/new',
@@ -238,20 +245,20 @@ getDashboardFilterSignal(`${res.windowId}:demoDashboard`).value = { periodView: 
 await runUICommand({ method: 'ui.window.activate', params: { windowId: res.windowId } });
 assert.equal(selectedWindowId.peek(), res.windowId);
 
+let selectedByNormalTabHandler;
+const unregisterTab=registerControlActions({windowId:res.windowId,controlId:'analysisPane'},()=>({visible:true,disabled:false,readOnly:false,actions:{selectTab:({tabId})=>{selectedByNormalTabHandler=tabId;getViewSignal(res.windowId).value={tabs:{analysisPane:tabId}};}}}));
 await runUICommand({ method: 'ui.window.selectTab', params: { windowId: res.windowId, containerId: 'analysisPane', tabId: 'kpiTab' } });
-const busMessages = getBusSignal(res.windowId).peek();
-assert.equal(busMessages[busMessages.length - 1].type, 'selectTab');
-assert.equal(busMessages[busMessages.length - 1].tabId, 'kpiTab');
-assert.equal(busMessages[busMessages.length - 1].containerId, 'analysisPane');
+assert.equal(selectedByNormalTabHandler,'kpiTab');
 assert.equal(getViewSignal(res.windowId).peek().tabs.analysisPane, 'kpiTab');
+unregisterTab();
 
-await runUICommand({ method: 'ui.window.close', params: { windowId: res.windowId } });
-await runUICommand({ method: 'ui.window.close', params: { windowId: replacedHosted.windowId } });
-await runUICommand({ method: 'ui.window.close', params: { windowId: appendedHosted.windowId } });
-await runUICommand({ method: 'ui.window.close', params: { windowId: crossConversationHosted.windowId } });
-await runUICommand({ method: 'ui.window.close', params: { windowId: replacedBuilder.windowId } });
-await runUICommand({ method: 'ui.window.close', params: { windowId: campaignWindow.windowId } });
-await runUICommand({ method: 'ui.window.close', params: { windowId: performanceReportWindow.windowId } });
+await closeTestWindow(res.windowId);
+await closeTestWindow(replacedHosted.windowId);
+await closeTestWindow(appendedHosted.windowId);
+await closeTestWindow(crossConversationHosted.windowId);
+await closeTestWindow(replacedBuilder.windowId);
+await closeTestWindow(campaignWindow.windowId);
+await closeTestWindow(performanceReportWindow.windowId);
 assert.equal(activeWindows.peek().length, 1);
 assert.equal(activeWindows.peek()[0].windowId, 'chat/new');
 assert.equal(selectedWindowId.peek(), 'chat/new');
@@ -309,7 +316,7 @@ const restoredHostedWindowAgain = addWindow(
 );
 assert.equal(restoredHostedWindowAgain.windowId, restoredHostedWindow.windowId);
 assert.equal(restoredHostedWindowAgain.hostOpenState, 'historical_replay');
-await runUICommand({ method: 'ui.window.close', params: { windowId: restoredHostedWindowAgain.windowId } });
+await closeTestWindow(restoredHostedWindowAgain.windowId);
 assert.equal(activeWindows.peek().length, 1);
 
 const regKey = registerControlTarget(
@@ -318,18 +325,12 @@ const regKey = registerControlTarget(
 );
 assert.ok(regKey);
 
-const list = await runUICommand({ method: 'ui.controls.list', params: { windowId: 'W1' } });
-assert.equal(Array.isArray(list.controls), true);
-assert.equal(list.controls.length, 1);
-
+await assert.rejects(runUICommand({method:'ui.controls.list',params:{windowId:'W1'}}),/window not found/);
 const search = await runUICommand({ method: 'ui.controls.search', params: { query: 'nam', windowId: 'W1' } });
 assert.equal(search.controls.length, 1);
 
-await runUICommand({
-  method: 'ui.control.setValue',
-  params: { windowId: 'W1', controlId: 'granularity', scope: 'windowForm', value: 'hour' },
-});
-assert.equal(getFormSignal('W1:windowForm').peek().granularity, 'hour');
+await assert.rejects(runUICommand({method:'ui.control.setValue',params:{windowId:'W1',controlId:'granularity',scope:'windowForm',value:'hour'}}), /window not found|unsupported or unmounted/);
+assert.equal(getFormSignal('W1:windowForm').peek().granularity,undefined);
 
 await runUICommand({
   method: 'ui.window.setFormData',
@@ -344,7 +345,6 @@ await runUICommand({
   },
 });
 assert.deepEqual(getFormSignal('W1:windowForm').peek(), {
-  granularity: 'hour',
   prefill: {
     advertiserId: 123,
     dealId: 'deal-xyz',
@@ -366,7 +366,6 @@ await runUICommand({
   },
 });
 assert.deepEqual(getFormSignal('W1:windowForm').peek(), {
-  granularity: 'hour',
   prefill: {
     advertiserId: 123,
     dealId: 'deal-xyz',
@@ -731,6 +730,7 @@ getCollectionSignal(selectableRowsId).value = [
   { advertiser: { id: 17 }, reportId: 'spend', title: 'Spend' },
   { advertiser: { id: 31 }, reportId: 'reach', title: 'Reach 31' },
 ];
+const unregisterRows=registerControlActions({windowId:openedDemo.windowId,dataSourceRef:'selectableRows',controlId:'rows'},()=>({visible:true,disabled:false,readOnly:false,actions:{selectRows:({rows})=>{getSelectionSignal(selectableRowsId).value={selection:rows};}}}));
 const selectedRows = await runUICommand({
   method: 'ui.datasource.setSelection',
   params: {
@@ -857,14 +857,10 @@ unregisterControlTarget(regKey);
 activeWindows.value = [{windowId: 'browse', windowKey: 'advertiserList'}];
 getMetadataSignal('browse').value = {dataSource: {advertisers: {}}};
 getInputSignal('browseDSadvertisers').value = {filter: {Status: 'Active'}, page: 4};
-await runUICommand({method: 'ui.control.setValue', params: {
-  windowId: 'browse', controlId: 'nameSearch', dataSourceRef: 'advertisers',
-  scope: 'filter', dataField: 'Name', value: 'Woomp',
-}});
-assert.deepEqual(getInputSignal('browseDSadvertisers').peek(), {
-  filter: {Status: 'Active', Name: 'Woomp'}, page: 1, fetch: true,
-});
-console.log('Semantic name filtering preserves other criteria and restarts paging');
+await assert.rejects(runUICommand({method:'ui.control.setValue',params:{windowId:'browse',controlId:'nameSearch',dataSourceRef:'advertisers',scope:'filter',dataField:'Name',value:'Woomp'}}),/unsupported or unmounted/);
+assert.deepEqual(getInputSignal('browseDSadvertisers').peek(),{filter:{Status:'Active'},page:4});
+unregisterRows();
+console.log('Unregistered controls cannot bypass declared filters or paging handlers');
 
 // A menu-created window acquires provenance when an assistant shows it.
 const shownWorkspace = {objectId: 'browse', origin: {turnId: 'turn-1'},

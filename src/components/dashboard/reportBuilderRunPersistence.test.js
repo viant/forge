@@ -43,6 +43,11 @@ import {
 const reportRuns = { begin() {} };
 assert.equal(resolveReportBuilderRunHandler({ handlers: { reportRuns } }), reportRuns);
 assert.equal(resolveReportBuilderRunHandler({ handlers: { reportRuns: {} } }), null);
+const canonicalHostRuns = {...reportRuns, capabilities: {browserSnapshots: false}, getRun() {}};
+assert.equal(resolveReportBuilderRunHandler({handlers: {reportRuns: canonicalHostRuns}}), null);
+assert.equal(typeof canonicalHostRuns.getRun, "function", "declining optional snapshots retains restoration APIs");
+const legacyHostRuns = {...reportRuns, capabilities: {browserSnapshots: true}};
+assert.equal(resolveReportBuilderRunHandler({handlers: {reportRuns: legacyHostRuns}}), legacyHostRuns);
 
 assert.equal(resolveReportRunBuilderRef({
     activeBuilderVariant: { builderRef: "enhanced-builder" },

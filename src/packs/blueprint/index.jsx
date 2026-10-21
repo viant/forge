@@ -1,3 +1,5 @@
+import {useRegisteredControlActions} from '../../runtime/useRegisteredControlActions.js';
+import {isLiveControlVisible,validateWidgetControlValue} from '../../core/ui/controlActions.js';
 import {preserveSelectExternalFocus} from './selectCloseFocus.js';
 import SwitchControl from '../../components/SwitchControl.jsx';
 import ForgeFormGroup from './ForgeFormGroup.jsx';
@@ -210,10 +212,10 @@ export function DateRangePresetInput({
         const patch = resolveDateRangePresetSyncPatch(current, resolved, {startField, endField, granularityField});
         if (patch) setAppliedFields(patch);
     }, [value, context, startField, endField, granularityField, resolvedLifetimeStart, resolvedTimeZone]);
-    const choosePreset = (option) => {
+    const choosePreset = (option, strict=false) => {
         if (String(option?.value).toLowerCase() === 'custom') return;
         const resolved = resolveDateRangePreset(option?.value, new Date(), resolvedLifetimeStart, resolvedTimeZone);
-        batch(() => {
+        const result=batch(() => {
             if (resolved) {
                 setAppliedFields({
                     [startField]: resolved.start,
@@ -221,24 +223,33 @@ export function DateRangePresetInput({
                     [granularityField]: resolved.granularity,
                 });
             }
-            onChange?.(option?.value);
+            return (strict && onChange?.operate?onChange.operate:onChange)?.(option?.value);
         });
-        setOpen(false);
+        setOpen(false);return result;
     };
-    const applyCustom = () => {
-        if (!customApplyEnabled || !customDraft.start || !customDraft.end || invalid) return;
-        const startDate = new Date(`${customDraft.start}T00:00:00Z`);
-        const endDate = new Date(`${customDraft.end}T00:00:00Z`);
-        const durationDays = Math.floor((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
-        // Draft typing must not update datasource parameters or be reset by
-        // the still-selected preset. Publish a coherent range only on Apply.
-        batch(() => {
-            setAppliedFields({[startField]: customDraft.start, [endField]: customDraft.end,
-                [granularityField]: durationDays <= 2 ? 'hour' : 'day'});
-            onChange?.('custom');
+    const applyCustomDraft = (draft,strict=false) => {
+        if (!customApplyEnabled || !draft.start || !draft.end || draft.start > draft.end) return false;
+        const error=validateWidgetControlValue(draft,{item:{widget:'dateRange'},props:{}});if(error)throw new Error(error);
+        const startDate = new Date(`${draft.start}T00:00:00Z`),endDate = new Date(`${draft.end}T00:00:00Z`);
+        const durationDays = Math.floor((endDate.getTime()-startDate.getTime())/86400000)+1;
+        const result=batch(()=>{
+            setAppliedFields({[startField]:draft.start,[endField]:draft.end,[granularityField]:durationDays<=2?'hour':'day'});
+            return (strict && onChange?.operate?onChange.operate:onChange)?.('custom');
         });
-        setOpen(false);
+        setOpen(false);return result;
     };
+    const applyCustom = () => applyCustomDraft(customDraft);
+    const toggleOpen=()=>{if(!open)setCustomDraft({start,end});setOpen(previous=>!previous);};
+    useRegisteredControlActions({windowId:context?.identity?.windowId,dataSourceRef:context?.identity?.dataSourceRef,controlId:item?.id,scope:item?.scope || 'form',dataField:item?.dataField,bindingPath:item?.bindingPath || item?.id,type:'dateRangePreset'},()=>({
+        visible:isLiveControlVisible(triggerRef.current),disabled:disabled===true,readOnly:readOnly===true,value,options,
+        constraints:{customApplyEnabled,startField,endField,granularityField},
+        actions:{click:toggleOpen,focus:()=>{triggerRef.current?.focus?.();return document.activeElement===triggerRef.current;},setValue:({value:next})=>{
+            if(next && typeof next==='object' && !Array.isArray(next)) {if(!customApplyEnabled)throw new Error(customDisabledMessage);return applyCustomDraft(next,true);}
+            const option=options.find(option=>Object.is(option.value,next)&&option.disabled!==true&&String(option.value).toLowerCase()!=='custom');
+            if(!option)throw new Error('preset is unavailable; custom requires explicit start/end');
+            return choosePreset(option,true);
+        }}
+    }),`${disabled}:${readOnly}:${open}`);
     const updatePopupPosition = React.useCallback(() => {
         const rect = triggerRef.current?.getBoundingClientRect?.();
         if (!rect || typeof window === 'undefined') return;
@@ -268,10 +279,7 @@ export function DateRangePresetInput({
                 aria-haspopup="dialog"
                 aria-expanded={open}
                 disabled={readOnly || disabled}
-                onClick={() => {
-                    if (!open) setCustomDraft({start, end});
-                    setOpen((current) => !current);
-                }}
+                onClick={toggleOpen}
                 style={{width: '100%', justifyContent: 'space-between'}}
             >
                 {triggerLabel}
@@ -1296,6 +1304,11 @@ export function registerPack() {
             return (
                 <div
                     role="group"
+                    id={rest.id}
+                    aria-label={rest['aria-label']}
+                    aria-labelledby={rest['aria-labelledby']}
+                    aria-describedby={rest['aria-describedby']}
+                    aria-errormessage={rest['aria-errormessage']}
                     className="forge-segmented-control"
                 >
                     {options.map((opt) => {
@@ -1537,6 +1550,7 @@ registerWrapper('blueprint', (item, container, children, context, accessibility 
                 labelInfo={required ? <span aria-hidden="true">*</span> : undefined}
                 inline={inline}
                 labelFor={accessibility.controlId || item.id}
+                labelId={accessibility.labelId}
                 helperId={accessibility.helperId}
                 helperText={item.validationError || item.helperText || item.description}
                 intent={item.validationError ? 'danger' : 'none'}

@@ -17,6 +17,9 @@ import (
 func projectIndependentDatasourceTransport(window *types.Window, references map[string]primitive.DataSourceReference) {
 	for id := range references {
 		entry := window.DataSource[id]
+		if entry.DataSourceRef != "" {
+			continue // Local views retain row-relative selectors and no transport.
+		}
 		entry.Service = &types.Service{Endpoint: "agentlyAPI", URI: "/v1/api/datasources/" + url.PathEscape(id) + "/fetch", Method: "POST"}
 		entry.Selectors = &types.Selectors{Data: "rows", DataInfo: "dataInfo", Metrics: "metrics"}
 		window.DataSource[id] = entry
@@ -64,6 +67,13 @@ func projectWindowDatasourceTransport(window *types.Window, descriptors map[stri
 		var descriptor dsproto.DataSource
 		if json.Unmarshal(raw, &descriptor) != nil {
 			return identity.ErrResourceDenied
+		}
+		if entry.DataSourceRef != "" {
+			// Local evaluation must not bypass the transport admission policy.
+			if !nativeHTTP && (entry.Service != nil || descriptor.Service != nil) {
+				return fmt.Errorf("%w: datasource %q", ErrUnsupportedWindowTransport, id)
+			}
+			continue // Only the aggregate owner consumes the host fetch envelope.
 		}
 		if descriptor.Backend == nil {
 			if !nativeHTTP && (entry.Service != nil || descriptor.Service != nil) {

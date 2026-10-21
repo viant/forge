@@ -1,3 +1,4 @@
+import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
 import React from 'react';
 import { InputGroup, ControlGroup, HTMLSelect, Icon } from '@blueprintjs/core';
 import {
@@ -52,10 +53,9 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
 
     const fetchFirstPage = React.useCallback(() => {
         if (typeof handlers?.dataSource?.setPage === 'function') {
-            handlers.dataSource.setPage(1);
-            return;
+            return handlers.dataSource.setPage(1);
         }
-        handlers?.dataSource?.fetchCollection?.();
+        return handlers?.dataSource?.fetchCollection?.();
     }, [handlers]);
 
     const mirrorValues = React.useCallback(
@@ -77,7 +77,7 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
             commitTimerRef.current = null;
             mirrorValues(newValues);
             pendingFetchValuesRef.current = null;
-            fetchFirstPage();
+            return fetchFirstPage();
         },
         [fetchFirstPage, mirrorValues]
     );
@@ -92,7 +92,7 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
                 commitTimerRef.current = null;
                 if (!pendingFetchValuesRef.current) return;
                 pendingFetchValuesRef.current = null;
-                fetchFirstPage();
+                return fetchFirstPage();
             }, QUICK_FILTER_DEBOUNCE_MS);
         },
         [fetchFirstPage, filters]
@@ -105,7 +105,7 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
             commitTimerRef.current = null;
             mirrorValues(nextValues);
             pendingFetchValuesRef.current = null;
-            fetchFirstPage();
+            return fetchFirstPage();
         },
         [fetchFirstPage, mirrorValues]
     );
@@ -138,11 +138,11 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
                 const clearedVals = {};
                 filters.forEach((f) => (clearedVals[f.field] = ''));
                 setValues(clearedVals);
-                commitValues(clearedVals);
+                return commitValues(clearedVals);
             } else {
                 const restored = { ...values, ...cacheRef.current };
                 setValues(restored);
-                commitValues(restored);
+                return commitValues(restored);
             }
         },
         [active, values, commitValues, filters]
@@ -157,7 +157,7 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
         valuesRef.current = clearedValues;
         setValues(clearedValues);
         setSelectedField(nextField);
-        commitValues(clearedValues);
+        return commitValues(clearedValues);
     }, [commitValues, filters]);
 
     const renderFilterInput = (filter, index = 0) => {
@@ -165,11 +165,10 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
         const showToggle = index === 0;
         const iconName = active ? 'filter-remove' : filter.icon || 'filter';
         return (
-            <InputGroup
-                key={filter.field}
+            <NativeControlTarget key={filter.field} context={context} item={{id:`quickFilter:${filter.field}`,type:'text',dataField:filter.field,label:filter.label || filter.field}} value={value} validate={next=>typeof next==='string'?null:'string filter required'} actions={{setValue:({value})=>{handleChange(filter.field)(value);return flushCommit();}}}><InputGroup
                 leftElement={
                     showToggle ? (
-                        <span
+                        <NativeControlTarget context={context} item={{id:'quickFilter:toggle',type:'button',label:'Toggle quick filters'}} actions={{click:({event})=>toggleFilters(event)}}><span
                             onClick={toggleFilters}
                             style={{
                                 display: 'flex',
@@ -181,7 +180,7 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
                             }}
                         >
                             <Icon icon={iconName} size={12} />
-                        </span>
+                        </span></NativeControlTarget>
                     ) : undefined
                 }
                 placeholder={filter.placeholder || filter.field}
@@ -195,7 +194,7 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
                     }
                 }}
                 style={{ width: filter.width || 140 }}
-            />
+            /></NativeControlTarget>
         );
     };
 
@@ -207,7 +206,7 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
                 className="bp4-small forge-quick-filter forge-quick-filter--field-selector"
                 style={{ marginRight: align === 'left' ? 8 : 0, marginLeft: align !== 'left' ? 8 : 0 }}
             >
-                <HTMLSelect
+                <NativeControlTarget context={context} item={{id:'quickFilter:field',type:'select',label:'Filter field'}} value={activeFilter.field} options={filters.map(filter=>({value:filter.field,label:filter.label || filter.field}))} validate={value=>filters.some(filter=>filter.field===value)?null:'Filter field unavailable'} actions={{setValue:({value})=>handleSelectedFieldChange({target:{value}})}}><HTMLSelect
                     aria-label="Filter field"
                     value={activeFilter.field}
                     onChange={handleSelectedFieldChange}
@@ -215,7 +214,7 @@ export default function QuickFilterInputs({ context, align = 'right' }) {
                         label: filter.optionLabel || filter.label || filter.field,
                         value: filter.field,
                     }))}
-                />
+                /></NativeControlTarget>
                 {renderFilterInput(activeFilter)}
             </ControlGroup>
         );

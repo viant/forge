@@ -1,3 +1,4 @@
+import NativeControlTarget from '../runtime/NativeControlTarget.jsx';
 import React, {useEffect, useRef, useMemo, useState} from 'react';
 import {Dialog, DialogBody, DialogFooter, Button, Classes, InputGroup} from '@blueprintjs/core';
 import LayoutRenderer from './LayoutRenderer';
@@ -25,12 +26,13 @@ export function resolveViewDialogDataSourceContext(context, reference, selection
     return reuse ? context : context.Context(reference, {selectionMode});
 }
 
-export function ViewDialogFooterAction({action, context, disabled = false, onClose, onInvoke, invokeBeforeClose = false}) {
+export function ViewDialogFooterAction({action, context, disabled = false, onClose, onInvoke, onOperateInvoke, dialogId, invokeBeforeClose = false}) {
     const [invoking, setInvoking] = useState(false);
     const invocationPending = useRef(false);
-    const activate = (event) => {
+    const activate = (event,strict=false) => {
         if (disabled || invocationPending.current) return false;
-        if (action?.close !== true) return onInvoke?.(event);
+        const invoke=strict?(onOperateInvoke || onInvoke):onInvoke;
+        if (action?.close !== true) return invoke?.(event);
         if (!invokeBeforeClose) return onClose?.();
         invocationPending.current = true;
         const complete = (result) => {
@@ -39,7 +41,7 @@ export function ViewDialogFooterAction({action, context, disabled = false, onClo
         };
         const release = () => { invocationPending.current = false; setInvoking(false); };
         try {
-            const result = onInvoke?.(event);
+            const result = invoke?.(event);
             if (result && typeof result.then === 'function') {
                 setInvoking(true);
                 return Promise.resolve(result).then(complete, () => false).finally(release);
@@ -59,13 +61,13 @@ export function ViewDialogFooterAction({action, context, disabled = false, onClo
             disabled={disabled}
         />;
     }
-    const button = <Button
+    const button = <NativeControlTarget context={context} controlId={dialogId?`${dialogId}:${action.id}`:action.id} item={{...action,type:'button'}} disabled={disabled||invoking} actions={{click:({event})=>activate(event,true)}}><Button
         intent={action?.intent}
         disabled={disabled || invoking}
         loading={invoking}
         title={action?.tooltip || action?.label || action?.id}
         onClick={activate}
-    >{action?.label}</Button>;
+    >{action?.label}</Button></NativeControlTarget>;
     return disabled && action?.tooltip ? (
         <DisabledActionShell reason={action.tooltip} label={action?.label || action?.id || 'Action'}>
             {button}
@@ -527,8 +529,8 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
         if (dialog.actions && Array.isArray(dialog.actions) && dialog.actions.length > 0) return undefined; // keep metadata-driven buttons
         return (
             <>
-                <Button minimal onClick={handleClose}>Cancel</Button>
-                <Button intent="primary" disabled={!canSelect} onClick={() => context.handlers.dialog.commit?.({ context: dsCtx })}>Select</Button>
+                <NativeControlTarget context={dsCtx} controlId={`${dialog.id}:cancel`} item={{type:'button'}} disabled={closeDisabled} actions={{click:handleClose}}><Button minimal onClick={handleClose}>Cancel</Button></NativeControlTarget>
+                <NativeControlTarget context={dsCtx} controlId={`${dialog.id}:select`} item={{type:'button'}} disabled={!canSelect} actions={{click:()=>context.handlers.dialog.commit?.({context:dsCtx})}}><Button intent="primary" disabled={!canSelect} onClick={() => context.handlers.dialog.commit?.({ context: dsCtx })}>Select</Button></NativeControlTarget>
             </>
         );
     };
@@ -586,6 +588,8 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                         <ViewDialogFooterAction
                             key={action.id}
                             action={action}
+                            dialogId={dialog.id}
+                            onOperateInvoke={(event)=>events.actions?.[action.id]?.onClick?.executeStrict?.({event,action:action.id,context:dsCtx})}
                             context={dsCtx}
                             disabled={dialogActionDisabled(action)}
                             onClose={handleClose}

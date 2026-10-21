@@ -287,7 +287,7 @@ export function createDataConnector(dataSource, runtime = {}) {
     /**
      * GET method
      */
-    async function get({filter = {}, page, cursor, pageSize, inputParameters = {}, cache = null, invocationId = null, signal = null}) {
+    async function get({filter = {}, page, cursor, pageSize, inputParameters = {}, cache = null, invocationId = null, signal = null, fresh = false}) {
         try {
             let {method, url, headers} = getUrlAndHeaders();
             let queryParams = new URLSearchParams();
@@ -340,7 +340,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             }));
 
             const finalUrl = appendQueryParams(url, queryParams);
-            const request = {method: String(method || requestMethod).toUpperCase(), headers, ...(signal ? {signal} : {})};
+            const request = {method: String(method || requestMethod).toUpperCase(), headers, ...(signal ? {signal} : {}), ...(fresh === true ? {cache:'no-store'} : {})};
 
             if (requestMethod !== 'GET' && isDatasourceFetchRoute) {
                 request["body"] = JSON.stringify(payload);
@@ -353,7 +353,7 @@ export function createDataConnector(dataSource, runtime = {}) {
             }
             const log = getLogger('connector');
             try { log.debug('[request]', { method, url: finalUrl, request }); } catch(_) {}
-            const requestKey = requestMethod === 'GET' && !signal
+            const requestKey = requestMethod === 'GET' && !signal && fresh !== true
                 ? JSON.stringify({ url: finalUrl, headers: request.headers || {} })
                 : '';
             if (requestKey && inFlightGetRequests.has(requestKey)) {

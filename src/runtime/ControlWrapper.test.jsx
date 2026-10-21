@@ -57,7 +57,7 @@ describe('ControlWrapper', () => {
 
         expect(html).toContain('class="forge-control-track-content"');
         expect(html).toContain('data-forge-control-id="objective"');
-        expect(html).toContain('<input id="objective"');
+        expect(html).toMatch(/<input id="forge-control-[^"]+"/);
         expect(html).toContain('aria-required="true"');
         expect(html).toContain('aria-describedby=');
         expect(html).toContain('data-forge-part="helper-text"');
@@ -80,7 +80,7 @@ describe('ControlWrapper', () => {
             </ControlWrapper>,
         );
 
-        expect(html).toContain('<input id="advertiserId"');
+        expect(html).toMatch(/<input id="forge-control-[^"]+"/);
         expect(html).toContain('aria-describedby=');
         expect(html).toContain('aria-invalid="true"');
         expect(html).toContain('data-forge-part="validation-message"');

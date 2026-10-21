@@ -1,0 +1,19 @@
+import assert from 'node:assert/strict';
+import {activeWindows,getMetadataSignal,getFormSignal,getInputSignal,getSelectionSignal,getViewSignal} from '../store/signals.js';
+import {getOperationRevision} from './operationRevision.js';
+import {registerWorkspaceRefresh,listWorkspaceRefreshCapabilities,refreshWorkspace} from './workspaceRefresh.js';
+const windowId='neutral-refresh';activeWindows.value=[{windowId,conversationId:'chat'}];getMetadataSignal(windowId).value={dataSource:{record:{}}};
+const form=getFormSignal(`${windowId}DSrecord`),input=getInputSignal(`${windowId}DSrecord`),selection=getSelectionSignal(`${windowId}DSrecord`),view=getViewSignal(windowId);
+form.value={name:'unsaved'};input.value={filter:{name:'keep'},page:3};selection.value={selected:{id:7}};view.value={tabs:{sections:'second'}};
+const state=()=>JSON.stringify([form.peek(),input.peek(),selection.peek(),view.peek()]);const before=state();let reads=0,commits=0;
+const cleanup=registerWorkspaceRefresh({windowId,scope:'window'},{admit:async()=>({current:true}),metadata:async()=>{reads++;return {commit:()=>{commits++;}};}});
+assert.deepEqual(listWorkspaceRefreshCapabilities(windowId),[{windowId,scope:'window',metadata:true,data:false,preservesLocalState:true}]);
+await assert.rejects(refreshWorkspace({windowId}),/data refresh is unsupported/);assert.equal(reads,0);
+await assert.rejects(refreshWorkspace({windowId,scope:'form',formId:'invented',reloadMetadata:true}),/unregistered/);
+const revision=getOperationRevision(windowId);assert.equal((await refreshWorkspace({windowId,reloadMetadata:true,expectedRevision:revision})).metadataRefreshed,true);assert.equal(reads,1);assert.equal(commits,1);assert.equal(state(),before);cleanup();
+let release;const pending=new Promise(resolve=>release=resolve);const c2=registerWorkspaceRefresh({windowId,scope:'window'},{admit:()=>pending,metadata:async()=>({commit:()=>{commits++;}})});
+const changed=refreshWorkspace({windowId,reloadMetadata:true});form.value={name:'new human edit'};release(true);await assert.rejects(changed,/stale/);assert.equal(commits,1);c2();
+const c3=registerWorkspaceRefresh({windowId,scope:'form',formId:'editor'},{admit:async()=>false,data:async()=>({commit:()=>{commits++;}})});await assert.rejects(refreshWorkspace({windowId,scope:'form',formId:'editor'}),/denied/);assert.equal(commits,1);c3();
+// A generic, non-network host may explicitly stage its own normal read result.
+let normalReads=0;const c4=registerWorkspaceRefresh({windowId,scope:'tab',containerId:'sections',tabId:'second'},{admit:async()=>true,data:async()=>{const result=++normalReads;return {commit:()=>assert.equal(result,1)};}});await refreshWorkspace({windowId,scope:'tab',containerId:'sections',tabId:'second'});assert.equal(normalReads,1);c4();
+activeWindows.value=[];console.log('PASS scoped refresh explicit capabilities, normal host callbacks, state retention, stale/denied/unregistered fail closed');

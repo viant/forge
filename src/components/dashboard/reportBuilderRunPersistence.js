@@ -88,6 +88,9 @@ export function buildHostedReportLifecycleContextKey({
 
 export function resolveReportBuilderRunHandler(builderContext = {}) {
     const candidate = builderContext?.handlers?.reportRuns || null;
+    // Persistence is optional for live datasource builders. A canonical host
+    // can decline browser snapshots without affecting saved resource execution.
+    if (candidate?.capabilities?.browserSnapshots === false) return null;
     return candidate && typeof candidate.begin === "function" ? candidate : null;
 }
 

@@ -20,3 +20,18 @@ func TestCanonicalDataSourceProjection(t *testing.T) {
 	require.Contains(t, string(raw), `"uri":"/explicit"`)
 	require.Contains(t, string(raw), `"data":"custom"`)
 }
+
+func TestCanonicalLocalProjectionKeepsRowRelativeSelectors(t *testing.T) {
+	source := DataSource{DataSourceRef: "record", Selectors: &Selectors{Data: ".", Metrics: ".", DataInfo: "summary"}}
+	projected := ProjectNativeDataSource("properties", source)
+	require.Equal(t, source, projected)
+	require.Nil(t, projected.Service)
+	raw, err := CompileWindowDataSource("properties", json.RawMessage(`{"id":"properties","dataSourceRef":"record","selectors":{"data":".","metrics":"."},"backend":{"kind":"inline","rows":[]}}`), nil)
+	require.NoError(t, err)
+	var actual DataSource
+	require.NoError(t, json.Unmarshal(raw, &actual))
+	require.Nil(t, actual.Service)
+	require.Equal(t, "record", actual.DataSourceRef)
+	require.Equal(t, ".", actual.Selectors.Data)
+	require.Equal(t, ".", actual.Selectors.Metrics)
+}

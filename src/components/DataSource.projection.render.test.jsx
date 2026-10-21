@@ -1,11 +1,11 @@
 import React,{act}from'react';import{createRoot}from'react-dom/client';import{expect,it,vi}from'vitest';
 import WindowContent from'./WindowContent.jsx';import{SettingProvider}from'../core/context/Setting.jsx';import{getWindowContext}from'../core/context/registry.js';import{removeSignalsForKey}from'../core/store/signals.js';import'../packs/blueprint/index.jsx';
 let index=0;
-async function mount(){
+async function mount({nativeEnvelope=false}={}){
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;const windowId='projected-record-'+(++index),host=document.createElement('div');document.body.append(host);const root=createRoot(host);
  let row={id:7,name:'Original',channels:['DISPLAY'],rate:1,acl:[{id:11,role:'OWNER'}]};
- const success=vi.fn();const transport=vi.fn(async()=>({data:[row]}));
- const metadata={dataSource:{record:{id:'record',service:{uri:'mcp://fixture/record'},uniqueKey:[{field:'id'}],selectors:{data:'data'},selectionMode:'single'},properties:{id:'properties',dataSourceRef:'record',uniqueKey:[{field:'id'}],selectors:{metrics:'.'},selectionMode:'single'},defaults:{id:'defaults',dataSourceRef:'record',resourceModelRef:'defaultsRecord',uniqueKey:[{field:'id'}],selectors:{metrics:'.'},selectionMode:'single',on:[{event:'onSuccess',handler:'test.success'}]},permissions:{id:'permissions',dataSourceRef:'record',uniqueKey:[{field:'id'}],selectors:{data:'acl'},autoSelect:false}},schemas:{defaultsRecord:{type:'object',required:['id'],properties:{id:{type:'integer'},channels:{type:'array',items:{type:'string'}}}}},resourceModels:{defaultsRecord:{schemaRef:'defaultsRecord',fields:{id:{read:'id'},channels:{read:'channels'}}}},view:{dataSourceRef:'properties',content:{id:'root',containers:['properties','defaults','permissions'].map(id=>({id:id+'Panel',dataSourceRef:id,fetchData:true}))}}};
+ const success=vi.fn();const transport=vi.fn(async()=>nativeEnvelope?{rows:[row],metrics:row,dataInfo:{}}:{data:[row]});
+ const metadata={dataSource:{record:{id:'record',service:{uri:'mcp://fixture/record'},uniqueKey:[{field:'id'}],selectors:{data:nativeEnvelope?'rows':'data',metrics:nativeEnvelope?'metrics':'data.0'},selectionMode:'single'},properties:{id:'properties',dataSourceRef:'record',uniqueKey:[{field:'id'}],selectors:{metrics:'.'},selectionMode:'single'},defaults:{id:'defaults',dataSourceRef:'record',resourceModelRef:'defaultsRecord',uniqueKey:[{field:'id'}],selectors:{metrics:'.'},selectionMode:'single',on:[{event:'onSuccess',handler:'test.success'}]},permissions:{id:'permissions',dataSourceRef:'record',uniqueKey:[{field:'id'}],selectors:{data:'acl'},autoSelect:false}},schemas:{defaultsRecord:{type:'object',required:['id'],properties:{id:{type:'integer'},channels:{type:'array',items:{type:'string'}}}}},resourceModels:{defaultsRecord:{schemaRef:'defaultsRecord',fields:{id:{read:'id'},channels:{read:'channels'}}}},view:{dataSourceRef:'properties',content:{id:'root',containers:['properties','defaults','permissions'].map(id=>({id:id+'Panel',dataSourceRef:id,fetchData:true}))}}};
  const settle=async fn=>act(async()=>{fn?.();for(let n=0;n<40;n++)await Promise.resolve();});
  await settle(()=>root.render(<SettingProvider endpoints={{}} connectorConfig={{window:{service:{uri:'/window'}}}} services={{dataConnectorTransport:transport,test:{success}}}><WindowContent window={{windowId,windowKey:'fixture'}} selectedMetadata={metadata}/></SettingProvider>));
  const context=getWindowContext(windowId);
@@ -77,5 +77,15 @@ it('keeps explicit child selection for the same parent and clears it on parent i
   expect(permissions.signals.selection.peek().selected?.id).toBe(11);
   v.setRow({id:8,name:'Next',channels:['AUDIO'],acl:[{id:11,role:'OWNER'}]});await v.settle(()=>v.context.Context('record').handlers.dataSource.fetchCollection({cache:{bypassCache:true}}));
   expect(permissions.signals.selection.peek().selected).toBeNull();
+ }finally{await v.close();}
+});
+
+it('reads local row selectors from a parent fetched through the normalized native HTTP envelope',async()=>{
+ const v=await mount({nativeEnvelope:true});try{
+  expect(v.transport).toHaveBeenCalledTimes(1);
+  expect(v.context.Context('properties').signals.form.peek()).toMatchObject({id:7,name:'Original'});
+  expect(v.context.Context('properties').signals.metrics.peek()).toMatchObject({id:7,name:'Original'});
+  expect(v.context.Context('defaults').signals.form.peek()).toEqual({id:7,channels:['DISPLAY']});
+  expect(v.context.Context('permissions').signals.collection.peek()).toEqual([{id:11,role:'OWNER'}]);
  }finally{await v.close();}
 });

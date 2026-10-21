@@ -134,6 +134,31 @@ const Execution = (context, messageBus) => {
         return ret;
     };
 
+    // Explicit invocation identity keeps strict async errors local to Operate;
+    // ordinary human callbacks continue using execute(), even while this awaits.
+    const executeStrict = async (args = {}) => {
+        init();
+        let result;
+        for (const execution of executions) {
+            const parameters=execution.parameters?.length?resolveParameters(execution.parameters,context):{};
+            let error=null;
+            try {
+                if(execution.initHandler && await execution.initHandler({execution,...args,parameters,context})===false)throw new Error('normal UI initialization rejected the action');
+                result=await execution.handler({execution,...args,parameters,context});
+                if(result===false)throw new Error('normal UI handler rejected the action');
+                if(execution.state && typeof execution.state==='object' && context?.signals?.windowForm)context.signals.windowForm.value={...(context.signals.windowForm.peek?.() || {}),...execution.state};
+                if(execution.onSuccessHandler)result=await execution.onSuccessHandler({execution,...args,result,parameters,context});
+            } catch(cause) {
+                error=cause;
+                if(execution.onErrorHandler)await execution.onErrorHandler({execution,...args,error:cause,parameters,context});
+                throw cause;
+            } finally {
+                if(execution.onDoneHandler)await execution.onDoneHandler({execution,...args,result,error,parameters,context});
+            }
+        }
+        return result;
+    };
+
     const handlerName = () => {
         init();
         if (executions.length === 0) {
@@ -152,7 +177,8 @@ const Execution = (context, messageBus) => {
 
     const size = () => executions.length;
     const hasExecution = () => (executions?.length || 0) > 0;
-    return {execute, push, prepend, size, handlerName, isDefined: hasExecution};
+    execute.operate=executeStrict;
+    return {execute, executeStrict, push, prepend, size, handlerName, isDefined: hasExecution};
 };
 
 function indexExecution(context, on, handlers, messageBus) {
@@ -339,6 +365,12 @@ export const useControlEvents = (context, items = [], state) => {
             }
         }
 
+        for(const [key,callback] of Object.entries(events)) {
+            callback.operate = value => {
+                const normalized=key==='onItemSelect'?(value?.value ?? value):['checkbox','toggle'].includes(item.type)?(typeof value==='boolean'?value:value?.target?.checked):(value?.target?.value ?? value);
+                return handlers[key].executeStrict({event:value,selected:key==='onItemSelect'?value:undefined,item,value:normalized,state,context});
+            };
+        }
         result[item.id] = {events, stateEvents};
     });
 
@@ -485,9 +517,7 @@ export const useCellEvents = ({context, cellSelection, columnHandlers = {}, onRo
     const keys = Object.keys(columnHandlers);
     const events = {};
     const stateEvents = {};
-    if (keys.length === 0) {
-        return {events, stateEvents};
-    }
+    if (keys.length === 0) return {events, stateEvents};
     const {isSelected} = context.handlers.dataSource;
     for (const key of keys) {
         const handler = columnHandlers[key];
@@ -507,6 +537,11 @@ export const useCellEvents = ({context, cellSelection, columnHandlers = {}, onRo
             };
         }
     }
+    for(const [key,callback] of Object.entries(events))callback.operate=async event=>{
+        event?.stopPropagation?.();
+        if(shouldSelectRowForCellAction(cellSelection,isSelected({...cellSelection})))await (onRowClick?.operate || onRowClick)?.({event,...cellSelection,context});
+        return await columnHandlers[key].executeStrict({event,...cellSelection,context});
+    };
     return {events, stateEvents};
 };
 
@@ -610,6 +645,7 @@ export const useToolbarControlEvents = (context, items = []) => {
                 }
             }
         }
+        for(const [key,callback]of Object.entries(events))callback.operate=event=>handlers[key].executeStrict({context,event,item});
         result[item.id] = {events, stateEvents};
     });
 

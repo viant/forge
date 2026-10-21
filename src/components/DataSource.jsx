@@ -122,7 +122,7 @@ export default function DataSource({context}) {
     const handleUpstream = () => {
         const requestId = input.peek()?.bindingGeneration || input.peek()?.invocationId;
         const parentControl = upstreamContext?.signals?.control?.peek?.() || {};
-        if (parentControl.loading || parentControl.stale || (!upstream?.peek?.()?.selected && !parentControl.loaded && !parentControl.error && !parentControl.inactive)) {
+        if (parentControl.loading || (parentControl.stale && !parentControl.error) || (!upstream?.peek?.()?.selected && !parentControl.loaded && !parentControl.error && !parentControl.inactive)) {
             if (!control.peek()?.loading) setLoading(true);
             return;
         }
@@ -147,12 +147,17 @@ export default function DataSource({context}) {
             const collectionChanged = stableSnapshotSignature(currentCollection) !== signature;
             const selectionChanged = parentChanged || Number(currentSelection.rowIndex ?? -1) !== nextRowIndex
                 || safeUniqueKey(getUniqueKeyValue, currentSelection.selected) !== safeUniqueKey(getUniqueKeyValue, nextSelected);
-            const keepDraft = !selectionChanged && signals.formStatus?.peek?.()?.dirty === true;
+            // Only the initiating successful save can accept normalized values.
+            // Edits made after submission and drafts in sibling views survive.
+            const synchronization = input.peek()?.formSynchronization;
+            const acceptSavedForm = !selectionChanged && synchronization
+                && stableSnapshotSignature(form.peek()) === stableSnapshotSignature(synchronization.expectedForm);
+            const keepDraft = !selectionChanged && !acceptSavedForm && signals.formStatus?.peek?.()?.dirty === true;
             const draft = keepDraft ? cloneProjection(form.peek()) : null;
             if (collectionChanged) collection.value = records;
             if (stableSnapshotSignature(metrics.peek()) !== stableSnapshotSignature(stats)) metrics.value = stats;
             if (stableSnapshotSignature(collectionInfo.peek()) !== stableSnapshotSignature(info)) collectionInfo.value = info;
-            if (selectionChanged || collectionChanged) {
+            if (selectionChanged || collectionChanged || acceptSavedForm) {
                 setSelected({selected: nextSelected, rowIndex: nextRowIndex});
                 // Advance the baseline while retaining another tab's draft.
                 if (keepDraft) handlers.dataSource.setEditedFormData({values: draft});
@@ -167,12 +172,16 @@ export default function DataSource({context}) {
             if (notify && events.onSuccess?.isDefined?.()) events.onSuccess.execute({collection: records, payload});
             settleDataSourceRequest(identity.dataSourceId, requestId, null, records);
         } catch (err) {
-            if ((collection.peek() || []).length) collection.value = [];
-            if (selection.peek()?.selected || Number(selection.peek()?.rowIndex ?? -1) !== -1) setSelected({selected: null, rowIndex: -1});
+            const retainDraft = signals.formStatus?.peek?.()?.dirty === true
+                && !isDataSourceLocalDenial(err, context) && !isProtectedUpstreamDenial(context, err);
+            if (!retainDraft) {
+                if ((collection.peek() || []).length) collection.value = [];
+                if (selection.peek()?.selected || Number(selection.peek()?.rowIndex ?? -1) !== -1) setSelected({selected: null, rowIndex: -1});
+            }
             const previous = control.peek() || {};
             if (previous.error !== err || previous.loading || previous.loaded) control.value = {...previous, loaded: false, loading: false, error: err};
             if (projectionRef.current?.error !== err) notifyFetchError(err, "projection");
-            projectionRef.current = {error: err};
+            projectionRef.current = {...projectionRef.current, error: err};
             flagReadDone();
             settleDataSourceRequest(identity.dataSourceId, requestId, err);
         }
@@ -184,7 +193,7 @@ export default function DataSource({context}) {
     const fetchUpstream = cache => {
         if (cache?.bypassCache === true && upstreamContext?.handlers?.dataSource?.fetchCollection) {
             if (!control.peek()?.loading) setLoading(true);
-            const completion = upstreamContext.handlers.dataSource.fetchCollection({cache});
+            const completion = upstreamContext.handlers.dataSource.fetchCollection({cache, sharedRead: true});
             // Parent signal updates own propagation. Consume an optional rejected
             // completion here; its error also reaches every dependent context.
             completion?.catch?.(() => {});
@@ -335,6 +344,7 @@ export default function DataSource({context}) {
             fetch: false,
             refresh: false,
             invocationId: null,
+            formSynchronization: null,
         };
     }
 
