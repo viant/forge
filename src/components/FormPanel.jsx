@@ -1,3 +1,5 @@
+import {useRegisteredControlActions} from '../runtime/useRegisteredControlActions.js';
+import {isLiveControlVisible} from '../core/ui/controlActions.js';
 import {useWorkspacePresentation} from '../core/context/WorkspacePresentation.jsx';
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
@@ -15,6 +17,7 @@ import {useViewPartition} from './useViewPartition.js';
 
 const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourceFetchMode = 'always'}) => {
     useSignals();
+    const operationRoot=useRef(null);
     const workspacePresentation = useWorkspacePresentation();
     const containers = container.containers || [];
     containers.forEach((entry) => {trackContainerVisibility(entry, context);trackVisibleWhen(entry.disabledWhen, context);});
@@ -68,10 +71,21 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
             const next = mergeSelectedTab(previous, panelId, newTabId);
             if (next.changed) {
                 viewSignal.value = next.value;
-                for (const execute of container.on || []) if (execute.event === 'onTabChange' && execute.handler) context.lookupHandler?.(execute.handler)?.({context,tabId:newTabId,execution:execute});
+                const results=[];
+                for (const execute of container.on || []) if (execute.event === 'onTabChange' && execute.handler) results.push(context.lookupHandler?.(execute.handler)?.({context,tabId:newTabId,execution:execute}));
+                if(results.some(result=>result && typeof result.then==='function'))return Promise.all(results).then(values=>values.some(value=>value===false)?false:undefined);
+                if(results.some(result=>result===false))return false;
             }
         }
     };
+
+    useRegisteredControlActions({windowId,controlId:panelId,dataSourceRef:context?.identity?.dataSourceRef,type:'tabs'},()=>({
+        visible:isLiveControlVisible(operationRoot.current),disabled:false,readOnly:false,actions:{selectTab:({tabId})=>{
+            const tab=containers.find(tab=>String(tab.id)===String(tabId));
+            if(!tab || !isContainerVisible(tab,context) || tabDisabled(tab))throw new Error('tab is hidden, disabled or unavailable');
+            return handleTabChange(tabId);
+        }}
+    }),`${selectedTabId}:${visibleContainers.map(tab=>`${tab.id}:${tabDisabled(tab)}`).join(',')}`);
 
     // Listen for bus messages requesting tab switches
     useEffect(() => {
@@ -134,7 +148,7 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
             ? visibleContainers.filter((tab) => shouldRenderTabPanel(tab.id))
             : [selected];
         return (
-            <div className={`form-panel forge-form-panel-section-tabs${compactTabs ? ' is-compact' : ''}${fillAvailableHeight ? ' is-fill' : ''}`}>
+            <div ref={operationRoot} className={`form-panel forge-form-panel-section-tabs${compactTabs ? ' is-compact' : ''}${fillAvailableHeight ? ' is-fill' : ''}`}>
                 <SectionTabRail
                     items={visibleContainers.map((tab,index) => ({id: tab.id, label: tab.title, icon: tab.icon, disabled:tabDisabled(tab), panelId:`${tabDOMPrefix}-panel-${index}`}))}
                     selectedId={selected?.id}
@@ -162,7 +176,7 @@ const FormPanel = ({context, container, children, sizingMode = 'fill', dataSourc
         );
     }
     return (
-        <div className={`form-panel${sizingMode === 'content' ? ' form-panel--content' : ''}`}>
+        <div ref={operationRoot} className={`form-panel${sizingMode === 'content' ? ' form-panel--content' : ''}`}>
             <Tabs id={`form-tabs-${visibleContainers[0]?.id || 'root'}`} className={tabsClassName} selectedTabId={selectedTabId} onChange={handleTabChange} renderActiveTabPanelOnly={mountPolicy ? mountPolicy === 'active' : !keepVisitedTabPanelsMounted} animate={false}>
                 {visibleContainers.map((tab) => (
                     <Tab

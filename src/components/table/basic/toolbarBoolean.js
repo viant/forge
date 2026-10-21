@@ -13,6 +13,6 @@ export function updateToolbarBoolean({signal, field, checked, event, onChange}) 
   if (!signal || !field) return false;
   const previous = signal.peek?.() || signal.value || {};
   signal.value = setSelector(previous, field, checked === true);
-  onChange?.(event);
-  return true;
+  const result=onChange?.(event);
+  return result === false || result && (typeof result.then==='function' || typeof result.status==='string') ? result : true;
 }

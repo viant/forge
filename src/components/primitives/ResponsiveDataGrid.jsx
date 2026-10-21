@@ -19,7 +19,7 @@ import ImageLabelCell from '../table/basic/ImageLabelCell.jsx';
 
 function openCardTarget(target, context) {
   if (target?.kind === 'dialog') return context?.handlers?.window?.openDialog?.({context, execution: {args: [target.dialogId, {awaitResult: target.awaitResult === true}]}, parameters: target.parameters});
-  if (target?.kind === 'window') return context?.handlers?.window?.openWindow?.({context, execution: {args: [target.windowKey, target.parameters || {}, {newInstance: target.newInstance === true, inTab: target.inTab !== false, windowTitle: target.windowTitle}]}});
+  if (target?.kind === 'window') return context?.handlers?.window?.openTarget?.({context, target});
   return false;
 }
 

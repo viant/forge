@@ -456,14 +456,7 @@ func (s *Service) Fetch(ctx context.Context, id string, inputs map[string]interf
 	raw, err := s.runBackend(ctx, executionDS, mergedArgs)
 	backend.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
-		if errors.Is(err, identity.ErrResourceDenied) || errors.Is(err, identity.ErrResourceStale) {
-			return nil, err
-		}
-		var upstream *dsproto.UpstreamAuthorizationError
-		if errors.As(err, &upstream) && upstream.Status == 403 {
-			return nil, dsproto.ErrDatasourceDenied
-		}
-		return nil, err
+		return FetchErrorResult(ctx, executionDS, err)
 	}
 	rows, dataInfo, metrics := project(raw, &ds.DataSource)
 	if err := validatePagingDataInfo(&ds.DataSource, dataInfo, mergedArgs); err != nil {
@@ -493,6 +486,88 @@ func (s *Service) Fetch(ctx context.Context, id string, inputs map[string]interf
 		}
 	}
 	return result, nil
+}
+
+// FetchErrorResult classifies a failed read and constructs the explicitly
+// opted-in empty result. Compatibility hosts must call this only from Fetch,
+// return before cache writes, and retain all deferred POST/release checks.
+// It must never be used to turn an executor or writer failure into success.
+func FetchErrorResult(ctx context.Context, ds *dsproto.DataSource, err error) (*dsproto.FetchResult, error) {
+	if singleToolEmptyOnForbidden(ds, err) {
+		if canceled := ctx.Err(); canceled != nil {
+			return nil, canceled
+		}
+		return emptyForbiddenFetchResult(&ds.DataSource), nil
+	}
+	var completion *readDispatchCompletionError
+	if errors.As(err, &completion) {
+		return nil, err
+	}
+	if errors.Is(err, identity.ErrResourceDenied) || errors.Is(err, identity.ErrResourceStale) {
+		return nil, err
+	}
+	var upstream *dsproto.UpstreamAuthorizationError
+	if errors.As(err, &upstream) && upstream != nil && upstream.Status == 403 {
+		return nil, dsproto.ErrDatasourceDenied
+	}
+	return nil, err
+}
+
+// FetchDispatchError preserves ordinary error precedence, but never lets a
+// typed business 403 fallback conceal a failed dispatch POST transition.
+// Call after the existing dispatch completion callback has run exactly once.
+func FetchDispatchError(ds *dsproto.DataSource, callErr, completionErr error) error {
+	if callErr != nil {
+		if completionErr != nil && singleToolEmptyOnForbidden(ds, callErr) {
+			return &readDispatchCompletionError{completionErr}
+		}
+		return callErr
+	}
+	return completionErr
+}
+
+// This marker keeps dispatch-lifecycle failures distinct from the upstream
+// error even if a host uses the same typed error in its release callback.
+type readDispatchCompletionError struct{ error }
+
+func (e *readDispatchCompletionError) Unwrap() error { return e.error }
+
+func singleToolEmptyOnForbidden(ds *dsproto.DataSource, err error) bool {
+	if ds == nil || ds.Backend == nil || ds.Backend.Kind != dsproto.BackendMCPTool || !ds.Backend.EmptyOnForbidden {
+		return false
+	}
+	var completion *readDispatchCompletionError
+	if errors.As(err, &completion) {
+		return false
+	}
+	var upstream *dsproto.UpstreamAuthorizationError
+	return errors.As(err, &upstream) && upstream != nil && upstream.Status == 403
+}
+
+func emptyForbiddenFetchResult(ds *types.DataSource) *dsproto.FetchResult {
+	info := map[string]interface{}{"totalCount": 0, "pageCount": 0, "returnedCount": 0, "hasMore": false, "nextCursor": nil}
+	if ds != nil && ds.Paging != nil && ds.Paging.DataInfoSelectors != nil {
+		selectors := ds.Paging.DataInfoSelectors
+		for path, value := range map[string]interface{}{selectors.TotalCount: 0, selectors.PageCount: 0, selectors.HasMore: false, selectors.NextCursor: nil} {
+			path = strings.TrimSpace(path)
+			if path == "" {
+				continue
+			}
+			path = strings.TrimPrefix(strings.ReplaceAll(strings.ReplaceAll(path, "[", "."), "]", ""), ".")
+			parts := strings.Split(path, ".")
+			holder := info
+			for _, part := range parts[:len(parts)-1] {
+				child, ok := holder[part].(map[string]interface{})
+				if !ok {
+					child = map[string]interface{}{}
+					holder[part] = child
+				}
+				holder = child
+			}
+			holder[parts[len(parts)-1]] = value
+		}
+	}
+	return &dsproto.FetchResult{Rows: []map[string]interface{}{}, DataInfo: info}
 }
 
 // InvalidateCache drops all entries for a datasource in the caller's scope.
@@ -564,11 +639,8 @@ func (s *Service) runBackend(ctx context.Context, ds *dsproto.DataSource, args m
 	}
 	result, callErr := s.runBackendRaw(ctx, ds, args)
 	finishErr := finish()
-	if callErr != nil {
-		return nil, callErr
-	}
-	if finishErr != nil {
-		return nil, finishErr
+	if err := FetchDispatchError(ds, callErr, finishErr); err != nil {
+		return nil, err
 	}
 	return result, nil
 }

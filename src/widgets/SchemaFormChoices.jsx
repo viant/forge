@@ -1,8 +1,10 @@
+import {useControlDOMIdentity} from '../runtime/controlDOMIdentity.jsx';
 import React from 'react';
 
 export default function SchemaFormChoices({ field, value, onChange, disabled = false, error }) {
+    const identity=useControlDOMIdentity({controlId:field.id || field.name});
     const selected = Array.isArray(value) ? value : [];
-    return <fieldset disabled={disabled || field.disabled || field.readOnly} className="forge-schema-choices" aria-describedby={error ? `${field.name}-error` : undefined}>
+    return <fieldset id={identity.controlId} disabled={disabled || field.disabled || field.readOnly} className="forge-schema-choices" aria-describedby={error ? identity.errorId : undefined}>
         <legend>{field.label}{field.required ? ' (required)' : ''}</legend>
         <div className="forge-schema-choices-options" role="group" aria-label={field.label}>
         {field.options?.map((option, index) => <label key={index}>
@@ -12,6 +14,6 @@ export default function SchemaFormChoices({ field, value, onChange, disabled = f
             <span>{option.label}</span>
         </label>)}
         </div>
-        {error ? <span id={`${field.name}-error`} role="alert">{error}</span> : null}
+        {error ? <span id={identity.errorId} role="alert">{error}</span> : null}
     </fieldset>;
 }

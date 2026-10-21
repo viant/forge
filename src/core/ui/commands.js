@@ -1,3 +1,6 @@
+import {refreshWorkspace,listWorkspaceRefreshCapabilities} from './workspaceRefresh.js';
+import {invokeRegisteredControlAction,readRegisteredControlActions} from './controlActions.js';
+import {assertOperationTarget,getOperationRevision} from './operationRevision.js';
 import { waitForWorkspaceReady } from './workspaceReady.js';
 import {
   addWindow,
@@ -259,11 +262,11 @@ export async function runUICommand(cmd = {}) {
     // ------------------------------------------------------------------
     // Control registry introspection
     // ------------------------------------------------------------------
-    case 'ui.controls.list': {
-      const windowId = params.windowId || undefined;
-      const dataSourceRef = params.dataSourceRef || undefined;
-      const controls = listControlTargets({ windowId, dataSourceRef });
-      return { controls };
+    case 'ui.controls.list':
+    case 'ui.controls.get': {
+      requireString('windowId',params.windowId);
+      assertOperationTarget(params);
+      return {...readRegisteredControlActions(params),operationRevision:getOperationRevision(params.windowId)};
     }
 
     case 'ui.controls.search': {
@@ -581,9 +584,9 @@ export async function runUICommand(cmd = {}) {
     }
 
     case 'ui.window.close': {
-      const windowId = requireString('windowId', params.windowId);
-      removeWindow(windowId);
-      return { ok: true };
+      requireString('windowId',params.windowId);assertOperationTarget(params);
+      const result=await invokeRegisteredControlAction({...params,controlId:'window:close'},'click');
+      return {...result,...(getWindowById(params.windowId)?{operationRevision:getOperationRevision(params.windowId)}:{})};
     }
     case 'ui.window.setFormData': {
       const windowId = requireString('windowId', params.windowId);
@@ -656,28 +659,11 @@ export async function runUICommand(cmd = {}) {
       return { ok: true };
     }
     case 'ui.window.selectTab': {
-      const windowId = requireString('windowId', params.windowId);
-      const tabId = requireString('tabId', params.tabId);
-      const w = getWindowById(windowId);
-      if (!w) throw new Error(`window not found: ${windowId}`);
-      const containerId = params.containerId ? requireString('containerId', params.containerId) : undefined;
-      const viewSignal = getViewSignal(windowId);
-      const previous = viewSignal.peek() || {};
-      const nextTabs = {
-        ...(previous?.tabs || {}),
-        ...(containerId ? { [containerId]: tabId } : {}),
-      };
-      viewSignal.value = {
-        ...previous,
-        tabs: nextTabs,
-      };
-      sendBusMessage(windowId, { type: 'selectTab', tabId, containerId });
-      if (params.activate !== false) {
-        selectedWindowId.value = windowId;
-        if (w.inTab !== false) selectedTabId.value = windowId;
-        if (w.inTab === false) bringFloatingWindowToFront(windowId);
-      }
-      return { ok: true };
+      const windowId=requireString('windowId',params.windowId);
+      requireString('tabId',params.tabId);
+      assertOperationTarget(params);
+      const result=await invokeRegisteredControlAction({...params,controlId:params.containerId},'selectTab');
+      return {...result,operationRevision:getOperationRevision(windowId)};
     }
     case 'ui.window.dock': {
       const windowId = requireString('windowId', params.windowId);
@@ -721,71 +707,30 @@ export async function runUICommand(cmd = {}) {
       return { ok: true };
     }
 
-    case 'ui.control.setValue': {
+    case 'ui.workspace.refresh':
+      return refreshWorkspace(params);
+    case 'ui.workspace.refreshCapabilities':
+      assertOperationTarget(params);
+      return {capabilities:listWorkspaceRefreshCapabilities(params.windowId),operationRevision:getOperationRevision(params.windowId)};
+    case 'ui.control.setValue':
+    case 'ui.control.focus':
+    case 'ui.control.click': {
       const windowId = requireString('windowId', params.windowId);
-      const controlId = requireString('controlId', params.controlId);
-      const item = {
-        id: controlId,
-        bindingPath: params.bindingPath || controlId,
-        dataField: params.dataField,
-      };
-      const value = params.value;
-      const scope = String(params.scope || 'form').trim() || 'form';
-
-      if (scope === 'filter') {
-        const { dataSourceId } = getDataSourceId(windowId, params.dataSourceRef);
-        const input = getInputSignal(dataSourceId);
-        const prev = input.peek() || {};
-        const filterPrev = prev.filter || {};
-        const fieldKey = item.dataField || item.bindingPath || item.id;
-        input.value = {
-          ...prev,
-          filter: setSelector(filterPrev, fieldKey, value),
-          page: 1,
-          fetch: true,
-        };
-      } else if (scope === 'windowForm') {
-        const windowForm = getFormSignal(`${windowId}:windowForm`);
-        const fieldKey = item.dataField || item.bindingPath || item.id;
-        windowForm.value = setSelector(windowForm.peek() || {}, fieldKey, value);
-      } else {
-        const { dataSourceId } = getDataSourceId(windowId, params.dataSourceRef);
-        const form = getFormSignal(dataSourceId);
-        const fieldKey = item.dataField || item.bindingPath || item.id;
-        form.value = setSelector(form.peek() || {}, fieldKey, value);
-
-        const st = getFormStatusSignal(dataSourceId);
-        const prev = st.peek() || {};
-        if (prev.dirty !== true) {
-          st.value = { ...prev, dirty: true };
-        }
-      }
-      return { ok: true };
+      requireString('controlId', params.controlId);
+      assertOperationTarget(params);
+      const result = await invokeRegisteredControlAction(params, method === 'ui.control.click' ? 'click' : method === 'ui.control.focus'?'focus':'setValue');
+      return {...result,...(getWindowById(windowId)?{operationRevision:getOperationRevision(windowId)}:{})};
     }
 
     // ------------------------------------------------------------------
     // Filtering / data
     // ------------------------------------------------------------------
-    case 'ui.filter.set': {
-      const windowId = requireString('windowId', params.windowId);
-      const { dataSourceId } = getDataSourceId(windowId, params.dataSourceRef);
-      const input = getInputSignal(dataSourceId);
-      const prev = input.peek() || {};
-      const patch = params.patch || {};
-      const fetch = params.fetch !== false;
-      input.value = {
-        ...prev,
-        filter: { ...(prev.filter || {}), ...patch },
-        fetch,
-      };
-      return { ok: true };
-    }
+    case 'ui.filter.set':
     case 'ui.data.fetch': {
-      const windowId = requireString('windowId', params.windowId);
-      const { dataSourceId } = getDataSourceId(windowId, params.dataSourceRef);
-      const input = getInputSignal(dataSourceId);
-      input.value = { ...(input.peek() || {}), fetch: true };
-      return { ok: true };
+      const windowId=requireString('windowId',params.windowId);
+      assertOperationTarget(params);
+      const result=await invokeRegisteredControlAction(params,method==='ui.filter.set'?'applyFilter':'refresh');
+      return {...result,operationRevision:getOperationRevision(windowId)};
     }
 
     // ------------------------------------------------------------------
@@ -831,20 +776,8 @@ export async function runUICommand(cmd = {}) {
 
       const selectedIdentities = matches.map(({ row }) => observeIdentity(row, identityFields));
       const rowIndexes = matches.map(({ rowIndex }) => rowIndex);
-      const selection = getSelectionSignal(
-        dataSourceId,
-        selectionMode === 'multi' ? { selection: [] } : { selected: null, rowIndex: -1 }
-      );
-      if (selectionMode === 'multi') {
-        selection.value = { selection: matches.map(({ row }) => row) };
-      } else {
-        const [{ row, rowIndex }] = matches;
-        selection.value = { selected: row, rowIndex };
-        const form = getFormSignal(dataSourceId);
-        const status = getFormStatusSignal(dataSourceId);
-        form.value = { ...(row || {}) };
-        status.value = { ...(status.peek() || {}), dirty: false, version: (status.peek()?.version || 0) + 1 };
-      }
+      assertOperationTarget(params);
+      await invokeRegisteredControlAction({...params,rows:matches.map(({row})=>row)},'selectRows');
       return {
         ok: true,
         windowId,
@@ -853,6 +786,7 @@ export async function runUICommand(cmd = {}) {
         identityFields,
         selectedIdentities,
         rowIndexes,
+        operationRevision: getOperationRevision(windowId),
       };
     }
 
@@ -860,38 +794,13 @@ export async function runUICommand(cmd = {}) {
     // Table selection (row index)
     // ------------------------------------------------------------------
     case 'ui.table.selectRow': {
-      const windowId = requireString('windowId', params.windowId);
-      const rowIndex = params.rowIndex;
-      if (!Number.isInteger(rowIndex) || rowIndex < 0) {
-        throw new Error('rowIndex must be a non-negative integer');
-      }
-      const { dataSourceId, dataSourceRef } = getDataSourceId(windowId, params.dataSourceRef);
-      const meta = getMetadataSignal(windowId).peek();
-      const dsCfg = meta?.dataSource?.[dataSourceRef] || {};
-      const selectionMode = dsCfg.selectionMode || 'single';
-
-      const items = getCollectionSignal(dataSourceId).peek() || [];
-      const row = items[rowIndex];
-      if (row === undefined) throw new Error(`rowIndex out of range: ${rowIndex}`);
-
-      const selection = getSelectionSignal(
-        dataSourceId,
-        selectionMode === 'multi' ? { selection: [] } : { selected: null, rowIndex: -1 }
-      );
-      const form = getFormSignal(dataSourceId);
-      const st = getFormStatusSignal(dataSourceId);
-
-      if (selectionMode === 'multi') {
-        const prev = selection.peek() || { selection: [] };
-        const arr = Array.isArray(prev.selection) ? prev.selection : [];
-        const next = arr.includes(row) ? arr.filter((r) => r !== row) : [...arr, row];
-        selection.value = { selection: next };
-      } else {
-        selection.value = { selected: row, rowIndex };
-        form.value = { ...(row || {}) };
-        st.value = { ...(st.peek() || {}), dirty: false, version: (st.peek()?.version || 0) + 1 };
-      }
-      return { ok: true };
+      const windowId=requireString('windowId',params.windowId);
+      assertOperationTarget(params);
+      const {dataSourceId,dataSourceRef}=getDataSourceId(windowId,params.dataSourceRef);
+      const rows=getCollectionSignal(dataSourceId).peek() || [];
+      if(!Number.isInteger(params.rowIndex) || params.rowIndex<0 || !rows[params.rowIndex])throw new Error('rowIndex is outside the current collection');
+      const result=await invokeRegisteredControlAction({...params,dataSourceRef,rows:[rows[params.rowIndex]]},'selectRows');
+      return {...result,operationRevision:getOperationRevision(windowId)};
     }
 
     // ------------------------------------------------------------------
@@ -925,7 +834,7 @@ export async function runUICommand(cmd = {}) {
       if (rowIndex < 0) {
         throw new Error(`no row found for key: ${keyStr}`);
       }
-      return runUICommand({ method: 'ui.table.selectRow', params: { windowId, dataSourceRef, rowIndex } });
+      return runUICommand({ method: 'ui.table.selectRow', params: { ...params, windowId, dataSourceRef, rowIndex } });
     }
 
     // ------------------------------------------------------------------
@@ -936,129 +845,39 @@ export async function runUICommand(cmd = {}) {
       const uri = requireString('uri', params.uri);
       return runUICommand({
         method: 'ui.filter.set',
-        params: { windowId, dataSourceRef: params.dataSourceRef, patch: { uri }, fetch: true },
+        params: { ...params, windowId, dataSourceRef: params.dataSourceRef, patch: { uri }, fetch: true },
       });
     }
 
     case 'ui.fileBrowser.selectUri': {
-      const windowId = requireString('windowId', params.windowId);
-      const uri = requireString('uri', params.uri);
-      const { dataSourceId, dataSourceRef } = getDataSourceId(windowId, params.dataSourceRef);
-      const meta = getMetadataSignal(windowId).peek();
-      const dsCfg = meta?.dataSource?.[dataSourceRef] || {};
-
-      const collection = getCollectionSignal(dataSourceId).peek() || [];
-      const found = findNodePathByUri(collection, uri);
-      if (!found) {
-        if (params.openParents !== false) {
-          await runUICommand({
-            method: 'ui.fileBrowser.openFolder',
-            params: { windowId, dataSourceRef, uri },
-          });
-        }
-        return { ok: false, error: 'not found in current collection', requested: uri };
-      }
-
-      const selectionMode = dsCfg.selectionMode || 'single';
-      const selection = getSelectionSignal(
-        dataSourceId,
-        selectionMode === 'multi' ? { selection: [] } : { selected: null, nodePath: null, rowIndex: -1 }
-      );
-      const form = getFormSignal(dataSourceId);
-      const st = getFormStatusSignal(dataSourceId);
-
-      if (dsCfg.selfReference) {
-        if (selectionMode === 'multi') {
-          const prev = selection.peek() || { selection: [] };
-          const arr = Array.isArray(prev.selection) ? prev.selection : [];
-          const exists = arr.some((it) => JSON.stringify(it?.nodePath || []) === JSON.stringify(found.nodePath));
-          const next = exists
-            ? arr.filter((it) => JSON.stringify(it?.nodePath || []) !== JSON.stringify(found.nodePath))
-            : [...arr, { selected: found.node, nodePath: found.nodePath }];
-          selection.value = { selection: next };
-        } else {
-          selection.value = { selected: found.node, nodePath: found.nodePath };
-          form.value = { ...(found.node || {}) };
-          st.value = { ...(st.peek() || {}), dirty: false, version: (st.peek()?.version || 0) + 1 };
-        }
-      } else {
-        const idx = collection.findIndex((n) => (n?.uri || n?.url) === uri);
-        if (idx >= 0) {
-          selection.value = selectionMode === 'multi' ? { selection: [collection[idx]] } : { selected: collection[idx], rowIndex: idx };
-          form.value = { ...(collection[idx] || {}) };
-          st.value = { ...(st.peek() || {}), dirty: false, version: (st.peek()?.version || 0) + 1 };
-        }
-      }
-      return { ok: true, nodePath: found.nodePath };
+      requireString('windowId',params.windowId);requireString('uri',params.uri);
+      assertOperationTarget(params);
+      const result=await invokeRegisteredControlAction(params,'selectUri');
+      return {...result,operationRevision:getOperationRevision(params.windowId)};
     }
 
     case 'ui.fileBrowser.openFile': {
       const windowId = requireString('windowId', params.windowId);
       const uri = requireString('uri', params.uri);
-      return runUICommand({ method: 'ui.fileBrowser.selectUri', params: { windowId, dataSourceRef: params.dataSourceRef, uri } });
+      return runUICommand({ method: 'ui.fileBrowser.selectUri', params: { ...params, windowId, dataSourceRef: params.dataSourceRef, uri } });
     }
 
     // ------------------------------------------------------------------
     // Dialog helpers (uses runtime Context when available)
     // ------------------------------------------------------------------
-    case 'ui.dialog.open': {
-      const windowId = requireString('windowId', params.windowId);
-      const dialogId = requireString('dialogId', params.dialogId);
-      try {
-        const base = getWindowContext(windowId);
-        const dsRef = params.dataSourceRef || base?.identity?.dataSourceRef || getDefaultDsRef(windowId);
-        const ctx = base?.Context?.(dsRef);
-        const opts = params.options || {};
-        const execArgs = [dialogId, opts];
-        const execution = { args: execArgs, parameters: opts.parameters || [] };
-        const ret = ctx?.handlers?.window?.openDialog?.({ execution, context: ctx });
-        if (opts.awaitResult) {
-          const payload = await ret;
-          return { ok: true, payload };
-        }
-        return { ok: true };
-      } catch (e) {
-        const meta = getMetadataSignal(windowId).peek();
-        const dialogs = meta?.dialogs || [];
-        const dialog = dialogs.find((d) => d?.id === dialogId);
-        if (!dialog) throw new Error(`dialog not found: ${dialogId}`);
-        const sigId = `${windowId}Dialog${dialogId}`;
-        const sig = getDialogSignal(sigId);
-        sig.value = { ...(sig.peek() || {}), open: true, args: params.args || {}, props: params.props || {} };
-        return { ok: true, fallback: true };
-      }
-    }
-
+    case 'ui.dialog.open':
     case 'ui.dialog.close': {
       const windowId = requireString('windowId', params.windowId);
-      const dialogId = requireString('dialogId', params.dialogId);
-      try {
-        const base = getWindowContext(windowId);
-        const dsRef = params.dataSourceRef || base?.identity?.dataSourceRef || getDefaultDsRef(windowId);
-        const ctx = base?.Context?.(dsRef);
-        ctx?.handlers?.window?.closeDialog?.({ dialogId, context: ctx });
-        return { ok: true };
-      } catch (_) {
-        const sig = getDialogSignal(`${windowId}Dialog${dialogId}`);
-        sig.value = { ...(sig.peek() || {}), open: false };
-        return { ok: true, fallback: true };
-      }
+      requireString('dialogId', params.dialogId);
+      assertOperationTarget(params);
+      // A dialog's authored trigger owns initialization, validation and guards.
+      // Opening/closing raw dialog signals skips those callbacks and is unsafe.
+      throw new Error('Direct dialog operation is unsupported; invoke its registered visible trigger or cancel control');
     }
 
     case 'ui.dialog.commit': {
-      const windowId = requireString('windowId', params.windowId);
-      const dialogId = requireString('dialogId', params.dialogId);
-      const payload = params.payload;
-      const base = getWindowContext(windowId);
-      if (!base) throw new Error(`window context not found: ${windowId}`);
-      const meta = getMetadataSignal(windowId).peek();
-      const dialog = (meta?.dialogs || []).find((d) => d?.id === dialogId);
-      if (!dialog) throw new Error(`dialog not found: ${dialogId}`);
-      const viewRef = meta?.view?.dataSourceRef || Object.keys(meta?.dataSource || {})[0];
-      const dsCtx = base.dialogContext?.(dialog, dialog.dataSourceRef || viewRef);
-      if (!dsCtx?.handlers?.dialog?.commit) throw new Error(`dialog handlers not available: ${dialogId}`);
-      dsCtx.handlers.dialog.commit({ payload, context: dsCtx });
-      return { ok: true };
+      assertOperationTarget(params);
+      throw new Error('Direct dialog commit is unsupported; invoke its registered visible confirmation control');
     }
 
     // ------------------------------------------------------------------

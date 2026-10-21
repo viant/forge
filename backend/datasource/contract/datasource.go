@@ -80,9 +80,13 @@ type Backend struct {
 	Kind          BackendKind                      `json:"kind" yaml:"kind"`
 
 	// mcp_tool
-	Service        string             `json:"service,omitempty" yaml:"service,omitempty"`
-	Method         string             `json:"method,omitempty" yaml:"method,omitempty"`
-	MethodVariants []MCPMethodVariant `json:"methodVariants,omitempty" yaml:"methodVariants,omitempty"`
+	// EmptyOnForbidden opts Fetch reads into an uncached empty result for a
+	// typed upstream 403 only. It never applies to executor/writer operations,
+	// local admission failures, authentication failures or composite backends.
+	EmptyOnForbidden bool               `json:"emptyOnForbidden,omitempty" yaml:"emptyOnForbidden,omitempty"`
+	Service          string             `json:"service,omitempty" yaml:"service,omitempty"`
+	Method           string             `json:"method,omitempty" yaml:"method,omitempty"`
+	MethodVariants   []MCPMethodVariant `json:"methodVariants,omitempty" yaml:"methodVariants,omitempty"`
 	// RequestMetadata names literal top-level logical request keys omitted only
 	// from MCP transport arguments. Cache and admission identity retain these keys.
 	RequestMetadata []string `json:"requestMetadata,omitempty" yaml:"requestMetadata,omitempty"`

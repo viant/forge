@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from "react";
+import React, {useCallback, useEffect, useRef, useState} from "react";
 import {Button, Callout, Spinner} from "@blueprintjs/core";
 import ReportPrintPreview from "./ReportPrintPreview.jsx";
 import ReportRuntime from "./ReportRuntime.jsx";
@@ -19,22 +19,42 @@ export default function ReportResourceRuntime({container, context}) {
     const generation = useRef(0);
     const clearPreview = () => setPrintPreview(false);
     const identity = JSON.stringify([pin, parameters.runOverride, parameters.prefill]);
-    useEffect(() => {
-        ++generation.current;
-        setResult(null); setError(""); setProgress(""); clearPreview();
-        return () => {++generation.current;};
-    }, [identity]);
-    const run = async () => {
+    const pendingRun = useRef(null);
+    const runReport = services.reportStore?.runReport;
+    const executeOnOpen = parameters.executeOnOpen === true;
+    const run = useCallback(async () => {
         const current = ++generation.current;
         clearPreview();
         setResult(null); setError(""); setProgress("Running the selected report revision.");
         try {
-            if (!canRun || typeof services.reportStore?.runReport !== "function") throw new Error("Report execution is unavailable.");
-            const value = validateReportResourceRunResult(await services.reportStore.runReport(buildReportResourceRunRequest(pin, parameters)), pin);
+            if (!canRun || typeof runReport !== "function") throw new Error("Report execution is unavailable.");
+            // StrictMode may replay the opening effect. Share only a pending request
+            // for this exact authority/parameter identity; manual reruns after it
+            // settles must execute again.
+            let pending = pendingRun.current;
+            if (!pending || pending.identity !== identity || pending.runReport !== runReport) {
+                const request = buildReportResourceRunRequest(pin, parameters);
+                pending = {identity, runReport};
+                pending.promise = Promise.resolve().then(() => runReport(request))
+                    .then(value => validateReportResourceRunResult(value, pin))
+                    .finally(() => {
+                        if (pendingRun.current === pending) pendingRun.current = null;
+                    });
+                pendingRun.current = pending;
+            }
+            const value = await pending.promise;
             if (current === generation.current) setResult(value);
-        } catch (failure) {if (current === generation.current) setError(failure.message);}
+        } catch (failure) {if (current === generation.current) setError(failure?.message || "The report could not be run.");}
         finally {if (current === generation.current) setProgress("");}
-    };
+    }, [identity, canRun, runReport]);
+    useEffect(() => {
+        ++generation.current;
+        setResult(null); setError(""); setProgress(""); clearPreview();
+        if (executeOnOpen) void run();
+        // The host contract has no abort signal. Invalidate UI ownership so a
+        // late result cannot replace a newer selection or update a closed view.
+        return () => {++generation.current;};
+    }, [identity, executeOnOpen, run]);
     const download = async format => {
         const current = ++generation.current;
         setError(""); setProgress(`Preparing ${format.toUpperCase()} export.`);

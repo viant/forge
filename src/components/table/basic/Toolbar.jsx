@@ -1,3 +1,6 @@
+import NativeControlTarget from '../../../runtime/NativeControlTarget.jsx';
+import RegisteredPopover from '../../RegisteredPopover.jsx';
+import {validateWidgetControlValue} from '../../../core/ui/controlActions.js';
 import {actionIconOnly, actionAccessibleName} from './actionPresentation.js';
 import {useWorkspacePresentation, workspaceToolbarItem} from '../../../core/context/WorkspacePresentation.jsx';
 
@@ -161,27 +164,29 @@ function ToolbarStatus({item, context, align}) {
     );
 }
 
-export function TableExportControl({item, align, disabled = false, rows = [], columns = []}) {
+export function TableExportControl({context, item, align, disabled = false, rows = [], columns = []}) {
     item = workspaceToolbarItem(item, useWorkspacePresentation());
     const [busy, setBusy] = React.useState(false);
     const [error, setError] = React.useState('');
     const busyRef = React.useRef(false);
     const mountedRef = React.useRef(true);
     const timerRef = React.useRef(null);
+    const completionRef = React.useRef(null);
     React.useEffect(() => () => {
         mountedRef.current = false;
         if (timerRef.current != null) clearTimeout(timerRef.current);
         timerRef.current = null;
         busyRef.current = false;
+        completionRef.current?.({status:'cancelled'});completionRef.current=null;
     }, []);
     const formats = tableExportFormats(item?.properties?.formats);
     const exportDisabled = disabled || busy || rows.length === 0 || tableExportColumns(columns).length === 0;
-    const runExport = (format) => {
-        if (busyRef.current || exportDisabled) return;
+    const runExport = (format,strict=false) => {
+        if (busyRef.current || exportDisabled) return false;
         busyRef.current = true;
         setBusy(true);
         setError('');
-        timerRef.current = setTimeout(() => {
+        return new Promise((resolve,reject)=>{completionRef.current=resolve;timerRef.current = setTimeout(() => {
             timerRef.current = null;
             try {
                 downloadTableExport({
@@ -191,35 +196,30 @@ export function TableExportControl({item, align, disabled = false, rows = [], co
                     filename: item?.properties?.filename || item.id || 'table-export',
                     limits: {maxRows: item?.properties?.maxRows, maxCells: item?.properties?.maxCells, maxBytes: item?.properties?.maxBytes},
                 });
+                resolve({status:'download_requested'});
             } catch (cause) {
                 if (mountedRef.current) setError(cause?.message || 'Export could not be created.');
+                if(strict)reject(cause);else resolve({status:'failed'});
             } finally {
-                busyRef.current = false;
+                completionRef.current=null;busyRef.current = false;
                 if (mountedRef.current) setBusy(false);
             }
-        }, 0);
+        }, 0);});
     };
     return (
         <span key={`table-export-${item.id}-${align}`} className="forge-toolbar-table-export" style={align === 'right' ? {marginLeft: 10} : {marginRight: 10}} aria-busy={busy || undefined}>
-            <Popover
-                placement="bottom-end"
-                interactionKind="click"
-                minimal
-                disabled={exportDisabled}
-                content={(
+            <RegisteredPopover context={context} item={item} disabled={exportDisabled} renderContent={close=>(
                     <Menu className="forge-toolbar-select-menu" aria-label={`${item.label || 'Export'} formats`}>
                         {formats.map((format) => (
-                            <MenuItem
-                                key={format}
+                            <NativeControlTarget key={format} context={context} item={{id:`${item.id}:${format}`,type:'button',label:format.toUpperCase()}} disabled={busy} actions={{click:()=>{close();return runExport(format,true);}}}><MenuItem
                                 text={format.toUpperCase()}
                                 icon={format === 'xlsx' ? 'th' : 'document'}
                                 disabled={busy}
-                                onClick={() => runExport(format)}
-                            />
+                                onClick={() => {close();return runExport(format);}}
+                            /></NativeControlTarget>
                         ))}
                     </Menu>
-                )}
-            >
+                )}>
                 <Button
                     type="button"
                     icon={toolbarItemIcon(item.icon || 'export')}
@@ -232,7 +232,7 @@ export function TableExportControl({item, align, disabled = false, rows = [], co
                 >
                     {toolbarItemLabel({...item, icon: item.icon || 'export'}) || ''}
                 </Button>
-            </Popover>
+            </RegisteredPopover>
             {error ? <span className="forge-toolbar-export-error" role="alert">{error}</span> : null}
         </span>
     );
@@ -279,7 +279,7 @@ const Toolbar = ({
         }
         if (item.type === 'tableExport' || item.widget === 'tableExport') {
             const rows = tableExportRows({filteredSortedRows: exportRows, pageRows: exportPageRows, scope: item?.properties?.scope});
-            return <TableExportControl key={`table-export-${item.id}-${align}`} item={item} align={align} disabled={item.disabled === true || disabled || isReadonly} rows={rows} columns={exportColumns}/>;
+            return <TableExportControl context={context} key={`table-export-${item.id}-${align}`} item={item} align={align} disabled={item.disabled === true || disabled || isReadonly} rows={rows} columns={exportColumns}/>;
         }
         if (item.type === 'collectionCount' || item.widget === 'collectionCount') {
             return <CollectionCountStatus key={`collection-count-${item.id}-${align}`} item={item} context={context} align={align}/>;
@@ -294,12 +294,7 @@ const Toolbar = ({
                 : (align === 'right' ? {marginLeft: '10px'} : {marginRight: '10px'});
             return (
                 <span key={`menu-${item.id}-${align}`} style={spanStyle}>
-                    <Popover
-                        placement="bottom-start"
-                        interactionKind="click"
-                        minimal
-                        disabled={menuDisabled}
-                        content={(
+                    <RegisteredPopover context={context} item={item} disabled={menuDisabled} placement="bottom-start" renderContent={close=>(
                             <Menu className="forge-toolbar-select-menu" aria-label={`${item.label || item.id || 'Actions'} menu`}>
                                 {item.menuItems.map((menuItem) => {
                                     const nested = menuEvents[menuItem.id] || {};
@@ -307,19 +302,17 @@ const Toolbar = ({
                                     if (nestedVisible === false) return null;
                                     const nestedReadonly = nested.stateEvents?.onReadonly ? nested.stateEvents.onReadonly() : false;
                                     return (
-                                        <MenuItem
-                                            key={menuItem.id}
+                                        <NativeControlTarget key={menuItem.id} context={context} item={{...menuItem,id:`${item.id}:${menuItem.id}`,type:'button'}} disabled={menuDisabled||menuItem.disabled===true||nestedReadonly} actions={{click:({event})=>{const result=(nested.events?.onClick?.operate || nested.events?.onClick)?.(event);close();return result;}}}><MenuItem
                                             text={menuItem.label || menuItem.id}
                                             icon={menuItem.icon}
                                             disabled={menuItem.disabled === true || nestedReadonly}
                                             title={menuItem.tooltip || menuItem.label || menuItem.id}
-                                            onClick={nested.events?.onClick}
-                                        />
+                                            onClick={event=>{const result=nested.events?.onClick?.(event);close();return result;}}
+                                        /></NativeControlTarget>
                                     );
                                 })}
                             </Menu>
-                        )}
-                    >
+                        )}>
                         <Button
                             type="button"
                             icon={toolbarItemIcon(item.icon)}
@@ -331,7 +324,7 @@ const Toolbar = ({
                         >
                             {toolbarItemLabel(item)}
                         </Button>
-                    </Popover>
+                    </RegisteredPopover>
                 </span>
             );
         }
@@ -379,20 +372,20 @@ const Toolbar = ({
                 || ruleDisabled
                 || booleanReadonly
                 || (stateEvents?.onDisabled ? stateEvents.onDisabled() : false);
-            const change = (event) => {
+            const change = (event,strict=false) => {
                 if (booleanDisabled) return;
-                updateToolbarBoolean({
+                return updateToolbarBoolean({
                     signal: targetSignal,
                     field,
                     checked: event.currentTarget.checked,
                     event,
-                    onChange: events.onChange,
+                    onChange: strict ? (events.onChange?.operate || events.onChange) : events.onChange,
                 });
             };
             const BooleanControl = item.type === 'switch' || item.widget === 'switch' ? Switch : Checkbox;
             const booleanClassName = item.type === 'switch' || item.widget === 'switch' ? undefined : 'forge-blueprint-checkbox-compat';
             return <span key={`boolean-${item.id}-${align}`} className="forge-toolbar-boolean" style={align === 'right' ? {marginLeft: 10} : {marginRight: 10}}>
-                <BooleanControl className={booleanClassName} checked={checked} disabled={booleanDisabled} readOnly={booleanReadonly} aria-readonly={booleanReadonly || undefined} label={item.label || undefined} aria-label={actionAccessibleName(item)} title={item.tooltip || item.label || item.id} onChange={change}/>
+                <NativeControlTarget context={ctx} item={item} disabled={booleanDisabled} readOnly={booleanReadonly} value={checked} validate={value=>typeof value==='boolean'?null:'boolean value required'} actions={{setValue:({value})=>change({target:{checked:value},currentTarget:{checked:value}},true)}}><BooleanControl className={booleanClassName} checked={checked} disabled={booleanDisabled} readOnly={booleanReadonly} aria-readonly={booleanReadonly || undefined} label={item.label || undefined} aria-label={actionAccessibleName(item)} title={item.tooltip || item.label || item.id} onChange={change}/></NativeControlTarget>
             </span>;
         }
         if (item.type === 'pagination' || item.id === 'pagination') {
@@ -424,17 +417,15 @@ const Toolbar = ({
                 const previous = targetSignal.peek?.() || targetSignal.value || {};
                 targetSignal.value = {...previous, [field]: nextValue};
             };
+            const selectValue=(next,strict=false)=>dispatchToolbarSelectChange({target:{value:next}},directChange,strict?(events.onChange?.operate || events.onChange):events.onChange);
             const spanStyle = align === 'center'
                 ? { margin: "0 10px", display: 'inline-flex', alignItems: 'center', gap: 6 }
                 : (align === 'right' ? { marginLeft: "10px", display: 'inline-flex', alignItems: 'center', gap: 6 } : { marginRight: "10px", display: 'inline-flex', alignItems: 'center', gap: 6 });
             return (
                 <span key={`select-${item.id}-${align}`} className={item.className || undefined} style={spanStyle}>
                     {item.label ? <span>{item.label}</span> : null}
-                    <Popover
-                        placement="bottom-end"
-                        interactionKind="click"
-                        minimal
-                        content={(
+                    <RegisteredPopover context={ctx} item={{...item,type:'select',dataField:field}} disabled={toolbarItemShouldDisable(item,context,isReadonly)||disabled} value={value} options={item.options || []}
+                        validate={next=>validateWidgetControlValue(next,{item:{type:'select'},props:{options:item.options || []}})} actions={{setValue:({value})=>selectValue(value,true)}} renderContent={close=>(
                             <Menu className="forge-toolbar-select-menu" aria-label={`${item.label || item.id || 'Toolbar'} options`}>
                                 {(item.options || []).map((option) => (
                                     <MenuItem
@@ -442,12 +433,12 @@ const Toolbar = ({
                                         text={option.label ?? option.text ?? String(option.value)}
                                         active={String(option.value) === String(value ?? '')}
                                         icon={String(option.value) === String(value ?? '') ? 'tick' : undefined}
-                                        onClick={() => dispatchToolbarSelectChange({target: {value: option.value}}, directChange, events.onChange)}
+                                        disabled={option.disabled===true}
+                                        onClick={() => {const result=selectValue(option.value);close();return result;}}
                                     />
                                 ))}
                             </Menu>
-                        )}
-                    >
+                        )}>
                         <Button
                             type="button"
                             rightIcon="caret-down"
@@ -458,7 +449,7 @@ const Toolbar = ({
                         >
                             {toolbarSelectLabel(item.options, value)}
                         </Button>
-                    </Popover>
+                    </RegisteredPopover>
                 </span>
             );
         }
@@ -490,7 +481,7 @@ const Toolbar = ({
             : (align === 'right' ? { marginLeft: "10px" } : { marginRight: "10px" });
 
         const button = (
-                <Button
+                <NativeControlTarget context={guardContext} item={{...item,type:'button'}} disabled={effectiveDisabled} readOnly={isReadonly===true} actions={events.onClick?{click:({event})=>(events.onClick.operate || events.onClick)(event)}:{}}><Button
                     key={item.id}
                     icon={toolbarItemIcon(item.icon)}
                     {...events}
@@ -505,7 +496,7 @@ const Toolbar = ({
                     style={item.style}
                 >
                     {toolbarItemLabel(item)}
-                </Button>
+                </Button></NativeControlTarget>
         );
         return effectiveDisabled && item.tooltip ? (
             <DisabledActionShell key={item.id} reason={item.tooltip} label={item.label || item.id} style={spanStyle}>

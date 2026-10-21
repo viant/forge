@@ -16,20 +16,24 @@ import {resolveParameters} from './parameters.js';
 import {isDataSourceLocalDenial, isWindowAuthorizationFailure} from '../components/dataSourceAuthorization.js';
 import { normalizeDataSourceError } from '../utils/dataSourceError.js';
 import {beginDataSourceRequest, settleDataSourceRequest} from '../components/dataSourceRequestLifecycle.js';
+import {pendingSharedRead, registerSharedRead, sharedReadRequestId} from '../components/dataSourceSharedRead.js';
+import {snapshotFilter} from '../components/dataSourceFetchState.js';
 
 function isPlainObject(value) {
     return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function buildFetchCollectionSignal(current = {}, props = {}) {
-    const {filter = {}, replaceFilter = false, cache = null, invocationId = null, bindingGeneration = null} = props || {};
+    const {filter = {}, replaceFilter = false, cache = null, invocationId = null, bindingGeneration = null, formSynchronization = null} = props || {};
+    const {formSynchronization: _previousSynchronization, ...rest} = current || {};
     return {
-        ...(current || {}),
+        ...rest,
         filter: replaceFilter ? {...filter} : {...((current || {}).filter || {}), ...filter},
         fetch: true,
         cache,
         invocationId,
         bindingGeneration,
+        ...(formSynchronization ? {formSynchronization} : {}),
     };
 }
 
@@ -1023,6 +1027,18 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
                 ? resolved
                 : {...(previous.parameters || {}), ...resolved};
         }
+        // Compare fully resolved read arguments within this datasource and actor
+        // generation. A writer never opts into projection forwarding.
+        let sharedSignature = null;
+        if (props?.sharedRead === true) {
+            sharedSignature = JSON.stringify(snapshotFilter({parameters: newValue.parameters, filter: newValue.filter,
+                page: newValue.page, pageSize: newValue.pageSize, sort: newValue.sort, cache: newValue.cache,
+                service: dataSource.service, backend: dataSource.backend,
+                windowEpoch: protectedWindowEpoch(identity?.windowId), datasetEpoch: protectedDataSourceEpoch(identity?.dataSourceId)}));
+            const pending = pendingSharedRead(input, sharedSignature, previous.bindingGeneration || previous.invocationId);
+            if (pending) return pending;
+            newValue.invocationId = newValue.invocationId || sharedReadRequestId();
+        }
         const previousRequestId = previous.bindingGeneration || previous.invocationId;
         const requestId = newValue.bindingGeneration || newValue.invocationId;
         if (previousRequestId && requestId && String(previousRequestId) !== String(requestId)) {
@@ -1035,6 +1051,7 @@ const setWindowFormData = ({values = {}, parameters = {}, replace = false, bumpP
             const log = getLogger('ds');
             log.debug('[fetchCollection]', { ds: identity?.dataSourceRef, filter: newValue.filter });
         } catch (_) {}
+        if (sharedSignature && completion) registerSharedRead(input, sharedSignature, requestId, completion);
         input.value =newValue
         return completion;
     };

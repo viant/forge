@@ -123,15 +123,20 @@ function awaitWriter(target, invoke, timeoutMs) {
   });
 }
 
-async function synchronizeUI(context, target, command, writerResponse = null, authorizationIsCurrent = () => true) {
+async function synchronizeUI(context, target, command, writerResponse = null, authorizationIsCurrent = () => true, formSynchronization = null) {
   const warnings = [];
   if (!authorizationIsCurrent()) return [{stage: 'authorization', error: new Error('Authorization context changed before UI synchronization.')}];
+  const refreshOptions = (destination, bypassCache) => ({
+    ...(bypassCache ? {cache: {bypassCache: true}} : {}),
+    ...(formSynchronization && context?.identity?.dataSourceId && destination?.identity?.dataSourceId === context.identity.dataSourceId
+      ? {formSynchronization, invocationId: invocationID()} : {}),
+  });
   if (command.reconcile) {
     const spec = command.reconcile;
     try {
       const destination = context?.Context?.(spec.dataSourceRef) || context;
       if (String(spec.mode || '').toLowerCase() === 'refetch') {
-        const result = destination?.handlers?.dataSource?.fetchCollection?.({cache: {bypassCache: true}});
+        const result = destination?.handlers?.dataSource?.fetchCollection?.(refreshOptions(destination, true));
         if (result?.then) await result;
         if (!authorizationIsCurrent()) return [...warnings, {stage: 'authorization', error: new Error('Authorization context changed before UI synchronization.')}];
       } else {
@@ -148,7 +153,7 @@ async function synchronizeUI(context, target, command, writerResponse = null, au
     try {
       const dataContext = context?.Context?.(refresh.dataSourceRef);
       if (refresh.clearSelection === true) dataContext?.handlers?.dataSource?.resetSelection?.();
-      const result = dataContext?.handlers?.dataSource?.fetchCollection?.(refresh.bypassCache ? {cache: {bypassCache: true}} : {});
+      const result = dataContext?.handlers?.dataSource?.fetchCollection?.(refreshOptions(dataContext, refresh.bypassCache));
       if (result?.then) await result;
       if (!authorizationIsCurrent()) return [...warnings, {stage: 'authorization', error: new Error('Authorization context changed before UI synchronization.')}];
     } catch (error) { warnings.push({stage: 'refresh', dataSourceRef: refresh.dataSourceRef, error}); }
@@ -239,6 +244,8 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
       notifyLifecycle(lifecycle, 'onRejected', {status: 'invalid', error});
       return {accepted: false, status: 'invalid', error};
     }
+    const formSynchronization = command.synchronizeForm === true && context?.signals?.form
+      ? {expectedForm: parameterSnapshot(context.signals.form.peek?.() ?? context.signals.form.value)} : null;
     const baseParameters = mutationCommandTargetParameters(resolved, targetRef);
     const preparedParameters = command.payload ? prepareResourcePayload(context, command.payload, extras) : extras;
     const preparedSnapshot = mergeCommandParameters(baseParameters, preparedParameters);
@@ -307,7 +314,7 @@ export async function executeCommand(context, command = {}, extras = {}, lifecyc
     releaseTransport(target, key);
     transportAcquired = false;
     publish(context, key, {phase: 'synchronizing', guarded: true, pending: false, retryAllowed: false, error: null, message: 'Refreshing…', writerStatus: 'succeeded', syncStatus: 'pending'});
-    try { warnings.push(...await synchronizeUI(context, target, command, writerResponse, authorizationIsCurrent)); } catch (error) { warnings.push({stage: 'synchronize', error}); }
+    try { warnings.push(...await synchronizeUI(context, target, command, writerResponse, authorizationIsCurrent, formSynchronization)); } catch (error) { warnings.push({stage: 'synchronize', error}); }
     if (!authorizationIsCurrent()) return superseded(writerInvoked, id);
     const syncStatus = warnings.length ? 'partial_failure' : 'succeeded';
     const message = warnings.length ? 'Saved. Some related data could not be refreshed.' : 'Completed';

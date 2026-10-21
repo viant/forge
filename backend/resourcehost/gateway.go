@@ -44,6 +44,7 @@ type LocatedResource struct {
 	Resource         primitive.ResourceState    `json:"resource"`
 }
 type capabilities struct {
+	lastUsed               uint64
 	cacheKey               string
 	sharedIndex            bool
 	standardResources      bool
@@ -74,6 +75,7 @@ type Gateway struct {
 	Now                     func() time.Time
 	mu                      sync.Mutex
 	generations             map[string]uint64
+	cacheTick               uint64
 	cache                   map[string]capabilities
 	capabilityHints         map[string]capabilityHint
 	discoveryInflight       map[string]*discoveryCall
@@ -372,6 +374,7 @@ func (g *Gateway) discoverMode(ctx context.Context, a identity.VerifiedActor, na
 				return capabilities{}, e
 			}
 		}
+		g.touchDiscovery(key)
 		return cached, nil
 	}
 	if !force {
@@ -693,16 +696,8 @@ func (g *Gateway) publishDiscovery(ctx context.Context, a identity.VerifiedActor
 		return capabilities{}, err
 	}
 	g.mu.Lock()
-	for k, v := range g.cache {
-		if !identity.MetadataExpiryValid(discoveryCacheUntil(v), g.now()) {
-			delete(g.cache, k)
-		}
-	}
-	if len(g.cache) >= 128 {
-		g.cache = map[string]capabilities{}
-	}
+	g.storeDiscoveryLocked(key, result)
 	result.cacheKey = key
-	g.cache[key] = result
 	g.observedOwners[name] = result.connection.ProviderIdentity
 	g.mu.Unlock()
 	if sequence := sequenceFromContext(ctx); sequence != nil && !force {

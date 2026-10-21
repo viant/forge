@@ -26,3 +26,14 @@
 .forge-window-manager-tabs > .forge-window-manager-tabs__panel { margin-top: 0; }
 
 .forge-window-content-mount, .forge-window-content-root { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; min-width: 0; }
+
+.forge-window-manager-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 3px;
+  min-width: 0;
+}
+.forge-window-manager-tab > [role="tab"] {
+  font-weight: 600;
+}

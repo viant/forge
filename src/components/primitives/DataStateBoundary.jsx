@@ -5,7 +5,7 @@ import React from 'react';
 import {Button, Callout, Icon, NonIdealState, Spinner} from '@blueprintjs/core';
 import {useSignals} from '@preact/signals-react/runtime';
 import {dataBoundaryState} from './presentationModels.js';
-import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
+import {evaluatePlainVisibleWhen, trackVisibleWhen} from '../visibleWhen.js';
 
 export default function DataStateBoundary({sizingMode = 'fill', container, context, children}) {
   useSignals();
@@ -24,7 +24,9 @@ export default function DataStateBoundary({sizingMode = 'fill', container, conte
     if (metrics && typeof metrics === 'object' && Object.keys(metrics).length) return [metrics];
     return Array.isArray(rows) ? rows : [];
   });
-  const state = dataBoundaryState(states, collections, spec.allowPartial);
+  trackVisibleWhen(spec.ignoreIdleWhen, context);
+  const ignoreIdle = !!spec.ignoreIdleWhen && evaluatePlainVisibleWhen(spec.ignoreIdleWhen, context);
+  const state = dataBoundaryState(states, collections, spec.allowPartial, ignoreIdle);
   // Tables own a complete initial-loading presentation (toolbar, headers and
   // skeleton rows). Keep that shell mounted so controls such as date presets
   // can initialize required datasource parameters instead of deadlocking

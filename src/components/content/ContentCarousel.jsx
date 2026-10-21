@@ -1,3 +1,4 @@
+import NativeControlTarget from '../../runtime/NativeControlTarget.jsx';
 import React, {useEffect, useId, useMemo, useState} from 'react';
 import {useSignals} from '@preact/signals-react/runtime';
 import {getViewSignal} from '../../core/store/signals.js';
@@ -58,6 +59,8 @@ export default function ContentCarousel({id, context, value = [], onClick, disab
         return () => clearInterval(timer);
     }, [interval, index, activeId, slides, paused, hovered, focused, reducedMotion, disabled]);
     if (!active) return null;
+    const native=(suffix,locked,invoke,child)=><NativeControlTarget context={context} item={{id:`${controlId}:${suffix}`,type:'button'}} disabled={locked} actions={invoke?{click:invoke}:{}}>{child}</NativeControlTarget>;
+    const open=(event,strict=false)=>(strict&&onClick?.operate?onClick.operate:onClick)?.(contentAction(active,event));
     const panelId = `${id || generatedId}-slide`;
     return <section id={id} className={`forge-content-carousel ${className}`} style={style} role="region" aria-roledescription="carousel" aria-label={ariaLabel}
         onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onFocusCapture={() => setFocused(true)}
@@ -66,17 +69,17 @@ export default function ContentCarousel({id, context, value = [], onClick, disab
         <article id={panelId} className="forge-content-carousel__slide" role="group" aria-roledescription="slide" aria-label={`${index + 1} of ${slides.length}`}>
             <ContentImage src={active.image} alt={active.imageAlt || ''} className="forge-content-carousel__image"/>
             {active.graphicImage ? <div className="forge-content-carousel__graphic" aria-hidden="true"><ContentImage src={active.graphicImage} className="forge-content-carousel__graphic-image"/></div> : null}
-            {wholeSlideAction ? <button type="button" className="forge-content-carousel__open" aria-label={`Open ${active.title || 'featured item'}`} disabled={disabled || active.disabled} onClick={event => onClick?.(contentAction(active,event))}/> : null}
+            {wholeSlideAction ? native('open',disabled||active.disabled,({event})=>open(event,true),<button type="button" className="forge-content-carousel__open" aria-label={`Open ${active.title || 'featured item'}`} disabled={disabled || active.disabled} onClick={event => open(event)}/>) : null}
             <div className="forge-content-carousel__copy">
                 <h2>{active.title}</h2>{active.description ? <p>{active.description}</p> : null}
-                {active.actionLabel ? <button type="button" className="forge-content-action" disabled={disabled || active.disabled} onClick={event => onClick?.(contentAction(active, event))}>{active.actionLabel}</button> : null}
+                {active.actionLabel ? native('action',disabled||active.disabled,({event})=>open(event,true),<button type="button" className="forge-content-action" disabled={disabled || active.disabled} onClick={event => open(event)}>{active.actionLabel}</button>) : null}
             </div>
         </article>
         {slides.length > 1 ? <>
-            <button type="button" className="forge-content-carousel__previous" aria-label="Previous featured item" disabled={disabled} onClick={() => choose(index - 1)}>‹</button>
-            <button type="button" className="forge-content-carousel__next" aria-label="Next featured item" disabled={disabled} onClick={() => choose(index + 1)}>›</button>
-            <div className="forge-content-carousel__pages" role="group" aria-label="Choose featured item">{slides.map((slide, position) => <button type="button" key={slide.id ?? position} aria-label={`Go to featured item ${position + 1}`} aria-current={position === index ? 'true' : undefined} aria-controls={panelId} disabled={disabled} onClick={() => choose(position)}/>)}</div>
-            {interval >= 1000 && !reducedMotion ? <button type="button" className="forge-content-carousel__pause" disabled={disabled} aria-label={paused ? 'Resume rotation' : 'Pause rotation'} onClick={() => setPaused(!paused)}>{paused ? '▶' : 'Ⅱ'}</button> : null}
+            {native('previous',disabled,()=>choose(index-1),<button type="button" className="forge-content-carousel__previous" aria-label="Previous featured item" disabled={disabled} onClick={() => choose(index - 1)}>‹</button>)}
+            {native('next',disabled,()=>choose(index+1),<button type="button" className="forge-content-carousel__next" aria-label="Next featured item" disabled={disabled} onClick={() => choose(index + 1)}>›</button>)}
+            <div className="forge-content-carousel__pages" role="group" aria-label="Choose featured item">{slides.map((slide, position) => <NativeControlTarget key={slide.id ?? position} context={context} item={{id:`${controlId}:page:${slide.id ?? position}`,type:'button'}} disabled={disabled} actions={{click:()=>choose(position)}}><button type="button" key={slide.id ?? position} aria-label={`Go to featured item ${position + 1}`} aria-current={position === index ? 'true' : undefined} aria-controls={panelId} disabled={disabled} onClick={() => choose(position)}/></NativeControlTarget>)}</div>
+            {interval >= 1000 && !reducedMotion ? native('pause',disabled,()=>setPaused(!paused),<button type="button" className="forge-content-carousel__pause" disabled={disabled} aria-label={paused ? 'Resume rotation' : 'Pause rotation'} onClick={() => setPaused(!paused)}>{paused ? '▶' : 'Ⅱ'}</button>) : null}
         </> : null}
     </section>;
 }

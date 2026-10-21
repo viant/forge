@@ -1,3 +1,5 @@
+import {getOperationRevision} from './operationRevision.js';
+import {buildSemanticUIContext} from './semanticContext.js';
 import {
   activeWindows,
   selectedTabId,
@@ -55,6 +57,7 @@ function toJSONValue(value, options, seen, depth) {
   const truncated = keys.length > maxKeys;
   const limit = truncated ? keys.slice(0, maxKeys) : keys;
   for (const key of limit) {
+    if(key==='localStateOwner')continue;
     out[key] = toJSONValue(value[key], options, seen, depth + 1);
   }
   if (truncated) {
@@ -84,6 +87,7 @@ function toSerializableDefinition(value, seen = new WeakSet()) {
   }
   const result = {};
   for (const [key, entry] of Object.entries(value)) {
+    if(key==='localStateOwner')continue;
     const next = toSerializableDefinition(entry, seen);
     if (next !== undefined) {
       result[key] = next;
@@ -212,6 +216,7 @@ function getWindowMetadataSummary(windowId, options) {
           scope: String(item?.scope || (item?.type === 'quickSearch' ? 'filter' : '')).trim() || null,
           dataSourceRef,
           bindingPath: String(item?.bindingPath || item?.path || '').trim() || null,
+          ...((item?.sensitive === true || item?.secret === true || item?.properties?.sensitive === true || item?.properties?.secret === true || item?.properties?.format === 'password' || item?.type === 'password' || item?.properties?.type === 'password' || item?.properties?.inputType === 'password') ? {sensitive: true} : {}),
           dataField: String(item?.dataField || (item?.type === 'quickSearch' ? item?.properties?.field : '') || '').trim() || null,
           options: Array.isArray(item?.options)
             ? item.options.map((option) => ({
@@ -277,6 +282,7 @@ function getDialogStates(windowId, metaSummary, options) {
 function getDataSourceSnapshot(windowId, dataSourceRef, options) {
   const dataSourceId = `${windowId}DS${dataSourceRef}`;
 
+  const identityKeys = getMetadataSignal(windowId).peek()?.dataSource?.[dataSourceRef]?.uniqueKey;
   const inputSnapshot = getInputSignal(dataSourceId).peek() || {};
   const controlSnapshot = getControlSignal(dataSourceId).peek() || {};
   const form = getFormSignal(dataSourceId).peek() || {};
@@ -298,6 +304,7 @@ function getDataSourceSnapshot(windowId, dataSourceRef, options) {
   return {
     dataSourceRef,
     dataSourceId,
+    identityFields: (Array.isArray(identityKeys) ? identityKeys : []).map(key => key?.field).filter(Boolean).slice(0, 8),
     input: safeJSON(input, options),
     filter: safeJSON(input.filter || {}, options),
     control: safeJSON(control, options),
@@ -370,7 +377,7 @@ export function buildUISnapshot(options = {}) {
         dataSources[ref] = getDataSourceSnapshot(w.windowId, ref, options);
       }
 
-      return {
+      const state = {
         windowId: w.windowId,
         windowKey: w.windowKey,
         windowTitle: w.windowTitle,
@@ -400,6 +407,9 @@ export function buildUISnapshot(options = {}) {
         dialogs: dialogStates,
         dataSources,
       };
+      state.semanticContext = buildSemanticUIContext(state, {focusedDataSourceRef: focused?.windowId === w.windowId ? focused.dataSourceRef : metaSummary.view?.dataSourceRef});
+      state.operationRevision = getOperationRevision(w.windowId);
+      return state;
     }),
   };
 

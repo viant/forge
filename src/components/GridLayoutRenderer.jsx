@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import {createControlDOMIdentity,ControlDOMIdentityProvider} from '../runtime/controlDOMIdentity.jsx';
+import React, { useMemo, useId } from 'react';
 import './GridLayoutRenderer.css';
 import {useSignals} from '@preact/signals-react/runtime';
 import ControlRenderer from './ControlRenderer.jsx';
@@ -194,6 +195,7 @@ export default function GridLayoutRenderer({
     style: styleOverride = {},
 }) {
     useSignals();
+    const gridInstanceId=useId();
     const layout = container?.layout || {};
     const isFieldTracks = String(layout?.appearance || '').trim().toLowerCase() === 'field-tracks';
     const columns = layout?.columns || 1;
@@ -235,7 +237,9 @@ export default function GridLayoutRenderer({
             {placements.map(({ item, r, c, w, h }) => {
                 const dsRef = item.dataSourceRef || baseDataSourceRef;
                 const subCtx = typeof context?.Context === 'function' ? context.Context(dsRef) : context;
+                const accessibility=createControlDOMIdentity({windowId:subCtx?.identity?.windowId,formId:container?.id || subCtx?.identity?.dataSourceRef,controlId:item.id || item.name,instanceId:gridInstanceId});
                 const hasLabel = !!item.label && !item.hideLabel && !item.isStandalone && labelMode !== 'none';
+                accessibility.labelOwned=hasLabel;
                 const pos = { r, c, w, h };
                 const css = labelMode === 'none' && layout.minColumnWidth
                     ? {ctrl: {}, label: null}
@@ -243,7 +247,7 @@ export default function GridLayoutRenderer({
 
                 if (typeof renderEntry === 'function') {
                     return (
-                        <React.Fragment key={`${item.id || item.name || `${r}-${c}`}-frag`}>
+                        <ControlDOMIdentityProvider key={`${item.id || item.name || `${r}-${c}`}-frag`} value={accessibility}>
                             {renderEntry({
                                 entry: item,
                                 context: subCtx,
@@ -254,8 +258,9 @@ export default function GridLayoutRenderer({
                                 state,
                                 container,
                                 layoutItemProps: gridLayoutItemAttributes(item),
+                                accessibility,
                             })}
-                        </React.Fragment>
+                        </ControlDOMIdentityProvider>
                     );
                 }
 
@@ -263,8 +268,8 @@ export default function GridLayoutRenderer({
                 const labelNode = hasLabel ? (
                     <label className="forge-grid-label" data-forge-part="label"
                         key={`${item.id || item.name}-label`}
-                        id={isFieldTracks && (item.id || item.name) ? `${item.id || item.name}-label` : undefined}
-                        htmlFor={item.id || undefined}
+                        id={accessibility.labelId}
+                        htmlFor={accessibility.controlId}
                         title={item.tooltip || undefined}
                         data-forge-field-id={isFieldTracks ? (item.id || item.name || undefined) : undefined}
                         style={{ display: 'flex', alignItems: cellAlignment, ...labelStyle, ...css.label }}
@@ -301,6 +306,7 @@ export default function GridLayoutRenderer({
                                 ? renderControl({
                                     item: controlItem,
                                     sourceItem: item,
+                                    accessibility,
                                     context: subCtx,
                                     container,
                                     events: ev,
@@ -308,7 +314,10 @@ export default function GridLayoutRenderer({
                                     state,
                                 })
                                 : undefined;
-                            if (rendered !== undefined) return rendered;
+                            if (rendered !== undefined) {
+                                if(React.isValidElement(rendered) && rendered.props.id === item.id) return React.cloneElement(rendered,{id:accessibility.controlId});
+                                return rendered;
+                            }
                             return <ControlRenderer
                                 key={`${item.id || item.name}`}
                                 item={controlItem}
@@ -323,10 +332,10 @@ export default function GridLayoutRenderer({
                 );
 
                 return (
-                    <React.Fragment key={`${item.id || item.name}-frag`}>
+                    <ControlDOMIdentityProvider key={`${item.id || item.name}-frag`} value={accessibility}>
                         {labelNode}
                         {ctrlNode}
-                    </React.Fragment>
+                    </ControlDOMIdentityProvider>
                 );
             })}
         </div>
