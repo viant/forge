@@ -9,7 +9,7 @@ import {copyDetailValue} from './detailViewModel.js';
 
 function openTarget(target, context) {
   if (target?.kind === 'dialog') return context?.handlers?.window?.openDialog?.({context, execution: {args: [target.dialogId, {awaitResult: target.awaitResult === true}]}, parameters: target.parameters});
-  if (target?.kind === 'window') return context?.handlers?.window?.openWindow?.({context, execution: {args: [target.windowKey, target.parameters || {}, {newInstance: target.newInstance === true, inTab: target.inTab !== false, windowTitle: target.windowTitle}]}});
+  if (target?.kind === 'window') return context?.handlers?.window?.openTarget?.({context, target});
   if (target?.kind === 'external' && target.href && typeof window !== 'undefined') return window.open(target.href, target.target || '_blank', 'noopener,noreferrer');
   return false;
 }
