@@ -42,3 +42,26 @@ it('a locally hidden configured default falls back to the visible implicit-fetch
  const calls=await mount(undefined,def=>{const nested=def.view.content.containers[0].containers[0].containers[0];nested.containers[0].visibleWhen={source:'windowForm',field:'showFirst',equals:true};delete nested.containers[1].fetchData;});
  expect(count(calls,'first')).toBe(0);expect(count(calls,'second')).toBe(1);expect(count(calls,'shared')).toBe(1);expect(tab('First panel')).toBeUndefined();
 });
+
+it.each(['tabs','stableTabs'])('an inferred default only used by an unvisited %s panel stays dormant until its actual consumer mounts',async tabKind=>{
+ const calls=await mount(undefined,def=>{
+  delete def.view.dataSourceRef;
+  def.dataSource={details:{id:'details',cardinality:'collection',selectionMode:'single',autoSelect:true,selectors:{data:'data'},uniqueKey:[{field:'id'}]}};
+  def.view.content={id:'inferred-tabs',[tabKind]:{defaultSelectedTabId:'home',renderActiveTabPanelOnly:true},containers:[{id:'home',title:'Home',content:'Home content'},{id:'details-panel',title:'Details',dataSourceRef:'details',fetchData:true,items:[{id:'detail-name',type:'text',dataField:'name'}]}]};
+ });
+ expect(count(calls,'details')).toBe(0);
+ await settle(()=>tab('Details').click());
+ expect(count(calls,'details')).toBe(1);
+ const context=getWindowContext(windowId).Context('details');
+ await settle(()=>context.handlers.dataSource.setEditedFormData({values:{...context.signals.form.peek(),name:'retained edit'}}));
+ expect(context.signals.form.peek().name).toBe('retained edit');
+});
+
+it.each(['tabs','stableTabs'].flatMap(tabKind=>['root','window-title','view-title'].map(binding=>[tabKind,binding])))('preserves eager explicit %s %s dependencies despite an inactive inferred consumer',async(tabKind,binding)=>{
+ const calls=await mount(undefined,def=>{
+  delete def.view.dataSourceRef;def.dataSource={details:{id:'details',cardinality:'collection',selectionMode:'single',autoSelect:true,selectors:{data:'data'},uniqueKey:[{field:'id'}]}};
+  def.view.content={id:'header-dependency-tabs',[tabKind]:{defaultSelectedTabId:'home',renderActiveTabPanelOnly:true},containers:[{id:'home',title:'Home',content:'Home content'},{id:'details-panel',title:'Details',dataSourceRef:'details',fetchData:true,items:[{id:'detail-name',type:'text',dataField:'name'}]}]};
+  if(binding==='root')def.view.dataSourceRef='details';else if(binding==='window-title')def.window={...def.window,titleBinding:{dataSourceRef:'details',field:'name'}};else def.view.titleBinding={dataSourceRef:'details',field:'name'};
+ });
+ expect(count(calls,'details')).toBe(1);
+});
