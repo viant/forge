@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: [
+      'src/components/dashboard/ReportResourceRuntime.render.test.jsx',
       'src/components/WindowContentMount.render.test.jsx',
       'src/core/context/WorkspacePresentation.render.test.jsx',
       'src/components/primitives/ResourcePolicyEditor.context.render.test.jsx',
