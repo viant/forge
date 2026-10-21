@@ -108,75 +108,88 @@ export default function DataSource({context}) {
     // Ensure the upstream selection signal is always initialised with an
     // object so that downstream code can safely access `.selected` without
     // additional null-checks.
-    const upstream = dataSource.dataSourceRef
-        ? findSelectionSignal(identity.getDataSourceId(dataSource.dataSourceRef))
-        : null;
+    const upstreamRef = dataSource.dataSourceRef;
+    const upstreamContext = upstreamRef && context.metadata?.dataSource?.[upstreamRef]
+        ? context.Context?.(upstreamRef) : null;
+    const upstream = upstreamContext?.signals?.selection || (upstreamRef
+        ? findSelectionSignal(identity.getDataSourceId(upstreamRef)) : null);
+    const upstreamSnapshot = upstream?.value;
+    const upstreamControl = upstreamContext?.signals?.control?.value;
+    const projectionRef = useRef(null);
+    const cloneProjection = value => value == null ? value
+        : typeof structuredClone === "function" ? structuredClone(value) : JSON.parse(JSON.stringify(value));
 
     const handleUpstream = () => {
-        try {
-            if (upstream.value.selected) {
-                let {records} = extractData(selectors, paging, upstream.value.selected);
-
-                records = unmarshalResourceCollection(records, context, resourceModelRef);
-                records = applyFetchTransform(events, records);
-                const currentCollection = Array.isArray(collection.peek()) ? collection.peek() : [];
-                const currentSelection = selection.peek() || {};
-                const nextSelected = dataSource.autoSelect === false
-                    ? null
-                    : (records?.length > 0 ? records[0] : null);
-                const nextRowIndex = nextSelected ? 0 : -1;
-                const collectionChanged = stableSnapshotSignature(currentCollection) !== stableSnapshotSignature(records);
-                const selectionChanged = (
-                    Number(currentSelection?.rowIndex ?? -1) !== nextRowIndex
-                    || safeUniqueKey(getUniqueKeyValue, currentSelection?.selected) !== safeUniqueKey(getUniqueKeyValue, nextSelected)
-                );
-                if (collectionChanged) {
-                    collection.value = records;
-                }
-
-                // ----------------------------------------------------------
-                // Auto-selection behaviour
-                // If dataSource.autoSelect === false we leave every row
-                // unselected; otherwise (default) keep the legacy behaviour
-                // of picking the first record.
-                // ----------------------------------------------------------
-                if (selectionChanged) {
-                    if (dataSource.autoSelect === false) {
-                        setSelected({selected: null, rowIndex: -1});
-                    } else {
-                        setSelected({selected: nextSelected, rowIndex: nextRowIndex});
-                    }
-                }
-            } else {
-                const currentCollection = Array.isArray(collection.peek()) ? collection.peek() : [];
-                const currentSelection = selection.peek() || {};
-                if (currentCollection.length > 0) {
-                    collection.value = [];
-                }
-                if (
-                    Number(currentSelection?.rowIndex ?? -1) !== -1
-                    || currentSelection?.selected != null
-                ) {
-                    setSelected({selected: null, rowIndex: -1})
-                }
-            }
-        } catch (err) {
-            if ((Array.isArray(collection.peek()) ? collection.peek() : []).length > 0) {
-                collection.value = [];
-            }
-            const currentSelection = selection.peek() || {};
-            if (
-                Number(currentSelection?.rowIndex ?? -1) !== -1
-                || currentSelection?.selected != null
-            ) {
-                setSelected({selected: null, rowIndex: -1})
-            }
-            setError(err);
-        } finally {
-            flagReadDone();
+        const requestId = input.peek()?.bindingGeneration || input.peek()?.invocationId;
+        const parentControl = upstreamContext?.signals?.control?.peek?.() || {};
+        if (parentControl.loading || parentControl.stale || (!upstream?.peek?.()?.selected && !parentControl.loaded && !parentControl.error && !parentControl.inactive)) {
+            if (!control.peek()?.loading) setLoading(true);
+            return;
         }
-    }
+        try {
+            if (parentControl.error) throw parentControl.error;
+            const payload = cloneProjection(upstream?.peek?.()?.selected);
+            let {records, info, stats} = payload
+                ? extractData(selectors, paging, payload)
+                : {records: [], info: {}, stats: {}};
+            records = unmarshalResourceCollection(records, context, resourceModelRef);
+            records = applyFetchTransform(events, records);
+            const currentCollection = Array.isArray(collection.peek()) ? collection.peek() : [];
+            const currentSelection = selection.peek() || {};
+            const parentIdentity = safeUniqueKey(upstreamContext?.handlers?.dataSource?.getUniqueKeyValue, payload);
+            const parentChanged = projectionRef.current?.parentIdentity != null && projectionRef.current.parentIdentity !== parentIdentity;
+            const selectedKey = safeUniqueKey(getUniqueKeyValue, currentSelection.selected);
+            const retainedIndex = !parentChanged && currentSelection.selected
+                ? records.findIndex(row => safeUniqueKey(getUniqueKeyValue, row) === selectedKey) : -1;
+            const nextRowIndex = dataSource.autoSelect === false ? retainedIndex : (records.length ? 0 : -1);
+            const nextSelected = nextRowIndex >= 0 ? records[nextRowIndex] : null;
+            const signature = stableSnapshotSignature(records);
+            const collectionChanged = stableSnapshotSignature(currentCollection) !== signature;
+            const selectionChanged = parentChanged || Number(currentSelection.rowIndex ?? -1) !== nextRowIndex
+                || safeUniqueKey(getUniqueKeyValue, currentSelection.selected) !== safeUniqueKey(getUniqueKeyValue, nextSelected);
+            const keepDraft = !selectionChanged && signals.formStatus?.peek?.()?.dirty === true;
+            const draft = keepDraft ? cloneProjection(form.peek()) : null;
+            if (collectionChanged) collection.value = records;
+            if (stableSnapshotSignature(metrics.peek()) !== stableSnapshotSignature(stats)) metrics.value = stats;
+            if (stableSnapshotSignature(collectionInfo.peek()) !== stableSnapshotSignature(info)) collectionInfo.value = info;
+            if (selectionChanged || collectionChanged) {
+                setSelected({selected: nextSelected, rowIndex: nextRowIndex});
+                // Advance the baseline while retaining another tab's draft.
+                if (keepDraft) handlers.dataSource.setEditedFormData({values: draft});
+            }
+            const previous = control.peek() || {};
+            if (previous.loaded !== !parentControl.inactive || previous.loading || previous.error || previous.inactive !== !!parentControl.inactive) {
+                control.value = {...previous, loaded: !parentControl.inactive, loading: false, error: null, inactive: !!parentControl.inactive};
+            }
+            const notify = !parentControl.inactive && (projectionRef.current?.signature !== signature || projectionRef.current?.error || projectionRef.current?.inactive);
+            projectionRef.current = {signature, parentIdentity, inactive: !!parentControl.inactive};
+            flagReadDone();
+            if (notify && events.onSuccess?.isDefined?.()) events.onSuccess.execute({collection: records, payload});
+            settleDataSourceRequest(identity.dataSourceId, requestId, null, records);
+        } catch (err) {
+            if ((collection.peek() || []).length) collection.value = [];
+            if (selection.peek()?.selected || Number(selection.peek()?.rowIndex ?? -1) !== -1) setSelected({selected: null, rowIndex: -1});
+            const previous = control.peek() || {};
+            if (previous.error !== err || previous.loading || previous.loaded) control.value = {...previous, loaded: false, loading: false, error: err};
+            if (projectionRef.current?.error !== err) notifyFetchError(err, "projection");
+            projectionRef.current = {error: err};
+            flagReadDone();
+            settleDataSourceRequest(identity.dataSourceId, requestId, err);
+        }
+    };
+    useEffect(() => {
+        if (upstream) handleUpstream();
+    }, [upstreamSnapshot, upstreamControl]);
 
+    const fetchUpstream = cache => {
+        if (cache?.bypassCache === true && upstreamContext?.handlers?.dataSource?.fetchCollection) {
+            if (!control.peek()?.loading) setLoading(true);
+            const completion = upstreamContext.handlers.dataSource.fetchCollection({cache});
+            // Parent signal updates own propagation. Consume an optional rejected
+            // completion here; its error also reaches every dependent context.
+            completion?.catch?.(() => {});
+        } else handleUpstream();
+    };
 
     const inputValue = input.value || {};
     const controlValue = control.value || {};
@@ -241,7 +254,7 @@ export default function DataSource({context}) {
             input.value = consumed;
             if (dataSource.dataSourceRef) {
                 try { log.debug('[watch] refresh: upstream branch', { ds: context?.identity?.dataSourceRef, upstream: dataSource.dataSourceRef }); } catch(_) {}
-                handleUpstream()
+                fetchUpstream(inputVal.cache)
                 return
             }
             try { log.debug('[watch] refresh: direct branch', { ds: context?.identity?.dataSourceRef }); } catch(_) {}
@@ -255,7 +268,7 @@ export default function DataSource({context}) {
             if (!consumed) return;
             input.value = consumed;
             try { log.debug('[watch] fetch: upstream branch', { ds: context?.identity?.dataSourceRef, upstream: dataSource.dataSourceRef }); } catch(_) {}
-            handleUpstream()
+            fetchUpstream(inputVal.cache)
             return
         }
 
