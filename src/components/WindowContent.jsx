@@ -487,7 +487,14 @@ export function resolveDeferredDataSourceRefs(metadata, defaultRef = '', scope =
     const usage = new Map();
     const refs = new Set();
     collectRequiredDataSourceRefs(metadata?.view?.content, scope, refs, viewState, usage);
-    for (const ref of [defaultRef, metadata?.window?.titleBinding?.dataSourceRef || metadata?.window?.titleBinding?.ref]) {
+    // An unbound tab rail can infer its context from a source used only by an
+    // unvisited panel. Keep that context mounted, but let its actual consumer
+    // own the first read instead of fetching once here and again on activation.
+    const dormantTabDefault = defaultRef && (metadata?.view?.content?.tabs || metadata?.view?.content?.stableTabs)
+        && !metadata?.view?.dataSourceRef && !metadata?.view?.content?.dataSourceRef
+        && !usage.has(defaultRef);
+    if (dormantTabDefault) usage.set(defaultRef, {deferred: true, eager: false});
+    for (const ref of [dormantTabDefault ? '' : defaultRef, metadata?.window?.titleBinding?.dataSourceRef || metadata?.window?.titleBinding?.ref || metadata?.view?.titleBinding?.dataSourceRef || metadata?.view?.titleBinding?.ref]) {
         if (ref) usage.set(ref, {deferred: false, ...(usage.get(ref) || {}), eager: true});
     }
     const queue = [...usage.keys()];
