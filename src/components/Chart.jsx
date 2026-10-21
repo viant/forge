@@ -38,6 +38,8 @@ import {
     buildPieChartData,
     fillMissingTemporalBuckets,
     formatChartNumber,
+    formatChartDisplayValue,
+    isChartNumericValue,
     formatChartXAxisValue,
     hasNonZeroChartSeriesValue,
     materializeChartDisplayRows,
@@ -251,26 +253,7 @@ function getSeriesDefinitions(chart = {}) {
     })).filter((entry) => !!entry.value);
 }
 
-function formatValueByFormat(value, formatType) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) {
-        return value;
-    }
-    switch (formatType) {
-        case "currency":
-            return new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}).format(numeric);
-        case "currency2":
-            return new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2}).format(numeric);
-        case "compactNumber":
-            return formatLargeNumber(numeric);
-        case "percent":
-            return `${numeric.toFixed(1)}%`;
-        case "percentFraction":
-            return `${(numeric * 100).toFixed(1)}%`;
-        default:
-            return formatLargeNumber(numeric);
-    }
-}
+const formatValueByFormat = formatChartDisplayValue;
 
 export function chartTableColumnMeta(columnKey, xAxis = {}, seriesDefinitions = []) {
     if (columnKey === xAxis?.dataKey) {
@@ -1287,10 +1270,10 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const canRenderChartSelection = isPieChart ? pieFilteredData.length > 0 : selectedSeriesDefinitions.length > 0;
     const hasChartRows = isPieChart ? pieFilteredData.length > 0 : normalizedChartData.length > 0;
     const hasRenderableSeriesValues = isPieChart
-        ? pieFilteredData.some((entry) => Number.isFinite(Number(entry?.value)))
-        : normalizedChartData.some((row) => selectedSeriesDefinitions.some((entry) => Number.isFinite(Number(row?.[entry.value]))));
+        ? pieFilteredData.some((entry) => isChartNumericValue(entry?.value))
+        : normalizedChartData.some((row) => selectedSeriesDefinitions.some((entry) => isChartNumericValue(row?.[entry.value])));
     const hasNonZeroRenderableSeriesValues = isPieChart
-        ? pieFilteredData.some((entry) => Number.isFinite(Number(entry?.value)) && Number(entry.value) !== 0)
+        ? pieFilteredData.some((entry) => isChartNumericValue(entry?.value) && Number(entry.value) !== 0)
         : hasNonZeroChartSeriesValue(normalizedChartData, selectedSeriesDefinitions.map((entry) => entry.value));
     const showZeroDataMessage = !effectiveLoading
         && !error
