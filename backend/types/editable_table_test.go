@@ -40,6 +40,9 @@ columns:
     required: true
     visibleWhen: {source: authorization, field: principal.features, contains: QUANTITY}
     editor: {type: number, disabledWhen: {source: row, field: enabled, equals: false}}
+  - key: reason
+    label: Rationale
+    editor: false
 `)
 	var container Container
 	if err := yaml.Unmarshal(data, &container); err != nil {
@@ -54,8 +57,11 @@ columns:
 	if container.QuickFilter == nil || *container.QuickFilter {
 		t.Fatalf("explicit quickFilter:false was not retained: %#v", container.QuickFilter)
 	}
-	if len(container.Columns) != 2 || container.AddRow == nil || container.AddRow.DeriveHandler != "Workspace.nextRow" {
+	if len(container.Columns) != 3 || container.AddRow == nil || container.AddRow.DeriveHandler != "Workspace.nextRow" {
 		t.Fatalf("editable-table contract was truncated: %#v", container)
+	}
+	if container.Columns[2].Editor != false {
+		t.Fatalf("explicit read-only editor:false was not retained: %#v", container.Columns[2].Editor)
 	}
 	if container.MobileCards == nil || !container.MobileCards.Enabled || container.MobileCards.MetaFormat != "currency" || len(container.MobileCards.RequiredFields) != 1 {
 		t.Fatalf("editable-table mobile cards were truncated: %#v", container.MobileCards)
@@ -76,5 +82,9 @@ columns:
 	}
 	if value, ok := output["quickFilter"]; !ok || value != false {
 		t.Fatalf("explicit false must be serialized, got %s", encoded)
+	}
+	columns := output["columns"].([]interface{})
+	if value, ok := columns[2].(map[string]interface{})["editor"]; !ok || value != false {
+		t.Fatalf("explicit editor:false must be serialized, got %s", encoded)
 	}
 }
