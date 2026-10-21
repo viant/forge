@@ -1,3 +1,4 @@
+import {discoverViewColumns,sqlInspection} from './readerColumnDiscovery.js';
 import {WorkbenchAlert as Alert} from './WorkbenchMutationContext.jsx';
 import './ReaderWorkbench.css';
 import {WorkbenchMutationContext} from './WorkbenchMutationContext.jsx';
@@ -408,7 +409,7 @@ function ReaderWorkbenchView({ api, report, openResources = false, resourceActio
               {rootView&&<ComponentGraph root={rootView} browse={graphBrowse} onBrowse={setGraphBrowse} selected={selectedNode} inputCount={inputDeclarationCount(inspection?.structure)} predicateCount={predicateOptionCount(inspection?.structure)} outputCount={outputCount} canEdit={canEdit} canRun={canPreview} onSelect={selectView} onOpen={selectView} onOpenSQL={openSQLTab} onAdd={(node)=>{setSelectedNode(node);setSubviewDialogOpen(true);}} onEdit={selectView} onTest={testSelectedView} onRemove={removeSelectedView}/>}
             </Card>
             {selectedNode?.type==='views'&&<ContractWorkspace onEditingChange={setContractEditing} readerContext={readerContext} onReaderApplied={acceptForgeResult} api={api} selection={selectedNode} structure={inspection?.structure} root={rootView} connector={report?.defaultConnectorName} canEdit={canEdit} onClear={()=>setSelectedNode(null)} onApply={applyCommand} onSelectView={(view)=>selectView({type:'view',name:view.namespace||view.name,label:view.name,view})}/>}
-            {selectedNode&&selectedNode.type!=='views'&&<SelectionWorkspace api={api} structure={inspection?.structure} selection={selectedNode} root={rootView} connector={report?.defaultConnectorName} functions={inspection?.structure?.functions ?? []} version={version} relationTest={testedRelation} canEdit={canEdit} canCreateDraft={ready && capabilities.canEdit !== false && version?.state === 'published'} onCreateDraft={createDraft} cloningDraft={cloningDraft} canRun={canPreview} testingView={testingView} testingRelation={testingRelation} onClear={() => setSelectedNode(null)} onOpenSQL={openSQLTab} onAdd={(node) => { setSelectedNode(node); setSubviewDialogOpen(true); }} onEditRelation={setEditRelation} onFields={(node) => setEditFields(node)} onTest={testSelectedView} onRunRelation={testSelectedRelation} onPreviewRelation={(node) => runPreview({type:'relation',label:`${displayNodeName(node.parentName, rootView)} → ${displayViewName(node.child?.view)}`})} onRemove={removeSelectedView}/>}
+            {selectedNode&&selectedNode.type!=='views'&&<SelectionWorkspace readerContext={readerContext} api={api} structure={inspection?.structure} selection={selectedNode} root={rootView} connector={report?.defaultConnectorName} functions={inspection?.structure?.functions ?? []} version={version} relationTest={testedRelation} canEdit={canEdit} canCreateDraft={ready && capabilities.canEdit !== false && version?.state === 'published'} onCreateDraft={createDraft} cloningDraft={cloningDraft} canRun={canPreview} testingView={testingView} testingRelation={testingRelation} onClear={() => setSelectedNode(null)} onOpenSQL={openSQLTab} onAdd={(node) => { setSelectedNode(node); setSubviewDialogOpen(true); }} onEditRelation={setEditRelation} onFields={(node) => setEditFields(node)} onTest={testSelectedView} onRunRelation={testSelectedRelation} onPreviewRelation={(node) => runPreview({type:'relation',label:`${displayNodeName(node.parentName, rootView)} → ${displayViewName(node.child?.view)}`})} onRemove={removeSelectedView}/>}
           </div>
         </section>
         <section className="studio-workspace-panel" role="tabpanel" id="reader-panel-inputs" aria-labelledby="reader-tab-inputs" hidden={workspaceTab!=='inputs'}>
@@ -508,33 +509,28 @@ function ViewWorkspace({ view, viewName, root, sql, resourcePath, resourceError,
   return <Card className="studio-card studio-view-workspace" elevation={0}><div className="studio-sql-header"><div><h2><Icon icon="code" aria-hidden="true"/>{displayViewName(view)} SQL</h2><p className="studio-muted">{lineage || displayViewName(view)} · <code>{resourcePath ? `embed:${resourcePath}` : 'Inline view SQL'}</code></p></div><div className="studio-sql-actions"><Tag minimal intent={dirty ? 'warning' : 'success'}>{dirty ? 'Unsaved changes' : 'Saved'}</Tag><Button icon="play" disabled={!canRun} loading={testing} onClick={onTest}>Test view</Button><Button intent="primary" icon="floppy-disk" disabled={!canEdit || !dirty} loading={saving} onClick={save}>Save SQL</Button></div></div>{relation&&<div className="studio-sql-relation-keys"><span>Join keys</span>{(relation.relation.on??[]).map((item,index)=><code key={`${item.parentColumn}-${item.childColumn}-${index}`}>{item.parentColumn} → {item.childColumn}</code>)}</div>}{(error || resourceError) && <Callout intent="danger" role="alert">{error || resourceError}</Callout>}<div className="studio-code-editor studio-code-editor-resizable" aria-label="SQL editor pane"><Editor ariaLabel={`${displayViewName(view)} SQL source`} value={draft} onChange={(value)=>{setDraft(value);onDirtyChange?.(value!==(sql||''));}} language="sql" height="100%" readOnly={saving || !canEdit}/></div></Card>;
 }
 
-function SelectionWorkspace({ api, structure, selection, root, connector, functions, version, relationTest, canEdit, canCreateDraft, onCreateDraft, cloningDraft, canRun, testingView, testingRelation, onClear, onOpenSQL, onAdd, onEditRelation, onFields, onTest, onRunRelation, onPreviewRelation, onRemove }) {
+function SelectionWorkspace({ readerContext, api, structure, selection, root, connector, functions, version, relationTest, canEdit, canCreateDraft, onCreateDraft, cloningDraft, canRun, testingView, testingRelation, onClear, onOpenSQL, onAdd, onEditRelation, onFields, onTest, onRunRelation, onPreviewRelation, onRemove }) {
   const target = selectedViewNode(selection);
   const view = target?.view;
   const effectiveConnector = viewLineage(root, view?.name).reduce((current,item)=>item.source?.bindings?.connector || current,connector);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
-  const [discoveredColumns, setDiscoveredColumns] = useState([]);
+  const [sqlView,setSQLView]=useState(null);
   const [metadataError, setMetadataError] = useState('');
   const [metadataLoading, setMetadataLoading] = useState(false);
   const [metadataReload, setMetadataReload] = useState(0);
   useEffect(() => { setQuery(''); setPage(0); }, [target?.name]);
   useEffect(() => {
     let cancelled = false;
-    if (!view || !api || !effectiveConnector) { setDiscoveredColumns([]); setMetadataError(''); setMetadataLoading(false); return () => { cancelled = true; }; }
-    const reference = tableReference(view?.source?.table);
-    if (!reference.table) { setDiscoveredColumns([]); setMetadataError(''); setMetadataLoading(false); return () => { cancelled = true; }; }
-    setMetadataError(''); setDiscoveredColumns([]); setMetadataLoading(true);
-    api.getTable(effectiveConnector, reference).then((detail) => {
-      if (!cancelled) setDiscoveredColumns((detail?.columns ?? []).map((column) => ({ name: column.name, source: column.name, databaseType: column.type, type: { name: column.type }, groupable: false, schema: column })));
+    if (!view || !api || !effectiveConnector) { setSQLView(null); setMetadataError(''); setMetadataLoading(false); return () => { cancelled = true; }; }
+    setMetadataError(''); setSQLView(null); setMetadataLoading(true);
+    discoverViewColumns(view,sqlInspection(api,readerContext)).then((detail) => {
+      if (!cancelled) setSQLView(detail.view);
     }).catch((cause) => { if (!cancelled) setMetadataError(cause.message); }).finally(() => { if (!cancelled) setMetadataLoading(false); });
     return () => { cancelled = true; };
-  }, [api, effectiveConnector, view?.name, view?.source?.table, view?.columns, metadataReload]);
+  }, [api, effectiveConnector, view?.name, view?.source?.table, view?.columns, view?.source?.sql, readerContext?.reportId, readerContext?.versionNo, readerContext?.sourceRevision, metadataReload]);
   if (!target || !view) return <Card className="studio-card studio-view-inspector studio-view-inspector-empty" elevation={0}><span>Select a view or relation to inspect its settings and columns.</span></Card>;
-  const viewNames = [view.name, view.namespace].filter(Boolean).map((name) => name.toLowerCase());
-  const constrained = (structure?.columnContracts ?? []).some((item) => viewNames.includes(String(item.view || '').toLowerCase())) || functions.some((fn) => ['output_exclude', 'tag', 'cast'].includes(String(fn.name || '').toLowerCase()) && viewNames.includes(String(fn.args?.[0] || '').split('.')[0].toLowerCase()));
-  const includePhysicalColumns = !constrained && (structure?.views ?? []).some((item) => viewNames.includes(String(item.name || '').toLowerCase()) && item.sourceProjectionAll);
-  const resolvedView = { ...view, columns: mergeViewColumns(view?.columns, discoveredColumns, includePhysicalColumns) };
+  const resolvedView = sqlView || view;
   const columns = (resolvedView.columns ?? []).filter((column) => `${column.name} ${column.source || ''} ${column.type?.name || column.databaseType || ''}`.toLowerCase().includes(query.trim().toLowerCase()));
   const pageSize = 20;
   const pages = Math.max(1, Math.ceil(columns.length / pageSize));
@@ -558,8 +554,8 @@ function SelectionWorkspace({ api, structure, selection, root, connector, functi
     <Card className="studio-card studio-columns-panel" elevation={0}>
       <div className="studio-columns-heading"><div><h2>Columns</h2><span>{columns.length} available</span></div><div className="studio-column-tools"><InputGroup leftIcon="search" aria-label="Search view columns" placeholder="Find column, source, or type" value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }}/><Button icon="properties" disabled={!canEdit} onClick={() => onFields({ ...target, view: resolvedView })}>Manage columns</Button></div></div>
       {!canEdit && <Callout className="studio-columns__read-only" intent="none">{canCreateDraft ? <>This published version is read-only. <Button small icon="duplicate" loading={cloningDraft} onClick={onCreateDraft}>Create draft to edit columns</Button></> : 'Columns are read-only for this version.'}</Callout>}
-      {metadataError && <Callout intent="warning" title="Connector metadata unavailable">{metadataError}<Button small minimal intent="warning" icon="refresh" onClick={() => setMetadataReload((value) => value + 1)}>Retry metadata</Button></Callout>}
-      {!metadataError && visibleColumns.length === 0 ? <div className="studio-empty-compact">{metadataLoading ? 'Loading column metadata…' : query ? 'No columns match this search.' : 'No columns are exposed by this view.'}</div> : <div className="studio-view-column-list">{visibleColumns.map((column) => <button type="button" disabled={!canEdit} key={columnIdentity(column)} onClick={() => onFields({ ...target, view: resolvedView, column })}><span><strong>{column.name}</strong><small>{column.source || column.name}</small></span><span>{column.type?.name || column.databaseType || 'inferred'}</span><Tag minimal intent={column.groupable ? 'primary' : 'none'}>{column.groupable ? 'dimension' : 'field'}</Tag><span className="studio-column-edit">{canEdit ? 'Edit' : 'Read-only'}</span></button>)}</div>}
+      {metadataError && <Callout intent="warning" title="SQL column discovery unavailable">{metadataError}<Button small minimal intent="warning" icon="refresh" onClick={() => setMetadataReload((value) => value + 1)}>Retry discovery</Button></Callout>}
+      {!metadataError && visibleColumns.length === 0 ? <div className="studio-empty-compact">{metadataLoading ? 'Discovering SQL columns…' : query ? 'No columns match this search.' : 'No columns are exposed by this view.'}</div> : <div className="studio-view-column-list">{visibleColumns.map((column) => <button type="button" disabled={!canEdit} key={columnIdentity(column)} onClick={() => onFields({ ...target, view: resolvedView, column })}><span><strong>{column.name}</strong><small>{column.source || column.name}</small></span><span>{column.type?.name || column.databaseType || 'inferred'}</span><Tag minimal intent={column.groupable ? 'primary' : 'none'}>{column.groupable ? 'dimension' : 'field'}</Tag><span className="studio-column-edit">{canEdit ? 'Edit' : 'Read-only'}</span></button>)}</div>}
       {columns.length > pageSize && <ButtonGroup minimal className="studio-column-pages"><Button small icon="chevron-left" aria-label="Previous column page" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}/><span>{currentPage + 1} / {pages}</span><Button small icon="chevron-right" aria-label="Next column page" disabled={currentPage + 1 >= pages} onClick={() => setPage(currentPage + 1)}/></ButtonGroup>}
     </Card>
   </>;
@@ -623,19 +619,7 @@ function viewLineage(root,targetName,path=[]){if(!root)return[];const next=[...p
 function collectViewEntries(root,path=[],relation=null){if(!root)return[];const next=[...path,root];return [{view:root,parent:path.at(-1),relation,canonicalPath:next.map((view)=>view.namespace||view.name),lineage:next.map(displayViewName)},...(root.relations??[]).flatMap((childRelation)=>collectViewEntries(childRelation.view,next,childRelation))];}
 function viewResourcePath(view,root){return `${viewLineage(root,view?.name).map((item)=>displayViewName(item).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'')).join('/')}.sql`;}
 function columnIdentity(column){return String(column?.name||column?.source||'');}
-function mergeViewColumns(compiled = [], discovered = [], includePhysicalColumns = false) {
-  const physical = new Map((discovered ?? []).map((column) => [columnIdentity(column).toLowerCase(), column]));
-  const result = includePhysicalColumns ? new Map(physical) : new Map();
-  for (const column of compiled ?? []) {
-    const key = columnIdentity(column).toLowerCase();
-    const source = String(column.source || column.name).toLowerCase();
-    const metadata = physical.get(source) || physical.get(source.split('.').at(-1));
-    result.set(key, { ...(metadata || {}), ...column });
-  }
-  return [...result.values()].sort((a, b) => Number(Boolean(b.schema?.primaryKey)) - Number(Boolean(a.schema?.primaryKey)));
-}
 function formatFunction(functionOccurrence){return `${functionOccurrence.name}(${(functionOccurrence.args ?? []).join(', ')})`;}
-function tableReference(value){const parts=String(value||'').split('.').map((item)=>item.trim()).filter(Boolean);return parts.length>1?{schema:parts.slice(0,-1).join('.'),table:parts.at(-1)}:{table:parts[0]||''};}
 function normalizedIdentity(value){return String(value||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'');}
 
 function collectViews(structure) {
