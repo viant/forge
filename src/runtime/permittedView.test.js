@@ -5,6 +5,7 @@ import {
   reduceAuthorizationCondition,
   resolveAuthorizationResourceID,
   authorizationSnapshotLeaseMs,
+  evaluateAuthorizationLeaf,
 } from './permittedView.js';
 
 const response = {
@@ -62,5 +63,35 @@ assert.equal(resolveAuthorizationResourceID(1, Number(largeID), {}).valid, false
 assert.equal(authorizationSnapshotLeaseMs({expiresAt: '2026-01-01T00:00:10Z'}, Date.parse('2026-01-01T00:00:00Z')), 10000);
 assert.equal(authorizationSnapshotLeaseMs({expiresAt: '2026-01-01T00:00:00Z'}, Date.parse('2026-01-01T00:00:10Z')), 0);
 assert.equal(authorizationSnapshotLeaseMs({}), 0);
+
+const factsResponse = {principal: {roles: ['reader'], features: Array.from({length: 211}, (_, i) => `feature-${i}`)}};
+const facts = normalizeAuthorizationSnapshot(factsResponse);
+const roleGuard = {field: 'principal.roles', contains: 'reader'};
+const featureGuard = {field: 'principal.features', contains: 'feature-210'};
+// Repeated guards must neither scan the owned arrays nor construct new sets.
+const originalIncludes = Array.prototype.includes;
+const OriginalSet = globalThis.Set;
+try {
+  Array.prototype.includes = function () { throw new Error('membership scanned an array'); };
+  globalThis.Set = class { constructor() { throw new Error('membership rebuilt a set'); } };
+  for (let i = 0; i < 1000; i++) {
+    assert.equal(evaluateAuthorizationLeaf(roleGuard, facts), true);
+    assert.equal(evaluateAuthorizationLeaf(featureGuard, facts), true);
+    assert.equal(evaluateAuthorizationLeaf({...featureGuard, contains: 'absent'}, facts), false);
+  }
+} finally {
+  Array.prototype.includes = originalIncludes;
+  globalThis.Set = OriginalSet;
+}
+assert.equal(Object.isFrozen(facts.principal.features), true);
+assert.deepEqual(JSON.parse(JSON.stringify(facts.principal)), factsResponse.principal);
+factsResponse.principal.roles.splice(0, 1, 'editor');
+assert.equal(evaluateAuthorizationLeaf(roleGuard, facts), true);
+assert.equal(evaluateAuthorizationLeaf(roleGuard, normalizeAuthorizationSnapshot(factsResponse)), false);
+assert.equal(evaluateAuthorizationLeaf({field: 'principal.roles', contains: 'editor'}, normalizeAuthorizationSnapshot(factsResponse)), true);
+// Unowned mutable callers retain live semantics; they are never cached by identity.
+assert.equal(evaluateAuthorizationLeaf(roleGuard, factsResponse), false);
+factsResponse.principal.roles.push('reader');
+assert.equal(evaluateAuthorizationLeaf(roleGuard, factsResponse), true);
 
 console.log('permitted view compiler ✓');
