@@ -52,3 +52,30 @@ it('generic host close admission may await confirmation, decline or reject witho
  const failure=new Error('host close admission unavailable');await expect(requestWorkspaceClose(entry,{onClose:async()=>{throw failure;}})).rejects.toBe(failure);expect(host.querySelector('textarea')).toBe(draft);expect(draft.value).toBe('edited draft');
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+
+it('mounts only explicitly admitted hidden content for readiness without selecting or focusing it',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const ready=vi.fn(),cleanup=vi.fn();
+ function Renderer({id}){useEffect(()=>{ready(id);return()=>cleanup(id);},[id]);return <input aria-label={id} defaultValue="initial"/>;}
+ const entries=[{windowId:'fresh-opening',preload:true},{windowId:'inactive-restored'}];
+ const show=(active=false,preload=true)=>act(async()=>root.render(<>
+  <textarea aria-label="Conversation"/>
+  <WorkspaceRuntimePanels entries={entries} selectedId="fresh-opening" active={active}
+   preloadContent={entry=>preload&&entry.preload===true} renderContent={entry=><Renderer id={entry.windowId}/>}/>
+ </>));
+ try{
+  await show();
+  const composer=host.querySelector('textarea');composer.focus();
+  const fresh=host.querySelector('input[aria-label="fresh-opening"]');
+  expect(ready.mock.calls).toEqual([['fresh-opening']]);
+  expect(fresh.closest('[role=tabpanel]').hidden).toBe(true);
+  expect(fresh.closest('[role=tabpanel]').hasAttribute('inert')).toBe(true);
+  expect(host.querySelector('input[aria-label="inactive-restored"]')).toBeNull();
+  expect(document.activeElement).toBe(composer);
+  await show(false,false);expect(host.querySelector('input')).toBe(fresh);
+  await show(true,false);expect(fresh.closest('[role=tabpanel]').hidden).toBe(false);
+  expect(ready).toHaveBeenCalledTimes(1);expect(cleanup).not.toHaveBeenCalled();
+ }finally{await act(async()=>root.unmount());host.remove();}
+ expect(cleanup.mock.calls).toEqual([['fresh-opening']]);
+});
