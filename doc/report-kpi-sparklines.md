@@ -22,8 +22,11 @@ sparkline:
 Source declarations and required fields survive ordinary dataset pruning and
 projection. Each dataset remains subject to its usual server authorization,
 subscription, date, and campaign gates. Hosts planning lazy section reads should
-use `getReportBlockDatasetRefs` from `forge/reporting/dataset-refs` to retain all
-primary, comparison, and sparkline dependencies.
+use `reportSectionDatasets` from `forge/reporting/section-datasets`. It derives
+the existing conservative active-section plan using `getReportBlockDatasetRefs`
+from `forge/reporting/dataset-refs`. Both use one closure for primary, comparison,
+and sparkline dependencies. Ambiguous or duplicate block identities retain full
+report validation, rather than omitting uncertain dependencies.
 
 With period paths, civil dates are validated and expanded to a bounded daily
 sequence (at most 4096 days). Missing dates and unavailable measurements remain
