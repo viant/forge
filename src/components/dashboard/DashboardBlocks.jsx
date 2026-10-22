@@ -1409,19 +1409,20 @@ export function DashboardEditableTable({container, context, embedded = false}) {
     const pageCount = Math.max(1, Math.ceil(filteredEntries.length / pageSize));
     const currentPage = Math.min(page, pageCount);
     const visibleEntries = filteredEntries.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    const emptyMessage = rows.length === 0 ? (container?.emptyText || 'No rows yet. Add one to begin.') : 'No matching rows.';
     const mobileCards = container?.mobileCards?.enabled === true ? container.mobileCards : null;
     const mobileFieldKeys = Array.isArray(mobileCards?.fields) ? mobileCards.fields : [];
     const mobileRequiredFields = new Set(Array.isArray(mobileCards?.requiredFields) ? mobileCards.requiredFields : []);
-    const commit = (nextRows) => {
+    const commit = (nextRows, selectAll = true) => {
         setDraftRows(nextRows);
-        if (typeof dataSource?.replaceCollection === 'function') dataSource.replaceCollection({rows: nextRows, selectAll: true});
+        if (typeof dataSource?.replaceCollection === 'function') dataSource.replaceCollection({rows: nextRows, selectAll});
         else if (typeof dataSource?.setCollection === 'function') dataSource.setCollection(nextRows);
         if (dataSourceContext?.signals?.collection) dataSourceContext.signals.collection.value = nextRows;
         setRevision((value) => value + 1);
     };
     const updateCell = (rowIndex, key, value) => commit(currentRows().map((row, index) => (
         index === rowIndex ? {...row, [key]: value} : row
-    )));
+    )), false);
     const addRow = () => {
         const latest = currentRows();
         const addRowConfig = container?.addRow || {};
@@ -1576,11 +1577,12 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                                     </td>
                                 </tr>
                             ))}
-                            {visibleEntries.length === 0 ? <tr><td colSpan={columns.length + 1} className="forge-editable-collection__empty">{rows.length === 0 ? (container?.emptyText || 'No rows yet. Add one to begin.') : 'No matching rows.'}</td></tr> : null}
+                            {visibleEntries.length === 0 ? <tr><td colSpan={columns.length + 1} className="forge-editable-collection__empty">{emptyMessage}</td></tr> : null}
                         </tbody>
                     </table>
                 </div>
                 {mobileCards ? <div className="forge-editable-collection__cards">
+                    {visibleEntries.length === 0 ? <div className="forge-editable-collection__empty">{emptyMessage}</div> : null}
                     {visibleEntries.map(({row, index: rowIndex}) => {
                         const titleColumn = columns.find((column) => column.key === mobileCards.titleField);
                         const metaColumn = columns.find((column) => column.key === mobileCards.metaField);

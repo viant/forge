@@ -1,6 +1,7 @@
 import {useRegisteredControlActions} from '../../runtime/useRegisteredControlActions.js';
 import {isLiveControlVisible,validateWidgetControlValue} from '../../core/ui/controlActions.js';
 import {preserveSelectExternalFocus} from './selectCloseFocus.js';
+import {inheritFieldTrackSelectTokens} from './selectPortalTokens.js';
 import SwitchControl from '../../components/SwitchControl.jsx';
 import ForgeFormGroup from './ForgeFormGroup.jsx';
 import './theme.css';
@@ -679,6 +680,7 @@ export function registerPack() {
                 if (!unavailable) onOptionsRequest?.(reason);
             };
             const opening = (...args) => {
+                if (isFieldTrack) inheritFieldTrackSelectTokens(args[0], triggerRef.current);
                 requestOptions('open');
                 popoverProps?.onOpening?.(...args);
             };
@@ -694,7 +696,7 @@ export function registerPack() {
                     popoverProps?.portalClassName,
                 ),
             } : (popoverProps === undefined ? defaultPopoverProps : popoverProps);
-            const lazyPopoverProps = onOptionsRequest ? {...resolvedPopoverProps, onOpening: opening} : resolvedPopoverProps;
+            const lazyPopoverProps = isFieldTrack || onOptionsRequest ? {...resolvedPopoverProps, onOpening: opening} : resolvedPopoverProps;
             const focusSafePopoverProps = {...lazyPopoverProps, onClosing: node => {
                 preserveSelectExternalFocus(node, triggerRef.current);
                 lazyPopoverProps?.onClosing?.(node);
