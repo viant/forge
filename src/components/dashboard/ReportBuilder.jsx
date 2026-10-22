@@ -1,3 +1,4 @@
+import {reportDatasetReadContextIdentity} from './reportBuilderConcurrentRead.js';
 import ReportResourceEditor from "./ReportResourceEditor.jsx";
 import ReportResourceRuntime from "./ReportResourceRuntime.jsx";
 import {hostedReportResource, buildReportBuilderResourceSaveRequest} from "./reportBuilderResourceLifecycle.js";
@@ -13,6 +14,7 @@ import SectionTabRail from "../SectionTabRail.jsx";
 import { buildReportBuilderDesignSections, resolveDesignSectionInsertion } from "./reportBuilderDesignSections.js";
 import {
     dispatchReportBuilderDatasourceRequest,
+    reportBuilderDatasetOwnsRequest,
     reportBuilderRequestMatchesExecutedScope,
     reportBuilderCursorNavigationFingerprint,
     shouldFetchReportBuilderRequest,
@@ -2462,6 +2464,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     }), [readiness, semanticFieldValidation?.message, semanticInlineNoticeBindingViewState, semanticSelectedIssueCount, semanticSelectionValidationState, semanticStatus]);
     const canRunReport = readiness.canRun;
     const requestFingerprintRef = useRef("");
+    const authoredDatasetReadOwnershipRef = useRef(null);
+    const datasourceReadOwnerRef = useRef(null);
     const authoredPreviewAutoFetchKeyRef = useRef("");
     const lastManualRunFingerprintRef = useRef("");
     const lastAutoCollapsedRunSequenceRef = useRef(0);
@@ -3678,10 +3682,11 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
      frozenRestore]);
 
     useEffect(() => {
-        if (!currentRequestFingerprint || matchesReportBuilderDatasourceDispatch({
+        const datasetOwnsRead = reportBuilderDatasetOwnsRequest(builderContext, currentRequest, authoredDatasetReadOwnershipRef.current);
+        if (!currentRequestFingerprint || (datasourceReadOwnerRef.current === datasetOwnsRead && matchesReportBuilderDatasourceDispatch({
             fingerprint: currentRequestDispatchFingerprint, previousFingerprint: requestFingerprintRef.current,
             paging: builderContext?.dataSource?.paging, page: state.page, previousPage: cursorDispatchedPageRef.current,
-        })) {
+        }))) {
             return;
         }
         if (shouldDeferReportBuilderRequestForPrefill({
@@ -3700,9 +3705,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             return;
         }
         requestFingerprintRef.current = currentRequestDispatchFingerprint;
+        datasourceReadOwnerRef.current = datasetOwnsRead;
         cursorDispatchedPageRef.current = state.page;
-        dispatchReportBuilderDatasourceRequest(builderContext, currentRequest, currentRequestShouldFetch, state.page);
-    }, [builderContext, currentPrefillSignature, currentRequest, currentRequestDispatchFingerprint, currentRequestFingerprint, currentRequestShouldFetch, hostedReportActivationCurrent, hostedReportStarterId, state]);
+        dispatchReportBuilderDatasourceRequest(builderContext, currentRequest, currentRequestShouldFetch, state.page, authoredDatasetReadOwnershipRef.current);
+    }, [builderContext, currentPrefillSignature, currentRequest, currentRequestDispatchFingerprint, currentRequestFingerprint, currentRequestShouldFetch, hostedReportActivationCurrent, hostedReportStarterId, state, workspaceMode]);
 
     useEffect(() => {
         if (!pendingScrollRowId) {
@@ -8357,11 +8363,12 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             && nextReadiness.canRun && (forceFetch || config.request?.autoFetch !== false);
         requestFingerprintRef.current = reportBuilderDispatchFingerprint(fingerprint, shouldFetch, builderContext?.dataSource?.paging, snapshot.metadata?.datasourcePage);
         cursorDispatchedPageRef.current = snapshot.metadata?.datasourcePage;
+        datasourceReadOwnerRef.current = reportBuilderDatasetOwnsRequest(builderContext, request, authoredDatasetReadOwnershipRef.current);
         if (markManual) {
             lastManualRunFingerprintRef.current = fingerprint;
             setManualRunSequence((current) => current + 1);
         }
-        dispatchReportBuilderDatasourceRequest(builderContext, request, shouldFetch, snapshot.metadata?.datasourcePage);
+        dispatchReportBuilderDatasourceRequest(builderContext, request, shouldFetch, snapshot.metadata?.datasourcePage, authoredDatasetReadOwnershipRef.current);
         return { request, fingerprint, readiness: nextReadiness, shouldFetch };
     }, [builderContext, config.request?.autoFetch, embeddedMode, reportFiltersNeedApply]);
 
@@ -10303,6 +10310,18 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         previewRequestKey: runtimePreviewRequestKey,
         datasets: runtimePreviewPublishedDatasets,
     }), [runtimePreviewPublishedDatasets, runtimePreviewRequestKey]);
+    authoredDatasetReadOwnershipRef.current = {
+        context: builderContext,
+        contextIdentity: JSON.stringify(reportDatasetReadContextIdentity(builderContext)),
+        scope: runtimePreviewRequestKey,
+        datasets: runtimePreviewPublishedDatasets,
+        enabled: authoredAudienceReportMode && !!authoredRuntimePreviewModel && !frozenRestore && !restoreBlocked && !embeddedMode
+            && !reportFiltersNeedApply && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
+            && !hostedReportActivationPending && hostedReportStarterReady && canRunReport
+            && !shouldDeferReportBuilderRequestForPrefill({
+                currentPrefillSignature, appliedPrefillSignature: appliedPrefillSignatureRef.current,
+            }),
+    };
     const fetchedRuntimePreviewDatasetPayloadState = useReportRuntimePreviewDatasetPayloads({
         enabled: !frozenRestore && !restoreBlocked && !embeddedMode && !reportFiltersNeedApply && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
             && !hostedReportActivationPending

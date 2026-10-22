@@ -1,3 +1,4 @@
+import {reportDatasetReadContextIdentity} from './reportBuilderConcurrentRead.js';
 import {cursorPagingAssociation, matchesCompletedCursorAssociation} from "../../hooks/paging.js";
 
 export function isReportBuilderCursorPaging(paging) {
@@ -15,17 +16,31 @@ function cursorQuery(request, paging, {keepSize = false} = {}) {
     return parameters;
 }
 
-export function dispatchReportBuilderDatasourceRequest(context, request, shouldFetch, requestedPage = 1) {
+// A rendered authored graph is the read owner only for the exact current host
+// context/source/query. This receipt never grants access or reuses a result.
+export function reportBuilderDatasetOwnsRequest(context, request, ownership) {
+    if (!ownership?.enabled || ownership.context !== context || !ownership.scope
+        || isReportBuilderCursorPaging(context?.dataSource?.paging)
+        || ownership.contextIdentity !== JSON.stringify(reportDatasetReadContextIdentity(context))) return false;
+    const source = context?.identity?.dataSourceRef;
+    const input = context?.signals?.input?.peek?.() || {};
+    if (!source || input.filter && Object.keys(input.filter).length) return false;
+    return ownership.datasets?.some(dataset => dataset.dataSourceRef === source
+        && JSON.stringify(dataset.request) === JSON.stringify(request)) === true;
+}
+
+export function dispatchReportBuilderDatasourceRequest(context, request, shouldFetch, requestedPage = 1, ownership = null) {
+    const fetch = shouldFetch && !reportBuilderDatasetOwnsRequest(context, request, ownership);
     const paging = context?.dataSource?.paging;
     const cursor = isReportBuilderCursorPaging(paging);
     const page = cursor ? Math.max(1, Math.floor(Number(requestedPage) || 1)) : undefined;
     const parameters = cursor ? cursorQuery(request, paging) : request;
     const input = context?.signals?.input;
     if (input) {
-        input.value = {...(input.peek?.() || {}), parameters, ...(cursor ? {page} : {}), fetch: shouldFetch};
+        input.value = {...(input.peek?.() || {}), parameters, ...(cursor ? {page} : {}), fetch};
     } else {
         context?.handlers?.dataSource?.setInputParameters?.(parameters);
-        if (shouldFetch) {
+        if (fetch) {
             if (cursor) context?.handlers?.dataSource?.fetchCollection?.({page});
             else context?.handlers?.dataSource?.fetchCollection?.();
         }

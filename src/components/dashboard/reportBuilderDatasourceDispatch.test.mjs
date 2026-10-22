@@ -1,6 +1,7 @@
+import {reportDatasetReadContextIdentity} from './reportBuilderConcurrentRead.js';
 import test from "node:test";
 import assert from "node:assert/strict";
-import {dispatchReportBuilderDatasourceRequest, reportBuilderRequestMatchesExecutedScope,
+import {dispatchReportBuilderDatasourceRequest, reportBuilderDatasetOwnsRequest, reportBuilderRequestMatchesExecutedScope,
     reportBuilderCursorNavigationFingerprint, shouldFetchReportBuilderRequest, reportBuilderDispatchFingerprint, matchesReportBuilderDatasourceDispatch} from "./reportBuilderDatasourceDispatch.js";
 import {buildReportBuilderRequest, buildReportBuilderDefaultState} from "./reportBuilderUtils.js";
 import {createCursorPagingSession} from "../../hooks/paging.js";
@@ -103,4 +104,15 @@ test("authored offset override cannot force cursor navigation back to page one",
         paging, page: 2, previousPage: 1}), false);
     assert.equal(reportBuilderDispatchFingerprint(JSON.stringify(original), true), `${JSON.stringify(original)}::fetch`);
     assert.equal(reportBuilderDispatchFingerprint("original", true, {mode: "offset", enabled: true}, 2), "original::fetch");
+});
+
+test('authored dataset ownership requires exact live context, source and query; distinct filter/cursor paths stay native',()=>{
+ const ctx=context();ctx.identity={windowId:'one',dataSourceRef:'report'};ctx.dataSource.paging={enabled:true,mode:'offset'};ctx.signals.input.value={filter:{},untouched:'kept'};
+ const query={dimensions:['channel'],filter:{country:'US'}};
+ const own={context:ctx,contextIdentity:JSON.stringify(reportDatasetReadContextIdentity(ctx)),scope:'run-one',enabled:true,datasets:[{dataSourceRef:'report',request:query}]};
+ assert.equal(reportBuilderDatasetOwnsRequest(ctx,query,own),true);dispatchReportBuilderDatasourceRequest(ctx,query,true,1,own);assert.equal(ctx.signals.input.peek().fetch,false);assert.equal(ctx.signals.input.peek().untouched,'kept');assert.deepEqual(ctx.signals.input.peek().parameters,query);
+ for(const candidate of [{...own,enabled:false},{...own,scope:''},{...own,context:{...ctx}},{...own,contextIdentity:'stale'},{...own,datasets:[{dataSourceRef:'other',request:query}]}])assert.equal(reportBuilderDatasetOwnsRequest(ctx,query,candidate),false);
+ assert.equal(reportBuilderDatasetOwnsRequest(ctx,{...query,dimensions:['different']},own),false);
+ ctx.signals.input.value={filter:{Id:[2]}};assert.equal(reportBuilderDatasetOwnsRequest(ctx,query,own),false);ctx.signals.input.value={filter:{}};
+ ctx.dataSource.paging=paging;assert.equal(reportBuilderDatasetOwnsRequest(ctx,query,own),false);
 });
