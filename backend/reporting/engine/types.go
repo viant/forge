@@ -28,6 +28,7 @@ type Diagnostic struct {
 
 // CompileRequest carries an authored artifact into the backend compile seam.
 type CompileRequest struct {
+	Parameters       map[string]interface{}               `json:"parameters,omitempty"`
 	DependencyPins   map[string]identity.ResolvedResource `json:"dependencyPins,omitempty"`
 	DependencyToken  string                               `json:"dependencyToken,omitempty"`
 	ResolvedResource *identity.ResolvedResource           `json:"resolvedResource,omitempty"`

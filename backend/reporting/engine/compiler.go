@@ -102,6 +102,7 @@ func cloneCompileRequest(input *CompileRequest) *CompileRequest {
 		return nil
 	}
 	return &CompileRequest{DependencyPins: cloneDependencyPins(input.DependencyPins), DependencyToken: input.DependencyToken, ResolvedResource: cloneResolvedResource(input.ResolvedResource), Resource: cloneResourceRef(input.Resource),
+		Parameters:  cloneJSONMap(input.Parameters),
 		ArtifactRef: strings.TrimSpace(input.ArtifactRef),
 		SourceKind:  strings.TrimSpace(input.SourceKind),
 		Document:    cloneJSON(input.Document),

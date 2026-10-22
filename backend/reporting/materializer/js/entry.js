@@ -44,7 +44,7 @@ import {buildReportPrintFromReportFill} from "../../../../src/reporting/reportPr
       });
     });
   }
-  function authoredReportDocument(envelope) {
+  function authoredReportDocument(envelope, requestBaseParameters = null) {
     var _a5;
     if (!isObject(envelope) || envelope.schemaVersion !== 1 || envelope.format !== "forge.authoredReport") {
       throw new Error("Expected a schema version 1 forge.authoredReport envelope.");
@@ -56,6 +56,7 @@ import {buildReportPrintFromReportFill} from "../../../../src/reporting/reportPr
       throw new Error("Authored reports require a report document and complete reportBuilder definition.");
     }
     const config = clone(builder);
+    if (requestBaseParameters) config.request = {...config.request, baseParameters: clone(requestBaseParameters)};
     delete config.document;
     delete config.reportDocument;
     delete config.state;
@@ -95,6 +96,11 @@ import {buildReportPrintFromReportFill} from "../../../../src/reporting/reportPr
     if (typeof envelopeJSON !== "string") throw new Error("Authored report input must be JSON text.");
     const envelope = JSON.parse(envelopeJSON);
     const document = authoredReportDocument(envelope);
+    return JSON.stringify(lowerReportDocumentToReportSpec(document));
+  }
+  export function lowerWithRequestBase(inputJSON) {
+    const input = JSON.parse(inputJSON);
+    const document = authoredReportDocument(input.envelope, input.requestBaseParameters);
     return JSON.stringify(lowerReportDocumentToReportSpec(document));
   }
   export function materialize(inputJSON) {

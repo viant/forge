@@ -26,6 +26,12 @@ var programError error
 // Lower accepts the exact envelope verified by the host resource resolver. The
 // resulting spec is still subject to the host's compiler and datasource gates.
 func Lower(ctx context.Context, raw json.RawMessage) (json.RawMessage, error) {
+	return LowerWithRequestBase(ctx, raw, nil)
+}
+
+// LowerWithRequestBase validates the original fingerprinted envelope before
+// applying host-bound predicate values to an invocation-local builder copy.
+func LowerWithRequestBase(ctx context.Context, raw json.RawMessage, requestBase map[string]interface{}) (json.RawMessage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("materializer context required")
 	}
@@ -51,7 +57,16 @@ func Lower(ctx context.Context, raw json.RawMessage) (json.RawMessage, error) {
 	if programError != nil {
 		return nil, fmt.Errorf("trusted lowerer bundle invalid: %w", programError)
 	}
-	result, err := runLowerer(ctx, program, raw)
+	entry, input := "lower", raw
+	if requestBase != nil {
+		var err error
+		input, err = json.Marshal(map[string]interface{}{"envelope": json.RawMessage(raw), "requestBaseParameters": requestBase})
+		if err != nil || len(input) > 8<<20 {
+			return nil, fmt.Errorf("invalid bound report request")
+		}
+		entry = "lowerWithRequestBase"
+	}
+	result, err := runEntry(ctx, program, entry, input)
 	if err != nil {
 		return nil, err
 	}

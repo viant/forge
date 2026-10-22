@@ -33,3 +33,11 @@ policy. The ten existing ReportSpec, ReportFill, and print golden fixtures remai
 unchanged. The tracked materializer build entrypoint and pinned lockfile now
 regenerate the embedded bundle reproducibly. No published dashboard uses the
 policy yet; upstream publication and report wiring remain required.
+
+For an execution whose dates are supplied by the viewer, the resource engine
+passes those values into compilation. Only aliases declared by the approved
+builder's predicates enter the base request before lowering. The materializer
+validates the original envelope and fingerprints before applying this base request
+to its temporary builder copy. This permits shared reports without saved date
+bounds to derive the prior period from the current invocation. Ordinary dataset
+argument binding, datasource admission, and resource revalidation still run.
