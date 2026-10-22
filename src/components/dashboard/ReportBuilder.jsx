@@ -6891,6 +6891,16 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     <option value="bold">Bold</option>
                 </select>
             </label>
+            <label className="forge-report-builder__chart-field">
+                <span>Chart/table switching</span>
+                <select aria-label="Report chart table switching" className="forge-report-builder-select"
+                    value={typeof state?.reportDocumentViewer?.allowChartTableSwitch === "boolean" ? String(state.reportDocumentViewer.allowChartTableSwitch) : ""}
+                    onChange={event=>updateReportDocumentMetadata("reportDocumentViewer",event.target.value)}>
+                    <option value="">Legacy host default</option>
+                    <option value="false">Hide switch</option>
+                    <option value="true">Allow switch</option>
+                </select>
+            </label>
             {state.reportDocumentTemplateLabel ? (
                 <div style={{ fontSize: 11, lineHeight: 1.5, color: "#486579" }}>
                     Seeded from template: {state.reportDocumentTemplateLabel}
@@ -13419,6 +13429,12 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     label: "Report title",
                 },
             });
+            return;
+        }
+        if (normalizedField === "reportDocumentViewer") {
+            if (value === "true" || value === "false") nextState.reportDocumentViewer = {allowChartTableSwitch:value === "true"};
+            else delete nextState.reportDocumentViewer;
+            persistExplorationMutation(nextState,{sourceKind:"reportBuilder.result",sourceContext:{label:"Report chart/table switching"}});
             return;
         }
         const nextValue = String(value || "").trim();

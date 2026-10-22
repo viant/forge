@@ -22,6 +22,7 @@ export const reportSpecSchema = {
     source: { $ref: "#/$defs/source" },
     title: { type: "string" },
     subtitle: { type: "string" },
+    viewer: {type:"object",additionalProperties:false,properties:{allowChartTableSwitch:{type:"boolean"}}},
     theme: { $ref: "#/$defs/reportTheme" },
     binding: { $ref: "#/$defs/binding" },
     semanticSummary: { $ref: "#/$defs/semanticSummary" },
@@ -785,6 +786,7 @@ export const reportSpecSchema = {
           items: { type: "string" },
         },
         seriesField: { type: "string" },
+        allowTableSwitch: {type:"boolean"},
         metricSelection: {type:"object",additionalProperties:false,required:["primaryField","secondaryField"],properties:{primaryField:{type:"string",minLength:1},secondaryField:{type:"string"}}},
         categoryColors: {type: "object", additionalProperties: {type: "string"}},
         categoryLabel: { $ref: "#/$defs/presentationTextClamp" },
@@ -1023,6 +1025,7 @@ export const reportSpecSchema = {
         xAxis: { $ref: "#/$defs/chartAxis" },
         yAxis: { $ref: "#/$defs/chartYAxis" },
         axes: {type:"object",additionalProperties:false,properties:{left:{$ref:"#/$defs/chartYAxis"},right:{$ref:"#/$defs/chartYAxis"}}},
+        allowTableSwitch: {type:"boolean"},
         metricSelection: {type:"object",additionalProperties:false,required:["primaryField","secondaryField","options"],properties:{primaryField:{type:"string",minLength:1},secondaryField:{type:"string"},options:{type:"array",items:{$ref:"#/$defs/chartSeriesValue"}}}},
         annotations: { $ref: "#/$defs/chartAnnotations" },
         series: {

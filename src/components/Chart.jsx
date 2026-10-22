@@ -497,7 +497,8 @@ export function resolveEmptyChartMessage(metrics = {}) {
     return 'No data for the selected period.';
 }
 
-const Chart = ({container, context, isActive = true, embedded = false, onDatumSelect = null, onLegendItemSelect = null, showControls = true, onMetricSelectionChange = null}) => {
+const Chart = ({container, context, isActive = true, embedded = false, onDatumSelect = null, onLegendItemSelect = null, showControls = true, allowTableSwitch = undefined, onMetricSelectionChange = null}) => {
+    const viewSwitchEnabled = typeof allowTableSwitch === "boolean" ? allowTableSwitch : (typeof container?.chart?.allowTableSwitch === "boolean" ? container.chart.allowTableSwitch : showControls !== false);
     const controlsVisible = container?.chart?.showControls !== false && showControls !== false;
     useSignals();
     const log = getLogger('chart');
@@ -685,10 +686,10 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     }, [series?.valueKey, seriesDefinitionKeysSignature, seriesDefinitions, seriesValueKeysSignature, series]);
 
     useEffect(() => {
-        if ((embedded || !controlsVisible) && viewMode !== "chart") {
+        if ((embedded || !viewSwitchEnabled) && viewMode !== "chart") {
             setViewMode("chart");
         }
-    }, [embedded, controlsVisible, viewMode]);
+    }, [embedded, viewSwitchEnabled, viewMode]);
 
     const allTableColumns = useMemo(
         () => [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
@@ -1478,9 +1479,9 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     })}
                 </div>
             ) : null}
-            {controlsVisible && !embedded && showSeriesSelectionControls ? (
+            {(controlsVisible || viewSwitchEnabled) && !embedded && showSeriesSelectionControls ? (
                 <>
-                    {!directSeriesChart && !isPieChart ? (
+                    {controlsVisible && !directSeriesChart && !isPieChart ? (
                         <RadioGroup
                             inline={true}
                             name={container.id}
@@ -1493,22 +1494,22 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         </RadioGroup>
                     ) : null}
                     <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 8, flexWrap: "wrap"}}>
-                        <div style={{display: "flex", gap: 6}}>
+                        {viewSwitchEnabled && <div style={{display: "flex", gap: 6}}>
                             <ChartActionButton active={viewMode === "chart"} onClick={() => setViewMode("chart")}>
                                 Chart
                             </ChartActionButton>
                             <ChartActionButton active={viewMode === "table"} onClick={() => setViewMode("table")}>
                                 Table
                             </ChartActionButton>
-                        </div>
-                        {viewMode === "chart"
+                        </div>}
+                        {controlsVisible && (viewMode === "chart"
                             ? renderSeriesSelectionControls({compact: true})
                             : (
                                 <div style={{display: "flex", gap: 6}}>
                                     <ChartActionButton onClick={() => setShowColumnDialog(true)}>Columns</ChartActionButton>
                                     <ChartActionButton onClick={downloadCsv}>CSV</ChartActionButton>
                                 </div>
-                            )}
+                            ))}
                     </div>
                 </>
             ) : null}

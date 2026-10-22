@@ -43355,6 +43355,15 @@ Please __addLocaleData before adding additional unit data`);
     });
   }
 
+  // src/reporting/reportViewerSettings.js
+  function normalizeReportViewerSettings(value) {
+    if (value == null) return null;
+    if (typeof value !== "object" || Array.isArray(value)) throw new Error("Report viewer settings must be an object.");
+    if (value.allowChartTableSwitch === void 0) return null;
+    if (typeof value.allowChartTableSwitch !== "boolean") throw new Error("allowChartTableSwitch must be boolean.");
+    return { allowChartTableSwitch: value.allowChartTableSwitch };
+  }
+
   // src/reporting/reportDatasetRefModel.js
   function normalizeString(value = "") {
     return String(value || "").trim();
@@ -47450,7 +47459,8 @@ Please __addLocaleData before adding additional unit data`);
       ...chartSpec.categoryColors && typeof chartSpec.categoryColors === "object" && !Array.isArray(chartSpec.categoryColors) ? { categoryColors: { ...chartSpec.categoryColors } } : {},
       ...seriesOptions ? { seriesOptions } : {},
       ...categoryLabel ? { categoryLabel } : {},
-      ...metricSelection ? { metricSelection } : {}
+      ...metricSelection ? { metricSelection } : {},
+      ...typeof chartSpec.allowTableSwitch === "boolean" ? { allowTableSwitch: chartSpec.allowTableSwitch } : {}
     };
   }
   function chartFieldIndex(columns = []) {
@@ -48438,6 +48448,7 @@ Please __addLocaleData before adding additional unit data`);
         collection: container.collection,
         chart: {
           ...baseChart,
+          ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {},
           series: {
             nameKey: seriesDisplayKey,
             ...seriesSourceKey && (seriesDisplayKey && seriesDisplayKey !== seriesSourceKey || hasSeriesDisplayValueMap) ? { sourceNameKey: seriesSourceKey } : {},
@@ -48479,6 +48490,7 @@ Please __addLocaleData before adding additional unit data`);
       collection: container.collection,
       chart: applyChartMetricSelection({
         ...baseChart,
+        ...typeof normalized.allowTableSwitch === "boolean" ? { allowTableSwitch: normalized.allowTableSwitch } : {},
         ...normalized.metricSelection ? { metricSelection: normalized.metricSelection } : {},
         series: {
           values,
@@ -51633,6 +51645,7 @@ Please __addLocaleData before adding additional unit data`);
     return {
       version: 1,
       kind: "reportDocument",
+      ...normalizeReportViewerSettings(state == null ? void 0 : state.reportDocumentViewer) ? { viewer: normalizeReportViewerSettings(state.reportDocumentViewer) } : {},
       id: documentId,
       title: resolveDocumentMetadataValue(state == null ? void 0 : state.reportDocumentTitle, resolveDocumentTitle(container, config)),
       subtitle: normalizeString29(state == null ? void 0 : state.reportDocumentSubtitle),
@@ -52014,6 +52027,7 @@ Please __addLocaleData before adding additional unit data`);
     });
     const nextSpec = {
       ...baseSpec,
+      ...normalizeReportViewerSettings(document == null ? void 0 : document.viewer) ? { viewer: normalizeReportViewerSettings(document.viewer) } : {},
       ...normalizeReportDocumentTheme(document == null ? void 0 : document.theme) ? { theme: normalizeReportDocumentTheme(document.theme) } : {},
       scope: {
         ...loweredContextPreset ? { contextPreset: loweredContextPreset } : {},

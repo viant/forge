@@ -1,3 +1,4 @@
+import {resolveReportChartTableSwitch} from "../../reporting/reportViewerSettings.js";
 import KpiSparkline from './KpiSparkline.jsx';
 import { buildRuntimeSections } from "./reportSections.js";
 export { buildRuntimeSections } from "./reportSections.js";
@@ -3283,6 +3284,7 @@ export default function ReportRuntime({
               isActive
               embedded={false}
               showControls={!reportPresentation}
+              allowTableSwitch={resolveReportChartTableSwitch({reportSpec,reportDocument,chartSpec:block?.chartSpec || block?.content?.chartSpec,presentationMode})}
               onMetricSelectionChange={onChartMetricSelectionChange ? selection => onChartMetricSelectionChange({blockId:block.id,selection}) : null}
               onDatumSelect={chartInteractionEnabled ? ((selection) => {
                 setSelectedChartSelection(block.id, selection);

@@ -222,6 +222,7 @@ function buildInlineDocument({
   const title = normalizeString(source?.title || adapter?.title || humanize(reportId) || "Inline report") || "Inline report";
   const state = {
     reportDocumentTitle: title,
+    ...(source?.viewer ? {reportDocumentViewer:cloneValue(source.viewer)} : {}),
     reportDocumentSubtitle: normalizeString(source?.subtitle || adapter?.subtitle),
     reportDocumentDescription: normalizeString(source?.description || adapter?.description),
     reportDocumentThemeAccent: normalizeString(source?.theme?.accentTone),

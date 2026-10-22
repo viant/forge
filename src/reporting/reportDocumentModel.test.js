@@ -3003,3 +3003,9 @@ assert.equal("binding" in emptyBuilderContext, false);
 assert.equal("staticDatasets" in emptyBuilderContext, false);
 
 console.log("reportDocumentModel ✓ resolveReportDocumentBuilderContext normalizes builder config, state, binding, and static datasets");
+
+for (const allowChartTableSwitch of [false,true]) {
+ const configured=buildReportBuilderReportDocument({container,config,state:{...state,reportDocumentViewer:{allowChartTableSwitch}}});
+ assert.deepEqual(configured.viewer,{allowChartTableSwitch});
+ assert.deepEqual(lowerReportDocumentToReportSpec(JSON.parse(JSON.stringify(configured))).viewer,{allowChartTableSwitch});
+}

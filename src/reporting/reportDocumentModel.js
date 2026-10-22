@@ -1,3 +1,4 @@
+import {normalizeReportViewerSettings} from './reportViewerSettings.js';
 import {getReportBlockDatasetRefs} from './reportDatasetRefModel.js';
 import {normalizeKpiSparkline} from './reportKpiSparklineModel.js';
 import { normalizeKpiSecondaryCalculation } from "./reportKpiComparisonModel.js";
@@ -2243,6 +2244,7 @@ export function buildReportBuilderReportDocument({
   return {
     version: 1,
     kind: "reportDocument",
+    ...(normalizeReportViewerSettings(state?.reportDocumentViewer) ? {viewer:normalizeReportViewerSettings(state.reportDocumentViewer)} : {}),
     id: documentId,
     title: resolveDocumentMetadataValue(state?.reportDocumentTitle, resolveDocumentTitle(container, config)),
     subtitle: normalizeString(state?.reportDocumentSubtitle),
@@ -2671,6 +2673,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
   });
   const nextSpec = {
     ...baseSpec,
+    ...(normalizeReportViewerSettings(document?.viewer) ? {viewer:normalizeReportViewerSettings(document.viewer)} : {}),
     ...(normalizeReportDocumentTheme(document?.theme) ? { theme: normalizeReportDocumentTheme(document.theme) } : {}),
     scope: {
       ...(loweredContextPreset ? { contextPreset: loweredContextPreset } : {}),
