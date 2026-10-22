@@ -1,4 +1,5 @@
-import React from "react";
+import React,{useState} from "react";
+import {Button,HTMLSelect} from "@blueprintjs/core";
 import {buildReportPrintPage} from "../../reporting/reportPrintModel.js";
 
 function PrintElement({element}) {
@@ -14,21 +15,29 @@ function PrintElement({element}) {
 
 // Preview uses backend pagination and geometry directly; it does not rebuild a
 // table, run a datasource, or depend on the browser's PDF plug-in.
-export default function ReportPrintPreview({reportPrint}) {
-    if (reportPrint?.kind !== "reportPrint" || !Array.isArray(reportPrint.pages) || !reportPrint.pageGeometry) return <p role="alert">Canonical print layout is unavailable.</p>;
+export default function ReportPrintPreview({reportPrint,pageIndex:controlledPage,onPageChange}) {
+    const [selected,setSelected]=useState(null),[fitWidth,setFitWidth]=useState(true);
+    if (reportPrint?.kind !== "reportPrint" || !Array.isArray(reportPrint.pages) || !reportPrint.pages.length || !reportPrint.pageGeometry) return <p role="alert">Canonical print layout is unavailable.</p>;
     const geometry = reportPrint.pageGeometry;
     if (![geometry.width, geometry.height].every(value => Number.isFinite(value) && value > 0)) return <p role="alert">Canonical print geometry is invalid.</p>;
+    const wanted=controlledPage??(selected?.reportPrint===reportPrint?selected.index:0);
+    const index=Number.isInteger(wanted)?Math.max(0,Math.min(wanted,reportPrint.pages.length-1)):0;
+    const select=index=>{if(controlledPage!==undefined)onPageChange?.(index);else setSelected({reportPrint,index});};
+    const rawPage=reportPrint.pages[index],page=buildReportPrintPage(rawPage);
+    const elements=page?[...page.headerElements,...page.elements,...page.footerElements]:[];
     return <section aria-label="Canonical print preview" style={{padding:12, background:"#eef2f6", marginTop:16}}>
-        {reportPrint.pages.map(rawPage => {
-            const page = buildReportPrintPage(rawPage);
-            if (!page) return <p role="alert" key={rawPage.number}>Unsupported or invalid canonical print page {rawPage.number}.</p>;
-            const elements = [...page.headerElements, ...page.elements, ...page.footerElements];
-            return <figure key={page.number} style={{margin:"0 auto 16px", maxWidth:geometry.width}}>
-                <figcaption>Page {page.number}</figcaption>
-                <svg role="img" aria-label={`${reportPrint.title || "Report"}, page ${page.number}`} viewBox={`0 0 ${geometry.width} ${geometry.height}`} style={{display:"block", width:"100%", background:"white", boxShadow:"0 1px 5px #cbd5e1", fontFamily:"Arial, sans-serif"}}>
-                    {elements.map(element => <PrintElement key={element.id} element={element}/>)}
-                </svg>
-            </figure>;
-        })}
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:12}}>
+            <Button icon="chevron-left" aria-label="Previous print page" disabled={index===0} onClick={()=>select(index-1)}/>
+            <HTMLSelect aria-label="Print page" value={index} onChange={event=>select(Number(event.target.value))} options={reportPrint.pages.map((item,i)=>({value:i,label:`Page ${item.number}`}))}/>
+            <span>of {reportPrint.pages.length}</span>
+            <Button icon="chevron-right" aria-label="Next print page" disabled={index===reportPrint.pages.length-1} onClick={()=>select(index+1)}/>
+            <Button onClick={()=>setFitWidth(value=>!value)}>{fitWidth?'Actual size':'Fit width'}</Button>
+        </div>
+        {!page?<p role="alert">Unsupported or invalid canonical print page {rawPage.number}.</p>:<figure key={page.number} style={{margin:"0 auto 16px",maxWidth:fitWidth?'100%':geometry.width}}>
+            <figcaption>Page {page.number}</figcaption>
+            <svg role="img" aria-label={`${reportPrint.title || "Report"}, page ${page.number}`} viewBox={`0 0 ${geometry.width} ${geometry.height}`} style={{display:"block",width:"100%",background:"white",boxShadow:"0 1px 5px #cbd5e1",fontFamily:"Arial, sans-serif"}}>
+                {elements.map(element=><PrintElement key={element.id} element={element}/>)}
+            </svg>
+        </figure>}
     </section>;
 }
