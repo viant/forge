@@ -28,12 +28,13 @@ type admittedReportDefinition struct {
 }
 
 type ExecuteResourceRequest struct {
-	DependencyPins   map[string]identity.ResolvedResource `json:"dependencyPins,omitempty"`
-	DependencyToken  string                               `json:"dependencyToken,omitempty"`
-	Resource         *identity.ResourceRef                `json:"resource,omitempty"`
-	ResolvedResource *identity.ResolvedResource           `json:"resolvedResource,omitempty"`
-	Parameters       map[string]interface{}               `json:"parameters,omitempty"`
-	DatasetIDs       []string                             `json:"datasetIds,omitempty"`
+	DependencyPins        map[string]identity.ResolvedResource         `json:"dependencyPins,omitempty"`
+	DependencyToken       string                                       `json:"dependencyToken,omitempty"`
+	Resource              *identity.ResourceRef                        `json:"resource,omitempty"`
+	ResolvedResource      *identity.ResolvedResource                   `json:"resolvedResource,omitempty"`
+	Parameters            map[string]interface{}                       `json:"parameters,omitempty"`
+	ChartMetricSelections map[string]materializer.ChartMetricSelection `json:"chartMetricSelections,omitempty"`
+	DatasetIDs            []string                                     `json:"datasetIds,omitempty"`
 }
 type ExecuteResourceResult struct {
 	DependencyPins  map[string]identity.ResolvedResource `json:"dependencyPins,omitempty"`
@@ -189,7 +190,14 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 			break
 		}
 	}
-	if decodeSpec(compiled.ReportSpec, &spec) != nil || len(spec.Datasets) == 0 {
+	executionSpec := compiled.ReportSpec
+	if len(request.ChartMetricSelections) > 0 {
+		executionSpec, err = materializer.Present(ctx, executionSpec, request.ChartMetricSelections)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if decodeSpec(executionSpec, &spec) != nil || len(spec.Datasets) == 0 {
 		return nil, fmt.Errorf("report has no executable datasets")
 	}
 
@@ -214,7 +222,7 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 		}
 	}
 	var specRoot map[string]json.RawMessage
-	_ = json.Unmarshal(compiled.ReportSpec, &specRoot)
+	_ = json.Unmarshal(executionSpec, &specRoot)
 	var effectiveDatasets []map[string]interface{}
 	if json.Unmarshal(specRoot["datasets"], &effectiveDatasets) != nil {
 		return nil, identity.ErrResourceDenied
