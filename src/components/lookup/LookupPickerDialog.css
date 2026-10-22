@@ -87,6 +87,34 @@
     border-block-end: 0;
 }
 
+.forge-lookup-picker__row[role="checkbox"] {
+    display: flex;
+    align-items: center;
+    gap: var(--forge-lookup-picker-space-3);
+}
+
+.forge-lookup-picker__row[aria-checked="true"] {
+    background: var(--forge-lookup-picker-hover-surface);
+}
+
+.forge-lookup-picker__row[role="checkbox"] .forge-lookup-picker__cells {
+    flex: 1;
+}
+
+.forge-lookup-picker__columns--multiple {
+    padding-inline-start: calc((2 * var(--forge-lookup-picker-space-3)) + 1.1em);
+}
+
+.forge-lookup-picker__check {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    inline-size: 1.1em;
+    block-size: 1.1em;
+    border: 1px solid currentColor;
+    border-radius: 3px;
+}
+
 .forge-lookup-picker__row:hover {
     background: var(--forge-lookup-picker-hover-surface);
 }

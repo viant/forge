@@ -45,6 +45,9 @@ export function normalizeLookupSearchResult(result) {
     return {rows, totalCount};
 }
 
+// Multiple selection is controlled by string keys from getRowKey. onSelect
+// toggles a row in the host's state; Done closes without clearing that state.
+// Existing callers retain the single-row Select/Cancel contract by default.
 export default function LookupPickerDialog({
     isOpen = false,
     title = 'Select an option',
@@ -58,6 +61,9 @@ export default function LookupPickerDialog({
     loadRows,
     onSelect,
     onCancel,
+    multiple = false,
+    selectedKeys = [],
+    onClearSelection,
     maxRenderedResults = 100,
     searchDelay = 180,
 }) {
@@ -73,6 +79,7 @@ export default function LookupPickerDialog({
     const normalizedColumns = normalizeLookupPickerColumns(columns);
     const renderedLimit = Math.max(1, Number(maxRenderedResults) || 100);
     const visibleRows = rows.slice(0, renderedLimit);
+    const selectionKeys = Array.isArray(selectedKeys) ? [...new Set(selectedKeys.map(String))] : [];
 
     useEffect(() => {
         if (!isOpen) {
@@ -198,7 +205,7 @@ export default function LookupPickerDialog({
                         <>
                             {normalizedColumns.length > 0 ? (
                                 <div
-                                    className="forge-lookup-picker__columns"
+                                    className={`forge-lookup-picker__columns${multiple ? ' forge-lookup-picker__columns--multiple' : ''}`}
                                     style={{gridTemplateColumns: `repeat(${normalizedColumns.length}, minmax(0, 1fr))`}}
                                     aria-hidden="true"
                                 >
@@ -209,16 +216,21 @@ export default function LookupPickerDialog({
                                 {visibleRows.map((row, index) => {
                                     const label = String(getRowLabel?.(row, index) || defaultLookupRowLabel(row));
                                     const description = getRowDescription?.(row, index);
+                                    const rowKey = String(getRowKey?.(row, index) ?? defaultLookupRowKey(row, index));
+                                    const checked = multiple && selectionKeys.includes(rowKey);
                                     return (
                                         <button
-                                            key={String(getRowKey?.(row, index) ?? defaultLookupRowKey(row, index))}
+                                            key={rowKey}
                                             type="button"
                                             className="forge-lookup-picker__row"
                                             data-forge-lookup-row=""
                                             disabled={disabled}
-                                            aria-label={`Select ${label}`}
+                                            role={multiple ? 'checkbox' : undefined}
+                                            aria-checked={multiple ? checked : undefined}
+                                            aria-label={multiple ? label : `Select ${label}`}
                                             onClick={() => select(row)}
                                         >
+                                            {multiple ? <span className="forge-lookup-picker__check" aria-hidden="true">{checked ? '✓' : ''}</span> : null}
                                             {normalizedColumns.length > 0 ? (
                                                 <span
                                                     className="forge-lookup-picker__cells"
@@ -249,7 +261,11 @@ export default function LookupPickerDialog({
                     )}
                 </div>
             </DialogBody>
-            <DialogFooter actions={<Button text="Cancel" onClick={cancel} />} />
+            <DialogFooter actions={<>
+                {multiple ? <span role="status">{selectionKeys.length} selected</span> : null}
+                {multiple && typeof onClearSelection === 'function' ? <Button text="Clear selection" disabled={disabled || selectionKeys.length === 0} onClick={onClearSelection} /> : null}
+                <Button text={multiple ? 'Done' : 'Cancel'} onClick={cancel} />
+            </>} />
         </Dialog>
     );
 }

@@ -6,6 +6,8 @@
     "./core": "./src/core/index.js",
     "./hooks": "./src/hooks/index.js",
     "./components": "./src/components/index.js",
+    "./lookup-picker": "./src/components/lookup/LookupPickerDialog.jsx",
+    "./lookup-selection": "./src/components/lookup/LookupSelectionInput.jsx",
     "./window": "./src/components/WindowContent.jsx",
     "./packs/blueprint": "./src/packs/blueprint/index.jsx",
     "./settings": "./src/core/context/Setting.jsx",
