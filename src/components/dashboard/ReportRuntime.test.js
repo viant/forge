@@ -3145,7 +3145,7 @@ const readOnlyImportedRuntimeHtml = renderToStaticMarkup(
     runtimeHandlers: null,
   }),
 );
-assert.ok(readOnlyImportedRuntimeHtml.includes("Chart actions are unavailable because this runtime preview is read-only."));
+assert.ok(!readOnlyImportedRuntimeHtml.includes("Chart actions are unavailable because this runtime preview is read-only."));
 assert.ok(!readOnlyImportedRuntimeHtml.includes("Click a chart mark to apply authored runtime actions."));
 assert.ok(!readOnlyImportedRuntimeHtml.includes(">Actions<"));
 assert.ok(!readOnlyImportedRuntimeHtml.includes("Keep Channel"));
