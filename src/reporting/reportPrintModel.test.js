@@ -1398,3 +1398,32 @@ const identifierFill=buildReportFillFromReportSpec(identifierSpec,{primary:{rows
 const identifierPrint=buildReportPrintFromReportFill({reportSpec:identifierSpec,reportFill:identifierFill});
 const identifierCells=identifierPrint.pages.flatMap(p=>p.elements||[]).filter(e=>e.kind==='tableCellText');
 for(const text of ['555785','000123','9007199254740993','Sep 21, 2026'])assert.ok(identifierCells.some(e=>e.text===text),`Missing exact print cell ${text}`);
+
+// Eight compact evidence columns fit together on portrait paper. Do not emit
+// another 100-row pane merely because the column count exceeds a fixed six.
+const compactColumns = [
+  {key:'civilDate',label:'Date',format:'date'},
+  {key:'recordId',label:'Record ID',format:'id'},
+  {key:'state',label:'State'}, {key:'country',label:'Country'},
+  {key:'impressions',label:'Impressions',format:'compactNumber'},
+  {key:'spend',label:'Spend',format:'currency2'},
+  {key:'clicks',label:'Clicks',format:'compactNumber'},
+  {key:'conversions',label:'Conversions',format:'compactNumber'},
+];
+const compactRows = Array.from({length:100},(_,i)=>({civilDate:'2026-01-01T00:00:00Z',recordId:100000+i,state:'CA',country:'United States',impressions:i+1,spend:.11,clicks:1,conversions:null}));
+function printEvidence(columns, rows) {
+  const spec={...identifierSpec,blocks:[{...identifierSpec.blocks[0],columns}]};
+  return buildReportPrintFromReportFill({reportSpec:spec,reportFill:buildReportFillFromReportSpec(spec,{primary:{rows}})});
+}
+const compactEvidence=printEvidence(compactColumns,compactRows);
+const compactCells=compactEvidence.pages.flatMap(p=>p.elements).filter(e=>e.kind==='tableCellText');
+assert.ok(compactEvidence.pages.length<=6,`Compact evidence should not be horizontally duplicated: ${compactEvidence.pages.length} pages`);
+for(const column of compactColumns)assert.equal(compactCells.filter(e=>e.columnKey===column.key).length,100,`${column.key} appears once per row`);
+for(const cell of compactCells){assert.ok(cell.box.x>=36);assert.ok(cell.box.x+cell.box.width<=576.01);}
+const wideColumns=[{key:'recordId',label:'Record ID',format:'id'},...Array.from({length:12},(_,i)=>({key:`description${i}`,label:`Description ${i}`}))];
+const wideRows=compactRows.slice(0,2).map(row=>({...row,...Object.fromEntries(wideColumns.slice(1).map(c=>[c.key,'A complete descriptive label that must remain available in print']))}));
+const wideEvidence=printEvidence(wideColumns,wideRows);
+const wideCells=wideEvidence.pages.flatMap(p=>p.elements).filter(e=>e.kind==='tableCellText');
+for(const column of wideColumns.slice(1))assert.equal(wideCells.filter(e=>e.columnKey===column.key).length,2,'Wide columns survive horizontal pagination');
+assert.ok(wideCells.filter(e=>e.columnKey==='recordId').length>2,'Wide panes repeat their identifying column');
+console.log('reportPrintModel ✓ packs compact evidence without losing wide-table cells');

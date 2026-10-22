@@ -54,8 +54,11 @@ func TestLargeDatedEvidenceCompletesWithinMaterializerBudget(t *testing.T) {
 			}
 		}
 	}
-	if ids < 600 || dates < 600 {
+	if ids != 600 || dates != 600 {
 		t.Fatalf("incomplete table: ids=%d dates=%d", ids, dates)
+	}
+	if len(print.Pages) > 26 {
+		t.Fatalf("compact evidence should fit in one horizontal pane: pages=%d", len(print.Pages))
 	}
 	t.Logf("600 synthetic dated rows completed in %s, pages=%d", time.Since(started), len(print.Pages))
 }
