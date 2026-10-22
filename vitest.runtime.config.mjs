@@ -11,6 +11,7 @@ export default defineConfig({
       'src/components/DataSource.projection.render.test.jsx',
       'src/components/DataSource.saveSynchronization.render.test.jsx',
       'src/components/dashboard/ReportResourceRuntime.render.test.jsx',
+      'src/components/dashboard/ReportOutputActions.render.test.jsx',
       'src/components/dashboard/reportBuilderConcurrentRead.render.test.jsx',
       'src/components/WindowContentMount.render.test.jsx',
       'src/components/WorkspaceRuntimeSurface.render.test.jsx',
