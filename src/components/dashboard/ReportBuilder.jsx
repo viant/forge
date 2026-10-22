@@ -10191,7 +10191,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             : null)),
         [frozenRestore, builderContext, displayConfig, runtimePreviewCanonicalRequest, state],
     );
-    const runtimePreviewPrimaryFetcher = useMemo(
+    const runtimePreviewBaseFetcher = useMemo(
         () => resolveReportBuilderDatasetPreviewFetcher(builderContext, runtimePreviewPrimaryDataset, {
             preferDataSourceRoute: true,
         }),
@@ -10206,8 +10206,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         [semanticModelRetrySequence, semanticValidationRetrySequence],
     );
     const runtimePreviewExtractConfigFingerprint = useMemo(
-        () => buildReportRuntimePreviewExtractConfigFingerprint(runtimePreviewPrimaryFetcher?.dataSourceContext?.dataSource || null),
-        [runtimePreviewPrimaryFetcher?.dataSourceContext?.dataSource],
+        () => buildReportRuntimePreviewExtractConfigFingerprint(runtimePreviewBaseFetcher?.dataSourceContext?.dataSource || null),
+        [runtimePreviewBaseFetcher?.dataSourceContext?.dataSource],
     );
     const runtimePreviewResultContractFingerprint = useMemo(
         () => buildReportRuntimePreviewResultContractFingerprint(runtimePreviewPrimaryDataset?.resultContract || null),
@@ -10222,6 +10222,13 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             runtimePreviewResultContractFingerprint,
         ),
         [manualRunSequence, runtimePreviewExtractConfigFingerprint, runtimePreviewFingerprint, runtimePreviewRecoveryToken, runtimePreviewResultContractFingerprint],
+    );
+    const runtimePreviewPrimaryFetcher = useMemo(
+        () => resolveReportBuilderDatasetPreviewFetcher(builderContext, runtimePreviewPrimaryDataset, {
+            preferDataSourceRoute: true,
+            concurrentRequestScope: runtimePreviewRequestKey,
+        }),
+        [builderContext, runtimePreviewPrimaryDataset, runtimePreviewRequestKey],
     );
     const hydrateRuntimePreviewRows = React.useCallback(async ({
         rows,
@@ -10309,6 +10316,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         requestKey: runtimePreviewPublishedDatasetsRequestKey,
         fetcherOptions: {
             preferDataSourceRoute: true,
+            concurrentRequestScope: runtimePreviewRequestKey,
         },
     });
     const runtimePreviewDatasetPayloadState = frozenRestore ? {...fetchedRuntimePreviewDatasetPayloadState, payloads:frozenRestore.payloads, loading:false, error:null, requestKey:runtimePreviewPublishedDatasetsRequestKey, freshResultRequestKey:runtimePreviewPublishedDatasetsRequestKey, freshDatasetIds:frozenRestore.datasets.map(dataset=>dataset.id)} : fetchedRuntimePreviewDatasetPayloadState;

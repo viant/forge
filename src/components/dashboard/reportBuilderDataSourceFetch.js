@@ -1,3 +1,4 @@
+import {readConcurrentReportDataset} from './reportBuilderConcurrentRead.js';
 import {
     isReportDatasetMCPSource,
     normalizeReportDatasetSource,
@@ -168,6 +169,7 @@ export function resolveReportBuilderMCPExecutionContext(
 export function resolveReportBuilderDatasetPreviewFetcher(builderContext = null, dataset = null, {
     preferDataSourceRoute = false,
     omitConversationId = false,
+    concurrentRequestScope = "",
 } = {}) {
     const normalizedDataset = isPlainObject(dataset) ? dataset : null;
     const source = normalizeDatasetSource(normalizedDataset?.source);
@@ -190,12 +192,17 @@ export function resolveReportBuilderDatasetPreviewFetcher(builderContext = null,
             fetcher: async ({
                 parameters = {},
                 signal = null,
-            } = {}) => fetchDataSourceByRef({
-                dataSourceRef: normalizedDataset?.dataSourceRef,
-                parameters,
-                builderContext,
-                ...(signal ? {signal} : {}),
-                ...(omitConversationId ? { omitConversationId: true } : {}),
+            } = {}) => readConcurrentReportDataset({
+                owner: builderContext, transport: fetchDataSourceByRef,
+                scope: concurrentRequestScope, dataSourceRef: normalizedDataset?.dataSourceRef,
+                parameters, omitConversationId, signal,
+                read: sharedSignal => fetchDataSourceByRef({
+                    dataSourceRef: normalizedDataset?.dataSourceRef,
+                    parameters,
+                    builderContext,
+                    ...(sharedSignal ? {signal: sharedSignal} : {}),
+                    ...(omitConversationId ? { omitConversationId: true } : {}),
+                }),
             }),
         };
     }
