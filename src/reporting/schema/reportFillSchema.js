@@ -922,6 +922,7 @@ export const reportFillSchema = {
           items: { type: "string" },
         },
         seriesField: { type: "string" },
+        metricSelection: {type:"object",additionalProperties:false,required:["primaryField","secondaryField"],properties:{primaryField:{type:"string",minLength:1},secondaryField:{type:"string"}}},
         categoryColors: {type: "object", additionalProperties: {type: "string"}},
         categoryLabel: { $ref: "#/$defs/presentationTextClamp" },
         seriesOptions: {
@@ -962,6 +963,7 @@ export const reportFillSchema = {
       additionalProperties: false,
       properties: {
         format: { type: "string" },
+        label: { type: "string" },
       },
     },
     chartSeriesValue: {
@@ -1160,6 +1162,8 @@ export const reportFillSchema = {
         type: { type: "string" },
         xAxis: { $ref: "#/$defs/chartAxis" },
         yAxis: { $ref: "#/$defs/chartYAxis" },
+        axes: {type:"object",additionalProperties:false,properties:{left:{$ref:"#/$defs/chartYAxis"},right:{$ref:"#/$defs/chartYAxis"}}},
+        metricSelection: {type:"object",additionalProperties:false,required:["primaryField","secondaryField","options"],properties:{primaryField:{type:"string",minLength:1},secondaryField:{type:"string"},options:{type:"array",items:{$ref:"#/$defs/chartSeriesValue"}}}},
         annotations: { $ref: "#/$defs/chartAnnotations" },
         series: {
           anyOf: [

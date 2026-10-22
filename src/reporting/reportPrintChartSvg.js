@@ -2,15 +2,14 @@ import {resolveCategoryColor} from '../components/chartTheme.js';
 import { compactReportPrintSequence, wrapReportPrintLabel } from "./reportPrintLabels.js";
 import { formatExportNumericValue } from "./reportExportValueFormatter.js";
 import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "./reportChartAnnotations.js";
-import { formatChartXAxisValue, readChartDataValue } from "../components/chartData.js";
+import { formatChartXAxisValue, readChartDataValue, isChartNumericValue } from "../components/chartData.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
 }
 
 function normalizeNumber(value) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : null;
+  return isChartNumericValue(value) ? Number(value) : null;
 }
 
 function escapeXml(value = "") {
@@ -112,6 +111,7 @@ function resolveCartesianSeriesDescriptors(chartModel = {}, resolvedChart = {}) 
           type: normalizeString(matched?.type || chartType) || chartType,
           color: printColor(matched?.color || palette[index % palette.length]) || palette[index % palette.length],
           format: normalizeString(matched?.format),
+          axis: matched?.axis === "right" ? "right" : "left",
           dataLabels: normalizeString(matched?.dataLabels).toLowerCase(),
           pointColorMode: normalizeString(matched?.pointColorMode),
           strokeDasharray: normalizeString(matched?.strokeDasharray),
@@ -815,7 +815,10 @@ function renderCartesianChartSvg({
       ],
     };
   }
-  const bounds = computeCartesianValueBounds(rows, seriesDescriptors);
+  const leftSeries = seriesDescriptors.filter(series=>series.axis !== "right");
+  const rightSeries = seriesDescriptors.filter(series=>series.axis === "right");
+  const bounds = computeCartesianValueBounds(rows, leftSeries.length ? leftSeries : seriesDescriptors);
+  const rightBounds = computeCartesianValueBounds(rows, rightSeries);
   if (!bounds) {
     return {
       svg: "",
@@ -827,7 +830,7 @@ function renderCartesianChartSvg({
   }
 
   const leftPad = 52;
-  const rightPad = 16;
+  const rightPad = rightBounds ? 58 : 16;
   const topPad = 16;
   const xAxisLabel = normalizeString(
     chartModel?.xAxis?.label
@@ -877,6 +880,12 @@ function renderCartesianChartSvg({
     <text x="${leftPad - 8}" y="${tick.y + 4}" text-anchor="end" font-size="10" fill="#667085">${escapeXml(formatAxisTick(tick.value, seriesDescriptors[0]?.format))}</text>
   `).join("\n");
 
+  const rightTicks = rightBounds ? Array.from({length:4},(_,index)=>{
+    const value = rightBounds.maxValue - index/3*(rightBounds.maxValue-rightBounds.minValue);
+    const y=topPad+index/3*plotHeight;
+    return `<text data-report-print-axis="right" x="${leftPad+plotWidth+8}" y="${y+4}" text-anchor="start" font-size="10" fill="#667085">${escapeXml(formatAxisTick(value,rightSeries[0]?.format))}</text>`;
+  }).join("\n") : "";
+
   const xAxisLabels = rows.map((row, index) => {
     if (index % labelStep !== 0 && index !== rows.length - 1) {
       return "";
@@ -901,22 +910,29 @@ function renderCartesianChartSvg({
 
   const renderedSeries = seriesDescriptors.map((series) => {
     const supportedType = resolveChartSupportedSeriesType(series.type);
-    const points = rows.map((row, rowIndex) => {
+    const seriesBounds = series.axis === "right" && rightBounds ? rightBounds : bounds;
+    const seriesRange = seriesBounds.maxValue-seriesBounds.minValue || 1;
+    const seriesBaselineY=topPad+(seriesBounds.maxValue/seriesRange)*plotHeight;
+    const pointSlots = rows.map((row, rowIndex) => {
       const value = normalizeNumber(row?.[series.key]);
       if (value == null) {
         return null;
       }
       const x = xPositions[rowIndex];
-      const y = topPad + (((bounds.maxValue - value) / valueRange) * plotHeight);
+      const y = topPad + (((seriesBounds.maxValue - value) / seriesRange) * plotHeight);
       return { x, y, value, rowIndex };
-    }).filter(Boolean);
+    });
+    const points=pointSlots.filter(Boolean);
+    const segments=[];let segment=[];
+    for(const point of pointSlots){if(point)segment.push(point);else if(segment.length){segments.push(segment);segment=[];}}
+    if(segment.length)segments.push(segment);
 
     if (supportedType === "bar") {
       const barOffset = barSeries.findIndex((entry) => entry.key === series.key);
       const bars = points.map((point) => {
         const x = point.x - (groupWidth / 2) + (barOffset * barWidth);
-        const y = Math.min(point.y, baselineY);
-        const barHeight = Math.max(1, Math.abs(baselineY - point.y));
+        const y = Math.min(point.y, seriesBaselineY);
+        const barHeight = Math.max(1, Math.abs(seriesBaselineY - point.y));
         const fillColor = resolveSeriesPointColor(series, point.value, series.color);
         const label = shouldRenderReportPrintSeriesDataLabels(series, supportedType, rows.length)
           ? `<text x="${x + ((barWidth - 1) / 2)}" y="${y - 4}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(point.value, series.format))}</text>`
@@ -932,7 +948,7 @@ function renderCartesianChartSvg({
     const smoothPath = supportedType === "line" || supportedType === "area";
     const strokeDasharray = normalizeString(series?.strokeDasharray);
     const dashAttribute = escapeStrokeDasharray(strokeDasharray);
-    const path = smoothPath ? buildMonotonePath(points) : buildPolylinePath(points);
+    const path = segments.map(segment => smoothPath ? buildMonotonePath(segment) : buildPolylinePath(segment)).join(" ");
     const markers = points.map((point) => `
       <circle cx="${point.x}" cy="${point.y}" r="2.5" fill="${escapeXml(resolveSeriesPointColor(series, point.value, series.color))}" />
     `).join("\n");
@@ -943,7 +959,7 @@ function renderCartesianChartSvg({
       : "";
     if (supportedType === "area") {
       return `
-        <path d="${buildAreaPath(points, baselineY, { smooth: true })}" fill="${escapeXml(series.color)}" fill-opacity="0.18" stroke="none" />
+        <path d="${segments.map(segment=>buildAreaPath(segment,seriesBaselineY,{smooth:true})).join(" ")}" fill="${escapeXml(series.color)}" fill-opacity="0.18" stroke="none" />
         <path d="${path}" fill="none" stroke="${escapeXml(series.color)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${dashAttribute} />
         ${markers}
         ${labels}
@@ -958,7 +974,7 @@ function renderCartesianChartSvg({
 
   return {
     svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
-      ${gridLines}
+      ${gridLines}${rightTicks ? "\n      " + rightTicks : ""}
       ${annotations.background}
       <line x1="${leftPad}" y1="${baselineY}" x2="${leftPad + plotWidth}" y2="${baselineY}" stroke="#98a2b3" stroke-width="1" />
       <line x1="${leftPad}" y1="${topPad}" x2="${leftPad}" y2="${topPad + plotHeight}" stroke="#98a2b3" stroke-width="1" />

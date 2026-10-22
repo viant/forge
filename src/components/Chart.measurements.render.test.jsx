@@ -22,3 +22,25 @@ it('keeps unavailable measurements distinct from genuine zero and formats fracti
   expect([...host.querySelectorAll('.recharts-yAxis .recharts-cartesian-axis-tick-value')].every(n=>n.textContent.endsWith('%'))).toBe(true);
  }finally{await act(async()=>root.unmount());host.remove();width.mockRestore();height.mockRestore();}
 });
+
+it('switches primary and secondary metrics through shared native controls',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const width=vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(600);
+ const height=vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockReturnValue(320);
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);const changed=vi.fn();
+ const options=[{value:'spend',label:'Spend',format:'currency2'},{value:'count',label:'Impressions',format:'compactNumber'},{value:'rate',label:'Rate',format:'percentFraction2'}];
+ const container={id:'metrics',dataSourceRef:'daily',chart:{type:'line',xAxis:{dataKey:'day'},series:{values:options},metricSelection:{primaryField:'spend',secondaryField:'rate'}}};
+ const context={identity:{dataSourceRef:'daily'},signals:{collection:{value:[{day:'one',spend:10,count:100,rate:.1},{day:'two',spend:20,count:200,rate:.2}]},control:{value:{}},metrics:{value:{}},windowForm:{value:{}}}};
+ try{
+  await act(async()=>{root.render(<Chart container={container} context={context} onMetricSelectionChange={changed}/>);});
+  const primary=host.querySelector('select[aria-label="Primary metric"]'),secondary=host.querySelector('select[aria-label="Secondary metric"]');
+  expect(primary.value).toBe('spend');expect(secondary.value).toBe('rate');
+  expect([...primary.options].some(o=>o.value==='rate')).toBe(false);
+  await act(async()=>{primary.value='count';primary.dispatchEvent(new Event('change',{bubbles:true}));});
+  expect(changed).toHaveBeenLastCalledWith({primaryField:'count',secondaryField:'rate'});
+  expect(primary.value).toBe('count');expect(host.querySelectorAll('.recharts-yAxis').length).toBe(2);
+  await act(async()=>{secondary.value='';secondary.dispatchEvent(new Event('change',{bubbles:true}));});
+  expect(changed).toHaveBeenLastCalledWith({primaryField:'count',secondaryField:''});
+  expect(host.querySelectorAll('.recharts-yAxis').length).toBe(1);
+ }finally{await act(async()=>root.unmount());host.remove();width.mockRestore();height.mockRestore();}
+});
