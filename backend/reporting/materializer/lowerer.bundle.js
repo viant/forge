@@ -43304,6 +43304,11 @@ Please __addLocaleData before adding additional unit data`);
     });
   }
 
+  // src/utils/isNumericValue.js
+  function isNumericValue(value) {
+    return (typeof value === "number" || typeof value === "string" && value.trim() !== "") && Number.isFinite(Number(value));
+  }
+
   // src/reporting/reportKpiComparisonModel.js
   function normalizeKpiSecondaryCalculation(value = "") {
     const mode = String(value || "value").trim();
@@ -43313,11 +43318,39 @@ Please __addLocaleData before adding additional unit data`);
   function calculateKpiSecondaryValue(current, previous, mode = "value") {
     const calculation = normalizeKpiSecondaryCalculation(mode);
     if (calculation === "value") return previous != null ? previous : null;
-    const numeric = (value) => (typeof value === "number" || typeof value === "string" && value.trim() !== "") && Number.isFinite(Number(value));
-    if (!numeric(current) || !numeric(previous)) return null;
+    if (!isNumericValue(current) || !isNumericValue(previous)) return null;
     const difference = Number(current) - Number(previous);
     const result = calculation === "relativeChange" ? Number(previous) === 0 ? null : difference / Number(previous) : difference;
     return result === null || !Number.isFinite(result) ? null : result;
+  }
+
+  // src/components/chartMetricSelection.js
+  function normalizeChartMetricSelection(value, fields = []) {
+    if (value == null) return null;
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("Chart metric selection must be an object.");
+    const primaryField = String(value.primaryField || "").trim(), secondaryField = String(value.secondaryField || "").trim();
+    if (!primaryField || !fields.includes(primaryField) || secondaryField && !fields.includes(secondaryField) || secondaryField === primaryField) throw Error("Chart metric selection requires distinct declared primary and secondary fields.");
+    return { primaryField, secondaryField };
+  }
+  function applyChartMetricSelection(chart, selection = null) {
+    var _a5, _b;
+    if (!(chart == null ? void 0 : chart.metricSelection)) return chart;
+    if (((_a5 = chart.series) == null ? void 0 : _a5.nameKey) || !["line", "area", "bar", "combo", "composed"].includes(chart.type)) throw Error("Metric selection requires a direct cartesian chart.");
+    const options = chart.metricSelection.options || ((_b = chart.series) == null ? void 0 : _b.values) || [];
+    const fields = options.map((option) => option.value);
+    const defaults = normalizeChartMetricSelection(chart.metricSelection, fields);
+    let selected = defaults;
+    if (selection) {
+      try {
+        selected = normalizeChartMetricSelection(selection, fields);
+      } catch (e3) {
+        selected = defaults;
+      }
+    }
+    const primary = options.find((option) => option.value === selected.primaryField);
+    const secondary = options.find((option) => option.value === selected.secondaryField);
+    const values = [{ ...primary, axis: "left" }, ...secondary ? [{ ...secondary, axis: "right" }] : []];
+    return { ...chart, metricSelection: { ...selected, options }, series: { ...chart.series, values }, yAxis: { ...chart.yAxis, format: primary.format }, axes: { left: { format: primary.format, label: primary.label }, ...secondary ? { right: { format: secondary.format, label: secondary.label } } : {} } };
   }
 
   // src/utils/selector.js
@@ -47219,6 +47252,8 @@ Please __addLocaleData before adding additional unit data`);
     const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
+    const metricSelection = normalizeChartMetricSelection(chartSpec.metricSelection, yFields);
+    if (metricSelection && (seriesField || !["line", "area", "bar", "combo"].includes(type))) throw new Error("Metric selection requires a direct cartesian chart.");
     return {
       ...title ? { title } : {},
       ...eyebrow ? { eyebrow } : {},
@@ -47230,7 +47265,8 @@ Please __addLocaleData before adding additional unit data`);
       ...seriesField ? { seriesField } : {},
       ...chartSpec.categoryColors && typeof chartSpec.categoryColors === "object" && !Array.isArray(chartSpec.categoryColors) ? { categoryColors: { ...chartSpec.categoryColors } } : {},
       ...seriesOptions ? { seriesOptions } : {},
-      ...categoryLabel ? { categoryLabel } : {}
+      ...categoryLabel ? { categoryLabel } : {},
+      ...metricSelection ? { metricSelection } : {}
     };
   }
   function chartFieldIndex(columns = []) {
@@ -48257,14 +48293,15 @@ Please __addLocaleData before adding additional unit data`);
       ...container,
       dataSourceRef: container.dataSourceRef,
       collection: container.collection,
-      chart: {
+      chart: applyChartMetricSelection({
         ...baseChart,
+        ...normalized.metricSelection ? { metricSelection: normalized.metricSelection } : {},
         series: {
           values,
           palette,
           ...normalized.categoryColors ? { categoryColors: normalized.categoryColors } : {}
         }
-      }
+      })
     };
   }
 
@@ -53583,9 +53620,7 @@ Please __addLocaleData before adding additional unit data`);
   function cloneValue19(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
-  function isChartNumericValue(value) {
-    return (typeof value === "number" || typeof value === "string" && value.trim() !== "") && Number.isFinite(Number(value));
-  }
+  var isChartNumericValue = isNumericValue;
   function attachChartSelectionRowsMetadata(target, initialValue) {
     if (!target || typeof target !== "object") {
       return target;
@@ -58337,8 +58372,7 @@ ${indent}${end}`;
     return !!value && typeof value === "object" && !Array.isArray(value);
   }
   function normalizeFiniteNumber(value) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : null;
+    return isNumericValue(value) ? Number(value) : null;
   }
   function formatExportDateValue(value, {
     includeTime = false
@@ -58411,6 +58445,8 @@ ${indent}${end}`;
         return `${numeric.toFixed(1)}%`;
       case "percentfraction":
         return `${(numeric * 100).toFixed(1)}%`;
+      case "percentfraction2":
+        return `${(numeric * 100).toFixed(2)}%`;
       case "number":
         return new Intl.NumberFormat("en-US", {
           minimumFractionDigits: 0,
@@ -58603,8 +58639,7 @@ ${indent}${end}`;
     return String(value || "").trim();
   }
   function normalizeNumber2(value) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : null;
+    return isChartNumericValue(value) ? Number(value) : null;
   }
   function escapeXml(value = "") {
     return String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
@@ -58685,6 +58720,7 @@ ${indent}${end}`;
           type: normalizeString36((matched == null ? void 0 : matched.type) || chartType) || chartType,
           color: printColor((matched == null ? void 0 : matched.color) || palette[index % palette.length]) || palette[index % palette.length],
           format: normalizeString36(matched == null ? void 0 : matched.format),
+          axis: (matched == null ? void 0 : matched.axis) === "right" ? "right" : "left",
           dataLabels: normalizeString36(matched == null ? void 0 : matched.dataLabels).toLowerCase(),
           pointColorMode: normalizeString36(matched == null ? void 0 : matched.pointColorMode),
           strokeDasharray: normalizeString36(matched == null ? void 0 : matched.strokeDasharray)
@@ -59336,7 +59372,10 @@ ${indent}${end}`;
         ]
       };
     }
-    const bounds = computeCartesianValueBounds(rows, seriesDescriptors);
+    const leftSeries = seriesDescriptors.filter((series) => series.axis !== "right");
+    const rightSeries = seriesDescriptors.filter((series) => series.axis === "right");
+    const bounds = computeCartesianValueBounds(rows, leftSeries.length ? leftSeries : seriesDescriptors);
+    const rightBounds = computeCartesianValueBounds(rows, rightSeries);
     if (!bounds) {
       return {
         svg: "",
@@ -59347,7 +59386,7 @@ ${indent}${end}`;
       };
     }
     const leftPad = 52;
-    const rightPad = 16;
+    const rightPad = rightBounds ? 58 : 16;
     const topPad = 16;
     const xAxisLabel = normalizeString36(
       ((_a5 = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _a5.label) || ((_b = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _b.sourceDataKey) || ((_c = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _c.dataKey) || (resolvedChart == null ? void 0 : resolvedChart.xAxisKey)
@@ -59394,6 +59433,12 @@ ${indent}${end}`;
     <text x="${leftPad - 8}" y="${tick.y + 4}" text-anchor="end" font-size="10" fill="#667085">${escapeXml(formatAxisTick(tick.value, (_a6 = seriesDescriptors[0]) == null ? void 0 : _a6.format))}</text>
   `;
     }).join("\n");
+    const rightTicks = rightBounds ? Array.from({ length: 4 }, (_2, index) => {
+      var _a6;
+      const value = rightBounds.maxValue - index / 3 * (rightBounds.maxValue - rightBounds.minValue);
+      const y4 = topPad + index / 3 * plotHeight;
+      return `<text data-report-print-axis="right" x="${leftPad + plotWidth + 8}" y="${y4 + 4}" text-anchor="start" font-size="10" fill="#667085">${escapeXml(formatAxisTick(value, (_a6 = rightSeries[0]) == null ? void 0 : _a6.format))}</text>`;
+    }).join("\n") : "";
     const xAxisLabels = rows.map((row, index) => {
       var _a6, _b2, _c2;
       if (index % labelStep !== 0 && index !== rows.length - 1) {
@@ -59415,21 +59460,35 @@ ${indent}${end}`;
     const barWidth = barSeries.length > 0 ? Math.max(8, groupWidth / barSeries.length) : 0;
     const renderedSeries = seriesDescriptors.map((series) => {
       const supportedType = resolveChartSupportedSeriesType(series.type);
-      const points = rows.map((row, rowIndex) => {
+      const seriesBounds = series.axis === "right" && rightBounds ? rightBounds : bounds;
+      const seriesRange = seriesBounds.maxValue - seriesBounds.minValue || 1;
+      const seriesBaselineY = topPad + seriesBounds.maxValue / seriesRange * plotHeight;
+      const pointSlots = rows.map((row, rowIndex) => {
         const value = normalizeNumber2(row == null ? void 0 : row[series.key]);
         if (value == null) {
           return null;
         }
         const x2 = xPositions[rowIndex];
-        const y4 = topPad + (bounds.maxValue - value) / valueRange * plotHeight;
+        const y4 = topPad + (seriesBounds.maxValue - value) / seriesRange * plotHeight;
         return { x: x2, y: y4, value, rowIndex };
-      }).filter(Boolean);
+      });
+      const points = pointSlots.filter(Boolean);
+      const segments = [];
+      let segment = [];
+      for (const point of pointSlots) {
+        if (point) segment.push(point);
+        else if (segment.length) {
+          segments.push(segment);
+          segment = [];
+        }
+      }
+      if (segment.length) segments.push(segment);
       if (supportedType === "bar") {
         const barOffset = barSeries.findIndex((entry) => entry.key === series.key);
         const bars = points.map((point) => {
           const x2 = point.x - groupWidth / 2 + barOffset * barWidth;
-          const y4 = Math.min(point.y, baselineY);
-          const barHeight = Math.max(1, Math.abs(baselineY - point.y));
+          const y4 = Math.min(point.y, seriesBaselineY);
+          const barHeight = Math.max(1, Math.abs(seriesBaselineY - point.y));
           const fillColor = resolveSeriesPointColor(series, point.value, series.color);
           const label = shouldRenderReportPrintSeriesDataLabels(series, supportedType, rows.length) ? `<text x="${x2 + (barWidth - 1) / 2}" y="${y4 - 4}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(point.value, series.format))}</text>` : "";
           return `
@@ -59442,7 +59501,7 @@ ${indent}${end}`;
       const smoothPath = supportedType === "line" || supportedType === "area";
       const strokeDasharray = normalizeString36(series == null ? void 0 : series.strokeDasharray);
       const dashAttribute = escapeStrokeDasharray(strokeDasharray);
-      const path = smoothPath ? buildMonotonePath(points) : buildPolylinePath(points);
+      const path = segments.map((segment2) => smoothPath ? buildMonotonePath(segment2) : buildPolylinePath(segment2)).join(" ");
       const markers = points.map((point) => `
       <circle cx="${point.x}" cy="${point.y}" r="2.5" fill="${escapeXml(resolveSeriesPointColor(series, point.value, series.color))}" />
     `).join("\n");
@@ -59451,7 +59510,7 @@ ${indent}${end}`;
     `).join("\n") : "";
       if (supportedType === "area") {
         return `
-        <path d="${buildAreaPath(points, baselineY, { smooth: true })}" fill="${escapeXml(series.color)}" fill-opacity="0.18" stroke="none" />
+        <path d="${segments.map((segment2) => buildAreaPath(segment2, seriesBaselineY, { smooth: true })).join(" ")}" fill="${escapeXml(series.color)}" fill-opacity="0.18" stroke="none" />
         <path d="${path}" fill="none" stroke="${escapeXml(series.color)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"${dashAttribute} />
         ${markers}
         ${labels}
@@ -59465,7 +59524,7 @@ ${indent}${end}`;
     }).join("\n");
     return {
       svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
-      ${gridLines}
+      ${gridLines}${rightTicks ? "\n      " + rightTicks : ""}
       ${annotations.background}
       <line x1="${leftPad}" y1="${baselineY}" x2="${leftPad + plotWidth}" y2="${baselineY}" stroke="#98a2b3" stroke-width="1" />
       <line x1="${leftPad}" y1="${topPad}" x2="${leftPad}" y2="${topPad + plotHeight}" stroke="#98a2b3" stroke-width="1" />

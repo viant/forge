@@ -1,3 +1,4 @@
+import {isNumericValue} from "../utils/isNumericValue.js";
 import { format } from "date-fns";
 import {formatDisplayValue} from "../utils/formatValue.js";
 
@@ -136,10 +137,8 @@ export function resolveResponsiveCivilDateAxis(rows = [], dataKey = "", containe
     return { compact: true, ticks, tickFormat: "MM/dd", bottomMargin: 72, labelPosition: "bottom", labelOffset: 18 };
 }
 
-export function isChartNumericValue(value) {
-    return (typeof value === "number" || typeof value === "string" && value.trim() !== "")
-        && Number.isFinite(Number(value));
-}
+const isChartNumericValue = isNumericValue;
+export {isChartNumericValue};
 
 // Use the same display formats as tables and KPIs; keep the chart's compact
 // number fallback for an unformatted axis.

@@ -1,9 +1,11 @@
+import {applyChartMetricSelection} from "./chartMetricSelection.js";
 import {resolveCategoryColor} from './chartTheme.js';
 import {normalizeChartExtent, resolveChartMargins} from './chartExtent.js';
 import React, {useState, useEffect, useMemo} from "react";
 import {useSignals} from '@preact/signals-react/runtime';
 import {
     Dialog,
+    HTMLSelect,
     RadioGroup,
     Radio,
     Tooltip as BpTooltip,
@@ -495,11 +497,13 @@ export function resolveEmptyChartMessage(metrics = {}) {
     return 'No data for the selected period.';
 }
 
-const Chart = ({container, context, isActive = true, embedded = false, onDatumSelect = null, onLegendItemSelect = null, showControls = true}) => {
+const Chart = ({container, context, isActive = true, embedded = false, onDatumSelect = null, onLegendItemSelect = null, showControls = true, onMetricSelectionChange = null}) => {
     const controlsVisible = container?.chart?.showControls !== false && showControls !== false;
     useSignals();
     const log = getLogger('chart');
-    const {chart} = container;
+    const authoredChart = container.chart;
+    const [metricChoice, setMetricChoice] = useState(null);
+    const chart = useMemo(() => applyChartMetricSelection(authoredChart, metricChoice), [authoredChart, metricChoice]);
     const [chartRef, chartSize] = useMeasuredContainer();
 
     // Extract chart configuration
@@ -1406,6 +1410,24 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             data-chart-loading={effectiveLoading ? "true" : "false"}
             data-chart-stale={staleWhileLoading ? "true" : "false"}
         >
+            {!embedded && chart.metricSelection ? (
+                <div className="forge-chart-metric-selectors" role="group" aria-label="Trend metrics">
+                    {[["primaryField", "Primary metric"], ["secondaryField", "Secondary metric"]].map(([field, label]) => (
+                        <label key={field}>
+                            <span>{label}</span>
+                            <HTMLSelect aria-label={label} value={chart.metricSelection[field]} onChange={event => {
+                                const choice = {primaryField: chart.metricSelection.primaryField, secondaryField: chart.metricSelection.secondaryField, [field]: event.target.value};
+                                selectionStateRef.current = {initialized: false, touched: false};
+                                setMetricChoice(choice);
+                                onMetricSelectionChange?.(choice);
+                            }} options={[
+                                ...(field === "secondaryField" ? [{value: "", label: "None"}] : []),
+                                ...chart.metricSelection.options.filter(option => option.value !== chart.metricSelection[field === "primaryField" ? "secondaryField" : "primaryField"]).map(option => ({value: option.value, label: option.label || option.value})),
+                            ]}/>
+                        </label>
+                    ))}
+                </div>
+            ) : null}
             {controlsVisible && showEmbeddedSeriesSelector && showSeriesSelectionControls ? (
                 <div
                     aria-label="Chart series selector"
