@@ -55,7 +55,7 @@ const selectionRoot = {
 };
 if (!permissionBoundaryAllows({mode: 'selection', dataSourceRef: 'authorization', identityField: 'id', capability: 'write'}, selectionRoot)) throw new Error('selection permission rejected an authorized row');
 selectionRoot.Context = () => ({signals: {collection: signal([{resourceId: 1, capabilities: {write: false}}])}});
-if (permissionBoundaryAllows({mode: 'selection', dataSourceRef: 'authorization', identityField: 'id', capability: 'write'}, selectionRoot)) throw new Error('selection permission allowed a denied row');
+if (!permissionBoundaryAllows({mode: 'selection', dataSourceRef: 'authorization', identityField: 'id', capability: 'write'}, selectionRoot)) throw new Error('legacy row capabilities must not gate presentation');
 if (!permissionBoundaryAllows({mode: 'resource', capability: 'write'}, root)) throw new Error('resource permission must not be rewritten as selection permission');
 if (responsiveTarget(390) !== 'phone' || responsiveTarget(900) !== 'narrow' || responsiveTarget(1200) !== 'desktop') throw new Error('responsive targets are not stable');
 if (responsiveGridStyle({style: {height: '300px'}}).flexShrink !== 0) throw new Error('explicit responsive height may not be silently flex-shrunk');
@@ -109,3 +109,17 @@ assert.doesNotMatch(externalWizardHTML,/>Next</);
 const completeWizardHTML=renderToStaticMarkup(<Wizard context={root} container={{wizard:{steps:[{id:'copy',label:'Copy',terminal:true}],submit:{commandId:'no-repeat',label:'Create Again'}}}} renderStep={()=> <div>Saved code</div>}/>);
 assert.match(completeWizardHTML,/Saved code/);
 assert.doesNotMatch(completeWizardHTML,/forge-wizard__actions|Create Again|>Back</);
+
+// A missing resource-capability projection must never hide a published tab.
+for (const mode of ['resource', 'selection', 'rows']) {
+  const context = {signals: {selection: signal({selection: [{id: 1}]})}, Context() { throw new Error('UI must not fetch authorization grants'); }};
+  includes(renderToStaticMarkup(<PermissionBoundary context={context} container={{permissionBoundary: {mode, capability: 'read', dataSourceRef: 'grants'}}}><span>Published tab</span></PermissionBoundary>), 'Published tab');
+}
+const hidden = renderToStaticMarkup(<PermissionBoundary context={{signals: {windowForm: signal({show: false})}}} container={{permissionBoundary: {visibleWhen: {source: 'windowForm', field: 'show', equals: true}}}}><span>Hidden control</span></PermissionBoundary>);
+if (hidden.includes('Hidden control')) throw new Error('presentation visibility must still hide controls');
+for (const [field, member] of [['principal.roles', 'ROLE_VIEW'], ['principal.exposure', 'SHOW_ORDERS']]) {
+  const rule = {source: 'authorization', field, contains: member};
+  const principalKey = field.split('.')[1];
+  if (!permissionBoundaryAllows({visibleWhen: rule}, {authorization: {principal: {[principalKey]: [member]}}})) throw new Error('role/exposure presentation rejected a visible control');
+  if (permissionBoundaryAllows({visibleWhen: rule}, {authorization: {principal: {[principalKey]: []}}})) throw new Error('role/exposure presentation exposed a hidden control');
+}
