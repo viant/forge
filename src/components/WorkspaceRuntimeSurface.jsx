@@ -60,19 +60,21 @@ export function WorkspaceRuntimeTabs({id='workspace',entries=[],selectedId,onSel
         </span>;
     })}</div>;
 }
-function RuntimePanel({entry,active,id,tabIdFor,panelIdFor,className,panelProps,renderContent,presentation,onLifecycle,onRuntimeEvent}) {
+function RuntimePanel({entry,active,preload,id,tabIdFor,panelIdFor,className,panelProps,renderContent,presentation,onLifecycle,onRuntimeEvent}) {
     const windowId=identity(entry),callbacks=useRef({});callbacks.current={onLifecycle,onRuntimeEvent};
     useEffect(()=>{callbacks.current.onLifecycle?.(windowId,{phase:'mounted'});callbacks.current.onRuntimeEvent?.({type:'panel_mounted',windowId});return()=>{callbacks.current.onLifecycle?.(windowId,{phase:'unmounted'});callbacks.current.onRuntimeEvent?.({type:'panel_unmounted',windowId});};},[windowId]);
     useEffect(()=>{callbacks.current.onRuntimeEvent?.({type:'panel_visibility',windowId,active});},[windowId,active]);
     return <WorkspacePresentationProvider value={presentation || {label:label(entry),kind:entry.kind || 'window'}}><div {...panelProps} id={panelIdFor(id,windowId)} role="tabpanel" aria-label={label(entry)} aria-labelledby={tabIdFor(id,windowId)} hidden={!active} aria-hidden={!active} inert={!active?'':undefined} className={className}>
-        <RetainedWindowContent active={active}>{renderContent(entry,{active})}</RetainedWindowContent>
+        <RetainedWindowContent active={active} preload={preload}>{renderContent(entry,{active})}</RetainedWindowContent>
     </div></WorkspacePresentationProvider>;
 }
 // Stable window identity, lazy first visit and retained state are shared across
 // any host, including floating/docked mounts. Resource loading stays in slots.
-export function WorkspaceRuntimePanels({id='workspace',entries=[],selectedId,active=true,className='',panelProps=()=>({}),getPresentation,renderContent,onLifecycle,onRuntimeEvent,tabIdFor=workspaceTabID,panelIdFor=workspacePanelID}) {
+// Hosts may admit individual hidden renderers for readiness with preloadContent;
+// unvisited entries remain lazy by default, independently of panel selection.
+export function WorkspaceRuntimePanels({id='workspace',entries=[],selectedId,active=true,preloadContent=()=>false,className='',panelProps=()=>({}),getPresentation,renderContent,onLifecycle,onRuntimeEvent,tabIdFor=workspaceTabID,panelIdFor=workspacePanelID}) {
     const windows=workspaceRuntimeEntries(entries),selected=windows.some(entry=>identity(entry)===selectedId)?selectedId:identity(windows[0]);
-    return windows.map(entry=><RuntimePanel key={identity(entry)} entry={entry} id={id} tabIdFor={tabIdFor} panelIdFor={panelIdFor} active={active&&identity(entry)===selected} className={className} panelProps={panelProps(entry)} presentation={getPresentation?.(entry)} renderContent={renderContent} onLifecycle={onLifecycle} onRuntimeEvent={onRuntimeEvent}/>);
+    return windows.map(entry=><RuntimePanel key={identity(entry)} entry={entry} id={id} tabIdFor={tabIdFor} panelIdFor={panelIdFor} active={active&&identity(entry)===selected} preload={preloadContent(entry)===true} className={className} panelProps={panelProps(entry)} presentation={getPresentation?.(entry)} renderContent={renderContent} onLifecycle={onLifecycle} onRuntimeEvent={onRuntimeEvent}/>);
 }
 export default function WorkspaceRuntimeSurface({children,tabProps,panelProps,className='',style}) {
     return <div className={className} style={style} data-forge-workspace-runtime="true"><WorkspaceRuntimeTabs {...tabProps}/>{children}<WorkspaceRuntimePanels {...panelProps}/></div>;
