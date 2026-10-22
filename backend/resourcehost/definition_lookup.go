@@ -44,6 +44,16 @@ func ResolveDefinitionIn[T any](ctx context.Context, g *Gateway, kind, key strin
 	var selected *Located[json.RawMessage]
 	parsed, parseErr := identity.ParseResourceURI(key)
 	exactURI := parseErr == nil && parsed.Kind == kind
+	if exactURI {
+		// Absolute references may cross the parent's provider boundary. Resolve
+		// their owner with the ordinary namespace collision checks, then read
+		// only the selected definition rather than hydrating the entire catalog.
+		connection, err := g.ConnectionForResource(ctx, parsed, "")
+		if err != nil {
+			return nil, err
+		}
+		return Get[T](ctx, g, connection, identity.ResourceRef{URI: key}, nil, decoder...)
+	}
 	if !exactURI && scope.ProviderIdentity != "" {
 		// An authored relative reference belongs to its selected provider. Use
 		// the existing rooted catalog/cache instead of discovering other MCPs.
