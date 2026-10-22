@@ -2,6 +2,8 @@ package xlsx
 
 import (
 	"bytes"
+	"encoding/json"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,8 +29,106 @@ func TestRender_TableBlockToWorkbook(t *testing.T) {
 	require.Equal(t, "$30.00", mustCellValue(t, workbook, "Report", "B3"))
 }
 
-func TestFormatXLSXNumericValue_Integer(t *testing.T) {
-	require.Equal(t, "42", formatXLSXNumericValue("integer", 42))
+func TestRenderPreservesNumericPrecisionAndSpreadsheetCalculations(t *testing.T) {
+	report, err := reportfill.DecodeJSON([]byte(validTestReportFillJSON()))
+	require.NoError(t, err)
+	values := []float64{0.11459765000000001, 0}
+	for i, value := range values {
+		report.Datasets[0].Rows[i]["spend"] = value
+		report.Blocks[0].Content.ResolvedRows[i].Cells[1].Value = value
+		report.Blocks[0].Content.ResolvedRows[i].Cells[1].DisplayValue = value
+	}
+	// Currency changes presentation only; SUM must retain sub-cent precision.
+	data, err := Render(report)
+	require.NoError(t, err)
+	workbook, err := excelize.OpenReader(bytes.NewReader(data))
+	require.NoError(t, err)
+	defer workbook.Close()
+	raw, err := workbook.GetCellValue("Report", "B2", excelize.Options{RawCellValue: true})
+	require.NoError(t, err)
+	value, err := strconv.ParseFloat(raw, 64)
+	require.NoError(t, err)
+	require.Equal(t, values[0], value)
+	require.Equal(t, "$0.11", mustCellValue(t, workbook, "Report", "B2"))
+	zero, err := workbook.GetCellValue("Report", "B3", excelize.Options{RawCellValue: true})
+	require.NoError(t, err)
+	require.Equal(t, "0", zero, "zero must not become a blank cell")
+	require.NoError(t, workbook.SetCellFormula("Report", "D2", "SUM(B2:B3)"))
+	total, err := workbook.CalcCellValue("Report", "D2")
+	require.NoError(t, err)
+	sum, err := strconv.ParseFloat(total, 64)
+	require.NoError(t, err)
+	require.InDelta(t, values[0], sum, 1e-14)
+}
+
+func TestRenderRetainsLongIdentifiersAndNullCells(t *testing.T) {
+	report, err := reportfill.DecodeJSON([]byte(validTestReportFillJSON()))
+	require.NoError(t, err)
+	cell := &report.Blocks[0].Content.ResolvedRows[0].Cells[0]
+	cell.Value = json.Number("9007199254740993")
+	cell.DisplayValue = cell.Value
+	report.Datasets[0].Rows[0]["channel"] = cell.Value
+	cell = &report.Blocks[0].Content.ResolvedRows[1].Cells[1]
+	cell.Value = nil
+	cell.DisplayValue = nil
+	report.Datasets[0].Rows[1]["spend"] = nil
+	column := reportfill.TableColumn{Key: "enabled", Label: "Enabled"}
+	report.Blocks[0].Columns = append(report.Blocks[0].Columns, column)
+	report.Blocks[0].Content.Columns = append(report.Blocks[0].Content.Columns, column)
+	for i, enabled := range []bool{false, true} {
+		report.Datasets[0].Rows[i]["enabled"] = enabled
+		report.Blocks[0].Content.ResolvedRows[i].Cells = append(report.Blocks[0].Content.ResolvedRows[i].Cells, reportfill.ResolvedTableCell{Key: "enabled", SourceKey: "enabled", DisplayKey: "enabled", Value: enabled, DisplayValue: enabled})
+	}
+	data, err := Render(report)
+	require.NoError(t, err)
+	workbook, err := excelize.OpenReader(bytes.NewReader(data))
+	require.NoError(t, err)
+	defer workbook.Close()
+	require.Equal(t, "9007199254740993", mustCellValue(t, workbook, "Report", "A2"))
+	kind, err := workbook.GetCellType("Report", "A2")
+	require.NoError(t, err)
+	require.Equal(t, excelize.CellTypeSharedString, kind)
+	require.Empty(t, mustCellValue(t, workbook, "Report", "B3"))
+	require.NoError(t, workbook.SetCellFormula("Report", "D2", "ISBLANK(B3)"))
+	blank, err := workbook.CalcCellValue("Report", "D2")
+	require.NoError(t, err)
+	require.Equal(t, "TRUE", blank, "null measurements must be real blanks")
+	for _, address := range []string{"C2", "C3"} {
+		kind, err := workbook.GetCellType("Report", address)
+		require.NoError(t, err)
+		require.Equal(t, excelize.CellTypeBool, kind)
+	}
+}
+
+func TestRenderPercentageDisplayKeepsOriginalScale(t *testing.T) {
+	for _, tc := range []struct {
+		format  string
+		value   float64
+		display string
+	}{
+		{"percent", 12.345, "12.3%"}, {"percentFraction", 0.12345, "12.3%"}, {"percentFraction2", 0.12345, "12.35%"},
+	} {
+		t.Run(tc.format, func(t *testing.T) {
+			report, err := reportfill.DecodeJSON([]byte(validTestReportFillJSON()))
+			require.NoError(t, err)
+			report.Blocks[0].Columns[1].Format = tc.format
+			report.Blocks[0].Content.Columns[1].Format = tc.format
+			cell := &report.Blocks[0].Content.ResolvedRows[0].Cells[1]
+			cell.Value, cell.DisplayValue = tc.value, tc.value
+			report.Datasets[0].Rows[0]["spend"] = tc.value
+			data, err := Render(report)
+			require.NoError(t, err)
+			workbook, err := excelize.OpenReader(bytes.NewReader(data))
+			require.NoError(t, err)
+			defer workbook.Close()
+			require.Equal(t, tc.display, mustCellValue(t, workbook, "Report", "B2"))
+			raw, err := workbook.GetCellValue("Report", "B2", excelize.Options{RawCellValue: true})
+			require.NoError(t, err)
+			value, err := strconv.ParseFloat(raw, 64)
+			require.NoError(t, err)
+			require.Equal(t, tc.value, value)
+		})
+	}
 }
 
 func TestRender_RejectsMissingOrMultipleTableBlocks(t *testing.T) {
@@ -177,7 +277,7 @@ func TestRender_FormatsDefaultNumbersAndCompactValues(t *testing.T) {
 
 	workbook, err := excelize.OpenReader(bytes.NewReader(data))
 	require.NoError(t, err)
-	require.Equal(t, "25 095 562 010", mustCellValue(t, workbook, "Report", "A2"))
+	require.Equal(t, "25,095,562,010", mustCellValue(t, workbook, "Report", "A2"))
 	require.Equal(t, "13.15164", mustCellValue(t, workbook, "Report", "B2"))
 }
 

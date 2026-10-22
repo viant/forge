@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +23,7 @@ func TestResourceFetchModeKeepsPreviewPageAndCompletesExport(t *testing.T) {
 	})}
 	service := New(Options{Compiler: NewReportSpecCompiler(time.Now), ResourceResolver: func(context.Context, string) (*identity.ResourceResolver, error) { return resolver, nil }})
 	calls := 0
+	batchSize := int64(2)
 	revokeOnLastPage := false
 	service.SetResourceDatasetExecutor(NewResourceDatasetExecutor(reportFixtureTransport(func(_ context.Context, method string, args map[string]interface{}) (string, error) {
 		calls++
@@ -31,6 +33,10 @@ func TestResourceFetchModeKeepsPreviewPageAndCompletesExport(t *testing.T) {
 		offset, err := reportPagingInteger(args["offset"])
 		if err != nil {
 			t.Fatal(err)
+		}
+		limit, err := reportPagingInteger(args["limit"])
+		if err != nil || limit != batchSize {
+			t.Fatalf("unexpected transport page size: %v %v", args["limit"], err)
 		}
 		if offset != 0 && offset != 2 {
 			t.Fatal("unexpected continuation", offset)
@@ -42,7 +48,10 @@ func TestResourceFetchModeKeepsPreviewPageAndCompletesExport(t *testing.T) {
 		if offset == 2 {
 			rows = `[["row-2"]]`
 		}
-		return fmt.Sprintf(`{"data":[{"columns":[{"name":"name"}],"rows":%s,"hasMore":%t}]}`, rows, offset == 0), nil
+		if limit == 3 {
+			rows = `[["row-0"],["row-1"],["row-2"]]`
+		}
+		return fmt.Sprintf(`{"data":[{"columns":[{"name":"name"}],"rows":%s,"hasMore":%t}]}`, rows, offset == 0 && limit == 2), nil
 	}), service.AuthorizeResourceDataset))
 	for _, mode := range []DatasetFetchMode{DatasetFetchPage, DatasetFetchComplete, ""} {
 		calls = 0
@@ -72,6 +81,54 @@ func TestResourceFetchModeKeepsPreviewPageAndCompletesExport(t *testing.T) {
 			t.Fatalf("completeness lost for %q: %+v", mode, got)
 		}
 	}
+	// Authored batching changes complete-fetch transport only, not preview size
+	// or the stored source/request. The effective spec records the actual batch.
+	raw = json.RawMessage(strings.Replace(string(raw), `"enabled":true,"mode":"offset"`, `"enabled":true,"mode":"offset","size":3`, 1))
+	for _, mode := range []DatasetFetchMode{DatasetFetchPage, DatasetFetchComplete} {
+		calls = 0
+		batchSize = 2
+		if mode == DatasetFetchComplete {
+			batchSize = 3
+		}
+		result, err := service.ExecuteResource(context.Background(), &ExecuteResourceRequest{Resource: &identity.ResourceRef{URI: uri.String()}, DatasetFetchMode: mode})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if calls != 1 || len(result.Datasets["primary"].Rows) != int(batchSize) {
+			t.Fatal("batching changed rows or made redundant calls", calls, result.Datasets)
+		}
+		var spec struct {
+			Datasets []struct {
+				Request map[string]interface{} `json:"request"`
+			} `json:"datasets"`
+		}
+		if err := json.Unmarshal(result.ReportSpec, &spec); err != nil {
+			t.Fatal(err)
+		}
+		if spec.Datasets[0].Request["limit"] != float64(batchSize) {
+			t.Fatal("effective request lost actual batch size")
+		}
+	}
+	var envelope map[string]interface{}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	descriptor := envelope["dataSources"].(map[string]interface{})["rows"].(map[string]interface{})
+	descriptor["backend"].(map[string]interface{})["pinned"] = map[string]interface{}{"limit": 2}
+	raw, _ = json.Marshal(envelope)
+	calls, batchSize = 0, 2
+	if result, err := service.ExecuteResource(context.Background(), &ExecuteResourceRequest{Resource: &identity.ResourceRef{URI: uri.String()}, DatasetFetchMode: DatasetFetchComplete}); err != nil || len(result.Datasets["primary"].Rows) != 3 || calls != 2 {
+		t.Fatal("complete batching replaced a pinned producer limit", err, calls)
+	}
+	descriptor["paging"].(map[string]interface{})["size"] = maxResourceDatasetRows + 1
+	raw, _ = json.Marshal(envelope)
+	calls = 0
+	if result, err := service.ExecuteResource(context.Background(), &ExecuteResourceRequest{Resource: &identity.ResourceRef{URI: uri.String()}, DatasetFetchMode: DatasetFetchComplete}); err == nil || result != nil || calls != 0 {
+		t.Fatal("excessive authored batch dispatched")
+	}
+	descriptor["paging"].(map[string]interface{})["size"] = 0
+	raw, _ = json.Marshal(envelope)
+	batchSize = 2
 	calls = 0
 	if out, err := service.ExecuteResource(context.Background(), &ExecuteResourceRequest{Resource: &identity.ResourceRef{URI: uri.String()}, DatasetFetchMode: "unknown"}); err == nil || out != nil || calls != 0 {
 		t.Fatal("invalid mode dispatched")
