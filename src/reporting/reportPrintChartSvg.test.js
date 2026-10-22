@@ -174,6 +174,20 @@ const horizontalBar = buildReportPrintChartSvg({
   width: 640,
 });
 
+// A narrow dashboard column must not pack fractional count ticks together.
+const narrowBarInput = {
+  chartModel: { type: "horizontal_bar", xAxis: { dataKey: "campaign" }, series: { values: [{ value: "impressions", label: "Impressions", type: "horizontal_bar" }] } },
+  resolvedChart: { kind: "directSeries", type: "horizontal_bar", xAxisKey: "campaign", seriesKeys: ["impressions"], rows: [{ campaign: "Campaign", impressions: 922 }] },
+};
+const narrowBar = buildReportPrintChartSvg({ ...narrowBarInput, width: 280 });
+assert.deepEqual(narrowBar.diagnostics, []);
+assert.match(narrowBar.svg, />461<\/text>/);
+assert.doesNotMatch(narrowBar.svg, />307\.33<\/text>/);
+assert.match(narrowBar.svg, />922<\/text>/);
+const wideBar = buildReportPrintChartSvg({ ...narrowBarInput, width: 680 });
+assert.match(wideBar.svg, />307\.33<\/text>/);
+assert.match(wideBar.svg, />614\.67<\/text>/);
+
 assert.equal(horizontalBar.diagnostics.length, 0);
 assert.ok(horizontalBar.height > 120);
 assert.match(horizontalBar.svg, /<rect/);
