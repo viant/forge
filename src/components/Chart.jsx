@@ -1,9 +1,11 @@
+import {applyChartMetricSelection} from "./chartMetricSelection.js";
 import {resolveCategoryColor} from './chartTheme.js';
 import {normalizeChartExtent, resolveChartMargins} from './chartExtent.js';
 import React, {useState, useEffect, useMemo} from "react";
 import {useSignals} from '@preact/signals-react/runtime';
 import {
     Dialog,
+    HTMLSelect,
     RadioGroup,
     Radio,
     Tooltip as BpTooltip,
@@ -38,6 +40,8 @@ import {
     buildPieChartData,
     fillMissingTemporalBuckets,
     formatChartNumber,
+    formatChartDisplayValue,
+    isChartNumericValue,
     formatChartXAxisValue,
     hasNonZeroChartSeriesValue,
     materializeChartDisplayRows,
@@ -251,26 +255,7 @@ function getSeriesDefinitions(chart = {}) {
     })).filter((entry) => !!entry.value);
 }
 
-function formatValueByFormat(value, formatType) {
-    const numeric = Number(value);
-    if (!Number.isFinite(numeric)) {
-        return value;
-    }
-    switch (formatType) {
-        case "currency":
-            return new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', maximumFractionDigits: 0}).format(numeric);
-        case "currency2":
-            return new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2}).format(numeric);
-        case "compactNumber":
-            return formatLargeNumber(numeric);
-        case "percent":
-            return `${numeric.toFixed(1)}%`;
-        case "percentFraction":
-            return `${(numeric * 100).toFixed(1)}%`;
-        default:
-            return formatLargeNumber(numeric);
-    }
-}
+const formatValueByFormat = formatChartDisplayValue;
 
 export function chartTableColumnMeta(columnKey, xAxis = {}, seriesDefinitions = []) {
     if (columnKey === xAxis?.dataKey) {
@@ -512,11 +497,13 @@ export function resolveEmptyChartMessage(metrics = {}) {
     return 'No data for the selected period.';
 }
 
-const Chart = ({container, context, isActive = true, embedded = false, onDatumSelect = null, onLegendItemSelect = null, showControls = true}) => {
+const Chart = ({container, context, isActive = true, embedded = false, onDatumSelect = null, onLegendItemSelect = null, showControls = true, onMetricSelectionChange = null}) => {
     const controlsVisible = container?.chart?.showControls !== false && showControls !== false;
     useSignals();
     const log = getLogger('chart');
-    const {chart} = container;
+    const authoredChart = container.chart;
+    const [metricChoice, setMetricChoice] = useState(null);
+    const chart = useMemo(() => applyChartMetricSelection(authoredChart, metricChoice), [authoredChart, metricChoice]);
     const [chartRef, chartSize] = useMeasuredContainer();
 
     // Extract chart configuration
@@ -1287,10 +1274,10 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const canRenderChartSelection = isPieChart ? pieFilteredData.length > 0 : selectedSeriesDefinitions.length > 0;
     const hasChartRows = isPieChart ? pieFilteredData.length > 0 : normalizedChartData.length > 0;
     const hasRenderableSeriesValues = isPieChart
-        ? pieFilteredData.some((entry) => Number.isFinite(Number(entry?.value)))
-        : normalizedChartData.some((row) => selectedSeriesDefinitions.some((entry) => Number.isFinite(Number(row?.[entry.value]))));
+        ? pieFilteredData.some((entry) => isChartNumericValue(entry?.value))
+        : normalizedChartData.some((row) => selectedSeriesDefinitions.some((entry) => isChartNumericValue(row?.[entry.value])));
     const hasNonZeroRenderableSeriesValues = isPieChart
-        ? pieFilteredData.some((entry) => Number.isFinite(Number(entry?.value)) && Number(entry.value) !== 0)
+        ? pieFilteredData.some((entry) => isChartNumericValue(entry?.value) && Number(entry.value) !== 0)
         : hasNonZeroChartSeriesValue(normalizedChartData, selectedSeriesDefinitions.map((entry) => entry.value));
     const showZeroDataMessage = !effectiveLoading
         && !error
@@ -1423,6 +1410,24 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             data-chart-loading={effectiveLoading ? "true" : "false"}
             data-chart-stale={staleWhileLoading ? "true" : "false"}
         >
+            {!embedded && chart.metricSelection ? (
+                <div className="forge-chart-metric-selectors" role="group" aria-label="Trend metrics">
+                    {[["primaryField", "Primary metric"], ["secondaryField", "Secondary metric"]].map(([field, label]) => (
+                        <label key={field}>
+                            <span>{label}</span>
+                            <HTMLSelect aria-label={label} value={chart.metricSelection[field]} onChange={event => {
+                                const choice = {primaryField: chart.metricSelection.primaryField, secondaryField: chart.metricSelection.secondaryField, [field]: event.target.value};
+                                selectionStateRef.current = {initialized: false, touched: false};
+                                setMetricChoice(choice);
+                                onMetricSelectionChange?.(choice);
+                            }} options={[
+                                ...(field === "secondaryField" ? [{value: "", label: "None"}] : []),
+                                ...chart.metricSelection.options.filter(option => option.value !== chart.metricSelection[field === "primaryField" ? "secondaryField" : "primaryField"]).map(option => ({value: option.value, label: option.label || option.value})),
+                            ]}/>
+                        </label>
+                    ))}
+                </div>
+            ) : null}
             {controlsVisible && showEmbeddedSeriesSelector && showSeriesSelectionControls ? (
                 <div
                     aria-label="Chart series selector"

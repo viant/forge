@@ -1,4 +1,6 @@
+import {isNumericValue} from "../utils/isNumericValue.js";
 import { format } from "date-fns";
+import {formatDisplayValue} from "../utils/formatValue.js";
 
 import { resolveKey, setSelector } from "../utils/selector.js";
 
@@ -24,6 +26,7 @@ export function resolveChartLoadingState({
 }
 
 export function formatChartNumber(value) {
+    if (value == null || typeof value === "string" && !value.trim()) return value;
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return value;
     const magnitude = Math.abs(numeric);
@@ -134,11 +137,24 @@ export function resolveResponsiveCivilDateAxis(rows = [], dataKey = "", containe
     return { compact: true, ticks, tickFormat: "MM/dd", bottomMargin: 72, labelPosition: "bottom", labelOffset: 18 };
 }
 
+const isChartNumericValue = isNumericValue;
+export {isChartNumericValue};
+
+// Use the same display formats as tables and KPIs; keep the chart's compact
+// number fallback for an unformatted axis.
+export function formatChartDisplayValue(value, formatType) {
+    if (value == null || typeof value === "string" && !value.trim()) return value;
+    if (["currency", "currency2", "compactNumber", "percent", "percentFraction", "percentFraction2"].includes(formatType)) {
+        return formatDisplayValue(value, formatType);
+    }
+    return formatChartNumber(value);
+}
+
 export function hasNonZeroChartSeriesValue(rows = [], seriesKeys = []) {
     const keys = Array.isArray(seriesKeys) ? seriesKeys : [];
     return (Array.isArray(rows) ? rows : []).some((row) => keys.some((key) => {
-        const value = Number(readChartDataValue(row, key));
-        return Number.isFinite(value) && value !== 0;
+        const value = readChartDataValue(row, key);
+        return isChartNumericValue(value) && Number(value) !== 0;
     }));
 }
 
@@ -331,7 +347,7 @@ export function aggregateDirectSeriesData(rawData = [], xAxisKey = "", seriesDef
         valueKeys.forEach((valueKey) => {
             const rawValue = readChartDataValue(row, valueKey);
             const numeric = Number(rawValue);
-            if (!Number.isFinite(numeric)) {
+            if (!isChartNumericValue(rawValue)) {
                 if (!(valueKey in existing) && rawValue !== undefined) {
                     existing[valueKey] = rawValue;
                 }
@@ -356,9 +372,10 @@ export function buildPieChartData(rawData = [], nameKey = "", valueKey = "") {
     const grouped = new Map();
     rawData.forEach((row) => {
         const label = readChartDataValue(row, resolvedNameKey);
-        const numericValue = Number(readChartDataValue(row, resolvedValueKey));
+        const rawValue = readChartDataValue(row, resolvedValueKey);
+        const numericValue = Number(rawValue);
         const category = label == null || label === "" ? "unknown" : String(label);
-        if (!Number.isFinite(numericValue)) {
+        if (!isChartNumericValue(rawValue)) {
             return;
         }
         const existing = grouped.get(category) || attachChartSelectionRowsMetadata({ name: category, value: 0 }, []);

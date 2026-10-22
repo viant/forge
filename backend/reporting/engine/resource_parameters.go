@@ -126,6 +126,7 @@ type reportExecutionDatasetScope struct {
 	Exclude           []string               `json:"exclude"`
 	Local             map[string]interface{} `json:"local"`
 	RelativeDateRange *struct {
+		Preset    string `json:"preset"`
 		StartPath string `json:"startParamPath"`
 		EndPath   string `json:"endParamPath"`
 	} `json:"relativeDateRange"`
@@ -135,7 +136,7 @@ func (scope *reportExecutionDatasetScope) preserves(declaration reportParameterD
 	if scope == nil {
 		return false
 	}
-	if scope.Mode == "override" {
+	if scope.Mode == "override" && !scope.previousPeriod() {
 		return true
 	}
 	for _, id := range scope.Exclude {
@@ -148,4 +149,8 @@ func (scope *reportExecutionDatasetScope) preserves(declaration reportParameterD
 	}
 	_, local := scope.Local[declaration.ID]
 	return local
+}
+
+func (scope *reportExecutionDatasetScope) previousPeriod() bool {
+	return scope != nil && scope.RelativeDateRange != nil && strings.EqualFold(strings.ReplaceAll(scope.RelativeDateRange.Preset, "_", ""), "previousperiod")
 }

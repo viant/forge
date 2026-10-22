@@ -341,7 +341,7 @@ function buildReportBuilderPublishedDatasetRequest(
   const localPatch = isPlainObject(scopePolicy?.local) ? scopePolicy.local : {};
   const relativeDateRangePatch = {};
   const relativeDateRange = scopePolicy?.relativeDateRange;
-  const resolvedRelativeDateRange = resolveReportRelativeDateRangeSpec(relativeDateRange);
+  const resolvedRelativeDateRange = resolveReportRelativeDateRangeSpec(relativeDateRange, new Date(), primaryRequestContext);
   if (resolvedRelativeDateRange) {
     setNestedValue(relativeDateRangePatch, relativeDateRange.startParamPath, resolvedRelativeDateRange.start);
     setNestedValue(relativeDateRangePatch, relativeDateRange.endParamPath, resolvedRelativeDateRange.end);
@@ -653,7 +653,7 @@ export function buildReportBuilderReportSpec({
   const contextPreset = resolveReportScopeContextPresetFromState(normalizedState, scopeParams);
   const referencedDatasetRefs = new Set(
     (Array.isArray(normalizedState?.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : [])
-      .map((block) => normalizeString(block?.datasetRef))
+      .flatMap((block) => [normalizeString(block?.datasetRef), normalizeString(block?.secondaryDatasetRef)])
       .filter((datasetRef) => !!datasetRef && datasetRef !== "primary"),
   );
   const authoredDatasetBackedBlocks = (Array.isArray(normalizedState?.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : [])

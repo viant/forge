@@ -8,6 +8,7 @@ export async function exportSelectedReport({pin, parameters, format, services, i
     for (let attempt = 0; attempt < 120; attempt++) {
         if (!isCurrent()) return null;
         const status = await services.getStatus({jobId: job.jobId});
+        if (!isCurrent()) return null;
         if (status.status === "failed") throw new Error(status.error || "Report export failed.");
         if (status.status === "succeeded") {
             const artifact = await services.getArtifact({artifactId: status.artifactId, includeData: true});

@@ -1,3 +1,4 @@
+import {isNumericValue} from "../utils/isNumericValue.js";
 function normalizeString(value = "") {
   return String(value || "").trim();
 }
@@ -7,8 +8,7 @@ function isPlainObject(value) {
 }
 
 function normalizeFiniteNumber(value) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : null;
+  return isNumericValue(value) ? Number(value) : null;
 }
 
 function formatExportDateValue(value, {
@@ -84,6 +84,8 @@ export function formatExportNumericValue(value, format = "", {
       return `${numeric.toFixed(1)}%`;
     case "percentfraction":
       return `${(numeric * 100).toFixed(1)}%`;
+    case "percentfraction2":
+      return `${(numeric * 100).toFixed(2)}%`;
     case "number":
       return new Intl.NumberFormat("en-US", {
         minimumFractionDigits: 0,

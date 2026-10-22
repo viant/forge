@@ -410,3 +410,12 @@ for (const names of [
     assert.equal(legend?.[1], color, `${name} keeps its color when reordered`);
   }
 }
+
+const dualChart=buildReportPrintChartSvg({chartModel:{type:'line',xAxis:{dataKey:'date'},series:{values:[{value:'spend',label:'Spend',format:'currency2',axis:'left'},{value:'rate',label:'Rate',format:'percentFraction2',axis:'right'}]}},resolvedChart:{kind:'directSeries',type:'line',xAxisKey:'date',seriesKeys:['spend','rate'],rows:[{date:'one',spend:1000,rate:.01},{date:'two',spend:2000,rate:.02}]}});
+assert.deepEqual([...dualChart.svg.matchAll(/<circle[^>]+cy="([^"]+)"/g)].map(m=>Number(m[1])),[106,16,106,16],'Both axes need independent bounds');
+assert.match(dualChart.svg,/data-report-print-axis="right"/);
+assert.match(dualChart.svg,/2.00%/);
+const missingLine=buildReportPrintChartSvg({chartModel:{type:'line',xAxis:{dataKey:'date'},series:{values:[{value:'value',label:'Value'}]}},resolvedChart:{kind:'directSeries',type:'line',xAxisKey:'date',seriesKeys:['value'],rows:[{date:'one',value:1},{date:'two',value:null},{date:'three',value:2}]}});
+assert.match(missingLine.svg,/<path d="M[^\"]* M/,'Missing values must break printed lines');
+const nullLine=buildReportPrintChartSvg({chartModel:{type:'line',series:{values:[{value:'value',label:'Value'}]}},resolvedChart:{kind:'directSeries',seriesKeys:['value'],rows:[{value:null}]}});
+assert.equal(nullLine.svg,'','Missing observations must not print as zero');

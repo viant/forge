@@ -43,6 +43,9 @@ type ReportCapabilities struct {
 	Export    bool `json:"export"`
 	Delete    bool `json:"delete"`
 	RunRange  bool `json:"runRange"`
+	// Host support for forwarding declared chart choices through run and export.
+	// This is not an additional data-access permission and defaults to false.
+	ChartMetricSelection bool `json:"chartMetricSelection,omitempty"`
 }
 type ReportCatalogEntry struct {
 	ReportCatalogCandidate
