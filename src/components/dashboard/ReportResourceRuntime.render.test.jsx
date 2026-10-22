@@ -5,6 +5,7 @@ vi.mock('@blueprintjs/core', () => ({
     Button: ({children, onClick, disabled}) => <button onClick={onClick} disabled={disabled}>{children}</button>,
     Callout: ({children, title}) => <section role="status">{title}{children}</section>,
     Spinner: () => <span/>,
+    HTMLSelect: props => <select {...props}/>,
 }));
 vi.mock('./ReportRuntime.jsx', () => ({default: ({reportSpec,onChartMetricSelectionChange}) => <><output>{reportSpec.title}</output>{onChartMetricSelectionChange&&<button onClick={()=>onChartMetricSelectionChange({blockId:'trend',selection:{primaryField:'count',secondaryField:'rate'}})}>Choose metrics</button>}</>}));
 vi.mock('./ReportPrintPreview.jsx', () => ({default: () => <aside>Print</aside>}));
