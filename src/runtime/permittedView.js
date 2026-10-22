@@ -9,8 +9,26 @@ const isEmpty = (value) => {
   return false;
 };
 
+// Index owned, immutable fact arrays at snapshot ingestion, never at each guard.
+// Weak keys let an old snapshot and its indexes be collected together.
+const factMembership = new WeakMap();
+function snapshotFacts(value) {
+  if (Array.isArray(value)) {
+    const result = Object.freeze(value.map(snapshotFacts));
+    factMembership.set(result, new Set(result));
+    return result;
+  }
+  if (value && typeof value === 'object') {
+    return Object.freeze(Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, snapshotFacts(entry)])));
+  }
+  return value;
+}
+
 const contains = (actual, expected) => {
-  if (Array.isArray(actual)) return actual.includes(expected);
+  if (Array.isArray(actual)) {
+    const index = factMembership.get(actual);
+    return index ? index.has(expected) : actual.includes(expected);
+  }
   if (typeof actual === 'string') return actual.includes(String(expected));
   if (actual && typeof actual === 'object') return Object.hasOwn(actual, expected);
   return false;
@@ -195,7 +213,7 @@ export function normalizeAuthorizationSnapshot(response, resourceType = '', reso
     ...(response?.schemaVersion !== undefined ? {schemaVersion: response.schemaVersion} : {}),
     authorizationVersion: response?.authorizationVersion || '',
     expiresAt: response?.expiresAt || '',
-    principal: response?.principal || {},
+    principal: snapshotFacts(response?.principal || {}),
     account: response?.account || {},
     globalCapabilities: response?.globalCapabilities || {},
     resource: resource ? {...resource, type: resource.type || resourceType} : null,

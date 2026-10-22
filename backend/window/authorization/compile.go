@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	forgetypes "github.com/viant/forge/backend/types"
+	"github.com/viant/forge/backend/window/presentationfacts"
 )
 
 type reducedCondition struct {
@@ -171,10 +172,20 @@ func validateCondition(value any) error {
 	return nil
 }
 
-func authorizationScope(snapshot *Snapshot, resource *Resource) map[string]any {
+type conditionScope struct {
+	values     map[string]any
+	membership *presentationfacts.Membership
+}
+
+func indexedConditionScope(values map[string]any) *conditionScope {
+	return &conditionScope{values: values, membership: presentationfacts.NewMembership(values,
+		"principal.roles", "principal.features", "principal.exposures", "principal.userAuthorities",
+		"account.roles", "account.features", "account.exposures", "resource.roles")}
+}
+func authorizationScope(snapshot *Snapshot, resource *Resource) *conditionScope {
 	result := map[string]any{"principal": map[string]any{}, "account": map[string]any{}, "globalCapabilities": map[string]any{}, "resource": nil}
 	if snapshot == nil {
-		return result
+		return indexedConditionScope(result)
 	}
 	raw, _ := json.Marshal(map[string]any{
 		"authorizationVersion": snapshot.AuthorizationVersion,
@@ -185,10 +196,10 @@ func authorizationScope(snapshot *Snapshot, resource *Resource) map[string]any {
 		"resource":             resource,
 	})
 	_ = json.Unmarshal(raw, &result)
-	return result
+	return indexedConditionScope(result)
 }
 
-func compileNode(value any, authorization map[string]any) (any, bool) {
+func compileNode(value any, authorization *conditionScope) (any, bool) {
 	switch actual := value.(type) {
 	case []any:
 		result := make([]any, 0, len(actual))
@@ -229,7 +240,7 @@ func compileNode(value any, authorization map[string]any) (any, bool) {
 	}
 }
 
-func applyGuard(node map[string]any, key string, authorization map[string]any, mode string) (bool, error) {
+func applyGuard(node map[string]any, key string, authorization *conditionScope, mode string) (bool, error) {
 	condition, ok := node[key]
 	if !ok {
 		return false, nil
@@ -258,7 +269,7 @@ func applyGuard(node map[string]any, key string, authorization map[string]any, m
 	return false, nil
 }
 
-func reduceCondition(value any, authorization map[string]any) reducedCondition {
+func reduceCondition(value any, authorization *conditionScope) reducedCondition {
 	condition, ok := value.(map[string]any)
 	if !ok {
 		return constant(false)
@@ -314,7 +325,7 @@ func reduceCondition(value any, authorization map[string]any) reducedCondition {
 	return reducedCondition{dynamic: condition}
 }
 
-func evaluateAuthorizationLeaf(condition, authorization map[string]any) bool {
+func evaluateAuthorizationLeaf(condition map[string]any, authorization *conditionScope) bool {
 	field := stringValue(condition["field"])
 	if field == "" {
 		field = stringValue(condition["selector"])
@@ -322,7 +333,12 @@ func evaluateAuthorizationLeaf(condition, authorization map[string]any) bool {
 	if field == "" {
 		field = stringValue(condition["key"])
 	}
-	actual, _ := selectValue(authorization, field)
+	if expected, ok := condition["contains"]; ok {
+		if match, handled := authorization.membership.Contains(field, expected); handled {
+			return match
+		}
+	}
+	actual, _ := selectValue(authorization.values, field)
 	if expected, ok := condition["equals"]; ok {
 		return reflect.DeepEqual(actual, expected)
 	}
@@ -389,7 +405,12 @@ func isEmpty(value any) bool {
 }
 
 func constant(value bool) reducedCondition { return reducedCondition{constant: &value} }
-func stringValue(value any) string         { return strings.TrimSpace(fmt.Sprint(value)) }
+func stringValue(value any) string {
+	if text, ok := value.(string); ok {
+		return strings.TrimSpace(text)
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
+}
 
 func collectWindowDataSourceRefs(window *forgetypes.Window) map[string]bool {
 	raw, _ := json.Marshal(window)
