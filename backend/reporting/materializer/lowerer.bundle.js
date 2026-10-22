@@ -43304,6 +43304,22 @@ Please __addLocaleData before adding additional unit data`);
     });
   }
 
+  // src/reporting/reportKpiComparisonModel.js
+  function normalizeKpiSecondaryCalculation(value = "") {
+    const mode = String(value || "value").trim();
+    if (!["value", "difference", "relativeChange"].includes(mode)) throw new Error(`Unknown KPI secondary calculation '${mode}'.`);
+    return mode;
+  }
+  function calculateKpiSecondaryValue(current, previous, mode = "value") {
+    const calculation = normalizeKpiSecondaryCalculation(mode);
+    if (calculation === "value") return previous != null ? previous : null;
+    const numeric = (value) => (typeof value === "number" || typeof value === "string" && value.trim() !== "") && Number.isFinite(Number(value));
+    if (!numeric(current) || !numeric(previous)) return null;
+    const difference = Number(current) - Number(previous);
+    const result = calculation === "relativeChange" ? Number(previous) === 0 ? null : difference / Number(previous) : difference;
+    return result === null || !Number.isFinite(result) ? null : result;
+  }
+
   // src/utils/selector.js
   var resolveKey = (object, path) => {
     try {
@@ -49466,7 +49482,7 @@ Please __addLocaleData before adding additional unit data`);
     const scopeParams = buildReportBuilderScopeParams(effectiveConfig, normalizedState);
     const contextPreset = resolveReportScopeContextPresetFromState(normalizedState, scopeParams);
     const referencedDatasetRefs = new Set(
-      (Array.isArray(normalizedState == null ? void 0 : normalizedState.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : []).map((block) => normalizeString26(block == null ? void 0 : block.datasetRef)).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
+      (Array.isArray(normalizedState == null ? void 0 : normalizedState.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : []).flatMap((block) => [normalizeString26(block == null ? void 0 : block.datasetRef), normalizeString26(block == null ? void 0 : block.secondaryDatasetRef)]).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
     );
     const authoredDatasetBackedBlocks = (Array.isArray(normalizedState == null ? void 0 : normalizedState.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : []).filter((block) => isReportDatasetBackedBlockKind(block == null ? void 0 : block.kind));
     const primaryDataSourceRef = resolveReportSpecDataSourceRef(container, config);
@@ -49993,7 +50009,7 @@ Please __addLocaleData before adding additional unit data`);
       return true;
     };
     (Array.isArray(blocks) ? blocks : []).forEach((block) => {
-      var _a5, _b, _c, _d, _e, _f, _g, _h, _i;
+      var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j;
       const normalizedBlock = block && typeof block === "object" && !Array.isArray(block) ? block : null;
       if (!normalizedBlock) {
         return;
@@ -50012,7 +50028,11 @@ Please __addLocaleData before adding additional unit data`);
           break;
         case "kpiBlock":
           enableField(normalizedBlock == null ? void 0 : normalizedBlock.valueField, normalizedDatasetRef, request);
-          enableField(normalizedBlock == null ? void 0 : normalizedBlock.secondaryField, normalizedDatasetRef, request);
+          {
+            const secondaryRef = normalizeString28(normalizedBlock == null ? void 0 : normalizedBlock.secondaryDatasetRef) || normalizedDatasetRef;
+            const secondaryRequest = (_d = nextSpec.datasets.find((entry) => normalizeString28(entry == null ? void 0 : entry.id) === secondaryRef)) == null ? void 0 : _d.request;
+            if (secondaryRequest) enableField(normalizedBlock == null ? void 0 : normalizedBlock.secondaryField, secondaryRef, secondaryRequest);
+          }
           break;
         case "badgesBlock":
           (Array.isArray(normalizedBlock == null ? void 0 : normalizedBlock.items) ? normalizedBlock.items : []).forEach((item) => {
@@ -50029,10 +50049,10 @@ Please __addLocaleData before adding additional unit data`);
           });
           break;
         case "geoMapBlock":
-          enableField((_d = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _d.key, normalizedDatasetRef, request);
-          enableField((_e = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _e.labelKey, normalizedDatasetRef, request);
-          enableField((_g = (_f = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _f.metric) == null ? void 0 : _g.key, normalizedDatasetRef, request);
-          enableField((_i = (_h = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _h.color) == null ? void 0 : _i.field, normalizedDatasetRef, request);
+          enableField((_e = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _e.key, normalizedDatasetRef, request);
+          enableField((_f = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _f.labelKey, normalizedDatasetRef, request);
+          enableField((_h = (_g = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _g.metric) == null ? void 0 : _h.key, normalizedDatasetRef, request);
+          enableField((_j = (_i = normalizedBlock == null ? void 0 : normalizedBlock.geo) == null ? void 0 : _i.color) == null ? void 0 : _j.field, normalizedDatasetRef, request);
           break;
         default:
           break;
@@ -50812,6 +50832,8 @@ Please __addLocaleData before adding additional unit data`);
       ...suffix ? { suffix } : {},
       ...secondaryField ? {
         secondaryField,
+        ...normalizeString28(block == null ? void 0 : block.secondaryDatasetRef) ? { secondaryDatasetRef: normalizeString28(block.secondaryDatasetRef) } : {},
+        ...(block == null ? void 0 : block.secondaryCalculation) ? { secondaryCalculation: normalizeKpiSecondaryCalculation(block.secondaryCalculation) } : {},
         secondaryLabel: normalizeString28((block == null ? void 0 : block.secondaryLabel) || secondaryField),
         ...normalizeString28(block == null ? void 0 : block.secondaryFormat) ? { secondaryFormat: normalizeString28(block.secondaryFormat) } : {},
         ...(block == null ? void 0 : block.secondaryTrend) === true ? { secondaryTrend: true } : {},
@@ -51720,7 +51742,7 @@ Please __addLocaleData before adding additional unit data`);
     const nextBlocks = filterExclusiveReportRuntimeBlocks(blocks, loweredLayout.blocks, exclusiveSectionOwnership);
     const nextBlockIds = new Set(nextBlocks.map((block) => normalizeString28(block == null ? void 0 : block.id)).filter(Boolean));
     const referencedDatasetRefs = new Set(
-      nextBlocks.map((block) => normalizeString28(block == null ? void 0 : block.datasetRef)).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
+      nextBlocks.flatMap((block) => [normalizeString28(block == null ? void 0 : block.datasetRef), normalizeString28(block == null ? void 0 : block.secondaryDatasetRef)]).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
     );
     const additionalPublishedDatasets = buildReportBuilderPublishedDatasetDeclarations(
       effectiveScopedConfig,
@@ -57541,6 +57563,17 @@ ${indent}${end}`;
     const bodyFormat = normalizeReportFillBodyFormat(block == null ? void 0 : block.bodyFormat);
     const rowSelector = normalizeString32(block == null ? void 0 : block.rowSelector).toLowerCase() || "firstrow";
     const selectedRow = resolveReportFillSelectedRow(dataset, rowSelector, { valueField });
+    const secondaryDatasetRef = normalizeString32(block == null ? void 0 : block.secondaryDatasetRef);
+    const secondaryDataset = secondaryDatasetRef ? resolveReportFillAliasedDataset(datasetsByAlias, secondaryDatasetRef) : dataset;
+    if (secondaryDatasetRef && !secondaryDataset) throw new Error(`KPI secondary dataset '${secondaryDatasetRef}' is unavailable.`);
+    const secondaryRow = secondaryDatasetRef ? resolveReportFillSelectedRow(secondaryDataset, "firstrow") : selectedRow;
+    const secondaryCalculation = normalizeKpiSecondaryCalculation(block == null ? void 0 : block.secondaryCalculation);
+    const rawSecondary = secondaryRow ? resolveReportFillFieldDisplayValue(secondaryRow, {
+      sourceField: secondaryField,
+      displayKey: secondaryCalculation === "value" ? block == null ? void 0 : block.secondaryDisplayKey : void 0,
+      displayValueMap: secondaryCalculation === "value" ? block == null ? void 0 : block.secondaryDisplayValueMap : void 0
+    }) : null;
+    const secondaryValue = calculateKpiSecondaryValue(valueField && selectedRow ? resolveKey(selectedRow, valueField) : null, rawSecondary, secondaryCalculation);
     const content = {
       title: normalizeString32((block == null ? void 0 : block.title) || "KPI"),
       ...normalizeString32(block == null ? void 0 : block.description) ? { description: normalizeString32(block.description) } : {},
@@ -57556,11 +57589,7 @@ ${indent}${end}`;
         secondaryLabel: normalizeString32((block == null ? void 0 : block.secondaryLabel) || secondaryField),
         ...normalizeString32(block == null ? void 0 : block.secondaryFormat) ? { secondaryFormat: normalizeString32(block.secondaryFormat) } : {},
         ...(block == null ? void 0 : block.secondaryTrend) === true ? { secondaryTrend: true } : {},
-        secondaryValue: selectedRow ? resolveReportFillFieldDisplayValue(selectedRow, {
-          sourceField: secondaryField,
-          displayKey: block == null ? void 0 : block.secondaryDisplayKey,
-          displayValueMap: block == null ? void 0 : block.secondaryDisplayValueMap
-        }) : null
+        secondaryValue
       } : {},
       ...normalizeString32(block == null ? void 0 : block.emptyLabel) ? { emptyLabel: normalizeString32(block.emptyLabel) } : {},
       ...rowSelector !== "firstrow" ? { rowSelector } : {},

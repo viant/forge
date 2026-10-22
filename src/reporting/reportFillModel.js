@@ -1,3 +1,4 @@
+import { calculateKpiSecondaryValue, normalizeKpiSecondaryCalculation } from "./reportKpiComparisonModel.js";
 import {
   buildReportBuilderReportSpec,
   normalizeReportSpecScopeParams,
@@ -459,6 +460,17 @@ function buildReportFillKpiContent(block = {}, dataset = {}, {
   const bodyFormat = normalizeReportFillBodyFormat(block?.bodyFormat);
   const rowSelector = normalizeString(block?.rowSelector).toLowerCase() || "firstrow";
   const selectedRow = resolveReportFillSelectedRow(dataset, rowSelector, { valueField });
+  const secondaryDatasetRef = normalizeString(block?.secondaryDatasetRef);
+  const secondaryDataset = secondaryDatasetRef ? resolveReportFillAliasedDataset(datasetsByAlias, secondaryDatasetRef) : dataset;
+  if (secondaryDatasetRef && !secondaryDataset) throw new Error(`KPI secondary dataset '${secondaryDatasetRef}' is unavailable.`);
+  const secondaryRow = secondaryDatasetRef ? resolveReportFillSelectedRow(secondaryDataset, "firstrow") : selectedRow;
+  const secondaryCalculation = normalizeKpiSecondaryCalculation(block?.secondaryCalculation);
+  const rawSecondary = secondaryRow ? resolveReportFillFieldDisplayValue(secondaryRow, {
+    sourceField: secondaryField,
+    displayKey: secondaryCalculation === "value" ? block?.secondaryDisplayKey : undefined,
+    displayValueMap: secondaryCalculation === "value" ? block?.secondaryDisplayValueMap : undefined,
+  }) : null;
+  const secondaryValue = calculateKpiSecondaryValue(valueField && selectedRow ? resolveKey(selectedRow, valueField) : null, rawSecondary, secondaryCalculation);
   const content = {
     title: normalizeString(block?.title || "KPI"),
     ...(normalizeString(block?.description)
@@ -477,13 +489,7 @@ function buildReportFillKpiContent(block = {}, dataset = {}, {
         secondaryLabel: normalizeString(block?.secondaryLabel || secondaryField),
         ...(normalizeString(block?.secondaryFormat) ? { secondaryFormat: normalizeString(block.secondaryFormat) } : {}),
         ...(block?.secondaryTrend === true ? { secondaryTrend: true } : {}),
-        secondaryValue: selectedRow
-          ? resolveReportFillFieldDisplayValue(selectedRow, {
-            sourceField: secondaryField,
-            displayKey: block?.secondaryDisplayKey,
-            displayValueMap: block?.secondaryDisplayValueMap,
-          })
-          : null,
+        secondaryValue,
       }
       : {}),
     ...(normalizeString(block?.emptyLabel)
