@@ -16,6 +16,44 @@ describe('local datasource parent placeholder', () => {
 });
 
 describe('applyWindowPermissionMetadata', () => {
+  it('consumes a resolved managing-provider delivery with authored authorization without another host check', async () => {
+    const metadata = {
+      resource: {uri: 'window://producer/record', providerIdentity: 'producer', kind: 'stamped', revision: '5', contentFingerprint: 'producer-fingerprint', authorityBinding: 'verified-owner'},
+      authorization: {scope: 'resource', dataSourceRef: 'owner_facts'},
+      authorizationSnapshot: {principal: {roles: ['editor']}, resource: {capabilities: {read: false}}},
+      view: {content: {id: 'root', visibleWhen: {source: 'authorization', field: 'principal.roles', contains: 'editor'}}},
+    };
+    let calls = 0;
+    const result = await applyWindowPermissionMetadata(metadata, {services: {applyPermission: async () => { calls++; throw new Error('Redundant host OPEN'); }}});
+    expect(result).toBe(metadata);
+    expect(result.authorizationSnapshot.resource.capabilities.read).toBe(false);
+    expect(result.view.content.visibleWhen).toEqual(metadata.view.content.visibleWhen);
+    expect(calls).toBe(0);
+  });
+
+  it('does not treat a guessed URI alone as a resolved managed delivery', async () => {
+    let calls = 0;
+    const metadata = {resource: {uri: 'window://producer/record'}, authorization: {scope: 'resource'}};
+    const result = await applyWindowPermissionMetadata(metadata, {services: {applyPermission: async () => { calls++; return metadata; }}});
+    expect(result).toBe(metadata);
+    expect(calls).toBe(1);
+  });
+
+  it('keeps missing optional managed display facts conservative without inventing read permission', async () => {
+    const guard = {source: 'authorization', field: 'principal.roles', contains: 'editor'};
+    const metadata = {
+      resource: {uri: 'window://producer/record', providerIdentity: 'producer', kind: 'working', contentFingerprint: 'selected', authorityBinding: 'verified-owner'},
+      authorization: {scope: 'resource'}, dataSource: {rows: {id: 'rows'}},
+      view: {content: {id: 'root', containers: [{id: 'editor-only', visibleWhen: guard}, {id: 'ordinary'}]}},
+    };
+    const delivered = await applyWindowPermissionMetadata(metadata, {services: {}});
+    const compiled = compilePermissionAppliedMetadata(delivered);
+    expect(metadata.view.content.containers[0].visibleWhen).toBe(guard);
+    expect(compiled.view.content.containers.map(item => item.id)).toEqual(['ordinary']);
+    expect(compiled.authorizationSnapshot).toBeUndefined();
+    expect(compiled.dataSource).toEqual(metadata.dataSource);
+  });
+
   it('passes the complete tree and one concrete resource to the dedicated service', async () => {
     const completeMetadata = {authorization: {scope: 'resource'}, view: {content: {id: 'root'}}};
     const calls = [];

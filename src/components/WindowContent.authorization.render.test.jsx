@@ -204,6 +204,36 @@ describe('rendered dataset denial retry behavior', () => {
 const binding = (instanceId = 'delivery-a') => ({actor:{issuer:'issuer',subject:'actor-a',tenantId:'tenant',accountId:'account'},instanceId,parametersDigest:'digest',token:'signed-server-token'});
 const boundWindow = (selectionBinding = binding()) => ({windowId,windowKey:'mcp://opaque/window',parameters:{entityId:'9007199254740993'},selectionBinding});
 describe('canonical delivered window uses display hints only', () => {
+  it('renders managed metadata with authorization hints, skips host OPEN, and retains owner datasource denial', async () => {
+    let permissions=0, rowReads=0, denied=false;
+    const ownerMetadata=definition(true);
+    ownerMetadata.resource={uri:'window://owner/record',providerIdentity:'owner',kind:'stamped',revision:'5',contentFingerprint:'selected-fingerprint',authorityBinding:'verified-owner'};
+    ownerMetadata.authorizationSnapshot.principal.roles=['editor'];
+    ownerMetadata.authorization={scope:'resource',resource:{type:'entity',id:{selector:'EntityId.0'}}};
+    ownerMetadata.authorizationSnapshot.resources={'42':{id:42,type:'entity',capabilities:{read:false}}};
+    ownerMetadata.view.content.containers=[
+      {id:'role-visible',visibleWhen:{source:'authorization',field:'principal.roles',contains:'editor'}},
+      {id:'role-hidden',visibleWhen:{source:'authorization',field:'principal.roles',contains:'other'}},
+    ];
+    const ownerDenial=Object.assign(new Error('owner dataset denied'),{status:403,code:'datasource_denied',scope:'dataset'});
+    const services={applyPermission:async()=>{permissions++;throw new Error('Redundant host OPEN');},dataConnectorTransport:async request=>{
+      if(request.dataSourceRef==='rows') {rowReads++;if(denied)throw ownerDenial;return {data:[{id:42}]};}
+      return {data:ownerMetadata};
+    }};
+    await mount(services,{windowId,windowKey:'window://owner/record',parameters:{EntityId:[42]}});await flush();
+    expect(element.querySelector('[data-authorized-renderer]')).not.toBeNull();
+    expect(getCollectionSignal(`${windowId}DSrows`).peek()).toEqual([{id:42}]);
+    const held=getMetadataSignal(windowId).peek();
+    expect(held.view.content.containers.map(item=>item.id)).toEqual(['role-visible']);
+    expect(held.authorizationSnapshot.resource.capabilities.read).toBe(false);
+    expect(held.dataSource.rows).toEqual(ownerMetadata.dataSource.rows);
+    denied=true;
+    await act(async()=>{await expect(getWindowContext(windowId).Context('rows').handlers.dataSource.fetchRecords()).rejects.toBe(ownerDenial);});await flush();
+    expect(getCollectionSignal(`${windowId}DSrows`).peek()).toEqual([]);
+    expect(element.querySelector('[data-authorized-renderer]')).not.toBeNull();
+    expect(rowReads).toBe(2);expect(permissions).toBe(0);
+  });
+
   it('consumes complete signed direct OPEN metadata without a second metadata lookup',async()=>{
     let metadataRequests=0,permissions=0;
     const services={applyPermission:async()=>{permissions++;throw new Error('repeat permission');},dataConnectorTransport:async request=>{

@@ -193,8 +193,16 @@ export async function applyWindowPermissionMetadata(completeMetadata, {
     conversationId = '',
     targetContext = null,
 } = {}) {
-    // A canonical resource URI is not an authorization declaration. The
-    // managing MCP already selected this metadata for the current user.
+    // A successful managing-provider read already selected this exact
+    // definition. Its authored authorization and snapshot are display facts,
+    // not a request for an independent host OPEN decision. A bare URI is not
+    // a resolved delivery identity; unmanaged metadata keeps its legacy path.
+    const selected = completeMetadata?.resource;
+    const managed = selected && ['working', 'stamped'].includes(selected.kind)
+        && typeof selected.uri === 'string' && selected.uri.startsWith('window://')
+        && ['providerIdentity', 'contentFingerprint', 'authorityBinding']
+            .every(key => typeof selected[key] === 'string' && selected[key].trim());
+    if (managed) return completeMetadata;
     if (!completeMetadata?.authorization) return completeMetadata;
     if (typeof services?.applyPermission !== 'function') {
         throw Object.assign(new Error('Permission service is unavailable'), {status: 503});
