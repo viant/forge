@@ -1,3 +1,4 @@
+import {buildRuntimeSections} from './reportSections.js';
 import {buildKpiSparklineSvg} from './reportKpiSparklineModel.js';
 import { resolveReportDatasetRefResolution } from "./reportDatasetRefModel.js";
 import { compactReportPrintSequence } from "./reportPrintLabels.js";
@@ -619,25 +620,11 @@ function buildOrderedReportFillBlocks(reportSpec = {}, reportFill = {}, visibleB
   if (!strictTabGroup) {
     return ordered;
   }
-  const authoredSectionIds = new Set(
-    (Array.isArray(strictTabGroup?.content?.sectionIds)
-      ? strictTabGroup.content.sectionIds
-      : (Array.isArray(strictTabGroup?.sectionIds) ? strictTabGroup.sectionIds : []))
-      .map((sectionId) => normalizeString(sectionId))
-      .filter(Boolean),
-  );
-  let includeCurrentSection = false;
-  return ordered.filter((block) => {
-    const kind = normalizeString(block?.kind);
-    if (kind === "tabGroupBlock") {
-      return true;
-    }
-    if (kind === "sectionBlock") {
-      includeCurrentSection = authoredSectionIds.has(normalizeString(block?.id));
-      return includeCurrentSection;
-    }
-    return includeCurrentSection;
-  });
+  const sections=buildRuntimeSections(ordered);
+  return [
+    ...ordered.filter(block=>normalizeString(block?.kind)==='tabGroupBlock'),
+    ...sections.flatMap(section=>section.block?[section.block,...section.items]:section.items),
+  ];
 }
 
 function buildLayoutSpanByBlockId(reportSpec = {}) {
@@ -2310,7 +2297,9 @@ function renderReportPrintChartBlock(state = {}, block = {}, {
     if (!svgResult?.svg) {
       const placeholder = renderReportPrintTextLines(state, {
         idPrefix: `${normalizeString(block?.id || "chart")}__unsupported`,
-        lines: ["Chart output is not available for this ReportPrint block."],
+        lines: [(svgResult?.diagnostics || []).some(diagnostic=>diagnostic.code==='emptyReportPrintChart')
+          ? "No measurements are available for this chart in the selected scope."
+          : "Chart output is not available for this ReportPrint block."],
         color: REPORT_PRINT_THEME.warningColor,
       });
       (Array.isArray(svgResult?.diagnostics) ? svgResult.diagnostics : []).forEach((diagnostic) => {
