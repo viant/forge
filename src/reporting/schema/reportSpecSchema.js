@@ -1,3 +1,4 @@
+import {kpiSparklineSchema} from '../reportKpiSparklineModel.js';
 export const reportSpecSchema = {
   $id: "report://schema/report-spec/v1",
   $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -1070,6 +1071,7 @@ export const reportSpecSchema = {
         suffix: { type: "string" },
         secondaryField: { type: "string" },
         secondaryDatasetRef: { type: "string", minLength: 1 },
+        sparkline: kpiSparklineSchema,
         secondaryCalculation: { enum: ["value", "difference", "relativeChange"] },
         secondaryLabel: { type: "string" },
         secondaryFormat: { enum: ["currency", "currency2", "number", "number5", "percent", "percentFraction", "percentFraction2", "compact", "compactNumber"] },

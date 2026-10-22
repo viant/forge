@@ -15,6 +15,13 @@ function normalizeDatasetRefs(datasetRefs = []) {
     });
 }
 
+// The shared closure for primary, comparison and KPI trend datasets. Hosts use
+// this when planning lazy section reads, so optional visuals cannot lose data.
+export function getReportBlockDatasetRefs(block = {}) {
+  return normalizeDatasetRefs([block?.datasetRef, block?.secondaryDatasetRef,
+    block?.sparkline?.datasetRef, block?.sparkline?.comparisonDatasetRef]);
+}
+
 export function resolveImplicitSingleReportDatasetRef(datasetRefs = []) {
   const normalizedDatasetRefs = normalizeDatasetRefs(datasetRefs);
   return normalizedDatasetRefs.length === 1

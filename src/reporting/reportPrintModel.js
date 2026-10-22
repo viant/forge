@@ -1,3 +1,4 @@
+import {buildKpiSparklineSvg} from './reportKpiSparklineModel.js';
 import { resolveReportDatasetRefResolution } from "./reportDatasetRefModel.js";
 import { compactReportPrintSequence } from "./reportPrintLabels.js";
 import { normalizeReportSpecScopeParams } from "./reportSpecModel.js";
@@ -1337,7 +1338,8 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
   const titleLines = wrapReportPrintText(title, innerWidth, 12);
   const valueLines = wrapReportPrintText(valueText, innerWidth, valueFontSize);
   const wrappedDetails = detailLines.flatMap((line) => wrapReportPrintText(line, innerWidth, 10));
-  const cardHeight = Math.max(
+  const sparklineSvg = content.sparkline ? buildKpiSparklineSvg(content.sparkline,innerWidth,36) : "";
+  const cardHeight = (sparklineSvg ? 44 : 0) + Math.max(
     92,
     (cardPadding * 2)
       + (titleLines.length * 16)
@@ -1409,6 +1411,7 @@ function renderReportPrintKpiBlock(state = {}, block = {}, {
       color: REPORT_PRINT_THEME.bodyColor,
     });
   }
+  if(sparklineSvg)pushReportPrintElement(state,buildReportPrintSvgElement({id:`${blockId}__sparkline`,kind:'svg',box:{x:state.contentLeft+cardPadding,y:cardY+cardHeight-cardPadding-36,width:innerWidth,height:36},svg:sparklineSvg}));
   state.cursorY = cardY + cardHeight;
   finishReportPrintBlock(state);
 }

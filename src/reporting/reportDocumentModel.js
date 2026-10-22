@@ -1,3 +1,5 @@
+import {getReportBlockDatasetRefs} from './reportDatasetRefModel.js';
+import {normalizeKpiSparkline} from './reportKpiSparklineModel.js';
 import { normalizeKpiSecondaryCalculation } from "./reportKpiComparisonModel.js";
 import {
   buildReportBuilderPublishedDatasetConfig,
@@ -513,6 +515,7 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
   }
   const nextSpec = cloneValue(baseSpec);
   const fieldCatalog = buildReportBuilderFieldCatalog(config);
+  const datasetFieldCatalogs=new Map(normalizeReportBuilderPublishedDataSources(config).map(source=>[source.id,buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config,source))]));
   const calculatedFields = Array.isArray(nextSpec?.calculatedFields) ? nextSpec.calculatedFields : [];
   nextSpec.calculatedFields = calculatedFields;
   const calculatedFieldIds = new Set(
@@ -529,7 +532,7 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
     if (!request || typeof request !== "object" || Array.isArray(request)) {
       return false;
     }
-    const catalogEntry = resolveReportBuilderCatalogEntry(fieldCatalog, fieldKey);
+    const catalogEntry = resolveReportBuilderCatalogEntry(datasetFieldCatalogs.get(normalizedDatasetRef)||fieldCatalog, fieldKey);
     if (!catalogEntry) {
       return false;
     }
@@ -588,6 +591,15 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
         break;
       case "kpiBlock":
         enableField(normalizedBlock?.valueField, normalizedDatasetRef, request);
+        if (normalizedBlock.sparkline) {
+          const sparkline=normalizeKpiSparkline(normalizedBlock.sparkline);
+          for(const ref of [sparkline.datasetRef,sparkline.comparisonDatasetRef].filter(Boolean)) {
+            const targetDataset=nextSpec.datasets.find(entry=>normalizeString(entry?.id)===ref);
+            if(!targetDataset)throw new Error(`KPI sparkline dataset '${ref}' is unavailable.`);
+            const target=targetDataset.request;
+            if(target&&(!enableField(sparkline.valueField,ref,target)||!enableField(sparkline.categoryField,ref,target)))throw new Error('KPI sparkline fields must be declared by their dataset.');
+          }
+        }
         {
           const secondaryRef = normalizeString(normalizedBlock?.secondaryDatasetRef) || normalizedDatasetRef;
           const secondaryRequest = nextSpec.datasets.find(entry => normalizeString(entry?.id) === secondaryRef)?.request;
@@ -1548,6 +1560,7 @@ export function buildReportDocumentKpiBlock(block = {}) {
     valueLabel: normalizeString(block?.valueLabel || valueField || "Value"),
     ...(valueFormat ? { valueFormat } : {}),
     ...(suffix ? { suffix } : {}),
+    ...(block.sparkline ? {sparkline:normalizeKpiSparkline(block.sparkline)} : {}),
     ...(secondaryField
       ? {
         secondaryField,
@@ -2610,7 +2623,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
   const nextBlockIds = new Set(nextBlocks.map((block) => normalizeString(block?.id)).filter(Boolean));
   const referencedDatasetRefs = new Set(
     nextBlocks
-      .flatMap((block) => [normalizeString(block?.datasetRef), normalizeString(block?.secondaryDatasetRef)])
+      .flatMap(getReportBlockDatasetRefs)
       .filter((datasetRef) => !!datasetRef && datasetRef !== "primary"),
   );
   const additionalPublishedDatasets = buildReportBuilderPublishedDatasetDeclarations(

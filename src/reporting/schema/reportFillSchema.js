@@ -1,3 +1,4 @@
+import {kpiSparklineSchema,kpiSparklineContentSchema} from '../reportKpiSparklineModel.js';
 export const reportFillSchema = {
   $id: "report://schema/report-fill/v1",
   $schema: "https://json-schema.org/draft/2020-12/schema",
@@ -1214,6 +1215,7 @@ export const reportFillSchema = {
         suffix: { type: "string" },
         secondaryField: { type: "string" },
         secondaryDatasetRef: { type: "string", minLength: 1 },
+        sparkline: kpiSparklineSchema,
         secondaryCalculation: { enum: ["value", "difference", "relativeChange"] },
         secondaryLabel: { type: "string" },
         secondaryFormat: { enum: ["currency", "currency2", "number", "number5", "percent", "percentFraction", "percentFraction2", "compact", "compactNumber"] },
@@ -1254,6 +1256,7 @@ export const reportFillSchema = {
               additionalProperties: { $ref: "#/$defs/jsonValue" },
             },
             secondaryValue: { $ref: "#/$defs/jsonValue" },
+            sparkline:kpiSparklineContentSchema,
             emptyLabel: { type: "string" },
             rowSelector: { enum: ["firstrow", "maxbyvalue", "minbyvalue"] },
             presentationMode: { enum: ["card", "body", "both"] },
