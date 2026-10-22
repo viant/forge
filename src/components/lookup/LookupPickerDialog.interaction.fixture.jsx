@@ -57,6 +57,8 @@ function App() {
     const [open, setOpen] = useState(false);
     const [disabled, setDisabled] = useState(false);
     const [selected, setSelected] = useState(null);
+    const [multiple, setMultiple] = useState(false);
+    const [selectedKeys, setSelectedKeys] = useState(['1']);
     const [showDashboardLookup, setShowDashboardLookup] = useState(true);
     const loadRows = useCallback(async ({query, signal}) => {
         window.__lookupPickerProof.calls += 1;
@@ -73,16 +75,20 @@ function App() {
             : rows;
         return {rows: matches, totalCount: matches.length};
     }, []);
-    const show = (nextDisabled) => {
+    const show = (nextDisabled, nextMultiple = false) => {
         setDisabled(nextDisabled);
+        setMultiple(nextMultiple);
         setOpen(true);
     };
     return (
-        <ForgeThemeProvider themeId="lookup-proof" scopeClassName="agently-workspace">
+        <ForgeThemeProvider scopeClassName="agently-workspace">
             <ForgeThemeBoundary windowKey="lookup-proof">
                 <main style={{padding: 24}}>
+                    <p>Development fixture: synthetic interaction data only.</p>
                     <button type="button" onClick={() => show(false)}>Open picker</button>
                     <button type="button" onClick={() => show(true)}>Open disabled picker</button>
+                    <button type="button" onClick={() => show(false, true)}>Open multiple picker</button>
+                    <output aria-label="Selected keys">{JSON.stringify(selectedKeys)}</output>
                     <output aria-label="Selected row">{selected ? JSON.stringify(selected) : 'No selection'}</output>
                     {showDashboardLookup ? (
                         <section aria-label="Dashboard lookup race proof">
@@ -137,10 +143,18 @@ function App() {
                         title="Select advertiser"
                         searchPlaceholder="Search advertisers"
                         disabled={disabled}
+                        multiple={multiple}
+                        selectedKeys={selectedKeys}
+                        onClearSelection={() => setSelectedKeys([])}
                         columns={[{key: 'name', label: 'Advertiser'}, {key: 'status', label: 'Status'}]}
                         loadRows={loadRows}
                         onCancel={() => setOpen(false)}
                         onSelect={(row) => {
+                            if (multiple) {
+                                const key = String(row.id);
+                                setSelectedKeys(previous => previous.includes(key) ? previous.filter(value => value !== key) : [...previous, key]);
+                                return;
+                            }
                             window.__lookupPickerProof.selected = row;
                             setSelected(row);
                             setOpen(false);

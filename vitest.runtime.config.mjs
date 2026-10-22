@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: [
+      'src/components/lookup/LookupPickerDialog.render.test.jsx',
       'src/components/table/Basic.autoFetch.render.test.jsx',
       'src/components/Chart.measurements.render.test.jsx',
       'src/core/ui/controlActions.render.test.jsx',
