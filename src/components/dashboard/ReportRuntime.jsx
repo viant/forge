@@ -3293,7 +3293,7 @@ export default function ReportRuntime({
               Chart actions are unavailable because this authored chart does not compile to a runtime chart model.
             </div>
           )}
-          {!reportPresentation ? (
+          {!reportPresentation && effectiveChartInteractionSupport.reason !== "readOnlyRuntime" ? (
             <ChartSelectionPanel
               viewModel={chartSelectionViewModel}
               onAction={(actionId) => executeReportRuntimeAction(chartExecutionsById.get(normalizeString(actionId)), runtimeHandlers)}
