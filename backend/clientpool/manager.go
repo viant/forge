@@ -161,6 +161,7 @@ type Manager struct {
 	userIDFn                  UserIDExtractor
 	prepareTokens             TokenContextPreparer
 	credentialError           CredentialErrorHandler
+	delegatedHTTPTransport    DelegatedHTTPTransportProvider
 	credResolver              authcfg.CredentialResolver
 	providerRegistry          authcfg.ProviderRegistry
 	// bindings persists validated non-secret challenge-learned MCP auth
@@ -833,6 +834,11 @@ func (m *Manager) newClientWithOptions(ctx context.Context, convID, serverName s
 			if err := m.crossCheckExplicitMetadata(ctx, serverName, opts.ClientOptions.Transport.URL, issuer, resource, opts.ProtectedResourceMetadataURL); err != nil {
 				return nil, err
 			}
+		}
+	}
+	if delegated {
+		if err := m.configureDelegatedHTTPTransport(ctx, serverName, opts.ClientOptions); err != nil {
+			return nil, err
 		}
 	}
 	// Resolve per-user auth RoundTripper.
