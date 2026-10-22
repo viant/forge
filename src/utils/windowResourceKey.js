@@ -10,3 +10,19 @@ export function resolveScopedWindowKey(key, ownerURI = '') {
     if (!safe(owner[1]) || !safe(owner[2]) || !safe(key)) throw new Error('Invalid relative window resource');
     return `window://${owner[1]}/${key}`;
 }
+
+// Reuse only the locator from a server-delivered active source definition.
+// This does not admit the destination: its provider still performs a fresh Get.
+// Never carry the source selector/revision/pin onto a different resource.
+export function scopedWindowProviderIdentity(destination, sourceResource) {
+    if (!sourceResource || !['working', 'stamped'].includes(sourceResource.kind)
+        || !['providerIdentity', 'contentFingerprint', 'authorityBinding'].every(key =>
+            typeof sourceResource[key] === 'string' && sourceResource[key].trim())) return undefined;
+    const parse = value => typeof value === 'string'
+        && /^window:\/\/([^/?#\s%\\]+)\/([^?#\s%\\]+)$/.exec(value);
+    const source = parse(sourceResource.uri);
+    const target = parse(destination);
+    if (!source || !target || source[1] !== target[1]) return undefined;
+    if ([source[2], target[2]].some(name => name.split('/').some(part => !part || part === '.' || part === '..'))) return undefined;
+    return sourceResource.providerIdentity;
+}
