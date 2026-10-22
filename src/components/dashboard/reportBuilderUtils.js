@@ -1,3 +1,4 @@
+import {normalizeChartMetricSelection, applyChartMetricSelection} from "../chartMetricSelection.js";
 import { resolveKey } from "../../utils/selector.js";
 import { normalizeSemanticBinding, validateSemanticBinding } from "../../semantic/modelValidation.js";
 import {
@@ -484,6 +485,8 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     const seriesField = normalizeChartSpecValue(chartSpec.seriesField);
     const seriesOptions = normalizeChartSeriesOptions(chartSpec.seriesOptions);
     const categoryLabel = normalizeChartCategoryLabel(chartSpec.categoryLabel);
+    const metricSelection = normalizeChartMetricSelection(chartSpec.metricSelection, yFields);
+    if (metricSelection && (seriesField || !["line", "area", "bar", "combo"].includes(type))) throw new Error("Metric selection requires a direct cartesian chart.");
     return {
         ...(title ? { title } : {}),
         ...(eyebrow ? { eyebrow } : {}),
@@ -496,6 +499,7 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         ...(chartSpec.categoryColors && typeof chartSpec.categoryColors === "object" && !Array.isArray(chartSpec.categoryColors) ? {categoryColors: {...chartSpec.categoryColors}} : {}),
         ...(seriesOptions ? { seriesOptions } : {}),
         ...(categoryLabel ? { categoryLabel } : {}),
+        ...(metricSelection ? {metricSelection} : {}),
     };
 }
 
@@ -2402,14 +2406,15 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
         ...container,
         dataSourceRef: container.dataSourceRef,
         collection: container.collection,
-        chart: {
+        chart: applyChartMetricSelection({
             ...baseChart,
+            ...(normalized.metricSelection ? {metricSelection: normalized.metricSelection} : {}),
             series: {
                 values,
                 palette,
                 ...(normalized.categoryColors ? {categoryColors: normalized.categoryColors} : {}),
             },
-        },
+        }),
     };
 }
 

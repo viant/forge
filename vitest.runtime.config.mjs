@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: [
+      'src/components/Chart.measurements.render.test.jsx',
       'src/core/ui/controlActions.render.test.jsx',
       'src/components/primitives/RelationDrill.render.test.jsx',
       'src/components/DataSource.projection.render.test.jsx',

@@ -922,6 +922,7 @@ export const reportFillSchema = {
           items: { type: "string" },
         },
         seriesField: { type: "string" },
+        metricSelection: {type:"object",additionalProperties:false,required:["primaryField","secondaryField"],properties:{primaryField:{type:"string",minLength:1},secondaryField:{type:"string"}}},
         categoryColors: {type: "object", additionalProperties: {type: "string"}},
         categoryLabel: { $ref: "#/$defs/presentationTextClamp" },
         seriesOptions: {
@@ -962,6 +963,7 @@ export const reportFillSchema = {
       additionalProperties: false,
       properties: {
         format: { type: "string" },
+        label: { type: "string" },
       },
     },
     chartSeriesValue: {
@@ -1160,6 +1162,8 @@ export const reportFillSchema = {
         type: { type: "string" },
         xAxis: { $ref: "#/$defs/chartAxis" },
         yAxis: { $ref: "#/$defs/chartYAxis" },
+        axes: {type:"object",additionalProperties:false,properties:{left:{$ref:"#/$defs/chartYAxis"},right:{$ref:"#/$defs/chartYAxis"}}},
+        metricSelection: {type:"object",additionalProperties:false,required:["primaryField","secondaryField","options"],properties:{primaryField:{type:"string",minLength:1},secondaryField:{type:"string"},options:{type:"array",items:{$ref:"#/$defs/chartSeriesValue"}}}},
         annotations: { $ref: "#/$defs/chartAnnotations" },
         series: {
           anyOf: [
@@ -1206,11 +1210,13 @@ export const reportFillSchema = {
         datasetRef: { type: "string" },
         valueField: { type: "string" },
         valueLabel: { type: "string" },
-        valueFormat: { enum: ["currency", "number", "number5", "percent", "percentFraction", "compact", "compactNumber"] },
+        valueFormat: { enum: ["currency", "currency2", "number", "number5", "percent", "percentFraction", "percentFraction2", "compact", "compactNumber"] },
         suffix: { type: "string" },
         secondaryField: { type: "string" },
+        secondaryDatasetRef: { type: "string", minLength: 1 },
+        secondaryCalculation: { enum: ["value", "difference", "relativeChange"] },
         secondaryLabel: { type: "string" },
-        secondaryFormat: { enum: ["currency", "number", "number5", "percent", "percentFraction", "compact", "compactNumber"] },
+        secondaryFormat: { enum: ["currency", "currency2", "number", "number5", "percent", "percentFraction", "percentFraction2", "compact", "compactNumber"] },
         secondaryTrend: { type: "boolean" },
         secondaryDisplayKey: { type: "string" },
         secondaryDisplayValueMap: {
@@ -1234,13 +1240,13 @@ export const reportFillSchema = {
             tone: { type: "string" },
             valueField: { type: "string" },
             valueLabel: { type: "string" },
-            valueFormat: { enum: ["currency", "number", "number5", "percent", "percentFraction", "compact", "compactNumber"] },
+            valueFormat: { enum: ["currency", "currency2", "number", "number5", "percent", "percentFraction", "percentFraction2", "compact", "compactNumber"] },
             suffix: { type: ["string", "null"] },
             value: { $ref: "#/$defs/jsonValue" },
             rowCount: { type: "integer", minimum: 0 },
             secondaryField: { type: "string" },
             secondaryLabel: { type: ["string", "null"] },
-            secondaryFormat: { enum: ["currency", "number", "number5", "percent", "percentFraction", "compact", "compactNumber", null] },
+            secondaryFormat: { enum: ["currency", "currency2", "number", "number5", "percent", "percentFraction", "percentFraction2", "compact", "compactNumber", null] },
             secondaryTrend: { type: ["boolean", "null"] },
             secondaryDisplayKey: { type: "string" },
             secondaryDisplayValueMap: {

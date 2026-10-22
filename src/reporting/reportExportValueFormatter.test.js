@@ -12,3 +12,8 @@ assert.equal(formatExportValue({ start: "2026-07-08", end: "2026-07-08" }, "date
 assert.equal(formatExportValue("2026-07-12T00:00:00Z", "date"), "Jul 12, 2026");
 
 console.log("reportExportValueFormatter ✓ formats readable default and compact values for export");
+
+assert.equal(formatExportNumericValue(.0065,"percentFraction2"),"0.65%");
+assert.equal(formatExportNumericValue(null,"currency2"),"");
+assert.equal(formatExportNumericValue(" ","number"),"");
+assert.equal(formatExportValue(null,"percentFraction2"),"—");

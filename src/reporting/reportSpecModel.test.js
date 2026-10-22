@@ -2052,3 +2052,15 @@ assert.deepEqual(styledRankPresetSpec.calculatedFields, [
 ]);
 
 console.log("reportSpecModel ✓ projects raw and semantic report builder state into ReportSpec");
+
+const comparisonSources = {
+  dataSources: [{id: "prior", dataSourceRef: "delivery", request: {filters: {}, measures: {impressions: true}},
+    scope: {mode: "override", relativeDateRange: {preset: "previousPeriod", startParamPath: "filters.from", endParamPath: "filters.to"}}}],
+};
+const comparisonContext = {dataSourceRef: "delivery", request: {filters: {from: "2026-09-21", to: "2026-10-20", advertiserId: 42, campaignIds: [7]}}};
+const comparisons = buildReportBuilderPublishedDatasetDeclarations(comparisonSources, {}, new Set(["prior"]), null, comparisonContext);
+assert.deepEqual(comparisons[0].request.filters, {from: "2026-08-22", to: "2026-09-20", advertiserId: 42, campaignIds: [7]});
+assert.deepEqual(comparisonContext.request.filters.campaignIds, [7]);
+assert.equal(comparisonContext.request.filters.from, "2026-09-21");
+assert.throws(() => buildReportBuilderPublishedDatasetDeclarations(comparisonSources, {}, new Set(["prior"]), null,
+  {dataSourceRef: "delivery", request: {filters: {from: "2026-09-21"}}}), /Previous period/);

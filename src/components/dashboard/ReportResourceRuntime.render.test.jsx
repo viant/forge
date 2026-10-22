@@ -6,7 +6,7 @@ vi.mock('@blueprintjs/core', () => ({
     Callout: ({children, title}) => <section role="status">{title}{children}</section>,
     Spinner: () => <span/>,
 }));
-vi.mock('./ReportRuntime.jsx', () => ({default: ({reportSpec}) => <output>{reportSpec.title}</output>}));
+vi.mock('./ReportRuntime.jsx', () => ({default: ({reportSpec,onChartMetricSelectionChange}) => <><output>{reportSpec.title}</output>{onChartMetricSelectionChange&&<button onClick={()=>onChartMetricSelectionChange({blockId:'trend',selection:{primaryField:'count',secondaryField:'rate'}})}>Choose metrics</button>}</>}));
 vi.mock('./ReportPrintPreview.jsx', () => ({default: () => <aside>Print</aside>}));
 import ReportResourceRuntime from './ReportResourceRuntime.jsx';
 
@@ -75,4 +75,60 @@ it('discards stale selection results and ignores settlement after close',async()
     const closing=deferred();const closed=await mount(()=>closing.promise,{executeOnOpen:true});
     await closed.close();await act(async()=>closing.resolve(result()));
     expect(closed.host.childNodes.length).toBe(0);
+});
+
+it('reruns opted-in presentation choices and keeps scope parameters unchanged',async()=>{
+ const chosen={...result(),reportSpec:{title:'Chosen report',blocks:[{id:'trend',chartSpec:{metricSelection:{primaryField:'count',secondaryField:'rate'}}}]}};
+ const run=vi.fn().mockResolvedValueOnce(result()).mockResolvedValueOnce(chosen);
+ const view=await mount(run,{executeOnOpen:true,prefill:{advertiserIds:[42]},reportCapabilities:{run:true,export:true,chartMetricSelection:true}});
+ try{
+  const button=[...view.host.querySelectorAll('button')].find(b=>b.textContent==='Choose metrics');
+  await act(async()=>button.click());
+  expect(run).toHaveBeenCalledTimes(2);
+  expect(run.mock.calls[1][0]).toEqual({resource:{uri:pin.uri,revision:2},resolvedResource:pin,parameters:{advertiserIds:[42]},chartMetricSelections:{trend:{primaryField:'count',secondaryField:'rate'}}});
+  expect([...view.host.querySelectorAll('button')].find(b=>b.textContent==='Print preview').disabled).toBe(false);
+ }finally{await view.close();}
+});
+it('blocks stale print/export after local selection when the host has not opted in',async()=>{
+ const run=vi.fn().mockResolvedValue(result());
+ const view=await mount(run,{executeOnOpen:true,reportCapabilities:{run:true,export:true}});
+ try{
+  await act(async()=>[...view.host.querySelectorAll('button')].find(b=>b.textContent==='Choose metrics').click());
+  expect(run).toHaveBeenCalledTimes(1);
+  expect(view.host.textContent).toContain('Chart selections cannot be exported');
+  for(const label of ['Print preview','Export PDF','Export CSV','Export XLSX'])expect([...view.host.querySelectorAll('button')].find(b=>b.textContent===label).disabled).toBe(true);
+  await act(async()=>view.host.querySelector('button').click());
+  expect(run).toHaveBeenCalledTimes(2);
+  expect(view.host.textContent).not.toContain('Chart selections cannot be exported');
+ }finally{await view.close();}
+});
+
+it('metric changes cancel a pending export before stale artifact retrieval',async()=>{
+ const run=vi.fn().mockResolvedValue(result());
+ const view=await mount(run,{executeOnOpen:true,reportCapabilities:{run:true,export:true}});
+ const status=deferred(),getArtifact=vi.fn();
+ view.handlers.reportExport={submitResource:vi.fn().mockResolvedValue({jobId:'pending'}),getStatus:vi.fn(()=>status.promise),getArtifact};
+ try{
+  await act(async()=>[...view.host.querySelectorAll('button')].find(b=>b.textContent==='Export PDF').click());
+  expect(view.handlers.reportExport.getStatus).toHaveBeenCalledTimes(1);
+  await act(async()=>[...view.host.querySelectorAll('button')].find(b=>b.textContent==='Choose metrics').click());
+  await act(async()=>status.resolve({status:'succeeded',artifactId:'stale'}));
+  expect(getArtifact).not.toHaveBeenCalled();
+  expect(view.host.textContent).not.toContain('Preparing PDF export');
+  expect(view.host.textContent).toContain('Chart selections cannot be exported');
+ }finally{await view.close();}
+});
+
+it('reruns metric choices after an explicitly started report without executeOnOpen',async()=>{
+ const choice={primaryField:'count',secondaryField:'rate'};
+ const chosen={...result(),reportSpec:{title:'Selected metrics',blocks:[{id:'trend',chartSpec:{metricSelection:choice}}]}};
+ const run=vi.fn().mockResolvedValueOnce(result()).mockResolvedValueOnce(chosen);
+ const view=await mount(run,{reportCapabilities:{run:true,export:true,chartMetricSelection:true}});
+ try{
+  expect(run).not.toHaveBeenCalled();
+  await act(async()=>view.host.querySelector('button').click());
+  await act(async()=>[...view.host.querySelectorAll('button')].find(b=>b.textContent==='Choose metrics').click());
+  expect(run).toHaveBeenCalledTimes(2);
+  expect(view.host.querySelector('output').textContent).toBe('Selected metrics');
+ }finally{await view.close();}
 });

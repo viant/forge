@@ -7617,6 +7617,8 @@ button.forge-report-builder__dialog-source-card:focus-visible {
     gap: var(--forge-report-panel-gap, 12px);
     min-width: 0;
 }
+/* KPI cards share their row height even when a value is unavailable. */
+.forge-report-runtime-kpi-panel { height: 100%; box-sizing: border-box; }
 .forge-report-runtime-panel__header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: var(--forge-report-panel-gap, 12px); }
 .forge-report-runtime-panel__heading { display: flex; flex-direction: column; gap: var(--forge-report-heading-gap, 6px); }
 .forge-report-runtime-panel__title { margin: 0; font-size: var(--forge-report-type-section-size, 15px); line-height: var(--forge-report-type-section-line-height, normal); color: var(--forge-report-text, #182026); }

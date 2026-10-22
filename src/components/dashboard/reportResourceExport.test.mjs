@@ -49,3 +49,21 @@ test("authored binding outranks caller pin/capabilities and preserves existing s
     assert.deepEqual(hostedReportParameters(container).reportCapabilities,{run:true,export:false});
     assert.deepEqual(buildReportResourceRunRequest(hostedReportResource(container),hostedReportParameters(container)).parameters,{region:"owned"});
 });
+
+test("export carries the same bounded metric choices as the run without changing business parameters",async()=>{
+ let submitted;
+ const parameters={prefill:{advertiserId:42,campaignIds:[7]},chartMetricSelections:{trend:{primaryField:'count',secondaryField:'rate'}}};
+ const services={submitResource:async request=>{submitted=request;return {jobId:'chosen'}},getStatus:async()=>({status:'succeeded',artifactId:'artifact'}),getArtifact:async()=>({jobId:'chosen',format:'pdf',artifactRef:pin.uri,data:'YWJj'})};
+ await exportSelectedReport({pin,parameters,format:'pdf',services,isCurrent:()=>true});
+ assert.deepEqual(submitted.chartMetricSelections,parameters.chartMetricSelections);
+ assert.deepEqual(submitted.parameters,parameters.prefill);
+ assert.equal(submitted.resolvedResource.authorityBinding,pin.authorityBinding);
+});
+
+test("a host cannot silently ignore a requested metric selection",()=>{
+ const choices={trend:{primaryField:'count',secondaryField:'rate'}};
+ const result={resource:pin,reportSpec:{blocks:[]},reportFill:{},reportPrint:{}};
+ assert.throws(()=>validateReportResourceRunResult(result,pin,choices),/retain the selected chart metrics/);
+ result.reportSpec.blocks=[{id:'trend',chartSpec:{metricSelection:choices.trend}}];
+ assert.equal(validateReportResourceRunResult(result,pin,choices),result);
+});

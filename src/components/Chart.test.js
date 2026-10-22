@@ -6,6 +6,8 @@ import {
     buildPieChartData,
     buildPieSliceCellKey,
     formatChartNumber,
+    formatChartDisplayValue,
+    isChartNumericValue,
     formatChartXAxisValue,
     hasNonZeroChartSeriesValue,
     formatTimestamp,
@@ -347,3 +349,27 @@ assert.equal(hasNonZeroChartSeriesValue([{ conversions: 0 }, { conversions: 0 }]
 assert.equal(hasNonZeroChartSeriesValue([{ conversions: 0 }, { conversions: 1 }], ["conversions"]), true);
 
 console.log('Chart ✓ transform, aggregation, and state helpers');
+
+
+// An absent measurement is not a zero-valued measurement.
+for (const missing of [null, undefined, "", "   ", false, {}, NaN, Infinity]) {
+    assert.equal(isChartNumericValue(missing), false);
+}
+for (const numeric of [0, "0", 1, -2.5, "0.0065"]) assert.equal(isChartNumericValue(numeric), true);
+assert.equal(formatChartDisplayValue(.0065, 'percentFraction2'), '0.65%');
+assert.equal(formatChartDisplayValue(.581, 'percentFraction'), '58.1%');
+assert.equal(formatChartDisplayValue(.25, 'currency2'), '$0.25');
+assert.equal(formatChartDisplayValue(null, 'percentFraction2'), null);
+assert.equal(formatChartNumber(null), null);
+assert.equal(formatChartNumber(''), '');
+assert.equal(hasNonZeroChartSeriesValue([{count: null}], ['count']), false);
+
+const nullableSeries = aggregateDirectSeriesData([
+    {day:'2026-01-01',metric:null}, {day:'2026-01-01',metric:null},
+    {day:'2026-01-02',metric:0}, {day:'2026-01-02',metric:null},
+    {day:'2026-01-03',metric:2}, {day:'2026-01-03',metric:null},
+], 'day', [{value:'metric'}]);
+assert.equal(nullableSeries[0].metric,null);
+assert.equal(nullableSeries[1].metric,0);
+assert.equal(nullableSeries[2].metric,2);
+assert.deepEqual(buildPieChartData([{category:'Missing',metric:null},{category:'Zero',metric:0},{category:'Blank',metric:''}], 'category', 'metric').map(x=>({name:x.name,value:x.value})),[]);

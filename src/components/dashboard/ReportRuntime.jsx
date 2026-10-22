@@ -2849,6 +2849,7 @@ export default function ReportRuntime({
   sectionPresentation = "tabs",
   selectedSectionId = "",
   onSectionChange = null,
+  onChartMetricSelectionChange = null,
   showContextSummary = true,
   suppressFilterBarBlocks = false,
   suppressFilterBarBlockDatasetRefs = [],
@@ -3280,6 +3281,7 @@ export default function ReportRuntime({
               isActive
               embedded={false}
               showControls={!reportPresentation}
+              onMetricSelectionChange={onChartMetricSelectionChange ? selection => onChartMetricSelectionChange({blockId:block.id,selection}) : null}
               onDatumSelect={chartInteractionEnabled ? ((selection) => {
                 setSelectedChartSelection(block.id, selection);
                 applyAuthoredSelectionActions(block, selection);
