@@ -23,11 +23,21 @@ query predicates, subscription, or an authorization decision. Changes to those
 source parameters still require the normal host execution path. The optional
 `onMetricSelectionChange` callback exposes the choice to consuming hosts.
 
-The canonical static print artifact uses authored defaults with independently
+Without requested presentation state, static print uses authored defaults with independently
 scaled axes and matching fractional-percent formats. Null observations remain
-unavailable and break lines instead of producing zero observations. Host wiring
-that exports a viewer's temporary selection, rather than the authored defaults,
-remains an explicit acceptance gap; do not claim viewer/export-state parity yet.
+unavailable and break lines instead of producing zero observations. `applyReportChartSelections` and the bounded Go `materializer.Present` entrypoint
+apply temporary viewer choices only to opted-in chart blocks. The resource engine
+uses the selected spec for both ReportFill and ReportPrint while retaining the
+approved datasource requests. Unknown blocks, undeclared fields, and arbitrary
+replacement metadata fail before dispatch.
+
+Hosts may advertise `reportCapabilities.chartMetricSelection: true` only after
+both their run and export adapters forward `chartMetricSelections` to this engine.
+The native resource viewer then reruns selected metrics, forwards the same choices
+to export, checks that the response retained them, and cancels stale exports.
+Without that capability, changing a local chart blocks print/export until the
+saved choice is restored. Consumer-adapter wiring and deployed interaction tests
+remain required; the library tests do not establish that every host supports it.
 
 Implementation evidence: field-contract/schema tests, native rendered selector
 interaction tests, independent-axis SVG geometry tests, nullable line-gap tests,

@@ -70,8 +70,58 @@ var ForgeAuthoredLowerer = (() => {
   var entry_exports = {};
   __export(entry_exports, {
     lower: () => lower,
-    materialize: () => materialize
+    materialize: () => materialize,
+    present: () => present
   });
+
+  // src/components/chartMetricSelection.js
+  function normalizeChartMetricSelection(value, fields = []) {
+    if (value == null) return null;
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("Chart metric selection must be an object.");
+    const primaryField = String(value.primaryField || "").trim(), secondaryField = String(value.secondaryField || "").trim();
+    if (!primaryField || !fields.includes(primaryField) || secondaryField && !fields.includes(secondaryField) || secondaryField === primaryField) throw Error("Chart metric selection requires distinct declared primary and secondary fields.");
+    return { primaryField, secondaryField };
+  }
+  function applyChartMetricSelection(chart, selection = null) {
+    var _a5, _b;
+    if (!(chart == null ? void 0 : chart.metricSelection)) return chart;
+    if (((_a5 = chart.series) == null ? void 0 : _a5.nameKey) || !["line", "area", "bar", "combo", "composed"].includes(chart.type)) throw Error("Metric selection requires a direct cartesian chart.");
+    const options = chart.metricSelection.options || ((_b = chart.series) == null ? void 0 : _b.values) || [];
+    const fields = options.map((option) => option.value);
+    const defaults = normalizeChartMetricSelection(chart.metricSelection, fields);
+    let selected = defaults;
+    if (selection) {
+      try {
+        selected = normalizeChartMetricSelection(selection, fields);
+      } catch (e3) {
+        selected = defaults;
+      }
+    }
+    const primary = options.find((option) => option.value === selected.primaryField);
+    const secondary = options.find((option) => option.value === selected.secondaryField);
+    const values = [{ ...primary, axis: "left" }, ...secondary ? [{ ...secondary, axis: "right" }] : []];
+    return { ...chart, metricSelection: { ...selected, options }, series: { ...chart.series, values }, yAxis: { ...chart.yAxis, format: primary.format }, axes: { left: { format: primary.format, label: primary.label }, ...secondary ? { right: { format: secondary.format, label: secondary.label } } : {} } };
+  }
+
+  // src/reporting/reportPresentationModel.js
+  function applyReportChartSelections(reportSpec, selections = {}) {
+    var _a5, _b;
+    if (!reportSpec || reportSpec.kind !== "reportSpec" || !Array.isArray(reportSpec.blocks)) throw Error("Approved reportSpec required for chart presentation.");
+    if (!selections || typeof selections !== "object" || Array.isArray(selections)) throw Error("Chart metric selections must be an object map.");
+    const result = JSON.parse(JSON.stringify(reportSpec));
+    const blocks = new Map(result.blocks.map((block) => [block.id, block]));
+    if (blocks.size !== result.blocks.length) throw Error("Ambiguous report block identity.");
+    for (const [id, selection] of Object.entries(selections)) {
+      const block = blocks.get(id);
+      if (!block || block.kind !== "chartBlock" || !((_a5 = block.chartSpec) == null ? void 0 : _a5.metricSelection) || !((_b = block.chartModel) == null ? void 0 : _b.metricSelection)) throw Error(`Chart '${id}' does not admit metric selection.`);
+      if (!selection || typeof selection !== "object" || Array.isArray(selection) || Object.keys(selection).some((key) => !["primaryField", "secondaryField"].includes(key))) throw Error("Only primary and secondary metric fields are admitted.");
+      const allowed = block.chartModel.metricSelection.options.map((option) => option.value).filter((field) => block.chartSpec.yFields.includes(field));
+      const normalized = normalizeChartMetricSelection(selection, allowed);
+      block.chartSpec.metricSelection = normalized;
+      block.chartModel = applyChartMetricSelection(block.chartModel, normalized);
+    }
+    return result;
+  }
 
   // backend/reporting/materializer/js/intl-global.js
   if (typeof globalThis.Intl === "undefined") globalThis.Intl = {};
@@ -43324,35 +43374,6 @@ Please __addLocaleData before adding additional unit data`);
     return result === null || !Number.isFinite(result) ? null : result;
   }
 
-  // src/components/chartMetricSelection.js
-  function normalizeChartMetricSelection(value, fields = []) {
-    if (value == null) return null;
-    if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("Chart metric selection must be an object.");
-    const primaryField = String(value.primaryField || "").trim(), secondaryField = String(value.secondaryField || "").trim();
-    if (!primaryField || !fields.includes(primaryField) || secondaryField && !fields.includes(secondaryField) || secondaryField === primaryField) throw Error("Chart metric selection requires distinct declared primary and secondary fields.");
-    return { primaryField, secondaryField };
-  }
-  function applyChartMetricSelection(chart, selection = null) {
-    var _a5, _b;
-    if (!(chart == null ? void 0 : chart.metricSelection)) return chart;
-    if (((_a5 = chart.series) == null ? void 0 : _a5.nameKey) || !["line", "area", "bar", "combo", "composed"].includes(chart.type)) throw Error("Metric selection requires a direct cartesian chart.");
-    const options = chart.metricSelection.options || ((_b = chart.series) == null ? void 0 : _b.values) || [];
-    const fields = options.map((option) => option.value);
-    const defaults = normalizeChartMetricSelection(chart.metricSelection, fields);
-    let selected = defaults;
-    if (selection) {
-      try {
-        selected = normalizeChartMetricSelection(selection, fields);
-      } catch (e3) {
-        selected = defaults;
-      }
-    }
-    const primary = options.find((option) => option.value === selected.primaryField);
-    const secondary = options.find((option) => option.value === selected.secondaryField);
-    const values = [{ ...primary, axis: "left" }, ...secondary ? [{ ...secondary, axis: "right" }] : []];
-    return { ...chart, metricSelection: { ...selected, options }, series: { ...chart.series, values }, yAxis: { ...chart.yAxis, format: primary.format }, axes: { left: { format: primary.format, label: primary.label }, ...secondary ? { right: { format: secondary.format, label: secondary.label } } : {} } };
-  }
-
   // src/utils/selector.js
   var resolveKey = (object, path) => {
     try {
@@ -67937,6 +67958,10 @@ ${indent}${end}`;
     if (!reportPrint) throw new Error("Trusted report print materialization failed.");
     return JSON.stringify({ reportFill, reportPrint });
   }
-  globalThis.ForgeAuthoredLowerer = { lower, materialize };
+  function present(inputJSON) {
+    const input = JSON.parse(inputJSON);
+    return JSON.stringify(applyReportChartSelections(input.reportSpec, input.chartMetricSelections));
+  }
+  globalThis.ForgeAuthoredLowerer = { lower, materialize, present };
   return __toCommonJS(entry_exports);
 })();

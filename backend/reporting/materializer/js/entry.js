@@ -1,3 +1,4 @@
+import {applyReportChartSelections} from "../../../../src/reporting/reportPresentationModel.js";
 // Envelope adapter restored from the previously embedded implementation.
 // All report lowering and rendering algorithms are imported from canonical Forge.
 import "./intl-global.js";
@@ -105,4 +106,8 @@ import {buildReportPrintFromReportFill} from "../../../../src/reporting/reportPr
     return JSON.stringify({ reportFill, reportPrint });
   }
 
-globalThis.ForgeAuthoredLowerer = {lower, materialize};
+export function present(inputJSON) {
+ const input=JSON.parse(inputJSON);
+ return JSON.stringify(applyReportChartSelections(input.reportSpec,input.chartMetricSelections));
+}
+globalThis.ForgeAuthoredLowerer = {lower, materialize, present};

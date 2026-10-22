@@ -1,0 +1,198 @@
+{
+  "version": 1,
+  "kind": "reportSpec",
+  "source": {
+    "kind": "dashboard.reportBuilder",
+    "containerId": "present",
+    "stateKey": "present",
+    "dataSourceRef": "approved"
+  },
+  "title": "Report",
+  "parameters": {
+    "viewMode": "chart",
+    "groupBy": "",
+    "pageSize": 1,
+    "orderField": "",
+    "orderDir": "desc"
+  },
+  "layoutIntent": {
+    "kind": "single",
+    "resultPanePosition": "right",
+    "blockOrder": [
+      "primaryTable",
+      "primaryChart"
+    ]
+  },
+  "refinements": [],
+  "calculatedFields": [],
+  "scope": {
+    "params": [],
+    "dataSourceRef": "approved"
+  },
+  "datasets": [
+    {
+      "id": "primary",
+      "dataSourceRef": "approved",
+      "request": {
+        "filters": {
+          "accountId": 42,
+          "campaignIds": [
+            7
+          ],
+          "from": "2026-01-01",
+          "to": "2026-01-02"
+        },
+        "measures": {
+          "spend": true,
+          "count": true,
+          "rate": true
+        },
+        "dimensions": {
+          "day": true
+        },
+        "limit": 50,
+        "offset": 0
+      }
+    }
+  ],
+  "blocks": [
+    {
+      "id": "primaryTable",
+      "kind": "tableBlock",
+      "datasetRef": "primary",
+      "columns": [
+        {
+          "key": "day",
+          "sourceKey": "day",
+          "displayKey": "day",
+          "label": "Day",
+          "kind": "dimension"
+        },
+        {
+          "key": "spend",
+          "sourceKey": "spend",
+          "displayKey": "spend",
+          "label": "Spend",
+          "kind": "measure",
+          "format": "currency2",
+          "align": "right"
+        },
+        {
+          "key": "count",
+          "sourceKey": "count",
+          "displayKey": "count",
+          "label": "Impressions",
+          "kind": "measure",
+          "format": "compactNumber",
+          "align": "right"
+        },
+        {
+          "key": "rate",
+          "sourceKey": "rate",
+          "displayKey": "rate",
+          "label": "Rate",
+          "kind": "measure",
+          "format": "percentFraction2",
+          "align": "right"
+        }
+      ]
+    },
+    {
+      "id": "primaryChart",
+      "kind": "chartBlock",
+      "datasetRef": "primary",
+      "chartSpec": {
+        "type": "line",
+        "xField": "day",
+        "yFields": [
+          "spend",
+          "count",
+          "rate"
+        ],
+        "metricSelection": {
+          "primaryField": "spend",
+          "secondaryField": "rate"
+        }
+      },
+      "chartModel": {
+        "type": "line",
+        "xAxis": {
+          "dataKey": "day",
+          "label": "Day"
+        },
+        "yAxis": {
+          "format": "currency2"
+        },
+        "metricSelection": {
+          "primaryField": "spend",
+          "secondaryField": "rate",
+          "options": [
+            {
+              "value": "spend",
+              "label": "Spend",
+              "color": "#1f77b4",
+              "format": "currency2",
+              "type": "line"
+            },
+            {
+              "value": "count",
+              "label": "Impressions",
+              "color": "#ff7f0e",
+              "format": "compactNumber",
+              "type": "line"
+            },
+            {
+              "value": "rate",
+              "label": "Rate",
+              "color": "#2ca02c",
+              "format": "percentFraction2",
+              "type": "line"
+            }
+          ]
+        },
+        "series": {
+          "values": [
+            {
+              "value": "spend",
+              "label": "Spend",
+              "color": "#1f77b4",
+              "format": "currency2",
+              "type": "line",
+              "axis": "left"
+            },
+            {
+              "value": "rate",
+              "label": "Rate",
+              "color": "#2ca02c",
+              "format": "percentFraction2",
+              "type": "line",
+              "axis": "right"
+            }
+          ],
+          "palette": [
+            "#1f77b4",
+            "#ff7f0e",
+            "#2ca02c",
+            "#d62728",
+            "#9467bd",
+            "#8c564b",
+            "#e377c2",
+            "#7f7f7f",
+            "#bcbd22",
+            "#17becf"
+          ]
+        },
+        "axes": {
+          "left": {
+            "format": "currency2",
+            "label": "Spend"
+          },
+          "right": {
+            "format": "percentFraction2",
+            "label": "Rate"
+          }
+        }
+      }
+    }
+  ]
+}
