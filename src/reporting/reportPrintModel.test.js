@@ -1389,3 +1389,12 @@ const collapsiblePrintText = collapsibleTablePrint.pages.flatMap((page) => page.
 assert.ok(collapsiblePrintText.includes("Kroil? creative full value"), "print keeps the full normalized value even when the runtime table defaults collapsed");
 
 console.log("reportPrintModel ✓ builds the canonical ReportPrint contract and lowers authored ReportFill blocks into paginated print output");
+
+
+// Identifier formatting must agree with screen presentation without grouping,
+// coercing leading zeros, or losing precision in source string identifiers.
+const identifierSpec={...authoredSpec,refinements:[],calculatedFields:[],datasets:[{id:'primary',dataSourceRef:'identifiers',request:{}}],blocks:[{id:'identityTable',kind:'tableBlock',datasetRef:'primary',columns:[{key:'recordId',label:'ID',format:'id'},{key:'civilDate',label:'Date',format:'date'}]}],layoutIntent:{kind:'stack',resultPanePosition:'bottom',blockOrder:['identityTable']}};
+const identifierFill=buildReportFillFromReportSpec(identifierSpec,{primary:{rows:[{recordId:555785,civilDate:'2026-09-21T00:00:00Z'},{recordId:'000123',civilDate:'2026-09-22T00:00:00Z'},{recordId:'9007199254740993',civilDate:'2026-09-23T00:00:00Z'}]}});
+const identifierPrint=buildReportPrintFromReportFill({reportSpec:identifierSpec,reportFill:identifierFill});
+const identifierCells=identifierPrint.pages.flatMap(p=>p.elements||[]).filter(e=>e.kind==='tableCellText');
+for(const text of ['555785','000123','9007199254740993','Sep 21, 2026'])assert.ok(identifierCells.some(e=>e.text===text),`Missing exact print cell ${text}`);

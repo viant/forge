@@ -17,3 +17,10 @@ assert.equal(formatExportNumericValue(.0065,"percentFraction2"),"0.65%");
 assert.equal(formatExportNumericValue(null,"currency2"),"");
 assert.equal(formatExportNumericValue(" ","number"),"");
 assert.equal(formatExportValue(null,"percentFraction2"),"—");
+
+for(const format of ['id','raw','plain','text']){
+ assert.equal(formatExportValue(555785,format),'555785');
+ assert.equal(formatExportValue('000123',format),'000123');
+ assert.equal(formatExportValue('9007199254740993',format),'9007199254740993');
+ assert.equal(formatExportNumericValue('000123',format),'000123');
+}
