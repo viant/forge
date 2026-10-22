@@ -146,6 +146,21 @@ export function createDataConnector(dataSource, runtime = {}) {
         if(scope)error.scope=scope;
         error.isUnauthorized = !(resp.status===403 && code==='datasource_denied' && scope==='dataset') && (resp.status === 401 || resp.status === 403);
         error.authRequired = String(resp.headers?.get?.('X-Agently-Auth-Required') || '').toLowerCase() === 'true';
+        // Failed-request diagnostics must never expose request credentials,
+        // query parameters, fragments or response bodies.
+        let responseURL = '';
+        try {
+            const parsed = new URL(resp.url);
+            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                responseURL = parsed.origin + parsed.pathname;
+            }
+        } catch (_) { /* Missing or malformed response URLs stay omitted. */ }
+        getLogger('connector').warn('request failed', {
+            url: responseURL,
+            status: resp.status,
+            authRequired: error.authRequired,
+            ...(code ? {code} : {}),
+        });
         if (detail) {
             error.detail = detail;
         }
