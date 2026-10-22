@@ -2,7 +2,7 @@ import React,{act,useState,useEffect} from 'react';
 import {Simulate} from 'react-dom/test-utils';
 import {createRoot} from 'react-dom/client';
 import {it,expect,vi} from 'vitest';
-import WorkspaceRuntimeSurface,{requestWorkspaceClose} from './WorkspaceRuntimeSurface.jsx';
+import WorkspaceRuntimeSurface,{requestWorkspaceClose,WorkspaceRuntimePanels} from './WorkspaceRuntimeSurface.jsx';
 it('shares roving keyboard focus, capability-aware close and retained drafts without reloading',async()=>{
  globalThis.IS_REACT_ACT_ENVIRONMENT=true;const host=document.createElement('div');document.body.append(host);const root=createRoot(host),mounted=vi.fn(),closed=vi.fn(),events=vi.fn();
  function Draft({id}){const [draft,setDraft]=useState('');useEffect(()=>{mounted(id);},[]);return <input aria-label={id} value={draft} onChange={e=>setDraft(e.target.value)}/>;}
@@ -10,6 +10,38 @@ it('shares roving keyboard focus, capability-aware close and retained drafts wit
  try{await act(async()=>root.render(<App/>));expect(mounted.mock.calls).toEqual([['a']]);const input=host.querySelector('input[aria-label=a]');await act(async()=>Simulate.change(input,{target:{value:'unsaved draft'}}));expect(input.value).toBe('unsaved draft');const first=host.querySelector('[role=tab]');first.focus();await act(async()=>first.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true})));expect(document.activeElement.textContent).toBe('B');expect(mounted.mock.calls).toEqual([['a'],['b']]);expect(host.querySelector('input[aria-label=a]').closest('[role=tabpanel]').hidden).toBe(true);expect(host.querySelector('input[aria-label=a]').closest('[role=tabpanel]').hasAttribute('inert')).toBe(true);
  const b=document.activeElement;await act(async()=>b.dispatchEvent(new KeyboardEvent('keydown',{key:'Delete',bubbles:true})));expect(closed).not.toHaveBeenCalled();await act(async()=>b.dispatchEvent(new KeyboardEvent('keydown',{key:'Home',bubbles:true})));expect(document.activeElement.textContent).toBe('A');expect(mounted).toHaveBeenCalledTimes(2);expect(host.querySelector('input[aria-label=a]')).toBe(input);expect(input.value).toBe('unsaved draft');await act(async()=>document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Delete',bubbles:true})));expect(closed).toHaveBeenCalledWith('a',expect.anything());expect(host.querySelector('input[aria-label=a]')).not.toBeNull();expect(events).toHaveBeenCalledWith(expect.objectContaining({type:'select_requested',windowId:'b',keyboard:true}));
  }finally{await act(async()=>root.unmount());host.remove();}
+});
+
+it('retains loaded report state across repeated chat/workspace switches and isolates new conversations',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const loads=vi.fn(),cleanups=vi.fn();
+ function Report({id}){
+  const [filter,setFilter]=useState('original');
+  useEffect(()=>{loads(id);return()=>cleanups(id);},[id]);
+  return <><input aria-label="Report filter" value={filter} onChange={event=>setFilter(event.target.value)}/><table><tbody><tr><td>{id}</td><td>42</td></tr></tbody></table></>;
+ }
+ const show=(active,id='report-conversation-a')=>act(async()=>root.render(<>
+  <section aria-label="Chat" hidden={active}><textarea aria-label="Message" defaultValue="unsent question"/></section>
+  <WorkspaceRuntimePanels id="host" entries={[{windowId:id,label:'Report'},{windowId:`${id}-unvisited`,label:'Other report'}]}
+   selectedId={id} active={active} renderContent={entry=><Report id={entry.windowId}/>}/>
+ </>));
+ try {
+  await show(false);expect(loads).not.toHaveBeenCalled();
+  const composer=host.querySelector('textarea');
+  await show(true);const filter=host.querySelector('input');
+  await act(async()=>Simulate.change(filter,{target:{value:'retained filter'}}));
+  for(let i=0;i<20;i++){
+   await show(false);expect(filter.closest('[role=tabpanel]').hidden).toBe(true);expect(filter.closest('[role=tabpanel]').hasAttribute('inert')).toBe(true);
+   expect(composer.closest('section').hidden).toBe(false);
+   await show(true);expect(host.querySelector('input')).toBe(filter);expect(filter.value).toBe('retained filter');
+   expect(filter.closest('[role=tabpanel]').hidden).toBe(false);expect(composer.value).toBe('unsent question');
+  }
+  expect(loads.mock.calls).toEqual([['report-conversation-a']]);expect(cleanups).not.toHaveBeenCalled();
+  await show(false,'report-conversation-b');expect(cleanups.mock.calls).toEqual([['report-conversation-a']]);expect(host.querySelector('input')).toBeNull();
+  await show(true,'report-conversation-b');expect(host.querySelector('input').value).toBe('original');
+  expect(loads.mock.calls).toEqual([['report-conversation-a'],['report-conversation-b']]);
+ } finally {await act(async()=>root.unmount());host.remove();}
 });
 
 it('generic host close admission may await confirmation, decline or reject without discarding retained content',async()=>{
