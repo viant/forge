@@ -25,9 +25,9 @@ export default function MasterDetail({container, context, renderRegion}) {
   const validSelected = masterAuthoritative ? resolveMasterDetailSelection(rows, selected, persisted, spec.identityFields || ['id']) : null;
   const selectedID = masterDetailIdentity(validSelected, spec.identityFields || ['id']);
   const contextsDistinct = masterContext !== detailContext;
-  const detailBoundaryMode = String(detailContainer?.permissionBoundary?.mode || 'resource').toLowerCase();
-  const unsafeResourceBoundary = !!detailContainer?.permissionBoundary && detailBoundaryMode === 'resource';
-  const boundaryAllowed = !detailContainer?.permissionBoundary || (!unsafeResourceBoundary && permissionBoundaryAllowsRows(detailContainer.permissionBoundary, detailContext, validSelected ? [validSelected] : []));
+  // The data producer owns resource and row authorization. Do not reintroduce
+  // authorization checks here. Legacy boundaries retain UI visibility predicates.
+  const boundaryAllowed = !detailContainer?.permissionBoundary || permissionBoundaryAllowsRows(detailContainer.permissionBoundary, detailContext, validSelected ? [validSelected] : []);
   const detailAllowed = !!validSelected
     && (!spec.detail?.allowedWhen || evaluatePlainVisibleWhen(spec.detail.allowedWhen, {...masterContext, row: validSelected}, validSelected))
     && boundaryAllowed;
@@ -110,7 +110,7 @@ export default function MasterDetail({container, context, renderRegion}) {
     const currentGeneration = ++generation.current;
     setDetailReady(false);
     setDetailError(null);
-    if (!contextsDistinct || unsafeResourceBoundary) return;
+    if (!contextsDistinct) return;
     if (!masterAuthoritative || !validSelected || !detailAllowed) {
       invalidateDetailBinding();
       return;
@@ -128,12 +128,12 @@ export default function MasterDetail({container, context, renderRegion}) {
     return () => {
       if (generation.current === currentGeneration) invalidateDetailBinding();
     };
-  }, [contextsDistinct, detailAllowed, detailContext, detailParameterSignature, invalidateDetailBinding, masterAuthoritative, masterContext, selectedID, unsafeResourceBoundary]);
+  }, [contextsDistinct, detailAllowed, detailContext, detailParameterSignature, invalidateDetailBinding, masterAuthoritative, masterContext, selectedID]);
 
   const mode = masterDetailResponsiveMode(spec.responsive, target);
   const master = <div ref={masterHost} tabIndex={-1} className="forge-master-detail__master">{renderRegion?.(masterContainer)}</div>;
   const emptyMessage = blockReason === 'denied' ? detailContainer?.permissionBoundary?.deniedMessage || 'Selection is not permitted.' : blockReason === 'removed' ? 'The selected item is no longer available.' : spec.emptyDetail?.message || 'Select an item';
-  const detail = <div className="forge-master-detail__detail">{unsafeResourceBoundary ? <Callout intent="danger">Master-detail prefetch requires selected-row authorization; resource-mode detail boundaries are not supported.</Callout> : validSelected && detailAllowed ? detailError ? <Callout intent="danger">{String(detailError?.message || detailError)}</Callout> : detailReady ? renderRegion?.(detailContainer) : <div className="forge-data-state"><Spinner size={24}/><span>Loading selection…</span></div> : <NonIdealState icon={blockReason === 'denied' ? 'lock' : 'hand'} title={emptyMessage}/>}</div>;
+  const detail = <div className="forge-master-detail__detail">{validSelected && detailAllowed ? detailError ? <Callout intent="danger">{String(detailError?.message || detailError)}</Callout> : detailReady ? renderRegion?.(detailContainer) : <div className="forge-data-state"><Spinner size={24}/><span>Loading selection…</span></div> : <NonIdealState icon={blockReason === 'denied' ? 'lock' : 'hand'} title={emptyMessage}/>}</div>;
   const back = () => { setDrillOpen(false); restoreMasterFocus(); };
   if (!contextsDistinct) return <Callout intent="danger" data-forge-primitive="masterDetail">Master and detail must use distinct datasource contexts.</Callout>;
   return <div ref={host} className={`forge-master-detail is-${mode}`} data-forge-primitive="masterDetail" data-selected-identity={selectedID}>
