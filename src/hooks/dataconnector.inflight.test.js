@@ -1,5 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
+const {warn} = vi.hoisted(() => ({warn: vi.fn()}));
+
 vi.mock('../core', () => ({
     useSetting: () => ({ endpoints: {}, useAuth: () => ({}), targetContext: {} }),
 }));
@@ -7,6 +9,7 @@ vi.mock('../core', () => ({
 vi.mock('../utils/logger.js', () => ({
     getLogger: () => ({
         debug: () => {},
+        warn,
     }),
 }));
 
@@ -15,6 +18,7 @@ import { createDataConnector } from './dataconnector.js';
 describe('createDataConnector', () => {
     beforeEach(() => {
         vi.restoreAllMocks();
+        warn.mockClear();
     });
 
     it('dedupes identical in-flight GET requests by exact request identity', async () => {
@@ -177,6 +181,31 @@ describe('createDataConnector', () => {
 
         await expect(connector.get({ filter: {}, inputParameters: {} })).rejects.toThrow('authorization required');
         expect(handleUnauthorized).toHaveBeenCalledOnce();
+    });
+
+    it.each([false, true])('diagnoses a 401 safely with host auth marker=%s', async authRequired => {
+        const handleUnauthorized = vi.fn();
+        const response = {
+            ok: false, status: 401, statusText: 'Unauthorized',
+            url: 'https://private-user:private-password@host.test:8100/v1/api/agently/forge/window/advertiser?token=query-secret#fragment-secret',
+            headers: {get: name => name === 'X-Agently-Auth-Required' && authRequired ? 'true' : null},
+            clone() { return this; },
+            text: async () => JSON.stringify({code: 'authorization_required', error: 'private-response-body'}),
+        };
+        global.fetch = vi.fn().mockResolvedValue(response);
+        const connector = createDataConnector({service: {URL: '/v1/api/agently/forge/window/advertiser'}}, {
+            auth: {handleUnauthorized},
+        });
+        await expect(connector.get({})).rejects.toMatchObject({status: 401, authRequired, code: 'authorization_required'});
+        expect(warn).toHaveBeenCalledExactlyOnceWith('request failed', {
+            url: 'https://host.test:8100/v1/api/agently/forge/window/advertiser',
+            status: 401, authRequired, code: 'authorization_required',
+        });
+        const diagnostic = JSON.stringify(warn.mock.calls);
+        for (const secret of ['private-user', 'private-password', 'query-secret', 'fragment-secret', 'private-response-body']) {
+            expect(diagnostic).not.toContain(secret);
+        }
+        expect(handleUnauthorized).toHaveBeenCalledTimes(authRequired ? 1 : 0);
     });
 });
 
