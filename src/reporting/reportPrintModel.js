@@ -1880,6 +1880,25 @@ function resolveReportPrintTableCellText(column = {}, cell = {}) {
   ));
 }
 
+// Size compact evidence from its displayed content rather than a fixed column count.
+// Cap long labels so descriptive columns can wrap without forcing every row into
+// another horizontal pane. Dates and numeric identifiers keep their full width.
+function minimumReportPrintColumnWidths(state = {}, block = {}, columns = []) {
+  const rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
+  const padding = REPORT_PRINT_THEME.tableCellPaddingX * 2;
+  const cap = Math.min(128, state.contentWidth / 2);
+  return columns.map((column) => {
+    const key = normalizeString(column?.key);
+    const labelWords = normalizeString(column?.label || key).split(/\s+/);
+    let characters = Math.max(6, ...labelWords.map((word) => Math.min(12, word.length)));
+    rows.slice(0, 50).forEach((row) => {
+      const cell = (row?.cells || []).find((entry) => normalizeString(entry?.key) === key);
+      characters = Math.max(characters, resolveReportPrintTableCellText(column, cell).length);
+    });
+    return Math.min(cap, Math.max(44, characters * 9 * 0.56 + padding));
+  });
+}
+
 function buildReportPrintTableColumnLayout(state = {}, block = {}, columns = []) {
   const rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
   const weights = columns.map((column) => {
@@ -1898,9 +1917,11 @@ function buildReportPrintTableColumnLayout(state = {}, block = {}, columns = [])
     return Math.max(7, Math.min(numeric ? 18 : 30, longest));
   });
   const totalWeight = Math.max(1, weights.reduce((sum, weight) => sum + weight, 0));
-  const baseWidth = Math.min(64, (state.contentWidth / Math.max(1, columns.length)) * 0.7);
-  const flexibleWidth = Math.max(0, state.contentWidth - (baseWidth * columns.length));
-  const widths = weights.map((weight) => baseWidth + (flexibleWidth * (weight / totalWeight)));
+  const minimumWidths = minimumReportPrintColumnWidths(state, block, columns);
+  const minimumTotal = minimumWidths.reduce((sum, width) => sum + width, 0);
+  const scale = Math.min(1, state.contentWidth / Math.max(1, minimumTotal));
+  const flexibleWidth = Math.max(0, state.contentWidth - minimumTotal);
+  const widths = weights.map((weight, index) => minimumWidths[index] * scale + (flexibleWidth * (weight / totalWeight)));
   const offsets = [];
   widths.reduce((left, width) => {
     offsets.push(left);
@@ -2185,20 +2206,30 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
 } = {}) {
   const columns = Array.isArray(block?.content?.columns) ? block.content.columns : [];
   let rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
-  const maxColumns = Math.max(3, Math.floor(state.contentWidth / 85));
-  if (columns.length > maxColumns) {
-    const groupSize = maxColumns - 1;
-    const groupCount = Math.ceil((columns.length - 1) / groupSize);
-    for (let start = 1; start < columns.length; start += groupSize) {
-      const group = Math.floor((start - 1) / groupSize) + 1;
-      const title = `${resolveReportPrintBlockTitle(block)} (${group}/${groupCount})`;
+  const minimumWidths = minimumReportPrintColumnWidths(state, block, columns);
+  if (columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
+    const groups = [];
+    let group = [columns[0]];
+    let width = minimumWidths[0];
+    for (let index = 1; index < columns.length; index += 1) {
+      if (group.length > 1 && width + minimumWidths[index] > state.contentWidth) {
+        groups.push(group);
+        group = [columns[0]];
+        width = minimumWidths[0];
+      }
+      group.push(columns[index]);
+      width += minimumWidths[index];
+    }
+    groups.push(group);
+    groups.forEach((groupColumns, index) => {
+      const title = `${resolveReportPrintBlockTitle(block)} (${index + 1}/${groups.length})`;
       renderReportPrintTableBlock(state, {
         ...block,
-        id: `${block.id}__columns_${group}`,
+        id: `${block.id}__columns_${index + 1}`,
         title,
-        content: { ...block.content, title, columns: [columns[0], ...columns.slice(start, start + groupSize)] },
+        content: { ...block.content, title, columns: groupColumns },
       }, { layoutNote });
-    }
+    });
     return;
   }
   const pathwayDetails = [];

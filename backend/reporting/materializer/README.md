@@ -29,3 +29,12 @@ logical dataset aliases remain distinct from physical datasource descriptors;
 both closures are preserved. The calculated-field and formatting expression
 interpreters are the official restricted parsers, with no JavaScript eval or
 metadata script execution.
+
+Canonical print tables allocate widths from bounded samples of formatted cell text.
+Compact tables stay in one horizontal pane when their columns fit; genuinely wide
+tables still split and repeat the first identifying column. This changes print
+geometry only. The ten fixture ReportSpec and ReportFill hashes remain unchanged;
+print hashes were regenerated with the official Node bundle after checking those
+artifacts against the preceding bundle. Compact/wide table tests cover complete
+cell retention and page bounds, and the 600-row Goja regression enforces a single
+horizontal pane without changing the materializer time budget.

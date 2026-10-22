@@ -67361,6 +67361,22 @@ ${indent}${end}`;
       normalizeString39(column == null ? void 0 : column.format)
     ));
   }
+  function minimumReportPrintColumnWidths(state = {}, block = {}, columns = []) {
+    var _a5;
+    const rows = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.resolvedRows) ? block.content.resolvedRows : [];
+    const padding = REPORT_PRINT_THEME.tableCellPaddingX * 2;
+    const cap = Math.min(128, state.contentWidth / 2);
+    return columns.map((column) => {
+      const key = normalizeString39(column == null ? void 0 : column.key);
+      const labelWords = normalizeString39((column == null ? void 0 : column.label) || key).split(/\s+/);
+      let characters = Math.max(6, ...labelWords.map((word) => Math.min(12, word.length)));
+      rows.slice(0, 50).forEach((row) => {
+        const cell = ((row == null ? void 0 : row.cells) || []).find((entry) => normalizeString39(entry == null ? void 0 : entry.key) === key);
+        characters = Math.max(characters, resolveReportPrintTableCellText(column, cell).length);
+      });
+      return Math.min(cap, Math.max(44, characters * 9 * 0.56 + padding));
+    });
+  }
   function buildReportPrintTableColumnLayout(state = {}, block = {}, columns = []) {
     var _a5;
     const rows = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.resolvedRows) ? block.content.resolvedRows : [];
@@ -67378,9 +67394,11 @@ ${indent}${end}`;
       return Math.max(7, Math.min(numeric ? 18 : 30, longest));
     });
     const totalWeight = Math.max(1, weights.reduce((sum, weight) => sum + weight, 0));
-    const baseWidth = Math.min(64, state.contentWidth / Math.max(1, columns.length) * 0.7);
-    const flexibleWidth = Math.max(0, state.contentWidth - baseWidth * columns.length);
-    const widths = weights.map((weight) => baseWidth + flexibleWidth * (weight / totalWeight));
+    const minimumWidths = minimumReportPrintColumnWidths(state, block, columns);
+    const minimumTotal = minimumWidths.reduce((sum, width) => sum + width, 0);
+    const scale = Math.min(1, state.contentWidth / Math.max(1, minimumTotal));
+    const flexibleWidth = Math.max(0, state.contentWidth - minimumTotal);
+    const widths = weights.map((weight, index) => minimumWidths[index] * scale + flexibleWidth * (weight / totalWeight));
     const offsets = [];
     widths.reduce((left, width) => {
       offsets.push(left);
@@ -67651,20 +67669,30 @@ ${indent}${end}`;
     var _a5, _b;
     const columns = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.columns) ? block.content.columns : [];
     let rows = Array.isArray((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.resolvedRows) ? block.content.resolvedRows : [];
-    const maxColumns = Math.max(3, Math.floor(state.contentWidth / 85));
-    if (columns.length > maxColumns) {
-      const groupSize = maxColumns - 1;
-      const groupCount = Math.ceil((columns.length - 1) / groupSize);
-      for (let start = 1; start < columns.length; start += groupSize) {
-        const group = Math.floor((start - 1) / groupSize) + 1;
-        const title = `${resolveReportPrintBlockTitle(block)} (${group}/${groupCount})`;
+    const minimumWidths = minimumReportPrintColumnWidths(state, block, columns);
+    if (columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
+      const groups = [];
+      let group = [columns[0]];
+      let width = minimumWidths[0];
+      for (let index = 1; index < columns.length; index += 1) {
+        if (group.length > 1 && width + minimumWidths[index] > state.contentWidth) {
+          groups.push(group);
+          group = [columns[0]];
+          width = minimumWidths[0];
+        }
+        group.push(columns[index]);
+        width += minimumWidths[index];
+      }
+      groups.push(group);
+      groups.forEach((groupColumns, index) => {
+        const title = `${resolveReportPrintBlockTitle(block)} (${index + 1}/${groups.length})`;
         renderReportPrintTableBlock(state, {
           ...block,
-          id: `${block.id}__columns_${group}`,
+          id: `${block.id}__columns_${index + 1}`,
           title,
-          content: { ...block.content, title, columns: [columns[0], ...columns.slice(start, start + groupSize)] }
+          content: { ...block.content, title, columns: groupColumns }
         }, { layoutNote });
-      }
+      });
       return;
     }
     const pathwayDetails = [];
