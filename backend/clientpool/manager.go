@@ -150,6 +150,8 @@ type Manager struct {
 	catalogEpoch              [16]byte
 	prov                      Provider
 	ttl                       time.Duration
+	maxClients                int
+	capacityUsed              int
 	newHandler                func() protoclient.Handler
 	newClientFn               func(context.Context, string, string) (mcpclient.Interface, error)
 	cookieJar                 http.CookieJar
@@ -176,6 +178,7 @@ type Manager struct {
 }
 
 type entry struct {
+	capacityHeld      bool
 	aliases           map[string]bool
 	configFingerprint [32]byte
 	client            mcpclient.Interface
@@ -510,9 +513,6 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (result mc
 	// This lock must be released before client creation/network setup
 	// (provider options, transport init) to prevent global manager stalls.
 	// Maintain per-conversation client to correlate elicitation correctly.
-	if m.pool[key] == nil {
-		m.pool[key] = map[string]*entry{}
-	}
 	if e := m.pool[key][serverName]; e != nil && e.client != nil && e.configFingerprint != fingerprint {
 		stale := m.evictEntryLocked(key, serverName, e)
 		m.mu.Unlock()
@@ -534,9 +534,6 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (result mc
 		m.mu.Unlock()
 		logPoolSummary(summary)
 		return client, nil
-	}
-	if m.inflight[key] == nil {
-		m.inflight[key] = map[string]*createCall{}
 	}
 	if call := m.inflight[key][serverName]; call != nil && call.configFingerprint != fingerprint {
 		m.mu.Unlock()
@@ -560,9 +557,24 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (result mc
 			return nil, ctx.Err()
 		}
 	}
+	if err := ctx.Err(); m.maxClients > 0 && err != nil {
+		m.mu.Unlock()
+		return nil, err
+	}
+	retired, capacityErr := m.reserveClientSlotLocked()
+	if capacityErr != nil {
+		m.mu.Unlock()
+		closeClientBestEffort(retired)
+		return nil, capacityErr
+	}
+	reservedCapacity := m.maxClients > 0
+	if m.inflight[key] == nil {
+		m.inflight[key] = map[string]*createCall{}
+	}
 	call := &createCall{ready: make(chan struct{}), epoch: m.epoch[key], configFingerprint: fingerprint}
 	m.inflight[key][serverName] = call
 	m.mu.Unlock()
+	closeClientBestEffort(retired)
 
 	newClient := func(ctx context.Context, conversation, server string) (mcpclient.Interface, error) {
 		// Resolve the existing delegated link before metadata discovery or transport
@@ -596,6 +608,14 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (result mc
 	createTiming := observe.Start(ctx, "mcp.pool.create", observe.Labels{Provider: serverName})
 	client, err := newClient(ctx, convID, serverName)
 	createTiming.End(observe.OutcomeFor(err), observe.CacheMiss)
+	if reservedCapacity && err != nil && client != nil {
+		closeClientBestEffort(client)
+		client = nil
+	}
+	if reservedCapacity && ctx.Err() != nil {
+		closeClientBestEffort(client)
+		client, err = nil, ctx.Err()
+	}
 	if err == nil {
 		current, configErr := m.Options(ctx, requestedName)
 		currentFingerprint, fingerprintErr := effectiveConfigFingerprint(current)
@@ -612,6 +632,12 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (result mc
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	capacityTransferred := false
+	defer func() {
+		if reservedCapacity && !capacityTransferred {
+			m.capacityUsed--
+		}
+	}()
 	delete(m.inflight[key], serverName)
 	if len(m.inflight[key]) == 0 {
 		delete(m.inflight, key)
@@ -627,6 +653,9 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (result mc
 		return nil, call.err
 	}
 	if subscribed, ok := client.(*sensitiveClient); ok && subscribed.subscriptionLost.Load() {
+		if reservedCapacity {
+			closeClientBestEffort(client)
+		}
 		call.err = errors.New("mcp manager: resource subscription ended during client creation")
 		close(call.ready)
 		return nil, call.err
@@ -651,9 +680,10 @@ func (m *Manager) Get(ctx context.Context, convID, serverName string) (result mc
 		close(call.ready)
 		return managed, nil
 	}
-	e := &entry{client: client, usedAt: time.Now(), epoch: call.epoch, configFingerprint: fingerprint, aliases: map[string]bool{requestedName: true, serverName: true}}
+	e := &entry{capacityHeld: reservedCapacity, client: client, usedAt: time.Now(), epoch: call.epoch, configFingerprint: fingerprint, aliases: map[string]bool{requestedName: true, serverName: true}}
 	e.managed = &managedClient{mgr: m, key: key, serverName: serverName, entry: e}
 	m.pool[key][serverName] = e
+	capacityTransferred = true
 	call.entry = e
 	close(call.ready)
 	summary := m.poolSummaryLogLinesLocked(time.Now())
@@ -931,7 +961,7 @@ func (m *Manager) endUse(e *entry) {
 		e.usedAt = time.Now()
 		if e.evicted && !e.closed {
 			e.closed = true
-			toClose = e.client
+			toClose = m.retirementClientLocked(e)
 		}
 	}
 	m.mu.Unlock()
@@ -952,7 +982,7 @@ func (m *Manager) evictEntryLocked(key, serverName string, e *entry) mcpclient.I
 	}
 	if e.active == 0 && !e.closed {
 		e.closed = true
-		return e.client
+		return m.retirementClientLocked(e)
 	}
 	return nil
 }
