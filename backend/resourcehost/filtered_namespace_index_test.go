@@ -107,7 +107,11 @@ func TestFilteredLegacyNamespaceIndex(t *testing.T) {
 	}{
 		{name: "standard read", owner: "producer", wantRows: 1},
 		{name: "allowed name", owner: "producer", restrictions: []string{"remote"}, wantRows: 1},
+		{name: "allowed advertised URI", owner: "producer", restrictions: []string{"ns://opaque_collection"}, wantRows: 1},
+		{name: "allowed name and advertised URI", owner: "producer", restrictions: []string{"remote", "ns://opaque_collection"}, wantRows: 1},
 		{name: "restricted name", owner: "producer", restrictions: []string{"other"}},
+		{name: "foreign URI", owner: "producer", restrictions: []string{"ns://other_collection"}},
+		{name: "resource authority is not collection URI", owner: "producer", restrictions: []string{"ns://remote"}},
 		{name: "owner mismatch", owner: "other", wantCollision: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

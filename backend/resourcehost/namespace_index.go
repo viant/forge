@@ -80,13 +80,11 @@ func (g *Gateway) discoverNamespaceIndex(ctx context.Context, c mcpclient.Interf
 				return result, identity.ErrResource
 			}
 			seenNS[namespace.URI] = true
-			// Restrictions use exact collection locators in this contract, never display
-			// names or guessed correspondence with resource URI authorities.
-			restriction := namespace.URI
-			if len(legacyOwner) > 0 {
-				restriction = namespace.Name
-			}
-			if len(allowed) > 0 && !allowed[restriction] {
+			// Match the producer's exact collection locator. Legacy indexes also
+			// retain their configured plain-name compatibility; resource URI
+			// authorities never supply an alternative collection identity.
+			permitted := allowed[namespace.URI] || len(legacyOwner) > 0 && allowed[namespace.Name]
+			if len(allowed) > 0 && !permitted {
 				continue
 			}
 			collections = append(collections, namespace)
@@ -232,7 +230,7 @@ func indexedDefinitionGet(ctx context.Context, c mcpclient.Interface, caps capab
 	return primitive.GetResult{Resource: &resource, ResolvedResource: pin}, nil
 }
 
-// Legacy authoring indexes identify collections by their explicit namespace name.
+// Legacy authoring indexes retain explicit names alongside collection URIs.
 // Their provider receipt remains validated even when resources/list replaces get.
 func decodeCollectionIndex(raw json.RawMessage, legacyOwner []string) (namespaces.ListResult, error) {
 	if len(legacyOwner) == 0 {
