@@ -8,23 +8,28 @@ import (
 	"strings"
 )
 
+type ReportViewerSettings struct {
+	AllowChartTableSwitch *bool `json:"allowChartTableSwitch,omitempty"`
+}
+
 type ReportSpec struct {
-	Version          int              `json:"version"`
-	Kind             string           `json:"kind"`
-	Source           Source           `json:"source"`
-	Title            string           `json:"title"`
-	Subtitle         string           `json:"subtitle,omitempty"`
-	Theme            map[string]any   `json:"theme,omitempty"`
-	Binding          *Binding         `json:"binding,omitempty"`
-	SemanticSummary  *SemanticSummary `json:"semanticSummary,omitempty"`
-	Parameters       *Parameters      `json:"parameters"`
-	LayoutIntent     *LayoutIntent    `json:"layoutIntent"`
-	Scope            *Scope           `json:"scope,omitempty"`
-	DrillMetadata    map[string]any   `json:"drillMetadata,omitempty"`
-	Refinements      []map[string]any `json:"refinements"`
-	CalculatedFields []map[string]any `json:"calculatedFields"`
-	Datasets         []Dataset        `json:"datasets"`
-	Blocks           []Block          `json:"blocks"`
+	Viewer           *ReportViewerSettings `json:"viewer,omitempty"`
+	Version          int                   `json:"version"`
+	Kind             string                `json:"kind"`
+	Source           Source                `json:"source"`
+	Title            string                `json:"title"`
+	Subtitle         string                `json:"subtitle,omitempty"`
+	Theme            map[string]any        `json:"theme,omitempty"`
+	Binding          *Binding              `json:"binding,omitempty"`
+	SemanticSummary  *SemanticSummary      `json:"semanticSummary,omitempty"`
+	Parameters       *Parameters           `json:"parameters"`
+	LayoutIntent     *LayoutIntent         `json:"layoutIntent"`
+	Scope            *Scope                `json:"scope,omitempty"`
+	DrillMetadata    map[string]any        `json:"drillMetadata,omitempty"`
+	Refinements      []map[string]any      `json:"refinements"`
+	CalculatedFields []map[string]any      `json:"calculatedFields"`
+	Datasets         []Dataset             `json:"datasets"`
+	Blocks           []Block               `json:"blocks"`
 }
 
 type Source struct {

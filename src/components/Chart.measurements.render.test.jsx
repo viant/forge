@@ -44,3 +44,20 @@ it('switches primary and secondary metrics through shared native controls',async
   expect(host.querySelectorAll('.recharts-yAxis').length).toBe(1);
  }finally{await act(async()=>root.unmount());host.remove();width.mockRestore();height.mockRestore();}
 });
+
+it('gates chart/table switching independently and returns to chart when disabled',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const width=vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(600);
+ const height=vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockReturnValue(320);
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ const container={id:'switch-gate',dataSourceRef:'daily',chart:{type:'line',xAxis:{dataKey:'day'},series:{values:[{value:'count',label:'Count'}]}}};
+ const context={identity:{dataSourceRef:'daily'},signals:{collection:{value:[{day:'one',count:10},{day:'two',count:20}]},control:{value:{}},metrics:{value:{}},windowForm:{value:{}}}};
+ const render=async(allowTableSwitch,showControls=true)=>act(async()=>root.render(<Chart container={container} context={context} allowTableSwitch={allowTableSwitch} showControls={showControls}/>));
+ const button=name=>[...host.querySelectorAll('button')].find(b=>b.textContent===name);
+ try{
+  await render(false);expect(button('Table')).toBeUndefined();
+  await render(true,false);expect(button('Table')).toBeTruthy();
+  await act(async()=>button('Table').click());expect(host.querySelector('table')).toBeTruthy();
+  await render(false,false);expect(button('Table')).toBeUndefined();expect(host.querySelector('table')).toBeNull();
+ }finally{await act(async()=>root.unmount());host.remove();width.mockRestore();height.mockRestore();}
+});

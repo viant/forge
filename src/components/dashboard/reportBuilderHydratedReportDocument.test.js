@@ -3385,3 +3385,9 @@ assert.deepEqual(modernEmbeddedConfigHydrated.config?.staticFilters, [
 
 console.log("reportBuilderHydratedReportDocument ✓ hydrates compatible ReportDocument responses back into live builder config and state");
 console.log("reportBuilderHydratedReportDocument ✓ recovers primary dimensions/measures/filter metadata from reportDocument.datasets when embedded config is sparse");
+
+for (const allowChartTableSwitch of [false,true]) {
+ const reopened=buildHydratedReportBuilderDocument({...getResponse,document:{...getResponse.document,viewer:{allowChartTableSwitch}}},{container:{id:'demoReportBuilder',stateKey:'demoReportBuilder',dataSourceRef:'demoReportSource'},builderIdentity});
+ assert.equal(reopened.valid,true);
+ assert.deepEqual(reopened.state.reportDocumentViewer,{allowChartTableSwitch});
+}

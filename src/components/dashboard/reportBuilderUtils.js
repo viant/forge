@@ -500,6 +500,7 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         ...(seriesOptions ? { seriesOptions } : {}),
         ...(categoryLabel ? { categoryLabel } : {}),
         ...(metricSelection ? {metricSelection} : {}),
+        ...(typeof chartSpec.allowTableSwitch === "boolean" ? {allowTableSwitch:chartSpec.allowTableSwitch} : {}),
     };
 }
 
@@ -2361,6 +2362,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
             collection: container.collection,
             chart: {
                 ...baseChart,
+            ...(typeof normalized.allowTableSwitch === "boolean" ? {allowTableSwitch:normalized.allowTableSwitch} : {}),
                 series: {
                     nameKey: seriesDisplayKey,
                     ...(seriesSourceKey && ((seriesDisplayKey && seriesDisplayKey !== seriesSourceKey) || hasSeriesDisplayValueMap) ? { sourceNameKey: seriesSourceKey } : {}),
@@ -2408,6 +2410,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
         collection: container.collection,
         chart: applyChartMetricSelection({
             ...baseChart,
+            ...(typeof normalized.allowTableSwitch === "boolean" ? {allowTableSwitch:normalized.allowTableSwitch} : {}),
             ...(normalized.metricSelection ? {metricSelection: normalized.metricSelection} : {}),
             series: {
                 values,

@@ -665,6 +665,7 @@ export function buildHydratedReportBuilderDocument(getResponse = null, {
         ...(resolvedSnapshotRecord?.source ? { savedViewOverlayPublishedSnapshotSource: cloneValue(resolvedSnapshotRecord.source) } : {}),
         state: {
             ...hydratedState,
+            ...(document?.viewer ? {reportDocumentViewer:cloneValue(document.viewer)} : {}),
             ...(normalizeString(document?.title) ? { reportDocumentTitle: normalizeString(document.title) } : {}),
             ...(normalizeString(document?.subtitle) ? { reportDocumentSubtitle: normalizeString(document.subtitle) } : {}),
             ...(normalizeString(document?.description) ? { reportDocumentDescription: normalizeString(document.description) } : {}),
