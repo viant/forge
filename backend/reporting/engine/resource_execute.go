@@ -238,6 +238,11 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 			plans = append(plans, plannedDataset{dataset.ID, descriptor, args})
 		}
 	}
+	// Plans and effectiveDatasets share the bound argument maps. Resolve only
+	// comparison dates again after newly submitted aliases have been bound.
+	if err := applyReportPreviousPeriods(effectiveDatasets); err != nil {
+		return nil, err
+	}
 	if selected != nil && len(plans) != len(selected) {
 		return nil, identity.ErrResourceDenied
 	}

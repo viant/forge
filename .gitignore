@@ -11,7 +11,6 @@ output/
 yarn.lock
 thtest_local.go
 
-backend/reporting/materializer/package-lock.json
 
 # Generated window editor bundle and Go browser bridge.
 dist-window-editor/
