@@ -4,7 +4,8 @@ import fs from "node:fs";
 import {renderToStaticMarkup} from "react-dom/server";
 import ReportPrintPreview from "./ReportPrintPreview.jsx";
 const actual=JSON.parse(fs.readFileSync("src/reporting/fixtures/ordinary-mcp-widgets-report-print.v1.json","utf8"));
-const html=renderToStaticMarkup(<ReportPrintPreview reportPrint={actual}/>);
+const allPages=print=>print.pages.map((_,index)=>renderToStaticMarkup(<ReportPrintPreview reportPrint={print} pageIndex={index}/>)).join("");
+const html=allPages(actual);
 for (const text of ["alpha","beta","gamma","125.5","274.5","100"]) assert.ok(html.includes(text));
 assert.ok(html.includes(`viewBox="0 0 ${actual.pageGeometry.width} ${actual.pageGeometry.height}"`));
 assert.ok(html.includes("Canonical print preview"));
@@ -17,7 +18,7 @@ assert.ok(escaped.includes("&lt;script&gt;"));assert.ok(!escaped.includes("<scri
 for(const name of ["authored-landscape-report-print-fixture.v1.json","capacity-audience-landscape-report-print-fixture.v1.json"]){
  const fixture=JSON.parse(fs.readFileSync("src/reporting/fixtures/"+name,"utf8"));
  const print=fixture.reportPrint || fixture;
- const rendered=renderToStaticMarkup(<ReportPrintPreview reportPrint={print}/>);
+ const rendered=allPages(print);
  assert.ok(rendered.includes(`viewBox="0 0 ${print.pageGeometry.width} ${print.pageGeometry.height}"`));
  assert.equal((rendered.match(/<figure/g)||[]).length,print.pages.length);
 }
