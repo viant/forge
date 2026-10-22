@@ -43355,9 +43355,149 @@ Please __addLocaleData before adding additional unit data`);
     });
   }
 
+  // src/reporting/reportDatasetRefModel.js
+  function normalizeString(value = "") {
+    return String(value || "").trim();
+  }
+  function normalizeDatasetRefs(datasetRefs = []) {
+    const seen = /* @__PURE__ */ new Set();
+    return (Array.isArray(datasetRefs) ? datasetRefs : []).map((entry) => normalizeString(entry)).filter((entry) => {
+      if (!entry || seen.has(entry)) {
+        return false;
+      }
+      seen.add(entry);
+      return true;
+    });
+  }
+  function getReportBlockDatasetRefs(block = {}) {
+    var _a5, _b;
+    return normalizeDatasetRefs([
+      block == null ? void 0 : block.datasetRef,
+      block == null ? void 0 : block.secondaryDatasetRef,
+      (_a5 = block == null ? void 0 : block.sparkline) == null ? void 0 : _a5.datasetRef,
+      (_b = block == null ? void 0 : block.sparkline) == null ? void 0 : _b.comparisonDatasetRef
+    ]);
+  }
+  function resolveImplicitSingleReportDatasetRef(datasetRefs = []) {
+    const normalizedDatasetRefs = normalizeDatasetRefs(datasetRefs);
+    return normalizedDatasetRefs.length === 1 ? normalizedDatasetRefs[0] : "";
+  }
+  function resolveReportDatasetRefResolution({
+    preferredDatasetRef = "",
+    availableDatasetRefs = [],
+    fallbackDatasetRef = "primary"
+  } = {}) {
+    const explicitDatasetRef = normalizeString(preferredDatasetRef);
+    if (explicitDatasetRef) {
+      return {
+        datasetRef: explicitDatasetRef,
+        source: "explicit"
+      };
+    }
+    const implicitSingleDatasetRef = resolveImplicitSingleReportDatasetRef(availableDatasetRefs);
+    if (implicitSingleDatasetRef) {
+      return {
+        datasetRef: implicitSingleDatasetRef,
+        source: "singleAvailable"
+      };
+    }
+    return {
+      datasetRef: normalizeString(fallbackDatasetRef || "primary") || "primary",
+      source: "fallback"
+    };
+  }
+
   // src/utils/isNumericValue.js
   function isNumericValue(value) {
     return (typeof value === "number" || typeof value === "string" && value.trim() !== "") && Number.isFinite(Number(value));
+  }
+
+  // src/reporting/reportKpiSparklineModel.js
+  var kpiSparklineSchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["datasetRef", "valueField", "categoryField"],
+    properties: { datasetRef: { type: "string", minLength: 1 }, valueField: { type: "string", minLength: 1 }, categoryField: { type: "string", minLength: 1 }, comparisonDatasetRef: { type: "string", minLength: 1 }, periodStartPath: { type: "string", minLength: 1 }, periodEndPath: { type: "string", minLength: 1 } }
+  };
+  function normalizeKpiSparkline(value) {
+    if (value == null) return null;
+    if (typeof value !== "object" || Array.isArray(value) || Object.keys(value).some((key) => !Object.hasOwn(kpiSparklineSchema.properties, key))) throw Error("Invalid KPI sparkline declaration.");
+    const result = {};
+    for (const key of Object.keys(kpiSparklineSchema.properties)) {
+      if (["comparisonDatasetRef", "periodStartPath", "periodEndPath"].includes(key) && value[key] === void 0) continue;
+      if (typeof value[key] !== "string" || !value[key].trim()) throw Error("KPI sparkline requires " + key + ".");
+      result[key] = value[key].trim();
+    }
+    if (Boolean(result.periodStartPath) !== Boolean(result.periodEndPath)) throw Error("KPI sparkline requires both period paths.");
+    return result;
+  }
+  function materializeKpiSparkline(declaration, resolveDataset) {
+    const config = normalizeKpiSparkline(declaration);
+    if (!config) return null;
+    const read = (ref) => {
+      const dataset = resolveDataset(ref);
+      if (!dataset) throw Error("KPI sparkline dataset '" + ref + "' is unavailable.");
+      const rows = [...dataset.rows || []].sort((a4, b3) => {
+        var _a5, _b;
+        return String((_a5 = a4[config.categoryField]) != null ? _a5 : "").localeCompare(String((_b = b3[config.categoryField]) != null ? _b : ""), "en", { numeric: true });
+      });
+      const labels = rows.map((row) => {
+        var _a5;
+        return String((_a5 = row[config.categoryField]) != null ? _a5 : "");
+      });
+      if (labels.some((label) => !label) || new Set(labels).size !== labels.length) throw Error("KPI sparkline requires one row per category.");
+      if (config.periodStartPath) {
+        const readPath = (path) => path.split(".").reduce((value, key) => value == null ? void 0 : value[key], dataset.request);
+        const civil = (value) => {
+          const text = String(value != null ? value : "").slice(0, 10);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw Error("KPI sparkline requires valid civil dates.");
+          const date = /* @__PURE__ */ new Date(text + "T00:00:00Z");
+          if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== text) throw Error("KPI sparkline requires valid civil dates.");
+          return date.getTime();
+        };
+        const start = civil(readPath(config.periodStartPath)), end = civil(readPath(config.periodEndPath)), days = (end - start) / 864e5 + 1;
+        if (days < 1 || days > 4096) throw Error("KPI sparkline period is invalid or exceeds 4096 days.");
+        const values = Array(days).fill(null), seen = /* @__PURE__ */ new Set();
+        rows.forEach((row) => {
+          const index = (civil(row[config.categoryField]) - start) / 864e5;
+          if (index < 0 || index >= days || seen.has(index)) throw Error("KPI sparkline date is duplicated or outside its selected period.");
+          seen.add(index);
+          values[index] = isNumericValue(row[config.valueField]) ? Number(row[config.valueField]) : null;
+        });
+        return { labels: Array.from({ length: days }, (_2, i3) => new Date(start + i3 * 864e5).toISOString().slice(0, 10)), values };
+      }
+      return { labels, values: rows.map((row) => isNumericValue(row[config.valueField]) ? Number(row[config.valueField]) : null) };
+    };
+    const current = read(config.datasetRef);
+    const comparison = config.comparisonDatasetRef ? read(config.comparisonDatasetRef) : null;
+    if (config.periodStartPath && comparison && comparison.values.length !== current.values.length) throw Error("KPI sparkline comparison periods must have equal length.");
+    return { ...current, ...comparison ? { comparisonValues: comparison.values } : {} };
+  }
+  function kpiSparklineGeometry(content, width = 160, height = 36) {
+    const series = [content == null ? void 0 : content.values, content == null ? void 0 : content.comparisonValues].map((values) => Array.isArray(values) ? values.map((v2) => isNumericValue(v2) ? Number(v2) : null) : []);
+    const numeric = series.flat().filter((v2) => v2 !== null);
+    if (!numeric.length) return null;
+    const min = Math.min(...numeric), max = Math.max(...numeric), count = Math.max(...series.map((s4) => s4.length)), pad2 = 2;
+    const point = (value, index) => ({ x: pad2 + (count <= 1 ? 0.5 : index / (count - 1)) * (width - pad2 * 2), y: max === min ? height / 2 : height - pad2 - (value - min) / (max - min) * (height - pad2 * 2) });
+    return { width, height, paths: series.map((values) => {
+      let open = false;
+      return values.map((v2, i3) => {
+        if (v2 === null) {
+          open = false;
+          return "";
+        }
+        const p4 = point(v2, i3), s4 = (open ? "L" : "M") + p4.x.toFixed(2) + " " + p4.y.toFixed(2);
+        open = true;
+        return s4;
+      }).filter(Boolean).join(" ");
+    }), points: series.map((values) => values.flatMap((v2, i3) => v2 === null ? [] : [{ ...point(v2, i3), isolated: values[i3 - 1] == null && values[i3 + 1] == null }])) };
+  }
+  function buildKpiSparklineSvg(content, width = 160, height = 36) {
+    const geometry = kpiSparklineGeometry(content, width, height);
+    if (!geometry) return "";
+    const lines = geometry.paths.map((d4, i3) => d4 ? `<path d="${d4}" fill="none" stroke="${i3 ? "#6d7e8c" : "#2868a9"}" stroke-width="${i3 ? "1.25" : "1.75"}"${i3 ? ' stroke-dasharray="3 2"' : ""}/>` : "").join("");
+    const dots = geometry.points.flatMap((points, i3) => points.filter((p4) => p4.isolated).map((p4) => `<circle cx="${p4.x}" cy="${p4.y}" r="1.75" fill="${i3 ? "#6d7e8c" : "#2868a9"}"/>`)).join("");
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${lines}${dots}</svg>`;
   }
 
   // src/reporting/reportKpiComparisonModel.js
@@ -43797,7 +43937,7 @@ Please __addLocaleData before adding additional unit data`);
   function cloneValue(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
-  function normalizeString(value = "") {
+  function normalizeString2(value = "") {
     return String(value || "").trim();
   }
   var REPORT_CALCULATED_FIELD_FUNCTION_SPECS = Object.freeze({
@@ -43867,31 +44007,31 @@ Please __addLocaleData before adding additional unit data`);
     }
   ]);
   function listReportCalculatedFieldTableCalculationSpecs() {
-    return REPORT_CALCULATED_FIELD_TABLE_CALC_SPECS.map((entry) => cloneValue(entry)).sort((left, right) => normalizeString(left.name).localeCompare(normalizeString(right.name)));
+    return REPORT_CALCULATED_FIELD_TABLE_CALC_SPECS.map((entry) => cloneValue(entry)).sort((left, right) => normalizeString2(left.name).localeCompare(normalizeString2(right.name)));
   }
 
   // src/reporting/calculatedFieldModel.js
-  function normalizeString2(value = "") {
+  function normalizeString3(value = "") {
     return String(value || "").trim();
   }
   function cloneValue2(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
   function normalizeStringArray(values = []) {
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString2(value)).filter(Boolean);
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString3(value)).filter(Boolean);
   }
   function normalizeOrderBy(orderBy = []) {
     return (Array.isArray(orderBy) ? orderBy : []).map((entry) => {
       if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
         return null;
       }
-      const field = normalizeString2(entry.field);
+      const field = normalizeString3(entry.field);
       if (!field) {
         return null;
       }
       return {
         field,
-        direction: normalizeString2(entry.direction).toLowerCase() === "desc" ? "desc" : "asc"
+        direction: normalizeString3(entry.direction).toLowerCase() === "desc" ? "desc" : "asc"
       };
     }).filter(Boolean);
   }
@@ -44159,7 +44299,7 @@ Please __addLocaleData before adding additional unit data`);
       return dependencies;
     }
     if (node.type === "identifier") {
-      dependencies.add(normalizeString2(node.name));
+      dependencies.add(normalizeString3(node.name));
       return dependencies;
     }
     if (node.type === "unary") {
@@ -44194,7 +44334,7 @@ Please __addLocaleData before adding additional unit data`);
       return;
     }
     if (node.type === "call") {
-      const normalizedCallee = normalizeString2(node.callee).toLowerCase();
+      const normalizedCallee = normalizeString3(node.callee).toLowerCase();
       const spec = REPORT_CALCULATED_FIELD_FUNCTION_SPECS[normalizedCallee];
       if (!spec) {
         throw buildExpressionError(`unsupported function "${node.callee}"`);
@@ -44214,7 +44354,7 @@ Please __addLocaleData before adding additional unit data`);
     throw buildExpressionError(`unsupported expression node "${String(node.type || "unknown")}"`);
   }
   function parseReportCalculatedFieldExpression(expression = "") {
-    const normalizedExpression = normalizeString2(expression);
+    const normalizedExpression = normalizeString3(expression);
     if (!normalizedExpression) {
       return null;
     }
@@ -44247,7 +44387,7 @@ Please __addLocaleData before adding additional unit data`);
     if (typeof value === "number") {
       return value !== 0;
     }
-    const trimmed = normalizeString2(value);
+    const trimmed = normalizeString3(value);
     if (!trimmed) {
       return false;
     }
@@ -44307,7 +44447,7 @@ Please __addLocaleData before adding additional unit data`);
     }
   }
   function evaluateReportCalculatedFieldFunction(node = {}, row = {}) {
-    const callee = normalizeString2(node == null ? void 0 : node.callee).toLowerCase();
+    const callee = normalizeString3(node == null ? void 0 : node.callee).toLowerCase();
     const args = Array.isArray(node == null ? void 0 : node.args) ? node.args : [];
     switch (callee) {
       case "if": {
@@ -44483,8 +44623,8 @@ Please __addLocaleData before adding additional unit data`);
     }
   }
   function normalizeRatioCalculation(compute = {}) {
-    const numerator = normalizeString2(compute == null ? void 0 : compute.numerator);
-    const denominator = normalizeString2(compute == null ? void 0 : compute.denominator);
+    const numerator = normalizeString3(compute == null ? void 0 : compute.numerator);
+    const denominator = normalizeString3(compute == null ? void 0 : compute.denominator);
     if (!numerator || !denominator) {
       return null;
     }
@@ -44502,7 +44642,7 @@ Please __addLocaleData before adding additional unit data`);
     return next;
   }
   function normalizePercentOfTotalCalculation(compute = {}) {
-    const sourceField = normalizeString2(compute == null ? void 0 : compute.sourceField);
+    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
     if (!sourceField) {
       return null;
     }
@@ -44523,7 +44663,7 @@ Please __addLocaleData before adding additional unit data`);
     return next;
   }
   function normalizeDeltaFromPreviousCalculation(compute = {}) {
-    const sourceField = normalizeString2(compute == null ? void 0 : compute.sourceField);
+    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
     const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
     if (!sourceField || orderBy.length === 0) {
       return null;
@@ -44540,7 +44680,7 @@ Please __addLocaleData before adding additional unit data`);
     return next;
   }
   function normalizeRunningTotalCalculation(compute = {}) {
-    const sourceField = normalizeString2(compute == null ? void 0 : compute.sourceField);
+    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
     const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
     if (!sourceField || orderBy.length === 0) {
       return null;
@@ -44557,7 +44697,7 @@ Please __addLocaleData before adding additional unit data`);
     return next;
   }
   function normalizeMovingAverageCalculation(compute = {}) {
-    const sourceField = normalizeString2(compute == null ? void 0 : compute.sourceField);
+    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
     const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
     const windowSize = Math.max(1, Number((compute == null ? void 0 : compute.windowSize) || 0) || 0);
     if (!sourceField || orderBy.length === 0 || !windowSize) {
@@ -44580,9 +44720,9 @@ Please __addLocaleData before adding additional unit data`);
   }
   function normalizeRankCalculation(compute = {}) {
     var _a5;
-    const sourceField = normalizeString2(compute == null ? void 0 : compute.sourceField);
+    const sourceField = normalizeString3(compute == null ? void 0 : compute.sourceField);
     const orderBy = normalizeOrderBy(compute == null ? void 0 : compute.orderBy);
-    const tieMode = normalizeString2(compute == null ? void 0 : compute.tieMode).toLowerCase();
+    const tieMode = normalizeString3(compute == null ? void 0 : compute.tieMode).toLowerCase();
     if (!sourceField || orderBy.length === 0 || ((_a5 = orderBy[0]) == null ? void 0 : _a5.field) !== sourceField) {
       return null;
     }
@@ -44608,7 +44748,7 @@ Please __addLocaleData before adding additional unit data`);
     ]));
   }
   function normalizeReportCalculatedFieldExpressionDefinition(definition = {}) {
-    const expr = normalizeString2(definition == null ? void 0 : definition.expr);
+    const expr = normalizeString3(definition == null ? void 0 : definition.expr);
     if (!expr) {
       return null;
     }
@@ -44623,7 +44763,7 @@ Please __addLocaleData before adding additional unit data`);
   }
   function normalizeReportCalculatedFieldCompute(definition = {}) {
     var _a5;
-    const computeType = normalizeString2((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type).toLowerCase();
+    const computeType = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type).toLowerCase();
     let compute = null;
     if (computeType === "ratio") {
       compute = normalizeRatioCalculation(definition.compute);
@@ -44654,7 +44794,7 @@ Please __addLocaleData before adding additional unit data`);
     if (!definition || typeof definition !== "object" || Array.isArray(definition)) {
       return null;
     }
-    const id = normalizeString2((definition == null ? void 0 : definition.id) || (definition == null ? void 0 : definition.key));
+    const id = normalizeString3((definition == null ? void 0 : definition.id) || (definition == null ? void 0 : definition.key));
     if (!id) {
       return null;
     }
@@ -44663,18 +44803,18 @@ Please __addLocaleData before adding additional unit data`);
     if (!normalizedExpression && !normalizedCompute) {
       return null;
     }
-    const kind = normalizedExpression ? "rowCalc" : normalizeString2((_a5 = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _a5.type).toLowerCase() === "percentoftotal" || normalizeString2((_b = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _b.type).toLowerCase() === "deltafromprevious" || normalizeString2((_c = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _c.type).toLowerCase() === "runningtotal" || normalizeString2((_d = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _d.type).toLowerCase() === "movingaverage" || normalizeString2((_e = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _e.type).toLowerCase() === "rank" ? "tableCalc" : "rowCalc";
-    if (normalizedExpression && normalizeString2(definition == null ? void 0 : definition.kind) && normalizeString2(definition.kind) !== "rowCalc") {
+    const kind = normalizedExpression ? "rowCalc" : normalizeString3((_a5 = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _a5.type).toLowerCase() === "percentoftotal" || normalizeString3((_b = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _b.type).toLowerCase() === "deltafromprevious" || normalizeString3((_c = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _c.type).toLowerCase() === "runningtotal" || normalizeString3((_d = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _d.type).toLowerCase() === "movingaverage" || normalizeString3((_e = normalizedCompute == null ? void 0 : normalizedCompute.compute) == null ? void 0 : _e.type).toLowerCase() === "rank" ? "tableCalc" : "rowCalc";
+    if (normalizedExpression && normalizeString3(definition == null ? void 0 : definition.kind) && normalizeString3(definition.kind) !== "rowCalc") {
       return null;
     }
     return {
       id,
-      key: normalizeString2((definition == null ? void 0 : definition.key) || id),
+      key: normalizeString3((definition == null ? void 0 : definition.key) || id),
       kind,
-      label: normalizeString2((definition == null ? void 0 : definition.label) || id),
-      dataType: normalizeString2((definition == null ? void 0 : definition.dataType) || "number") || "number",
-      ...normalizeString2(definition == null ? void 0 : definition.format) ? { format: normalizeString2(definition.format) } : {},
-      ...normalizeString2(datasetRef || (definition == null ? void 0 : definition.datasetRef)) ? { datasetRef: normalizeString2(datasetRef || (definition == null ? void 0 : definition.datasetRef)) } : {},
+      label: normalizeString3((definition == null ? void 0 : definition.label) || id),
+      dataType: normalizeString3((definition == null ? void 0 : definition.dataType) || "number") || "number",
+      ...normalizeString3(definition == null ? void 0 : definition.format) ? { format: normalizeString3(definition.format) } : {},
+      ...normalizeString3(datasetRef || (definition == null ? void 0 : definition.datasetRef)) ? { datasetRef: normalizeString3(datasetRef || (definition == null ? void 0 : definition.datasetRef)) } : {},
       dependencies: (normalizedExpression == null ? void 0 : normalizedExpression.dependencies) || (normalizedCompute == null ? void 0 : normalizedCompute.dependencies) || [],
       ...normalizedExpression ? { expr: normalizedExpression.expr } : { compute: normalizedCompute.compute }
     };
@@ -44712,7 +44852,7 @@ Please __addLocaleData before adding additional unit data`);
   }
   function topologicallySortRowCalculatedFields(definitions = []) {
     const byKey = new Map(
-      definitions.map((definition) => [normalizeString2((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), definition]).filter(([key]) => !!key)
+      definitions.map((definition) => [normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), definition]).filter(([key]) => !!key)
     );
     const pending = new Set(byKey.keys());
     const sorted = [];
@@ -44744,34 +44884,34 @@ Please __addLocaleData before adding additional unit data`);
     datasetRef = ""
   } = {}) {
     const applicableFields = normalizeReportCalculatedFields(calculatedFields).filter((definition) => {
-      const targetDatasetRef = normalizeString2(definition == null ? void 0 : definition.datasetRef);
+      const targetDatasetRef = normalizeString3(definition == null ? void 0 : definition.datasetRef);
       if (!targetDatasetRef) {
         return true;
       }
-      return targetDatasetRef === normalizeString2(datasetRef);
+      return targetDatasetRef === normalizeString3(datasetRef);
     });
     if (applicableFields.length === 0) {
       return Array.isArray(rows) ? rows : [];
     }
     const compiledExpressions = new Map(
-      applicableFields.filter((definition) => normalizeString2(definition == null ? void 0 : definition.expr)).map((definition) => {
+      applicableFields.filter((definition) => normalizeString3(definition == null ? void 0 : definition.expr)).map((definition) => {
         var _a5;
-        return [normalizeString2((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), ((_a5 = parseReportCalculatedFieldExpression(definition.expr)) == null ? void 0 : _a5.ast) || null];
+        return [normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id)), ((_a5 = parseReportCalculatedFieldExpression(definition.expr)) == null ? void 0 : _a5.ast) || null];
       })
     );
     const rowCalculated = (Array.isArray(rows) ? rows : []).map((row) => {
       const next = { ...row || {} };
       topologicallySortRowCalculatedFields(applicableFields.filter((definition) => definition.kind === "rowCalc")).forEach((definition) => {
         var _a5, _b, _c;
-        const outputKey = normalizeString2((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
+        const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
         if (!outputKey) {
           return;
         }
-        if (normalizeString2(definition == null ? void 0 : definition.expr)) {
+        if (normalizeString3(definition == null ? void 0 : definition.expr)) {
           next[outputKey] = evaluateReportCalculatedFieldExpression(compiledExpressions.get(outputKey), next);
           return;
         }
-        if (normalizeString2((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "ratio") {
+        if (normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "ratio") {
           const numerator = Number(resolveKey(next, definition.compute.numerator));
           const denominator = Number(resolveKey(next, definition.compute.denominator));
           const scale = Number.isFinite(Number((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.scale)) ? Number(definition.compute.scale) : 1;
@@ -44791,11 +44931,11 @@ Please __addLocaleData before adding additional unit data`);
     const withTableCalcs = rowCalculated.map((row) => ({ ...row }));
     applicableFields.filter((definition) => {
       var _a5;
-      return normalizeString2((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "percentOfTotal";
+      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "percentOfTotal";
     }).forEach((definition) => {
       var _a5, _b, _c, _d;
-      const outputKey = normalizeString2((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-      const sourceField = normalizeString2((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
+      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
+      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
       if (!outputKey || !sourceField) {
         return;
       }
@@ -44821,11 +44961,11 @@ Please __addLocaleData before adding additional unit data`);
     });
     applicableFields.filter((definition) => {
       var _a5;
-      return normalizeString2((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "deltaFromPrevious";
+      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "deltaFromPrevious";
     }).forEach((definition) => {
       var _a5, _b, _c;
-      const outputKey = normalizeString2((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-      const sourceField = normalizeString2((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
+      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
+      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
       const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
       if (!outputKey || !sourceField || orderBy.length === 0) {
         return;
@@ -44846,11 +44986,11 @@ Please __addLocaleData before adding additional unit data`);
     });
     applicableFields.filter((definition) => {
       var _a5;
-      return normalizeString2((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "runningTotal";
+      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "runningTotal";
     }).forEach((definition) => {
       var _a5, _b, _c;
-      const outputKey = normalizeString2((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-      const sourceField = normalizeString2((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
+      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
+      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
       const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
       if (!outputKey || !sourceField || orderBy.length === 0) {
         return;
@@ -44869,11 +45009,11 @@ Please __addLocaleData before adding additional unit data`);
     });
     applicableFields.filter((definition) => {
       var _a5;
-      return normalizeString2((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "movingAverage";
+      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "movingAverage";
     }).forEach((definition) => {
       var _a5, _b, _c, _d;
-      const outputKey = normalizeString2((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-      const sourceField = normalizeString2((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
+      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
+      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
       const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
       const windowSize = Math.max(1, Number(((_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.windowSize) || 0) || 0);
       if (!outputKey || !sourceField || orderBy.length === 0 || !windowSize) {
@@ -44899,13 +45039,13 @@ Please __addLocaleData before adding additional unit data`);
     });
     applicableFields.filter((definition) => {
       var _a5;
-      return normalizeString2((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "rank";
+      return normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.type) === "rank";
     }).forEach((definition) => {
       var _a5, _b, _c, _d, _e;
-      const outputKey = normalizeString2((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
-      const sourceField = normalizeString2((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
+      const outputKey = normalizeString3((definition == null ? void 0 : definition.key) || (definition == null ? void 0 : definition.id));
+      const sourceField = normalizeString3((_a5 = definition == null ? void 0 : definition.compute) == null ? void 0 : _a5.sourceField);
       const orderBy = normalizeOrderBy((_b = definition == null ? void 0 : definition.compute) == null ? void 0 : _b.orderBy);
-      const tieMode = normalizeString2((_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.tieMode).toLowerCase();
+      const tieMode = normalizeString3((_c = definition == null ? void 0 : definition.compute) == null ? void 0 : _c.tieMode).toLowerCase();
       if (!outputKey || !sourceField || orderBy.length === 0 || ((_d = orderBy[0]) == null ? void 0 : _d.field) !== sourceField) {
         return;
       }
@@ -44961,42 +45101,42 @@ Please __addLocaleData before adding additional unit data`);
   }
 
   // src/reporting/reportTableLink.js
-  function normalizeString3(value = "") {
+  function normalizeString4(value = "") {
     return String(value != null ? value : "").trim();
   }
   function normalizeReportTableLink(link = null) {
     if (!link || typeof link !== "object" || Array.isArray(link)) return null;
-    const kind = normalizeString3(link.kind).toLowerCase();
+    const kind = normalizeString4(link.kind).toLowerCase();
     if (kind === "external") {
-      const urlField = normalizeString3(link.urlField);
+      const urlField = normalizeString4(link.urlField);
       return urlField ? { kind: "external", urlField } : null;
     }
     if (kind === "entitydetail") {
-      const handler = normalizeString3(link.handler);
-      const idField = normalizeString3(link.idField);
+      const handler = normalizeString4(link.handler);
+      const idField = normalizeString4(link.idField);
       return handler && idField ? { kind: "entityDetail", handler, idField } : null;
     }
     return null;
   }
 
   // src/reporting/tableVisualSpec.js
-  function normalizeString4(value = "") {
+  function normalizeString5(value = "") {
     return String(value || "").trim();
   }
   function isTruncatedPlaceholder(value = "") {
-    return normalizeString4(value) === "[MaxDepth]";
+    return normalizeString5(value) === "[MaxDepth]";
   }
   function cloneValue3(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
   function normalizeStringArray2(values = []) {
-    return (Array.isArray(values) ? values : []).map((value) => normalizeString4(value)).filter(Boolean);
+    return (Array.isArray(values) ? values : []).map((value) => normalizeString5(value)).filter(Boolean);
   }
   function normalizeRange(range = {}) {
     if (!range || typeof range !== "object" || Array.isArray(range)) {
       return null;
     }
-    const mode = normalizeString4(range.mode);
+    const mode = normalizeString5(range.mode);
     const next = {
       ...mode ? { mode } : {},
       ...Number.isFinite(Number(range.min)) ? { min: Number(range.min) } : {},
@@ -45011,10 +45151,10 @@ Please __addLocaleData before adding additional unit data`);
       }
       const next = {
         ..."value" in rule ? { value: cloneValue3(rule.value) } : {},
-        ...normalizeString4(rule.tone) ? { tone: normalizeString4(rule.tone) } : {},
-        ...normalizeString4(rule.label) ? { label: normalizeString4(rule.label) } : {},
-        ...normalizeString4(rule.color) ? { color: normalizeString4(rule.color) } : {},
-        ...normalizeString4(rule.background) ? { background: normalizeString4(rule.background) } : {}
+        ...normalizeString5(rule.tone) ? { tone: normalizeString5(rule.tone) } : {},
+        ...normalizeString5(rule.label) ? { label: normalizeString5(rule.label) } : {},
+        ...normalizeString5(rule.color) ? { color: normalizeString5(rule.color) } : {},
+        ...normalizeString5(rule.background) ? { background: normalizeString5(rule.background) } : {}
       };
       return Object.keys(next).length > 0 ? next : null;
     }).filter(Boolean);
@@ -45024,14 +45164,14 @@ Please __addLocaleData before adding additional unit data`);
       if (!segment || typeof segment !== "object" || Array.isArray(segment)) {
         return null;
       }
-      const valueField = normalizeString4(segment.valueField);
+      const valueField = normalizeString5(segment.valueField);
       if (!valueField) {
         return null;
       }
       const next = {
         valueField,
-        ...normalizeString4(segment.label) ? { label: normalizeString4(segment.label) } : {},
-        ...normalizeString4(segment.color) ? { color: normalizeString4(segment.color) } : {}
+        ...normalizeString5(segment.label) ? { label: normalizeString5(segment.label) } : {},
+        ...normalizeString5(segment.color) ? { color: normalizeString5(segment.color) } : {}
       };
       return next;
     }).filter(Boolean);
@@ -45040,18 +45180,18 @@ Please __addLocaleData before adding additional unit data`);
     if (!cellVisual || typeof cellVisual !== "object" || Array.isArray(cellVisual)) {
       return null;
     }
-    const kind = normalizeString4(cellVisual.kind);
+    const kind = normalizeString5(cellVisual.kind);
     if (!["dataBar", "progressBar", "sparkBar", "shareBar", "tone", "badge", "delta", "rank"].includes(kind)) {
       return null;
     }
     const next = {
       kind,
-      ...normalizeString4(cellVisual.valueField) ? { valueField: normalizeString4(cellVisual.valueField) } : {},
-      ...normalizeString4(cellVisual.colorField) ? { colorField: normalizeString4(cellVisual.colorField) } : {},
+      ...normalizeString5(cellVisual.valueField) ? { valueField: normalizeString5(cellVisual.valueField) } : {},
+      ...normalizeString5(cellVisual.colorField) ? { colorField: normalizeString5(cellVisual.colorField) } : {},
       ...normalizeRange(cellVisual.range) ? { range: normalizeRange(cellVisual.range) } : {},
       ...normalizeStringArray2(cellVisual.palette).length > 0 ? { palette: normalizeStringArray2(cellVisual.palette) } : {},
       ...normalizeSegments(cellVisual.segments).length > 0 ? { segments: normalizeSegments(cellVisual.segments) } : {},
-      ...normalizeString4(cellVisual.nullBehavior) ? { nullBehavior: normalizeString4(cellVisual.nullBehavior) } : {},
+      ...normalizeString5(cellVisual.nullBehavior) ? { nullBehavior: normalizeString5(cellVisual.nullBehavior) } : {},
       ...normalizeRules(cellVisual.rules).length > 0 ? { rules: normalizeRules(cellVisual.rules) } : {},
       ...(cellVisual == null ? void 0 : cellVisual.positiveIsGood) === false ? { positiveIsGood: false } : {}
     };
@@ -45061,7 +45201,7 @@ Please __addLocaleData before adding additional unit data`);
     if (!column || typeof column !== "object" || Array.isArray(column)) {
       return null;
     }
-    const key = normalizeString4(column.key);
+    const key = normalizeString5(column.key);
     if (!key || isTruncatedPlaceholder(key)) {
       return null;
     }
@@ -45070,14 +45210,14 @@ Please __addLocaleData before adding additional unit data`);
     const labelClamp = normalizePresentationClampConfig(column.labelClamp);
     return {
       key,
-      ...normalizeString4(column.sourceKey) ? { sourceKey: normalizeString4(column.sourceKey) } : {},
-      ...normalizeString4(column.displayKey) ? { displayKey: normalizeString4(column.displayKey) } : {},
+      ...normalizeString5(column.sourceKey) ? { sourceKey: normalizeString5(column.sourceKey) } : {},
+      ...normalizeString5(column.displayKey) ? { displayKey: normalizeString5(column.displayKey) } : {},
       ...(column == null ? void 0 : column.displayValueMap) && typeof column.displayValueMap === "object" && !Array.isArray(column.displayValueMap) ? { displayValueMap: cloneValue3(column.displayValueMap) } : {},
       ...(column == null ? void 0 : column.displayIconMap) && typeof column.displayIconMap === "object" && !Array.isArray(column.displayIconMap) ? { displayIconMap: cloneValue3(column.displayIconMap) } : {},
-      ...normalizeString4(column.kind) ? { kind: normalizeString4(column.kind) } : {},
-      ...normalizeString4(column.label) ? { label: normalizeString4(column.label) } : {},
-      ...normalizeString4(column.format) || normalizeString4(column.valueFormat) ? { format: normalizeString4(column.format) || normalizeString4(column.valueFormat) } : {},
-      ...normalizeString4(column.align) ? { align: normalizeString4(column.align) } : {},
+      ...normalizeString5(column.kind) ? { kind: normalizeString5(column.kind) } : {},
+      ...normalizeString5(column.label) ? { label: normalizeString5(column.label) } : {},
+      ...normalizeString5(column.format) || normalizeString5(column.valueFormat) ? { format: normalizeString5(column.format) || normalizeString5(column.valueFormat) } : {},
+      ...normalizeString5(column.align) ? { align: normalizeString5(column.align) } : {},
       ...(column == null ? void 0 : column.runtimeFilterable) === true ? { runtimeFilterable: true } : {},
       ...link ? { link } : {},
       ...cellVisual ? { cellVisual } : {},
@@ -45085,9 +45225,9 @@ Please __addLocaleData before adding additional unit data`);
     };
   }
   function normalizeReportDocumentTableBlock(block = {}) {
-    const id = normalizeString4((block == null ? void 0 : block.id) || "tableBlock");
-    const title = normalizeString4((block == null ? void 0 : block.title) || "Table");
-    const datasetRef = normalizeString4((block == null ? void 0 : block.datasetRef) || "primary");
+    const id = normalizeString5((block == null ? void 0 : block.id) || "tableBlock");
+    const title = normalizeString5((block == null ? void 0 : block.title) || "Table");
+    const datasetRef = normalizeString5((block == null ? void 0 : block.datasetRef) || "primary");
     const rawColumns = Array.isArray(block == null ? void 0 : block.columns) ? block.columns : [];
     const rawColumnKeys = Array.isArray(block == null ? void 0 : block.columnKeys) ? block.columnKeys : [];
     const explicitColumns = (Array.isArray(block == null ? void 0 : block.columns) ? block.columns : []).map((column) => normalizeReportTableBlockColumn(column)).filter(Boolean);
@@ -45095,7 +45235,7 @@ Please __addLocaleData before adding additional unit data`);
     if (columns.length === 0 && (rawColumns.some((column) => isTruncatedPlaceholder(column == null ? void 0 : column.key)) || rawColumnKeys.some((key) => isTruncatedPlaceholder(key)))) {
       return null;
     }
-    const accentTone = normalizeString4(block == null ? void 0 : block.accentTone).toLowerCase();
+    const accentTone = normalizeString5(block == null ? void 0 : block.accentTone).toLowerCase();
     const labelClamp = normalizePresentationClampConfig(block == null ? void 0 : block.labelClamp);
     return {
       id,
@@ -45111,7 +45251,7 @@ Please __addLocaleData before adding additional unit data`);
   }
 
   // src/components/dashboard/reportBuilderCalculatedFieldAuthoring.js
-  function normalizeString5(value = "") {
+  function normalizeString6(value = "") {
     return String(value || "").trim();
   }
   function cloneValue4(value) {
@@ -45120,8 +45260,8 @@ Please __addLocaleData before adding additional unit data`);
   function normalizeMeasureSections(measureSections = []) {
     return (Array.isArray(measureSections) ? measureSections : []).filter((section) => section && typeof section === "object" && !Array.isArray(section)).map((section, index) => ({
       ...cloneValue4(section),
-      id: normalizeString5(section == null ? void 0 : section.id),
-      label: normalizeString5(section == null ? void 0 : section.label),
+      id: normalizeString6(section == null ? void 0 : section.id),
+      label: normalizeString6(section == null ? void 0 : section.label),
       order: Number.isFinite(Number(section == null ? void 0 : section.order)) ? Number(section.order) : index
     })).filter((section) => section.id);
   }
@@ -45144,7 +45284,7 @@ Please __addLocaleData before adding additional unit data`);
     ];
   }
   function normalizeReportBuilderLocalCalculatedFields(calculatedFields = []) {
-    return normalizeReportCalculatedFields(calculatedFields).filter((field) => (field == null ? void 0 : field.kind) === "rowCalc" && normalizeString5(field == null ? void 0 : field.expr)).map((field) => cloneValue4(field));
+    return normalizeReportCalculatedFields(calculatedFields).filter((field) => (field == null ? void 0 : field.kind) === "rowCalc" && normalizeString6(field == null ? void 0 : field.expr)).map((field) => cloneValue4(field));
   }
   function normalizeReportBuilderLocalTableCalculations(calculatedFields = []) {
     return normalizeReportCalculatedFields(calculatedFields).filter((field) => (field == null ? void 0 : field.kind) === "tableCalc" && (field == null ? void 0 : field.compute)).map((field) => cloneValue4(field));
@@ -45155,12 +45295,12 @@ Please __addLocaleData before adding additional unit data`);
     defaultSection = "calculated"
   } = {}) {
     const localById = new Map(
-      (Array.isArray(localFields) ? localFields : []).map((field) => [normalizeString5((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key)), field]).filter(([id, field]) => !!id && !!field)
+      (Array.isArray(localFields) ? localFields : []).map((field) => [normalizeString6((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key)), field]).filter(([id, field]) => !!id && !!field)
     );
     const merged = [];
     const seen = /* @__PURE__ */ new Set();
     (Array.isArray(baseFields) ? baseFields : []).forEach((field) => {
-      const fieldId = normalizeString5((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key));
+      const fieldId = normalizeString6((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key));
       if (!fieldId || seen.has(fieldId)) {
         return;
       }
@@ -45168,7 +45308,7 @@ Please __addLocaleData before adding additional unit data`);
       if (localOverride) {
         merged.push({
           ...localOverride,
-          section: normalizeString5(localOverride == null ? void 0 : localOverride.section) || defaultSection,
+          section: normalizeString6(localOverride == null ? void 0 : localOverride.section) || defaultSection,
           authoringScope,
           authoringEditable: true,
           ...authoringKind ? { authoringKind } : {}
@@ -45179,13 +45319,13 @@ Please __addLocaleData before adding additional unit data`);
       seen.add(fieldId);
     });
     (Array.isArray(localFields) ? localFields : []).forEach((field) => {
-      const fieldId = normalizeString5((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key));
+      const fieldId = normalizeString6((field == null ? void 0 : field.id) || (field == null ? void 0 : field.key));
       if (!fieldId || seen.has(fieldId)) {
         return;
       }
       merged.push({
         ...field,
-        section: normalizeString5(field == null ? void 0 : field.section) || defaultSection,
+        section: normalizeString6(field == null ? void 0 : field.section) || defaultSection,
         authoringScope,
         authoringEditable: true,
         ...authoringKind ? { authoringKind } : {}
@@ -45224,27 +45364,27 @@ Please __addLocaleData before adding additional unit data`);
     };
   }
   var REPORT_BUILDER_TABLE_CALC_FUNCTIONS = listReportCalculatedFieldTableCalculationSpecs().map((entry) => ({
-    value: normalizeString5(entry == null ? void 0 : entry.name),
-    label: normalizeString5((entry == null ? void 0 : entry.label) || (entry == null ? void 0 : entry.name)),
+    value: normalizeString6(entry == null ? void 0 : entry.name),
+    label: normalizeString6((entry == null ? void 0 : entry.label) || (entry == null ? void 0 : entry.name)),
     supportsPartition: (entry == null ? void 0 : entry.supportsPartition) === true,
     // Rank always orders by its source field in the current authoring UX,
     // so it only needs a direction/tie-breaker control rather than a
     // separate order-by field selector.
-    requiresOrder: (entry == null ? void 0 : entry.requiresOrder) === true && normalizeString5(entry == null ? void 0 : entry.name) !== "rank",
+    requiresOrder: (entry == null ? void 0 : entry.requiresOrder) === true && normalizeString6(entry == null ? void 0 : entry.name) !== "rank",
     supportsRankDirection: (entry == null ? void 0 : entry.supportsRankDirection) === true,
     supportsTieBreaker: (entry == null ? void 0 : entry.supportsTieBreaker) === true,
     requiresWindowSize: (entry == null ? void 0 : entry.requiresWindowSize) === true,
     supportsDecimals: (entry == null ? void 0 : entry.supportsDecimals) === true,
-    defaultFormat: normalizeString5(entry == null ? void 0 : entry.defaultFormat)
+    defaultFormat: normalizeString6(entry == null ? void 0 : entry.defaultFormat)
   })).filter((entry) => entry.value && entry.label);
 
   // src/reporting/reportBuilderBlockModel.js
-  function normalizeString6(value = "") {
+  function normalizeString7(value = "") {
     return String(value || "").trim();
   }
   function resolveReportBuilderBlock(document = null) {
     const blocks = Array.isArray(document == null ? void 0 : document.blocks) ? document.blocks : [];
-    return blocks.find((block) => normalizeString6(block == null ? void 0 : block.kind) === "reportBuilderBlock") || null;
+    return blocks.find((block) => normalizeString7(block == null ? void 0 : block.kind) === "reportBuilderBlock") || null;
   }
 
   // src/reporting/reportLayoutModel.js
@@ -45256,7 +45396,7 @@ Please __addLocaleData before adding additional unit data`);
     { span: 4, label: "Third" },
     { span: 3, label: "Quarter" }
   ]);
-  function normalizeString7(value = "") {
+  function normalizeString8(value = "") {
     return String(value || "").trim();
   }
   function normalizeReportLayoutSpanValue(value = null) {
@@ -45267,7 +45407,7 @@ Please __addLocaleData before adding additional unit data`);
     return numeric;
   }
   function normalizeLegacyReportLayoutSize(value = "") {
-    const normalized = normalizeString7(value).toLowerCase();
+    const normalized = normalizeString8(value).toLowerCase();
     if (normalized === "quarter" || normalized === "1/4") {
       return 3;
     }
@@ -45313,13 +45453,13 @@ Please __addLocaleData before adding additional unit data`);
     omitDefaultSpan = true,
     preserveLegacyHalf = false
   } = {}) {
-    const normalizedBlockId = normalizeString7(blockId);
+    const normalizedBlockId = normalizeString8(blockId);
     if (!normalizedBlockId) {
       return null;
     }
     const normalizedSource = source && typeof source === "object" && !Array.isArray(source) ? source : {
       span: normalizeReportLayoutSpanValue(source),
-      size: normalizeString7(source)
+      size: normalizeString8(source)
     };
     const explicitSpan = normalizeReportLayoutSpanValue(normalizedSource == null ? void 0 : normalizedSource.span);
     if (explicitSpan) {
@@ -45333,49 +45473,6 @@ Please __addLocaleData before adding additional unit data`);
       return omitDefaultSpan && legacySpan === REPORT_LAYOUT_GRID_COLUMNS ? { blockId: normalizedBlockId } : { blockId: normalizedBlockId, span: legacySpan };
     }
     return { blockId: normalizedBlockId };
-  }
-
-  // src/reporting/reportDatasetRefModel.js
-  function normalizeString8(value = "") {
-    return String(value || "").trim();
-  }
-  function normalizeDatasetRefs(datasetRefs = []) {
-    const seen = /* @__PURE__ */ new Set();
-    return (Array.isArray(datasetRefs) ? datasetRefs : []).map((entry) => normalizeString8(entry)).filter((entry) => {
-      if (!entry || seen.has(entry)) {
-        return false;
-      }
-      seen.add(entry);
-      return true;
-    });
-  }
-  function resolveImplicitSingleReportDatasetRef(datasetRefs = []) {
-    const normalizedDatasetRefs = normalizeDatasetRefs(datasetRefs);
-    return normalizedDatasetRefs.length === 1 ? normalizedDatasetRefs[0] : "";
-  }
-  function resolveReportDatasetRefResolution({
-    preferredDatasetRef = "",
-    availableDatasetRefs = [],
-    fallbackDatasetRef = "primary"
-  } = {}) {
-    const explicitDatasetRef = normalizeString8(preferredDatasetRef);
-    if (explicitDatasetRef) {
-      return {
-        datasetRef: explicitDatasetRef,
-        source: "explicit"
-      };
-    }
-    const implicitSingleDatasetRef = resolveImplicitSingleReportDatasetRef(availableDatasetRefs);
-    if (implicitSingleDatasetRef) {
-      return {
-        datasetRef: implicitSingleDatasetRef,
-        source: "singleAvailable"
-      };
-    }
-    return {
-      datasetRef: normalizeString8(fallbackDatasetRef || "primary") || "primary",
-      source: "fallback"
-    };
   }
 
   // src/reporting/reportRelativeDateRangeModel.js
@@ -50017,6 +50114,7 @@ Please __addLocaleData before adding additional unit data`);
     }
     const nextSpec = cloneValue18(baseSpec);
     const fieldCatalog = buildReportBuilderFieldCatalog(config);
+    const datasetFieldCatalogs = new Map(normalizeReportBuilderPublishedDataSources(config).map((source) => [source.id, buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config, source))]));
     const calculatedFields = Array.isArray(nextSpec == null ? void 0 : nextSpec.calculatedFields) ? nextSpec.calculatedFields : [];
     nextSpec.calculatedFields = calculatedFields;
     const calculatedFieldIds = new Set(
@@ -50032,7 +50130,7 @@ Please __addLocaleData before adding additional unit data`);
       if (!request || typeof request !== "object" || Array.isArray(request)) {
         return false;
       }
-      const catalogEntry = resolveReportBuilderCatalogEntry(fieldCatalog, fieldKey);
+      const catalogEntry = resolveReportBuilderCatalogEntry(datasetFieldCatalogs.get(normalizedDatasetRef) || fieldCatalog, fieldKey);
       if (!catalogEntry) {
         return false;
       }
@@ -50087,6 +50185,15 @@ Please __addLocaleData before adding additional unit data`);
           break;
         case "kpiBlock":
           enableField(normalizedBlock == null ? void 0 : normalizedBlock.valueField, normalizedDatasetRef, request);
+          if (normalizedBlock.sparkline) {
+            const sparkline = normalizeKpiSparkline(normalizedBlock.sparkline);
+            for (const ref of [sparkline.datasetRef, sparkline.comparisonDatasetRef].filter(Boolean)) {
+              const targetDataset = nextSpec.datasets.find((entry) => normalizeString28(entry == null ? void 0 : entry.id) === ref);
+              if (!targetDataset) throw new Error(`KPI sparkline dataset '${ref}' is unavailable.`);
+              const target = targetDataset.request;
+              if (target && (!enableField(sparkline.valueField, ref, target) || !enableField(sparkline.categoryField, ref, target))) throw new Error("KPI sparkline fields must be declared by their dataset.");
+            }
+          }
           {
             const secondaryRef = normalizeString28(normalizedBlock == null ? void 0 : normalizedBlock.secondaryDatasetRef) || normalizedDatasetRef;
             const secondaryRequest = (_d = nextSpec.datasets.find((entry) => normalizeString28(entry == null ? void 0 : entry.id) === secondaryRef)) == null ? void 0 : _d.request;
@@ -50889,6 +50996,7 @@ Please __addLocaleData before adding additional unit data`);
       valueLabel: normalizeString28((block == null ? void 0 : block.valueLabel) || valueField || "Value"),
       ...valueFormat ? { valueFormat } : {},
       ...suffix ? { suffix } : {},
+      ...block.sparkline ? { sparkline: normalizeKpiSparkline(block.sparkline) } : {},
       ...secondaryField ? {
         secondaryField,
         ...normalizeString28(block == null ? void 0 : block.secondaryDatasetRef) ? { secondaryDatasetRef: normalizeString28(block.secondaryDatasetRef) } : {},
@@ -51801,7 +51909,7 @@ Please __addLocaleData before adding additional unit data`);
     const nextBlocks = filterExclusiveReportRuntimeBlocks(blocks, loweredLayout.blocks, exclusiveSectionOwnership);
     const nextBlockIds = new Set(nextBlocks.map((block) => normalizeString28(block == null ? void 0 : block.id)).filter(Boolean));
     const referencedDatasetRefs = new Set(
-      nextBlocks.flatMap((block) => [normalizeString28(block == null ? void 0 : block.datasetRef), normalizeString28(block == null ? void 0 : block.secondaryDatasetRef)]).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
+      nextBlocks.flatMap(getReportBlockDatasetRefs).filter((datasetRef) => !!datasetRef && datasetRef !== "primary")
     );
     const additionalPublishedDatasets = buildReportBuilderPublishedDatasetDeclarations(
       effectiveScopedConfig,
@@ -57660,6 +57768,7 @@ ${indent}${end}`;
     });
     return {
       ...content,
+      ...block.sparkline ? { sparkline: materializeKpiSparkline(block.sparkline, (ref) => resolveReportFillAliasedDataset(datasetsByAlias, ref)) } : {},
       ...bodyMarkdown ? { bodyMarkdown } : {}
     };
   }
@@ -66642,7 +66751,8 @@ ${indent}${end}`;
     const titleLines = wrapReportPrintText(title, innerWidth, 12);
     const valueLines = wrapReportPrintText(valueText, innerWidth, valueFontSize);
     const wrappedDetails = detailLines.flatMap((line) => wrapReportPrintText(line, innerWidth, 10));
-    const cardHeight = Math.max(
+    const sparklineSvg = content.sparkline ? buildKpiSparklineSvg(content.sparkline, innerWidth, 36) : "";
+    const cardHeight = (sparklineSvg ? 44 : 0) + Math.max(
       92,
       cardPadding * 2 + titleLines.length * 16 + 12 + valueLines.length * 24 + (wrappedDetails.length > 0 ? 6 + wrappedDetails.length * 14 : 0)
     );
@@ -66710,6 +66820,7 @@ ${indent}${end}`;
         color: REPORT_PRINT_THEME.bodyColor
       });
     }
+    if (sparklineSvg) pushReportPrintElement(state, buildReportPrintSvgElement({ id: `${blockId}__sparkline`, kind: "svg", box: { x: state.contentLeft + cardPadding, y: cardY + cardHeight - cardPadding - 36, width: innerWidth, height: 36 }, svg: sparklineSvg }));
     state.cursorY = cardY + cardHeight;
     finishReportPrintBlock(state);
   }

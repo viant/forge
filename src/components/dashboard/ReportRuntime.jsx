@@ -1,3 +1,4 @@
+import KpiSparkline from './KpiSparkline.jsx';
 import { buildRuntimeSections } from "./reportSections.js";
 export { buildRuntimeSections } from "./reportSections.js";
 import {WorkspacePresentationProvider, useWorkspacePresentation, distinctWorkspaceTitle} from '../../core/context/WorkspacePresentation.jsx';
@@ -1629,6 +1630,7 @@ function KpiBlock({ block = {}, diagnostics = [], locale = "en-US", onRetryProvi
           ) : null}
         </div>
       )}
+      {!invalidDiagnostic && showCard && content.sparkline ? <KpiSparkline content={content.sparkline} label={`${blockTitle} trend over the selected period`}/> : null}
     </RuntimePanel>
   );
 }

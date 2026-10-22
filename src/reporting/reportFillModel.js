@@ -1,3 +1,4 @@
+import {materializeKpiSparkline} from './reportKpiSparklineModel.js';
 import { calculateKpiSecondaryValue, normalizeKpiSecondaryCalculation } from "./reportKpiComparisonModel.js";
 import {
   buildReportBuilderReportSpec,
@@ -506,6 +507,7 @@ function buildReportFillKpiContent(block = {}, dataset = {}, {
   });
   return {
     ...content,
+    ...(block.sparkline ? {sparkline:materializeKpiSparkline(block.sparkline,ref=>resolveReportFillAliasedDataset(datasetsByAlias,ref))} : {}),
     ...(bodyMarkdown ? { bodyMarkdown } : {}),
   };
 }

@@ -43,7 +43,8 @@
     "./gate-requirements-editor/contract": "./src/components/primitives/gateContractAPI.js",
     "./preview-workbench": "./src/components/primitives/PreviewWorkbench.jsx",
     "./reader-workbench/models/*": "./src/components/readerWorkbench/*.js",
-    "./runtime/operationTelemetry": "./src/runtime/operationTelemetry.js"
+    "./runtime/operationTelemetry": "./src/runtime/operationTelemetry.js",
+    "./reporting/dataset-refs": "./src/reporting/reportDatasetRefModel.js"
   },
   "scripts": {
     "test:widget-pairing": "node --no-warnings src/components/primitives/nativeWidgetContract.test.js",
@@ -91,7 +92,8 @@
     "prebuild:window-editor": "sh scripts/build-window-canonical.sh",
     "test:lazy-options": "npm run test:react-runtime",
     "test:react-runtime": "vitest run --config vitest.runtime.config.mjs",
-    "test:native-switch": "node --no-warnings ./node_modules/vite-node/vite-node.mjs src/packs/blueprint/switchInput.render.test.jsx"
+    "test:native-switch": "node --no-warnings ./node_modules/vite-node/vite-node.mjs src/packs/blueprint/switchInput.render.test.jsx",
+    "test:kpi-sparkline": "node --no-warnings src/reporting/reportKpiSparklineModel.test.js && node --no-warnings ./node_modules/vite-node/vite-node.mjs src/components/dashboard/KpiSparkline.render.test.jsx"
   },
   "dependencies": {
     "@blueprintjs/core": "^6.0.0-alpha.1",
