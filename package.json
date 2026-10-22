@@ -94,7 +94,8 @@
     "test:lazy-options": "npm run test:react-runtime",
     "test:react-runtime": "vitest run --config vitest.runtime.config.mjs",
     "test:native-switch": "node --no-warnings ./node_modules/vite-node/vite-node.mjs src/packs/blueprint/switchInput.render.test.jsx",
-    "test:kpi-sparkline": "node --no-warnings src/reporting/reportKpiSparklineModel.test.js && node --no-warnings ./node_modules/vite-node/vite-node.mjs src/components/dashboard/KpiSparkline.render.test.jsx && node --no-warnings --test src/reporting/reportSectionDatasets.test.js"
+    "test:kpi-sparkline": "node --no-warnings src/reporting/reportKpiSparklineModel.test.js && node --no-warnings ./node_modules/vite-node/vite-node.mjs src/components/dashboard/KpiSparkline.render.test.jsx && node --no-warnings --test src/reporting/reportSectionDatasets.test.js",
+    "test:report-sections": "node --no-warnings --test src/reporting/reportSections.test.js"
   },
   "dependencies": {
     "@blueprintjs/core": "^6.0.0-alpha.1",
