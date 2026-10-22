@@ -197,10 +197,10 @@ describe('createDataConnector', () => {
             auth: {handleUnauthorized},
         });
         await expect(connector.get({})).rejects.toMatchObject({status: 401, authRequired, code: 'authorization_required'});
-        expect(warn).toHaveBeenCalledExactlyOnceWith('request failed', {
+        expect(warn).toHaveBeenCalledExactlyOnceWith('request failed', JSON.stringify({
             url: 'https://host.test:8100/v1/api/agently/forge/window/advertiser',
             status: 401, authRequired, code: 'authorization_required',
-        });
+        }));
         const diagnostic = JSON.stringify(warn.mock.calls);
         for (const secret of ['private-user', 'private-password', 'query-secret', 'fragment-secret', 'private-response-body']) {
             expect(diagnostic).not.toContain(secret);

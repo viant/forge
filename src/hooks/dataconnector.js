@@ -155,12 +155,12 @@ export function createDataConnector(dataSource, runtime = {}) {
                 responseURL = parsed.origin + parsed.pathname;
             }
         } catch (_) { /* Missing or malformed response URLs stay omitted. */ }
-        getLogger('connector').warn('request failed', {
+        getLogger('connector').warn('request failed', JSON.stringify({
             url: responseURL,
             status: resp.status,
             authRequired: error.authRequired,
             ...(code ? {code} : {}),
-        });
+        }));
         if (detail) {
             error.detail = detail;
         }
