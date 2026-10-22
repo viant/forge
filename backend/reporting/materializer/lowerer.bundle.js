@@ -41198,9 +41198,9 @@ Please __addLocaleData before adding additional unit data`);
     const internalSlots = getInternalSlots5(dtf);
     const rootLocaleData = localeData[internalSlots.dataLocale];
     const dataLocaleData = (_b = (_a5 = rootLocaleData.calendarData) == null ? void 0 : _a5[internalSlots.calendar]) != null ? _b : rootLocaleData;
-    const numberFormatters = (rangeFormatOptions == null ? void 0 : rangeFormatOptions.numberFormatters) || createNumberFormatters(internalSlots);
-    if (rangeFormatOptions) rangeFormatOptions.numberFormatters = numberFormatters;
-    const { nf, nf2, nf3 } = numberFormatters;
+    const numberFormatters2 = (rangeFormatOptions == null ? void 0 : rangeFormatOptions.numberFormatters) || createNumberFormatters(internalSlots);
+    if (rangeFormatOptions) rangeFormatOptions.numberFormatters = numberFormatters2;
+    const { nf, nf2, nf3 } = numberFormatters2;
     const fractionalSecondDigits = internalSlots.fractionalSecondDigits;
     const tm = (_c = rangeFormatOptions == null ? void 0 : rangeFormatOptions.localTime) != null ? _c : ToLocalTime(epochNanoseconds, internalSlots.calendar, isPlain ? "+00:00" : internalSlots.timeZone, {
       tzData,
@@ -58584,6 +58584,16 @@ ${indent}${end}`;
   function normalizeFiniteNumber(value) {
     return isNumericValue(value) ? Number(value) : null;
   }
+  var dateFormatters = /* @__PURE__ */ new Map();
+  var numberFormatters = /* @__PURE__ */ new Map();
+  function exportFormatter(cache, Constructor, options) {
+    const key = JSON.stringify(options);
+    if (cache.has(key)) return cache.get(key);
+    const formatter = new Constructor("en-US", options);
+    if (cache.size >= 16) cache.delete(cache.keys().next().value);
+    cache.set(key, formatter);
+    return formatter;
+  }
   function formatExportDateValue(value, {
     includeTime = false
   } = {}) {
@@ -58591,7 +58601,7 @@ ${indent}${end}`;
     if (Number.isNaN(date.getTime())) {
       return String(value);
     }
-    return new Intl.DateTimeFormat("en-US", {
+    return exportFormatter(dateFormatters, Intl.DateTimeFormat, {
       timeZone: "UTC",
       month: "short",
       day: "numeric",
@@ -58607,7 +58617,7 @@ ${indent}${end}`;
     if (numeric == null) {
       return normalizeString35(value);
     }
-    return new Intl.NumberFormat("en-US", {
+    return exportFormatter(numberFormatters, Intl.NumberFormat, {
       minimumFractionDigits,
       maximumFractionDigits,
       useGrouping: true
@@ -58625,7 +58635,7 @@ ${indent}${end}`;
     switch (normalizedFormat) {
       case "currency":
       case "currency2":
-        return new Intl.NumberFormat("en-US", {
+        return exportFormatter(numberFormatters, Intl.NumberFormat, {
           style: "currency",
           currency: "USD",
           minimumFractionDigits: 2,
@@ -58659,31 +58669,31 @@ ${indent}${end}`;
       case "percentfraction2":
         return `${(numeric * 100).toFixed(2)}%`;
       case "number":
-        return new Intl.NumberFormat("en-US", {
+        return exportFormatter(numberFormatters, Intl.NumberFormat, {
           minimumFractionDigits: 0,
           maximumFractionDigits: axis ? Number.isInteger(numeric) ? 0 : 1 : 5,
           useGrouping: true
         }).format(numeric);
       case "number2":
-        return new Intl.NumberFormat("en-US", {
+        return exportFormatter(numberFormatters, Intl.NumberFormat, {
           minimumFractionDigits: 0,
           maximumFractionDigits: 2,
           useGrouping: true
         }).format(numeric);
       case "number5":
-        return new Intl.NumberFormat("en-US", {
+        return exportFormatter(numberFormatters, Intl.NumberFormat, {
           minimumFractionDigits: 5,
           maximumFractionDigits: 5,
           useGrouping: true
         }).format(numeric);
       case "":
-        return new Intl.NumberFormat("en-US", {
+        return exportFormatter(numberFormatters, Intl.NumberFormat, {
           minimumFractionDigits: 0,
           maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
           useGrouping: true
         }).format(numeric);
       default:
-        return new Intl.NumberFormat("en-US", {
+        return exportFormatter(numberFormatters, Intl.NumberFormat, {
           minimumFractionDigits: 0,
           maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
           useGrouping: true
