@@ -15,7 +15,7 @@ test('archives start concurrently, deduplicate, and preserve authored bindings',
 });
 test('missing entries warn without blocking other window content or retrying',async()=>{
  const warnings=[];let calls=0;const fs=new ResourceFS({namespace:'example',scopeKey:'alice',warn:w=>warnings.push(w),loadArchive:async({kind})=>{calls++;return snapshot(kind)}});
- const source={resources:{dialogs:['missing']},view:{content:{id:'root'}}};const loaded=await fs.loadWindow(source);await fs.read('missing',{kind:'dialog'});assert.equal(loaded.view.content.id,'root');assert.equal(warnings.length,1);assert.equal(warnings[0].code,'resource_missing');assert.equal(calls,2);assert.equal(source.dialogs,undefined);
+ const source={resources:{dialogs:['missing']},view:{content:{id:'root'}}};const loaded=await fs.loadWindow(source);await fs.read('missing',{kind:'dialog'});assert.equal(loaded.view.content.id,'root');assert.equal(warnings.length,1);assert.equal(warnings[0].code,'resource_missing');assert.equal(calls,1,'only the referenced dialog archive is requested');assert.equal(source.dialogs,undefined);
 });
 test('only required archive gates loading and incomplete archives are not cached as complete',async()=>{
  const warnings=[];const fs=new ResourceFS({namespace:'example',scopeKey:'alice',warn:w=>warnings.push(w),loadArchive:({kind})=>kind==='dialog'?new Promise(()=>{}):Promise.resolve(snapshot(kind,[entry(kind,'orders',{id:'orders'})]))});
@@ -78,4 +78,15 @@ test('standard MCP reads use separate kind archives without business tool calls'
  }});
  await fs.preload();assert.deepEqual(calls,['windows','reports','lookups','styles'].map(name=>`resource-archive://example/${name}`));
  assert.equal((await fs.read('report://example/sample')).id,'sample');assert.equal(calls.length,4);
+});
+
+test('complete compiled window performs no implicit definition preloads',async()=>{
+ const calls=[];
+ const resources=new ResourceFS({namespace:'example',scopeKey:'compiled-window',loadArchive:async({kind})=>{calls.push(kind);return snapshot(kind)}});
+ const window={resources:{dataSources:['rows'],dialogs:['picker']},dataSource:{rows:{backend:{kind:'inline',rows:[]}}},dialogs:[{id:'picker',title:'Picker'}],view:{content:{id:'root'}}};
+ const loaded=await resources.loadWindow(window);
+ assert.deepEqual(calls,[]);
+ assert.deepEqual(loaded.dialogs,window.dialogs);
+ assert.deepEqual(loaded.dataSource,window.dataSource);
+ assert.notEqual(loaded,window);
 });

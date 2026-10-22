@@ -1,3 +1,4 @@
+import ReportDatasetPager from "./ReportDatasetPager.jsx";
 import {resolveReportChartTableSwitch} from "../../reporting/reportViewerSettings.js";
 import KpiSparkline from './KpiSparkline.jsx';
 import { buildRuntimeSections } from "./reportSections.js";
@@ -2125,7 +2126,7 @@ function resolveRuntimeCompositeConfig(blocks = []) {
   return { composites, ...resolveReportRuntimeCompositeOwnership(blocks) };
 }
 
-function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false }) {
+function TableBlock({ page = {}, onDatasetPageChange = null, block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false }) {
   const authoredBlock = (Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : [])
     .find((candidate) => normalizeString(candidate?.id) === normalizeString(block?.id)) || {};
   const tableAccentTone = normalizeString(block?.content?.accentTone || block?.accentTone).toLowerCase();
@@ -2291,6 +2292,7 @@ function TableBlock({ block = {}, diagnostics = [], dataset = {}, reportSpec = {
       />
       </div>
       )}
+      <ReportDatasetPager dataset={dataset} page={page} onPageChange={onDatasetPageChange}/>
     </RuntimePanel>
   );
 }
@@ -2853,6 +2855,8 @@ export default function ReportRuntime({
   selectedSectionId = "",
   onSectionChange = null,
   onChartMetricSelectionChange = null,
+  datasetPages = {},
+  onDatasetPageChange = null,
   showContextSummary = true,
   suppressFilterBarBlocks = false,
   suppressFilterBarBlockDatasetRefs = [],
@@ -3191,6 +3195,8 @@ export default function ReportRuntime({
           block={block}
           diagnostics={resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset, publicDiagnosticsMode)}
           dataset={dataset}
+          page={datasetPages[dataset?.id] || {}}
+          onDatasetPageChange={onDatasetPageChange}
           reportSpec={reportSpec}
           providerActionsByField={providerActionsByField}
           runtimeHandlers={runtimeHandlers}

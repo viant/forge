@@ -81,6 +81,25 @@ func TestResourceFetchModeKeepsPreviewPageAndCompletesExport(t *testing.T) {
 			t.Fatalf("completeness lost for %q: %+v", mode, got)
 		}
 	}
+	calls = 0
+	nextPage, err := service.ExecuteResource(context.Background(), &ExecuteResourceRequest{Resource: &identity.ResourceRef{URI: uri.String()}, DatasetFetchMode: DatasetFetchPage, DatasetPageOffsets: map[string]int{"primary": 2}})
+	if err != nil || nextPage == nil {
+		t.Fatalf("next page: %v", err)
+	}
+	if calls != 1 || len(nextPage.Datasets["primary"].Rows) != 1 || nextPage.Datasets["primary"].Rows[0]["name"] != "row-2" {
+		t.Fatal("wrong next page")
+	}
+	for _, request := range []*ExecuteResourceRequest{
+		{DatasetFetchMode: DatasetFetchPage, DatasetPageOffsets: map[string]int{"unknown": 2}},
+		{DatasetFetchMode: DatasetFetchPage, DatasetPageOffsets: map[string]int{"primary": -1}},
+		{DatasetFetchMode: DatasetFetchComplete, DatasetPageOffsets: map[string]int{"primary": 2}},
+	} {
+		calls = 0
+		request.Resource = &identity.ResourceRef{URI: uri.String()}
+		if out, err := service.ExecuteResource(context.Background(), request); err == nil || out != nil || calls != 0 {
+			t.Fatalf("invalid paging executed: %#v %v", out, err)
+		}
+	}
 	// Authored batching changes complete-fetch transport only, not preview size
 	// or the stored source/request. The effective spec records the actual batch.
 	raw = json.RawMessage(strings.Replace(string(raw), `"enabled":true,"mode":"offset"`, `"enabled":true,"mode":"offset","size":3`, 1))

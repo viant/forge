@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Button, Callout, Dialog, DialogBody, DialogFooter, FormGroup, HTMLSelect, InputGroup, Spinner, Tag } from '@blueprintjs/core';
 import { changedPolicies, describePolicy } from './resourcePolicyReview.js';
 import './ResourcePolicyEditor.css';
+import {NamedPolicyManager} from './NamedPolicyManager.jsx';
 
 const blankRule = () => ({ kind: 'role', value: '' });
 const clone = value => JSON.parse(JSON.stringify(value));
@@ -16,7 +17,7 @@ export function ResourceAccessEditor({ api, resource, actions = [], choices = {}
   const policyStatus = name => {
     const entry = draft?.policies?.[name];
     if (!entry && name !== '*' && draft?.policies?.['*']) return 'Inherited from *';
-    return entry?.mode === 'public' ? 'Public' : entry?.mode === 'protected' ? 'Protected' : entry?.mode === 'deny' ? 'Denied explicitly' : 'Denied · no policy';
+    return entry?.mode === 'named' ? 'Named policy' : entry?.mode === 'public' ? 'Public' : entry?.mode === 'protected' ? 'Protected' : entry?.mode === 'deny' ? 'Denied explicitly' : 'Denied · no policy';
   };
   const [document, setDocument] = useState(null);
   const [draft, setDraft] = useState(null);
@@ -93,7 +94,10 @@ export function ResourceAccessEditor({ api, resource, actions = [], choices = {}
   }, [preview]);
   const cannotManage = readOnly || editorContext?.canManage === false;
   const disabled = cannotManage || saving || loading;
-  const incompleteRules = Object.values(draft?.policies ?? {}).some(policy => policy.mode === 'protected' && policy.rule && !completeRule(policy.rule));
+  const incompleteRules = Object.values(draft?.policies ?? {}).some(policy => ((policy.mode === 'protected' || policy.mode === 'named') && policy.rule && !completeRule(policy.rule)) || (policy.mode === 'named' && (!policy.named?.resource?.id || !policy.named?.revision)));
+  const namedPolicies = resource.kind === 'window' ? (editorContext?.namedPolicies || []) : [];
+  const namedKey = ref => JSON.stringify(ref?.resource || null);
+  const selectedNamed = namedPolicies.find(item => namedKey(item) === namedKey(policy?.named));
   const providerChoices = editorContext?.choices || choices;
   const conflict = error?.code === 'conflict';
   return <section className="forge-resource-access" aria-label="Resource access">
@@ -119,9 +123,10 @@ export function ResourceAccessEditor({ api, resource, actions = [], choices = {}
           <HTMLSelect id="resource-access-mode" disabled={disabled} value={policy?.mode || ''} onChange={event => {
             const mode = event.target.value;
             if (!mode) { const policies = { ...draft.policies }; delete policies[action]; setDraft({ ...draft, policies }); clearPreview(); }
-            else update(mode === 'public' || mode === 'deny' ? { mode } : { mode, rule: blankRule() });
+            else update(mode === 'named' ? {...policy, mode, named: null} : mode === 'public' || mode === 'deny' ? { mode } : { mode, rule: blankRule() });
           }}>
             <option value="">{action !== '*' && draft.policies['*'] ? 'Inherit from *' : 'No policy (denied)'}</option><option value="deny">Deny access</option><option value="protected">Protected</option>
+            {(namedPolicies.length > 0 || policy?.mode === 'named') && <option value="named">Reusable named policy</option>}
             {publicActions.has(action) && <option value="public">Public consumption</option>}
           </HTMLSelect>
         </FormGroup>
@@ -131,8 +136,24 @@ export function ResourceAccessEditor({ api, resource, actions = [], choices = {}
           setSaved(false); clearPreview();
         }}>{applyGroupLabel}</Button>}
         {policy?.mode === 'public' && <Callout icon="globe">No identity rule is required for this action. Dependencies can still restrict access.</Callout>}
-        {policy?.mode === 'protected' && <>
-          <RuleEditor rule={policy.rule || blankRule()} onChange={rule => update({ ...policy, rule })} choices={providerChoices} disabled={disabled}/>
+        {policy?.mode === 'named' && <>
+          <FormGroup label="Named policy" labelFor="resource-access-named" helperText="Assignments follow the current policy. Changes to the named policy apply to every assigned window.">
+            <HTMLSelect id="resource-access-named" fill disabled={disabled || !namedPolicies.length} value={policy.named ? namedKey(policy.named) : ''} onChange={event => {
+              const selected = namedPolicies.find(item => namedKey(item) === event.target.value);
+              if (selected) update({...policy, named:{resource:selected.resource,revision:selected.revision}});
+            }}>
+              <option value="">Choose an existing policy</option>
+              {policy.named && !selectedNamed && <option value={namedKey(policy.named)}>{policy.named.resource.id} · reviewed revision {policy.named.revision}</option>}
+              {namedPolicies.map(item => <option key={namedKey(item)} value={namedKey(item)}>{item.displayName} · revision {item.revision}</option>)}
+            </HTMLSelect>
+          </FormGroup>
+          {!namedPolicies.length && <Callout>Named policy choices are unavailable. The saved reference is preserved. Reload permissions to try again.</Callout>}
+          {policy.named && <p>Stable policy ID: {policy.named.resource.id}. Reviewed revision {policy.named.revision}{selectedNamed && selectedNamed.revision !== policy.named.revision ? `; current revision ${selectedNamed.revision}` : ''}.</p>}
+          <Button minimal disabled={disabled} onClick={() => {const next={...policy};if(next.rule)delete next.rule;else next.rule=blankRule();update(next);}}>{policy.rule ? 'Remove additional restriction' : 'Add an additional restriction'}</Button>
+        </>}
+        {(policy?.mode === 'protected' || policy?.mode === 'named') && <>
+
+          {(policy.mode === 'protected' || policy.rule) && <RuleEditor rule={policy.rule || blankRule()} onChange={rule => update({ ...policy, rule })} choices={providerChoices} disabled={disabled}/>}
           <FormGroup label="Required entity scope" labelFor="resource-access-scope" helperText="Applied to every matching rule, including any-match groups.">
             <HTMLSelect id="resource-access-scope" disabled={disabled} value={policy.entityType || ''} onChange={event => update({ ...policy, entityType: event.target.value })}>
               <option value="">No entity scope</option>
@@ -180,7 +201,7 @@ function RuleEditor({ rule, onChange, choices, disabled, path = 'rule', depth = 
       const kind = event.target.value;
       onChange(kind === 'all' || kind === 'any' ? { kind, rules: [blankRule()] } : kind === 'entity' ? { kind, entity: { type: '', id: '' } } : { kind, value: '' });
     }}>
-      <option value="subject">Principal</option><option value="role">Role</option><option value="exposure">Feature exposure</option><option value="entity">Allowed entity</option>
+      <option value="subject">Principal</option><option value="role">Role</option><option value="group">Membership group</option><option value="exposure">Feature exposure</option><option value="entity">Allowed entity</option>
       {depth < 12 && <><option value="all">Match all rules</option><option value="any">Match any rule</option></>}
     </HTMLSelect>
     {group ? <div className="forge-resource-rule-children">
@@ -219,6 +240,7 @@ export default function ResourcePolicyEditorPanel({container,context}) {
  const ref=spec.dataSourceRef||container.dataSourceRef,scoped=ref?context.Context(ref):context;
  const form=scoped.signals.form.value||{},resource=resolveSelector(form,spec.resourceField||'resource');
  const latestContext=React.useRef(context);latestContext.current=context;
+ const [namedGeneration,setNamedGeneration]=useState(0),[editorState,setEditorState]=useState({dirty:false,saving:false});
  const api=React.useMemo(()=>{
   const invoke=async(operation,input,field)=>{
    const sourceRef=spec.operations?.[operation];if(!sourceRef)throw new Error('Policy operation is not configured.');
@@ -228,7 +250,8 @@ export default function ResourcePolicyEditorPanel({container,context}) {
   };
   return {
    getResourceAccess:resource=>invoke('get',{resource},'document'),
-   getResourceAccessContext:spec.operations?.context?resource=>invoke('context',{resource},'context'):undefined,
+   getResourceAccessContext:spec.operations?.context?async resource=>{const result=await invoke('context',{resource},'context');if(!spec.operations?.named)return result;try{const named=await invoke('named',{operation:'list'});return {...result,namedPolicies:named.policies||[]};}catch{return {...result,namedPolicies:[],namedPoliciesUnavailable:true};}}:undefined,
+   ...(spec.operations?.named?{listNamedPolicies:async()=> (await invoke('named',{operation:'list'})).policies||[],createNamedPolicy:async(id,definition)=>(await invoke('named',{operation:'create',id,definition})).policy,updateNamedPolicy:(reference,definition)=>invoke('named',{operation:'update',reference,definition}),namedPolicyImpact:async reference=>(await invoke('named',{operation:'impact',reference})).impacts||[]}:{}),
    createResourceAccess:document=>invoke('create',{document},'document'),
    replaceResourceAccess:document=>invoke('replace',{document},'document'),
    checkCurrentAccess:spec.operations?.check?async(resource,action)=>{
@@ -236,12 +259,14 @@ export default function ResourcePolicyEditorPanel({container,context}) {
     catch(error){if(error.status===403||error.code==='forbidden')return {effect:'deny',bounded:false,entities:[]};throw error;}
    }:undefined,
   };
- },[spec.operations]);
- const changed=React.useCallback(value=>{const current=latestContext.current;if(spec.onStateChange)current.lookupHandler?.(spec.onStateChange)?.({context:current,value});},[spec.onStateChange]);
+ },[spec.operations,namedGeneration]);
+ const changed=React.useCallback(value=>{setEditorState(value);const current=latestContext.current;if(spec.onStateChange)current.lookupHandler?.(spec.onStateChange)?.({context:current,value});},[spec.onStateChange]);
  const contracts=(spec.actionsByKindField?resolveSelector(form,spec.actionsByKindField):null)??spec.actionsByKind;
  const choices=(spec.choicesField?resolveSelector(form,spec.choicesField):null)??spec.choices;
  const actions=spec.actions||contracts?.[resource?.kind]||[];
  if(!resource)return null;
  if(!actions.length)return <Callout intent="warning">Configure the permission actions for this resource type.</Callout>;
- return <ResourceAccessEditor key={JSON.stringify(resource)} api={api} resource={resource} actions={actions} choices={choices} readOnly={spec.readOnly===true||form.readOnly===true} displayName={resolveSelector(form,spec.displayNameField||'displayName')} onStateChange={changed} publicActionNames={spec.publicActions} relatedActions={spec.relatedActions} applyGroupLabel={spec.applyGroupLabel}/>;
+ return <>{spec.operations?.named&&spec.readOnly!==true&&<NamedPolicyManager api={api} disabled={form.readOnly===true||editorState.dirty||editorState.saving} onChange={()=>setNamedGeneration(value=>value+1)}/>}<ResourceAccessEditor key={JSON.stringify(resource)} api={api} resource={resource} actions={actions} choices={choices} readOnly={spec.readOnly===true||form.readOnly===true} displayName={resolveSelector(form,spec.displayNameField||'displayName')} onStateChange={changed} publicActionNames={spec.publicActions} relatedActions={spec.relatedActions} applyGroupLabel={spec.applyGroupLabel}/></>;
 }
+
+export {NamedPolicyManager};

@@ -31,6 +31,7 @@ type ExecuteResourceRequest struct {
 	// DatasetFetchMode defaults to complete for backward compatibility. Page
 	// returns one producer page and preserves its completeness metadata; complete
 	// follows only the continuation contract declared by the approved datasource.
+	DatasetPageOffsets    map[string]int                               `json:"datasetPageOffsets,omitempty"`
 	DatasetFetchMode      DatasetFetchMode                             `json:"datasetFetchMode,omitempty"`
 	DependencyPins        map[string]identity.ResolvedResource         `json:"dependencyPins,omitempty"`
 	DependencyToken       string                                       `json:"dependencyToken,omitempty"`
@@ -238,6 +239,9 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 			selected[id] = true
 		}
 	}
+	if len(request.DatasetPageOffsets) > 32 || len(request.DatasetPageOffsets) > 0 && request.DatasetFetchMode != DatasetFetchPage {
+		return nil, fmt.Errorf("dataset offsets require bounded page execution")
+	}
 	var specRoot map[string]json.RawMessage
 	_ = json.Unmarshal(executionSpec, &specRoot)
 	var effectiveDatasets []map[string]interface{}
@@ -269,6 +273,14 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 				args[parameter] = descriptor.Paging.Size
 			}
 		}
+		if offset, ok := request.DatasetPageOffsets[dataset.ID]; ok {
+			if selected != nil && !selected[dataset.ID] {
+				return nil, identity.ErrResourceDenied
+			}
+			if err := applyReportDatasetOffset(descriptor, args, offset); err != nil {
+				return nil, err
+			}
+		}
 		effectiveDatasets[index]["request"] = args
 		if explicitReportPaging(descriptor) {
 			// Producer tabular envelopes must be flattened before counting offset
@@ -277,6 +289,11 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 		}
 		if selected == nil || selected[dataset.ID] {
 			plans = append(plans, plannedDataset{dataset.ID, descriptor, args, dataset.ResultContract})
+		}
+	}
+	for id := range request.DatasetPageOffsets {
+		if !seen[id] {
+			return nil, identity.ErrResourceDenied
 		}
 	}
 	// Plans and effectiveDatasets share the bound argument maps. Resolve only

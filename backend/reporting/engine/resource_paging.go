@@ -268,3 +268,23 @@ func decodeReportDatasource(body []byte, target *dsproto.DataSource) error {
 	}
 	return json.Unmarshal(body, target)
 }
+
+// A viewer may move only the authored offset position; scope, projection, limits
+// and pinned inputs remain the responsibility of the admitted report plan.
+func applyReportDatasetOffset(descriptor *dsproto.DataSource, inputs map[string]interface{}, offset int) error {
+	if offset < 0 || offset >= maxResourceDatasetRows {
+		return fmt.Errorf("report offset exceeds row bound")
+	}
+	if descriptor == nil || descriptor.Backend == nil || descriptor.Paging == nil || !descriptor.Paging.Enabled || descriptor.Paging.Mode != "offset" || descriptor.Paging.Parameters == nil || descriptor.Paging.Parameters.Page == "" {
+		return fmt.Errorf("report dataset does not support authored offset paging")
+	}
+	position := descriptor.Paging.Parameters.Page
+	if _, pinned := descriptor.Backend.Pinned[position]; pinned {
+		return fmt.Errorf("report offset cannot replace pinned input")
+	}
+	if inputs == nil {
+		return fmt.Errorf("report page inputs unavailable")
+	}
+	inputs[position] = offset
+	return nil
+}
