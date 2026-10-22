@@ -45,11 +45,12 @@ function formatGroupedNumberWithSpaces(value, {
 export function formatExportNumericValue(value, format = "", {
   axis = false,
 } = {}) {
+  const normalizedFormat = normalizeString(format).toLowerCase();
+  if (["id", "raw", "plain", "text"].includes(normalizedFormat)) return String(value);
   const numeric = normalizeFiniteNumber(value);
   if (numeric == null) {
     return normalizeString(value);
   }
-  const normalizedFormat = normalizeString(format).toLowerCase();
   switch (normalizedFormat) {
     case "currency":
     case "currency2":
@@ -138,6 +139,7 @@ export function formatExportValue(value, format = "", options = {}) {
     return JSON.stringify(value);
   }
   const normalizedFormat = normalizeString(format).toLowerCase();
+  if (["id", "raw", "plain", "text"].includes(normalizedFormat)) return String(value);
   if (normalizedFormat === "date" || normalizedFormat === "datetime") {
     return formatExportDateValue(value, { includeTime: normalizedFormat === "datetime" });
   }

@@ -58616,11 +58616,12 @@ ${indent}${end}`;
   function formatExportNumericValue(value, format2 = "", {
     axis = false
   } = {}) {
+    const normalizedFormat = normalizeString35(format2).toLowerCase();
+    if (["id", "raw", "plain", "text"].includes(normalizedFormat)) return String(value);
     const numeric = normalizeFiniteNumber(value);
     if (numeric == null) {
       return normalizeString35(value);
     }
-    const normalizedFormat = normalizeString35(format2).toLowerCase();
     switch (normalizedFormat) {
       case "currency":
       case "currency2":
@@ -58708,6 +58709,7 @@ ${indent}${end}`;
       return JSON.stringify(value);
     }
     const normalizedFormat = normalizeString35(format2).toLowerCase();
+    if (["id", "raw", "plain", "text"].includes(normalizedFormat)) return String(value);
     if (normalizedFormat === "date" || normalizedFormat === "datetime") {
       return formatExportDateValue(value, { includeTime: normalizedFormat === "datetime" });
     }
