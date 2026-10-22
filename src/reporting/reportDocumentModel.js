@@ -1,3 +1,4 @@
+import { normalizeKpiSecondaryCalculation } from "./reportKpiComparisonModel.js";
 import {
   buildReportBuilderPublishedDatasetConfig,
   buildReportBuilderPublishedDatasetDeclarations,
@@ -587,7 +588,11 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
         break;
       case "kpiBlock":
         enableField(normalizedBlock?.valueField, normalizedDatasetRef, request);
-        enableField(normalizedBlock?.secondaryField, normalizedDatasetRef, request);
+        {
+          const secondaryRef = normalizeString(normalizedBlock?.secondaryDatasetRef) || normalizedDatasetRef;
+          const secondaryRequest = nextSpec.datasets.find(entry => normalizeString(entry?.id) === secondaryRef)?.request;
+          if (secondaryRequest) enableField(normalizedBlock?.secondaryField, secondaryRef, secondaryRequest);
+        }
         break;
       case "badgesBlock":
         (Array.isArray(normalizedBlock?.items) ? normalizedBlock.items : []).forEach((item) => {
@@ -1546,6 +1551,8 @@ export function buildReportDocumentKpiBlock(block = {}) {
     ...(secondaryField
       ? {
         secondaryField,
+        ...(normalizeString(block?.secondaryDatasetRef) ? { secondaryDatasetRef: normalizeString(block.secondaryDatasetRef) } : {}),
+        ...(block?.secondaryCalculation ? { secondaryCalculation: normalizeKpiSecondaryCalculation(block.secondaryCalculation) } : {}),
         secondaryLabel: normalizeString(block?.secondaryLabel || secondaryField),
         ...(normalizeString(block?.secondaryFormat) ? { secondaryFormat: normalizeString(block.secondaryFormat) } : {}),
         ...(block?.secondaryTrend === true ? { secondaryTrend: true } : {}),
@@ -2603,7 +2610,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
   const nextBlockIds = new Set(nextBlocks.map((block) => normalizeString(block?.id)).filter(Boolean));
   const referencedDatasetRefs = new Set(
     nextBlocks
-      .map((block) => normalizeString(block?.datasetRef))
+      .flatMap((block) => [normalizeString(block?.datasetRef), normalizeString(block?.secondaryDatasetRef)])
       .filter((datasetRef) => !!datasetRef && datasetRef !== "primary"),
   );
   const additionalPublishedDatasets = buildReportBuilderPublishedDatasetDeclarations(

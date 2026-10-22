@@ -653,7 +653,7 @@ export function buildReportBuilderReportSpec({
   const contextPreset = resolveReportScopeContextPresetFromState(normalizedState, scopeParams);
   const referencedDatasetRefs = new Set(
     (Array.isArray(normalizedState?.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : [])
-      .map((block) => normalizeString(block?.datasetRef))
+      .flatMap((block) => [normalizeString(block?.datasetRef), normalizeString(block?.secondaryDatasetRef)])
       .filter((datasetRef) => !!datasetRef && datasetRef !== "primary"),
   );
   const authoredDatasetBackedBlocks = (Array.isArray(normalizedState?.reportDocumentBlocks) ? normalizedState.reportDocumentBlocks : [])
