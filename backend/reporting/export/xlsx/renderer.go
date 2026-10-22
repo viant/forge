@@ -40,6 +40,7 @@ func Render(report *reportfill.ReportFill) ([]byte, error) {
 	}
 
 	workbook := excelize.NewFile()
+	defer workbook.Close()
 	const sheetName = "Report"
 	defaultSheet := workbook.GetSheetName(workbook.GetActiveSheetIndex())
 	if defaultSheet != "" && defaultSheet != sheetName {
@@ -79,6 +80,7 @@ func Render(report *reportfill.ReportFill) ([]byte, error) {
 		}
 	}
 
+	numberStyles := map[string]int{}
 	for rowIndex, row := range block.Content.ResolvedRows {
 		cellByKey := make(map[string]reportfill.ResolvedTableCell, len(row.Cells))
 		for _, cell := range row.Cells {
@@ -94,8 +96,24 @@ func Render(report *reportfill.ReportFill) ([]byte, error) {
 			if err != nil {
 				return nil, err
 			}
-			if err := workbook.SetCellStr(sheetName, cellName, formatXLSXValue(column, cell)); err != nil {
+			numeric, err := setXLSXCell(workbook, sheetName, cellName, cell)
+			if err != nil {
 				return nil, err
+			}
+			if numeric {
+				if format := xlsxNumberFormat(column.Format); format != "" {
+					style, found := numberStyles[format]
+					if !found {
+						style, err = workbook.NewStyle(&excelize.Style{CustomNumFmt: &format})
+						if err != nil {
+							return nil, err
+						}
+						numberStyles[format] = style
+					}
+					if err := workbook.SetCellStyle(sheetName, cellName, cellName, style); err != nil {
+						return nil, err
+					}
+				}
 			}
 		}
 	}
@@ -107,101 +125,79 @@ func Render(report *reportfill.ReportFill) ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-func formatGroupedNumberWithSpaces(value float64, decimals int) string {
-	text := strconv.FormatFloat(value, 'f', decimals, 64)
-	parts := strings.SplitN(text, ".", 2)
-	sign := ""
-	integer := parts[0]
-	if strings.HasPrefix(integer, "-") {
-		sign = "-"
-		integer = strings.TrimPrefix(integer, "-")
-	}
-	var builder strings.Builder
-	for index, char := range integer {
-		if index > 0 && (len(integer)-index)%3 == 0 {
-			builder.WriteByte(' ')
-		}
-		builder.WriteRune(char)
-	}
-	if len(parts) == 2 {
-		return sign + builder.String() + "." + parts[1]
-	}
-	return sign + builder.String()
-}
-
-func formatXLSXNumericValue(format string, value float64) string {
-	switch strings.ToLower(strings.TrimSpace(format)) {
-	case "currency":
-		return "$" + formatGroupedNumberWithSpaces(value, 2)
-	case "compactnumber":
-		if math.Mod(value, 1) == 0 {
-			return formatGroupedNumberWithSpaces(value, 0)
-		}
-		return formatGroupedNumberWithSpaces(value, 5)
-	case "percent":
-		return strconv.FormatFloat(value, 'f', 1, 64) + "%"
-	case "percentfraction":
-		return strconv.FormatFloat(value*100, 'f', 1, 64) + "%"
-	case "integer":
-		return strconv.FormatFloat(value, 'f', 0, 64)
-	case "number", "":
-		return strconv.FormatFloat(value, 'f', 5, 64)
-	default:
-		return strconv.FormatFloat(value, 'f', 5, 64)
-	}
-}
-
-func formatXLSXValue(column reportfill.TableColumn, cell reportfill.ResolvedTableCell) string {
+// Spreadsheet formatting must not round the underlying measurements or turn
+// ordinary numeric cells into text. Long integer identifiers stay text because
+// Excel cannot represent more than fifteen decimal digits exactly.
+func setXLSXCell(workbook *excelize.File, sheet, name string, cell reportfill.ResolvedTableCell) (bool, error) {
 	value := cell.DisplayValue
 	if value == nil || value == "" {
 		value = cell.Value
 	}
-	format := strings.TrimSpace(column.Format)
 	switch actual := value.(type) {
 	case nil:
-		return ""
+		return false, workbook.SetCellValue(sheet, name, nil)
 	case string:
-		return actual
+		return false, workbook.SetCellStr(sheet, name, actual)
 	case bool:
-		return strconv.FormatBool(actual)
+		return false, workbook.SetCellBool(sheet, name, actual)
+	case json.Number:
+		text := actual.String()
+		if !strings.ContainsAny(text, ".eE") && len(strings.TrimLeft(text, "-+")) > 15 {
+			return false, workbook.SetCellStr(sheet, name, text)
+		}
+		number, err := actual.Float64()
+		if err != nil || math.IsNaN(number) || math.IsInf(number, 0) {
+			return false, fmt.Errorf("xlsx export requires a finite numeric value")
+		}
+		if math.Abs(number) >= 1e15 && math.Trunc(number) == number {
+			return false, workbook.SetCellStr(sheet, name, text)
+		}
+		return true, workbook.SetCellFloat(sheet, name, number, -1, 64)
 	case float64:
-		return formatXLSXNumericValue(format, actual)
+		if math.IsNaN(actual) || math.IsInf(actual, 0) {
+			return false, fmt.Errorf("xlsx export requires a finite numeric value")
+		}
+		if math.Abs(actual) >= 1e15 && math.Trunc(actual) == actual {
+			return false, workbook.SetCellStr(sheet, name, strconv.FormatFloat(actual, 'f', -1, 64))
+		}
+		return true, workbook.SetCellValue(sheet, name, actual)
 	case float32:
-		return formatXLSXNumericValue(format, float64(actual))
-	case int:
-		return formatXLSXNumericValue(format, float64(actual))
-	case int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-		return formatXLSXNumericValue(format, toFloat64(actual))
+		if math.IsNaN(float64(actual)) || math.IsInf(float64(actual), 0) {
+			return false, fmt.Errorf("xlsx export requires a finite numeric value")
+		}
+		return true, workbook.SetCellValue(sheet, name, actual)
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		text := fmt.Sprint(actual)
+		if len(strings.TrimLeft(text, "-+")) > 15 {
+			return false, workbook.SetCellStr(sheet, name, text)
+		}
+		return true, workbook.SetCellValue(sheet, name, actual)
 	default:
 		data, err := json.Marshal(actual)
 		if err != nil {
-			return fmt.Sprint(actual)
+			return false, err
 		}
-		return string(data)
+		return false, workbook.SetCellStr(sheet, name, string(data))
 	}
 }
 
-func toFloat64(value any) float64 {
-	switch actual := value.(type) {
-	case int8:
-		return float64(actual)
-	case int16:
-		return float64(actual)
-	case int32:
-		return float64(actual)
-	case int64:
-		return float64(actual)
-	case uint:
-		return float64(actual)
-	case uint8:
-		return float64(actual)
-	case uint16:
-		return float64(actual)
-	case uint32:
-		return float64(actual)
-	case uint64:
-		return float64(actual)
+func xlsxNumberFormat(format string) string {
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case "currency":
+		return `"$"#,##0.00`
+	case "compactnumber":
+		return "#,##0.#####"
+	case "integer":
+		return "0"
+	case "number":
+		return "0.00000"
+	case "percent":
+		return `0.0"%"`
+	case "percentfraction":
+		return "0.0%"
+	case "percentfraction2":
+		return "0.00%"
 	default:
-		return 0
+		return ""
 	}
 }

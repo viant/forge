@@ -258,6 +258,17 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 		if err != nil {
 			return nil, err
 		}
+		if request.DatasetFetchMode != DatasetFetchPage && explicitReportPaging(descriptor) && descriptor.Paging.Size > 0 && descriptor.Paging.Parameters != nil && descriptor.Paging.Parameters.Size != "" {
+			if descriptor.Paging.Size > maxResourceDatasetRows {
+				return nil, fmt.Errorf("complete report page size exceeds row bound")
+			}
+			// Complete aggregation uses the authored transport batch size. The
+			// preview's page limit and every non-paging input remain unchanged.
+			parameter := descriptor.Paging.Parameters.Size
+			if _, pinned := descriptor.Backend.Pinned[parameter]; !pinned {
+				args[parameter] = descriptor.Paging.Size
+			}
+		}
 		effectiveDatasets[index]["request"] = args
 		if explicitReportPaging(descriptor) {
 			// Producer tabular envelopes must be flattened before counting offset
