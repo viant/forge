@@ -4,6 +4,7 @@ package resource
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	manager "github.com/viant/forge/backend/clientpool"
@@ -11,6 +12,7 @@ import (
 	"github.com/viant/mcp-protocol/schema"
 	client "github.com/viant/mcp/client"
 	cfg "github.com/viant/mcp/client/config"
+	"sort"
 	"time"
 )
 
@@ -62,12 +64,35 @@ func (s *NativeSkillSource) CatalogScope(ctx context.Context, conversation strin
 	if err != nil {
 		return "", false, err
 	}
-	names, err = s.Gateway.Manager.Names(ctx)
+	// The caller already selected skill discovery participants. An empty set
+	// must remain empty; unrelated connectors do not own this metadata scope.
+	names = append([]string(nil), names...)
+	sort.Strings(names)
+	base, cacheable, err := s.Gateway.Manager.CatalogScope(ctx, conversation, nil)
 	if err != nil {
 		return "", false, err
 	}
-	scope, cacheable, err := s.Gateway.Manager.CatalogScope(ctx, conversation, names)
-	return actorKey(a, "", 0) + scope, cacheable, err
+	parts := []string{base}
+	for _, name := range names {
+		scope, reusable, scopeErr := s.Gateway.Manager.CatalogScope(ctx, conversation, []string{name})
+		if aggregateLinkRequired(scopeErr) {
+			// Optional metadata discovery cannot require linking. Do not cache
+			// this partial snapshot across a later credential-state change.
+			cacheable = false
+			parts = append(parts, name, "unlinked")
+			continue
+		}
+		if scopeErr != nil {
+			return "", false, scopeErr
+		}
+		cacheable = cacheable && reusable
+		parts = append(parts, name, scope)
+	}
+	raw, err := json.Marshal(parts)
+	if err != nil {
+		return "", false, err
+	}
+	return fmt.Sprintf("%s%x", actorKey(a, "", 0), sha256.Sum256(raw)), cacheable, nil
 }
 func (s *NativeSkillSource) VisibleCatalog(ctx context.Context, key string, until time.Time, load func(context.Context) ([]primitive.CatalogItem[json.RawMessage], error), sourceLease ...func() time.Time) (*primitive.Catalog[json.RawMessage], error) {
 	a, err := s.Gateway.actor(ctx)
