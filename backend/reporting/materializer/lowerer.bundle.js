@@ -59815,22 +59815,27 @@ ${indent}${end}`;
       groupGap,
       bounds
     });
-    const xTicks = Array.from({ length: 4 }, (_2, index) => {
-      const fraction = index / 3;
+    const makeTicks = (count) => Array.from({ length: count }, (_2, index) => {
+      var _a5;
+      const fraction = index / (count - 1);
       const value = bounds.minValue + fraction * valueRange;
       const x2 = leftPad + fraction * plotWidth;
       return {
         value,
-        x: x2
+        x: x2,
+        label: formatAxisTick(value, (_a5 = seriesDescriptors[0]) == null ? void 0 : _a5.format)
       };
     });
-    const gridLines = xTicks.map((tick) => {
-      var _a5;
-      return `
+    let xTicks = makeTicks(4);
+    const ticksFit = (ticks) => ticks.every((tick, index) => index === 0 || tick.x - ticks[index - 1].x >= (tick.label.length + ticks[index - 1].label.length) * 2.8 + 8);
+    for (const count of [3, 2]) {
+      if (ticksFit(xTicks)) break;
+      xTicks = makeTicks(count);
+    }
+    const gridLines = xTicks.map((tick) => `
     <line x1="${tick.x}" y1="${topPad}" x2="${tick.x}" y2="${topPad + plotHeight}" stroke="#eaecf0" stroke-width="1" />
-    <text x="${tick.x}" y="${topPad + plotHeight + 18}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatAxisTick(tick.value, (_a5 = seriesDescriptors[0]) == null ? void 0 : _a5.format))}</text>
-  `;
-    }).join("\n");
+    <text x="${tick.x}" y="${topPad + plotHeight + 18}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(tick.label)}</text>
+  `).join("\n");
     const categoryLabels = rows.map((row, rowIndex) => {
       const groupTop = topPad + rowIndex * (rowHeight + groupGap);
       return renderPrintLabelLines(categoryLabelLines[rowIndex], {
