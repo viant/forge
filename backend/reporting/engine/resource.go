@@ -87,7 +87,11 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest) 
 				return nil, nil, nil, identity.ErrResourceDenied
 			}
 		}
-		spec, err = materializer.Lower(ctx, raw)
+		requestBase, bindErr := bindAuthoredCompileParameters(raw, request.Parameters)
+		if bindErr != nil {
+			return nil, nil, nil, bindErr
+		}
+		spec, err = materializer.LowerWithRequestBase(ctx, raw, requestBase)
 		if err != nil {
 			return nil, nil, nil, err
 		}

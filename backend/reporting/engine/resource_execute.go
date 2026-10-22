@@ -118,7 +118,7 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 			return nil, err
 		}
 	}
-	compiled, err := s.Compile(ctx, &CompileRequest{DependencyPins: dependencyPins, DependencyToken: dependencyToken, ResolvedResource: pin})
+	compiled, err := s.Compile(ctx, &CompileRequest{DependencyPins: dependencyPins, DependencyToken: dependencyToken, ResolvedResource: pin, Parameters: request.Parameters})
 	if err != nil {
 		return nil, err
 	}
