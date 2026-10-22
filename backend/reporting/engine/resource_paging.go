@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	dsproto "github.com/viant/forge/backend/datasource/contract"
+	"github.com/viant/forge/backend/reporting/materializer"
 	"io"
 	"math"
 	"math/big"
@@ -16,6 +17,38 @@ import (
 const maxResourceDatasetRows = 10000
 const maxResourceDatasetBytes = 8 << 20
 const maxResourceDatasetPages = 1000
+
+func normalizeReportPageResult(result *dsproto.FetchResult, descriptor *dsproto.DataSource, contract json.RawMessage) (*dsproto.FetchResult, error) {
+	if result == nil || descriptor.Paging.DataInfoSelectors == nil || descriptor.Paging.DataInfoSelectors.HasMore == "" {
+		return nil, fmt.Errorf("report page requires explicit completeness metadata")
+	}
+	more, ok := reportPagingValue(result.DataInfo, descriptor.Paging.DataInfoSelectors.HasMore).(bool)
+	if !ok {
+		return nil, fmt.Errorf("report page requires boolean hasMore")
+	}
+	raw, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+	normalized, err := materializer.NormalizeDatasetResult(contract, raw)
+	if err != nil {
+		return nil, err
+	}
+	var body struct {
+		Rows []map[string]interface{} `json:"rows"`
+	}
+	if err := decodeReportPagingJSON(normalized, &body); err != nil {
+		return nil, err
+	}
+	copy := *result
+	copy.Rows = body.Rows
+	copy.DataInfo = make(map[string]interface{}, len(result.DataInfo)+1)
+	for key, value := range result.DataInfo {
+		copy.DataInfo[key] = value
+	}
+	copy.DataInfo["hasMore"] = more
+	return &copy, nil
+}
 
 // Explicit paging opts into complete aggregation. Legacy mode remains one call.
 // check retains the original selected resource and narrowed lease around every

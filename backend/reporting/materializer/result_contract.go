@@ -7,6 +7,21 @@ import (
 	"strings"
 )
 
+// NormalizeDatasetResult applies the same approved result contract used by
+// Materialize to one producer page, before a host counts/aggregates its rows.
+// It preserves numeric JSON values and does not dispatch a datasource.
+func NormalizeDatasetResult(contract, payload json.RawMessage) (json.RawMessage, error) {
+	spec, err := json.Marshal(map[string]interface{}{"datasets": []map[string]interface{}{{"id": "result", "resultContract": contract}}})
+	if err != nil {
+		return nil, err
+	}
+	results, err := normalizeDatasetResults(spec, map[string]json.RawMessage{"result": payload})
+	if err != nil {
+		return nil, err
+	}
+	return results["result"], nil
+}
+
 // normalizeDatasetResults applies declarative result contracts before the
 // official fill/print builder consumes rows. RawMessage preserves numeric values.
 func normalizeDatasetResults(spec json.RawMessage, payloads map[string]json.RawMessage) (map[string]json.RawMessage, error) {

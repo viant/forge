@@ -28,6 +28,10 @@ type admittedReportDefinition struct {
 }
 
 type ExecuteResourceRequest struct {
+	// DatasetFetchMode defaults to complete for backward compatibility. Page
+	// returns one producer page and preserves its completeness metadata; complete
+	// follows only the continuation contract declared by the approved datasource.
+	DatasetFetchMode      DatasetFetchMode                             `json:"datasetFetchMode,omitempty"`
 	DependencyPins        map[string]identity.ResolvedResource         `json:"dependencyPins,omitempty"`
 	DependencyToken       string                                       `json:"dependencyToken,omitempty"`
 	Resource              *identity.ResourceRef                        `json:"resource,omitempty"`
@@ -36,6 +40,14 @@ type ExecuteResourceRequest struct {
 	ChartMetricSelections map[string]materializer.ChartMetricSelection `json:"chartMetricSelections,omitempty"`
 	DatasetIDs            []string                                     `json:"datasetIds,omitempty"`
 }
+
+type DatasetFetchMode string
+
+const (
+	DatasetFetchPage     DatasetFetchMode = "page"
+	DatasetFetchComplete DatasetFetchMode = "complete"
+)
+
 type ExecuteResourceResult struct {
 	DependencyPins  map[string]identity.ResolvedResource `json:"dependencyPins,omitempty"`
 	DependencyToken string                               `json:"dependencyToken,omitempty"`
@@ -78,6 +90,9 @@ func (s *Service) ExecuteResource(ctx context.Context, request *ExecuteResourceR
 func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteResourceRequest) (*ExecuteResourceResult, error) {
 	if request == nil || !s.hasResourceReader() || s.resourceDatasetExecutor == nil {
 		return nil, identity.ErrResourceDenied
+	}
+	if request.DatasetFetchMode != "" && request.DatasetFetchMode != DatasetFetchPage && request.DatasetFetchMode != DatasetFetchComplete {
+		return nil, fmt.Errorf("unsupported report dataset fetch mode")
 	}
 
 	ref := identity.ResourceRef{}
@@ -175,11 +190,12 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 	}
 	var spec struct {
 		Datasets []struct {
-			ID            string                       `json:"id"`
-			DataSourceRef string                       `json:"dataSourceRef"`
-			Request       map[string]interface{}       `json:"request"`
-			Rows          json.RawMessage              `json:"rows"`
-			Scope         *reportExecutionDatasetScope `json:"scope"`
+			ID             string                       `json:"id"`
+			DataSourceRef  string                       `json:"dataSourceRef"`
+			Request        map[string]interface{}       `json:"request"`
+			Rows           json.RawMessage              `json:"rows"`
+			ResultContract json.RawMessage              `json:"resultContract"`
+			Scope          *reportExecutionDatasetScope `json:"scope"`
 		} `json:"datasets"`
 	}
 	decodeSpec := json.Unmarshal
@@ -202,9 +218,10 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 	}
 
 	type plannedDataset struct {
-		id         string
-		descriptor *dsproto.DataSource
-		args       map[string]interface{}
+		id             string
+		descriptor     *dsproto.DataSource
+		args           map[string]interface{}
+		resultContract json.RawMessage
 	}
 	plans := make([]plannedDataset, 0, len(spec.Datasets))
 	seen := map[string]bool{}
@@ -242,8 +259,13 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 			return nil, err
 		}
 		effectiveDatasets[index]["request"] = args
+		if explicitReportPaging(descriptor) {
+			// Producer tabular envelopes must be flattened before counting offset
+			// progress. Materialization then consumes the canonical aggregated rows.
+			effectiveDatasets[index]["resultContract"] = map[string]interface{}{"shape": "rows", "rowPath": "rows", "hasMorePath": "dataInfo.hasMore"}
+		}
 		if selected == nil || selected[dataset.ID] {
-			plans = append(plans, plannedDataset{dataset.ID, descriptor, args})
+			plans = append(plans, plannedDataset{dataset.ID, descriptor, args, dataset.ResultContract})
 		}
 	}
 	// Plans and effectiveDatasets share the bound argument maps. Resolve only
@@ -278,10 +300,21 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 		if err := checkPage(); err != nil {
 			return err
 		}
-		result, err := fetchCompleteResourceDataset(datasetCtx, plan.descriptor, plan.args, checkPage, func(exact *dsproto.DataSource, pageArgs map[string]interface{}) (*dsproto.FetchResult, error) {
+		fetch := func(exact *dsproto.DataSource, pageArgs map[string]interface{}) (*dsproto.FetchResult, error) {
 			admittedContext := context.WithValue(datasetCtx, admittedReportDefinitionKey{}, admittedReportDefinition{service: s, pin: *pin, definition: envelope})
-			return s.resourceDatasetExecutor(requestctx.WithResourceDependencies(requestctx.WithResolvedResource(admittedContext, *pin), *pin, compiled.DependencyPins), *pin, exact, pageArgs)
-		})
+			result, err := s.resourceDatasetExecutor(requestctx.WithResourceDependencies(requestctx.WithResolvedResource(admittedContext, *pin), *pin, compiled.DependencyPins), *pin, exact, pageArgs)
+			if err != nil || !explicitReportPaging(exact) {
+				return result, err
+			}
+			return normalizeReportPageResult(result, exact, plan.resultContract)
+		}
+		var result *dsproto.FetchResult
+		var err error
+		if request.DatasetFetchMode == DatasetFetchPage {
+			result, err = fetch(plan.descriptor, plan.args)
+		} else {
+			result, err = fetchCompleteResourceDataset(datasetCtx, plan.descriptor, plan.args, checkPage, fetch)
+		}
 		if err != nil {
 			return err
 		}
