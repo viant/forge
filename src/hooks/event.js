@@ -423,8 +423,9 @@ export const tableHandlers = (context, container) => {
     };
     indexExecution(context, on, handlers, message);
 
-    if (!handlers.onInit.isDefined()) {
-        // TODO if has dependency refresh only if parent is set
+    // Explicit authored initialization still runs. Only the implicit fetch must
+    // respect the datasource/container owner (for example a derived collection).
+    if (!handlers.onInit.isDefined() && container.fetchData !== false && context.dataSource?.autoFetch !== false) {
         handlers.onInit.push({id: "dataSource.fetchCollection"});
     }
     if (!handlers.onRowSelect.isDefined()) {

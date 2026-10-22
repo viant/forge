@@ -1,3 +1,5 @@
+import {dispatchReportBuilderDatasourceRequest,reportBuilderDatasetOwnsRequest} from './reportBuilderDatasourceDispatch.js';
+import {reportDatasetReadContextIdentity} from './reportBuilderConcurrentRead.js';
 import React,{act,useMemo} from 'react';
 import {createRoot} from 'react-dom/client';
 import {it,expect,vi} from 'vitest';
@@ -78,4 +80,58 @@ it('shared failure settles both rendered consumers honestly and leaves distinct 
 it('constructing the unscoped base fetcher for extract metadata issues no read',()=>{
  const h=host();const fetcher=resolveReportBuilderDatasetPreviewFetcher(h.owner,{id:'summary',dataSourceRef:'forecasting_cube_report',request:{}},{preferDataSourceRoute:true});
  expect(typeof fetcher.fetcher).toBe('function');expect(h.calls).toHaveLength(0);
+});
+
+function MainDatasourceDispatch({owner,request,ownership}) {
+ const previous=React.useRef('');
+ React.useEffect(()=>{
+  const key=JSON.stringify([request,reportBuilderDatasetOwnsRequest(owner,request,ownership)]);if(previous.current===key)return;previous.current=key;
+  dispatchReportBuilderDatasourceRequest(owner,request,true,1,process.env.REPORT_THIRD_OWNER_BASELINE==='1'?null:ownership);
+ },[owner,request,ownership]);
+ return null;
+}
+function ThreeOwners({owner,filter='all',run=0,mainDimensions=[],audience=true}) {
+ const datasets=useMemo(()=>definitions.map(([id,dimensions])=>({id,dataSourceRef:'forecasting_cube_report',request:{dimensions,filter},resultContract:{rowPath:'data'}})),[filter]);
+ const mainRequest=useMemo(()=>({dimensions:mainDimensions,filter}),[JSON.stringify(mainDimensions),filter]);
+ const scope=JSON.stringify([filter,run]);
+ const ownership={context:owner,contextIdentity:JSON.stringify(reportDatasetReadContextIdentity(owner)),scope,datasets,enabled:audience};
+ return <><MainDatasourceDispatch {...{owner,ownership}} request={mainRequest}/><Primary {...{owner,scope}} dataset={datasets[0]}/><Datasets {...{owner,datasets,scope}}/></>;
+}
+function threeOwnerHost(){
+ const h=host();let input={parameters:{},filter:{}};
+ h.owner.identity={windowId:'report-one',dataSourceRef:'forecasting_cube_report'};
+ h.owner.signals={input:{peek:()=>input,get value(){return input;},set value(next){input=next;if(next.fetch)h.owner.handlers.reportBuilderPreview.fetchByRef({parameters:next.parameters}).catch(()=>{});}}};
+ return h;
+}
+it('three real dispatch owners issue one query per dataset and leave the main datasource input configured without another read',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;const h=threeOwnerHost(),element=document.createElement('div'),root=createRoot(element);document.body.append(element);
+ const render=async(filter='all',run=0)=>act(async()=>{root.render(<ThreeOwners owner={h.owner} filter={filter} run={run}/>);await tick();});
+ try{await render();await settle(h);expect(h.calls).toHaveLength(4);expect(h.owner.signals.input.peek()).toMatchObject({parameters:{dimensions:[],filter:'all'},fetch:false});
+  await render('filtered');await settle(h);expect(h.calls).toHaveLength(8);
+  await render('filtered',1);await settle(h);expect(h.calls).toHaveLength(12);
+ }finally{await act(async()=>root.unmount());element.remove();}
+});
+it('on-open materialization promotion cancels the old hook generation without leaving an independent duplicate main read alive',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;const h=threeOwnerHost(),element=document.createElement('div'),root=createRoot(element);document.body.append(element);
+ try{
+  await act(async()=>{root.render(<ThreeOwners owner={h.owner}/>);await tick();});
+  await act(async()=>{root.render(<ThreeOwners owner={h.owner} run={1}/>);await tick();});
+  const summary=h.calls.filter(c=>!c.parameters.dimensions.length);
+  expect(summary.filter(c=>!c.signal?.aborted)).toHaveLength(1);
+  expect(summary.filter(c=>!c.signal)).toHaveLength(0);
+  await settle(h);expect(JSON.parse(element.querySelector('[data-state=primary]').textContent).error).toBeNull();
+ }finally{await act(async()=>root.unmount());element.remove();}
+});
+it('a distinct main query retains its independent normal dispatch',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;const h=threeOwnerHost(),element=document.createElement('div'),root=createRoot(element);document.body.append(element);
+ try{await act(async()=>{root.render(<ThreeOwners owner={h.owner} mainDimensions={['different-fact']}/>);await tick();});await settle(h);expect(h.calls).toHaveLength(5);expect(h.calls.some(c=>c.parameters.dimensions[0]==='different-fact')).toBe(true);}
+ finally{await act(async()=>root.unmount());element.remove();}
+});
+
+it('returning from the authored report to a normal table owner fetches even when the query is unchanged',async()=>{
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true;const h=threeOwnerHost(),element=document.createElement('div'),root=createRoot(element);document.body.append(element);
+ try{await act(async()=>{root.render(<ThreeOwners owner={h.owner}/>);await tick();});await settle(h);expect(h.calls).toHaveLength(4);
+  await act(async()=>{root.render(<ThreeOwners owner={h.owner} audience={false}/>);await tick();});await settle(h);expect(h.calls).toHaveLength(5);expect(h.owner.signals.input.peek().fetch).toBe(true);
+  await act(async()=>{root.render(<ThreeOwners owner={h.owner}/>);await tick();});expect(h.calls).toHaveLength(5);expect(h.owner.signals.input.peek().fetch).toBe(false);
+ }finally{await act(async()=>root.unmount());element.remove();}
 });
