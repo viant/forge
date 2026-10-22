@@ -173,3 +173,34 @@ func TestReportIntegerPositionRejectsLossyAndFractionalValues(t *testing.T) {
 		t.Fatal("exact integer lexical form rejected", value, err)
 	}
 }
+
+func TestViewerOffsetPreservesScopeAndPinnedInputs(t *testing.T) {
+	descriptor := cursorReportDescriptor()
+	descriptor.Paging.Mode = "offset"
+	descriptor.Paging.Parameters.Page = "offset"
+	args := map[string]interface{}{"advertiserId": 7, "campaignIds": []int{11}, "limit": 25, "offset": 0}
+	if err := applyReportDatasetOffset(descriptor, args, 25); err != nil {
+		t.Fatal(err)
+	}
+	if args["advertiserId"] != 7 || args["limit"] != 25 || args["offset"] != 25 {
+		t.Fatalf("changed scope or limit: %#v", args)
+	}
+	ids := args["campaignIds"].([]int)
+	if len(ids) != 1 || ids[0] != 11 {
+		t.Fatal("changed campaign scope")
+	}
+	for _, offset := range []int{-1, maxResourceDatasetRows} {
+		if applyReportDatasetOffset(descriptor, args, offset) == nil {
+			t.Fatal("accepted out-of-bound offset")
+		}
+	}
+	descriptor.Backend.Pinned = map[string]interface{}{"offset": 0}
+	if applyReportDatasetOffset(descriptor, args, 50) == nil {
+		t.Fatal("replaced pinned offset")
+	}
+	delete(descriptor.Backend.Pinned, "offset")
+	descriptor.Paging.Mode = "cursor"
+	if applyReportDatasetOffset(descriptor, args, 50) == nil {
+		t.Fatal("treated cursor as offset")
+	}
+}

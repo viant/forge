@@ -314,15 +314,14 @@ func (c *MetadataWindowCatalog) checkEntryAccess(ctx context.Context, entry Save
 			}
 			return false, windowDefinitionFailure(err, "window role authority unavailable")
 		}
+		roleSet := make(map[string]struct{}, len(actual))
+		for _, role := range actual {
+			roleSet[role] = struct{}{}
+		}
 		matched := false
 		for _, required := range entry.Roles {
-			for _, role := range actual {
-				if role == required {
-					matched = true
-					break
-				}
-			}
-			if matched {
+			if _, ok := roleSet[required]; ok {
+				matched = true
 				break
 			}
 		}

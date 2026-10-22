@@ -19,6 +19,7 @@ function describeRule(rule) {
   if (!rule) return 'No rule';
   switch (rule.kind) {
     case 'subject': return `Principal ${rule.value || 'unset'}`;
+    case 'group': return `Membership group ${rule.value || 'unset'}`;
     case 'role': return `Role ${rule.value || 'unset'}`;
     case 'exposure': return `Feature exposure ${rule.value || 'unset'}`;
     case 'entity': return `Allowed entity ${rule.entity?.type || 'unset'}: ${rule.entity?.id || 'unset'}`;
@@ -30,6 +31,7 @@ function describeRule(rule) {
 
 export function describePolicy(policy) {
   if (!policy) return 'Denied · no policy';
+  if (policy.mode === 'named') return `Named policy ${policy.named?.resource?.id || 'unset'} · reviewed revision ${policy.named?.revision || 'unset'} · follows current policy${policy.rule ? ` · additionally ${describeRule(policy.rule)}` : ''}${policy.entityType ? ` · required ${policy.entityType} scope` : ''}`;
   if (policy.mode === 'deny') return 'Denied explicitly';
   if (policy.mode === 'public') return 'Public consumption';
   if (policy.mode !== 'protected') return 'Invalid mode';

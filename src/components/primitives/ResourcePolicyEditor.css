@@ -37,3 +37,9 @@
 .forge-resource-review-raw summary { cursor: pointer; }
 .forge-resource-review-raw pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
 @media (max-width: 640px) { .forge-resource-access { padding: 16px; } .forge-resource-access-layout { grid-template-columns: minmax(0, 1fr); gap: 12px; } .forge-resource-action-picker { display: block; } .forge-resource-action-picker .bp6-form-group { margin-bottom: 0; } .forge-resource-access nav { display: none; } .forge-resource-rule-children { padding-inline-start: 8px; } }
+.forge-named-policy-manager { margin-block: 24px; max-width: 72ch; }
+.forge-named-policy-manager p, .forge-named-policy-manager li { overflow-wrap: anywhere; }
+.forge-named-policy-manager h3 { margin-block: 24px 8px; }
+.forge-named-policy-manager h4 { margin-block: 24px 8px; }
+.forge-named-policy-manager textarea { min-height: 160px; }
+.forge-named-policy-manager pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow-y: auto; }

@@ -129,7 +129,8 @@ export class ResourceFS {
     const suppliedDialogs = new Set((result.dialogs || []).map(dialog => dialog.id));
     const dialogs = (assigned.dialogs || []).filter(id => !suppliedDialogs.has(id));
     // Start both pulls together. Rendering waits only for referenced kinds.
-    this.preload();
+    // Missing references below load only their required archive kinds.
+    // Complete compiled windows need no additional definition requests.
     const [loadedSources, loadedDialogs] = await Promise.all([
       Promise.all(sources.map(async id => [id, await this.read(id, {kind: 'datasource'})])),
       Promise.all(dialogs.map(async id => [id, await this.read(id, {kind: 'dialog'})])),
