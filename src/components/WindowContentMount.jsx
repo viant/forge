@@ -24,8 +24,11 @@ export function PersistentWindowContent({host,children}) {
 
 // Restored windows load on their first visit. Once visited, keep their state and
 // effects alive while the host hides them, so switching tabs preserves drafts.
-export function RetainedWindowContent({active=true,children}) {
-    const [visited,setVisited]=useState(active);
-    useEffect(()=>{if(active)setVisited(true);},[active]);
-    return active || visited ? children : null;
+// Explicit preloading admits a fresh renderer's readiness effects without
+// changing its host's visibility or focus selection.
+export function RetainedWindowContent({active=true,preload=false,children}) {
+    const admitted=active || preload;
+    const [visited,setVisited]=useState(admitted);
+    useEffect(()=>{if(admitted)setVisited(true);},[admitted]);
+    return admitted || visited ? children : null;
 }
