@@ -341,7 +341,7 @@ function buildReportBuilderPublishedDatasetRequest(
   const localPatch = isPlainObject(scopePolicy?.local) ? scopePolicy.local : {};
   const relativeDateRangePatch = {};
   const relativeDateRange = scopePolicy?.relativeDateRange;
-  const resolvedRelativeDateRange = resolveReportRelativeDateRangeSpec(relativeDateRange);
+  const resolvedRelativeDateRange = resolveReportRelativeDateRangeSpec(relativeDateRange, new Date(), primaryRequestContext);
   if (resolvedRelativeDateRange) {
     setNestedValue(relativeDateRangePatch, relativeDateRange.startParamPath, resolvedRelativeDateRange.start);
     setNestedValue(relativeDateRangePatch, relativeDateRange.endParamPath, resolvedRelativeDateRange.end);

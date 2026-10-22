@@ -11,7 +11,7 @@ function isPlainObject(value) {
 }
 
 const DATASET_SCOPE_MODES = new Set(["inherit", "append", "override", "exclude"]);
-const RELATIVE_DATE_PRESETS = new Set(["today", "yesterday", "last3days", "last7days", "last30days", "3d", "7d", "30d"]);
+const RELATIVE_DATE_PRESETS = new Set(["today", "yesterday", "last3days", "last7days", "last30days", "3d", "7d", "30d", "previousperiod"]);
 
 function normalizeDatasetScopeMode(value = "") {
   const normalized = normalizeString(value).toLowerCase();
@@ -70,6 +70,9 @@ export function normalizeReportDatasetScope(value = null) {
     const endParamPath = normalizeString(relativeDateRange?.endParamPath);
     if ((!RELATIVE_DATE_PRESETS.has(preset) && (!startExpression || !endExpression)) || !startParamPath || !endParamPath) {
       throw new Error("Dataset relativeDateRange requires a supported preset or start/end expressions, plus startParamPath and endParamPath.");
+    }
+    if (preset === "previousperiod" && next.mode !== "override") {
+      throw new Error("Previous period requires dataset scope mode 'override'.");
     }
     next.relativeDateRange = {
       ...(preset ? { preset } : {}),

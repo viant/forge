@@ -85,10 +85,32 @@ export function resolveReportRelativeDateRange(preset = "", now = new Date()) {
   return { start: formatDateISO(start), end: formatDateISO(end) };
 }
 
-export function resolveReportRelativeDateRangeSpec(spec = {}, now = new Date()) {
+export function resolveReportRelativeDateRangeSpec(spec = {}, now = new Date(), referenceRequest = null) {
+  if (normalizePreset(spec?.preset) === "previousperiod") {
+    const atPath = (path) => String(path || "").split(".").reduce((value, key) => value?.[key], referenceRequest);
+    return resolveReportPreviousPeriodRange(atPath(spec.startParamPath), atPath(spec.endParamPath));
+  }
   const presetRange = resolveReportRelativeDateRange(spec?.preset, now);
   if (presetRange) return presetRange;
   const start = formatReportRelativeTime(spec?.startExpression, { now, format: spec?.format });
   const end = formatReportRelativeTime(spec?.endExpression, { now, format: spec?.format });
   return start && end ? { start, end } : null;
+}
+
+// Civil date arithmetic is independent of the browser timezone and DST. The
+// preceding interval has the same inclusive day count and never overlaps.
+export function resolveReportPreviousPeriodRange(start, end) {
+  const parse = (value) => {
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    const date = new Date(value + "T00:00:00.000Z");
+    return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? date : null;
+  };
+  const from = parse(start), to = parse(end);
+  if (!from || !to || from > to) throw new Error("Previous period requires a valid bounded civil date range.");
+  const day = 86400000;
+  const length = (to.getTime() - from.getTime()) / day + 1;
+  const previousStart = new Date(from.getTime() - length * day);
+  const previousEnd = new Date(from.getTime() - day);
+  if (previousStart.getUTCFullYear() < 1) throw new Error("Previous period exceeds the supported civil date range.");
+  return { start: previousStart.toISOString().slice(0, 10), end: previousEnd.toISOString().slice(0, 10) };
 }
