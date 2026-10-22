@@ -11,6 +11,17 @@ function normalizeFiniteNumber(value) {
   return isNumericValue(value) ? Number(value) : null;
 }
 
+// Fixed presentation options only: never rows, identities, or authorization.
+const dateFormatters=new Map();
+const numberFormatters=new Map();
+function exportFormatter(cache,Constructor,options){
+  const key=JSON.stringify(options);
+  if(cache.has(key))return cache.get(key);
+  const formatter=new Constructor("en-US",options);
+  if(cache.size>=16)cache.delete(cache.keys().next().value);
+  cache.set(key,formatter);
+  return formatter;
+}
 function formatExportDateValue(value, {
   includeTime = false,
 } = {}) {
@@ -18,7 +29,7 @@ function formatExportDateValue(value, {
   if (Number.isNaN(date.getTime())) {
     return String(value);
   }
-  return new Intl.DateTimeFormat("en-US", {
+  return exportFormatter(dateFormatters,Intl.DateTimeFormat, {
     timeZone: "UTC",
     month: "short",
     day: "numeric",
@@ -35,7 +46,7 @@ function formatGroupedNumberWithSpaces(value, {
   if (numeric == null) {
     return normalizeString(value);
   }
-  return new Intl.NumberFormat("en-US", {
+  return exportFormatter(numberFormatters,Intl.NumberFormat, {
     minimumFractionDigits,
     maximumFractionDigits,
     useGrouping: true,
@@ -54,7 +65,7 @@ export function formatExportNumericValue(value, format = "", {
   switch (normalizedFormat) {
     case "currency":
     case "currency2":
-      return new Intl.NumberFormat("en-US", {
+      return exportFormatter(numberFormatters,Intl.NumberFormat, {
         style: "currency",
         currency: "USD",
         minimumFractionDigits: 2,
@@ -88,31 +99,31 @@ export function formatExportNumericValue(value, format = "", {
     case "percentfraction2":
       return `${(numeric * 100).toFixed(2)}%`;
     case "number":
-      return new Intl.NumberFormat("en-US", {
+      return exportFormatter(numberFormatters,Intl.NumberFormat, {
         minimumFractionDigits: 0,
         maximumFractionDigits: axis ? (Number.isInteger(numeric) ? 0 : 1) : 5,
         useGrouping: true,
       }).format(numeric);
     case "number2":
-      return new Intl.NumberFormat("en-US", {
+      return exportFormatter(numberFormatters,Intl.NumberFormat, {
         minimumFractionDigits: 0,
         maximumFractionDigits: 2,
         useGrouping: true,
       }).format(numeric);
     case "number5":
-      return new Intl.NumberFormat("en-US", {
+      return exportFormatter(numberFormatters,Intl.NumberFormat, {
         minimumFractionDigits: 5,
         maximumFractionDigits: 5,
         useGrouping: true,
       }).format(numeric);
     case "":
-      return new Intl.NumberFormat("en-US", {
+      return exportFormatter(numberFormatters,Intl.NumberFormat, {
         minimumFractionDigits: 0,
         maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
         useGrouping: true,
       }).format(numeric);
     default:
-      return new Intl.NumberFormat("en-US", {
+      return exportFormatter(numberFormatters,Intl.NumberFormat, {
         minimumFractionDigits: 0,
         maximumFractionDigits: Number.isInteger(numeric) ? 0 : 2,
         useGrouping: true,
