@@ -87,10 +87,10 @@ assert.doesNotMatch(labelOutput, /dy=/);
 console.log("MTA print pairing regressions passed");
 
 // Short context sections move together; long ones repeat their heading on each page.
-function textSectionPrint(blocks) {
+function textSectionPrint(blocks, datasets = []) {
   const source = { kind: 'reportBuilder', containerId: 'text-pagination', stateKey: 'text-pagination', dataSourceRef: 'primary' };
-  const reportSpec = { version: 1, kind: 'reportSpec', title: 'Context pagination', source, blocks, layoutIntent: { blockOrder: blocks.map(block => block.id) } };
-  const reportFill = { version: 1, kind: 'reportFill', specVersion: 1, specHash: buildReportSpecHash(reportSpec), source, blocks, datasets: [] };
+  const reportSpec = { version: 1, kind: 'reportSpec', title: 'Context pagination', source, blocks, datasets: datasets.map(dataset=>({id:dataset.id,dataSourceRef:'fixture'})), layoutIntent: { blockOrder: blocks.map(block => block.id) } };
+  const reportFill = { version: 1, kind: 'reportFill', specVersion: 1, specHash: buildReportSpecHash(reportSpec), source, blocks, datasets };
   return buildReportPrintFromReportFill({ reportSpec, reportFill });
 }
 const contextBlocks = [
@@ -112,3 +112,25 @@ const longElements = longContext.pages.flatMap(page=>page.elements);
 assert.equal(new Set(longElements.map(element=>element.id)).size, longElements.length);
 for (let i=0;i<90;i++) assert.equal(longElements.filter(element=>element.text===`option${i}: Selected ${i}`).length,1,'every option retained exactly once');
 console.log('Text context pagination regressions passed');
+
+
+const emptyChart = { id:'emptyChart',kind:'chartBlock',title:'Daily amount',datasetRef:'measurements',content:{rowCount:0,resolvedChart:null,chartModel:{type:'horizontal_bar',series:{values:[{value:'amount',label:'Amount'}]}}} };
+const emptyDataset = { id:'measurements',provenance:{rowCount:0,hasMore:false,truncated:false,diagnostics:[]},rows:[] };
+const emptyPrint=textSectionPrint([emptyChart],[emptyDataset]);
+const emptyText=emptyPrint.pages.flatMap(page=>page.elements).map(element=>element.text||'').join(' ');
+assert.match(emptyText,/No data for the selected scope/,'A complete empty dataset is a normal no-data state');
+assert.doesNotMatch(emptyText,/ReportPrint block/);
+for(const bad of [[],[{...emptyDataset,provenance:{...emptyDataset.provenance,hasMore:true}}],[{...emptyDataset,provenance:{...emptyDataset.provenance,diagnostics:[{code:'sourceFailure',severity:'error',message:'Fixture source failed'}]}}]]) {
+ const rejected=textSectionPrint([emptyChart],bad);
+ assert.doesNotMatch(rejected.pages.flatMap(page=>page.elements).map(element=>element.text||'').join(' '),/No data for the selected scope/,'Missing/incomplete/failed datasets must not become ordinary no-data');
+ assert.ok(rejected.diagnostics.some(d=>d.code==='unsupportedReportPrintChartPayload'));
+}
+const contextBeforeChart=textSectionPrint([
+ {id:'preceding',kind:'markdownBlock',title:'Preceding analysis',content:{markdown:Array.from({length:21},(_,i)=>`Evidence line ${i}`).join('\n')}},
+ {id:'dailySection',kind:'sectionBlock',title:'Daily trends'},
+ {id:'dailyContext',kind:'markdownBlock',title:'Trend context',content:{markdown:'Compare the reported daily observations in the selected period.'}},
+ {...chart,id:'dailyChart',title:'Daily observations',runtime:{},content:{...chart.content,resolvedChart:{...chart.content.resolvedChart,rows:[{pathway:'A',revenue:5},{pathway:'B',revenue:3}]}}},
+]);
+const dailySectionPage=contextBeforeChart.pages.find(page=>page.elements.some(element=>element.id.startsWith('dailySection__title')));
+assert.ok(dailySectionPage.elements.some(element=>element.id.startsWith('dailyChart__svg')),'A section and its short context stay with the first analytical block');
+console.log('Empty chart and section-introduction pagination regressions passed');
