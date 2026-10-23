@@ -2326,8 +2326,8 @@ function renderReportPrintChartBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
   const datasetRef = normalizeString(block?.datasetRef);
-  const declared = (state.reportSpec?.datasets || []).some(dataset => dataset.id === datasetRef);
-  const dataset = (state.reportFill?.datasets || []).find(dataset => dataset.id === datasetRef);
+  const declared = (Array.isArray(state.reportSpec?.datasets) ? state.reportSpec.datasets : []).some(dataset => dataset?.id === datasetRef);
+  const dataset = (Array.isArray(state.reportFill?.datasets) ? state.reportFill.datasets : []).find(dataset => dataset?.id === datasetRef);
   const provenance = dataset?.provenance;
   // An admitted, complete empty dataset is ordinary no-data. Missing datasets,
   // incomplete pages and producer diagnostics must retain their failure path.
