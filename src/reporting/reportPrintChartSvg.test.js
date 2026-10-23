@@ -490,3 +490,6 @@ for(const [format,expected] of [['percentFraction',/>84\.8%</],['currency2',/>\$
   }
  }
 }
+
+const tinyAudienceCost=buildReportPrintChartSvg({width:640,chartModel:{type:'horizontal_bar',series:{values:[{value:'cost',label:'Cost per published reach (USD)',type:'horizontal_bar',format:'number5'}]}},resolvedChart:{kind:'directSeries',type:'horizontal_bar',xAxisKey:'publisher',seriesKeys:['cost'],rows:[{publisher:'One',cost:.00123}]}});
+assert.match(tinyAudienceCost.svg,/>0\.00123</,'Printed cost labels must retain small authored values');

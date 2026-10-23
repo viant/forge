@@ -397,3 +397,7 @@ assert.match(rightTip,/L 10 32 C 10 32 10 32 10 32 L 10 20 C 10 20 10 20 10 20 Z
 const leftTip=buildChartBarPath({x:10,y:20,width:100,height:12,value:-5});
 assert.match(leftTip,/L 110 20 C 110 20 110 20 110 20 L 110 32/,'Negative origin side must stay flat at the right');
 assert.equal(buildChartBarPath({x:0,y:0,width:0,height:12,value:0}),'');
+
+assert.equal(formatChartDisplayValue(0.00123,'number5'),'0.00123','Small cost values must retain authored precision');
+assert.equal(formatChartDisplayValue(0,'number5'),'0.00000');
+assert.equal(formatChartDisplayValue(1234.56789,'number'),'1,234.56789');
