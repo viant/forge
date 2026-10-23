@@ -144,7 +144,7 @@ export {isChartNumericValue};
 // number fallback for an unformatted axis.
 export function formatChartDisplayValue(value, formatType) {
     if (value == null || typeof value === "string" && !value.trim()) return value;
-    if (["currency", "currency2", "compactNumber", "percent", "percentFraction", "percentFraction2"].includes(formatType)) {
+    if (["currency", "currency2", "compactNumber", "percent", "percentFraction", "percentFraction2", "number", "number2", "number5"].includes(formatType)) {
         return formatDisplayValue(value, formatType);
     }
     return formatChartNumber(value);
