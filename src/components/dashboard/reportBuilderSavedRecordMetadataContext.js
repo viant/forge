@@ -111,16 +111,13 @@ export function resolveNormalizedReportSpecDocumentContext({
     document = null,
     title = "",
 } = {}) {
-    const derivedReportSpec = isPlainObject(document)
+    const suppliedReportSpec = isPlainObject(reportSpec) && hasOwnKeys(reportSpec)
+        ? reportSpec
+        : null;
+    const derivedReportSpec = !suppliedReportSpec && isPlainObject(document)
         ? resolveEmbeddedReportSpec(document)
         : null;
-    const normalizedReportSpec = isPlainObject(reportSpec)
-        ? (
-            hasOwnKeys(reportSpec)
-                ? reportSpec
-                : derivedReportSpec
-        )
-        : derivedReportSpec;
+    const normalizedReportSpec = suppliedReportSpec || derivedReportSpec;
     const normalizedDocument = isPlainObject(document)
         ? backfillImportedDocumentMetadata(document, normalizedReportSpec)
         : null;

@@ -148,3 +148,7 @@ assert.deepEqual(campaignConfig([{value:12,label:'Synthetic display'},{value:12,
 const loweredChoices=lowerReportBuilderPredicates({predicates:[campaignConfig([{value:12,label:'Synthetic display'}])]});
 assert.deepEqual(loweredChoices.staticFilters[0].options,[{value:12,label:'Synthetic display'}]);
 assert.equal(loweredChoices.staticFilters[0].multiple,true);
+const lazyCampaign=applyReportBuilderRuntimeFieldCatalog({runtimeFieldCatalog:{enabled:true},campaignChoicesDataSourceRef:'campaign_choices'}, {reportDefinition:{fieldCatalog:{columns:[{name:'campaignId',role:'dimension',type:'integer'}],allowedFilters:['campaignIds'],parameters:[{name:'campaignIds'}]}}});
+const lazyFilter=lowerReportBuilderPredicates(lazyCampaign).staticFilters[0];
+assert.deepEqual([lazyFilter.optionsDataSourceRef,lazyFilter.optionsFetchMode,lazyFilter.optionValueField,lazyFilter.optionLabelField],['campaign_choices','onFocus','value','label']);
+assert.deepEqual(lazyFilter.options,[]);

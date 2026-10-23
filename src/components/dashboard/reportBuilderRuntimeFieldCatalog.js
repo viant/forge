@@ -150,6 +150,7 @@ export function applyReportBuilderRuntimeFieldCatalog(config = {}, windowForm = 
       if (!Number.isSafeInteger(choice?.value) || choice.value <= 0 || seen.has(choice.value)) return false;
       seen.add(choice.value);return true;
     }).map(choice => ({value:choice.value,label:normalizeString(choice.label) || `Campaign ${choice.value}`}));
+    const lazyChoicesRef = normalizeString(next.campaignChoicesDataSourceRef);
     predicates.push({
       id: "campaignIds",
       label: "Campaign",
@@ -161,6 +162,7 @@ export function applyReportBuilderRuntimeFieldCatalog(config = {}, windowForm = 
       // on execution; missing/empty choices never enable free-form identifiers.
       manualEntry: false,
       options,
+      ...(lazyChoicesRef ? {optionsDataSourceRef:lazyChoicesRef,optionsFetchMode:"onFocus",optionValueField:"value",optionLabelField:"label"} : {}),
       prefill: ["campaignIds", "campaignId"],
     });
   }
