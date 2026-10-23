@@ -3649,3 +3649,21 @@ const distinctSectionTitleHtml = renderMergedSections([
   ...mergedSections.slice(1),
 ]);
 assert.match(distinctSectionTitleHtml, /Regional utilization/);
+
+// Conditional alternatives must not leave empty grid rows/gaps in a dashboard.
+const conditionalTiles = Array.from({length: 9},(_,i)=>({
+ id:`rankAlternative${i}`,kind:"markdownBlock",content:{markdown:`Metric ${i}`},
+ runtime:{visibleWhen:{source:"filters",field:"rankingMetric",equals:String(i)}},
+}));
+const noGapHtml = renderToStaticMarkup(React.createElement(ReportRuntime,{
+ reportSpec:{blocks:conditionalTiles},reportFill:{blocks:conditionalTiles},conditionValues:{rankingMetric:"8"},
+}));
+assert.equal((noGapHtml.match(/data-report-runtime-block-id=/g)||[]).length,1);
+assert.match(noGapHtml,/data-report-runtime-block-id="rankAlternative8"/);
+assert.doesNotMatch(noGapHtml,/data-report-runtime-block-id="rankAlternative[0-7]"/);
+const conditionalGroup={id:"conditionalGroup",kind:"compositeBlock",content:{layout:"grid",columns:2,childBlockIds:conditionalTiles.map(b=>b.id)}};
+const groupedNoGapHtml=renderToStaticMarkup(React.createElement(ReportRuntime,{
+ reportSpec:{blocks:[conditionalGroup,...conditionalTiles]},reportFill:{blocks:[conditionalGroup,...conditionalTiles]},conditionValues:{rankingMetric:"8"},
+}));
+assert.doesNotMatch(groupedNoGapHtml,/data-report-runtime-block-id="rankAlternative[0-7]"/);
+assert.match(groupedNoGapHtml,/data-report-runtime-block-id="rankAlternative8"/);

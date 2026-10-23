@@ -3364,15 +3364,17 @@ export default function ReportRuntime({
                 gap: 16,
               }}
             >
-              {childBlocks.map((childBlock) => (
-                <div
+              {childBlocks.map((childBlock) => {
+                const rendered = renderBlock(childBlock);
+                if (rendered == null) return null;
+                return <div
                   key={`runtime:${normalizeString(block?.id || "composite")}:${childBlock?.id || "block"}`}
                   data-report-runtime-block-id={normalizeString(childBlock?.id)}
                   style={{ minWidth: 0 }}
                 >
-                  {renderBlock(childBlock)}
-                </div>
-              ))}
+                  {rendered}
+                </div>;
+              })}
             </div> : renderLayoutBlockGrid(childBlocks, `runtime:${normalizeString(block?.id || "composite")}`)
           ) : (
             <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
@@ -3431,8 +3433,10 @@ export default function ReportRuntime({
         }}
         data-report-runtime-layout-columns={runtimeGridColumns}
       >
-        {blocks.map((block) => (
-          <div
+        {blocks.map((block) => {
+          const rendered = renderBlock(block);
+          if (rendered == null) return null;
+          return <div
             key={`${keyPrefix}:${block?.id || "block"}`}
             data-report-runtime-block-id={normalizeString(block?.id)}
             data-report-runtime-layout-span={resolveRuntimeLayoutSpanForBlock(block)}
@@ -3441,9 +3445,9 @@ export default function ReportRuntime({
               gridColumn: resolveResponsiveRuntimeLayoutGridColumn(block, runtimeGridColumns),
             }}
           >
-            {renderBlock(block)}
-          </div>
-        ))}
+            {rendered}
+          </div>;
+        })}
       </div>
     );
   };
