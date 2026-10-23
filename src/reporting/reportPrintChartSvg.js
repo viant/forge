@@ -131,7 +131,7 @@ function resolveCartesianSeriesDescriptors(chartModel = {}, resolvedChart = {}) 
           label: normalizedKey,
           type: chartType,
           color: printColor(resolveCategoryColor(chartModel?.series?.categoryColors, normalizedKey, palette[index % palette.length])),
-          format: "",
+          format: normalizeString(chartModel?.yAxis?.format),
           dataLabels: "",
           pointColorMode: "",
         };
@@ -846,7 +846,14 @@ function renderCartesianChartSvg({
   const xAxisKey = normalizeString(resolvedChart?.xAxisKey);
   const valueRange = bounds.maxValue - bounds.minValue || 1;
   const baselineY = topPad + ((bounds.maxValue - 0) / valueRange) * plotHeight;
+  const barSeries = seriesDescriptors.filter((series) => resolveChartSupportedSeriesType(series.type) === "bar");
+  const categoryWidth = plotWidth / Math.max(rows.length, 1);
   const xPositions = rows.map((row, index) => {
+    // Bars occupy category bands. Centering edge categories on the axis itself
+    // places half of their bars over tick labels or beyond the plotting area.
+    if (barSeries.length > 0) {
+      return leftPad + ((index + 0.5) * categoryWidth);
+    }
     if (rows.length === 1) {
       return leftPad + (plotWidth / 2);
     }
@@ -916,9 +923,9 @@ function renderCartesianChartSvg({
     ? `<text x="${leftPad + (plotWidth / 2)}" y="${topPad + plotHeight + 36}" text-anchor="middle" font-size="11" font-weight="600" fill="#475467">${escapeXml(xAxisLabel)}</text>`
     : "";
 
-  const barSeries = seriesDescriptors.filter((series) => resolveChartSupportedSeriesType(series.type) === "bar");
-  const groupWidth = Math.min(48, Math.max(14, (plotWidth / Math.max(rows.length, 1)) * 0.56));
-  const barWidth = barSeries.length > 0 ? Math.max(8, groupWidth / barSeries.length) : 0;
+  const groupWidth = Math.min(48, categoryWidth * 0.56);
+  const barWidth = barSeries.length > 0 ? groupWidth / barSeries.length : 0;
+  const drawnBarWidth = Math.max(0, barWidth - Math.min(1, barWidth * 0.12));
 
   const renderedSeries = seriesDescriptors.map((series) => {
     const supportedType = resolveChartSupportedSeriesType(series.type);
@@ -947,10 +954,10 @@ function renderCartesianChartSvg({
         const barHeight = Math.max(1, Math.abs(seriesBaselineY - point.y));
         const fillColor = resolveSeriesPointColor(series, point.value, series.color);
         const label = shouldRenderReportPrintSeriesDataLabels(series, supportedType, rows.length)
-          ? `<text x="${x + ((barWidth - 1) / 2)}" y="${y - 4}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(point.value, series.format))}</text>`
+          ? `<text x="${x + (drawnBarWidth / 2)}" y="${y - 4}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(point.value, series.format))}</text>`
           : "";
         return `
-          <rect x="${x}" y="${y}" width="${barWidth - 1}" height="${barHeight}" rx="2" fill="${escapeXml(fillColor)}" />
+          <rect x="${x}" y="${y}" width="${drawnBarWidth}" height="${barHeight}" rx="2" fill="${escapeXml(fillColor)}" />
           ${label}
         `;
       }).join("\n");
