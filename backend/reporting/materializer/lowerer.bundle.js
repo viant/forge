@@ -47197,7 +47197,7 @@ Please __addLocaleData before adding additional unit data`);
     return normalizeArray3(values).flatMap((entry) => typeof entry === "string" ? entry.split(/[\s,]+/) : [entry]).map((entry) => String(entry != null ? entry : "").trim()).filter(Boolean);
   }
   function resolveRelativeDateRangeDefault(seed = {}) {
-    return resolveReportRelativeDateRange(seed == null ? void 0 : seed.preset);
+    return (seed == null ? void 0 : seed.startExpression) || (seed == null ? void 0 : seed.endExpression) ? resolveReportRelativeDateRangeSpec(seed) : resolveReportRelativeDateRange(seed == null ? void 0 : seed.preset);
   }
   function defaultSelectedIds(items = [], fallbackCount = 1) {
     const explicit = normalizeArray3(items).filter((item) => item == null ? void 0 : item.default).map((item) => String(item.id || "").trim()).filter(Boolean);

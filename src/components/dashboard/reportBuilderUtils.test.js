@@ -3252,3 +3252,15 @@ const coloredSpoContainer = buildExplicitReportBuilderChartContainer(
 assert.deepEqual(coloredSpoContainer.chart.series.categoryColors, coloredSpoSpec.categoryColors);
 
 assert.equal(shouldAutoCollapseReportBuilderFilters({canShowResults:true,hasCompletedCurrentRun:true,manualRunSequence:2,collapsedRunSequence:1,editingFilters:true}),false,'completed requests must not collapse filters while the user is editing them');
+
+// Reports can use the existing relative-date expressions to exclude incomplete
+// current-day observations while still showing concrete editable date fields.
+const completeDays = buildReportBuilderDefaultState({staticFilters:[{
+    id:'dateRange',type:'dateRange',default:{startExpression:'30 days ago',endExpression:'yesterday'},
+}]});
+const completeDayISO = date => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+const completeFrom = new Date(), completeTo = new Date();
+completeFrom.setDate(completeFrom.getDate()-30);
+completeTo.setDate(completeTo.getDate()-1);
+assert.equal(completeDays.scopeParams.dateRange.start,completeDayISO(completeFrom));
+assert.equal(completeDays.scopeParams.dateRange.end,completeDayISO(completeTo));

@@ -56,7 +56,7 @@ import {
     resolveReportBuilderDynamicFilterGroups,
     resolveReportBuilderScopeParamFilters,
 } from "./reportBuilderPredicates.js";
-import { resolveReportRelativeDateRange } from "../../reporting/reportRelativeDateRangeModel.js";
+import { resolveReportRelativeDateRange, resolveReportRelativeDateRangeSpec } from "../../reporting/reportRelativeDateRangeModel.js";
 
 export {
     normalizeDynamicGroupRows,
@@ -163,7 +163,9 @@ export function resolveReportBuilderRailFilterState({
 }
 
 function resolveRelativeDateRangeDefault(seed = {}) {
-    return resolveReportRelativeDateRange(seed?.preset);
+    return seed?.startExpression || seed?.endExpression
+        ? resolveReportRelativeDateRangeSpec(seed)
+        : resolveReportRelativeDateRange(seed?.preset);
 }
 
 function defaultSelectedIds(items = [], fallbackCount = 1) {
