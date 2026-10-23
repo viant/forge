@@ -2222,7 +2222,7 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
   const columns = Array.isArray(block?.content?.columns) ? block.content.columns : [];
   let rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
   const minimumWidths = minimumReportPrintColumnWidths(state, block, columns);
-  if (columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
+  if (rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
     const groups = [];
     let group = [columns[0]];
     let width = minimumWidths[0];
