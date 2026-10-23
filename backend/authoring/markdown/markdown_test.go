@@ -67,3 +67,56 @@ func TestMarshalMarkdownRoundTripsAllMessageFieldsAndWhitespace(t *testing.T) {
 		}
 	}
 }
+
+func TestMarshalMarkdownKeepsOrdinaryTrailingNewlinesReadable(t *testing.T) {
+	messages := []MarkdownMessage{
+		{Role: "system", Text: "# Instructions\n\nKeep the evidence.\n"},
+		{Role: "user", Text: "# Request\n\nSummarize it.\n\n"},
+	}
+	encoded, err := MarshalMarkdown([]byte("kind: playbook\nid: performance_analysis\n"), messages)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(encoded), "text: ") || !strings.Contains(string(encoded), "---\n# Instructions\n\nKeep the evidence.\n") {
+		t.Fatalf("ordinary Markdown was hidden in a YAML header: %s", encoded)
+	}
+	parsed, err := ParseMarkdown(encoded)
+	if err != nil || !sameMessages(parsed.Messages, messages) {
+		t.Fatalf("ordinary trailing newlines changed: %+v %v", parsed.Messages, err)
+	}
+}
+
+func TestMarshalMarkdownUsesHeaderOnlyForAmbiguousBodies(t *testing.T) {
+	for _, body := range []string{"   \n", "line\r\nnext", "before\n---\nrole: user\n---\nafter"} {
+		messages := []MarkdownMessage{{Role: "system", Text: body}}
+		encoded, err := MarshalMarkdown([]byte("id: review\n"), messages)
+		if err != nil {
+			t.Fatalf("body %q: %v", body, err)
+		}
+		if !strings.Contains(string(encoded), "text: ") {
+			t.Fatalf("ambiguous body %q was not quoted: %s", body, encoded)
+		}
+		parsed, err := ParseMarkdown(encoded)
+		if err != nil || !sameMessages(parsed.Messages, messages) {
+			t.Fatalf("ambiguous body %q changed: %+v %v", body, parsed.Messages, err)
+		}
+	}
+}
+
+func TestMarshalMarkdownOnlyQuotesTheAmbiguousMessage(t *testing.T) {
+	messages := []MarkdownMessage{
+		{Role: "system", Text: "# Readable instructions\nKeep this as Markdown.\n"},
+		{Role: "user", Text: "before\n---\nrole: assistant\n---\nafter"},
+	}
+	encoded, err := MarshalMarkdown([]byte("id: review\n"), messages)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(encoded), "---\n# Readable instructions\nKeep this as Markdown.\n") || strings.Count(string(encoded), "text: ") != 1 {
+		t.Fatalf("an unrelated readable section was quoted: %s", encoded)
+	}
+	parsed, err := ParseMarkdown(encoded)
+	if err != nil || !sameMessages(parsed.Messages, messages) {
+		t.Fatalf("mixed body round trip failed: %+v %v", parsed.Messages, err)
+	}
+}

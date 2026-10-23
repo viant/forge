@@ -111,9 +111,67 @@ func ParseMarkdown(raw []byte) (MarkdownDocument, error) {
 }
 
 // MarshalMarkdown writes complete YAML metadata and ordered role blocks. It
-// leaves ordinary text in readable Markdown bodies; whitespace-sensitive or
-// delimiter-like text uses a YAML header scalar for exact round trips.
+// keeps ordinary text, including leading and trailing newlines, in readable
+// Markdown bodies. A header scalar is used only when parsing a body would
+// change the authored message.
 func MarshalMarkdown(metadata []byte, messages []MarkdownMessage) ([]byte, error) {
+	forceHeader := make([]bool, len(messages))
+	for index, message := range messages {
+		body := message.Text
+		forceHeader[index] = message.URI != "" && body != "" ||
+			body != "" && strings.TrimSpace(body) == "" ||
+			strings.Contains(body, "\r")
+		if body != "" && !forceHeader[index] {
+			probe, err := marshalMarkdownWithHeaders(metadata, []MarkdownMessage{message}, []bool{false})
+			if err != nil {
+				return nil, err
+			}
+			parsed, err := ParseMarkdown(probe)
+			forceHeader[index] = err != nil || !sameMessages(parsed.Messages, []MarkdownMessage{message})
+		}
+	}
+	for {
+		encoded, err := marshalMarkdownWithHeaders(metadata, messages, forceHeader)
+		if err != nil {
+			return nil, err
+		}
+		parsed, err := ParseMarkdown(encoded)
+		if err == nil && sameMessages(parsed.Messages, messages) {
+			return encoded, nil
+		}
+		// An authored delimiter may become another role section. Retry with one
+		// exact YAML scalar at a time so other messages remain readable.
+		changed := false
+		for index, message := range messages {
+			if message.Text == "" || forceHeader[index] {
+				continue
+			}
+			forceHeader[index] = true
+			changed = true
+			break
+		}
+		if !changed {
+			if err != nil {
+				return nil, err
+			}
+			return nil, fmt.Errorf("Markdown messages cannot round trip")
+		}
+	}
+}
+
+func sameMessages(actual, expected []MarkdownMessage) bool {
+	if len(actual) != len(expected) {
+		return false
+	}
+	for index := range expected {
+		if actual[index] != expected[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func marshalMarkdownWithHeaders(metadata []byte, messages []MarkdownMessage, forceHeader []bool) ([]byte, error) {
 	var output strings.Builder
 	output.WriteString("---\n")
 	output.WriteString(strings.TrimRight(string(metadata), "\n"))
@@ -131,7 +189,7 @@ func MarshalMarkdown(metadata []byte, messages []MarkdownMessage) ([]byte, error
 			Text   string `yaml:"text,omitempty"`
 		}{Role: role, Field: message.Field, Engine: message.Engine, URI: message.URI}
 		body := message.Text
-		if message.URI != "" && message.Text != "" || strings.TrimSpace(body) != body || strings.Contains(body, "\n---\nrole:") || strings.HasPrefix(body, "---\nrole:") {
+		if forceHeader[index] {
 			header.Text = body
 			body = ""
 		}
