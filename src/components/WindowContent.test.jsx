@@ -1,6 +1,26 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, isProtectedWindowMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowRootContainer, reuseShallowEqualRuntimeObject, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
+import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, isProtectedWindowMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowModelCacheScope, resolveWindowRootContainer, reuseShallowEqualRuntimeObject, scopedWindowHostServices, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
+
+describe('window-scoped host capability',()=>{
+  it('binds each published window to its own host callbacks without changing global services',()=>{
+    const factory=window=>({navigate:()=>window.windowId});
+    const services={createHostWindow:factory,hostWindow:{download:()=>true}};
+    const first=scopedWindowHostServices(services,{windowId:'first'});
+    const second=scopedWindowHostServices(services,{windowId:'second'});
+    expect(first.hostWindow.navigate()).toBe('first');
+    expect(second.hostWindow.navigate()).toBe('second');
+    expect(first.hostWindow.download()).toBe(true);
+    expect(services.hostWindow.navigate).toBeUndefined();
+  });
+  it('prefers a verified host owner over reconnecting UI transport sessions for model reuse',()=>{
+    const services={windowModelCacheScope:()=> 'verified-owner-A'};
+    expect(resolveWindowModelCacheScope(services,'transport-one')).toBe('verified-owner-A');
+    expect(resolveWindowModelCacheScope(services,'transport-two')).toBe('verified-owner-A');
+    expect(resolveWindowModelCacheScope({windowModelCacheScope:()=>''},'transport-two')).toBe('');
+    expect(resolveWindowModelCacheScope({},'transport-two')).toBe('transport-two');
+  });
+});
 import { resolveDataSourceOptions } from '../runtime/WidgetRenderer.jsx';
 
 describe('local datasource parent placeholder', () => {

@@ -50,6 +50,12 @@ type partitionState struct {
 type admission struct {
 	tenant, policyIndex string
 	cohorts             map[string]string // admitted cohort name -> current policy hash
+	manifestHash        string
+	selections          map[string]effectiveSelection
+}
+type effectiveSelection struct {
+	roots map[string]RootRef
+	err   error
 }
 
 // View exposes selected producer-closed bytes without granting access to the
@@ -214,7 +220,7 @@ func staticPolicyStore(ctx context.Context, manifest Manifest) (*authz.StaticSto
 func refsForPartition(manifest Manifest, key string) map[string]RootRef {
 	refs := map[string]RootRef{}
 	for _, cohort := range manifest.Cohorts {
-		for _, ref := range cohort.Roots {
+		for _, ref := range append(append([]RootRef(nil), cohort.Roots...), cohort.RevisionOverrides...) {
 			partition, err := RootPartition(ref)
 			if err == nil && partition == key {
 				refs[RootKey(ref)] = ref
@@ -484,6 +490,7 @@ func (r *Replica) Sync(ctx context.Context) (syncErr error) {
 		r.partitions = next // full snapshot removes omitted roots
 		r.latest = manifest
 		r.store = policyStore
+		r.refreshAdmissionSelectionsLocked()
 		r.mu.Unlock()
 		activateTiming.End(observe.OK, observe.CacheUnknown)
 	}
@@ -652,8 +659,7 @@ func (r *Replica) Admit(ctx context.Context) (admitErr error) {
 		if cohort.Tenant != facts.Tenant || matched[cohort.Name] != cohort.PolicyHash {
 			continue
 		}
-		for _, ref := range cohort.Roots {
-			partition, _ := RootPartition(ref)
+		for partition := range cohortPartitions(cohort) {
 			namespace, _, _ := cutPartition(partition)
 			policyKey := PartitionKey(namespace, "policy")
 			state := r.partitions[policyKey]
@@ -669,7 +675,12 @@ func (r *Replica) Admit(ctx context.Context) (admitErr error) {
 	if !r.ready || r.latest.Hash != manifest.Hash {
 		return ErrUnavailable
 	}
-	r.admissions[key] = admission{tenant: facts.Tenant, policyIndex: policyIndexHash(manifest, facts.Tenant), cohorts: matched}
+	held := admission{tenant: facts.Tenant, policyIndex: policyIndexHash(manifest, facts.Tenant), cohorts: matched, manifestHash: manifest.Hash, selections: map[string]effectiveSelection{}}
+	if r.cfg.Cohort == nil {
+		roots, selectionErr := effectiveRoots(manifest, held, "")
+		held.selections[""] = effectiveSelection{roots, selectionErr}
+	}
+	r.admissions[key] = held
 	return nil
 }
 
@@ -686,7 +697,7 @@ func (r *Replica) EnsureAdmitted(ctx context.Context) error {
 	}
 	r.mu.RLock()
 	held, ok := r.admissions[key]
-	current := ok && held.policyIndex == policyIndexHash(r.latest, held.tenant)
+	current := ok && held.policyIndex == policyIndexHash(r.latest, held.tenant) && held.manifestHash == r.latest.Hash
 	r.mu.RUnlock()
 	if current {
 		return nil
@@ -705,6 +716,9 @@ func (r *Replica) Open(ctx context.Context, uri string) (view *View, openErr err
 	}
 	selected, err := r.selectedCohort(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := r.ensureSelection(key, selected); err != nil {
 		return nil, err
 	}
 	r.mu.RLock()
@@ -748,28 +762,113 @@ func (r *Replica) selectedCohort(ctx context.Context) (string, error) {
 	return name, nil
 }
 
-// selectedRootLocked resolves one root from already admitted cohorts. If
-// admitted cohorts assign different revisions of one URI, a trusted cohort
-// selector is required; choosing the first map/list entry is never safe.
-func (r *Replica) selectedRootLocked(admitted admission, uri, selected string) (RootRef, error) {
+// effectiveRootsLocked composes local admitted policy decisions. A deny always
+// wins; overrides only select a revision of a separately granted URI.
+func (r *Replica) effectiveRootsLocked(admitted admission, selected string) (map[string]RootRef, error) {
+	return effectiveRoots(r.latest, admitted, selected)
+}
+
+func effectiveRoots(manifest Manifest, admitted admission, selected string) (map[string]RootRef, error) {
 	if selected != "" && admitted.cohorts[selected] == "" {
+		return nil, ErrDenied
+	}
+	type choice struct {
+		ref      RootRef
+		priority int
+	}
+	grants, overrides, denied := map[string]choice{}, map[string]choice{}, map[string]bool{}
+	for _, cohort := range manifest.Cohorts {
+		if cohort.Tenant != admitted.tenant || admitted.cohorts[cohort.Name] != cohort.PolicyHash {
+			continue
+		}
+		for _, uri := range cohort.DeniedURIs {
+			denied[uri] = true
+		}
+		for _, ref := range cohort.RevisionOverrides {
+			old, ok := overrides[ref.URI]
+			if !ok || cohort.Priority > old.priority {
+				overrides[ref.URI] = choice{ref, cohort.Priority}
+			} else if cohort.Priority == old.priority && old.ref != ref {
+				return nil, ErrConflict
+			}
+		}
+		if selected != "" && cohort.Name != selected {
+			continue
+		}
+		for _, ref := range cohort.Roots {
+			old, ok := grants[ref.URI]
+			if !ok || cohort.Priority > old.priority {
+				grants[ref.URI] = choice{ref, cohort.Priority}
+			} else if cohort.Priority == old.priority && old.ref != ref {
+				return nil, ErrConflict
+			}
+		}
+	}
+	out := map[string]RootRef{}
+	for uri, grant := range grants {
+		if denied[uri] {
+			continue
+		}
+		if override, ok := overrides[uri]; ok {
+			out[uri] = override.ref
+		} else {
+			out[uri] = grant.ref
+		}
+	}
+	return out, nil
+}
+
+// Called only while holding r.mu.Lock after a verified manifest swap. Content
+// selection changes refresh admission maps locally; policy-head changes leave
+// the admission stale until the next verified-facts authz join.
+func (r *Replica) refreshAdmissionSelectionsLocked() {
+	for key, held := range r.admissions {
+		if held.policyIndex != policyIndexHash(r.latest, held.tenant) {
+			continue
+		}
+		updated := make(map[string]effectiveSelection, len(held.selections))
+		for selected := range held.selections {
+			roots, selectionErr := effectiveRoots(r.latest, held, selected)
+			updated[selected] = effectiveSelection{roots, selectionErr}
+		}
+		held.selections = updated
+		held.manifestHash = r.latest.Hash
+		r.admissions[key] = held
+	}
+}
+
+func (r *Replica) ensureSelection(key, selected string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	held, ok := r.admissions[key]
+	if !ok {
+		return ErrDenied
+	}
+	if held.manifestHash != r.latest.Hash {
+		return ErrDenied
+	}
+	if _, ok := held.selections[selected]; ok {
+		return nil
+	}
+	roots, selectionErr := effectiveRoots(r.latest, held, selected)
+	held.selections[selected] = effectiveSelection{roots, selectionErr}
+	r.admissions[key] = held
+	return nil
+}
+
+func (r *Replica) selectedRootLocked(admitted admission, uri, selected string) (RootRef, error) {
+	if admitted.manifestHash != r.latest.Hash {
 		return RootRef{}, ErrDenied
 	}
-	var ref RootRef
-	for _, cohort := range r.latest.Cohorts {
-		if cohort.Tenant != admitted.tenant || admitted.cohorts[cohort.Name] != cohort.PolicyHash || selected != "" && cohort.Name != selected {
-			continue
-		}
-		found, ok := FindRoot(cohort.Roots, uri)
-		if !ok {
-			continue
-		}
-		if ref.URI != "" && ref != found {
-			return RootRef{}, ErrConflict
-		}
-		ref = found
+	selection, ok := admitted.selections[selected]
+	if !ok {
+		return RootRef{}, ErrDenied
 	}
-	if ref.URI == "" {
+	if selection.err != nil {
+		return RootRef{}, selection.err
+	}
+	ref, ok := selection.roots[uri]
+	if !ok {
 		return RootRef{}, ErrDenied
 	}
 	return ref, nil
@@ -821,41 +920,36 @@ func (r *Replica) PermittedRoots(ctx context.Context) ([]RootRef, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := r.ensureSelection(key, selected); err != nil {
+		return nil, err
+	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	admitted, ok := r.admissions[key]
 	if !ok {
 		return nil, ErrDenied
 	}
-	if selected != "" && admitted.cohorts[selected] == "" {
+	if len(r.latest.Cohorts) == 0 {
 		return nil, ErrDenied
+	}
+	if admitted.manifestHash != r.latest.Hash {
+		return nil, ErrDenied
+	}
+	selection, ok := admitted.selections[selected]
+	if !ok {
+		return nil, ErrDenied
+	}
+	if selection.err != nil {
+		return nil, selection.err
 	}
 	out := []RootRef{}
-	seen := map[string]RootRef{}
-	matched := false
-	for _, cohort := range r.latest.Cohorts {
-		if cohort.Tenant != admitted.tenant || admitted.cohorts[cohort.Name] != cohort.PolicyHash || selected != "" && cohort.Name != selected {
-			continue
+	for _, ref := range selection.roots {
+		partition, _ := RootPartition(ref)
+		namespace, _, _ := cutPartition(partition)
+		state, policyState := r.partitions[partition], r.partitions[PartitionKey(namespace, "policy")]
+		if state != nil && !state.stale && state.hash == r.latest.PartitionHashes[partition] && state.refs[RootKey(ref)] == ref && policyState != nil && !policyState.stale && policyState.hash == r.latest.PartitionHashes[PartitionKey(namespace, "policy")] {
+			out = append(out, ref)
 		}
-		matched = true
-		for _, ref := range cohort.Roots {
-			if prior, ok := seen[ref.URI]; ok {
-				if prior != ref {
-					return nil, ErrConflict
-				}
-				continue
-			}
-			seen[ref.URI] = ref
-			partition, _ := RootPartition(ref)
-			namespace, _, _ := cutPartition(partition)
-			state, policyState := r.partitions[partition], r.partitions[PartitionKey(namespace, "policy")]
-			if state != nil && !state.stale && state.hash == r.latest.PartitionHashes[partition] && state.refs[RootKey(ref)] == ref && policyState != nil && !policyState.stale && policyState.hash == r.latest.PartitionHashes[PartitionKey(namespace, "policy")] {
-				out = append(out, ref)
-			}
-		}
-	}
-	if !matched {
-		return nil, ErrDenied
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].URI < out[j].URI })
 	return out, nil

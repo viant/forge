@@ -89,13 +89,16 @@ func (a *Artifact) ETag() string {
 }
 
 type Cohort struct {
-	Tenant          string         `json:"tenant"`
-	Name            string         `json:"name"`
-	PolicyResource  authz.Resource `json:"policyResource"`
-	PolicyHash      string         `json:"policyHash"`
-	Hash            string         `json:"hash"`
-	Roots           []RootRef      `json:"roots"`
-	FollowPublished []string       `json:"followPublished,omitempty"`
+	Tenant            string         `json:"tenant"`
+	Name              string         `json:"name"`
+	PolicyResource    authz.Resource `json:"policyResource"`
+	PolicyHash        string         `json:"policyHash"`
+	Hash              string         `json:"hash"`
+	Priority          int            `json:"priority,omitempty"`
+	Roots             []RootRef      `json:"roots"`
+	FollowPublished   []string       `json:"followPublished,omitempty"`
+	RevisionOverrides []RootRef      `json:"revisionOverrides,omitempty"`
+	DeniedURIs        []string       `json:"deniedUris,omitempty"`
 }
 
 func CohortHash(value Cohort) string {
@@ -137,6 +140,27 @@ func RootPartition(ref RootRef) (string, error) {
 	}
 	return PartitionKey(u.Host, ref.Kind), nil
 }
+func uriPartition(uri string) (string, error) {
+	u, err := url.Parse(uri)
+	if err != nil || !RootKind(u.Scheme) {
+		return "", ErrInvalid
+	}
+	return RootPartition(RootRef{URI: uri, Kind: u.Scheme})
+}
+func cohortPartitions(cohort Cohort) map[string]bool {
+	partitions := map[string]bool{}
+	for _, ref := range append(append([]RootRef(nil), cohort.Roots...), cohort.RevisionOverrides...) {
+		if key, err := RootPartition(ref); err == nil {
+			partitions[key] = true
+		}
+	}
+	for _, uri := range cohort.DeniedURIs {
+		if key, err := uriPartition(uri); err == nil {
+			partitions[key] = true
+		}
+	}
+	return partitions
+}
 
 // PartitionHash isolates namespace and kind. A sales intent update changes
 // neither sales windows nor operations intents. Policy partitions use the
@@ -150,9 +174,8 @@ func PartitionHash(value Manifest, key string) string {
 		type head struct{ Tenant, Name, PolicyHash string }
 		var heads []head
 		for _, cohort := range value.Cohorts {
-			for _, ref := range cohort.Roots {
-				partition, err := RootPartition(ref)
-				if err == nil && strings.HasPrefix(partition, namespace+"|") {
+			for partition := range cohortPartitions(cohort) {
+				if strings.HasPrefix(partition, namespace+"|") {
 					heads = append(heads, head{cohort.Tenant, cohort.Name, cohort.PolicyHash})
 					break
 				}
@@ -167,7 +190,10 @@ func PartitionHash(value Manifest, key string) string {
 	}
 	type selection struct {
 		Tenant, Cohort string
+		Mode           string
+		Priority       int
 		Root           RootRef
+		URI            string
 		Follow         bool
 	}
 	selections := []selection{}
@@ -179,7 +205,17 @@ func PartitionHash(value Manifest, key string) string {
 		for _, ref := range cohort.Roots {
 			partition, err := RootPartition(ref)
 			if err == nil && partition == key {
-				selections = append(selections, selection{cohort.Tenant, cohort.Name, ref, follow[ref.URI]})
+				selections = append(selections, selection{Tenant: cohort.Tenant, Cohort: cohort.Name, Mode: "allow", Priority: cohort.Priority, Root: ref, URI: ref.URI, Follow: follow[ref.URI]})
+			}
+		}
+		for _, ref := range cohort.RevisionOverrides {
+			if partition, err := RootPartition(ref); err == nil && partition == key {
+				selections = append(selections, selection{Tenant: cohort.Tenant, Cohort: cohort.Name, Mode: "override", Priority: cohort.Priority, Root: ref, URI: ref.URI})
+			}
+		}
+		for _, uri := range cohort.DeniedURIs {
+			if partition, err := uriPartition(uri); err == nil && partition == key {
+				selections = append(selections, selection{Tenant: cohort.Tenant, Cohort: cohort.Name, Mode: "deny", Priority: cohort.Priority, URI: uri})
 			}
 		}
 	}
@@ -194,6 +230,12 @@ func PartitionHash(value Manifest, key string) string {
 		if a.Cohort != b.Cohort {
 			return a.Cohort < b.Cohort
 		}
+		if a.Mode != b.Mode {
+			return a.Mode < b.Mode
+		}
+		if a.URI != b.URI {
+			return a.URI < b.URI
+		}
 		return RootKey(a.Root) < RootKey(b.Root)
 	})
 	raw, _ := json.Marshal(selections)
@@ -205,11 +247,7 @@ func FillPartitionHashes(value *Manifest) {
 	}
 	keys := map[string]bool{}
 	for _, cohort := range value.Cohorts {
-		for _, ref := range cohort.Roots {
-			partition, err := RootPartition(ref)
-			if err != nil {
-				continue
-			}
+		for partition := range cohortPartitions(cohort) {
 			keys[partition] = true
 			namespace, _, _ := strings.Cut(partition, "|")
 			keys[PartitionKey(namespace, "policy")] = true
@@ -263,6 +301,33 @@ func ValidateManifest(value Manifest) error {
 			sharedRoots[RootKey(root)] = root
 			delete(following, root.URI)
 			prior = root.URI
+		}
+		if !sort.SliceIsSorted(cohort.RevisionOverrides, func(i, j int) bool { return cohort.RevisionOverrides[i].URI < cohort.RevisionOverrides[j].URI }) || !sort.StringsAreSorted(cohort.DeniedURIs) {
+			return ErrInvalid
+		}
+		prior = ""
+		for _, override := range cohort.RevisionOverrides {
+			if override.URI == "" || override.URI == prior || !RootKind(override.Kind) || override.Version == 0 || override.Hash == "" {
+				return ErrInvalid
+			}
+			if _, err := RootPartition(override); err != nil {
+				return ErrInvalid
+			}
+			if old, ok := sharedRoots[RootKey(override)]; ok && old != override {
+				return ErrInvalid
+			}
+			sharedRoots[RootKey(override)] = override
+			prior = override.URI
+		}
+		prior = ""
+		for _, uri := range cohort.DeniedURIs {
+			if uri == "" || uri == prior {
+				return ErrInvalid
+			}
+			if _, err := uriPartition(uri); err != nil {
+				return ErrInvalid
+			}
+			prior = uri
 		}
 		if len(following) > 0 {
 			return ErrInvalid

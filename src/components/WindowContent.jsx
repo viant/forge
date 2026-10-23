@@ -23,6 +23,7 @@ import {
     primeWindowSignals,
     clearProtectedWindowState,
     clearProtectedWindowDenial,
+    getActiveUIBridgeTransportContext,
     protectedWindowDenials,
     removeWindow,
 } from '../core';
@@ -56,6 +57,7 @@ import { buildReportBuilderHostServices } from './dashboard/reportBuilderHostSer
 import { windowMetadataEndpoint } from './windowMetadataEndpoint.js';
 import {useViewPartition} from './useViewPartition.js';
 import {applyTablePagingMetadata} from '../runtime/tablePagingMetadata.js';
+import {admittedPublishedWindowModel,publishedWindowConditionalETag} from '../runtime/publishedWindowModelCache.js';
 
 export function reuseShallowEqualRuntimeObject(previous = null, candidate = null) {
     if (!previous || !candidate || typeof previous !== 'object' || typeof candidate !== 'object') {
@@ -65,6 +67,20 @@ export function reuseShallowEqualRuntimeObject(previous = null, candidate = null
     const candidateKeys = Object.keys(candidate);
     if (previousKeys.length !== candidateKeys.length) return candidate;
     return candidateKeys.every((key) => Object.is(previous[key], candidate[key])) ? previous : candidate;
+}
+
+export function scopedWindowHostServices(services = {}, windowState = null) {
+    if (typeof services?.createHostWindow !== 'function') return services;
+    const hostWindow = services.createHostWindow(windowState);
+    return hostWindow && typeof hostWindow === 'object'
+        ? {...services, hostWindow: {...(services.hostWindow || {}), ...hostWindow}}
+        : services;
+}
+
+export function resolveWindowModelCacheScope(services = {}, bridgeSessionId = '') {
+    return typeof services?.windowModelCacheScope === 'function'
+        ? services.windowModelCacheScope() || ''
+        : bridgeSessionId || '';
 }
 
 function useStableRuntimeIdentity(dependencies = []) {
@@ -1314,8 +1330,9 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
         conversationId: runtimeWindow?.conversationId,
         prepareRequest: prepareConnectorRequest,
     }), [services, endpoints, auth, service?.endpoint, runtimeWindow?.conversationId, prepareConnectorRequest]);
+    const scopedServices = useMemo(() => scopedWindowHostServices(reportBuilderServices, runtimeWindow), [reportBuilderServices, runtimeWindow]);
     const resolvedServices = useMemo(() => ({
-        ...reportBuilderServices,
+        ...scopedServices,
         windowState: runtimeWindow,
         __connectorRuntime: {
             endpoints,
@@ -1324,7 +1341,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             transport: services.dataConnectorTransport,
             prepareRequest: prepareConnectorRequest,
         },
-    }), [reportBuilderServices, runtimeWindow, endpoints, targetContext, auth, prepareConnectorRequest]);
+    }), [scopedServices, runtimeWindow, endpoints, targetContext, auth, prepareConnectorRequest]);
     const config  = {service: {...service, uri: windowMetadataEndpoint(service.uri, baseKey, runtimeWindow), includeTargetContext: true}};
     const connector = createDataConnector(config, {
         endpoints, targetContext, auth,
@@ -1409,13 +1426,35 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             }
         }
 
-        withWindowPermissionDeadline(() => connector.get({})
+        const modelIdentity = {
+            providerIdentity: window?.providerIdentity,
+            uri: window?.resourceRef?.uri,
+            revision: window?.resourceRef?.revision,
+            target: targetContext,
+            sessionId: resolveWindowModelCacheScope(services,getActiveUIBridgeTransportContext()?.sessionId),
+        };
+        const responseInfo = {};
+        withWindowPermissionDeadline(async () => connector.get({responseInfo,ifNoneMatch:await publishedWindowConditionalETag(modelIdentity)})
             .then(async (resp) => {
                 if (cancelled || expired) return;
                 setFetchError(null);
-                const selectedDefinition = resolveWindowMetadataForTarget(resp.data, targetContext);
-                const completeMetadata = services.resourceFS
-                    ? await services.resourceFS.loadWindow(selectedDefinition) : selectedDefinition;
+                let completeMetadata;
+                const compileModel = async definition => {
+                    const selected = resolveWindowMetadataForTarget(definition, targetContext);
+                    return services.resourceFS ? services.resourceFS.loadWindow(selected) : selected;
+                };
+                const modelRequest = {...modelIdentity,hash:responseInfo.artifactHash,etag:responseInfo.etag,compile:compileModel};
+                try {
+                    completeMetadata = await admittedPublishedWindowModel({...modelRequest,definition:resp.notModified ? null : resp.data});
+                } catch (error) {
+                    if (!resp.notModified) throw error;
+                    // A concurrent eviction after the conditional GET cannot
+                    // turn an empty 304 into a usable definition.
+                    const freshInfo = {};
+                    const fresh = await connector.get({responseInfo:freshInfo,fresh:true});
+                    completeMetadata = await admittedPublishedWindowModel({...modelIdentity,hash:freshInfo.artifactHash,etag:freshInfo.etag,
+                        definition:fresh.data,compile:compileModel});
+                }
                 if (cancelled || expired) return;
                 fetchedProtectedMetadata = isProtectedWindowMetadata(completeMetadata);
                 // A signed delivery is emitted only after host OPEN admission. Its

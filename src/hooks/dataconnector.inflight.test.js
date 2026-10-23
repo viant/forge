@@ -84,6 +84,19 @@ describe('createDataConnector', () => {
         );
     });
 
+    it('sends the normal datasource input envelope on a published cohort URL', async () => {
+        global.fetch = vi.fn().mockResolvedValue({ok: true, status: 200, json: async () => ({data: []})});
+        const connector = createDataConnector({
+            service: {URL: '/v1/api/datasources/connectors/fetch?cohort=1', method: 'POST'},
+        }, {endpoints: {}, targetContext: {}, auth: {}});
+
+        await connector.get({inputParameters: {namespace: 'demo'}, filter: {status: 'active'}});
+        const [url, request] = global.fetch.mock.calls[0];
+        expect(url).toBe('/v1/api/datasources/connectors/fetch?cohort=1');
+        expect(request.headers['Content-Type']).toBe('application/json');
+        expect(JSON.parse(request.body)).toEqual({inputs: {namespace: 'demo', status: 'active'}});
+    });
+
     it('appends target context for mutation methods when requested by the service', async () => {
         global.fetch = vi.fn().mockResolvedValue({
             ok: true,
@@ -143,6 +156,31 @@ describe('createDataConnector', () => {
         expect(requested.searchParams.get('formFactor')).toBe('desktop');
         expect(requested.searchParams.get('surface')).toBe('browser');
         expect(requested.searchParams.getAll('capabilities')).toEqual(['markdown']);
+    });
+
+    it('exposes a returned artifact hash only to the current metadata caller', async () => {
+        const hash = 'a'.repeat(64);
+        global.fetch = vi.fn().mockResolvedValue({ok:true,status:200,headers:{get:name=>name==='X-Artifact-Hash'?hash:name==='ETag'?`"${hash}.cohort-v1"`:null},json:async()=>({data:{view:{content:{id:'root'}}}})});
+        const connector = createDataConnector({service:{URL:'/v1/api/agently/forge/window/records',method:'GET'}},{endpoints:{},targetContext:{},auth:{}});
+        const responseInfo = {};
+        await connector.get({responseInfo});
+        expect(responseInfo).toEqual({artifactHash:hash,etag:`"${hash}.cohort-v1"`});
+    });
+
+    it('returns a conditional 304 only to a caller that supplied the ETag', async () => {
+        const hash='a'.repeat(64),etag=`"${hash}.cohort-v1"`;
+        global.fetch=vi.fn().mockResolvedValue({ok:false,status:304,headers:{get:name=>name==='X-Artifact-Hash'?hash:name==='ETag'?etag:null}});
+        const connector=createDataConnector({service:{URL:'/v1/api/agently/forge/window/records',method:'GET'}},{endpoints:{},targetContext:{},auth:{}});
+        const responseInfo={};
+        await expect(connector.get({ifNoneMatch:etag,responseInfo})).resolves.toEqual({notModified:true});
+        expect(global.fetch.mock.calls[0][1].headers['If-None-Match']).toBe(etag);
+        expect(responseInfo).toEqual({artifactHash:hash,etag});
+    });
+
+    it('never falls back to a retained model after a conditional admission denial', async () => {
+        global.fetch=vi.fn().mockResolvedValue({ok:false,status:403,statusText:'Forbidden',headers:{get:()=>null},clone(){return this;},text:async()=> 'denied'});
+        const connector=createDataConnector({service:{URL:'/v1/api/agently/forge/window/records',method:'GET'}},{endpoints:{},targetContext:{},auth:{}});
+        await expect(connector.get({ifNoneMatch:`"${'a'.repeat(64)}.cohort-v1"`})).rejects.toThrow(/403/);
     });
 
     it('does not treat an upstream datasource 401 as an expired workspace session', async () => {
