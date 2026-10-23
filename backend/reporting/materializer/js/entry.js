@@ -112,8 +112,17 @@ import {buildReportPrintFromReportFill} from "../../../../src/reporting/reportPr
     return JSON.stringify({ reportFill, reportPrint });
   }
 
+  // Interactive preview needs the fill model. Complete print/export keeps
+  // using materialize on a fresh authorized execution.
+  export function materializeFill(inputJSON) {
+    const input = JSON.parse(inputJSON);
+    if (!isObject(input.reportSpec) || input.reportSpec.kind !== "reportSpec" || !isObject(input.datasets)) throw new Error("Trusted reportSpec and executed datasets required.");
+    const reportFill = buildReportFillFromReportSpec(input.reportSpec, input.datasets);
+    return JSON.stringify({ reportFill });
+  }
+
 export function present(inputJSON) {
  const input=JSON.parse(inputJSON);
  return JSON.stringify(applyReportChartSelections(input.reportSpec,input.chartMetricSelections));
 }
-globalThis.ForgeAuthoredLowerer = {lower, materialize, present};
+globalThis.ForgeAuthoredLowerer = {lower, materialize, materializeFill, present};

@@ -3,6 +3,7 @@ package reporting
 import (
 	"context"
 	"errors"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	identity "github.com/viant/forge/backend/resource"
 )
 
@@ -10,7 +11,9 @@ import (
 // original execution context proceeds to datasource admission or dispatch.
 func (s *Service) Compile(ctx context.Context, request *CompileRequest) (out *CompileResult, resultErr error) {
 	if s.reportCatalog != nil && s.hasResourceReader() {
+		scopeTiming := observe.Start(ctx, "report.compile.scope", observe.Labels{Kind: "report"})
 		scoped, finish, err := s.reportCatalog.MetadataRead(ctx)
+		scopeTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 		if err != nil {
 			if finish != nil {
 				err = errors.Join(err, finish())

@@ -72,6 +72,7 @@ var ForgeAuthoredLowerer = (() => {
     lower: () => lower,
     lowerWithRequestBase: () => lowerWithRequestBase,
     materialize: () => materialize,
+    materializeFill: () => materializeFill,
     present: () => present
   });
 
@@ -49345,7 +49346,7 @@ Please __addLocaleData before adding additional unit data`);
       };
     });
   }
-  function buildReportBuilderPublishedDatasetConfig(baseConfig = {}, source = null) {
+  function buildReportBuilderPublishedDatasetConfig(baseConfig = {}, source = null, { borrowBase = false } = {}) {
     var _a5;
     const normalizedSource = source && typeof source === "object" && !Array.isArray(source) ? source : null;
     if (!normalizedSource) {
@@ -49393,7 +49394,11 @@ Please __addLocaleData before adding additional unit data`);
       ...normalizeString27(column == null ? void 0 : column.format) ? { format: normalizeString27(column.format) } : {}
     })).filter((entry) => entry.id && entry.key && entry.label);
     return {
-      ...isPlainObject6(baseConfig) ? cloneValue17(baseConfig) : {},
+      // The authored lowerer only reads its invocation-local builder config.
+      // Preserve the public detached result by default; its internal read-only
+      // callers can borrow the base instead of serializing the entire builder
+      // once for every published dataset and authored block.
+      ...isPlainObject6(baseConfig) ? borrowBase ? baseConfig : cloneValue17(baseConfig) : {},
       dataSourceRef: normalizeString27((normalizedSource == null ? void 0 : normalizedSource.dataSourceRef) || (baseConfig == null ? void 0 : baseConfig.dataSourceRef)),
       dimensions,
       measures
@@ -50191,7 +50196,10 @@ Please __addLocaleData before adding additional unit data`);
     }
     const nextSpec = cloneValue18(baseSpec);
     const fieldCatalog = buildReportBuilderFieldCatalog(config);
-    const datasetFieldCatalogs = new Map(normalizeReportBuilderPublishedDataSources(config).map((source) => [source.id, buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config, source))]));
+    const datasetFieldCatalogs = new Map(normalizeReportBuilderPublishedDataSources(config).map((source) => [
+      source.id,
+      buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config, source, { borrowBase: true }))
+    ]));
     const calculatedFields = Array.isArray(nextSpec == null ? void 0 : nextSpec.calculatedFields) ? nextSpec.calculatedFields : [];
     nextSpec.calculatedFields = calculatedFields;
     const calculatedFieldIds = new Set(
@@ -51910,7 +51918,7 @@ Please __addLocaleData before adding additional unit data`);
       }
       const publishedDataset = publishedDatasetIndex.get(normalizedDatasetRef) || null;
       if (publishedDataset) {
-        const datasetConfig = buildReportBuilderPublishedDatasetConfig(effectiveConfig, publishedDataset);
+        const datasetConfig = buildReportBuilderPublishedDatasetConfig(effectiveConfig, publishedDataset, { borrowBase: true });
         return {
           config: datasetConfig,
           fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig),
@@ -67790,11 +67798,22 @@ ${indent}${end}`;
   function renderReportPrintChartBlock(state = {}, block = {}, {
     layoutNote = ""
   } = {}) {
-    var _a5, _b, _c, _d;
+    var _a5, _b, _c, _d, _e, _f, _g;
+    const datasetRef = normalizeString39(block == null ? void 0 : block.datasetRef);
+    const declared = (((_a5 = state.reportSpec) == null ? void 0 : _a5.datasets) || []).some((dataset2) => dataset2.id === datasetRef);
+    const dataset = (((_b = state.reportFill) == null ? void 0 : _b.datasets) || []).find((dataset2) => dataset2.id === datasetRef);
+    const provenance = dataset == null ? void 0 : dataset.provenance;
+    if (declared && ((_c = block == null ? void 0 : block.content) == null ? void 0 : _c.rowCount) === 0 && (provenance == null ? void 0 : provenance.hasMore) === false && (provenance == null ? void 0 : provenance.truncated) === false && Array.isArray(provenance == null ? void 0 : provenance.diagnostics) && provenance.diagnostics.length === 0) {
+      ensureReportPrintSpace(state, reportPrintTitleHeight(state, block, layoutNote) + REPORT_PRINT_THEME.bodyLineHeight);
+      renderReportPrintSectionTitle(state, block, { layoutNote });
+      renderReportPrintTextLines(state, { idPrefix: `${normalizeString39(block.id)}__empty`, lines: ["No data for the selected scope."], color: REPORT_PRINT_THEME.mutedColor });
+      finishReportPrintBlock(state);
+      return;
+    }
     const titleHeight = reportPrintTitleHeight(state, block, layoutNote);
     const chartPages = buildReportPrintChartPages({
-      chartModel: ((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.chartModel) || (block == null ? void 0 : block.chartModel) || {},
-      resolvedChart: ((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.resolvedChart) || null,
+      chartModel: ((_d = block == null ? void 0 : block.content) == null ? void 0 : _d.chartModel) || (block == null ? void 0 : block.chartModel) || {},
+      resolvedChart: ((_e = block == null ? void 0 : block.content) == null ? void 0 : _e.resolvedChart) || null,
       width: state.contentWidth,
       maxHeight: state.contentBottom - state.contentTop - titleHeight,
       firstMaxHeight: state.contentBottom - state.cursorY - titleHeight >= 180 ? state.contentBottom - state.cursorY - titleHeight : state.contentBottom - state.contentTop - titleHeight - (state.sectionHeadingHeight || 0)
@@ -67823,7 +67842,7 @@ ${indent}${end}`;
       }
       ensureReportPrintSpace(state, chartHeight);
       const svgElement = pushReportPrintElement(state, buildReportPrintSvgElement({
-        id: `${normalizeString39((block == null ? void 0 : block.id) || "chart")}__svg_page_${(_c = state.currentPage) == null ? void 0 : _c.number}`,
+        id: `${normalizeString39((block == null ? void 0 : block.id) || "chart")}__svg_page_${(_f = state.currentPage) == null ? void 0 : _f.number}`,
         kind: "svg",
         box: {
           x: state.contentLeft,
@@ -67842,7 +67861,7 @@ ${indent}${end}`;
           elementId: svgElement == null ? void 0 : svgElement.id
         });
       });
-      if ((_d = svgResult.labelDetails) == null ? void 0 : _d.length) {
+      if ((_g = svgResult.labelDetails) == null ? void 0 : _g.length) {
         renderReportPrintTextLines(state, { idPrefix: `${block.id}__labels_${pageIndex}`, lines: svgResult.labelDetails, fontSize: 9, lineHeight: 12 });
       }
       finishReportPrintBlock(state);
@@ -67979,21 +67998,40 @@ ${indent}${end}`;
     }
   }
   function keepReportPrintSectionWithNext(state, blocks, index) {
-    var _a5, _b, _c, _d;
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i;
     if (((_a5 = blocks[index]) == null ? void 0 : _a5.kind) !== "sectionBlock") return;
-    const probe = { ...state, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null, cursorY: state.contentTop };
+    let probe = { ...state, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null, cursorY: state.contentTop };
     let next = index;
     while (((_b = blocks[next]) == null ? void 0 : _b.kind) === "sectionBlock") {
       renderReportPrintBlock(probe, blocks[next], {});
       next += 1;
+    }
+    const sectionProbe = probe;
+    const firstContent = next;
+    for (let introductions = 0; introductions < 2 && ((_c = blocks[next]) == null ? void 0 : _c.kind) === "markdownBlock"; introductions += 1) {
+      const candidate = { ...probe, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null };
+      moveToReportPrintPage(candidate, 0);
+      candidate.cursorY = probe.cursorY;
+      renderReportPrintBlock(candidate, blocks[next], {});
+      if (candidate.currentPageIndex > 0 || candidate.cursorY - candidate.contentTop > (state.contentBottom - state.contentTop) / 3) break;
+      probe = candidate;
+      next += 1;
+    }
+    if (!blocks[next]) {
+      probe = sectionProbe;
+      next = firstContent;
     }
     const headingHeight = probe.cursorY - probe.contentTop;
     state.sectionHeadingHeight = Math.max(state.sectionHeadingHeight || 0, headingHeight);
     if (!blocks[next]) return;
     const contentProbe = { ...probe, sectionHeadingHeight: headingHeight, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null, cursorY: state.contentTop };
     renderReportPrintBlock(contentProbe, blocks[next], {});
-    const firstPageElements = ((_c = contentProbe.pages[0]) == null ? void 0 : _c.elements) || [];
-    const contentHeight = blocks[next].kind === "tableBlock" ? (((_d = firstPageElements.find((element) => element.id.includes("__row_rule_0"))) == null ? void 0 : _d.box.y) || state.contentTop) - state.contentTop : blocks[next].kind === "chartBlock" ? Math.min(reportPrintTitleHeight(state, blocks[next]) + 180, Math.max(0, ...firstPageElements.map((element) => element.box.y + element.box.height - state.contentTop))) : Math.max(0, ...firstPageElements.map((element) => element.box.y + element.box.height - state.contentTop));
+    const firstPageElements = ((_d = contentProbe.pages[0]) == null ? void 0 : _d.elements) || [];
+    const firstContentHeight = Math.max(0, ...firstPageElements.map((element) => element.box.y + element.box.height - state.contentTop));
+    const firstRowRule = firstPageElements.find((element) => element.id.includes("__row_rule_0"));
+    const chartType = normalizeString39(((_g = (_f = (_e = blocks[next]) == null ? void 0 : _e.content) == null ? void 0 : _f.chartModel) == null ? void 0 : _g.type) || ((_i = (_h = blocks[next]) == null ? void 0 : _h.chartModel) == null ? void 0 : _i.type)).toLowerCase();
+    const paginatedChart = blocks[next].kind === "chartBlock" && ["horizontal_bar", "funnel_bar"].includes(chartType) && contentProbe.pages.length > 1;
+    const contentHeight = blocks[next].kind === "tableBlock" && firstRowRule ? firstRowRule.box.y - state.contentTop : paginatedChart ? Math.min(reportPrintTitleHeight(state, blocks[next]) + 180, firstContentHeight) : firstContentHeight;
     ensureReportPrintSpace(state, Math.min(state.contentBottom - state.contentTop, headingHeight + contentHeight));
   }
   function buildReportPrintFromReportFill({
@@ -68208,10 +68246,16 @@ ${indent}${end}`;
     if (!reportPrint) throw new Error("Trusted report print materialization failed.");
     return JSON.stringify({ reportFill, reportPrint });
   }
+  function materializeFill(inputJSON) {
+    const input = JSON.parse(inputJSON);
+    if (!isObject(input.reportSpec) || input.reportSpec.kind !== "reportSpec" || !isObject(input.datasets)) throw new Error("Trusted reportSpec and executed datasets required.");
+    const reportFill = buildReportFillFromReportSpec(input.reportSpec, input.datasets);
+    return JSON.stringify({ reportFill });
+  }
   function present(inputJSON) {
     const input = JSON.parse(inputJSON);
     return JSON.stringify(applyReportChartSelections(input.reportSpec, input.chartMetricSelections));
   }
-  globalThis.ForgeAuthoredLowerer = { lower, materialize, present };
+  globalThis.ForgeAuthoredLowerer = { lower, materialize, materializeFill, present };
   return __toCommonJS(entry_exports);
 })();

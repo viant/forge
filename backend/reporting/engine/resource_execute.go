@@ -10,6 +10,7 @@ import (
 
 	dssvc "github.com/viant/forge/backend/datasource"
 	dsproto "github.com/viant/forge/backend/datasource/contract"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	"github.com/viant/forge/backend/reporting/materializer"
 	"github.com/viant/forge/backend/reporting/registry"
 	requestctx "github.com/viant/forge/backend/requestctx"
@@ -28,6 +29,9 @@ type admittedReportDefinition struct {
 }
 
 type ExecuteResourceRequest struct {
+	// FillOnly projects interactive preview output; it does not change dataset
+	// planning, authority, or business-source dispatch. Default output is full.
+	FillOnly bool `json:"fillOnly,omitempty"`
 	// DatasetFetchMode defaults to complete for backward compatibility. Page
 	// returns one producer page and preserves its completeness metadata; complete
 	// follows only the continuation contract declared by the approved datasource.
@@ -70,6 +74,8 @@ func (s *Service) SetResourceDatasetExecutor(execute ResourceDatasetExecutor) {
 	}
 }
 func (s *Service) ExecuteResource(ctx context.Context, request *ExecuteResourceRequest) (out *ExecuteResourceResult, resultErr error) {
+	entryTiming := observe.Start(ctx, "report.resource.entry", observe.Labels{Kind: "report"})
+	defer func() { entryTiming.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	if s != nil && s.reportCatalog != nil && s.hasResourceReader() {
 		scoped, finish, err := s.reportCatalog.MetadataRead(ctx)
 		if err != nil {
@@ -88,7 +94,9 @@ func (s *Service) ExecuteResource(ctx context.Context, request *ExecuteResourceR
 	}
 	return s.executeResourceUnscoped(ctx, request)
 }
-func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteResourceRequest) (*ExecuteResourceResult, error) {
+func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteResourceRequest) (output *ExecuteResourceResult, resultErr error) {
+	totalTiming := observe.Start(ctx, "report.resource.total", observe.Labels{Kind: "report"})
+	defer func() { totalTiming.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	if request == nil || !s.hasResourceReader() || s.resourceDatasetExecutor == nil {
 		return nil, identity.ErrResourceDenied
 	}
@@ -116,7 +124,9 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 	pin := cloneResolvedResource(request.ResolvedResource)
 	// Select and deliver through one admitted read; no discarded definition.
 	original := cloneResolvedResource(pin)
+	selectTiming := observe.Start(ctx, "report.resource.select", observe.Labels{Kind: "report"})
 	admittedRaw, pin, err := selectResourceRead(ctx, resolver, ref, pin)
+	selectTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +144,9 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 			return nil, err
 		}
 	}
+	compileTiming := observe.Start(ctx, "report.resource.compile", observe.Labels{Kind: "report"})
 	compiled, err := s.Compile(ctx, &CompileRequest{DependencyPins: dependencyPins, DependencyToken: dependencyToken, ResolvedResource: pin, Parameters: request.Parameters})
+	compileTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, err
 	}
@@ -186,9 +198,19 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 	}
 	// Compile has already revalidated the complete original child mapping;
 	// publication revalidates it again after all managing-MCP data dispatch.
-	if err = check(); err != nil {
+	precheckTiming := observe.Start(ctx, "report.resource.precheck", observe.Labels{Kind: "report"})
+	err = check()
+	precheckTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
+	if err != nil {
 		return nil, err
 	}
+	planTiming := observe.Start(ctx, "report.resource.plan", observe.Labels{Kind: "report"})
+	planPending := true
+	defer func() {
+		if planPending {
+			planTiming.End(observe.OutcomeFor(resultErr), observe.CacheUnknown)
+		}
+	}()
 	var spec struct {
 		Datasets []struct {
 			ID             string                       `json:"id"`
@@ -315,8 +337,11 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 	if err != nil {
 		return nil, err
 	}
+	planTiming.End(observe.OK, observe.CacheUnknown)
+	planPending = false
 	fetched := make([]*dsproto.FetchResult, len(plans))
 	fetchedPayloads := make([]json.RawMessage, len(plans))
+	fetchTiming := observe.Start(ctx, "report.resource.fetch", observe.Labels{Kind: "report"})
 	err = runReportDatasetPlans(ctx, len(plans), s.resourceDatasetConcurrency, func(datasetCtx context.Context, index int) error {
 		plan := plans[index]
 		checkPage := func() error {
@@ -359,6 +384,7 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 		fetched[index], fetchedPayloads[index] = result, payload
 		return nil
 	})
+	fetchTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, err
 	}
@@ -369,11 +395,21 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 		results[plan.id] = fetched[index]
 		payloads[plan.id] = fetchedPayloads[index]
 	}
-	artifacts, err := materializer.Materialize(ctx, effectiveSpec, payloads)
+	materializeTiming := observe.Start(ctx, "report.resource.materialize", observe.Labels{Kind: "report"})
+	var artifacts *materializer.Artifacts
+	if request.FillOnly {
+		artifacts, err = materializer.MaterializeFill(ctx, effectiveSpec, payloads)
+	} else {
+		artifacts, err = materializer.Materialize(ctx, effectiveSpec, payloads)
+	}
+	materializeTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, err
 	}
-	if err = finalCheck(); err != nil {
+	finalTiming := observe.Start(ctx, "report.resource.final", observe.Labels{Kind: "report"})
+	err = finalCheck()
+	finalTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
+	if err != nil {
 		return nil, err
 	}
 	return &ExecuteResourceResult{DependencyPins: cloneDependencyPins(compiled.DependencyPins), DependencyToken: compiled.DependencyToken, Resource: cloneResolvedResource(pin), ReportSpec: cloneJSON(effectiveSpec), ReportFill: artifacts.ReportFill, ReportPrint: artifacts.ReportPrint, Datasets: results}, nil
