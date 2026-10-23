@@ -556,3 +556,18 @@ export function resolveChartBarRadius(width, height) {
     return Number.isFinite(w) && Number.isFinite(h)
         ? Math.min(CHART_BAR_END_RADIUS, w / 2, h / 2) : 0;
 }
+
+// Corner order matches Recharts: top-left, top-right, bottom-right, bottom-left.
+// Keep the origin/zero edge square; round only the end away from the baseline.
+export function resolveChartBarCornerRadii(value, orientation = 'horizontal', radius = CHART_BAR_END_RADIUS) {
+    const negative = Number(value) < 0;
+    if (orientation === 'vertical') return negative ? [0, 0, radius, radius] : [radius, radius, 0, 0];
+    return negative ? [radius, 0, 0, radius] : [0, radius, radius, 0];
+}
+
+export function buildChartBarPath({x, y, width, height, value, orientation = 'horizontal'}) {
+    if (![x,y,width,height].every(Number.isFinite) || width <= 0 || height <= 0) return '';
+    const [tl,tr,br,bl] = resolveChartBarCornerRadii(value,orientation,resolveChartBarRadius(width,height));
+    const right=x+width,bottom=y+height,k=0.5522847498307936;
+    return `M ${x+tl} ${y} L ${right-tr} ${y} C ${right-tr+k*tr} ${y} ${right} ${y+tr-k*tr} ${right} ${y+tr} L ${right} ${bottom-br} C ${right} ${bottom-br+k*br} ${right-br+k*br} ${bottom} ${right-br} ${bottom} L ${x+bl} ${bottom} C ${x+bl-k*bl} ${bottom} ${x} ${bottom-bl+k*bl} ${x} ${bottom-bl} L ${x} ${y+tl} C ${x} ${y+tl-k*tl} ${x+tl-k*tl} ${y} ${x+tl} ${y} Z`;
+}

@@ -45959,6 +45959,10 @@ Please __addLocaleData before adding additional unit data`);
         presentation: String(entry.presentation || "").trim(),
         semanticRef: String(entry.semanticRef || "").trim(),
         options: Array.isArray(entry.options) ? clone2(entry.options) : void 0,
+        optionsDataSourceRef: String(entry.optionsDataSourceRef || "").trim(),
+        optionsFetchMode: String(entry.optionsFetchMode || "").trim(),
+        optionValueField: String(entry.optionValueField || "").trim(),
+        optionLabelField: String(entry.optionLabelField || "").trim(),
         default: entry.default !== void 0 ? clone2(entry.default) : void 0,
         paramPath: String(entry.paramPath || "").trim(),
         startParamPath: String(entry.startParamPath || "").trim(),
@@ -46054,6 +46058,9 @@ Please __addLocaleData before adding additional unit data`);
     }
     if (predicate.options !== void 0) {
       filter.options = clone2(predicate.options);
+    }
+    for (const field of ["optionsDataSourceRef", "optionsFetchMode", "optionValueField", "optionLabelField"]) {
+      if (predicate[field]) filter[field] = predicate[field];
     }
     if (predicate.default !== void 0) {
       filter.default = clone2(predicate.default);
@@ -54074,6 +54081,17 @@ Please __addLocaleData before adding additional unit data`);
     const w2 = Math.abs(Number(width)), h4 = Math.abs(Number(height));
     return Number.isFinite(w2) && Number.isFinite(h4) ? Math.min(CHART_BAR_END_RADIUS, w2 / 2, h4 / 2) : 0;
   }
+  function resolveChartBarCornerRadii(value, orientation = "horizontal", radius = CHART_BAR_END_RADIUS) {
+    const negative = Number(value) < 0;
+    if (orientation === "vertical") return negative ? [0, 0, radius, radius] : [radius, radius, 0, 0];
+    return negative ? [radius, 0, 0, radius] : [0, radius, radius, 0];
+  }
+  function buildChartBarPath({ x: x2, y: y4, width, height, value, orientation = "horizontal" }) {
+    if (![x2, y4, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return "";
+    const [tl, tr, br, bl] = resolveChartBarCornerRadii(value, orientation, resolveChartBarRadius(width, height));
+    const right = x2 + width, bottom = y4 + height, k2 = 0.5522847498307936;
+    return `M ${x2 + tl} ${y4} L ${right - tr} ${y4} C ${right - tr + k2 * tr} ${y4} ${right} ${y4 + tr - k2 * tr} ${right} ${y4 + tr} L ${right} ${bottom - br} C ${right} ${bottom - br + k2 * br} ${right - br + k2 * br} ${bottom} ${right - br} ${bottom} L ${x2 + bl} ${bottom} C ${x2 + bl - k2 * bl} ${bottom} ${x2} ${bottom - bl + k2 * bl} ${x2} ${bottom - bl} L ${x2} ${y4 + tl} C ${x2} ${y4 + tl - k2 * tl} ${x2 + tl - k2 * tl} ${y4} ${x2 + tl} ${y4} Z`;
+  }
 
   // src/reporting/reportFillChartPayload.js
   function normalizeString30(value = "") {
@@ -59746,7 +59764,7 @@ ${indent}${end}`;
           const fillColor = resolveSeriesPointColor(series, point.value, series.color);
           const label = shouldRenderReportPrintSeriesDataLabels(series, supportedType, rows.length) ? `<text x="${x2 + drawnBarWidth / 2}" y="${y4 - 4}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(point.value, series.format))}</text>` : "";
           return `
-          <rect x="${x2}" y="${y4}" width="${drawnBarWidth}" height="${barHeight}" rx="${resolveChartBarRadius(drawnBarWidth, barHeight)}" fill="${escapeXml(fillColor)}" />
+          <path class="forge-chart-bar" d="${buildChartBarPath({ x: x2, y: y4, width: drawnBarWidth, height: barHeight, value: point.value, orientation: "vertical" })}" fill="${escapeXml(fillColor)}" />
           ${label}
         `;
         }).join("\n");
@@ -59919,7 +59937,7 @@ ${indent}${end}`;
       const fillColor = printColor(resolveCategoryColor((_a5 = chartModel == null ? void 0 : chartModel.series) == null ? void 0 : _a5.categoryColors, readChartDataValue(row, xAxisKey), resolveSeriesPointColor(series, value, series.color)));
       const valueLabel = shouldRenderReportPrintSeriesDataLabels(series, "horizontal_bar", rows.length) ? `<text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(value, series.format))}</text>` : "";
       return `
-        <rect x="${x2}" y="${barY}" width="${barWidth}" height="${perSeriesHeight}" rx="${resolveChartBarRadius(barWidth, perSeriesHeight)}" fill="${escapeXml(fillColor)}" />
+        <path class="forge-chart-bar" d="${buildChartBarPath({ x: x2, y: barY, width: barWidth, height: perSeriesHeight, value })}" fill="${escapeXml(fillColor)}" />
         ${valueLabel}
       `;
     }).join("\n")).join("\n");

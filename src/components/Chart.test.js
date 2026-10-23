@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 
 import {
     resolveChartBarRadius,
+    resolveChartBarCornerRadii,
+    buildChartBarPath,
     aggregateDirectSeriesData,
     orderHorizontalChartRows,
     applyChartRowLimit,
@@ -384,3 +386,14 @@ assert.equal(serverRankedCosts[0].publisher,'Lowest CPM','Chart sorting must not
 for (const [width,height,radius] of [[100,12,6],[2,12,1],[-40,12,6],[0,12,0],[NaN,12,0],[Infinity,12,0]]) {
  assert.equal(resolveChartBarRadius(width,height),radius);
 }
+
+assert.deepEqual(resolveChartBarCornerRadii(5,'horizontal',6),[0,6,6,0]);
+assert.deepEqual(resolveChartBarCornerRadii(-5,'horizontal',6),[6,0,0,6]);
+assert.deepEqual(resolveChartBarCornerRadii(5,'vertical',6),[6,6,0,0]);
+assert.deepEqual(resolveChartBarCornerRadii(-5,'vertical',6),[0,0,6,6]);
+const rightTip=buildChartBarPath({x:10,y:20,width:100,height:12,value:5});
+assert.match(rightTip,/^M 10 20 L 104 20 C /);
+assert.match(rightTip,/L 10 32 C 10 32 10 32 10 32 L 10 20 C 10 20 10 20 10 20 Z$/,'Origin side must be a flat full-height edge');
+const leftTip=buildChartBarPath({x:10,y:20,width:100,height:12,value:-5});
+assert.match(leftTip,/L 110 20 C 110 20 110 20 110 20 L 110 32/,'Negative origin side must stay flat at the right');
+assert.equal(buildChartBarPath({x:0,y:0,width:0,height:12,value:0}),'');
