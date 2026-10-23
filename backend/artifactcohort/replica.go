@@ -81,6 +81,7 @@ type Replica struct {
 	syncMu        sync.Mutex
 	mu            sync.RWMutex
 	latest        Manifest
+	persistedHash string // guarded by syncMu; last successfully saved complete manifest
 	store         *authz.StaticStore
 	partitions    map[string]*partitionState
 	admissions    map[string]admission
@@ -410,6 +411,7 @@ func (r *Replica) Sync(ctx context.Context) (syncErr error) {
 			if matchingTenant {
 				prior = candidate
 				loadedCandidate = true
+				r.persistedHash = candidate.Hash
 			}
 		}
 	}
@@ -578,12 +580,13 @@ func (r *Replica) Sync(ctx context.Context) (syncErr error) {
 	if len(failed) > 0 {
 		return firstPartitionError(failed)
 	}
-	if r.cfg.ManifestStore != nil && !unchanged {
+	if r.cfg.ManifestStore != nil && manifest.Hash != r.persistedHash {
 		saveTiming := timing(ctx, phaseManifestSave, r.cfg.Source, "")
 		if err := r.cfg.ManifestStore.Save(ctx, r.cfg.Source, r.cfg.Tenant, r.cfg.Account, manifest); err != nil {
 			saveTiming.End(timingOutcome(err), observe.CacheMiss)
 			return err
 		}
+		r.persistedHash = manifest.Hash
 		saveTiming.End(observe.OK, observe.CacheMiss)
 	}
 	return nil

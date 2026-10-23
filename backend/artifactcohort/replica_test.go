@@ -54,6 +54,37 @@ type fakeCaller struct {
 	release   chan struct{}
 }
 
+type countedManifestStore struct {
+	mu    sync.Mutex
+	value Manifest
+	saves int
+}
+
+func (s *countedManifestStore) Load(context.Context, string, string, string) (Manifest, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.saves == 0 {
+		return Manifest{}, ErrUnavailable
+	}
+	return CloneManifest(s.value)
+}
+func (s *countedManifestStore) Save(_ context.Context, _, _, _ string, value Manifest) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cloned, err := CloneManifest(value)
+	if err != nil {
+		return err
+	}
+	s.value = cloned
+	s.saves++
+	return nil
+}
+func (s *countedManifestStore) snapshot() (string, int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.value.Hash, s.saves
+}
+
 func (f *fakeCaller) Discover(context.Context) (Manifest, error) {
 	f.mu.Lock()
 	f.discovers++
@@ -176,6 +207,65 @@ func TestReplicaStartupLocalAdmissionAndHashReconnect(t *testing.T) {
 	}
 	if caller.compact != 1 {
 		t.Fatal("same-hash reconnect did not use compact discovery")
+	}
+}
+
+func TestReplicaPersistsActivatedManifestAfterCompactRetry(t *testing.T) {
+	p := fixturePublisher(t, `{"window":"sales"}`)
+	caller := &fakeCaller{publisher: p, fetches: map[string]int{}}
+	store := &countedManifestStore{}
+	r, err := NewReplica(Config{Enabled: true, Source: "studio-management", Tenant: "tenant", Account: "account-a", Caller: caller, Facts: fixtureFacts{}, SessionKey: fixtureSession, ManifestStore: store})
+	if err != nil {
+		t.Fatal(err)
+	}
+	actor := actorContext("alice", "operator")
+	if err = r.Sync(actor); err != nil {
+		t.Fatal(err)
+	}
+	oldHash, saves := store.snapshot()
+	if oldHash == "" || saves != 1 {
+		t.Fatalf("initial catalog not persisted: hash=%q saves=%d", oldHash, saves)
+	}
+	uri := "intent://sales/main"
+	if _, _, err = p.Publish(actor, RootRef{URI: uri, Kind: "intent", Version: 2}, json.RawMessage(`{"intent":"changed"}`), allowPublished); err != nil {
+		t.Fatal(err)
+	}
+	caller.mu.Lock()
+	caller.blockURI = uri
+	caller.entered = make(chan struct{}, 1)
+	caller.release = make(chan struct{})
+	entered, release := caller.entered, caller.release
+	caller.mu.Unlock()
+	first := make(chan error, 1)
+	go func() { first <- r.Sync(actor) }()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("changed partition was not staged")
+	}
+	r.MarkDisconnected() // notification arrives while changed bytes stage
+	close(release)
+	if err = <-first; !errors.Is(err, ErrUnavailable) {
+		t.Fatalf("raced activation did not fail closed: %v", err)
+	}
+	if got, count := store.snapshot(); got != oldHash || count != 1 {
+		t.Fatalf("failed activation persisted candidate: hash=%q saves=%d", got, count)
+	}
+	if err = r.Sync(actor); err != nil {
+		t.Fatalf("compact retry failed: %v", err)
+	}
+	want, err := p.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, count := store.snapshot(); got != want.Hash || count != 2 || caller.compact < 1 {
+		t.Fatalf("compact retry did not persist activated index: got=%q want=%q saves=%d compact=%d", got, want.Hash, count, caller.compact)
+	}
+	if err = r.Sync(actor); err != nil {
+		t.Fatal(err)
+	}
+	if _, count := store.snapshot(); count != 2 {
+		t.Fatalf("unchanged poll rewrote verified manifest: saves=%d", count)
 	}
 }
 func TestFailedSalesIntentPartitionDoesNotBlockSalesWindowOrOpsIntent(t *testing.T) {
