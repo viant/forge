@@ -4,6 +4,26 @@ package primitive
 
 import "testing"
 
+func TestPlaybookAndLegacyIntentKeepExactResourceIdentity(t *testing.T) {
+	for _, kind := range []string{"playbook", "intent"} {
+		methods := Methods(kind, []string{"list", "get"})
+		if Kind(Plural(kind)) != kind || methods["get"] != kind+"s/get" {
+			t.Fatalf("unexpected methods for %s: %#v", kind, methods)
+		}
+		body := []byte(`{"resources":[{"uri":"` + kind + `://sales/analysis","kind":"` + kind + `"}],"complete":true}`)
+		if _, err := DecodeList(body, kind); err != nil {
+			t.Fatal(err)
+		}
+		other := "intent"
+		if kind == other {
+			other = "playbook"
+		}
+		if _, err := DecodeList(body, other); err == nil {
+			t.Fatal("renaming must not reinterpret an authorized resource URI")
+		}
+	}
+}
+
 func TestNavigationMethodContract(t *testing.T) {
 	if got := Plural("navigation"); got != "navigations" {
 		t.Fatalf("navigation plural = %q", got)
