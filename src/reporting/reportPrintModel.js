@@ -689,7 +689,7 @@ function wrapReportPrintText(text = "", width = 0, fontSize = REPORT_PRINT_THEME
   if (!normalized) {
     return [];
   }
-  const maxChars = Math.max(8, Math.floor(Math.max(1, width) / Math.max(4, fontSize * 0.56)));
+  const maxChars = Math.max(1, Math.floor(Math.max(1, width) / Math.max(4, fontSize * 0.56)));
   const wrapped = [];
   normalized.split("\n").forEach((line) => {
     const trimmedLine = line.trim();

@@ -82,6 +82,9 @@ func emitRenderPlan(plan *renderPlan, options Options) (*RenderResult, error) {
 		Size:           size,
 	})
 	doc.SetMargins(0, 0, 0)
+	// Canonical text boxes already include their padding. FPDF's implicit
+	// cell margin would narrow them again and re-wrap measured header lines.
+	doc.SetCellMargin(0)
 	doc.SetAutoPageBreak(false, 0)
 	doc.SetCatalogSort(true)
 	doc.SetCompression(false)
