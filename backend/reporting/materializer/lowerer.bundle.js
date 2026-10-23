@@ -46874,6 +46874,9 @@ Please __addLocaleData before adding additional unit data`);
     if (chartFamilyForType(normalized) === "cartesian") return true;
     return normalized === "horizontal_bar";
   }
+  function chartFamilyAllowsSeriesDimension(type = "") {
+    return chartFamilyForType(type) === "cartesian" || String(type || "").trim().toLowerCase() === "horizontal_bar";
+  }
   function isValidPerSeriesType(chartType = "", perSeriesType = "") {
     const family = chartFamilyForType(chartType);
     const normalized = String(perSeriesType || "").trim().toLowerCase();
@@ -47516,9 +47519,9 @@ Please __addLocaleData before adding additional unit data`);
       if (!universe.has(normalized.seriesField)) {
         return null;
       }
-      if (family === "category") {
+      if (!chartFamilyAllowsSeriesDimension(normalized.type)) {
         delete normalized.seriesField;
-      } else if (family === "cartesian" && normalized.yFields.length > 1) {
+      } else if (normalized.yFields.length > 1) {
         delete normalized.seriesField;
       } else if (normalized.seriesField === normalized.xField) {
         delete normalized.seriesField;
@@ -47745,9 +47748,9 @@ Please __addLocaleData before adding additional unit data`);
       if (normalized.seriesField === normalized.xField) {
         errors.push({ field: "seriesField", code: "duplicateField" });
       }
-      if (family === "category") {
+      if (!chartFamilyAllowsSeriesDimension(normalized.type)) {
         errors.push({ field: "seriesField", code: "notAllowed" });
-      } else if (family === "cartesian") {
+      } else {
         if (Array.isArray(normalized.yFields) && normalized.yFields.length > 1) {
           errors.push({ field: "seriesField", code: "tooManyMeasures" });
         }
@@ -47764,7 +47767,7 @@ Please __addLocaleData before adding additional unit data`);
         errors.push({ field: "seriesOptions", code: "notAllowed" });
       }
     }
-    const canValidateSeriesOptionsEntries = !!normalized.seriesOptions && typeof normalized.seriesOptions === "object" && !(normalized.seriesField && family === "cartesian") && !!chartFamilyAllowsSeriesOptions(normalized.type);
+    const canValidateSeriesOptionsEntries = !!normalized.seriesOptions && typeof normalized.seriesOptions === "object" && !(normalized.seriesField && chartFamilyAllowsSeriesDimension(normalized.type)) && !!chartFamilyAllowsSeriesOptions(normalized.type);
     if (canValidateSeriesOptionsEntries) {
       const ySet = new Set(Array.isArray(normalized.yFields) ? normalized.yFields : []);
       const stackAxis = /* @__PURE__ */ new Map();
@@ -47986,7 +47989,7 @@ Please __addLocaleData before adding additional unit data`);
     const suggestSeriesField = (options == null ? void 0 : options.suggestSeriesField) === true;
     const seededYFields = Array.isArray(normalizedSeed.yFields) && normalizedSeed.yFields.length > 0 ? normalizedSeed.yFields : defaultYField ? [defaultYField] : [];
     const yFields = SINGLE_MEASURE_CATEGORY_TYPES.has(type) ? seededYFields.slice(0, 1) : seededYFields;
-    const allowSeriesField = family === "cartesian" && yFields.length === 1;
+    const allowSeriesField = chartFamilyAllowsSeriesDimension(type) && yFields.length === 1;
     const seriesField = allowSeriesField ? normalizedSeed.seriesField || (suggestSeriesField ? (_d = dimensions.find((entry) => entry.key !== xField)) == null ? void 0 : _d.key : null) || null : null;
     const allowSeriesOptions = chartFamilyAllowsSeriesOptions(type) && !seriesField;
     const seriesOptions = allowSeriesOptions ? normalizedSeed.seriesOptions : null;
@@ -48437,7 +48440,7 @@ Please __addLocaleData before adding additional unit data`);
         format: (_b = yMeasures[0]) == null ? void 0 : _b.format
       }
     };
-    if (family === "cartesian" && normalized.seriesField && yMeasures.length === 1) {
+    if (chartFamilyAllowsSeriesDimension(seriesType) && normalized.seriesField && yMeasures.length === 1) {
       const yMeasure = yMeasures[0];
       const seriesDimension = resolveReportBuilderDimensionByField(config, normalized.seriesField);
       const seriesDisplayKey = resolveReportBuilderDimensionDisplayKey(seriesDimension) || normalized.seriesField;

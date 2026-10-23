@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
     ALL_SUPPORTED_CHART_TYPES,
     chartFamilyAllowsSeriesOptions,
+    chartFamilyAllowsSeriesDimension,
     chartFamilyForType,
     chartFamilyHelperText,
     chartTypeLabel,
@@ -46,3 +47,6 @@ assert.equal(
 );
 
 console.log("reportBuilderChartRules ✓");
+
+for(const type of ["line","area","bar","horizontal_bar"]) assert.equal(chartFamilyAllowsSeriesDimension(type),true);
+for(const type of ["pie","donut","funnel_bar","unknown"]) assert.equal(chartFamilyAllowsSeriesDimension(type),false);
