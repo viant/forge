@@ -38,6 +38,23 @@ func (c *managedClient) Initialize(ctx context.Context, options ...mcpclient.Req
 	return client.Initialize(ctx, options...)
 }
 
+// NegotiatedServer reuses the active client's completed handshake without a
+// network RPC. Clients lacking this optional capability retain Initialize.
+func (c *managedClient) NegotiatedServer() (*mcpschema.InitializeResult, error) {
+	client, release, err := c.use()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	negotiated, ok := client.(interface {
+		NegotiatedServer() (*mcpschema.InitializeResult, error)
+	})
+	if !ok {
+		return nil, fmt.Errorf("managed MCP client has no negotiated handshake")
+	}
+	return negotiated.NegotiatedServer()
+}
+
 func (c *managedClient) Discover(ctx context.Context, options ...mcpclient.RequestOption) (*mcpschema.DiscoverResult, error) {
 	client, release, err := c.use()
 	if err != nil {

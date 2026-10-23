@@ -12,6 +12,7 @@ import (
 	"time"
 
 	primitive "github.com/viant/forge/backend/provider/contract"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	requestctx "github.com/viant/forge/backend/requestctx"
 	identity "github.com/viant/forge/backend/resource"
 	cfg "github.com/viant/mcp/client/config"
@@ -32,6 +33,8 @@ func (g *Gateway) cachedDefinitionGet(ctx context.Context, actor identity.Verifi
 	// Otherwise preserve the managing server's existing fresh-read behavior.
 	declared := binding.options.ResourceCacheScopes[uri.Namespace+"/"+uri.Kind] != "" || binding.options.ResourceCacheScopes[uri.Namespace] != "" || binding.options.ResourceCacheScopes["*"] != ""
 	if !declared && (ref.Revision == "" || ref.Revision == identity.WorkingCandidate) {
+		bypass := observe.Start(ctx, "gateway.definition.cache.undeclared", observe.Labels{})
+		bypass.End(observe.OK, observe.CacheBypass)
 		result, err := load(ctx)
 		return result, nil, err
 	}
@@ -54,6 +57,8 @@ func (g *Gateway) cachedDefinitionGet(ctx context.Context, actor identity.Verifi
 			return primitive.GetResult{}, nil, err
 		}
 		if !cacheable {
+			bypass := observe.Start(ctx, "gateway.definition.cache.credential_bypass", observe.Labels{})
+			bypass.End(observe.OK, observe.CacheBypass)
 			result, err := load(ctx)
 			return result, nil, err
 		}
@@ -79,6 +84,8 @@ func (g *Gateway) cachedDefinitionGet(ctx context.Context, actor identity.Verifi
 		}
 	}
 	entry += targetSuffix
+	attempt := observe.Start(ctx, "gateway.definition.cache.attempt", observe.Labels{})
+	attempt.End(observe.OK, observe.CacheUnknown)
 	value, err := g.Manager.VisibleCatalogEntryInPartition(ctx, key, partition, entry, func(ctx context.Context) (json.RawMessage, time.Time, error) {
 		result, err := load(ctx)
 		if err != nil {
