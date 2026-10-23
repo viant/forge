@@ -3304,6 +3304,35 @@ const selectedSectionRuntimeHtml = renderToStaticMarkup(React.createElement(Repo
 assert.match(selectedSectionRuntimeHtml, /Second section body/);
 assert.doesNotMatch(selectedSectionRuntimeHtml, /First section body/);
 
+const transitioningSectionHtml = renderToStaticMarkup(React.createElement(ReportRuntime, {
+  reportSpec: {title: "Section transition", layoutIntent: {blockOrder: ["tabs", "first", "firstBody", "second", "secondBody"]}, blocks: [], datasets: []},
+  reportFill: {diagnostics: [], datasets: [], blocks: [
+    {id: "tabs", kind: "tabGroupBlock", sectionIds: ["first", "second"], defaultSectionId: "first", includeUnlistedSections: false},
+    {id: "first", kind: "sectionBlock", title: "First", blockIds: ["firstBody"]},
+    {id: "firstBody", kind: "markdownBlock", content: {markdown: "Old first rows"}},
+    {id: "second", kind: "sectionBlock", title: "Second", blockIds: ["secondBody"]},
+    {id: "secondBody", kind: "markdownBlock", content: {markdown: "Old second rows"}},
+  ]},
+  selectedSectionId: "second", sectionLoading: true, presentationMode: "report",
+}));
+assert.match(transitioningSectionHtml, /Loading section/);
+assert.match(transitioningSectionHtml, /aria-busy="true"/);
+assert.doesNotMatch(transitioningSectionHtml, /Old first rows|Old second rows/);
+const failedSectionHtml = renderToStaticMarkup(React.createElement(ReportRuntime, {
+  reportSpec: {title: "Section transition", layoutIntent: {blockOrder: ["tabs", "first", "firstBody", "second", "secondBody"]}, blocks: [], datasets: []},
+  reportFill: {diagnostics: [], datasets: [], blocks: [
+    {id: "tabs", kind: "tabGroupBlock", sectionIds: ["first", "second"], defaultSectionId: "first", includeUnlistedSections: false},
+    {id: "first", kind: "sectionBlock", title: "First", blockIds: ["firstBody"]},
+    {id: "firstBody", kind: "markdownBlock", content: {markdown: "Old first rows"}},
+    {id: "second", kind: "sectionBlock", title: "Second", blockIds: ["secondBody"]},
+    {id: "secondBody", kind: "markdownBlock", content: {markdown: "Old second rows"}},
+  ]},
+  selectedSectionId: "second", sectionError: "Section unavailable", onSectionRetry: () => {}, presentationMode: "report",
+}));
+assert.match(failedSectionHtml, /Section unavailable/);
+assert.match(failedSectionHtml, /Retry section/);
+assert.doesNotMatch(failedSectionHtml, /Old first rows|Old second rows/);
+
 const compositeRuntimeHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
     reportSpec: {
