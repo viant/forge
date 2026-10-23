@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +13,29 @@ import (
 	primitive "github.com/viant/forge/backend/provider/contract"
 	identity "github.com/viant/forge/backend/resource"
 )
+
+func TestExtensionEntryPredicateDoesNotPublishSupportingFiles(t *testing.T) {
+	root := t.TempDir()
+	extensionWrite(t, root, "playbooks/review.md", "declared-root")
+	extensionWrite(t, root, "playbooks/README.md", "support")
+	extensionWrite(t, root, "playbooks/references/request.user.md", "support")
+	var inspected []string
+	directory := ExtensionDirectory{Kind: "playbook", Namespace: "workspace", Directory: "playbooks", FormatVersion: 1, Suffixes: []string{".md"}, Load: extensionJSON,
+		IncludeFile: func(ctx context.Context, reader *ExtensionReader, file string) (bool, error) {
+			inspected = append(inspected, file)
+			raw, err := reader.ReadFile(ctx, file)
+			return string(raw) == "declared-root", err
+		}}
+	definitions, err := SnapshotExtensionDefinitions(context.Background(), root, []ExtensionDirectory{directory})
+	require.NoError(t, err)
+	require.Len(t, inspected, 3)
+	require.Len(t, definitions, 1)
+	require.Equal(t, "playbook://workspace/review", definitions[0].URI)
+	invalid := errors.New("declared root is invalid")
+	directory.IncludeFile = func(context.Context, *ExtensionReader, string) (bool, error) { return false, invalid }
+	_, err = SnapshotExtensionDefinitions(context.Background(), root, []ExtensionDirectory{directory})
+	require.ErrorIs(t, err, invalid)
+}
 
 func extensionWrite(t *testing.T, root, name, data string) {
 	t.Helper()
