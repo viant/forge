@@ -51,6 +51,7 @@ export default defineConfig({
       'src/components/Editor.formBinding.render.test.jsx',
       'src/components/WindowContent.fetchQueue.test.jsx',
       'src/components/WindowContent.lazyOptions.render.test.jsx',
+      'src/components/dashboard/reportBuilderLazyFilterChoices.render.test.jsx',
       'src/components/DataSource.spread.render.test.jsx',
       'src/components/DataSource.aggregateOffset.render.test.jsx',
       'src/components/primitives/EditableCollection.readiness.render.test.jsx',

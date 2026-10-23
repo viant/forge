@@ -402,6 +402,7 @@ export function useReportRuntimePreviewDatasetPayloads({
   datasets = [],
   requestKey = "",
   fetcherOptions = null,
+  retainResolvedRequests = false,
 } = {}) {
   const [state, setState] = React.useState(buildIdleReportRuntimePreviewDatasetPayloadState);
   const [progress, setProgress] = React.useState(null);
@@ -414,6 +415,10 @@ export function useReportRuntimePreviewDatasetPayloads({
   datasetsRef.current = datasets;
   const fetcherOptionsRef = React.useRef(fetcherOptions);
   fetcherOptionsRef.current = fetcherOptions;
+  // A mounted tabbed report may revisit a completed section under the same
+  // exact request. Keep only a few results within this component's lifetime;
+  // manual refresh and scope changes produce different request keys.
+  const resolvedRequestsRef = React.useRef(new Map());
   React.useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -448,6 +453,14 @@ export function useReportRuntimePreviewDatasetPayloads({
       }
       setProgress(null);
       return undefined;
+    }
+    if (retainResolvedRequests) {
+      const previous = resolvedRequestsRef.current.get(normalizedRequestKey);
+      if (previous?.freshResultRequestKey === normalizedRequestKey) {
+        if (stateRef.current.requestKey !== normalizedRequestKey || stateRef.current.loading) setState(previous);
+        setProgress(null);
+        return undefined;
+      }
     }
     if (!shouldStartReportRuntimePreviewDatasetFetch({
       state: stateRef.current,
@@ -484,6 +497,12 @@ export function useReportRuntimePreviewDatasetPayloads({
       },
       applyState: (nextState) => {
         if (shouldContinue()) {
+          if (retainResolvedRequests && nextState?.freshResultRequestKey === normalizedRequestKey && !nextState.error) {
+            const retained = resolvedRequestsRef.current;
+            retained.delete(normalizedRequestKey);
+            retained.set(normalizedRequestKey, {...nextState,payloads:cloneValue(nextState.payloads)});
+            if (retained.size > 8) retained.delete(retained.keys().next().value);
+          }
           setState(nextState);
         }
       },
@@ -508,7 +527,7 @@ export function useReportRuntimePreviewDatasetPayloads({
         activeRequestKeyRef.current = "";
       }
     };
-  }, [enabled, normalizedRequestKey]);
+  }, [enabled, normalizedRequestKey, retainResolvedRequests]);
 
   return React.useMemo(() => ({...state, progress: state.loading ? progress : null}), [state, progress]);
 }

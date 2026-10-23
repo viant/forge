@@ -29,6 +29,7 @@ import { useSignals } from "@preact/signals-react/runtime";
 
 import Chart from "../Chart.jsx";
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
+import { reportRuntimeSectionDatasets } from "./reportRuntimeSectionDatasets.js";
 import {
     resolveReportBuilderDefinitionDataSourceRef,
     resolveReportBuilderDefinitionInitialization,
@@ -2503,6 +2504,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     const [designRecentlyAddedId, setDesignRecentlyAddedId] = useState("");
     const [designPreviewOpen, setDesignPreviewOpen] = useState(false);
     const [designSectionId, setDesignSectionId] = useState("");
+    const [activeRuntimeSectionId, setActiveRuntimeSectionId] = useState("");
     useEffect(() => {
         if (embeddedMode && embedded.selectedSectionId) setDesignSectionId(embedded.selectedSectionId);
     }, [embeddedMode, embedded?.selectedSectionId]);
@@ -3511,6 +3513,13 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     );
     const runtimePreviewConfig = config?.result?.runtimePreview;
     const authoredReportBlocksConfigured = Array.isArray(state?.reportDocumentBlocks) && state.reportDocumentBlocks.length > 0;
+    const authoredTabGroupConfigured = authoredReportBlocksConfigured
+        && state.reportDocumentBlocks.some((block) => String(block?.kind || "").trim() === "tabGroupBlock");
+    const selectedVisualProfile = String(rootWindowFormValue?.reportDefinition?.fieldCatalog?.visualProfile || "").trim();
+    const authoredProfileHasTabs = !!selectedVisualProfile && (Array.isArray(displayConfig?.presentationProfiles)
+        ? displayConfig.presentationProfiles : []).some((catalog) => (Array.isArray(catalog?.views) ? catalog.views : [])
+        .some((view) => String(view?.visualProfile || "").trim() === selectedVisualProfile
+            && Array.isArray(view?.tabs) && view.tabs.length > 0));
     const runtimePreviewEnabled = useMemo(() => {
         if (typeof runtimePreviewConfig === "boolean") {
             return runtimePreviewConfig;
@@ -3682,6 +3691,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
      frozenRestore]);
 
     useEffect(() => {
+        // Tabbed authored reports own their active-section dataset reads.
+        if (authoredTabGroupConfigured || authoredProfileHasTabs) return;
         const datasetOwnsRead = reportBuilderDatasetOwnsRequest(builderContext, currentRequest, authoredDatasetReadOwnershipRef.current);
         if (!currentRequestFingerprint || (datasourceReadOwnerRef.current === datasetOwnsRead && matchesReportBuilderDatasourceDispatch({
             fingerprint: currentRequestDispatchFingerprint, previousFingerprint: requestFingerprintRef.current,
@@ -3708,7 +3719,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         datasourceReadOwnerRef.current = datasetOwnsRead;
         cursorDispatchedPageRef.current = state.page;
         dispatchReportBuilderDatasourceRequest(builderContext, currentRequest, currentRequestShouldFetch, state.page, authoredDatasetReadOwnershipRef.current);
-    }, [builderContext, currentPrefillSignature, currentRequest, currentRequestDispatchFingerprint, currentRequestFingerprint, currentRequestShouldFetch, hostedReportActivationCurrent, hostedReportStarterId, state, workspaceMode]);
+    }, [authoredProfileHasTabs, authoredTabGroupConfigured, builderContext, currentPrefillSignature, currentRequest, currentRequestDispatchFingerprint, currentRequestFingerprint, currentRequestShouldFetch, hostedReportActivationCurrent, hostedReportStarterId, state, workspaceMode]);
 
     useEffect(() => {
         if (!pendingScrollRowId) {
@@ -10191,6 +10202,13 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             : null),
         [runtimePreviewFetchReportSpec],
     );
+    const runtimePreviewSectionSelection = useMemo(
+        () => reportRuntimeSectionDatasets(authoredRuntimePreviewModel?.document, authoredRuntimePreviewModel?.reportSpec, activeRuntimeSectionId),
+        [activeRuntimeSectionId, authoredRuntimePreviewModel?.document, authoredRuntimePreviewModel?.reportSpec],
+    );
+    const awaitingAuthoredPresentation = authoredProfileHasTabs && !runtimePreviewSectionSelection;
+    const runtimePreviewPrimaryRequired = !runtimePreviewSectionSelection
+        || runtimePreviewSectionSelection.datasetIds.includes(String(runtimePreviewPrimaryDataset?.id || "primary"));
     const runtimePreviewCanonicalRequest = useMemo(
         () => (runtimePreviewPrimaryDataset?.request && typeof runtimePreviewPrimaryDataset.request === "object"
             ? runtimePreviewPrimaryDataset.request
@@ -10258,6 +10276,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     }), [builderContext, displayConfig]);
     const fetchedRuntimePreviewRowsState = useReportRuntimePreviewRows({
         enabled: !frozenRestore && !restoreBlocked && !embeddedMode && !reportFiltersNeedApply && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
+            && !awaitingAuthoredPresentation
+            && runtimePreviewPrimaryRequired
             && !hostedReportActivationPending
             && hostedReportStarterReady
             && !shouldDeferReportBuilderRequestForPrefill({
@@ -10283,6 +10303,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         const datasets = Array.isArray(authoredRuntimePreviewModel?.reportSpec?.datasets)
             ? authoredRuntimePreviewModel.reportSpec.datasets
             : [];
+        const selectedIds = runtimePreviewSectionSelection ? new Set(runtimePreviewSectionSelection.datasetIds) : null;
+        const primaryId = String(runtimePreviewPrimaryDataset?.id || "primary").trim();
         const staticDatasetIds = new Set(
             authoredRuntimePreviewModel?.staticDatasetPayloads && typeof authoredRuntimePreviewModel.staticDatasetPayloads === "object" && !Array.isArray(authoredRuntimePreviewModel.staticDatasetPayloads)
                 ? Object.keys(authoredRuntimePreviewModel.staticDatasetPayloads).map((datasetId) => normalizeString(datasetId)).filter(Boolean)
@@ -10291,7 +10313,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         return datasets
             .filter((dataset) => {
                 const datasetId = normalizeString(dataset?.id);
-                return datasetId && !staticDatasetIds.has(datasetId);
+                return datasetId && !staticDatasetIds.has(datasetId)
+                    && (!selectedIds || selectedIds.has(datasetId) && datasetId !== primaryId);
             })
             .map((dataset) => {
                 const canonicalRequest = dataset?.request && typeof dataset.request === "object" && !Array.isArray(dataset.request)
@@ -10315,11 +10338,15 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 };
             })
             .filter((dataset) => dataset.id && dataset.dataSourceRef && dataset.request);
-    }, [frozenRestore, authoredDatasetOptionIndex, authoredRuntimePreviewModel?.reportSpec?.datasets, authoredRuntimePreviewModel?.staticDatasetPayloads, builderContext, displayConfig, state]);
+    }, [frozenRestore, authoredDatasetOptionIndex, authoredRuntimePreviewModel?.reportSpec?.datasets, authoredRuntimePreviewModel?.staticDatasetPayloads, builderContext, displayConfig, runtimePreviewPrimaryDataset?.id, runtimePreviewSectionSelection, state]);
+    const runtimePreviewPublishedContextKey = JSON.stringify(reportDatasetReadContextIdentity(builderContext));
     const runtimePreviewPublishedDatasetsRequestKey = useMemo(() => JSON.stringify({
-        previewRequestKey: runtimePreviewRequestKey,
         datasets: runtimePreviewPublishedDatasets,
-    }), [runtimePreviewPublishedDatasets, runtimePreviewRequestKey]);
+        manualRunSequence,
+        recovery: runtimePreviewRecoveryToken,
+        extract: runtimePreviewExtractConfigFingerprint,
+        context: runtimePreviewPublishedContextKey,
+    }), [manualRunSequence, runtimePreviewExtractConfigFingerprint, runtimePreviewPublishedDatasets, runtimePreviewRecoveryToken, runtimePreviewPublishedContextKey]);
     authoredDatasetReadOwnershipRef.current = {
         context: builderContext,
         contextIdentity: JSON.stringify(reportDatasetReadContextIdentity(builderContext)),
@@ -10332,8 +10359,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 currentPrefillSignature, appliedPrefillSignature: appliedPrefillSignatureRef.current,
             }),
     };
+
     const fetchedRuntimePreviewDatasetPayloadState = useReportRuntimePreviewDatasetPayloads({
         enabled: !frozenRestore && !restoreBlocked && !embeddedMode && !reportFiltersNeedApply && (runtimePreviewEnabled || authoredRuntimeSurfaceEnabled)
+            && !awaitingAuthoredPresentation
             && !hostedReportActivationPending
             && hostedReportStarterReady
             && !shouldDeferReportBuilderRequestForPrefill({
@@ -10343,6 +10372,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         builderContext,
         datasets: runtimePreviewPublishedDatasets,
         requestKey: runtimePreviewPublishedDatasetsRequestKey,
+        retainResolvedRequests: !!runtimePreviewSectionSelection,
         fetcherOptions: {
             preferDataSourceRoute: true,
             concurrentRequestScope: runtimePreviewRequestKey,
@@ -10483,7 +10513,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         }),
         [currentReportMaterialization, currentRequest],
     );
-    const currentPrimaryRuntimeResultFresh = (
+    const currentPrimaryRuntimeResultFresh = !runtimePreviewPrimaryRequired || (
         !!runtimePreviewRequestKey
         && runtimePreviewRowsState.requestKey === runtimePreviewRequestKey
         && runtimePreviewRowsState.freshResultRequestKey === runtimePreviewRequestKey
@@ -14574,7 +14604,10 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     );
     useEffect(() => {
         let cancelled = false;
-        if (typeof reportStoreHandler?.listReports !== "function") {
+        // A hosted report can render its selected definition without opening
+        // the saved-report inventory. Fetch that inventory only when its panel
+        // is visible (including the design workspace, where it is always shown).
+        if (!showImportedArtifactSummaryPanels || typeof reportStoreHandler?.listReports !== "function") {
             return undefined;
         }
         async function loadStoredReports() {
@@ -14596,7 +14629,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         return () => {
             cancelled = true;
         };
-    }, [reportStoreHandler]);
+    }, [reportStoreHandler, showImportedArtifactSummaryPanels]);
     const hydratedImportedSourceIdentity = useMemo(
         () => buildHydratedReportDocumentImportedSourceIdentity(hydratedReportDocumentSession),
         [hydratedReportDocumentSession],
@@ -20621,6 +20654,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                             reportSpec={previewStateForDisplay.runtimeConfig.reportSpec}
                             reportDocument={previewArtifactForDisplay?.document || null}
                             reportFill={previewStateForDisplay.runtimeConfig.reportFill}
+                            selectedSectionId={runtimePreviewSectionSelection?.sectionId || ""}
+                            onSectionChange={runtimePreviewSectionSelection ? setActiveRuntimeSectionId : null}
                             title={previewArtifactForDisplay?.runtimeBlock?.title || ""}
                             subtitle={previewArtifactForDisplay?.runtimeBlock?.subtitle || ""}
                             locale={locale}
@@ -20730,6 +20765,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
 
     useEffect(() => {
         if (frozenRestore || restoreBlocked) return;
+        if (authoredTabGroupConfigured || authoredProfileHasTabs) return;
         if (embeddedMode || reportFiltersNeedApply || pendingReportWorkspaceRunRef.current) {
             return;
         }
@@ -20807,6 +20843,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         hostedExecuteOnOpen,
         loading,
         reportWorkspaceMode,
+        authoredProfileHasTabs,
+        authoredTabGroupConfigured,
         showAuthoredReportSurface,
         state,
      frozenRestore, restoreBlocked]);

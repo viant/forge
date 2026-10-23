@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Dialog, Icon, Menu, MenuDivider, MenuItem, Popover } from "@blueprintjs/core";
 import { useSignals } from "@preact/signals-react/runtime";
 
@@ -4975,13 +4975,24 @@ export function StaticFilterSection({
         ? context.Context(filter.optionsDataSourceRef)
         : null;
     const optionCollection = optionContext?.signals?.collection?.value || [];
+    const optionControl = optionContext?.signals?.control?.value || {};
+    const requestedOptions = useRef(false);
+    const loadOptions = () => {
+        if (!optionContext || requestedOptions.current) return;
+        requestedOptions.current = true;
+        optionContext.handlers?.dataSource?.fetchCollection?.();
+    };
 
     useEffect(() => {
-        if (!optionContext || filter.autoFetchOptions === false) {
+        if (optionControl.error) requestedOptions.current = false;
+    }, [optionControl.error]);
+
+    useEffect(() => {
+        if (!optionContext || filter.autoFetchOptions === false || filter.optionsFetchMode === "onFocus") {
             return;
         }
         optionContext.handlers?.dataSource?.fetchCollection?.();
-    }, [optionContext, filter.autoFetchOptions]);
+    }, [optionContext, filter.autoFetchOptions, filter.optionsFetchMode]);
 
     const options = useMemo(
         () => resolveFilterOptions(filter, optionCollection || []),
@@ -5039,6 +5050,11 @@ export function StaticFilterSection({
                 </div>
             ) : null}
             <div className={String(filter.presentation || "").trim() === "compactIconRow" ? "forge-report-builder-icon-row forge-report-builder-icon-row--compact" : "forge-report-builder-icon-row"}>
+                {options.length === 0 && optionContext && filter.optionsFetchMode === "onFocus" ? (
+                    <Button small outlined icon="search" className="forge-report-builder__load-filter-options" loading={optionControl.loading === true} onFocus={loadOptions} onClick={loadOptions}>
+                        {optionControl.error ? "Retry choices" : requestedOptions.current ? "No choices available" : `Choose ${filter.label || "options"}`}
+                    </Button>
+                ) : null}
                 {options.map((option) => {
                     const active = activeValues.includes(option.value);
                     return (
