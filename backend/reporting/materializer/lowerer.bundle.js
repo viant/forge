@@ -68172,6 +68172,31 @@ ${indent}${end}`;
     });
     return result;
   }
+  function bindInvocationScope(config, state, request) {
+    if (!request) return state;
+    const safe = (name) => typeof name === "string" && /^[A-Za-z][A-Za-z0-9_]*$/.test(name) && !["constructor", "prototype", "__proto__"].includes(name);
+    const read = (path) => {
+      const parts = typeof path === "string" ? path.split(".") : [];
+      if (!parts.length || !["filters", "options"].includes(parts[0]) || !parts.every(safe)) return void 0;
+      return parts.reduce((value, key) => isObject(value) && Object.prototype.hasOwnProperty.call(value, key) ? value[key] : void 0, request);
+    };
+    const params = { ...isObject(state.scopeParams) ? state.scopeParams : {} };
+    for (const predicate of normalizeReportBuilderPredicates(config)) {
+      if (!safe(predicate == null ? void 0 : predicate.id)) continue;
+      if (predicate.kind === "dateRange") {
+        const start = read(predicate.startParamPath), end = read(predicate.endParamPath);
+        if (start !== void 0 || end !== void 0) params[predicate.id] = {
+          ...isObject(params[predicate.id]) ? params[predicate.id] : {},
+          ...start !== void 0 ? { start: clone4(start) } : {},
+          ...end !== void 0 ? { end: clone4(end) } : {}
+        };
+      } else {
+        const value = read(predicate.paramPath);
+        if (value !== void 0) params[predicate.id] = clone4(value);
+      }
+    }
+    return { ...state, scopeParams: params };
+  }
   function normalizeDataSources(dataSources) {
     if (dataSources == null) return [];
     if (!isObject(dataSources)) throw new Error("Report envelope dataSources must be an object map.");
@@ -68215,7 +68240,7 @@ ${indent}${end}`;
     const generated = buildReportBuilderReportDocument({
       container,
       config,
-      state: isObject(envelope.state) ? clone4(envelope.state) : {},
+      state: bindInvocationScope(config, isObject(envelope.state) ? clone4(envelope.state) : {}, requestBaseParameters),
       additionalBlocks: authoredBlocks,
       refinements: Array.isArray(sourceDocument.refinements) ? sourceDocument.refinements : [],
       semanticSummary: isObject(sourceDocument.semanticSummary) ? sourceDocument.semanticSummary : null
