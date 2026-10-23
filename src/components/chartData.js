@@ -547,3 +547,12 @@ export function orderHorizontalChartRows(rows = [], primaryKey, preserveSourceOr
     if (preserveSourceOrder) return ordered;
     return ordered.sort((a, b) => Number(b?.[primaryKey] || 0) - Number(a?.[primaryKey] || 0));
 }
+
+// Recharts clamps the requested radius to the bar bounds. Print uses the same
+// pill geometry explicitly, including very short and negative-value bars.
+export const CHART_BAR_END_RADIUS = 999;
+export function resolveChartBarRadius(width, height) {
+    const w = Math.abs(Number(width)), h = Math.abs(Number(height));
+    return Number.isFinite(w) && Number.isFinite(h)
+        ? Math.min(CHART_BAR_END_RADIUS, w / 2, h / 2) : 0;
+}

@@ -2,7 +2,7 @@ import {resolveCategoryColor} from '../components/chartTheme.js';
 import { compactReportPrintSequence, wrapReportPrintLabel } from "./reportPrintLabels.js";
 import { formatExportNumericValue } from "./reportExportValueFormatter.js";
 import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "./reportChartAnnotations.js";
-import { formatChartXAxisValue, readChartDataValue, isChartNumericValue } from "../components/chartData.js";
+import { formatChartXAxisValue, readChartDataValue, isChartNumericValue, resolveChartBarRadius } from "../components/chartData.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -957,7 +957,7 @@ function renderCartesianChartSvg({
           ? `<text x="${x + (drawnBarWidth / 2)}" y="${y - 4}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(point.value, series.format))}</text>`
           : "";
         return `
-          <rect x="${x}" y="${y}" width="${drawnBarWidth}" height="${barHeight}" rx="2" fill="${escapeXml(fillColor)}" />
+          <rect x="${x}" y="${y}" width="${drawnBarWidth}" height="${barHeight}" rx="${resolveChartBarRadius(drawnBarWidth, barHeight)}" fill="${escapeXml(fillColor)}" />
           ${label}
         `;
       }).join("\n");
@@ -1146,7 +1146,7 @@ function renderHorizontalBarChartSvg({
         ? `<text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(value, series.format))}</text>`
         : "";
       return `
-        <rect x="${x}" y="${barY}" width="${barWidth}" height="${perSeriesHeight}" rx="2" fill="${escapeXml(fillColor)}" />
+        <rect x="${x}" y="${barY}" width="${barWidth}" height="${perSeriesHeight}" rx="${resolveChartBarRadius(barWidth, perSeriesHeight)}" fill="${escapeXml(fillColor)}" />
         ${valueLabel}
       `;
     }).join("\n")
