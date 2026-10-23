@@ -401,6 +401,19 @@ func reportDatasetArguments(base, parameters map[string]interface{}, descriptor 
 	if err != nil {
 		return nil, err
 	}
+	// Compilation may already have copied global predicate values into the
+	// request. Exclusion applies to those values as well as incoming aliases;
+	// retain explicitly authored dataset-local values at the same paths.
+	if scope != nil {
+		for _, declaration := range declarations {
+			for _, excluded := range scope.Exclude {
+				if excluded == declaration.ID {
+					removeExcludedReportParameter(args, scope.Local, declaration.Path)
+					break
+				}
+			}
+		}
+	}
 	for _, p := range descriptor.Parameters {
 		if p.Name != "" {
 			allowed[p.Name] = true
