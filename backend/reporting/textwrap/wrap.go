@@ -17,8 +17,8 @@ func Lines(text string, width, fontSize float64) []string {
 		return nil
 	}
 	maxChars := int(width / maxFloat(4, fontSize*0.56))
-	if maxChars < 8 {
-		maxChars = 8
+	if maxChars < 1 {
+		maxChars = 1
 	}
 	var result []string
 	for _, paragraph := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {

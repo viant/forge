@@ -59615,7 +59615,7 @@ ${indent}${end}`;
     );
     const bottomPad = xAxisLabel ? 50 : 34;
     const plotHeight = 180;
-    const plotWidth = Math.max(200, width - leftPad - rightPad);
+    const plotWidth = Math.max(1, width - leftPad - rightPad);
     const xAxisKey = normalizeString37(resolvedChart == null ? void 0 : resolvedChart.xAxisKey);
     const valueRange = bounds.maxValue - bounds.minValue || 1;
     const baselineY = topPad + (bounds.maxValue - 0) / valueRange * plotHeight;
@@ -66251,7 +66251,7 @@ ${indent}${end}`;
     if (!normalized) {
       return [];
     }
-    const maxChars = Math.max(8, Math.floor(Math.max(1, width) / Math.max(4, fontSize * 0.56)));
+    const maxChars = Math.max(1, Math.floor(Math.max(1, width) / Math.max(4, fontSize * 0.56)));
     const wrapped = [];
     normalized.split("\n").forEach((line) => {
       const trimmedLine = line.trim();

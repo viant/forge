@@ -433,3 +433,20 @@ const missingLine=buildReportPrintChartSvg({chartModel:{type:'line',xAxis:{dataK
 assert.match(missingLine.svg,/<path d="M[^\"]* M/,'Missing values must break printed lines');
 const nullLine=buildReportPrintChartSvg({chartModel:{type:'line',series:{values:[{value:'value',label:'Value'}]}},resolvedChart:{kind:'directSeries',seriesKeys:['value'],rows:[{value:null}]}});
 assert.equal(nullLine.svg,'','Missing observations must not print as zero');
+
+// A three-column letter-page dashboard gives each chart roughly 170 points.
+// Geometry must obey that allocation rather than extending into the next tile.
+for (const width of [140, 170, 210, 680]) {
+  const output = buildReportPrintChartSvg({
+    width,
+    chartModel: {type:'bar',xAxis:{dataKey:'campaignId'},yAxis:{format:'currency2'},series:{values:[{value:'spend',label:'Spend',format:'currency2',type:'bar'}]}},
+    resolvedChart: {kind:'directSeries',type:'bar',xAxisKey:'campaignId',seriesKeys:['spend'],rows:[{campaignId:'101',spend:67.75}]},
+  });
+  assert.equal(output.diagnostics.length,0);
+  const xCoordinates = [...output.svg.matchAll(/\b(?:x1|x2)="([\d.-]+)"/g)].map(match=>Number(match[1]));
+  assert.ok(xCoordinates.length>0);
+  assert.ok(xCoordinates.every(x=>x>=0&&x<=width),`Chart geometry escapes ${width}-point allocation: ${Math.max(...xCoordinates)}`);
+  for(const match of output.svg.matchAll(/<rect\b[^>]*\bx="([\d.-]+)"[^>]*\bwidth="([\d.-]+)"/g)) {
+    assert.ok(Number(match[1])+Number(match[2])<=width,`Bar escapes ${width}-point allocation`);
+  }
+}

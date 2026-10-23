@@ -840,7 +840,9 @@ function renderCartesianChartSvg({
   );
   const bottomPad = xAxisLabel ? 50 : 34;
   const plotHeight = 180;
-  const plotWidth = Math.max(200, width - leftPad - rightPad);
+  // The caller owns the grid allocation; a minimum plot width must not
+  // extend a narrow dashboard tile into its neighbor or beyond the page.
+  const plotWidth = Math.max(1, width - leftPad - rightPad);
   const xAxisKey = normalizeString(resolvedChart?.xAxisKey);
   const valueRange = bounds.maxValue - bounds.minValue || 1;
   const baselineY = topPad + ((bounds.maxValue - 0) / valueRange) * plotHeight;
