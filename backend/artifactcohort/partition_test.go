@@ -2,6 +2,19 @@ package artifactcohort
 
 import "testing"
 
+func TestPlaybookPublicationRetainsLegacyIntentPartition(t *testing.T) {
+	for _, kind := range []string{"playbook", "intent"} {
+		body := []byte(`{"profile":{"id":"analysis"}}`)
+		root := RootRef{URI: kind + "://sales/analysis", Kind: kind, Version: 1, Hash: Hash(body)}
+		if err := ValidateArtifact(&Artifact{Root: root, Payload: body}); err != nil {
+			t.Fatal(err)
+		}
+		if partition, err := RootPartition(root); err != nil || partition != PartitionKey("sales", kind) {
+			t.Fatalf("partition=%s error=%v", partition, err)
+		}
+	}
+}
+
 func TestPartitionHashesIsolateNamespaceAndKind(t *testing.T) {
 	root := []RootRef{
 		{URI: "intent://ops/main", Kind: "intent", Version: 1, Hash: "ops-intent-1"},
