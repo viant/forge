@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/viant/forge/backend/provider/contract/observe"
 	"github.com/viant/jsonrpc"
 	protoclient "github.com/viant/mcp-protocol/client"
 	"github.com/viant/mcp-protocol/schema"
@@ -74,8 +75,10 @@ func (h *NotificationHandler) OnNotification(ctx context.Context, notification *
 		replica := h.replica
 		h.mu.RUnlock()
 		if replica != nil {
+			var received observe.Span
 			switch notification.Method {
 			case NotificationUpdated:
+				received = timing(h.ctx, phaseNotificationReceived, "", "")
 				var params struct {
 					URI string `json:"uri"`
 				}
@@ -92,9 +95,11 @@ func (h *NotificationHandler) OnNotification(ctx context.Context, notification *
 				}
 				h.signal()
 			case NotificationListChanged:
+				received = timing(h.ctx, phaseNotificationReceived, "", "")
 				replica.MarkListChanged()
 				h.signal()
 			}
+			received.End(observe.OK, observe.CacheBypass)
 		}
 	}
 	h.Handler.OnNotification(ctx, notification)
@@ -104,6 +109,25 @@ func (h *NotificationHandler) signal() {
 	case h.queue <- struct{}{}:
 	default:
 	}
+}
+
+// ReconcileHint fences an old catalog when a re-admitted notification session
+// sees a different manifest hash. It does not trust the sidecar's manifest as
+// authorization; the stateless caller performs the full validated Sync.
+func (h *NotificationHandler) ReconcileHint() {
+	if h == nil {
+		return
+	}
+	h.mu.RLock()
+	replica := h.replica
+	h.mu.RUnlock()
+	if replica == nil {
+		return
+	}
+	span := timing(h.ctx, phaseNotificationReconnectHint, "", "")
+	replica.MarkDisconnected()
+	h.signal()
+	span.End(observe.OK, observe.CacheBypass)
 }
 func (h *NotificationHandler) run() {
 	h.mu.RLock()
@@ -120,7 +144,10 @@ func (h *NotificationHandler) run() {
 				if h.ctx.Err() != nil {
 					return
 				}
-				if err := replica.Sync(h.ctx); err == nil {
+				syncTiming := timing(h.ctx, phaseNotificationSync, "", "")
+				err := replica.Sync(h.ctx)
+				syncTiming.End(timingOutcome(err), observe.CacheUnknown)
+				if err == nil {
 					break
 				}
 				timer := time.NewTimer(retryDelay)
