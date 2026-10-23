@@ -216,7 +216,7 @@ export function normalizeReportSpecScopeParams(reportSpec = {}) {
   });
 }
 
-export function buildReportBuilderPublishedDatasetConfig(baseConfig = {}, source = null) {
+export function buildReportBuilderPublishedDatasetConfig(baseConfig = {}, source = null, { borrowBase = false } = {}) {
   const normalizedSource = source && typeof source === "object" && !Array.isArray(source)
     ? source
     : null;
@@ -274,7 +274,11 @@ export function buildReportBuilderPublishedDatasetConfig(baseConfig = {}, source
     }))
     .filter((entry) => entry.id && entry.key && entry.label);
   return {
-    ...(isPlainObject(baseConfig) ? cloneValue(baseConfig) : {}),
+    // The authored lowerer only reads its invocation-local builder config.
+    // Preserve the public detached result by default; its internal read-only
+    // callers can borrow the base instead of serializing the entire builder
+    // once for every published dataset and authored block.
+    ...(isPlainObject(baseConfig) ? (borrowBase ? baseConfig : cloneValue(baseConfig)) : {}),
     dataSourceRef: normalizeString(normalizedSource?.dataSourceRef || baseConfig?.dataSourceRef),
     dimensions,
     measures,

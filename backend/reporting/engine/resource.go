@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/viant/forge/backend/provider/contract/observe"
 	"github.com/viant/forge/backend/reporting/materializer"
 	"github.com/viant/forge/backend/reporting/registry"
 	identity "github.com/viant/forge/backend/resource"
@@ -46,7 +47,9 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest) 
 	if request.ResolvedResource != nil {
 		pin = cloneResolvedResource(request.ResolvedResource)
 	}
+	readTiming := observe.Start(ctx, "report.compile.read", observe.Labels{Kind: "report"})
 	raw, pin, err := selectResourceRead(ctx, resolver, ref, pin)
+	readTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -59,7 +62,9 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest) 
 	if decoder.Decode(new(any)) != io.EOF || (len(definition.ReportDocument) == 0 && len(definition.ReportSpec) == 0) || !(definition.SchemaVersion == 1 && definition.Format != registry.ResourceReportFormat && len(definition.DataSourceResources) == 0 && definition.SourceFormat == "" || definition.SchemaVersion == 2 && definition.Format == registry.ResourceReportFormat && len(definition.DataSourceResources) > 0) {
 		return nil, nil, nil, fmt.Errorf("invalid resolved report definition")
 	}
+	bindTiming := observe.Start(ctx, "report.compile.bind", observe.Labels{Kind: "report"})
 	dependencyPins, dependencyToken, err := s.bindOperationDependencies(ctx, request.ResolvedResource, pin, definition, request.DependencyPins, request.DependencyToken)
+	bindTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -91,7 +96,9 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest) 
 		if bindErr != nil {
 			return nil, nil, nil, bindErr
 		}
+		lowerTiming := observe.Start(ctx, "report.compile.lower", observe.Labels{Kind: "report"})
 		spec, err = materializer.LowerWithRequestBase(ctx, raw, requestBase)
+		lowerTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 		if err != nil {
 			return nil, nil, nil, err
 		}
