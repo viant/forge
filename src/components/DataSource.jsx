@@ -1,5 +1,6 @@
 // DataSource.jsx
 import React, {useEffect, useState} from "react";
+import {recordWindowPerfPhase} from '../runtime/windowPerfPhases.js';
 import {getLogger} from "../utils/logger.js";
 import {useSignals} from '@preact/signals-react/runtime';
 import { extractData, isDeferredCacheHitEnvelope } from "./dataSourceExtract.js";
@@ -100,6 +101,7 @@ export default function DataSource({context}) {
     const resourceModelRef = resourceModelRefForDataSource(context, dataSource.resourceModelRef);
     const selectionMode = dataSource.selectionMode || 'single';
     useEffect(() => {
+        recordWindowPerfPhase('datasource-mounted',context?.identity?.windowId);
         mountedRef.current = true;
         return () => {
             mountedRef.current = false;

@@ -509,7 +509,7 @@ const Basic = ({ toolbarActions, sizingMode = 'fill', context, container, column
             });
         }
         return newPreparedData;
-    }, [renderedCollection, columnsToUse, loading, formattingRules, columnTimeZones]);
+    }, [renderedCollection, columnsToUse, formattingRules, columnTimeZones]);
 
     const handleOpenFilter = () => setIsFilterOpen(true);
     const handleCloseFilter = () => setIsFilterOpen(false);
