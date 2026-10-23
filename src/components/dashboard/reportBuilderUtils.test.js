@@ -3264,3 +3264,15 @@ completeFrom.setDate(completeFrom.getDate()-30);
 completeTo.setDate(completeTo.getDate()-1);
 assert.equal(completeDays.scopeParams.dateRange.start,completeDayISO(completeFrom));
 assert.equal(completeDays.scopeParams.dateRange.end,completeDayISO(completeTo));
+
+const splitHorizontalSpec={type:'horizontal_bar',xField:'eventDate',yFields:['totalSpend'],seriesField:'siteType'};
+const splitHorizontalState={selectedDimensions:['eventDate','siteType'],selectedMeasures:['totalSpend'],chartSpec:splitHorizontalSpec,viewMode:'chart'};
+assert.deepEqual(validateReportBuilderChartSpec(expandedSupportedConfig,splitHorizontalSpec,buildReportBuilderChartFields(expandedSupportedConfig,splitHorizontalState)),{valid:true,errors:[]});
+assert.equal(sanitizeReportBuilderState(expandedSupportedConfig,splitHorizontalState).chartSpec.seriesField,'siteType');
+const splitHorizontal=buildExplicitReportBuilderChartContainer({dataSourceRef:'report_source',collection:[]},expandedSupportedConfig,splitHorizontalState,splitHorizontalSpec);
+assert.equal(splitHorizontal.chart.type,'horizontal_bar');
+assert.equal(splitHorizontal.chart.series.nameKey,'siteType');
+assert.equal(splitHorizontal.chart.series.valueKey,'totalSpend');
+assert.equal(splitHorizontal.chart.yAxis.format,splitContainer.chart.yAxis.format);
+assert.ok(validateReportBuilderChartSpec(expandedSupportedConfig,{...splitHorizontalSpec,yFields:['totalSpend','impressions']},familyFields).errors.some(e=>e.code==='tooManyMeasures'));
+for(const type of ['pie','donut','funnel_bar'])assert.ok(validateReportBuilderChartSpec(expandedSupportedConfig,{...splitHorizontalSpec,type},familyFields).errors.some(e=>e.field==='seriesField'&&e.code==='notAllowed'));

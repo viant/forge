@@ -32,7 +32,7 @@ export function chartFamilyHelperText(type = "") {
         case "donut":
             return "Pie and donut charts use one category dimension and a single measure to slice.";
         case "horizontal_bar":
-            return "Horizontal bars compare a category against one or more measures.";
+            return "Horizontal bars compare a category against one or more measures. Split a single measure by a series dimension to preserve separate groups.";
         case "funnel_bar":
             return "Funnel charts use one category dimension and a single measure ordered by value.";
         case "line":
@@ -47,6 +47,11 @@ export function chartFamilyAllowsSeriesOptions(type = "") {
     const normalized = String(type || "").trim().toLowerCase();
     if (chartFamilyForType(normalized) === "cartesian") return true;
     return normalized === "horizontal_bar";
+}
+
+export function chartFamilyAllowsSeriesDimension(type = "") {
+    return chartFamilyForType(type) === "cartesian"
+        || String(type || "").trim().toLowerCase() === "horizontal_bar";
 }
 
 export function isValidPerSeriesType(chartType = "", perSeriesType = "") {
