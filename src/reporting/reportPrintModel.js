@@ -2325,6 +2325,21 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
 function renderReportPrintChartBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
+  const datasetRef = normalizeString(block?.datasetRef);
+  const declared = (state.reportSpec?.datasets || []).some(dataset => dataset.id === datasetRef);
+  const dataset = (state.reportFill?.datasets || []).find(dataset => dataset.id === datasetRef);
+  const provenance = dataset?.provenance;
+  // An admitted, complete empty dataset is ordinary no-data. Missing datasets,
+  // incomplete pages and producer diagnostics must retain their failure path.
+  if (declared && block?.content?.rowCount === 0 && provenance?.hasMore === false
+    && provenance?.truncated === false && Array.isArray(provenance?.diagnostics)
+    && provenance.diagnostics.length === 0) {
+    ensureReportPrintSpace(state, reportPrintTitleHeight(state, block, layoutNote) + REPORT_PRINT_THEME.bodyLineHeight);
+    renderReportPrintSectionTitle(state, block, {layoutNote});
+    renderReportPrintTextLines(state, {idPrefix: `${normalizeString(block.id)}__empty`, lines: ["No data for the selected scope."], color: REPORT_PRINT_THEME.mutedColor});
+    finishReportPrintBlock(state);
+    return;
+  }
   const titleHeight = reportPrintTitleHeight(state, block, layoutNote);
   const chartPages = buildReportPrintChartPages({
     chartModel: block?.content?.chartModel || block?.chartModel || {},
@@ -2516,23 +2531,39 @@ function renderReportPrintBlock(state = {}, block = {}, options = {}) {
 
 function keepReportPrintSectionWithNext(state, blocks, index) {
   if (blocks[index]?.kind !== "sectionBlock") return;
-  const probe = { ...state, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null, cursorY: state.contentTop };
+  let probe = { ...state, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null, cursorY: state.contentTop };
   let next = index;
   while (blocks[next]?.kind === "sectionBlock") {
     renderReportPrintBlock(probe, blocks[next], {});
     next += 1;
   }
+  const sectionProbe = probe;
+  const firstContent = next;
+  // Short introductions belong with the first analytical block, rather than
+  // allowing a section title and its context to strand on the previous page.
+  for (let introductions = 0; introductions < 2 && blocks[next]?.kind === "markdownBlock"; introductions += 1) {
+    const candidate = { ...probe, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null };
+    moveToReportPrintPage(candidate, 0);
+    candidate.cursorY = probe.cursorY;
+    renderReportPrintBlock(candidate, blocks[next], {});
+    if (candidate.currentPageIndex > 0 || candidate.cursorY - candidate.contentTop > (state.contentBottom - state.contentTop) / 3) break;
+    probe = candidate;
+    next += 1;
+  }
+  if (!blocks[next]) {probe = sectionProbe; next = firstContent;}
   const headingHeight = probe.cursorY - probe.contentTop;
   state.sectionHeadingHeight = Math.max(state.sectionHeadingHeight || 0, headingHeight);
   if (!blocks[next]) return;
   const contentProbe = { ...probe, sectionHeadingHeight: headingHeight, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null, cursorY: state.contentTop };
   renderReportPrintBlock(contentProbe, blocks[next], {});
   const firstPageElements = contentProbe.pages[0]?.elements || [];
-  const contentHeight = blocks[next].kind === "tableBlock"
-    ? (firstPageElements.find((element) => element.id.includes("__row_rule_0"))?.box.y || state.contentTop) - state.contentTop
-    : blocks[next].kind === "chartBlock"
-      ? Math.min(reportPrintTitleHeight(state, blocks[next]) + 180, Math.max(0, ...firstPageElements.map((element) => element.box.y + element.box.height - state.contentTop)))
-      : Math.max(0, ...firstPageElements.map((element) => element.box.y + element.box.height - state.contentTop));
+  const firstContentHeight = Math.max(0, ...firstPageElements.map((element) => element.box.y + element.box.height - state.contentTop));
+  const firstRowRule = firstPageElements.find(element => element.id.includes("__row_rule_0"));
+  const chartType = normalizeString(blocks[next]?.content?.chartModel?.type || blocks[next]?.chartModel?.type).toLowerCase();
+  const paginatedChart = blocks[next].kind === "chartBlock" && ["horizontal_bar", "funnel_bar"].includes(chartType) && contentProbe.pages.length > 1;
+  const contentHeight = blocks[next].kind === "tableBlock" && firstRowRule
+    ? firstRowRule.box.y - state.contentTop
+    : paginatedChart ? Math.min(reportPrintTitleHeight(state, blocks[next]) + 180, firstContentHeight) : firstContentHeight;
   ensureReportPrintSpace(state, Math.min(state.contentBottom - state.contentTop, headingHeight + contentHeight));
 }
 
