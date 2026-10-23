@@ -159,24 +159,33 @@ func withReportOptionContext(report *reportprint.ReportPrint, options Options) (
 		y = top
 		bottom = geometry.Height - geometry.MarginBottom - math.Max(geometry.FooterHeight+8, 22)
 	}
-	if y+36 > bottom {
+	wrappedLines := []string{}
+	for _, line := range lines {
+		for _, wrapped := range textwrap.Lines(line, width, 10) {
+			if wrapped != "" {
+				wrappedLines = append(wrappedLines, wrapped)
+			}
+		}
+	}
+	// Preserve a compact context as one unit. Longer contexts retain a heading
+	// on each continuation page rather than leaving unlabeled option values.
+	contextHeight := float64(len(wrappedLines)+1) * 14
+	pageCapacity := geometry.Height - geometry.MarginBottom - math.Max(geometry.FooterHeight+8, 22) - top
+	if (contextHeight <= pageCapacity && y+contextHeight > bottom) || y+28 > bottom {
 		newPage()
 	}
 	add := func(text, weight string) {
-		if y+14 > bottom {
-			newPage()
-		}
 		page.Elements = append(page.Elements, reportprint.Element{ID: fmt.Sprintf("option_context_%d_%d", page.Number, sequence), Kind: "text", Text: text, FontSize: 10, FontWeight: weight, Box: reportprint.Box{X: geometry.MarginLeft, Y: y, Width: width, Height: 14}})
 		sequence++
 		y += 14
 	}
 	add("Report options", "700")
-	for _, line := range lines {
-		for _, wrapped := range textwrap.Lines(line, width, 10) {
-			if wrapped != "" {
-				add(wrapped, "")
-			}
+	for _, line := range wrappedLines {
+		if y+14 > bottom {
+			newPage()
+			add("Report options (continued)", "700")
 		}
+		add(line, "")
 	}
 	return &result, result.Validate()
 }

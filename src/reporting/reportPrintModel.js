@@ -947,7 +947,15 @@ function renderReportPrintTextLines(state = {}, {
   align = "",
   x = undefined,
   width = undefined,
+  onPageBreak = null,
 } = {}) {
+  const ensureLineSpace = (height) => {
+    const pageIndex = state.currentPageIndex;
+    ensureReportPrintSpace(state, height);
+    if (pageIndex != null && state.currentPageIndex !== pageIndex && onPageBreak) {
+      onPageBreak();
+    }
+  };
   const boxX = normalizeNonNegativeNumber(x) ?? state.contentLeft;
   const boxWidth = normalizeNonNegativeNumber(width, { minimum: 1, allowZero: false }) ?? state.contentWidth;
   let sequence = 0;
@@ -957,12 +965,12 @@ function renderReportPrintTextLines(state = {}, {
       return;
     }
     if (line === "") {
-      ensureReportPrintSpace(state, lineHeight / 2);
+      ensureLineSpace(lineHeight / 2);
       state.cursorY += lineHeight / 2;
       return;
     }
     wrapReportPrintText(line, boxWidth, fontSize).forEach((wrappedLine) => {
-      ensureReportPrintSpace(state, lineHeight);
+      ensureLineSpace(lineHeight);
       const element = pushReportPrintElement(state, buildReportPrintTextElement({
         id: `${idPrefix}_${sequence}`,
         kind: "text",
@@ -1223,14 +1231,21 @@ function buildRefinementBarLines(block = {}) {
 function renderReportPrintTextSectionBlock(state = {}, block = {}, lines = [], {
   layoutNote = "",
 } = {}) {
-  ensureReportPrintSpace(
-    state,
-    reportPrintTitleHeight(state, block, layoutNote) + REPORT_PRINT_THEME.bodyLineHeight,
-  );
+  const titleHeight = reportPrintTitleHeight(state, block, layoutNote);
+  const bodyHeight = lines.reduce((height, line) => height + (line === ""
+    ? REPORT_PRINT_THEME.bodyLineHeight / 2
+    : wrapReportPrintText(line, state.contentWidth).length * REPORT_PRINT_THEME.bodyLineHeight), 0);
+  // Keep a short narrative/filter context intact when it fits on a fresh page.
+  // Oversized sections may split, but every continuation needs its own heading.
+  const sectionHeight = titleHeight + bodyHeight;
+  ensureReportPrintSpace(state, sectionHeight <= state.contentBottom - state.contentTop
+    ? sectionHeight
+    : titleHeight + REPORT_PRINT_THEME.bodyLineHeight);
   renderReportPrintSectionTitle(state, block, { layoutNote });
   renderReportPrintTextLines(state, {
     idPrefix: `${normalizeString(block?.id || block?.kind || "block")}__line`,
     lines,
+    onPageBreak: () => renderReportPrintSectionTitle(state, block, { layoutNote, continuation: true }),
   });
   finishReportPrintBlock(state);
 }
