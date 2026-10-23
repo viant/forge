@@ -888,20 +888,30 @@ function renderCartesianChartSvg({
     return `<text data-report-print-axis="right" x="${leftPad+plotWidth+8}" y="${y+4}" text-anchor="start" font-size="10" fill="#667085">${escapeXml(formatAxisTick(value,rightSeries[0]?.format))}</text>`;
   }).join("\n") : "";
 
-  const xAxisLabels = rows.map((row, index) => {
-    if (index % labelStep !== 0 && index !== rows.length - 1) {
-      return "";
-    }
+  const xTicks = rows.flatMap((row, index) => {
+    if (index % labelStep !== 0 && index !== rows.length - 1) return [];
     const label = formatChartXAxisValue(
       readChartDataValue(row, xAxisKey),
       normalizeString(chartModel?.xAxis?.tickFormat),
       normalizeString(chartModel?.xAxis?.valueMode),
     );
-    return renderPrintLabelLines(
-      buildPrintLabelLines(label, chartModel?.xAxis?.categoryLabel, 14),
-      { x: xPositions[index], y: topPad + plotHeight + 18 },
-    );
-  }).join("\n");
+    const lines = buildPrintLabelLines(label, chartModel?.xAxis?.categoryLabel, 14);
+    const halfWidth = Math.max(0, ...lines.map(line => line.length * 2.8));
+    return [{lines, halfWidth, x: Math.max(halfWidth, Math.min(width - halfWidth, xPositions[index]))}];
+  });
+  // Keep both endpoints, then fit intermediate ticks to the actual tile width.
+  // A forced last tick can be much closer than the normal periodic spacing.
+  const visibleXTicks = [];
+  const lastXTick = xTicks.at(-1);
+  const ticksApart = (left, right) => right.x - left.x >= left.halfWidth + right.halfWidth + 8;
+  for (const tick of xTicks) {
+    if (tick !== lastXTick && visibleXTicks.length && !ticksApart(tick, lastXTick)) continue;
+    if (visibleXTicks.length && !ticksApart(visibleXTicks.at(-1), tick)) continue;
+    visibleXTicks.push(tick);
+  }
+  const xAxisLabels = visibleXTicks.map(tick => renderPrintLabelLines(
+    tick.lines, {x: tick.x, y: topPad + plotHeight + 18},
+  )).join("\n");
   const xAxisTitle = xAxisLabel
     ? `<text x="${leftPad + (plotWidth / 2)}" y="${topPad + plotHeight + 36}" text-anchor="middle" font-size="11" font-weight="600" fill="#475467">${escapeXml(xAxisLabel)}</text>`
     : "";

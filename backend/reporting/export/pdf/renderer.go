@@ -257,7 +257,26 @@ func (r *renderer) renderWrappedTextOperation(operation textPaintOperation) {
 			lines = lines[:maxLines]
 		}
 	}
-	r.pdf.MultiCell(operation.box.Width, lineHeight, strings.Join(lines, "\n"), "", horizontalAlignment(operation.align), false)
+	// The canonical print model already measured these exact lines. MultiCell
+	// would wrap them again using font metrics and can add an unallocated line.
+	// Render each line once, fitting unusually wide glyphs to its measured box.
+	for index, line := range lines {
+		y := operation.box.Y + float64(index)*lineHeight
+		width := operation.box.Width
+		measuredWidth := r.pdf.GetStringWidth(line)
+		fit := width > 0 && measuredWidth > width
+		if fit {
+			r.pdf.TransformBegin()
+			r.pdf.TransformScaleX(100*width/measuredWidth, operation.box.X, y)
+			width = measuredWidth
+		}
+		r.pdf.SetXY(operation.box.X, y)
+		r.pdf.CellFormat(width, lineHeight, line, "", 0, horizontalAlignment(operation.align), false, 0, "")
+		if fit {
+			r.pdf.TransformEnd()
+		}
+	}
+
 }
 
 func (r *renderer) resolveWrappedTextLines(text string, width float64) []string {
