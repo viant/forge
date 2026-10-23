@@ -5,6 +5,8 @@ import {actionIconOnly, actionAccessibleName} from './actionPresentation.js';
 import {useWorkspacePresentation, workspaceToolbarItem} from '../../../core/context/WorkspacePresentation.jsx';
 
 import React from 'react';
+import ForgeButton from '../../Button.jsx';
+import ForgeIcon from '../../Icon.jsx';
 import {Button, Checkbox, Menu, MenuItem, Popover, Switch} from '@blueprintjs/core';
 import { useSignals } from '@preact/signals-react/runtime';
 import QuickFilterInputs from './QuickFilterInputs.jsx';
@@ -43,6 +45,7 @@ function toolbarItemTestID(item) {
 
 export function toolbarItemIcon(icon) {
     const normalized = String(icon || '').trim().toLowerCase();
+    if (normalized.startsWith('lucide:')) return <ForgeIcon name={normalized}/>;
     if (normalized === 'pdf' || normalized === 'document-pdf') {
         return <span className="forge-toolbar-pdf-icon" aria-hidden="true">PDF</span>;
     }
@@ -480,15 +483,15 @@ const Toolbar = ({
             ? { margin: "0 10px" }
             : (align === 'right' ? { marginLeft: "10px" } : { marginRight: "10px" });
 
+        const ActionComponent = item.variant ? ForgeButton : Button;
         const button = (
-                <NativeControlTarget context={guardContext} item={{...item,type:'button'}} disabled={effectiveDisabled} readOnly={isReadonly===true} actions={events.onClick?{click:({event})=>(events.onClick.operate || events.onClick)(event)}:{}}><Button
+                <NativeControlTarget context={guardContext} item={{...item,type:'button'}} disabled={effectiveDisabled} readOnly={isReadonly===true} actions={events.onClick?{click:({event})=>(events.onClick.operate || events.onClick)(event)}:{}}><ActionComponent
                     key={item.id}
                     icon={toolbarItemIcon(item.icon)}
                     {...events}
                     disabled={effectiveDisabled}
                     intent={item.intent || 'none'}
-                    minimal={item.appearance === 'minimal'}
-                    outlined={item.appearance === 'outlined'}
+                    {...(item.variant ? {variant: item.variant, hideLabel: actionIconOnly(item)} : {minimal: item.appearance === 'minimal', outlined: item.appearance === 'outlined'})}
                     data-testid={testID}
                     aria-label={actionAccessibleName(item)}
                     title={item.tooltip || item.label || item.id}
@@ -496,7 +499,7 @@ const Toolbar = ({
                     style={item.style}
                 >
                     {toolbarItemLabel(item)}
-                </Button></NativeControlTarget>
+                </ActionComponent></NativeControlTarget>
         );
         return effectiveDisabled && item.tooltip ? (
             <DisabledActionShell key={item.id} reason={item.tooltip} label={item.label || item.id} style={spanStyle}>

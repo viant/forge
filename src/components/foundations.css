@@ -1,0 +1,77 @@
+/* Neutral shared recipes. Workspace values arrive through the portable catalog.
+ * Brand palettes, font assets and product-selected values never belong here. */
+:is(.agently-workspace, .agently-application) {
+    --forge-motion-easing: cubic-bezier(0.2, 0, 0, 1);
+    --forge-default-overlay-shadow: 0 12px 28px -10px color-mix(in srgb, var(--forge-text, currentColor) 24%, transparent);
+    --forge-default-modal-shadow: 0 24px 60px -18px color-mix(in srgb, var(--forge-text, currentColor) 36%, transparent);
+}
+/* The same public primitives can consume the host's application boundary. */
+.agently-application[data-agently-theme] .forge-button[data-forge-variant]:not(.agently-workspace *) {
+    --forge-text: var(--agently-theme-text);
+    --forge-text-inverse: var(--agently-theme-text-inverse);
+    --forge-surface: var(--agently-theme-surface);
+    --forge-surface-subtle: var(--agently-theme-surface-subtle);
+    --forge-border-strong: var(--agently-theme-border-strong);
+    --forge-border-width: var(--agently-theme-border-width);
+    --forge-interaction-color: var(--agently-theme-interaction);
+    --forge-interaction-hover-color: var(--agently-theme-interaction-hover);
+    --forge-interaction-active-color: var(--agently-theme-interaction-active);
+    --forge-selected-background: var(--agently-theme-selected-background);
+    --forge-button-bg: var(--agently-theme-button-background);
+    --forge-button-text: var(--agently-theme-button-foreground);
+    --forge-disabled-bg: var(--agently-theme-disabled-background);
+    --forge-disabled-text: var(--agently-theme-disabled-foreground);
+    --forge-control-height: var(--agently-theme-control-height);
+    --forge-control-text: var(--agently-theme-control-foreground);
+    --forge-control-radius: var(--agently-theme-control-radius);
+    --forge-control-padding-inline: var(--agently-theme-control-padding-inline);
+    --forge-focus-color: var(--agently-theme-focus);
+    --forge-focus-width: var(--agently-theme-focus-width);
+    --forge-focus-offset: var(--agently-theme-focus-offset);
+    --forge-motion-fast: var(--agently-theme-motion-fast);
+    --forge-spacing-2: var(--agently-theme-spacing-2);
+    --forge-status-danger-foreground: var(--agently-theme-status-danger-foreground, var(--agently-theme-validation-border));
+}
+.forge-icon { width: var(--forge-icon-size, var(--agently-theme-icon-size, 16px)); height: var(--forge-icon-size, var(--agently-theme-icon-size, 16px)); flex: none; stroke-width: var(--forge-icon-stroke-width, 2); }
+.forge-button[data-forge-variant] {
+    gap: var(--forge-spacing-2, 8px);
+    min-height: var(--forge-control-height, 36px);
+    padding-inline: var(--forge-control-padding-inline, 12px);
+    border: var(--forge-border-width, 1px) solid var(--forge-border-strong, currentColor);
+    border-radius: var(--forge-control-radius, 4px);
+    color: var(--forge-text, inherit);
+    background: var(--forge-surface, transparent);
+    transition: background-color var(--forge-motion-fast, 120ms) var(--forge-motion-easing), color var(--forge-motion-fast, 120ms) var(--forge-motion-easing), border-color var(--forge-motion-fast, 120ms) var(--forge-motion-easing);
+}
+.forge-button[data-forge-variant="primary"] { background: var(--forge-button-bg); color: var(--forge-button-text); border-color: var(--forge-button-bg); }
+.forge-button[data-forge-variant="danger"] { background: var(--forge-status-danger-foreground); color: var(--forge-text-inverse, var(--forge-surface)); border-color: var(--forge-status-danger-foreground); }
+.forge-button:is([data-forge-variant="ghost"], [data-forge-variant="link"]) { background: transparent; border-color: transparent; }
+.forge-button[data-forge-variant="link"] { color: var(--forge-interaction-color); text-decoration: underline; text-underline-offset: .2em; }
+.forge-button[data-forge-variant]:not(:disabled):hover { background: var(--forge-surface-subtle); border-color: var(--forge-border-strong); }
+.forge-button[data-forge-variant="primary"]:not(:disabled):hover { background: var(--forge-button-hover-bg, color-mix(in srgb, var(--forge-button-bg) 88%, var(--forge-control-text))); border-color: transparent; }
+.forge-button[data-forge-variant="danger"]:not(:disabled):hover { background: color-mix(in srgb, var(--forge-status-danger-foreground) 90%, var(--forge-text)); }
+.forge-button[data-forge-variant]:not(:disabled):active { background: var(--forge-selected-background); }
+.forge-button[data-forge-variant="primary"]:not(:disabled):active { background: var(--forge-button-active-bg, color-mix(in srgb, var(--forge-button-bg) 80%, var(--forge-control-text))); }
+.forge-button[data-forge-variant]:disabled { background: var(--forge-disabled-bg); color: var(--forge-disabled-text); border-color: transparent; cursor: default; }
+.forge-button[data-forge-variant][data-forge-size="compact"] { min-height: 28px; padding-inline: var(--forge-spacing-2, 8px); }
+.forge-button[data-forge-variant].forge-button--icon-only { min-width: var(--forge-control-height, 36px); padding-inline: var(--forge-spacing-2, 8px); }
+.forge-button[data-forge-variant]:focus-visible { outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color); outline-offset: var(--forge-focus-offset, 2px); }
+.forge-button__busy { width: var(--forge-icon-size, 16px); height: var(--forge-icon-size, 16px); border: 2px solid currentColor; border-inline-end-color: transparent; border-radius: 50%; animation: forge-busy 800ms linear infinite; }
+@keyframes forge-busy { to { transform: rotate(360deg); } }
+/* Existing Blueprint components opt into semantic status appearance. */
+[data-forge-status="info"] { --forge-status-bg: var(--forge-status-info-background); --forge-status-fg: var(--forge-status-info-foreground); --forge-status-border: var(--forge-status-info-border); }
+[data-forge-status="success"] { --forge-status-bg: var(--forge-status-success-background); --forge-status-fg: var(--forge-status-success-foreground); --forge-status-border: var(--forge-status-success-border); }
+[data-forge-status="warning"] { --forge-status-bg: var(--forge-status-warning-background); --forge-status-fg: var(--forge-status-warning-foreground); --forge-status-border: var(--forge-status-warning-border); }
+[data-forge-status="danger"] { --forge-status-bg: var(--forge-status-danger-background); --forge-status-fg: var(--forge-status-danger-foreground); --forge-status-border: var(--forge-status-danger-border); }
+:is(.agently-workspace, .agently-application) :is(.bp6-callout, .bp6-tag)[data-forge-status] { background: var(--forge-status-bg); color: var(--forge-status-fg); box-shadow: none; }
+.bp6-callout[data-forge-status] { padding: var(--forge-spacing-4, 16px); border-radius: var(--forge-radius-surface, 12px); }
+.bp6-callout[data-forge-status] .bp6-heading { color: inherit; }
+.bp6-tag[data-forge-status] { border-radius: var(--forge-radius-pill, 999px); padding: var(--forge-spacing-1, 4px) var(--forge-spacing-2, 8px); }
+.forge-foundation-overlay { background: var(--forge-surface-raised, var(--forge-surface)); color: var(--forge-text); border-radius: var(--forge-radius-surface, 12px); box-shadow: var(--forge-overlay-shadow, var(--forge-default-overlay-shadow)); padding: var(--forge-spacing-4, 16px); }
+.forge-foundation-overlay.bp6-dialog { box-shadow: var(--forge-modal-shadow, var(--forge-default-modal-shadow)); width: min(480px, calc(100vw - 32px)); }
+.forge-segmented-control[data-forge-type] { border-color: var(--forge-control-border); background: var(--forge-surface-subtle); gap: var(--forge-spacing-1, 4px); }
+.forge-segmented-control__option[data-forge-type] { transition-property: background-color, color, border-color; transition-duration: var(--forge-motion-fast, 120ms); transition-timing-function: var(--forge-motion-easing); }
+.forge-segmented-control__option[data-forge-type][aria-pressed="true"] { background: var(--forge-selected-background); color: var(--forge-text); font-weight: inherit; box-shadow: none; }
+.forge-segmented-control__option[data-forge-type]:focus-visible, .forge-switch[data-forge-type]:focus-visible { outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color); outline-offset: var(--forge-focus-offset, 2px); }
+@media (pointer: coarse) { .forge-button[data-forge-variant] { min-height: 44px; min-width: 44px; } }
+@media (prefers-reduced-motion: reduce) { .forge-button[data-forge-variant], .forge-segmented-control__option[data-forge-type] { transition-duration: 0s; } .forge-button__busy { animation: none; } }

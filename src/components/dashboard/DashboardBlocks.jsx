@@ -24,6 +24,9 @@ import { DashboardErrorBoundary } from "./dashboardErrorBoundary.js";
 import {editableNumberValue} from './editableTableValue.js';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import "./Dashboard.css";
+import "./documentTable.css";
+import SharedIcon from "../Icon.jsx";
+import {documentTableColumns, documentTableLayout} from "./documentTable.js";
 
 const EMPTY_REPORT_RUNTIME_SPEC = {};
 
@@ -1400,7 +1403,16 @@ export function DashboardEditableTable({container, context, embedded = false}) {
     const visibleRuntimeColumns = useMemo(() => runtimeColumns.filter((column) => (
         !column?.visibleWhen || evaluatePlainVisibleWhen(column.visibleWhen, context)
     )), [runtimeColumns, context, authorization]);
-    const tableColumns = useMemo(() => withFrozenIdentifierColumn(visibleRuntimeColumns), [visibleRuntimeColumns]);
+    const tablePresentation = container?.tablePresentation;
+    const documentTable = tablePresentation?.variant === 'document';
+    if (tablePresentation?.variant && !documentTable) throw new Error(`Unsupported table variant: ${tablePresentation.variant}`);
+    const editSessions = useRef(new WeakMap());
+    const wrapSelect = select => documentTable ? <span className="forge-document-select">{select}<SharedIcon name="lucide:chevron-down"/></span> : select;
+
+    const tableColumns = useMemo(() => documentTable ? documentTableColumns(visibleRuntimeColumns, tablePresentation)
+        : withFrozenIdentifierColumn(visibleRuntimeColumns), [visibleRuntimeColumns, tablePresentation, documentTable]);
+    const documentLayout = documentTable ? documentTableLayout(tableColumns, {hasRowActions: true}) : null;
+    const detailsField = documentTable ? tablePresentation.rowDetails?.field : null;
     const pageSize = Math.max(1, Number(container?.pageSize || 20));
     const normalizedFilter = filterText.trim().toLowerCase();
     const filteredEntries = rows.map((row, index) => ({row, index})).filter(({row}) => !normalizedFilter || columns.some((column) => (
@@ -1409,19 +1421,20 @@ export function DashboardEditableTable({container, context, embedded = false}) {
     const pageCount = Math.max(1, Math.ceil(filteredEntries.length / pageSize));
     const currentPage = Math.min(page, pageCount);
     const visibleEntries = filteredEntries.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-    const mobileCards = container?.mobileCards?.enabled === true ? container.mobileCards : null;
+    const emptyMessage = rows.length === 0 ? (container?.emptyText || 'No rows yet. Add one to begin.') : 'No matching rows.';
+    const mobileCards = !documentTable && container?.mobileCards?.enabled === true ? container.mobileCards : null;
     const mobileFieldKeys = Array.isArray(mobileCards?.fields) ? mobileCards.fields : [];
     const mobileRequiredFields = new Set(Array.isArray(mobileCards?.requiredFields) ? mobileCards.requiredFields : []);
-    const commit = (nextRows) => {
+    const commit = (nextRows, selectAll = true) => {
         setDraftRows(nextRows);
-        if (typeof dataSource?.replaceCollection === 'function') dataSource.replaceCollection({rows: nextRows, selectAll: true});
+        if (typeof dataSource?.replaceCollection === 'function') dataSource.replaceCollection({rows: nextRows, selectAll});
         else if (typeof dataSource?.setCollection === 'function') dataSource.setCollection(nextRows);
         if (dataSourceContext?.signals?.collection) dataSourceContext.signals.collection.value = nextRows;
         setRevision((value) => value + 1);
     };
     const updateCell = (rowIndex, key, value) => commit(currentRows().map((row, index) => (
         index === rowIndex ? {...row, [key]: value} : row
-    )));
+    )), false);
     const addRow = () => {
         const latest = currentRows();
         const addRowConfig = container?.addRow || {};
@@ -1514,21 +1527,36 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                         <button type="button" className="forge-editable-collection__icon-action" aria-label={container?.addRow?.label || 'Add row'} title={container?.addRow?.label || 'Add row'} onClick={addRow}><Icon icon="plus" size={14}/></button>
                     ) : null}
                 </div>
-                <div className="forge-editable-collection__table-wrap">
-                    <table className="forge-editable-collection__table forge-editable-collection__table--frozen-identifier">
-                        <thead><tr>{tableColumns.map((column) => <th key={column.key} title={column.tooltip || column.cardLabel || undefined} className={column.frozen ? 'forge-table-frozen-identifier' : undefined} style={column.frozen ? {'--forge-frozen-column-width': `${column.resolvedCompactWidth}px`} : undefined}>{column.label || column.key}</th>)}<th aria-label="Row actions"/></tr></thead>
+                <div className={`forge-editable-collection__table-wrap${documentTable ? ' forge-document-table-wrap' : ''}`} data-forge-table-variant={documentTable ? 'document' : undefined} role={documentTable ? 'region' : undefined} aria-label={documentTable ? `${container.title || 'Editable'} table` : undefined} tabIndex={documentTable ? 0 : undefined}>
+                    <table onFocusCapture={documentTable ? event => {
+                        const field=event.target, cell=field.closest('td[data-column-key]');
+                        if (cell && field.matches('input,select,textarea') && !field.disabled && !field.readOnly) {
+                            editSessions.current.set(field, currentRows()[Number(cell.dataset.rowIndex)]?.[cell.dataset.columnKey]);
+                        }
+                    } : undefined} onKeyDownCapture={documentTable ? event => {
+                        const field=event.target, cell=field.closest('td[data-column-key]');
+                        if (!cell || !field.matches('input,select,textarea') || field.disabled || field.readOnly) return;
+                        if (event.key==='Escape') {
+                            if (editSessions.current.has(field)) updateCell(Number(cell.dataset.rowIndex), cell.dataset.columnKey, editSessions.current.get(field));
+                            event.preventDefault(); field.blur();
+                        } else if (event.key==='Enter' && field.tagName!=='SELECT' && (field.tagName!=='TEXTAREA' || cell.hasAttribute('data-column-flex') || event.ctrlKey || event.metaKey)) {
+                            event.preventDefault(); field.blur();
+                        }
+                    } : undefined} className={`forge-editable-collection__table ${documentTable ? 'forge-document-table' : 'forge-editable-collection__table--frozen-identifier'}`} data-forge-table-variant={documentTable ? 'document' : undefined} style={documentLayout ? {minWidth: documentLayout.minWidth} : undefined}>
+                        {documentLayout ? <colgroup>{documentLayout.columnWidths.map((width, index) => <col key={tableColumns[index].key} style={width ? {width} : undefined}/>)}<col style={{width: documentLayout.actionsWidth}}/></colgroup> : null}
+                        <thead><tr>{tableColumns.map((column) => <th key={column.key} data-column-align={column.align} title={column.tooltip || column.cardLabel || undefined} className={column.frozen ? 'forge-table-frozen-identifier' : undefined} style={column.frozen ? {'--forge-frozen-column-width': `${column.resolvedCompactWidth}px`} : undefined}>{column.label || column.key}</th>)}<th aria-label="Row actions"/></tr></thead>
                         <tbody>
                             {visibleEntries.map(({row, index: rowIndex}) => (
-                                <tr key={rowIndex}>
+                                <React.Fragment key={rowIndex}><tr className={detailsField && row[detailsField] ? "forge-table-has-details" : undefined}>
                                     {tableColumns.map((column) => {
                                         const editor = column.editor === false ? null : (column.editor || {type: 'text'});
                                         const editorDisabled = !!(editor?.disabledWhen && evaluatePlainVisibleWhen(editor.disabledWhen, context, row));
                                         const value = row?.[column.key] ?? '';
                                         return (
-                                            <td key={column.key} className={[column.frozen ? 'forge-table-frozen-identifier' : '', column.required === true ? 'is-required' : ''].filter(Boolean).join(' ') || undefined} style={column.frozen ? {'--forge-frozen-column-width': `${column.resolvedCompactWidth}px`} : undefined}>
+                                            <td key={column.key} data-row-index={rowIndex} data-column-key={column.key} data-read-only={!editor || undefined} data-column-flex={column.flex || undefined} data-column-align={column.align} className={[column.frozen ? 'forge-table-frozen-identifier' : '', column.required === true ? 'is-required' : ''].filter(Boolean).join(' ') || undefined} style={column.frozen ? {'--forge-frozen-column-width': `${column.resolvedCompactWidth}px`} : undefined}>
                                                 {!editor ? <span>{formatDashboardValue(value, column.format, getDashboardLocale(context))}</span>
                                                     : editor.type === 'frequency' ? frequencyControl(rowIndex, column, value)
-                                                    : editor.type === 'select' ? (
+                                                    : editor.type === 'select' ? wrapSelect(
                                                         <select aria-label={`${column.label || column.key} row ${rowIndex + 1}`} value={value} disabled={editorDisabled}
                                                             onChange={(event) => updateCell(rowIndex, column.key, event.target.value)}>
                                                             {(editor.options || []).map((option) => {
@@ -1536,19 +1564,20 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                                                                 return <option key={normalized.value} value={normalized.value}>{normalized.label}</option>;
                                                             })}
                                                         </select>
-                                                    ) : /rationale|reason|description/i.test(`${column.key} ${column.label || ''}`) ? (
+                                                    ) : editor.type === 'multiline' || /rationale|reason|description/i.test(`${column.key} ${column.label || ''}`) ? (
                                                         <textarea aria-label={`${column.label || column.key} row ${rowIndex + 1}`} disabled={editorDisabled}
                                                             rows={1}
                                                             ref={(node) => {
                                                                 if (!node) return;
                                                                 node.style.height = 'auto';
+                                                                if (documentTable && 'fieldSizing' in node.style) return;
                                                                 node.style.height = `${node.scrollHeight}px`;
                                                             }}
                                                             style={editableCellStyle(row, column)}
                                                             value={value} placeholder={editor.placeholder || ''}
                                                             onChange={(event) => {
                                                                 event.currentTarget.style.height = 'auto';
-                                                                event.currentTarget.style.height = `${event.currentTarget.scrollHeight}px`;
+                                                                if (!documentTable || !('fieldSizing' in event.currentTarget.style)) event.currentTarget.style.height = `${event.currentTarget.scrollHeight}px`;
                                                                 updateCell(rowIndex, column.key, event.target.value);
                                                             }}/>
                                                     ) : (
@@ -1556,7 +1585,7 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                                                             type={editor.type === 'number' ? 'number' : editor.type === 'time' ? 'time' : editor.type === 'date' ? 'date' : editor.type === 'datetime-local' ? 'datetime-local' : 'text'}
                                                             min={editor.min}
                                                             max={editor.max}
-                                                            step={editor.step}
+                                                            step={editor.step ?? (documentTable ? 'any' : undefined)}
                                                             required={column.required === true}
                                                             disabled={editorDisabled}
                                                             style={editableCellStyle(row, column)}
@@ -1569,18 +1598,19 @@ export function DashboardEditableTable({container, context, embedded = false}) {
                                             </td>
                                         );
                                     })}
-                                    <td className="forge-editable-collection__actions">
+                                    <td className="forge-editable-collection__actions" data-forge-table-variant={documentTable ? "document" : undefined}>
                                         {container?.allowRemove !== false ? (
-                                            <button type="button" disabled={rows.length <= Math.max(0, Number(container?.minRows || 0))} aria-label={`${container?.removeRowLabel || 'Remove row'} ${rowIndex + 1}`} title={container?.removeRowLabel || 'Remove row'} onClick={() => removeRow(rowIndex)}><Icon icon="trash" size={14}/></button>
+                                            <button type="button" disabled={rows.length <= Math.max(0, Number(container?.minRows || 0))} aria-label={`${container?.removeRowLabel || 'Remove row'} ${rowIndex + 1}`} title={container?.removeRowLabel || 'Remove row'} onClick={() => removeRow(rowIndex)}><SharedIcon name={tablePresentation?.removeIcon || "trash"}/></button>
                                         ) : null}
                                     </td>
-                                </tr>
+                                </tr>{detailsField && row[detailsField] ? <tr className="forge-table-row-details"><td colSpan={tableColumns.length + 1}><div className="forge-table-row-details__content">{tablePresentation.rowDetails.label ? `${tablePresentation.rowDetails.label}: ` : ''}{String(row[detailsField])}</div></td></tr> : null}</React.Fragment>
                             ))}
-                            {visibleEntries.length === 0 ? <tr><td colSpan={columns.length + 1} className="forge-editable-collection__empty">{rows.length === 0 ? (container?.emptyText || 'No rows yet. Add one to begin.') : 'No matching rows.'}</td></tr> : null}
+                            {visibleEntries.length === 0 ? <tr><td colSpan={tableColumns.length + 1} className="forge-editable-collection__empty">{emptyMessage}</td></tr> : null}
                         </tbody>
                     </table>
                 </div>
                 {mobileCards ? <div className="forge-editable-collection__cards">
+                    {visibleEntries.length === 0 ? <div className="forge-editable-collection__empty">{emptyMessage}</div> : null}
                     {visibleEntries.map(({row, index: rowIndex}) => {
                         const titleColumn = columns.find((column) => column.key === mobileCards.titleField);
                         const metaColumn = columns.find((column) => column.key === mobileCards.metaField);
