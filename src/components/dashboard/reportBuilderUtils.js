@@ -502,6 +502,7 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         ...(chartSpec.categoryColors && typeof chartSpec.categoryColors === "object" && !Array.isArray(chartSpec.categoryColors) ? {categoryColors: {...chartSpec.categoryColors}} : {}),
         ...(seriesOptions ? { seriesOptions } : {}),
         ...(categoryLabel ? { categoryLabel } : {}),
+        ...(chartSpec.preserveCategoryOrder === true ? {preserveCategoryOrder:true} : {}),
         ...(metricSelection ? {metricSelection} : {}),
         ...(typeof chartSpec.allowTableSwitch === "boolean" ? {allowTableSwitch:chartSpec.allowTableSwitch} : {}),
     };
@@ -2335,6 +2336,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
     const hasXDisplayValueMap = xField?.displayValueMap && typeof xField.displayValueMap === "object" && !Array.isArray(xField.displayValueMap);
     const baseChart = {
         type: seriesType,
+        ...(normalized.preserveCategoryOrder === true ? {preserveCategoryOrder:true} : {}),
         xAxis: {
             dataKey: xDisplayKey || xSourceKey,
             label: xField?.label || xField?.id || xSourceKey,

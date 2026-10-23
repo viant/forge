@@ -3276,3 +3276,7 @@ assert.equal(splitHorizontal.chart.series.valueKey,'totalSpend');
 assert.equal(splitHorizontal.chart.yAxis.format,splitContainer.chart.yAxis.format);
 assert.ok(validateReportBuilderChartSpec(expandedSupportedConfig,{...splitHorizontalSpec,yFields:['totalSpend','impressions']},familyFields).errors.some(e=>e.code==='tooManyMeasures'));
 for(const type of ['pie','donut','funnel_bar'])assert.ok(validateReportBuilderChartSpec(expandedSupportedConfig,{...splitHorizontalSpec,type},familyFields).errors.some(e=>e.field==='seriesField'&&e.code==='notAllowed'));
+
+const orderedHorizontal=buildExplicitReportBuilderChartContainer({dataSourceRef:'report_source',collection:[]},expandedSupportedConfig,splitHorizontalState,{...splitHorizontalSpec,preserveCategoryOrder:true});
+assert.equal(orderedHorizontal.chart.preserveCategoryOrder,true);
+assert.equal(normalizeReportBuilderChartSpec({...splitHorizontalSpec,preserveCategoryOrder:true}).preserveCategoryOrder,true);

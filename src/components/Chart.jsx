@@ -35,6 +35,7 @@ import {
 import { useDataSourceState } from "../hooks/useDataSourceState.js";
 import {
     aggregateDirectSeriesData,
+    orderHorizontalChartRows,
     applyChartRowLimit,
     buildPieSliceCellKey,
     buildPieChartData,
@@ -134,7 +135,8 @@ function ClampedCategoryTick({ x = 0, y = 0, payload = {}, config = null, valueF
     );
 }
 
-function HorizontalBarValueLabel({ x = 0, y = 0, width = 0, height = 0, value = 0, formatter = null }) {
+export function HorizontalBarValueLabel({ x = 0, y = 0, width = 0, height = 0, value, formatter = null }) {
+    if (!isChartNumericValue(value)) return null;
     const layout = resolveHorizontalBarDataLabelLayout({ x, width, value });
     const label = typeof formatter === "function" ? formatter(value) : value;
     return (
@@ -615,7 +617,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         return {
             chartData: data,
             availableDataKeys: keys,
-            yAxisLabel: selectedValue ? selectedValue.name : (leftAxis.label || ""),
+                yAxisLabel: selectedValue?.name || selectedValue?.label || leftAxis.label || "",
         };
     }, [chart, directSeriesChart, effectiveCollection, isPieChart, leftAxis.label, selectedValueKey, series, seriesDefinitions, xAxis?.dataKey]);
 
@@ -899,10 +901,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     );
 
     const normalizedAllChartData = (isHorizontalBar
-        ? [...denseChartData].sort((a, b) => {
-            const primaryKey = renderableSeriesDefinitions[0]?.value;
-            return Number(b?.[primaryKey] || 0) - Number(a?.[primaryKey] || 0);
-        })
+        ? orderHorizontalChartRows(denseChartData, renderableSeriesDefinitions[0]?.value, chart?.preserveCategoryOrder === true)
         : denseChartData
     ).map((row) => ({
         ...row,
@@ -1100,7 +1099,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     tickFormatter={createAxisTickFormatter(primarySeries.format || leftAxis.format)}
                     tick={axisTickStyle}
                     label={{
-                        value: embedded ? "" : (leftAxis.label || primarySeries.label || ""),
+                        value: embedded ? "" : (leftAxis.label || yAxisLabel || (directSeriesChart ? primarySeries.label : "") || ""),
                         position: "insideBottomRight",
                         offset: 0,
                     }}

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import {
     aggregateDirectSeriesData,
+    orderHorizontalChartRows,
     applyChartRowLimit,
     buildPieChartData,
     buildPieSliceCellKey,
@@ -373,3 +374,8 @@ assert.equal(nullableSeries[0].metric,null);
 assert.equal(nullableSeries[1].metric,0);
 assert.equal(nullableSeries[2].metric,2);
 assert.deepEqual(buildPieChartData([{category:'Missing',metric:null},{category:'Zero',metric:0},{category:'Blank',metric:''}], 'category', 'metric').map(x=>({name:x.name,value:x.value})),[]);
+
+const serverRankedCosts=[{publisher:'Lowest CPM',cost:.76},{publisher:'Next CPM',cost:.95}];
+assert.deepEqual(orderHorizontalChartRows(serverRankedCosts,'cost',true),serverRankedCosts);
+assert.equal(orderHorizontalChartRows(serverRankedCosts,'cost')[0].publisher,'Next CPM','Legacy descending default remains compatible');
+assert.equal(serverRankedCosts[0].publisher,'Lowest CPM','Chart sorting must not mutate producer ordering');

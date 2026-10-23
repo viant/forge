@@ -539,3 +539,11 @@ export function resolveChartValueAxisDomain(chartType = "", explicitDomain = und
 export function resolveChartAnimationActive(chart = {}) {
     return chart?.animate === true || chart?.animation === true;
 }
+
+// Preserve server-ranked categories when requested; existing charts retain their
+// descending-value default. Neither path mutates the executed row collection.
+export function orderHorizontalChartRows(rows = [], primaryKey, preserveSourceOrder = false) {
+    const ordered = [...rows];
+    if (preserveSourceOrder) return ordered;
+    return ordered.sort((a, b) => Number(b?.[primaryKey] || 0) - Number(a?.[primaryKey] || 0));
+}
