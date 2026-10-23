@@ -3630,8 +3630,17 @@ const renderConditionalRuntime = (conditionValues, scope) => renderToStaticMarku
 }));
 assert.match(renderConditionalRuntime({ showDetails: true }), /Composite child must stay hidden/);
 assert.doesNotMatch(renderConditionalRuntime({ showDetails: false }), /Composite child must stay hidden/);
-assert.doesNotMatch(renderConditionalRuntime({ showDetails: true }, {
+assert.match(renderConditionalRuntime({ showDetails: true }, {
   params: [{ id: "showDetails", value: false }],
+}), /Composite child must stay hidden/);
+assert.doesNotMatch(renderConditionalRuntime({}, {
+  params: [{ id: "showDetails", value: false }],
+}), /Composite child must stay hidden/);
+assert.match(renderConditionalRuntime({}, {
+  params: [{ id: "showDetails", value: true }],
+}), /Composite child must stay hidden/);
+assert.doesNotMatch(renderConditionalRuntime({ showDetails: false }, {
+  params: [{ id: "showDetails", value: true }],
 }), /Composite child must stay hidden/);
 console.log("ReportRuntime ✓ preserves metadata disclosure, workspace titles, section details/actions, and option visibility after merge");
 
