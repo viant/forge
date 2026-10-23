@@ -58959,7 +58959,7 @@ ${indent}${end}`;
     }
     if (normalizeString37(resolvedChart == null ? void 0 : resolvedChart.kind) === "groupedSeries") {
       return (Array.isArray(resolvedChart == null ? void 0 : resolvedChart.seriesKeys) ? resolvedChart.seriesKeys : []).map((seriesKey, index) => {
-        var _a6;
+        var _a6, _b;
         const normalizedKey = normalizeString37(seriesKey);
         if (!normalizedKey) {
           return null;
@@ -58969,7 +58969,7 @@ ${indent}${end}`;
           label: normalizedKey,
           type: chartType,
           color: printColor(resolveCategoryColor((_a6 = chartModel == null ? void 0 : chartModel.series) == null ? void 0 : _a6.categoryColors, normalizedKey, palette[index % palette.length])),
-          format: "",
+          format: normalizeString37((_b = chartModel == null ? void 0 : chartModel.yAxis) == null ? void 0 : _b.format),
           dataLabels: "",
           pointColorMode: ""
         };
@@ -59627,7 +59627,12 @@ ${indent}${end}`;
     const xAxisKey = normalizeString37(resolvedChart == null ? void 0 : resolvedChart.xAxisKey);
     const valueRange = bounds.maxValue - bounds.minValue || 1;
     const baselineY = topPad + (bounds.maxValue - 0) / valueRange * plotHeight;
+    const barSeries = seriesDescriptors.filter((series) => resolveChartSupportedSeriesType(series.type) === "bar");
+    const categoryWidth = plotWidth / Math.max(rows.length, 1);
     const xPositions = rows.map((row, index) => {
+      if (barSeries.length > 0) {
+        return leftPad + (index + 0.5) * categoryWidth;
+      }
       if (rows.length === 1) {
         return leftPad + plotWidth / 2;
       }
@@ -59694,9 +59699,9 @@ ${indent}${end}`;
       { x: tick.x, y: topPad + plotHeight + 18 }
     )).join("\n");
     const xAxisTitle = xAxisLabel ? `<text x="${leftPad + plotWidth / 2}" y="${topPad + plotHeight + 36}" text-anchor="middle" font-size="11" font-weight="600" fill="#475467">${escapeXml(xAxisLabel)}</text>` : "";
-    const barSeries = seriesDescriptors.filter((series) => resolveChartSupportedSeriesType(series.type) === "bar");
-    const groupWidth = Math.min(48, Math.max(14, plotWidth / Math.max(rows.length, 1) * 0.56));
-    const barWidth = barSeries.length > 0 ? Math.max(8, groupWidth / barSeries.length) : 0;
+    const groupWidth = Math.min(48, categoryWidth * 0.56);
+    const barWidth = barSeries.length > 0 ? groupWidth / barSeries.length : 0;
+    const drawnBarWidth = Math.max(0, barWidth - Math.min(1, barWidth * 0.12));
     const renderedSeries = seriesDescriptors.map((series) => {
       const supportedType = resolveChartSupportedSeriesType(series.type);
       const seriesBounds = series.axis === "right" && rightBounds ? rightBounds : bounds;
@@ -59729,9 +59734,9 @@ ${indent}${end}`;
           const y4 = Math.min(point.y, seriesBaselineY);
           const barHeight = Math.max(1, Math.abs(seriesBaselineY - point.y));
           const fillColor = resolveSeriesPointColor(series, point.value, series.color);
-          const label = shouldRenderReportPrintSeriesDataLabels(series, supportedType, rows.length) ? `<text x="${x2 + (barWidth - 1) / 2}" y="${y4 - 4}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(point.value, series.format))}</text>` : "";
+          const label = shouldRenderReportPrintSeriesDataLabels(series, supportedType, rows.length) ? `<text x="${x2 + drawnBarWidth / 2}" y="${y4 - 4}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(point.value, series.format))}</text>` : "";
           return `
-          <rect x="${x2}" y="${y4}" width="${barWidth - 1}" height="${barHeight}" rx="2" fill="${escapeXml(fillColor)}" />
+          <rect x="${x2}" y="${y4}" width="${drawnBarWidth}" height="${barHeight}" rx="2" fill="${escapeXml(fillColor)}" />
           ${label}
         `;
         }).join("\n");

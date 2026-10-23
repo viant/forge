@@ -468,3 +468,23 @@ for (const count of [20, 30]) {
     }
   }
 }
+
+// Campaign shares retain their published unit after grouped-series lowering.
+// Multiple categories and many series must fit inside category bands, including
+// the first and last groups on a narrow dashboard tile.
+for(const [format,expected] of [['percentFraction',/>84\.8%</],['currency2',/>\$0\.85</]]) {
+ for(const width of [140,270,640]) for(const seriesCount of [2,8]) {
+  const seriesKeys=Array.from({length:seriesCount},(_,i)=>String(101+i));
+  const rows=['top 1-10','top 11-25','top 26-50'].map((bucket,i)=>({bucket,...Object.fromEntries(seriesKeys.map((key,j)=>[key,i===0&&j===1?.848:.681/(i+1)]))}));
+  const output=buildReportPrintChartSvg({width,chartModel:{type:'bar',xAxis:{dataKey:'bucket'},yAxis:{format}},resolvedChart:{kind:'groupedSeries',type:'bar',xAxisKey:'bucket',seriesKeys,rows}});
+  assert.equal(output.diagnostics.length,0);
+  assert.match(output.svg,expected,'Grouped series must inherit the measure axis format');
+  const bars=[...output.svg.matchAll(/<rect x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="[\d.-]+" rx="2"/g)].filter(match=>Number(match[2])<=196);
+  assert.equal(bars.length,rows.length*seriesCount);
+  for(const [,x,y,w] of bars){
+   assert.ok(Number(w)>0,'Dense grouped bars must retain positive width');
+   assert.ok(Number(x)>=52,'First category bars must not cover the y-axis or its labels');
+   assert.ok(Number(x)+Number(w)<=width-16,'Last category bars must remain inside the plot');
+  }
+ }
+}
