@@ -4,9 +4,11 @@ export function installForgePerfDiagnostics({env=globalThis,panelId='forge-timin
   armId='forge-timing-arm',serverId='forge-timing-server',outputId='forge-timing-output',
   globalKey='__forgePerfDiagnostics',panelTitle='Forge timing diagnostics',
   classifyFetch=()=>'',resourcePath=()=>true,serverTimingPath=()=>false,
+  showServerTimingToggle=true,
   openPublishedWindow=null,
   clickLabel=event=>event.target?.closest?.('button')?.textContent?.trim(),
   findVisiblePanel=(doc)=>doc.querySelector('[role="tabpanel"]:not([hidden]):not([aria-hidden="true"])'),
+  findVisibleResult=null,extraSnapshot=()=>null,
 }={}) {
   const {window, document, performance} = env;
   if (!window || !document || !performance || new URL(window.location.href).searchParams.get('diagnostics') !== 'timing') return null;
@@ -81,6 +83,8 @@ export function installForgePerfDiagnostics({env=globalThis,panelId='forge-timin
     const data = scoped.filter(event => event.kind === 'fetch' && event.category === 'data');
     const rows = scoped.find(event => event.kind === 'rows-dom');
     const frame = scoped.find(event => event.kind === 'rows-frame');
+    const content = scoped.find(event => event.kind === 'content-dom');
+    const contentFrame = scoped.find(event => event.kind === 'content-frame');
     const phases=[...new Set(scoped.filter(event=>event.kind==='window-phase').map(event=>event.scope))]
       .map(scope=>{
         const own=scoped.filter(event=>event.kind==='window-phase' && event.scope===scope);
@@ -104,8 +108,10 @@ export function installForgePerfDiagnostics({env=globalThis,panelId='forge-timin
       metadataEndToDataNetworkStartMs:metadata&&data.length===1&&data[0].start>=metadata.end?+(data[0].start-metadata.end).toFixed(1):null,
       openToRowsDOMMs:rows && open ? +(rows.start-open.start).toFixed(1) : null,
       openToRowsFrameMs:frame && open ? +(frame.start-open.start).toFixed(1) : null,
+      openToContentDOMMs:content && open ? +(content.start-open.start).toFixed(1) : null,
+      openToContentFrameMs:contentFrame && open ? +(contentFrame.start-open.start).toFixed(1) : null,
       dataEndToRowsDOMMs:rows && data.length===1 && latestDataEnd!==null && rows.start>=latestDataEnd?+(rows.start-latestDataEnd).toFixed(1):null,
-      phaseScopes:phases,events:scoped,resources:relevantResources()};
+      phaseScopes:phases,events:scoped,resources:relevantResources(),extra:extraSnapshot({events:scoped,open,performance})};
   };
   const render = () => { if (output) output.textContent = JSON.stringify(snapshot(),null,2); };
   let renderScheduled=false;
@@ -145,6 +151,8 @@ export function installForgePerfDiagnostics({env=globalThis,panelId='forge-timin
     let metadataSeen = false;
     let timeoutId,firstFrame,secondFrame;
     const current=()=>epoch===openEpoch;
+    const firstPanel=findVisiblePanel(document,label);
+    const baseline=firstPanel&&findVisibleResult?.(firstPanel,document,label);
     const stop=()=>{
       observer.disconnect();
       clearTimeout(timeoutId);
@@ -157,6 +165,23 @@ export function installForgePerfDiagnostics({env=globalThis,panelId='forge-timin
       if (!panel || panel.checkVisibility?.({checkVisibilityCSS:true}) === false) return;
       const style = window.getComputedStyle?.(panel);
       if (style?.display === 'none' || style?.visibility === 'hidden') return;
+      const visibleResult=findVisibleResult?.(panel,document,label);
+      if(visibleResult?.element && visibleResult.token!=null){
+        if(visibleResult.element!==baseline?.element || visibleResult.token!==baseline?.token){
+          const contentKind=['report','window'].includes(visibleResult.kind)?visibleResult.kind:'content';
+          add({kind:'content-dom',contentKind,start:now()});
+          observer.disconnect();clearTimeout(timeoutId);
+          firstFrame=requestAnimationFrame(()=>{
+            firstFrame=null;if(!current())return;
+            secondFrame=requestAnimationFrame(()=>{
+              secondFrame=null;if(current())add({kind:'content-frame',contentKind,start:now()});
+            });
+          });
+        }
+        // A retained report table is not a fresh window row commit. Only a
+        // changed host result token can finish this measured open.
+        return;
+      }
       if (!metadataSeen && panel.querySelector('.basic-table-wrapper')) {
         metadataSeen = true;
         add({kind:'table-dom',start:now()});
@@ -175,7 +200,8 @@ export function installForgePerfDiagnostics({env=globalThis,panelId='forge-timin
         });
       });
     });
-    observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
+    observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,
+      attributeFilter:['class','hidden','aria-hidden','data-preview-report-commit']});
     timeoutId=setTimeout(stop,30000);
     return stop;
   };
@@ -216,7 +242,7 @@ export function installForgePerfDiagnostics({env=globalThis,panelId='forge-timin
     input.id = serverId;
     input.onchange = () => {serverTiming = input.checked;render();};
     toggle.append(input,document.createTextNode(' Request Server-Timing'));
-    panel.append(toggle);
+    if(showServerTimingToggle)panel.append(toggle);
     openerControls=document.createElement('div');
     openerControls.id=`${panelId}-published-opener`;
     openerControls.hidden=!opener;
@@ -264,7 +290,7 @@ export function installForgePerfDiagnostics({env=globalThis,panelId='forge-timin
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',mount,{once:true});
   else mount();
-  const diagnostics = {snapshot,setOpenPublishedWindow(callback) {
+  const diagnostics = {snapshot,refresh:scheduleRender,setOpenPublishedWindow(callback) {
     opener=typeof callback==='function'?callback:null;
     if(openerControls)openerControls.hidden=!opener;
   }};

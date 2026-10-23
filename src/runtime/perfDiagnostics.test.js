@@ -140,3 +140,46 @@ it('does not let a failed same-title open observe rows from the next open',async
   await new Promise(resolve=>setTimeout(resolve,0));
   expect(trace.snapshot().events.filter(event=>event.kind==='rows-dom')).toHaveLength(1);
 });
+
+it('marks a new visible report commit and two frames without treating an old report as fresh',async()=>{
+  const frames=[];
+  vi.stubGlobal('requestAnimationFrame',callback=>{frames.push(callback);return frames.length;});
+  const host={location:{href:'http://fixture/?diagnostics=timing'},fetch:vi.fn(),
+    requestAnimationFrame:callback=>{frames.push(callback);return frames.length;},getComputedStyle:window.getComputedStyle};
+  const panel=document.createElement('div');panel.setAttribute('role','tabpanel');
+  const report=document.createElement('div');report.dataset.previewReportCommit='1';panel.append(report);document.body.append(panel);
+  const trace=installForgePerfDiagnostics({env:{window:host,document,performance},
+    findVisibleResult:container=>({kind:'report',element:container.querySelector('[data-preview-report-commit]'),
+      token:Number(container.querySelector('[data-preview-report-commit]')?.dataset.previewReportCommit||0)})});
+  document.dispatchEvent(new Event('DOMContentLoaded'));
+  document.querySelector('#forge-timing-arm').click();
+  const button=document.createElement('button');button.textContent='Apply filters';document.body.append(button);button.click();
+  expect(trace.snapshot().events.some(event=>event.kind==='content-dom')).toBe(false);
+  report.dataset.previewReportCommit='2';
+  await new Promise(resolve=>setTimeout(resolve,0));
+  expect(trace.snapshot().events.filter(event=>event.kind==='content-dom')).toMatchObject([{contentKind:'report'}]);
+  expect(trace.snapshot().openToContentDOMMs).not.toBeNull();
+  while(frames.length)frames.shift()();
+  expect(trace.snapshot().events.filter(event=>event.kind==='content-frame')).toMatchObject([{contentKind:'report'}]);
+  expect(trace.snapshot().openToContentFrameMs).not.toBeNull();
+});
+
+it('does not count old report table rows while the report commit token is unchanged',async()=>{
+  vi.stubGlobal('requestAnimationFrame',callback=>setTimeout(callback,0));
+  const host={location:{href:'http://fixture/?diagnostics=timing'},fetch:vi.fn(),getComputedStyle:window.getComputedStyle};
+  const panel=document.createElement('div');panel.setAttribute('role','tabpanel');
+  const report=document.createElement('div');report.dataset.previewReportCommit='1';
+  report.innerHTML='<div class="basic-table-wrapper"><table><tbody><tr class="row"><td>old row</td></tr></tbody></table></div>';
+  panel.append(report);document.body.append(panel);
+  const trace=installForgePerfDiagnostics({env:{window:host,document,performance},
+    findVisibleResult:container=>({kind:'report',element:report,token:Number(report.dataset.previewReportCommit)})});
+  document.dispatchEvent(new Event('DOMContentLoaded'));
+  document.querySelector('#forge-timing-arm').click();
+  const button=document.createElement('button');button.textContent='Apply filters';document.body.append(button);button.click();
+  report.querySelector('tbody').append(document.createElement('tr'));
+  await new Promise(resolve=>setTimeout(resolve,0));
+  expect(trace.snapshot().events.some(event=>['rows-dom','content-dom'].includes(event.kind))).toBe(false);
+  report.dataset.previewReportCommit='2';
+  await new Promise(resolve=>setTimeout(resolve,0));
+  expect(trace.snapshot().events.filter(event=>event.kind==='content-dom')).toHaveLength(1);
+});
