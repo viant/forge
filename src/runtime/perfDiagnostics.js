@@ -20,6 +20,8 @@ export function installForgePerfDiagnostics({env=globalThis,panelId='forge-timin
   performance.setResourceTimingBufferSize?.(2000);
   let armed = false;
   let open = null;
+  let openEpoch=0;
+  let stopRows=()=>{};
   let panel;
   let output;
   let serverTiming = false;
@@ -139,9 +141,18 @@ export function installForgePerfDiagnostics({env=globalThis,panelId='forge-timin
     }
   };
 
-  const watchRows = label => {
+  const watchRows = (label,epoch) => {
     let metadataSeen = false;
+    let timeoutId,firstFrame,secondFrame;
+    const current=()=>epoch===openEpoch;
+    const stop=()=>{
+      observer.disconnect();
+      clearTimeout(timeoutId);
+      if(firstFrame!=null)globalThis.cancelAnimationFrame?.(firstFrame);
+      if(secondFrame!=null)globalThis.cancelAnimationFrame?.(secondFrame);
+    };
     const observer = new MutationObserver(() => {
+      if(!current())return;
       const panel = findVisiblePanel(document,label);
       if (!panel || panel.checkVisibility?.({checkVisibilityCSS:true}) === false) return;
       const style = window.getComputedStyle?.(panel);
@@ -154,19 +165,30 @@ export function installForgePerfDiagnostics({env=globalThis,panelId='forge-timin
       if (!rows.length) return;
       add({kind:'rows-dom',start:now(),rowCount:rows.length});
       observer.disconnect();
-      requestAnimationFrame(() => requestAnimationFrame(() => add({kind:'rows-frame',start:now()})));
+      clearTimeout(timeoutId);
+      firstFrame=requestAnimationFrame(()=>{
+        firstFrame=null;
+        if(!current())return;
+        secondFrame=requestAnimationFrame(()=>{
+          secondFrame=null;
+          if(current())add({kind:'rows-frame',start:now()});
+        });
+      });
     });
     observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
-    setTimeout(()=>observer.disconnect(),30000);
+    timeoutId=setTimeout(stop,30000);
+    return stop;
   };
   const beginOpen = label => {
+    openEpoch++;
+    stopRows();
     performance.clearResourceTimings?.();
     scopes.clear();nextScope=0;
     armed = false;
     events.length = 0;
     open = {label,start:now()};
     add({kind:'open-click',start:open.start});
-    watchRows(label);
+    stopRows=watchRows(label,openEpoch);
   };
   document.addEventListener('click', event => {
     if (!armed || panel?.contains(event.target)) return;
