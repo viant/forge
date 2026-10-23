@@ -99,6 +99,18 @@ func NewReplica(cfg Config) (*Replica, error) {
 }
 func (r *Replica) Enabled() bool      { return r != nil && r.cfg.Enabled }
 func (r *Replica) Generation() uint64 { r.mu.RLock(); defer r.mu.RUnlock(); return r.latest.Generation }
+
+// KnownHash is the last validated complete catalog hash for conditional MCP
+// discovery. It is a transport hint, never an admission or readiness signal.
+// An empty value means no catalog has been loaded yet.
+func (r *Replica) KnownHash() string {
+	if r == nil {
+		return ""
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.latest.Hash
+}
 func (r *Replica) PartitionReady(key string) bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
