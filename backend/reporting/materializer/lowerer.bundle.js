@@ -67696,7 +67696,7 @@ ${indent}${end}`;
     const columns = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.columns) ? block.content.columns : [];
     let rows = Array.isArray((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.resolvedRows) ? block.content.resolvedRows : [];
     const minimumWidths = minimumReportPrintColumnWidths(state, block, columns);
-    if (columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
+    if (rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
       const groups = [];
       let group = [columns[0]];
       let width = minimumWidths[0];
@@ -67800,8 +67800,8 @@ ${indent}${end}`;
   } = {}) {
     var _a5, _b, _c, _d, _e, _f, _g;
     const datasetRef = normalizeString39(block == null ? void 0 : block.datasetRef);
-    const declared = (((_a5 = state.reportSpec) == null ? void 0 : _a5.datasets) || []).some((dataset2) => dataset2.id === datasetRef);
-    const dataset = (((_b = state.reportFill) == null ? void 0 : _b.datasets) || []).find((dataset2) => dataset2.id === datasetRef);
+    const declared = (Array.isArray((_a5 = state.reportSpec) == null ? void 0 : _a5.datasets) ? state.reportSpec.datasets : []).some((dataset2) => (dataset2 == null ? void 0 : dataset2.id) === datasetRef);
+    const dataset = (Array.isArray((_b = state.reportFill) == null ? void 0 : _b.datasets) ? state.reportFill.datasets : []).find((dataset2) => (dataset2 == null ? void 0 : dataset2.id) === datasetRef);
     const provenance = dataset == null ? void 0 : dataset.provenance;
     if (declared && ((_c = block == null ? void 0 : block.content) == null ? void 0 : _c.rowCount) === 0 && (provenance == null ? void 0 : provenance.hasMore) === false && (provenance == null ? void 0 : provenance.truncated) === false && Array.isArray(provenance == null ? void 0 : provenance.diagnostics) && provenance.diagnostics.length === 0) {
       ensureReportPrintSpace(state, reportPrintTitleHeight(state, block, layoutNote) + REPORT_PRINT_THEME.bodyLineHeight);
