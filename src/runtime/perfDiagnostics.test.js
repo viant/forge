@@ -101,3 +101,42 @@ it('records phases immediately but batches panel writes into one frame',()=>{
   frames.shift()();
   expect(output.textContent).toContain('metadata-signal-published');
 });
+
+it('replaces a same-title row watcher and rejects late frames from the previous open',async()=>{
+  const rowFrames=new Map();let nextFrame=0;
+  vi.stubGlobal('requestAnimationFrame',callback=>{const id=++nextFrame;rowFrames.set(id,callback);return id;});
+  vi.stubGlobal('cancelAnimationFrame',id=>rowFrames.delete(id));
+  const host={location:{href:'http://fixture/?diagnostics=timing'},fetch:vi.fn(),
+    requestAnimationFrame:vi.fn(),getComputedStyle:window.getComputedStyle};
+  const trace=installForgePerfDiagnostics({env:{window:host,document,performance}});
+  document.dispatchEvent(new Event('DOMContentLoaded'));
+  const button=document.createElement('button');button.textContent='Connectors';document.body.append(button);
+  const panel=document.createElement('div');panel.setAttribute('role','tabpanel');document.body.append(panel);
+  document.querySelector('#forge-timing-arm').click();button.click();
+  panel.innerHTML='<div class="basic-table-wrapper"><table><tbody><tr class="row"><td>old</td></tr></tbody></table></div>';
+  await new Promise(resolve=>setTimeout(resolve,0));
+  const oldFrame=[...rowFrames.values()][0];
+  expect(trace.snapshot().events.filter(event=>event.kind==='rows-dom')).toHaveLength(1);
+  panel.textContent='';
+  document.querySelector('#forge-timing-arm').click();button.click();
+  panel.innerHTML='<div class="basic-table-wrapper"><table><tbody><tr class="row"><td>new</td></tr></tbody></table></div>';
+  await new Promise(resolve=>setTimeout(resolve,0));
+  oldFrame(); // A callback already queued by the browser must still be inert.
+  while(rowFrames.size){const [id,callback]=rowFrames.entries().next().value;rowFrames.delete(id);callback();}
+  const events=trace.snapshot().events;
+  expect(events.filter(event=>event.kind==='rows-dom')).toHaveLength(1);
+  expect(events.filter(event=>event.kind==='rows-frame')).toHaveLength(1);
+});
+
+it('does not let a failed same-title open observe rows from the next open',async()=>{
+  const host={location:{href:'http://fixture/?diagnostics=timing'},fetch:vi.fn(),getComputedStyle:window.getComputedStyle};
+  const trace=installForgePerfDiagnostics({env:{window:host,document,performance}});
+  document.dispatchEvent(new Event('DOMContentLoaded'));
+  const button=document.createElement('button');button.textContent='Connectors';document.body.append(button);
+  const panel=document.createElement('div');panel.setAttribute('role','tabpanel');document.body.append(panel);
+  document.querySelector('#forge-timing-arm').click();button.click(); // Denied: no rows arrive.
+  document.querySelector('#forge-timing-arm').click();button.click();
+  panel.innerHTML='<div class="basic-table-wrapper"><table><tbody><tr class="row"><td>admitted</td></tr></tbody></table></div>';
+  await new Promise(resolve=>setTimeout(resolve,0));
+  expect(trace.snapshot().events.filter(event=>event.kind==='rows-dom')).toHaveLength(1);
+});
