@@ -3013,10 +3013,12 @@ export default function ReportRuntime({
   };
   const runtimeFilterValues = useMemo(
     () => ({
+      ...resolveReportRuntimeFilterValues(scopeParamIndex),
+      // Hosts may supply values from the completed execution. Authored scope
+      // defaults are a fallback for presentation, not a newer execution result.
       ...(conditionValues && typeof conditionValues === "object" && !Array.isArray(conditionValues)
         ? conditionValues
         : {}),
-      ...resolveReportRuntimeFilterValues(scopeParamIndex),
     }),
     [conditionValues, scopeParamIndex],
   );
