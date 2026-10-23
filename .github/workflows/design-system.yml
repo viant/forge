@@ -1,0 +1,42 @@
+name: Design system contracts
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  foundation:
+    name: Design system contracts
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: forge
+    env:
+      PLAYWRIGHT_CHANNEL: chromium
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: forge
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: viant/agently-core
+          ref: 43dff0269461212b9c8bb493e23bda3ac6fa2de8
+          path: agently-core
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: forge/package-lock.json
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: forge/go.mod
+          cache-dependency-path: forge/go.sum
+      - run: go test ./backend/types
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:workspace-theme
+      - run: npm run build
+      - name: Check contributor entry points
+        run: test -f AGENTS.md && test -f CLAUDE.md && test -f .cursor/rules/design-system.mdc

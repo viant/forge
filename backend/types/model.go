@@ -521,10 +521,21 @@ type MCPAppSpec struct {
 	ResourceURI  string                   `json:"resourceURI" yaml:"resourceURI"`
 }
 
+type TablePresentation struct {
+	Variant    string           `json:"variant,omitempty" yaml:"variant,omitempty"`
+	RemoveIcon string           `json:"removeIcon,omitempty" yaml:"removeIcon,omitempty"`
+	RowDetails *TableRowDetails `json:"rowDetails,omitempty" yaml:"rowDetails,omitempty"`
+}
+type TableRowDetails struct {
+	Field string `json:"field,omitempty" yaml:"field,omitempty"`
+	Label string `json:"label,omitempty" yaml:"label,omitempty"`
+}
+
 type Container struct {
-	MCPApp                     *MCPAppSpec `json:"mcpApp,omitempty" yaml:"mcpApp,omitempty"`
-	ID                         string      `json:"id" yaml:"id"`
-	ClassName                  string      `json:"className,omitempty" yaml:"className,omitempty"`
+	TablePresentation          *TablePresentation `json:"tablePresentation,omitempty" yaml:"tablePresentation,omitempty"`
+	MCPApp                     *MCPAppSpec        `json:"mcpApp,omitempty" yaml:"mcpApp,omitempty"`
+	ID                         string             `json:"id" yaml:"id"`
+	ClassName                  string             `json:"className,omitempty" yaml:"className,omitempty"`
 	Binding                    `yaml:",inline"`
 	Target                     *TargetSpec                       `json:"target,omitempty" yaml:"target,omitempty"`
 	TargetOverrides            map[string]map[string]interface{} `json:"targetOverrides,omitempty" yaml:"targetOverrides,omitempty"`
@@ -614,6 +625,10 @@ type Container struct {
 }
 
 type DashboardEditableTableColumn struct {
+	Width       int                    `json:"width,omitempty" yaml:"width,omitempty"`
+	MinWidth    int                    `json:"minWidth,omitempty" yaml:"minWidth,omitempty"`
+	Flex        bool                   `json:"flex,omitempty" yaml:"flex,omitempty"`
+	Align       string                 `json:"align,omitempty" yaml:"align,omitempty"`
 	Key         string                 `json:"key,omitempty" yaml:"key,omitempty"`
 	Label       string                 `json:"label,omitempty" yaml:"label,omitempty"`
 	CardLabel   string                 `json:"cardLabel,omitempty" yaml:"cardLabel,omitempty"`
@@ -1317,6 +1332,9 @@ type DashboardTableAction struct {
 }
 
 type DashboardTableColumn struct {
+	Width            int        `json:"width,omitempty" yaml:"width,omitempty"`
+	MinWidth         int        `json:"minWidth,omitempty" yaml:"minWidth,omitempty"`
+	Flex             bool       `json:"flex,omitempty" yaml:"flex,omitempty"`
 	Key              string     `json:"key,omitempty" yaml:"key,omitempty"`
 	Label            string     `json:"label,omitempty" yaml:"label,omitempty"`
 	Format           string     `json:"format,omitempty" yaml:"format,omitempty"`

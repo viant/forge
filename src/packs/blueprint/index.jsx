@@ -1,5 +1,7 @@
 import {useRegisteredControlActions} from '../../runtime/useRegisteredControlActions.js';
 import {isLiveControlVisible,validateWidgetControlValue} from '../../core/ui/controlActions.js';
+import Typography, {typographyProps} from '../../components/Typography.jsx';
+import ForgeButton from '../../components/Button.jsx';
 import {preserveSelectExternalFocus} from './selectCloseFocus.js';
 import SwitchControl from '../../components/SwitchControl.jsx';
 import ForgeFormGroup from './ForgeFormGroup.jsx';
@@ -794,6 +796,7 @@ export function registerPack() {
                         data-forge-widget={forgeWidget}
                         data-forge-control-id={forgeControlId}
                         data-forge-part={forgePart}
+                        data-forge-type={rest['data-forge-type']}
                         data-forge-field-track-control={fieldTrackControl}
                         fill={resolvedFill}
                         alignText={alignText ?? (isFieldTrack ? 'start' : undefined)}
@@ -1305,11 +1308,12 @@ export function registerPack() {
                 <div
                     role="group"
                     id={rest.id}
-                    aria-label={rest['aria-label']}
-                    aria-labelledby={rest['aria-labelledby']}
-                    aria-describedby={rest['aria-describedby']}
                     aria-errormessage={rest['aria-errormessage']}
                     className="forge-segmented-control"
+                    aria-label={rest['aria-label'] || rest.item?.label}
+                    aria-labelledby={rest['aria-labelledby']}
+                    aria-describedby={rest['aria-describedby']}
+                    data-forge-type={rest['data-forge-type']}
                 >
                     {options.map((opt) => {
                         const isActive = String(value) === String(opt.value);
@@ -1320,6 +1324,7 @@ export function registerPack() {
                                 disabled={disabled || readOnly}
                                 aria-pressed={isActive}
                                 className="forge-segmented-control__option"
+                                data-forge-type={rest['data-forge-type']}
                                 onClick={() => !disabled && !readOnly && onChange?.(opt.value)}
                             >
                                 {opt.label || opt.value}
@@ -1391,26 +1396,7 @@ export function registerPack() {
     ), { framework: 'blueprint' });
 
     /* -------------------- Button ------------------------------------ */
-    registerWidget('button', ({ onClick, readOnly, disabled, intent, children, className, style, title, item, icon, hideLabel, ...rest }) => {
-        const unavailable = readOnly === true || disabled === true;
-        const variant = String(intent || '').trim().toLowerCase();
-        const intentClass = ['primary','success','warning','danger'].includes(variant) ? `forge-button--${variant}` : '';
-        const buttonClass = ['forge-button', hideLabel ? 'forge-button--icon-only' : '', intentClass, className].filter(Boolean).join(' ');
-        return (
-            <button
-                type="button"
-                className={buttonClass}
-                disabled={unavailable}
-                title={title}
-                onClick={onClick}
-                style={style}
-                {...rest}
-            >
-                {icon ? <Icon icon={icon} size={14}/> : null}
-                {hideLabel ? null : (children || item?.label || title)}
-            </button>
-        );
-    }, { framework: 'blueprint' });
+    registerWidget('button', ForgeButton, { framework: 'blueprint' });
 
     registerEventAdapter('button', {
         onClick: () => () => {},
@@ -1528,9 +1514,10 @@ registerWrapper('blueprint', (item, container, children, context, accessibility 
         const requiredEditable = required && !(accessibility.readOnly ?? item?.readOnly) && !(accessibility.disabled ?? item?.disabled);
         // Stand-alone controls like button can disable FormGroup
         if (item.isStandalone) return <>{children}{item.validationError && <div
+            {...(item?.properties?.typographyRole ? typographyProps('metadata') : {})}
             id={accessibility.helperId} data-forge-part="validation-message" role="alert">{item.validationError}</div>}</>;
 
-        const labelContent = item.hideLabel ? undefined : (
+        let labelContent = item.hideLabel ? undefined : (
             item.tooltip ? (
                 <Tooltip content={item.tooltip} hoverOpenDelay={250}>
                     <span>{item.label}</span>
@@ -1540,8 +1527,12 @@ registerWrapper('blueprint', (item, container, children, context, accessibility 
             )
         );
 
+        if (item?.properties?.typographyRole && labelContent) {
+            labelContent = <Typography typeRole="label">{labelContent}</Typography>;
+        }
         return (
             <ForgeFormGroup
+                feedbackRole={accessibility.feedbackRole}
                 className={[
                     requiredEditable ? 'forge-required-input' : '',
                     item?.requiredState ? `forge-required-${item.requiredState}` : '',

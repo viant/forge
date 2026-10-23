@@ -1,0 +1,11 @@
+.forge-type-specimen {
+    display: grid;
+    gap: var(--forge-spacing-4, 16px);
+    padding: var(--forge-spacing-6, 24px);
+    max-width: 75ch;
+    min-width: 0;
+    color: var(--forge-text);
+    background: var(--forge-surface);
+}
+.forge-type-specimen > :is(h1, h2, h3, h4, p) { margin: 0; overflow-wrap: anywhere; }
+.forge-type-specimen input { max-width: 100%; }

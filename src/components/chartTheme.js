@@ -53,6 +53,12 @@ export function resolveChartTypography(element) {
     const tokenFamily = String(style?.getPropertyValue?.('--forge-font-family') || '').trim();
     return {
         family: tokenFamily || inheritedFamily || 'system-ui, sans-serif',
+        captionFamily: String(style?.getPropertyValue?.('--forge-type-caption-family') || '').trim() || tokenFamily || inheritedFamily || 'system-ui, sans-serif',
+        captionWeight: cssPixels(style, '--forge-type-caption-weight', 400),
+        captionLetterSpacing: String(style?.getPropertyValue?.('--forge-type-caption-letter-spacing') || '').trim() || '0em',
+        smallFamily: String(style?.getPropertyValue?.('--forge-type-small-family') || '').trim() || tokenFamily || inheritedFamily || 'system-ui, sans-serif',
+        smallWeight: cssPixels(style, '--forge-type-small-weight', 400),
+        smallLetterSpacing: String(style?.getPropertyValue?.('--forge-type-small-letter-spacing') || '').trim() || '0em',
         captionSize: cssPixels(style, '--forge-type-caption-size', 11),
         captionLineHeight: cssPixels(style, '--forge-type-caption-line-height', 16),
         smallSize: cssPixels(style, '--forge-type-small-size', 12),

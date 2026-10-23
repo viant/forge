@@ -224,3 +224,12 @@ For individual components, consult [table behavior](doc/table-behavior.md), [tab
 ## Contributing
 
 Keep generic rendering and interaction behavior in Forge, with application policy and business operations in host integrations. Changes to metadata or bindings should include representative definitions and focused checks for affected renderers. For visual changes, inspect the result on the intended surface as well as running the relevant package tests.
+
+
+## Design-system contributions
+
+Start with [the canonical usage guide](doc/typography.md) before changing appearance,
+components or workspace theme contracts. The guide identifies the supported
+roles, real examples, extension path and existing checks. Include the reused
+components/roles, specimen and integration evidence, checks and remaining
+legacy limits in the pull request for shared-owner review.
