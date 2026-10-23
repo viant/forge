@@ -6,7 +6,8 @@ import WindowContent, {compileWindowAuthorizationMetadata} from './WindowContent
 import {SettingProvider} from '../core/context/Setting.jsx';
 import {getWindowContext} from '../core/context/registry.js';
 import {registerContainerRenderer} from '../runtime/containerRendererRegistry.js';
-import {getCollectionSignal, getMetadataSignal, removeSignalsForKey} from '../core/store/signals.js';
+import {activeWindows,getCollectionSignal, getMetadataSignal, removeSignalsForKey} from '../core/store/signals.js';
+import {runUICommand} from '../core/ui/commands.js';
 import QuickFilterInputs from './table/basic/QuickFilterInputs.jsx';
 
 let latestRendererContext;
@@ -84,6 +85,29 @@ it('uses the published cohort GET admission without a second permission GET',asy
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
     expect(applyPermission).not.toHaveBeenCalled();
   }finally{globalThis.fetch=originalFetch;}
+});
+
+it('readmits a mounted published window through one refresh GET without legacy permission preflight',async()=>{
+  const originalFetch=globalThis.fetch;
+  const hash='b'.repeat(64);
+  const metadata={authorization:{scope:'window'},dataSource:{},view:{content:{id:'published-root',kind:'test.authorized'}}};
+  const applyPermission=vi.fn(async()=>{throw new Error('redundant published preflight');});
+  const etag=`"${hash}.cohort-v2"`;
+  globalThis.fetch=vi.fn(async(_url,request)=>request?.headers?.['If-None-Match']===etag
+    ?new Response(null,{status:304,headers:{'X-Artifact-Hash':hash,ETag:etag}})
+    :new Response(JSON.stringify({data:metadata}),{
+      status:200,headers:{'Content-Type':'application/json','X-Artifact-Hash':hash,ETag:etag},
+    }));
+  try{
+    activeWindows.value=[{windowId,windowKey:'window://dspui/orderList'}];
+    await mount({applyPermission,windowModelCacheScope:()=> 'verified-owner',workspaceRefresh:{loadMetadata:({load})=>load()}},
+      {windowId,windowKey:'window://dspui/orderList',providerIdentity:'aistudio-local',resourceRef:{uri:'window://dspui/orderList'}});
+    await flush();
+    await act(async()=>{await runUICommand({method:'ui.workspace.refresh',params:{windowId,reloadMetadata:true}});});
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2); // Initial admission and one fresh readmission.
+    expect(globalThis.fetch.mock.calls[1][1].headers['If-None-Match']).toBe(etag);
+    expect(applyPermission).not.toHaveBeenCalled();
+  }finally{globalThis.fetch=originalFetch;activeWindows.value=[];}
 });
 
 it('retains the separate permission preflight for legacy metadata',async()=>{

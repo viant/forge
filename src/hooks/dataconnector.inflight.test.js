@@ -15,6 +15,55 @@ vi.mock('../utils/logger.js', () => ({
 
 import { createDataConnector } from './dataconnector.js';
 
+describe('published window binding recovery',()=>{
+    const datasource={service:{URL:'/v1/api/datasources/rows/fetch?cohort=1',method:'POST'}};
+    const runtime=recoverWindowBinding=>({windowId:'current-window',dataSourceRef:'rows',recoverWindowBinding,
+        prepareRequest:request=>({headers:{...request.headers,'Mcp-Session-Id':'session-a'}})});
+    const missing=()=>new Response(JSON.stringify({error:'window binding required',code:'window_binding_required',scope:'window'}),
+        {status:403,headers:{'Content-Type':'application/json'}});
+    it('readmits once and replays one datasource request after the exact missing-binding marker',async()=>{
+        const recoverWindowBinding=vi.fn(async()=>{});
+        global.fetch=vi.fn().mockResolvedValueOnce(missing()).mockResolvedValueOnce(new Response(JSON.stringify({data:[{id:1}]}),{status:200}));
+        const connector=createDataConnector(datasource,runtime(recoverWindowBinding));
+        await expect(connector.get({inputParameters:{id:1}})).resolves.toEqual({data:[{id:1}]});
+        expect(recoverWindowBinding).toHaveBeenCalledOnce();
+        expect(recoverWindowBinding).toHaveBeenCalledWith({windowId:'current-window',signal:null,sessionId:'session-a'});
+        expect(global.fetch).toHaveBeenCalledTimes(2);
+        expect(global.fetch.mock.calls[1][1].body).toBe(global.fetch.mock.calls[0][1].body);
+    });
+    it('does not readmit on a genuine datasource denial or retry after failed metadata admission',async()=>{
+        const recoverWindowBinding=vi.fn(async()=>{});
+        global.fetch=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({code:'datasource_denied',scope:'dataset'}),{status:403}));
+        const connector=createDataConnector(datasource,runtime(recoverWindowBinding));
+        await expect(connector.get()).rejects.toMatchObject({status:403,code:'datasource_denied'});
+        expect(recoverWindowBinding).not.toHaveBeenCalled();
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+        recoverWindowBinding.mockRejectedValueOnce(new Error('metadata admission denied'));
+        global.fetch=vi.fn().mockResolvedValueOnce(missing());
+        await expect(connector.get()).rejects.toThrow('metadata admission denied');
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+    it('does not retry a second missing-binding denial',async()=>{
+        const recoverWindowBinding=vi.fn(async()=>{});
+        global.fetch=vi.fn().mockResolvedValue(missing());
+        const connector=createDataConnector(datasource,runtime(recoverWindowBinding));
+        await expect(connector.get()).rejects.toMatchObject({status:403,code:'window_binding_required'});
+        expect(recoverWindowBinding).toHaveBeenCalledOnce();
+        expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
+    it('replays one GET after readmission and shares the full recovery with a concurrent identical GET',async()=>{
+        const recoverWindowBinding=vi.fn(async()=>{});
+        global.fetch=vi.fn().mockResolvedValueOnce(missing()).mockResolvedValueOnce(new Response(JSON.stringify({data:[{id:2}]}),{status:200}));
+        const connector=createDataConnector({service:{URL:'/v1/api/datasources/rows/fetch?cohort=1',method:'GET'}},
+            runtime(recoverWindowBinding));
+        const [first,second]=await Promise.all([connector.get(),connector.get()]);
+        expect(first).toEqual({data:[{id:2}]});
+        expect(second).toEqual(first);
+        expect(recoverWindowBinding).toHaveBeenCalledOnce();
+        expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
+});
+
 describe('createDataConnector', () => {
     beforeEach(() => {
         vi.restoreAllMocks();
