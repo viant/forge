@@ -1,0 +1,49 @@
+.forge-release-manager {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 56rem;
+}
+
+.forge-release-manager h2,
+.forge-release-manager h3,
+.forge-release-manager p {
+  margin: 0;
+}
+
+.forge-release-manager fieldset {
+  border: 1px solid var(--pt-divider-black, #d8e1e8);
+  border-radius: 3px;
+  margin: 0;
+  padding: 0.75rem;
+}
+
+.forge-release-manager legend {
+  font-weight: 600;
+  padding: 0 0.35rem;
+}
+
+.forge-release-manager-choice {
+  align-items: start;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  overflow-wrap: anywhere;
+}
+
+.forge-release-manager-artifact {
+  margin: 0.5rem 0 0;
+}
+
+.forge-release-manager details {
+  overflow-wrap: anywhere;
+}
+
+.forge-release-manager details summary {
+  cursor: pointer;
+}
+
+.forge-release-manager > section[aria-label="Promotion and rollback"] {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
