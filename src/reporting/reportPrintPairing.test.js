@@ -42,6 +42,24 @@ assert.match(text, /\[x20\]/);
 assert.match(text, /20 touchpoints/);
 assert.match(text, /Pathway evidence \(1\/2\)/);
 assert.match(text, /Pathway evidence \(2\/2\)/);
+const emptyWideFixture = buildPairingPrintFixture();
+const emptyWideTable = {
+  ...emptyWideFixture.reportFill.blocks.find((block) => block.id === "evidence"),
+  content: {
+    ...emptyWideFixture.reportFill.blocks.find((block) => block.id === "evidence").content,
+    columns: Array.from({ length: 20 }, (_, index) => ({ key: `field${index}`, label: `Measurement${index}` })),
+    resolvedRows: [],
+  },
+};
+emptyWideFixture.reportSpec.blocks = [emptyWideTable];
+emptyWideFixture.reportSpec.layoutIntent.blockOrder = [emptyWideTable.id];
+emptyWideFixture.reportFill.blocks = [emptyWideTable];
+emptyWideFixture.reportFill.specHash = buildReportSpecHash(emptyWideFixture.reportSpec);
+const emptyWidePrint = buildReportPrintFromReportFill(emptyWideFixture);
+const emptyWideText = emptyWidePrint.pages.flatMap((page) => page.elements).map((element) => element.text || "").join("\n");
+assert.equal((emptyWideText.match(/No rows are available for print\./g) || []).length, 1,
+  "An empty wide table has one empty state, not one per column partition");
+assert.doesNotMatch(emptyWideText, /Pathway evidence \(\d+\/\d+\)/);
 for (let i = 0; i < 9; i += 1) assert.match(text, new RegExp(`Evidence metric ${i}`));
 for (const page of result.pages) {
   for (const element of page.elements) {
