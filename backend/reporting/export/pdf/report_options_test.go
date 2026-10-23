@@ -2,6 +2,8 @@ package pdf
 
 import (
 	"encoding/json"
+	"fmt"
+	reportprint "github.com/viant/forge/backend/reporting/print"
 	"strings"
 	"testing"
 
@@ -60,4 +62,45 @@ func TestReportOptionsExcludeCompatibilityAndHiddenControls(t *testing.T) {
 	require.Equal(t, []string{"Ranking Metric: ROAS"}, reportOptionLines(options))
 	options.ReportSpec = json.RawMessage(`{"datasets":[{"request":{"options":{"metric":"ROAS","compatibility":"Device","hidden":true,"invisible":1,"legacy":"Channel"}}}]}`)
 	require.Equal(t, []string{"Ranking Metric: ROAS"}, reportOptionLines(options))
+}
+
+func TestReportOptionsKeepShortContextTogetherAndRepeatLongHeading(t *testing.T) {
+	report := loadFixtureReportPrint(t, "raw")
+	report.Pages = report.Pages[:1]
+	g := report.PageGeometry
+	report.Pages[0].FooterElements = nil
+	report.Pages[0].Elements = []reportprint.Element{{ID: "occupied", Kind: "text", Text: "Existing evidence", FontSize: 10, Box: reportprint.Box{X: g.MarginLeft, Y: g.Height - g.MarginBottom - g.FooterHeight - 80, Width: 100, Height: 14}}}
+	selected := map[string]any{}
+	for i := 0; i < 10; i++ {
+		selected[fmt.Sprintf("option%02d", i)] = fmt.Sprintf("Selected %d", i)
+	}
+	metadata, err := json.Marshal(map[string]any{"options": selected})
+	require.NoError(t, err)
+	prepared, err := withReportOptionContext(report, Options{Metadata: metadata})
+	require.NoError(t, err)
+	require.Len(t, prepared.Pages, 2)
+	for _, element := range prepared.Pages[0].Elements {
+		require.False(t, strings.HasPrefix(element.ID, "option_context_"), "short context must move intact")
+	}
+	require.Equal(t, "Report options", prepared.Pages[1].Elements[0].Text)
+	require.Len(t, prepared.Pages[1].Elements, 11)
+	longMetadata, err := json.Marshal(map[string]any{"options": map[string]any{"selection": strings.Repeat("Long option value ", 1000)}})
+	require.NoError(t, err)
+	long, err := withReportOptionContext(report, Options{Metadata: longMetadata})
+	require.NoError(t, err)
+	require.Greater(t, len(long.Pages), 2)
+	for _, page := range long.Pages {
+		hasContext, hasHeading := false, false
+		for _, element := range page.Elements {
+			if strings.HasPrefix(element.ID, "option_context_") {
+				hasContext = true
+				if strings.HasPrefix(element.Text, "Report options") {
+					hasHeading = true
+				}
+			}
+		}
+		if hasContext {
+			require.True(t, hasHeading, "every context page retains its heading")
+		}
+	}
 }

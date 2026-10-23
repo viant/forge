@@ -85,3 +85,30 @@ assert.match(labelOutput, /Category 3/);
 assert.doesNotMatch(labelOutput, /dy=/);
 
 console.log("MTA print pairing regressions passed");
+
+// Short context sections move together; long ones repeat their heading on each page.
+function textSectionPrint(blocks) {
+  const source = { kind: 'reportBuilder', containerId: 'text-pagination', stateKey: 'text-pagination', dataSourceRef: 'primary' };
+  const reportSpec = { version: 1, kind: 'reportSpec', title: 'Context pagination', source, blocks, layoutIntent: { blockOrder: blocks.map(block => block.id) } };
+  const reportFill = { version: 1, kind: 'reportFill', specVersion: 1, specHash: buildReportSpecHash(reportSpec), source, blocks, datasets: [] };
+  return buildReportPrintFromReportFill({ reportSpec, reportFill });
+}
+const contextBlocks = [
+  { id: 'introText', kind: 'markdownBlock', title: 'Introduction', content: { markdown: Array.from({length: 31}, (_, i) => `Introduction line ${i}`).join('\n') } },
+  { id: 'shortOptions', kind: 'filterBarBlock', title: 'Selected report options', content: { params: Array.from({length: 7}, (_, i) => ({id:`option${i}`, value:`Selected ${i}`})) } },
+];
+const shortContext = textSectionPrint(contextBlocks);
+const shortPages = shortContext.pages.filter(page => page.elements.some(element => element.id.startsWith('shortOptions__')));
+assert.equal(shortPages.length, 1, 'an options section that fits on a fresh page must stay together');
+assert.equal(shortPages[0].number, 2);
+const longContext = textSectionPrint([{ id: 'longOptions', kind: 'filterBarBlock', title: 'Selected report options', content: { params: Array.from({length: 90}, (_, i) => ({id:`option${i}`, value:`Selected ${i}`})) } }]);
+assert.ok(longContext.pages.length >= 3);
+for (const page of longContext.pages) {
+  assert.ok(page.elements.some(element => element.id.startsWith('longOptions__title')), 'continued options must retain their heading');
+  assert.ok(page.elements.every(element => element.box.y + element.box.height <= 724.01), 'context stays inside printable page');
+}
+assert.equal(longContext.bookmarks.length, 1, 'continuation headings do not duplicate bookmarks');
+const longElements = longContext.pages.flatMap(page=>page.elements);
+assert.equal(new Set(longElements.map(element=>element.id)).size, longElements.length);
+for (let i=0;i<90;i++) assert.equal(longElements.filter(element=>element.text===`option${i}: Selected ${i}`).length,1,'every option retained exactly once');
+console.log('Text context pagination regressions passed');
