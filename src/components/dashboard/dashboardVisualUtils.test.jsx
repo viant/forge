@@ -106,6 +106,7 @@ const dataBarHtml = renderToStaticMarkup(
 assert.ok(dataBarHtml.includes("forge-dashboard-table-cell-visual--data-bar"));
 assert.ok(dataBarHtml.includes("data-visual-kind=\"dataBar\""));
 assert.ok(dataBarHtml.includes("240"));
+assert.equal((dataBarHtml.match(/border-radius:999px/g)||[]).length,2,"Both track and fill have pill ends");
 
 const plainTextHtml = renderToStaticMarkup(
   React.createElement("div", null, renderDashboardTableCell("Plain", {}, { key: "label", label: "Label" }, "en-US")),

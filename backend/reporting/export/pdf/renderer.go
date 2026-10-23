@@ -319,14 +319,17 @@ func (r *renderer) renderTableCellDataBarOperation(operation dataBarPaintOperati
 	if operation.box.Width <= 0 || operation.box.Height <= 0 {
 		return
 	}
+	radius := math.Min(operation.box.Width, operation.box.Height) / 2
 	// ReportPrint lowering already resolves the proportional bar geometry into
 	// absolute print-space width. Value/min/max remain on the element for
 	// provenance and diagnostics, not for a second scaling pass here.
 	if !hasPaintValue(operation.backgroundColor) {
 		r.applyOptionalFillColor(operation.fillColor)
-		r.pdf.Rect(operation.box.X, operation.box.Y, operation.box.Width, operation.box.Height, "F")
+		r.pdf.RoundedRect(operation.box.X, operation.box.Y, operation.box.Width, operation.box.Height, radius, "1234", "F")
 		return
 	}
+	r.pdf.ClipRoundedRect(operation.box.X, operation.box.Y, operation.box.Width, operation.box.Height, radius, false)
+	defer r.pdf.ClipEnd()
 	startRed, startGreen, startBlue := parseHexColor(operation.backgroundColor, 255, 255, 255)
 	endRed, endGreen, endBlue := parseHexColor(operation.fillColor, startRed, startGreen, startBlue)
 	const steps = 64

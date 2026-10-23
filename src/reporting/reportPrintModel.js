@@ -1,3 +1,4 @@
+import {resolveChartBarRadius} from '../components/chartData.js';
 import {buildRuntimeSections} from './reportSections.js';
 import {buildKpiSparklineSvg} from './reportKpiSparklineModel.js';
 import { resolveReportDatasetRefResolution } from "./reportDatasetRefModel.js";
@@ -2045,7 +2046,6 @@ function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {
         max: visualState.value,
       };
       const palette = Array.isArray(visualState?.palette) ? visualState.palette : [];
-      const trackRadius = Math.min(cellInnerHeight / 2, 8);
       const fillWidth = Math.max(0, cellInnerWidth * Math.max(0, Math.min(1, Number(visualState?.percent) || 0)));
       const normalizedVisualKind = normalizeString(visualState?.kind);
       const trackHeight = normalizedVisualKind === "progressBar"
@@ -2059,6 +2059,7 @@ function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {
       const trackWidth = normalizedVisualKind === "sparkBar"
         ? Math.min(cellInnerWidth, 40)
         : cellInnerWidth;
+      const trackRadius = resolveChartBarRadius(trackWidth, trackHeight);
       pushReportPrintElement(state, buildReportPrintRectElement({
         id: `${normalizeString(block?.id || "table")}__${rowKey}__${columnKey}__${normalizedVisualKind === "progressBar" ? "progress_track" : normalizedVisualKind === "sparkBar" ? "spark_track" : "bar_track"}`,
         kind: "rect",

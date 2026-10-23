@@ -1,5 +1,6 @@
 import React,{useState} from "react";
 import {Button,HTMLSelect} from "@blueprintjs/core";
+import {resolveChartBarRadius} from "../chartData.js";
 import {buildReportPrintPage} from "../../reporting/reportPrintModel.js";
 
 function PrintElement({element}) {
@@ -7,7 +8,8 @@ function PrintElement({element}) {
     const style = {fontSize:element.fontSize || 9, fontWeight:element.fontWeight || "normal", color:element.color || "#101828", textAlign:element.align || "left", whiteSpace:element.wrap ? "pre-wrap" : "pre", lineHeight:1.2, margin:0, width:"100%", height:"100%", overflow:"hidden"};
     if (["text", "tableCellText"].includes(element.kind)) return <foreignObject x={box.x} y={box.y} width={box.width} height={box.height}><div xmlns="http://www.w3.org/1999/xhtml" style={style}>{element.text}</div></foreignObject>;
     if (element.kind === "line") return <line x1={box.x} y1={box.y} x2={box.x + box.width} y2={box.y + box.height} stroke={element.strokeColor || "#101828"} strokeWidth={element.strokeWidth || 1} strokeDasharray={element.strokeStyle === "dashed" ? "4 3" : element.strokeStyle === "dotted" ? "1 2" : undefined}/>;
-    if (element.kind === "rect") return <rect x={box.x} y={box.y} width={box.width} height={box.height} fill={element.fillColor || "none"} stroke={element.strokeColor || "none"} strokeWidth={element.strokeWidth || 0}/>;
+    if (element.kind === "rect") return <rect x={box.x} y={box.y} width={box.width} height={box.height} rx={element.radius || 0} fill={element.fillColor || "none"} stroke={element.strokeColor || "none"} strokeWidth={element.strokeWidth || 0}/>;
+    if (element.kind === "tableCellDataBar") return <rect x={box.x} y={box.y} width={box.width} height={box.height} rx={resolveChartBarRadius(box.width,box.height)} fill={element.fillColor}/>;
     if (element.kind === "svg") return <image x={box.x} y={box.y} width={box.width} height={box.height} href={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(element.svg)}`}/>;
     if (element.kind === "image" && /^(image\/(png|jpeg|webp|gif))$/.test(element.image?.mimeType || "")) return <image x={box.x} y={box.y} width={box.width} height={box.height} href={`data:${element.image.mimeType};base64,${element.image.payload}`}/>;
     return <text x={box.x} y={box.y + 10} fontSize={9} fill="#b42318">Unsupported print element: {element.kind}</text>;

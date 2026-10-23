@@ -479,9 +479,10 @@ for(const [format,expected] of [['percentFraction',/>84\.8%</],['currency2',/>\$
   const output=buildReportPrintChartSvg({width,chartModel:{type:'bar',xAxis:{dataKey:'bucket'},yAxis:{format}},resolvedChart:{kind:'groupedSeries',type:'bar',xAxisKey:'bucket',seriesKeys,rows}});
   assert.equal(output.diagnostics.length,0);
   assert.match(output.svg,expected,'Grouped series must inherit the measure axis format');
-  const bars=[...output.svg.matchAll(/<rect x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="[\d.-]+" rx="2"/g)].filter(match=>Number(match[2])<=196);
+  const bars=[...output.svg.matchAll(/<rect x="([\d.-]+)" y="([\d.-]+)" width="([\d.-]+)" height="([\d.-]+)" rx="([\d.-]+)"/g)].filter(match=>Number(match[2])<=196);
   assert.equal(bars.length,rows.length*seriesCount);
-  for(const [,x,y,w] of bars){
+  for(const [,x,y,w,h,radius] of bars){
+   assert.equal(Number(radius),Math.min(Number(w),Number(h))/2,"Bar ends fit their actual bounds");
    assert.ok(Number(w)>0,'Dense grouped bars must retain positive width');
    assert.ok(Number(x)>=52,'First category bars must not cover the y-axis or its labels');
    assert.ok(Number(x)+Number(w)<=width-16,'Last category bars must remain inside the plot');

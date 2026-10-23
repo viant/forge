@@ -54069,6 +54069,11 @@ Please __addLocaleData before adding additional unit data`);
     }
     return formatTimestamp(value, normalizedTickFormat, valueMode);
   }
+  var CHART_BAR_END_RADIUS = 999;
+  function resolveChartBarRadius(width, height) {
+    const w2 = Math.abs(Number(width)), h4 = Math.abs(Number(height));
+    return Number.isFinite(w2) && Number.isFinite(h4) ? Math.min(CHART_BAR_END_RADIUS, w2 / 2, h4 / 2) : 0;
+  }
 
   // src/reporting/reportFillChartPayload.js
   function normalizeString30(value = "") {
@@ -59741,7 +59746,7 @@ ${indent}${end}`;
           const fillColor = resolveSeriesPointColor(series, point.value, series.color);
           const label = shouldRenderReportPrintSeriesDataLabels(series, supportedType, rows.length) ? `<text x="${x2 + drawnBarWidth / 2}" y="${y4 - 4}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(point.value, series.format))}</text>` : "";
           return `
-          <rect x="${x2}" y="${y4}" width="${drawnBarWidth}" height="${barHeight}" rx="2" fill="${escapeXml(fillColor)}" />
+          <rect x="${x2}" y="${y4}" width="${drawnBarWidth}" height="${barHeight}" rx="${resolveChartBarRadius(drawnBarWidth, barHeight)}" fill="${escapeXml(fillColor)}" />
           ${label}
         `;
         }).join("\n");
@@ -59914,7 +59919,7 @@ ${indent}${end}`;
       const fillColor = printColor(resolveCategoryColor((_a5 = chartModel == null ? void 0 : chartModel.series) == null ? void 0 : _a5.categoryColors, readChartDataValue(row, xAxisKey), resolveSeriesPointColor(series, value, series.color)));
       const valueLabel = shouldRenderReportPrintSeriesDataLabels(series, "horizontal_bar", rows.length) ? `<text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(value, series.format))}</text>` : "";
       return `
-        <rect x="${x2}" y="${barY}" width="${barWidth}" height="${perSeriesHeight}" rx="2" fill="${escapeXml(fillColor)}" />
+        <rect x="${x2}" y="${barY}" width="${barWidth}" height="${perSeriesHeight}" rx="${resolveChartBarRadius(barWidth, perSeriesHeight)}" fill="${escapeXml(fillColor)}" />
         ${valueLabel}
       `;
     }).join("\n")).join("\n");
@@ -67539,12 +67544,12 @@ ${indent}${end}`;
           max: visualState.value
         };
         const palette = Array.isArray(visualState == null ? void 0 : visualState.palette) ? visualState.palette : [];
-        const trackRadius = Math.min(cellInnerHeight / 2, 8);
         const fillWidth = Math.max(0, cellInnerWidth * Math.max(0, Math.min(1, Number(visualState == null ? void 0 : visualState.percent) || 0)));
         const normalizedVisualKind = normalizeString39(visualState == null ? void 0 : visualState.kind);
         const trackHeight = normalizedVisualKind === "progressBar" ? Math.max(6, Math.min(10, cellInnerHeight - 6)) : normalizedVisualKind === "sparkBar" ? Math.max(10, Math.min(12, cellInnerHeight - 4)) : cellInnerHeight;
         const trackY = normalizedVisualKind === "progressBar" || normalizedVisualKind === "sparkBar" ? cellInnerY + Math.max(0, (cellInnerHeight - trackHeight) / 2) : cellInnerY;
         const trackWidth = normalizedVisualKind === "sparkBar" ? Math.min(cellInnerWidth, 40) : cellInnerWidth;
+        const trackRadius = resolveChartBarRadius(trackWidth, trackHeight);
         pushReportPrintElement(state, buildReportPrintRectElement({
           id: `${normalizeString39((block == null ? void 0 : block.id) || "table")}__${rowKey}__${columnKey}__${normalizedVisualKind === "progressBar" ? "progress_track" : normalizedVisualKind === "sparkBar" ? "spark_track" : "bar_track"}`,
           kind: "rect",

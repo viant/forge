@@ -36,6 +36,7 @@ import { useDataSourceState } from "../hooks/useDataSourceState.js";
 import {
     aggregateDirectSeriesData,
     orderHorizontalChartRows,
+    CHART_BAR_END_RADIUS,
     applyChartRowLimit,
     buildPieSliceCellKey,
     buildPieChartData,
@@ -937,7 +938,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
 
         if (entry.type === "bar") {
             return (
-                <Bar key={entry.value} {...commonProps} barSize={configuredBarSize} stackId={entry.stackId} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
+                <Bar key={entry.value} {...commonProps} radius={entry.stackId ? 0 : CHART_BAR_END_RADIUS} barSize={configuredBarSize} stackId={entry.stackId} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                     {entry.pointColorMode === "bySign"
                         ? normalizedChartData.map((row, index) => (
                             <Cell key={`${entry.value}-cell-${index}`} fill={resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} />
@@ -1122,6 +1123,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 {selectedSeriesDefinitions.length === 1 ? (
                     <Bar
                         dataKey={primarySeries.value}
+                        radius={CHART_BAR_END_RADIUS}
                         name={primarySeries.name || primarySeries.label}
                         fill={primarySeries.color}
                         barSize={barSize}
@@ -1144,6 +1146,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     selectedSeriesDefinitions.map((entry) => (
                         <Bar
                             key={entry.value}
+                            radius={entry.stackId ? 0 : CHART_BAR_END_RADIUS}
                             dataKey={entry.value}
                             name={entry.name || entry.label}
                             fill={entry.color}

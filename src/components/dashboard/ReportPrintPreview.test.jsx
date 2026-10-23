@@ -26,3 +26,12 @@ console.log("actual canonical reportPrint and authored geometry/escaping SSR pas
 
 const unsupported=structuredClone(actual); unsupported.pages[0].elements[0].kind="futurePrintKind";
 assert.ok(renderToStaticMarkup(<ReportPrintPreview reportPrint={unsupported}/>).includes("Unsupported or invalid canonical print page"));
+
+const rounded=structuredClone(actual);
+rounded.pages[0].elements=[
+ {id:"pill-track",kind:"rect",box:{x:10,y:20,width:100,height:12},radius:6,fillColor:"#eee"},
+ {id:"pill-fill",kind:"tableCellDataBar",rowKey:"row_1",columnKey:"amount",box:{x:10,y:20,width:25,height:12},value:25,min:0,max:100,fillColor:"#123456"},
+];
+const roundedHtml=renderToStaticMarkup(<ReportPrintPreview reportPrint={rounded}/>);
+assert.match(roundedHtml, /width="100" height="12" rx="6"/);
+assert.match(roundedHtml, /width="25" height="12" rx="6"/);
