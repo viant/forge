@@ -408,6 +408,17 @@ describe('resolveDataSourceOptions', () => {
 });
 
 describe('resolveDefaultDataSourceRef', () => {
+  it('keeps the implicit default for a single-source window', () => {
+    expect(resolveDefaultDataSourceRef({dataSource: {records: {}}, view: {}})).toBe('records');
+  });
+  it('does not execute the first command source in a multi-source window', () => {
+    const metadata = {
+      dataSource: {connector_activate: {}, connector_filter: {}, connectors: {}},
+      view: {content: {id: 'connectors', containers: [{id: 'filter', dataSourceRef: 'connector_filter'}, {id: 'table', dataSourceRef: 'connectors'}]}},
+    };
+    expect(resolveDefaultDataSourceRef(metadata)).toBe('');
+    expect(resolveRequiredDataSourceRefs(metadata, resolveDefaultDataSourceRef(metadata))).toEqual(['connector_filter', 'connectors']);
+  });
   it('prefers the title binding over an arbitrary datasource map order', () => {
     expect(resolveDefaultDataSourceRef({
       dataSource: { advertiser_history: {}, advertiser_properties: {} },
