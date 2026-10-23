@@ -58,6 +58,7 @@ import { windowMetadataEndpoint } from './windowMetadataEndpoint.js';
 import {useViewPartition} from './useViewPartition.js';
 import {applyTablePagingMetadata} from '../runtime/tablePagingMetadata.js';
 import {admittedPublishedWindowModel,publishedWindowConditionalETag} from '../runtime/publishedWindowModelCache.js';
+import {recordWindowPerfPhase} from '../runtime/windowPerfPhases.js';
 
 export function reuseShallowEqualRuntimeObject(previous = null, candidate = null) {
     if (!previous || !candidate || typeof previous !== 'object' || typeof candidate !== 'object') {
@@ -1340,6 +1341,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             auth,
             transport: services.dataConnectorTransport,
             prepareRequest: prepareConnectorRequest,
+            windowId,
         },
     }), [scopedServices, runtimeWindow, endpoints, targetContext, auth, prepareConnectorRequest]);
     const config  = {service: {...service, uri: windowMetadataEndpoint(service.uri, baseKey, runtimeWindow), includeTargetContext: true}};
@@ -1434,9 +1436,12 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             sessionId: resolveWindowModelCacheScope(services,getActiveUIBridgeTransportContext()?.sessionId),
         };
         const responseInfo = {};
-        withWindowPermissionDeadline(async () => connector.get({responseInfo,ifNoneMatch:await publishedWindowConditionalETag(modelIdentity)})
+        withWindowPermissionDeadline(async () => {
+            recordWindowPerfPhase('metadata-request-scheduled',windowId);
+            return connector.get({responseInfo,ifNoneMatch:await publishedWindowConditionalETag(modelIdentity)})
             .then(async (resp) => {
                 if (cancelled || expired) return;
+                recordWindowPerfPhase('metadata-response-parsed',windowId);
                 setFetchError(null);
                 let completeMetadata;
                 const compileModel = async definition => {
@@ -1487,7 +1492,9 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                     __provisionalInline: false,
                 };
                 metadataSignalHandle.value = heldMetadata;
-            }))
+                recordWindowPerfPhase('metadata-signal-published',windowId);
+            });
+        })
             .catch((err) => {
                 rejectWindowStateAdoption(adoption);
                 if (Number(err?.status) === 504) expired = true;
@@ -1514,6 +1521,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
         if (!metadata || typeof metadata !== 'object') return;
         syncWindowRuntimeHints(windowId, metadata, window);
         primeWindowSignals(windowId, metadata);
+        recordWindowPerfPhase('metadata-prime-complete',windowId);
         setSignalsReady(true);
     }, [windowId, metadataSignalHandle?.value, resolvedServices, window]);
 

@@ -167,6 +167,21 @@ describe('createDataConnector', () => {
         expect(responseInfo).toEqual({artifactHash:hash,etag:`"${hash}.cohort-v1"`});
     });
 
+    it('marks only declared datasource fetches, not a window metadata connector', async () => {
+        const phases=vi.fn();
+        vi.stubGlobal('window',{__forgeWindowPerfPhaseRecorder:phases});
+        global.fetch=vi.fn().mockResolvedValue({ok:true,status:200,headers:{get:()=>null},json:async()=>({data:[]})});
+        const metadata=createDataConnector({service:{URL:'/v1/api/agently/forge/window/records',method:'GET'}},
+            {endpoints:{},targetContext:{},auth:{},windowId:'instance'});
+        const rows=createDataConnector({service:{URL:'/v1/api/datasources/rows/fetch?cohort=1',method:'POST'}},
+            {endpoints:{},targetContext:{},auth:{},windowId:'instance',dataSourceRef:'rows'});
+        await metadata.get({});
+        await rows.get({});
+        expect(phases).toHaveBeenCalledOnce();
+        expect(phases).toHaveBeenCalledWith('datasource-fetch-start','instance',expect.any(Number));
+        vi.unstubAllGlobals();
+    });
+
     it('returns a conditional 304 only to a caller that supplied the ETag', async () => {
         const hash='a'.repeat(64),etag=`"${hash}.cohort-v1"`;
         global.fetch=vi.fn().mockResolvedValue({ok:false,status:304,headers:{get:name=>name==='X-Artifact-Hash'?hash:name==='ETag'?etag:null}});

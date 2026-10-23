@@ -1,4 +1,5 @@
 import {createTransportConnector} from './connectorTransport.js';
+import {recordWindowPerfPhase} from '../runtime/windowPerfPhases.js';
 import {useSetting} from "../core/index.js";
 import { getLogger } from "../utils/logger.js";
 import { appendTargetContextQuery } from "../runtime/targetContext.js";
@@ -52,6 +53,8 @@ export function createDataConnector(dataSource, runtime = {}) {
         targetContext = {},
         auth = {},
         prepareRequest,
+        windowId = '',
+        dataSourceRef = '',
     } = runtime || {};
     const {authStates, defaultAuthProvider} = auth;
     const {paging, parameters = []} = dataSource;
@@ -376,6 +379,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 return inFlightGetRequests.get(requestKey);
             }
             const performRequest = (async () => {
+                if (dataSourceRef) recordWindowPerfPhase('datasource-fetch-start',windowId);
                 const resp = await fetch(finalUrl, request);
                 if (responseInfo && typeof responseInfo === 'object') {
                     responseInfo.artifactHash = resp.headers?.get?.('X-Artifact-Hash') || '';
