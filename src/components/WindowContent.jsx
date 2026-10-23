@@ -1322,6 +1322,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
         return () => globalThis.removeEventListener?.('forge:retry-window-metadata', retry);
     }, []);
     const [signalsReady, setSignalsReady] = useState(() => !!(metadataSignalHandle?.peek?.()));
+    const admittedRefreshDefinitions = useMemo(() => new WeakSet(), []);
 
     // Settings & connector
     const {endpoints = {}, connectorConfig = {}, services = {}, targetContext = {}, useAuth = () => ({})} = useSetting();
@@ -1357,6 +1358,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             auth,
             transport: services.dataConnectorTransport,
             prepareRequest: prepareConnectorRequest,
+            recoverWindowBinding: services.recoverWindowBinding,
             windowId,
         },
     }), [scopedServices, runtimeWindow, endpoints, targetContext, auth, prepareConnectorRequest]);
@@ -1580,13 +1582,37 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             // A signal bypasses only the connector's concurrent GET sharing;
             // this remains the normal host-selected definition/admission path.
             const controller=new AbortController();
-            const response=await connector.get({signal:controller.signal,fresh:true,cache:{bypassCache:true}});
-            const selected=resolveWindowMetadataForTarget(response.data,targetContext);
-            return services.resourceFS?services.resourceFS.loadWindow(selected):selected;
+            const identity={providerIdentity:runtimeWindow?.providerIdentity,uri:runtimeWindow?.resourceRef?.uri,
+                revision:runtimeWindow?.resourceRef?.revision,target:targetContext,
+                sessionId:resolveWindowModelCacheScope(services,getActiveUIBridgeTransportContext()?.sessionId)};
+            const responseInfo={};
+            const compile=async raw=>{
+                const selected=resolveWindowMetadataForTarget(raw,targetContext);
+                return services.resourceFS?services.resourceFS.loadWindow(selected):selected;
+            };
+            const response=await connector.get({signal:controller.signal,fresh:true,cache:{bypassCache:true},responseInfo,
+                ifNoneMatch:await publishedWindowConditionalETag(identity)});
+            let admittedInfo=responseInfo,definition;
+            try{
+                definition=await admittedPublishedWindowModel({...identity,hash:responseInfo.artifactHash,etag:responseInfo.etag,
+                    definition:response.notModified?null:response.data,compile});
+            }catch(error){
+                if(!response.notModified)throw error;
+                // A 304 without an intact local model still needs a complete
+                // admitted GET; it cannot render or bind from an empty body.
+                const freshInfo={};
+                const fresh=await connector.get({signal:controller.signal,fresh:true,cache:{bypassCache:true},responseInfo:freshInfo});
+                definition=await admittedPublishedWindowModel({...identity,hash:freshInfo.artifactHash,etag:freshInfo.etag,
+                    definition:fresh.data,compile});
+                admittedInfo=freshInfo;
+            }
+            if(isAdmittedPublishedWindowResponse(admittedInfo,runtimeWindow,definition))admittedRefreshDefinitions.add(definition);
+            return definition;
         },
         prepareMetadata:async definition=>{
             const binding=canonicalSelectionBinding(runtimeWindow);
-            const applied=binding?definition:await applyWindowPermissionMetadata(definition,{services,windowId,windowKey:baseKey,
+            const admittedRefresh=admittedRefreshDefinitions.delete(definition);
+            const applied=binding||admittedRefresh?definition:await applyWindowPermissionMetadata(definition,{services,windowId,windowKey:baseKey,
                 resource:window.resource || window.parameters || {},windowParams:window.parameters || {},conversationId:window.conversationId || '',targetContext});
             if(workspaceRefreshScopeIdentity(applied)!==workspaceRefreshScopeIdentity(definition))throw new Error('Workspace admission changed the held resource scope');
             // Scope equality is verified against unmodified producer output by
