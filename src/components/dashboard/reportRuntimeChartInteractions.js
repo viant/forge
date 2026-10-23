@@ -19,6 +19,7 @@ const SUPPORTED_MULTI_SERIES_CARTESIAN_TYPES = new Set([
   "line",
   "bar",
   "area",
+  "horizontal_bar",
 ]);
 
 export function resolveReportRuntimeChartInteractionSupport(chartSpec = {}) {
