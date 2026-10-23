@@ -26,6 +26,79 @@ func NewPublisher() *Publisher {
 }
 func (p *Publisher) Generation() uint64 { p.mu.RLock(); defer p.mu.RUnlock(); return p.generation }
 
+// RetainBatch validates and stores exact immutable versions without publishing
+// them. In particular it does not advance the latest-version pointer, follow
+// selectors, catalog generation, or manifest hash. A producer can retain every
+// member of a release before atomically selecting its exact refs in
+// ReplaceCatalog. The validator checks the producer's complete closed payload;
+// a nil validator fails closed. No candidate is retained if any member fails.
+func (p *Publisher) RetainBatch(ctx context.Context, artifacts []*Artifact, validator func(context.Context, *Artifact) error) ([]*Artifact, error) {
+	if p == nil || ctx == nil || ctx.Err() != nil || validator == nil || len(artifacts) == 0 {
+		return nil, ErrInvalid
+	}
+	candidates := make([]*Artifact, 0, len(artifacts))
+	seen := make(map[string]*Artifact, len(artifacts))
+	kinds := make(map[string]string, len(artifacts))
+	for _, input := range artifacts {
+		if input == nil {
+			return nil, ErrInvalid
+		}
+		// Match Publish's exact wire-byte normalization before hashing. Do not
+		// accept a supplied hash that describes different bytes.
+		canonical, err := json.Marshal(json.RawMessage(input.Payload))
+		if err != nil {
+			return nil, ErrInvalid
+		}
+		candidate := &Artifact{Root: RootRef{URI: input.Root.URI, Kind: input.Root.Kind, Version: input.Root.Version, Hash: Hash(canonical)}, Payload: bytes.Clone(canonical)}
+		if input.Root.Hash != "" && input.Root.Hash != candidate.Root.Hash {
+			return nil, ErrInvalid
+		}
+		if err = ValidateArtifact(candidate); err != nil {
+			return nil, err
+		}
+		key := RootKey(candidate.Root)
+		if prior := seen[key]; prior != nil && prior.Root != candidate.Root {
+			return nil, ErrConflict
+		}
+		if kind := kinds[candidate.Root.URI]; kind != "" && kind != candidate.Root.Kind {
+			return nil, ErrConflict
+		}
+		kinds[candidate.Root.URI] = candidate.Root.Kind
+		if err = validator(ctx, CloneArtifact(candidate)); err != nil {
+			return nil, err
+		}
+		seen[key] = candidate
+		candidates = append(candidates, candidate)
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if ctx.Err() != nil {
+		return nil, ErrInvalid
+	}
+	for _, candidate := range candidates {
+		if active := p.active[candidate.Root.URI]; active != nil && active.Root.Kind != candidate.Root.Kind {
+			return nil, ErrConflict
+		}
+		if old := p.versions[RootKey(candidate.Root)]; old != nil && old.Root != candidate.Root {
+			return nil, ErrConflict
+		}
+	}
+	if p.versions == nil {
+		p.versions = map[string]*Artifact{}
+	}
+	result := make([]*Artifact, len(candidates))
+	for i, candidate := range candidates {
+		key := RootKey(candidate.Root)
+		if old := p.versions[key]; old != nil {
+			result[i] = CloneArtifact(old)
+			continue
+		}
+		p.versions[key] = candidate
+		result[i] = CloneArtifact(candidate)
+	}
+	return result, nil
+}
+
 // Publish is a root-version CAS. The validator must be the producer's
 // publication-time closure/schema check; a nil validator fails closed. It is
 // deliberately never called by host Open or Fetch.
@@ -60,9 +133,15 @@ func (p *Publisher) Publish(ctx context.Context, root RootRef, payload json.RawM
 			p.mu.Unlock()
 			return nil, 0, ErrConflict
 		}
-		result, gen := CloneArtifact(old), p.generation
-		p.mu.Unlock()
-		return result, gen, nil
+		// RetainBatch may have stored this exact version without activating
+		// it. An ordinary publication of that same version must still advance
+		// the latest pointer and follow cohorts exactly once.
+		if active := p.active[root.URI]; active != nil && active.Root.Version >= old.Root.Version {
+			result, gen := CloneArtifact(old), p.generation
+			p.mu.Unlock()
+			return result, gen, nil
+		}
+		candidate = old
 	}
 	latest := p.active[root.URI]
 	if latest != nil && latest.Root.Kind != root.Kind {
