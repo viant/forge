@@ -450,3 +450,21 @@ for (const width of [140, 170, 210, 680]) {
     assert.ok(Number(match[1])+Number(match[2])<=width,`Bar escapes ${width}-point allocation`);
   }
 }
+
+// A forced final date tick must not collide with the preceding periodic tick.
+for (const count of [20, 30]) {
+  for (const width of [170, 270, 680]) {
+    const output = buildReportPrintChartSvg({
+      width,
+      chartModel: {type:'line',xAxis:{dataKey:'date',tickFormat:'MMM d',valueMode:'civil'},series:{values:[{value:'value',label:'Value'}]}},
+      resolvedChart: {kind:'directSeries',type:'line',xAxisKey:'date',seriesKeys:['value'],rows:Array.from({length:count},(_,i)=>({date:`2026-10-${String(i+1).padStart(2,'0')}`,value:i+1}))},
+    });
+    const ticks=[...output.svg.matchAll(/<text x="([\d.-]+)" y="214"[^>]*><tspan>(Oct \d+)<\/tspan><\/text>/g)].map(m=>({x:Number(m[1]),label:m[2]}));
+    assert.equal(ticks[0]?.label,'Oct 1');
+    assert.equal(ticks.at(-1)?.label,`Oct ${count}`);
+    for(let i=1;i<ticks.length;i++) {
+      const needed=(ticks[i-1].label.length+ticks[i].label.length)*2.8+8;
+      assert.ok(ticks[i].x-ticks[i-1].x>=needed,`Date labels overlap at width ${width}: ${JSON.stringify(ticks)}`);
+    }
+  }
+}

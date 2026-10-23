@@ -59661,21 +59661,30 @@ ${indent}${end}`;
       const y4 = topPad + index / 3 * plotHeight;
       return `<text data-report-print-axis="right" x="${leftPad + plotWidth + 8}" y="${y4 + 4}" text-anchor="start" font-size="10" fill="#667085">${escapeXml(formatAxisTick(value, (_a6 = rightSeries[0]) == null ? void 0 : _a6.format))}</text>`;
     }).join("\n") : "";
-    const xAxisLabels = rows.map((row, index) => {
+    const xTicks = rows.flatMap((row, index) => {
       var _a6, _b2, _c2;
-      if (index % labelStep !== 0 && index !== rows.length - 1) {
-        return "";
-      }
+      if (index % labelStep !== 0 && index !== rows.length - 1) return [];
       const label = formatChartXAxisValue(
         readChartDataValue(row, xAxisKey),
         normalizeString37((_a6 = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _a6.tickFormat),
         normalizeString37((_b2 = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _b2.valueMode)
       );
-      return renderPrintLabelLines(
-        buildPrintLabelLines(label, (_c2 = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _c2.categoryLabel, 14),
-        { x: xPositions[index], y: topPad + plotHeight + 18 }
-      );
-    }).join("\n");
+      const lines = buildPrintLabelLines(label, (_c2 = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _c2.categoryLabel, 14);
+      const halfWidth = Math.max(0, ...lines.map((line) => line.length * 2.8));
+      return [{ lines, halfWidth, x: Math.max(halfWidth, Math.min(width - halfWidth, xPositions[index])) }];
+    });
+    const visibleXTicks = [];
+    const lastXTick = xTicks.at(-1);
+    const ticksApart = (left, right) => right.x - left.x >= left.halfWidth + right.halfWidth + 8;
+    for (const tick of xTicks) {
+      if (tick !== lastXTick && visibleXTicks.length && !ticksApart(tick, lastXTick)) continue;
+      if (visibleXTicks.length && !ticksApart(visibleXTicks.at(-1), tick)) continue;
+      visibleXTicks.push(tick);
+    }
+    const xAxisLabels = visibleXTicks.map((tick) => renderPrintLabelLines(
+      tick.lines,
+      { x: tick.x, y: topPad + plotHeight + 18 }
+    )).join("\n");
     const xAxisTitle = xAxisLabel ? `<text x="${leftPad + plotWidth / 2}" y="${topPad + plotHeight + 36}" text-anchor="middle" font-size="11" font-weight="600" fill="#475467">${escapeXml(xAxisLabel)}</text>` : "";
     const barSeries = seriesDescriptors.filter((series) => resolveChartSupportedSeriesType(series.type) === "bar");
     const groupWidth = Math.min(48, Math.max(14, plotWidth / Math.max(rows.length, 1) * 0.56));
