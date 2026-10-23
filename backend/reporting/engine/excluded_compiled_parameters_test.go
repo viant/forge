@@ -25,6 +25,15 @@ func TestExcludedDatasetParametersRemoveCompiledInheritedValues(t *testing.T) {
 	if base["filters"].(map[string]interface{})["from"] != "2026-10-10" {
 		t.Fatal("mutated compiled request shared with another dataset")
 	}
+	// Scope-local values may also use their predicate ID rather than a request path.
+	logicalLocal := &reportExecutionDatasetScope{Mode: "exclude", Exclude: []string{"dateRange"}, Local: map[string]interface{}{"dateRange": map[string]interface{}{"start": "2026-10-10", "end": "2026-10-12"}}}
+	localArgs, err := reportDatasetArguments(base, parameters, descriptor, builder, logicalLocal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if localArgs["filters"].(map[string]interface{})["from"] != "2026-10-10" {
+		t.Fatal("removed an authored local date interval")
+	}
 	// A daily dataset without the exclusion must still receive the new dates.
 	daily, err := reportDatasetArguments(base, parameters, descriptor, builder, nil)
 	if err != nil {
