@@ -209,6 +209,21 @@ func (p *Publisher) ReplaceCatalog(ctx context.Context, policies []authz.Documen
 		sort.Strings(followOutput)
 		c.FollowPublished = followOutput
 		sort.Slice(c.Roots, func(a, b int) bool { return c.Roots[a].URI < c.Roots[b].URI })
+		for j, ref := range c.RevisionOverrides {
+			if ref.Version == 0 {
+				return Manifest{}, ErrInvalid
+			}
+			a := p.versions[RootKey(ref)]
+			if a == nil || (ref.Kind != "" && ref.Kind != a.Root.Kind) {
+				return Manifest{}, ErrUnavailable
+			}
+			if ref.Hash != "" && ref.Hash != a.Root.Hash {
+				return Manifest{}, ErrConflict
+			}
+			c.RevisionOverrides[j] = a.Root
+		}
+		sort.Slice(c.RevisionOverrides, func(a, b int) bool { return c.RevisionOverrides[a].URI < c.RevisionOverrides[b].URI })
+		sort.Strings(c.DeniedURIs)
 		c.Hash = CohortHash(*c)
 	}
 	sort.Slice(detached.Cohorts, func(i, j int) bool {

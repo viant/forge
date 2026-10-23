@@ -143,7 +143,15 @@ func walkAssetReferences(node interface{}, parentKey string, refs *AssetReferenc
 					}
 				case "dialogId":
 					refs.Dialogs[text] = true
-				case "modelRef", "resourceModelRef":
+				case "modelRef":
+					// Report builders carry a semantic model URI in their
+					// binding and inline semanticModel. It identifies the
+					// report model, not a Forge resourceModels registry key.
+					if (parentKey == "binding" || parentKey == "semanticModel") && strings.HasPrefix(text, "model://") {
+						continue
+					}
+					refs.ResourceModels[text] = true
+				case "resourceModelRef":
 					refs.ResourceModels[text] = true
 				case "schemaRef", "$ref":
 					refs.Schemas[text] = true

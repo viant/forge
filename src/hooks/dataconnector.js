@@ -302,12 +302,12 @@ export function createDataConnector(dataSource, runtime = {}) {
     /**
      * GET method
      */
-    async function get({filter = {}, page, cursor, pageSize, inputParameters = {}, cache = null, invocationId = null, signal = null, fresh = false}) {
+    async function get({filter = {}, page, cursor, pageSize, inputParameters = {}, cache = null, invocationId = null, signal = null, fresh = false, responseInfo = null, ifNoneMatch = ''}) {
         try {
             let {method, url, headers} = getUrlAndHeaders();
             let queryParams = new URLSearchParams();
             const requestMethod = String(method || 'GET').toUpperCase();
-            const isDatasourceFetchRoute = /\/v1\/api\/datasources\/[^/]+\/fetch$/.test(url);
+            const isDatasourceFetchRoute = /\/v1\/api\/datasources\/[^/?]+\/fetch(?:\?[^#]*)?$/.test(url);
             const pagingValues = String(dataSource?.paginationMode || '').toLowerCase() === 'client'
                 ? null
                 : resolvePagingValues(page, withPagingSize(paging, pageSize), cursor);
@@ -346,6 +346,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 })
                 : body;
             if (invocationId) headers = {...(headers || {}), 'X-Forge-Invocation-Id': String(invocationId)};
+            if (requestMethod === 'GET' && ifNoneMatch) headers = {...(headers || {}), 'If-None-Match': String(ifNoneMatch)};
             ({url, method, headers, queryParams, body: payload} = applyRequestPreparation({
                 url,
                 method: requestMethod,
@@ -376,6 +377,11 @@ export function createDataConnector(dataSource, runtime = {}) {
             }
             const performRequest = (async () => {
                 const resp = await fetch(finalUrl, request);
+                if (responseInfo && typeof responseInfo === 'object') {
+                    responseInfo.artifactHash = resp.headers?.get?.('X-Artifact-Hash') || '';
+                    responseInfo.etag = resp.headers?.get?.('ETag') || '';
+                }
+                if (resp.status === 304 && ifNoneMatch && requestMethod === 'GET') return {notModified:true};
                 if (!resp.ok) {
                     const err = await makeRequestError(resp, 'GET error');
                     notifyUnauthorized(err);
