@@ -104,3 +104,16 @@ func TestReportOptionsKeepShortContextTogetherAndRepeatLongHeading(t *testing.T)
 		}
 	}
 }
+
+func TestReportOptionConflictsRetainAuthoredDatasetContext(t *testing.T) {
+	options := Options{Metadata: json.RawMessage(`{"reportOptions":[{"name":"minimum","label":"Minimum impressions"},{"name":"metric","label":"Detail metric"},{"name":"supply","label":"Supply"},{"name":"secret","hidden":true}]}`), ReportSpec: json.RawMessage(`{"datasets":[{"id":"custom","request":{"options":{"minimum":5000,"metric":"CPM","supply":"All","secret":"hidden1"}}},{"id":"evidence","request":{"options":{"minimum":0,"metric":"Spend","supply":"All","secret":"hidden2"}}}],"blocks":[{"kind":"chartBlock","title":"Publisher ranking","datasetRef":"custom"},{"kind":"tableBlock","title":"Custom publisher detail","datasetRef":"custom"},{"kind":"tableBlock","title":"Publisher source evidence","datasetRef":"evidence"}]}`)}
+	require.Equal(t, []string{"Detail metric (Custom publisher detail): CPM", "Minimum impressions (Custom publisher detail): 5000", "Supply: All", "Detail metric (Publisher source evidence): Spend", "Minimum impressions (Publisher source evidence): 0"}, reportOptionLines(options))
+	// Identical effective values stay concise even when different private values exist.
+	options.ReportSpec = json.RawMessage(`{"datasets":[{"id":"a","request":{"options":{"metric":"CPM","secret":"hidden1"}}},{"id":"b","request":{"options":{"metric":"CPM","secret":"hidden2"}}}]}`)
+	require.Equal(t, []string{"Detail metric: CPM"}, reportOptionLines(options))
+}
+
+func TestReportOptionPrimaryContextIgnoresFilterCaption(t *testing.T) {
+	options := Options{ReportSpec: json.RawMessage(`{"datasets":[{"id":"primary","request":{"options":{"minimum":5000}}},{"id":"evidence","label":"Raw evidence","request":{"options":{"minimum":0}}}],"blocks":[{"kind":"filterBarBlock","title":"Report filters","datasetRef":"primary"}]}`)}
+	require.Equal(t, []string{"minimum (Report results): 5000", "minimum (Raw evidence): 0"}, reportOptionLines(options))
+}

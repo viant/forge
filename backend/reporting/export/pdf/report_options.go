@@ -29,28 +29,68 @@ func reportOptionLines(options Options) []string {
 	_ = json.Unmarshal(options.Metadata, &metadata)
 	var spec struct {
 		Datasets []struct {
+			ID      string `json:"id"`
+			Label   string `json:"label"`
+			Title   string `json:"title"`
 			Request struct {
 				Options map[string]any `json:"options"`
 			} `json:"request"`
 		} `json:"datasets"`
+		Blocks []struct {
+			Kind       string `json:"kind"`
+			Title      string `json:"title"`
+			DatasetRef string `json:"datasetRef"`
+			Hidden     bool   `json:"hidden"`
+		} `json:"blocks"`
 	}
 	_ = json.Unmarshal(options.ReportSpec, &spec)
-	selections := []map[string]any{}
-	for _, dataset := range spec.Datasets {
-		if len(dataset.Request.Options) > 0 {
-			selections = append(selections, dataset.Request.Options)
+	type selection struct {
+		caption string
+		values  map[string]any
+	}
+	selections := []selection{}
+	for index, dataset := range spec.Datasets {
+		if len(dataset.Request.Options) == 0 {
+			continue
 		}
+		caption := strings.TrimSpace(dataset.Label)
+		if caption == "" {
+			caption = strings.TrimSpace(dataset.Title)
+		}
+		if caption == "" {
+			for _, block := range spec.Blocks {
+				if block.DatasetRef != dataset.ID || block.Hidden || block.Kind == "filterBarBlock" || block.Kind == "refinementBarBlock" || strings.TrimSpace(block.Title) == "" {
+					continue
+				}
+				if caption == "" || block.Kind == "tableBlock" {
+					caption = strings.TrimSpace(block.Title)
+				}
+				if block.Kind == "tableBlock" {
+					break
+				}
+			}
+		}
+		if caption == "" {
+			caption = dataset.ID
+			if caption == "primary" {
+				caption = "Report results"
+			}
+			if caption == "" {
+				caption = fmt.Sprintf("Report data %d", index+1)
+			}
+		}
+		selections = append(selections, selection{caption, dataset.Request.Options})
 	}
-	// Fenced mobile exports contain materialized datasets; their original request
-	// values travel in export metadata rather than executable datasource requests.
+	// Materialized mobile exports carry the effective values in metadata.
 	if len(selections) == 0 && len(metadata.Values) > 0 {
-		selections = append(selections, metadata.Values)
+		selections = append(selections, selection{"Report results", metadata.Values})
 	}
-	lines := []string{}
-	seen := map[string]bool{}
+	type optionLine struct{ name, label, display, caption string }
+	entries := []optionLine{}
+	valuesByName := map[string]map[string]bool{}
 	for _, selected := range selections {
-		names := make([]string, 0, len(selected))
-		for name := range selected {
+		names := make([]string, 0, len(selected.values))
+		for name := range selected.values {
 			names = append(names, name)
 		}
 		sort.Strings(names)
@@ -77,7 +117,7 @@ func reportOptionLines(options Options) []string {
 			if !visible {
 				continue
 			}
-			value := selected[name]
+			value := selected.values[name]
 			switch value.(type) {
 			case string, bool, float64:
 			default:
@@ -107,11 +147,27 @@ func reportOptionLines(options Options) []string {
 				}
 				break
 			}
-			line := label + ": " + display
-			if !seen[line] {
-				seen[line] = true
-				lines = append(lines, line)
+			encoded, _ := json.Marshal(value)
+			if valuesByName[name] == nil {
+				valuesByName[name] = map[string]bool{}
 			}
+			valuesByName[name][string(encoded)] = true
+			entries = append(entries, optionLine{name, label, display, selected.caption})
+		}
+	}
+	lines := []string{}
+	seen := map[string]bool{}
+	for _, entry := range entries {
+		label := entry.label
+		// A chart-local option is not a conflicting global selection. Retain
+		// its authored context only when the visible effective values differ.
+		if len(valuesByName[entry.name]) > 1 {
+			label += " (" + entry.caption + ")"
+		}
+		line := label + ": " + entry.display
+		if !seen[line] {
+			seen[line] = true
+			lines = append(lines, line)
 		}
 	}
 	return lines
