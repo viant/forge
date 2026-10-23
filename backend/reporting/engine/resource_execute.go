@@ -406,6 +406,9 @@ func reportDatasetArguments(base, parameters map[string]interface{}, descriptor 
 	// retain explicitly authored dataset-local values at the same paths.
 	if scope != nil {
 		for _, declaration := range declarations {
+			if _, authoredLocal := scope.Local[declaration.ID]; authoredLocal {
+				continue
+			}
 			for _, excluded := range scope.Exclude {
 				if excluded == declaration.ID {
 					removeExcludedReportParameter(args, scope.Local, declaration.Path)
