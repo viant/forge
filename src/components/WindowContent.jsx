@@ -235,6 +235,22 @@ export async function applyWindowPermissionMetadata(completeMetadata, {
     });
 }
 
+// The cohort HTTP handler admits the selected root and binds this UI instance
+// before emitting these headers, including on 304. A legacy window GET lacks
+// this representation marker and retains its separate permission preflight.
+export function isAdmittedPublishedWindowResponse(responseInfo, window, metadata) {
+    const hash = String(responseInfo?.artifactHash || '');
+    const etag = String(responseInfo?.etag || '');
+    const uri = String(window?.resourceRef?.uri || '');
+    const providerIdentity = String(window?.providerIdentity || '');
+    const cohortETag = /^"([a-f0-9]{64})\.cohort-v\d+"$/i.exec(etag);
+    if (!/^[a-f0-9]{64}$/i.test(hash) || cohortETag?.[1]?.toLowerCase() !== hash.toLowerCase() ||
+        !/^window:\/\/[^/]+\/.+/.test(uri) || !providerIdentity || !metadata?.view) return false;
+    if (metadata.resource?.uri && metadata.resource.uri !== uri) return false;
+    if (metadata.resource?.providerIdentity && metadata.resource.providerIdentity !== providerIdentity) return false;
+    return true;
+}
+
 export function resolveInitialWindowFormValues(metadata) {
     const windowCfg = metadata?.window || {};
     const onEntries = [
@@ -1449,6 +1465,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                     return services.resourceFS ? services.resourceFS.loadWindow(selected) : selected;
                 };
                 const modelRequest = {...modelIdentity,hash:responseInfo.artifactHash,etag:responseInfo.etag,compile:compileModel};
+                let admittedResponseInfo=responseInfo;
                 try {
                     completeMetadata = await admittedPublishedWindowModel({...modelRequest,definition:resp.notModified ? null : resp.data});
                 } catch (error) {
@@ -1459,13 +1476,15 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                     const fresh = await connector.get({responseInfo:freshInfo,fresh:true});
                     completeMetadata = await admittedPublishedWindowModel({...modelIdentity,hash:freshInfo.artifactHash,etag:freshInfo.etag,
                         definition:fresh.data,compile:compileModel});
+                    admittedResponseInfo=freshInfo;
                 }
                 if (cancelled || expired) return;
                 fetchedProtectedMetadata = isProtectedWindowMetadata(completeMetadata);
                 // A signed delivery is emitted only after host OPEN admission. Its
                 // snapshot is a rendering hint, not a data-operation preflight.
                 const selectionBinding = canonicalSelectionBinding(window);
-                const permissionAppliedMetadata = selectionBinding ? completeMetadata : await applyWindowPermissionMetadata(completeMetadata, {
+                const permissionAppliedMetadata = selectionBinding || isAdmittedPublishedWindowResponse(admittedResponseInfo,window,completeMetadata)
+                    ? completeMetadata : await applyWindowPermissionMetadata(completeMetadata, {
                     services,
                     windowId,
                     windowKey: baseKey,

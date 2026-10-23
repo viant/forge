@@ -68,6 +68,39 @@ it('prepares the metadata request with the concrete rendered window instance', a
   }
 });
 
+it('uses the published cohort GET admission without a second permission GET',async()=>{
+  const originalFetch=globalThis.fetch;
+  const hash='a'.repeat(64);
+  const metadata={authorization:{scope:'window'},dataSource:{},view:{content:{id:'published-root',kind:'test.authorized'}}};
+  const applyPermission=vi.fn(async()=>{throw new Error('redundant published preflight');});
+  globalThis.fetch=vi.fn(async()=>new Response(JSON.stringify({data:metadata}),{
+    status:200,headers:{'Content-Type':'application/json','X-Artifact-Hash':hash,ETag:`"${hash}.cohort-v2"`},
+  }));
+  try{
+    await mount({applyPermission},{windowId,windowKey:'window://dspui/orderList',
+      providerIdentity:'aistudio-local',resourceRef:{uri:'window://dspui/orderList'}});
+    await flush();
+    expect(element.querySelector('[data-authorized-renderer]')).not.toBeNull();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(applyPermission).not.toHaveBeenCalled();
+  }finally{globalThis.fetch=originalFetch;}
+});
+
+it('retains the separate permission preflight for legacy metadata',async()=>{
+  const originalFetch=globalThis.fetch;
+  const metadata={authorization:{scope:'window'},dataSource:{},view:{content:{id:'legacy-root',kind:'test.authorized'}}};
+  const applyPermission=vi.fn(async()=>metadata);
+  globalThis.fetch=vi.fn(async()=>new Response(JSON.stringify({data:metadata}),{
+    status:200,headers:{'Content-Type':'application/json'},
+  }));
+  try{
+    await mount({applyPermission},{windowId,windowKey:'window://dspui/orderList',
+      providerIdentity:'aistudio-local',resourceRef:{uri:'window://dspui/orderList'}});
+    await flush();
+    expect(applyPermission).toHaveBeenCalledTimes(1);
+  }finally{globalThis.fetch=originalFetch;}
+});
+
 it('updates a floating picker footer when its selection changes', async () => {
   const metadata={dataSource:{rows:{selectionMode:'single',cardinality:'many',autoFetch:false,parameters:[]}},
     view:{content:{id:'picker-root',kind:'test.authorized',dataSourceRef:'rows'}}};

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, isProtectedWindowMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowModelCacheScope, resolveWindowRootContainer, reuseShallowEqualRuntimeObject, scopedWindowHostServices, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
+import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, isAdmittedPublishedWindowResponse, isProtectedWindowMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowModelCacheScope, resolveWindowRootContainer, reuseShallowEqualRuntimeObject, scopedWindowHostServices, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
 
 describe('window-scoped host capability',()=>{
   it('binds each published window to its own host callbacks without changing global services',()=>{
@@ -36,6 +36,17 @@ describe('local datasource parent placeholder', () => {
 });
 
 describe('applyWindowPermissionMetadata', () => {
+  it('recognizes only a bound canonical cohort GET as an already-admitted delivery', () => {
+    const hash='a'.repeat(64),etag=`"${hash}.cohort-v2"`;
+    const responseInfo={artifactHash:hash,etag};
+    const window={providerIdentity:'studio',resourceRef:{uri:'window://dspui/orderList'}};
+    const metadata={view:{content:{id:'root'}},authorization:{scope:'window'}};
+    expect(isAdmittedPublishedWindowResponse(responseInfo,window,metadata)).toBe(true);
+    expect(isAdmittedPublishedWindowResponse({artifactHash:hash,etag:'"legacy"'},window,metadata)).toBe(false);
+    expect(isAdmittedPublishedWindowResponse(responseInfo,{...window,providerIdentity:''},metadata)).toBe(false);
+    expect(isAdmittedPublishedWindowResponse(responseInfo,{...window,resourceRef:null},metadata)).toBe(false);
+    expect(isAdmittedPublishedWindowResponse(responseInfo,window,{...metadata,resource:{uri:'window://other/list'}})).toBe(false);
+  });
   it('consumes a resolved managing-provider delivery with authored authorization without another host check', async () => {
     const metadata = {
       resource: {uri: 'window://producer/record', providerIdentity: 'producer', kind: 'stamped', revision: '5', contentFingerprint: 'producer-fingerprint', authorityBinding: 'verified-owner'},
