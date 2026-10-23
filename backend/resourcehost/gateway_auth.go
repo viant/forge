@@ -20,6 +20,16 @@ func (c *gatewayAuthClient) Initialize(ctx context.Context, options ...mcpclient
 	return c.Interface.Initialize(c.manager.WithAuthTokenContext(ctx, c.name), options...)
 }
 
+func (c *gatewayAuthClient) NegotiatedServer() (*schema.InitializeResult, error) {
+	negotiated, ok := c.Interface.(interface {
+		NegotiatedServer() (*schema.InitializeResult, error)
+	})
+	if !ok {
+		return nil, ErrUnavailable
+	}
+	return negotiated.NegotiatedServer()
+}
+
 func (c *gatewayAuthClient) ListTools(ctx context.Context, cursor *string, options ...mcpclient.RequestOption) (*schema.ListToolsResult, error) {
 	return c.Interface.ListTools(c.manager.WithAuthTokenContext(ctx, c.name), cursor, options...)
 }

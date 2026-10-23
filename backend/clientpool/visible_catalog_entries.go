@@ -11,6 +11,7 @@ import (
 	"time"
 
 	primitive "github.com/viant/forge/backend/provider/contract"
+	"github.com/viant/forge/backend/provider/contract/observe"
 )
 
 // Keyed definitions live in the existing manager catalog slot, sorted within
@@ -37,11 +38,13 @@ func (m *Manager) VisibleCatalogEntryInPartition(ctx context.Context, key string
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
+		lookup := observe.Start(ctx, "manager.entry.lookup", observe.Labels{})
 		m.mu.Lock()
 		if partition.sourceVersions != nil {
 			for name, held := range *partition.sourceVersions {
 				if m.resourceCatalogGenerationLocked(name, receiver) != held {
 					m.mu.Unlock()
+					lookup.End(observe.Error, observe.CacheUnknown)
 					return nil, primitive.ErrCatalogCursor
 				}
 			}
@@ -50,7 +53,9 @@ func (m *Manager) VisibleCatalogEntryInPartition(ctx context.Context, key string
 			m.visibleCatalogs = map[string]*visibleCatalog{}
 		}
 		slot := m.visibleCatalogs[key]
+		slotNew, entryExpired, entryMissing := false, false, false
 		if slot == nil {
+			slotNew = true
 			now := time.Now()
 			for name, existing := range m.visibleCatalogs {
 				if existing.ready == nil && !existing.until.IsZero() && !existing.until.After(now) {
@@ -59,6 +64,7 @@ func (m *Manager) VisibleCatalogEntryInPartition(ctx context.Context, key string
 			}
 			if !m.makeVisibleCatalogRoomLocked() {
 				m.mu.Unlock()
+				lookup.End(observe.Error, observe.CacheUnknown)
 				return nil, fmt.Errorf("visible catalog cache capacity exceeded")
 			}
 			slot = &visibleCatalog{lastUsed: now, partition: partition, receiver: receiver}
@@ -68,6 +74,7 @@ func (m *Manager) VisibleCatalogEntryInPartition(ctx context.Context, key string
 			m.visibleCatalogs[key] = slot
 		} else if !sameCatalogPartition(slot.partition, partition) {
 			m.mu.Unlock()
+			lookup.End(observe.Error, observe.CacheUnknown)
 			return nil, primitive.ErrCatalogCursor
 		}
 		slot.lastUsed = time.Now()
@@ -78,6 +85,7 @@ func (m *Manager) VisibleCatalogEntryInPartition(ctx context.Context, key string
 			if entry.ready != nil {
 				ready := entry.ready
 				m.mu.Unlock()
+				lookup.End(observe.OK, observe.CacheMiss)
 				select {
 				case <-ready:
 					continue
@@ -88,16 +96,36 @@ func (m *Manager) VisibleCatalogEntryInPartition(ctx context.Context, key string
 			if entry.until.IsZero() || entry.until.After(time.Now()) {
 				out := bytes.Clone(entry.value)
 				m.mu.Unlock()
+				lookup.End(observe.OK, observe.CacheHit)
 				return out, nil
 			}
+			entryExpired = true
 			slot.entries = append(slot.entries[:index], slot.entries[index+1:]...)
+		}
+		if entry == nil {
+			entryMissing = true
 		}
 		entry = &visibleCatalogEntry{key: entryKey, ready: make(chan struct{}), representations: map[string]*visibleCatalogRepresentation{}}
 		slot.entries = append(slot.entries, nil)
 		copy(slot.entries[index+1:], slot.entries[index:])
 		slot.entries[index] = entry
 		m.mu.Unlock()
+		if slotNew {
+			s := observe.Start(ctx, "manager.entry.slot.new", observe.Labels{})
+			s.End(observe.OK, observe.CacheMiss)
+		}
+		if entryExpired {
+			s := observe.Start(ctx, "manager.entry.expired", observe.Labels{})
+			s.End(observe.OK, observe.CacheMiss)
+		}
+		if entryMissing {
+			s := observe.Start(ctx, "manager.entry.key.miss", observe.Labels{})
+			s.End(observe.OK, observe.CacheMiss)
+		}
+		lookup.End(observe.OK, observe.CacheMiss)
+		loadTiming := observe.Start(ctx, "manager.entry.load", observe.Labels{})
 		value, until, err := load(ctx)
+		loadTiming.End(observe.OutcomeFor(err), observe.CacheMiss)
 		if err == nil {
 			err = ctx.Err()
 		}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
 	identity "github.com/viant/forge/backend/resource"
 	mcpcfg "github.com/viant/mcp/client/config"
@@ -15,12 +16,15 @@ import (
 type MCPDefinitionSource struct{ ConnectionName, ProviderIdentity, Namespace string }
 
 // MCPReferenceReader implements manager.DefinitionReader through the shared
-// gateway. It retains no catalog, credentials or resolved client configurations.
+// gateway. It retains only bounded, scoped URI-to-owner selections; no catalog
+// bytes, credentials or resolved client configurations are stored here.
 type MCPReferenceReader struct {
 	gateway  *Gateway
 	internal MCPDefinitionSource
 	catalogs []identity.ResourceRef
 	reserved map[string]bool
+	memoMu   sync.RWMutex
+	memo     map[mcpReferenceMemoKey]mcpReferenceMemoEntry
 }
 
 func NewMCPReferenceReader(g *Gateway, internal MCPDefinitionSource, catalogs []identity.ResourceRef) (*MCPReferenceReader, error) {
@@ -95,6 +99,11 @@ func (r *MCPReferenceReader) DefinitionContentGeneration(ctx context.Context) st
 	return strings.Join(parts, "|")
 }
 func (r *MCPReferenceReader) rows(ctx context.Context, root Connection, namespace string) ([]Located[json.RawMessage], error) {
+	if root.Name != r.internal.ConnectionName {
+		if selected, supported, err := r.filteredMCPRows(ctx, root); supported || err != nil {
+			return selected, err
+		}
+	}
 	var rows []Located[json.RawMessage]
 	query := CatalogQuery{Namespace: namespace, Limit: 1000}
 	for {
@@ -161,7 +170,7 @@ func (r *MCPReferenceReader) effectiveOptions(ctx context.Context, source Connec
 	config.ResourceCacheScopes = scopes
 	return config, nil
 }
-func (r *MCPReferenceReader) inventory(ctx context.Context, external bool) ([]Located[json.RawMessage], error) {
+func (r *MCPReferenceReader) inventory(ctx context.Context, external bool, targetNamespace ...string) ([]Located[json.RawMessage], error) {
 	rows, err := r.rows(ctx, r.internalRoot(), r.internal.Namespace)
 	if err != nil {
 		return nil, err
@@ -172,6 +181,26 @@ func (r *MCPReferenceReader) inventory(ctx context.Context, external bool) ([]Lo
 			return nil, err
 		}
 		for _, root := range roots {
+			if len(targetNamespace) == 1 && targetNamespace[0] != "" {
+				options, optionsErr := r.gateway.Manager.Options(ctx, root.Name)
+				if optionsErr != nil {
+					return nil, optionsErr
+				}
+				if options == nil {
+					return nil, ErrUnavailable
+				}
+				if len(options.PrimitiveNamespaces) > 0 {
+					matches := false
+					for _, namespace := range options.PrimitiveNamespaces {
+						if namespace == targetNamespace[0] || namespace == "ns://"+targetNamespace[0] {
+							matches = true
+						}
+					}
+					if !matches {
+						continue // Explicit producer namespace restrictions exclude this URI.
+					}
+				}
+			}
 			additional, err := r.rows(ctx, root, "")
 			if err != nil {
 				return nil, err
@@ -239,6 +268,16 @@ func (r *MCPReferenceReader) Load(ctx context.Context, name string) (*mcpcfg.MCP
 	if r.reserved[name] {
 		return nil, ErrCollision
 	}
+	var selectionStart mcpReferenceMemoKey
+	if target, err := identity.ParseResourceURI(name); err == nil && target.Kind == "mcp" && target.Namespace != r.internal.Namespace {
+		selectionStart, _, err = r.memoKey(ctx, target.String())
+		if err != nil {
+			return nil, err
+		}
+		if cached, found, err := r.memoLoad(ctx, target); found || err != nil {
+			return cached, err
+		}
+	}
 	// Explicit catalog roots always bootstrap from the internal source. They
 	// cannot depend on aggregate enumeration of their own connection options.
 	for _, ref := range r.catalogs {
@@ -273,7 +312,11 @@ func (r *MCPReferenceReader) Load(ctx context.Context, name string) (*mcpcfg.MCP
 		return nil, err
 	}
 	if selected == nil {
-		all, err := r.inventory(ctx, true)
+		namespace := ""
+		if target, parseErr := identity.ParseResourceURI(name); parseErr == nil && target.Kind == "mcp" {
+			namespace = target.Namespace
+		}
+		all, err := r.inventory(ctx, true, namespace)
 		if err != nil {
 			return nil, err
 		}
@@ -285,7 +328,16 @@ func (r *MCPReferenceReader) Load(ctx context.Context, name string) (*mcpcfg.MCP
 	if selected == nil {
 		return nil, fmt.Errorf("MCP definition not found")
 	}
-	result, err := GetFrom[*mcpcfg.MCPClient](ctx, r.gateway, selected.Connection, identity.ResourceRef{URI: selected.Resource.URI}, func(raw json.RawMessage) (*mcpcfg.MCPClient, error) { return DecodeMCPDefinition(1, raw) })
+	var result *Result[*mcpcfg.MCPClient]
+	if selected.Connection.Name != r.internal.ConnectionName {
+		// The exact URI came from the owning provider's authenticated mcp-only
+		// index above. Get still validates the provider's current read, actor,
+		// binding, fingerprint and lease before returning the definition.
+		ctx = context.WithValue(ctx, mcpReferenceProofKey{}, mcpReferenceProof{connection: selected.Connection, uri: selected.Resource.URI})
+		result, err = Get[*mcpcfg.MCPClient](ctx, r.gateway, selected.Connection, identity.ResourceRef{URI: selected.Resource.URI}, nil, func(raw json.RawMessage) (*mcpcfg.MCPClient, error) { return DecodeMCPDefinition(1, raw) })
+	} else {
+		result, err = GetFrom[*mcpcfg.MCPClient](ctx, r.gateway, selected.Connection, identity.ResourceRef{URI: selected.Resource.URI}, func(raw json.RawMessage) (*mcpcfg.MCPClient, error) { return DecodeMCPDefinition(1, raw) })
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -294,5 +346,9 @@ func (r *MCPReferenceReader) Load(ctx context.Context, name string) (*mcpcfg.MCP
 		serviceName = selected.Resource.URI
 	}
 	result.Definition.ResolvedIdentity = &mcpcfg.ResolvedServiceIdentity{ServiceName: serviceName, ResourceURI: selected.Resource.URI, ProviderIdentity: selected.Connection.ProviderIdentity}
-	return r.effectiveOptions(ctx, selected.Connection, selected.Resource.Namespace, result.Definition)
+	options, err := r.effectiveOptions(ctx, selected.Connection, selected.Resource.Namespace, result.Definition)
+	if err == nil && selected.Connection.Name != r.internal.ConnectionName && name == selected.Resource.URI && result.ResolvedResource != nil {
+		r.memoSave(ctx, selected, result.ResolvedResource.ValidUntil, selectionStart)
+	}
+	return options, err
 }

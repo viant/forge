@@ -126,6 +126,13 @@ func (g *Gateway) discoverStandardResources(ctx context.Context, actor identity.
 }
 
 func standardResourceReadSupported(ctx context.Context, client mcpclient.Interface) bool {
+	if negotiated, ok := client.(interface {
+		NegotiatedServer() (*schema.InitializeResult, error)
+	}); ok {
+		if result, err := negotiated.NegotiatedServer(); err == nil && result != nil && result.Capabilities.Resources != nil {
+			return true
+		}
+	}
 	if discovery, ok := client.(mcpclient.DiscoveryInterface); ok {
 		if result, err := discovery.Discover(ctx); err == nil && result != nil && result.Capabilities.Resources != nil {
 			return true
