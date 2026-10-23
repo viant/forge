@@ -240,12 +240,16 @@ export function resolveInitialWindowFormValues(metadata) {
 }
 
 export function resolveDefaultDataSourceRef(metadata) {
+    const dataSourceRefs = Object.keys(metadata?.dataSource || {});
     return String(
         metadata?.view?.dataSourceRef
         || metadata?.view?.content?.dataSourceRef
         || metadata?.window?.titleBinding?.dataSourceRef
         || metadata?.window?.titleBinding?.ref
-        || Object.keys(metadata?.dataSource || {})[0]
+        // An implicit default is unambiguous only for a single-source window.
+        // Multi-source definitions may serialize a command datasource first;
+        // selecting that key would execute it when the window opens.
+        || (dataSourceRefs.length === 1 ? dataSourceRefs[0] : '')
         || ''
     ).trim();
 }

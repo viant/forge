@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 
 	lookupProto "github.com/viant/forge/backend/lookup/contract"
@@ -68,6 +69,9 @@ func mergeWorkspaceForgeAssetsWithOptionsAt(ctx context.Context, workspaceRoot s
 	}
 	resolver.applyAssignment(normalized)
 	resolver.resolve()
+	if options.RequireCompleteResources && len(resolver.unresolved) > 0 {
+		return fmt.Errorf("window %s has unresolved declared resources:\n  %s", windowIdentity(window), strings.Join(resolver.unresolved, "\n  "))
+	}
 	if err := resolver.attach(); err != nil {
 		return err
 	}
@@ -102,12 +106,67 @@ func mergeWorkspaceForgeAssetsWithOptionsAt(ctx context.Context, workspaceRoot s
 			return err
 		}
 	}
+	if options.RequireCompleteResources {
+		if err := validateCompleteWindowReferences(window); err != nil {
+			return err
+		}
+	}
 	// Host extensions (including report builders) add datasource references.
 	// Validate the complete window, while keeping missing datasources non-fatal.
 	if _, err := validateWindowReferences(window, catalog, workspaceRoot); err != nil {
 		return err
 	}
 	return forgeTypes.ValidateResourceModels(window)
+}
+
+// Only declarative references are publication dependencies. Action-code
+// string literals are advisory because arbitrary UI text can match an asset ID.
+func validateCompleteWindowReferences(window *forgeTypes.Window) error {
+	refs := CollectWindowReferences(window).YAML
+	dialogs := map[string]bool{}
+	for _, dialog := range window.Dialogs {
+		dialogs[strings.TrimSpace(dialog.Id)] = true
+	}
+	missing := map[string][]string{}
+	for id := range refs.DataSources {
+		if _, ok := window.DataSource[id]; !ok {
+			missing["datasource"] = append(missing["datasource"], id)
+		}
+	}
+	for id := range refs.Dialogs {
+		if !dialogs[id] {
+			missing["dialog"] = append(missing["dialog"], id)
+		}
+	}
+	for id := range refs.ResourceModels {
+		if _, ok := window.ResourceModels[id]; !ok {
+			missing["resource model"] = append(missing["resource model"], id)
+		}
+	}
+	for id := range refs.Schemas {
+		if _, ok := window.Schemas[id]; !ok {
+			missing["schema"] = append(missing["schema"], id)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	var parts []string
+	for _, kind := range []string{"datasource", "dialog", "resource model", "schema"} {
+		if names := missing[kind]; len(names) > 0 {
+			sort.Strings(names)
+			parts = append(parts, kind+": "+strings.Join(names, ", "))
+		}
+	}
+	return fmt.Errorf("window %s references unattached declared resources: %s", windowIdentity(window), strings.Join(parts, "; "))
+}
+
+// ValidatePublishedReferences is a producer-only closure check for callers
+// publishing an already compiled window rather than loading its YAML source.
+// Serving a published window must not call this again.
+func ValidatePublishedReferences(window *forgeTypes.Window) error {
+	if window == nil { return fmt.Errorf("published window is missing") }
+	return validateCompleteWindowReferences(window)
 }
 
 // assignmentResolver computes the transitive closure of assigned assets over

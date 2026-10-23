@@ -29,40 +29,44 @@ func presentationWindowTarget(ctx context.Context) *types.WindowTarget {
 }
 
 func supportsWindowTarget(ctx context.Context, client mcpclient.Interface) bool {
-	initialized, err := client.Initialize(ctx)
-	if err != nil || initialized == nil {
-		return false
-	}
-	raw, err := json.Marshal(initialized.Capabilities.Extensions[windowTargetExtension])
-	if err != nil {
-		return false
-	}
-	var capability struct {
-		SchemaVersion int `json:"schemaVersion"`
-	}
-	return json.Unmarshal(raw, &capability) == nil && capability.SchemaVersion == 1
+	_, target := windowResourceCapabilities(ctx, client)
+	return target
 }
 
 func supportsIndependentWindowDefinitions(ctx context.Context, client mcpclient.Interface) bool {
+	references, _ := windowResourceCapabilities(ctx, client)
+	return references
+}
+
+// Both extensions are advertised by the same Initialize response. A window
+// read checks them together so it does not negotiate twice on one request.
+func windowResourceCapabilities(ctx context.Context, client mcpclient.Interface) (references, target bool) {
 	initialized, err := client.Initialize(ctx)
 	if err != nil || initialized == nil {
-		return false
+		return false, false
 	}
-	raw, err := json.Marshal(initialized.Capabilities.Extensions[types.WindowDeliveryExtension])
+	raw, err := json.Marshal(initialized.Capabilities.Extensions[windowTargetExtension])
+	var targetCapability struct {
+		SchemaVersion int `json:"schemaVersion"`
+	}
+	if err == nil && json.Unmarshal(raw, &targetCapability) == nil {
+		target = targetCapability.SchemaVersion == 1
+	}
+	raw, err = json.Marshal(initialized.Capabilities.Extensions[types.WindowDeliveryExtension])
 	if err != nil {
-		return false
+		return false, target
 	}
 	var capability struct {
 		SchemaVersion int      `json:"schemaVersion"`
 		Modes         []string `json:"modes"`
 	}
 	if json.Unmarshal(raw, &capability) != nil || capability.SchemaVersion != 1 {
-		return false
+		return false, target
 	}
 	for _, mode := range capability.Modes {
 		if mode == "references" {
-			return true
+			return true, target
 		}
 	}
-	return false
+	return false, target
 }
