@@ -666,6 +666,9 @@
           "type": "string"
         },
         "pressedWhenValue": {},
+        "preview": {
+          "$ref": "#/$defs/MediaPreviewOptions"
+        },
         "progress": {
           "$ref": "#/$defs/Progress"
         },
@@ -818,12 +821,18 @@
         "footer": {
           "$ref": "#/$defs/Container"
         },
+        "gateRequirementsEditor": {
+          "$ref": "#/$defs/GateRequirementsEditorSpec"
+        },
         "hiddenWhen": {
           "additionalProperties": {},
           "type": "object"
         },
         "historyDiff": {
           "$ref": "#/$defs/HistoryDiffSpec"
+        },
+        "hostContent": {
+          "$ref": "#/$defs/HostContentSpec"
         },
         "id": {
           "type": "string"
@@ -870,8 +879,17 @@
         "pageSize": {
           "type": "integer"
         },
+        "parameterEditor": {
+          "$ref": "#/$defs/ParameterEditorSpec"
+        },
         "permissionBoundary": {
           "$ref": "#/$defs/PermissionBoundarySpec"
+        },
+        "predicateCompositionEditor": {
+          "$ref": "#/$defs/PredicateCompositionEditorSpec"
+        },
+        "previewWorkbench": {
+          "$ref": "#/$defs/PreviewWorkbenchSpec"
         },
         "queryToolbar": {
           "$ref": "#/$defs/QueryToolbarSpec"
@@ -882,6 +900,9 @@
         "readOnlyWhen": {
           "additionalProperties": {},
           "type": "object"
+        },
+        "readerWorkbench": {
+          "$ref": "#/$defs/ReaderWorkbenchSpec"
         },
         "relationDrill": {
           "$ref": "#/$defs/RelationDrillSpec"
@@ -895,8 +916,14 @@
         "resourceHeader": {
           "$ref": "#/$defs/ResourceHeaderSpec"
         },
+        "resourcePolicyEditor": {
+          "$ref": "#/$defs/ResourcePolicyEditorSpec"
+        },
         "responsiveDataGrid": {
           "$ref": "#/$defs/ResponsiveDataGridSpec"
+        },
+        "resultPreview": {
+          "$ref": "#/$defs/ResultPreviewSpec"
         },
         "role": {
           "type": "string"
@@ -992,6 +1019,42 @@
         },
         "wizard": {
           "$ref": "#/$defs/WizardSpec"
+        },
+        "workspaceSummary": {
+          "$ref": "#/$defs/WorkspaceSummarySpec"
+        }
+      },
+      "type": "object"
+    },
+    "CriteriaField": {
+      "additionalProperties": true,
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "input": {
+          "type": "string"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "CriteriaMapping": {
+      "additionalProperties": true,
+      "properties": {
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/CriteriaField"
+          },
+          "type": "array"
+        },
+        "parameter": {
+          "type": "string"
         }
       },
       "type": "object"
@@ -2038,6 +2101,10 @@
         "errorMessage": {
           "type": "string"
         },
+        "ignoreIdleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
         "loadingMessage": {
           "type": "string"
         },
@@ -2302,6 +2369,10 @@
         "className": {
           "type": "string"
         },
+        "closeDisabledWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
         "content": {
           "$ref": "#/$defs/Container"
         },
@@ -2357,6 +2428,10 @@
         },
         "className": {
           "type": "string"
+        },
+        "closeDisabledWhen": {
+          "additionalProperties": {},
+          "type": "object"
         },
         "contentClassName": {
           "type": "string"
@@ -2573,11 +2648,24 @@
     "Editor": {
       "additionalProperties": true,
       "properties": {
+        "errorField": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string"
+        },
         "on": {
           "items": {
             "$ref": "#/$defs/Execute"
           },
           "type": "array"
+        },
+        "readOnly": {
+          "type": "boolean"
+        },
+        "readOnlyWhen": {
+          "additionalProperties": {},
+          "type": "object"
         },
         "selector": {
           "$ref": "#/$defs/EditorSelector"
@@ -2586,6 +2674,9 @@
           "$ref": "#/$defs/StyleProperties"
         },
         "title": {
+          "type": "string"
+        },
+        "valueFormat": {
           "type": "string"
         }
       },
@@ -2773,6 +2864,36 @@
       },
       "type": "object"
     },
+    "GateRequirementsEditorSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "actionField": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "onStateChange": {
+          "type": "string"
+        },
+        "operations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "previewSelectionField": {
+          "type": "string"
+        },
+        "readOnly": {
+          "type": "boolean"
+        },
+        "resourceField": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "HistoryDiffSpec": {
       "additionalProperties": true,
       "properties": {
@@ -2811,6 +2932,25 @@
             "type": "string"
           },
           "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "HostContentSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "on": {
+          "items": {
+            "$ref": "#/$defs/Execute"
+          },
+          "type": "array"
+        },
+        "properties": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "slot": {
+          "type": "string"
         }
       },
       "type": "object"
@@ -3357,6 +3497,24 @@
       },
       "type": "object"
     },
+    "MediaPreviewOptions": {
+      "additionalProperties": true,
+      "properties": {
+        "ariaLabel": {
+          "type": "string"
+        },
+        "className": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "popoverClassName": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "MetricSummaryItem": {
       "additionalProperties": true,
       "properties": {
@@ -3639,6 +3797,62 @@
       },
       "type": "object"
     },
+    "ParameterEditorSection": {
+      "additionalProperties": true,
+      "properties": {
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/Item"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "open": {
+          "type": "boolean"
+        },
+        "visibleWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "ParameterEditorSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "draft": {
+          "$ref": "#/$defs/DraftFormSpec"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/Item"
+          },
+          "type": "array"
+        },
+        "label": {
+          "type": "string"
+        },
+        "readOnlyWhen": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/ParameterEditorSection"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
     "PermissionBoundarySpec": {
       "additionalProperties": true,
       "properties": {
@@ -3705,6 +3919,144 @@
         },
         "zIndex": {
           "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PredicateCompositionEditorSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "compositionsField": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "groupsField": {
+          "type": "string"
+        },
+        "onGroupSave": {
+          "type": "string"
+        },
+        "onSave": {
+          "type": "string"
+        },
+        "protectedGroups": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "PreviewWorkbenchControl": {
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/PreviewWorkbenchOption"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "PreviewWorkbenchOption": {
+      "additionalProperties": true,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "PreviewWorkbenchSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "badge": {
+          "type": "string"
+        },
+        "baseURL": {
+          "type": "string"
+        },
+        "checklist": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "checklistDescription": {
+          "type": "string"
+        },
+        "checklistTitle": {
+          "type": "string"
+        },
+        "controls": {
+          "items": {
+            "$ref": "#/$defs/PreviewWorkbenchControl"
+          },
+          "type": "array"
+        },
+        "defaults": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "description": {
+          "type": "string"
+        },
+        "fixedParameters": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "iframeTitle": {
+          "type": "string"
+        },
+        "iterationField": {
+          "type": "string"
+        },
+        "narrowAt": {
+          "type": "integer"
+        },
+        "narrowValue": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "queryFields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "resetLabel": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "viewportField": {
+          "type": "string"
+        },
+        "widths": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "type": "object"
         }
       },
       "type": "object"
@@ -3801,6 +4153,55 @@
       },
       "type": "object"
     },
+    "ReaderWorkbenchSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "defaults": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "lookups": {
+          "additionalProperties": {
+            "$ref": "#/$defs/WorkbenchMethodBinding"
+          },
+          "type": "object"
+        },
+        "namespaceField": {
+          "type": "string"
+        },
+        "onBack": {
+          "type": "string"
+        },
+        "onReportUpdated": {
+          "type": "string"
+        },
+        "onResourcesClosed": {
+          "type": "string"
+        },
+        "openResourcesField": {
+          "type": "string"
+        },
+        "operations": {
+          "additionalProperties": {
+            "$ref": "#/$defs/WorkbenchMethodBinding"
+          },
+          "type": "object"
+        },
+        "reportField": {
+          "type": "string"
+        },
+        "resourceActionField": {
+          "type": "string"
+        },
+        "resourceNamespace": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "ReconcileSpec": {
       "additionalProperties": true,
       "properties": {
@@ -3878,6 +4279,42 @@
         },
         "iterator": {
           "$ref": "#/$defs/Parameter"
+        }
+      },
+      "type": "object"
+    },
+    "ResourceAssignment": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSources": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "dialogs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "models": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "resourceModels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "schemas": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "type": "object"
@@ -4148,6 +4585,73 @@
       },
       "type": "object"
     },
+    "ResourcePolicyEditorSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "actions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "actionsByKind": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "actionsByKindField": {
+          "type": "string"
+        },
+        "applyGroupLabel": {
+          "type": "string"
+        },
+        "choices": {
+          "additionalProperties": {},
+          "type": "object"
+        },
+        "choicesField": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "displayNameField": {
+          "type": "string"
+        },
+        "onStateChange": {
+          "type": "string"
+        },
+        "operations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "publicActions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "readOnly": {
+          "type": "boolean"
+        },
+        "relatedActions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "resourceField": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "ResourceReadBinding": {
       "additionalProperties": true,
       "properties": {
@@ -4300,6 +4804,21 @@
         "style": {
           "additionalProperties": {},
           "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "ResultPreviewSpec": {
+      "additionalProperties": true,
+      "properties": {
+        "dataField": {
+          "type": "string"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
         }
       },
       "type": "object"
@@ -4690,8 +5209,21 @@
     "StatusWorkflow": {
       "additionalProperties": true,
       "properties": {
+        "activeState": {},
+        "appearance": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
         "stateField": {
           "type": "string"
+        },
+        "stateLabels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
         },
         "transitions": {
           "items": {
@@ -4998,6 +5530,9 @@
         },
         "replaceHostedRegion": {
           "type": "boolean"
+        },
+        "revision": {
+          "type": "string"
         },
         "size": {
           "additionalProperties": {},
@@ -5559,6 +6094,9 @@
           },
           "type": "object"
         },
+        "resources": {
+          "$ref": "#/$defs/ResourceAssignment"
+        },
         "schemas": {
           "additionalProperties": {
             "$ref": "#/$defs/ResourceSchema"
@@ -5796,6 +6334,168 @@
       },
       "type": "object"
     },
+    "WorkbenchArgument": {
+      "additionalProperties": true,
+      "properties": {
+        "arg": {
+          "type": "integer"
+        },
+        "default": {},
+        "selector": {
+          "type": "string"
+        },
+        "value": {}
+      },
+      "type": "object"
+    },
+    "WorkbenchMethodBinding": {
+      "additionalProperties": true,
+      "properties": {
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "mutation": {
+          "type": "boolean"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "$ref": "#/$defs/WorkbenchArgument"
+          },
+          "type": "object"
+        },
+        "responseDefault": {},
+        "responseSelector": {
+          "type": "string"
+        },
+        "spreadArg": {
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "WorkspaceSummaryAction": {
+      "additionalProperties": true,
+      "properties": {
+        "handler": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "intent": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "WorkspaceSummarySection": {
+      "additionalProperties": true,
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/WorkspaceSummaryAction"
+        },
+        "dataSourceRef": {
+          "type": "string"
+        },
+        "dateField": {
+          "type": "string"
+        },
+        "detailFields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "emptyText": {
+          "type": "string"
+        },
+        "fullWidth": {
+          "type": "boolean"
+        },
+        "handler": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "labelField": {
+          "type": "string"
+        },
+        "statusField": {
+          "type": "string"
+        },
+        "statusFirst": {
+          "type": "boolean"
+        },
+        "statuses": {
+          "additionalProperties": {
+            "$ref": "#/$defs/WorkspaceSummaryStatus"
+          },
+          "type": "object"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "WorkspaceSummarySpec": {
+      "additionalProperties": true,
+      "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/WorkspaceSummaryAction"
+          },
+          "type": "array"
+        },
+        "appearance": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "descriptionField": {
+          "type": "string"
+        },
+        "errorField": {
+          "type": "string"
+        },
+        "sections": {
+          "items": {
+            "$ref": "#/$defs/WorkspaceSummarySection"
+          },
+          "type": "array"
+        },
+        "stateDataSourceRef": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "titleField": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "WorkspaceSummaryStatus": {
+      "additionalProperties": true,
+      "properties": {
+        "icon": {
+          "type": "string"
+        },
+        "intent": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "github.com/viant/forge/backend/datasource/contract.AuthorizationBinding": {
       "additionalProperties": true,
       "properties": {
@@ -5837,6 +6537,13 @@
         },
         "component": {
           "$ref": "#/$defs/github.com~1viant~1forge~1backend~1window~1contract.ComponentBinding"
+        },
+        "criteriaMapping": {
+          "$ref": "#/$defs/CriteriaMapping"
+        },
+        "emptyOnForbidden": {
+          "description": "mcp_tool\nEmptyOnForbidden opts Fetch reads into an uncached empty result for a\ntyped upstream 403 only. It never applies to executor/writer operations,\nlocal admission failures, authentication failures or composite backends.",
+          "type": "boolean"
         },
         "fanout": {
           "$ref": "#/$defs/github.com~1viant~1forge~1backend~1datasource~1contract.MCPFanout"
@@ -5900,7 +6607,6 @@
           "type": "string"
         },
         "service": {
-          "description": "mcp_tool",
           "type": "string"
         },
         "sort": {
@@ -6026,6 +6732,10 @@
         "constants": {
           "additionalProperties": {},
           "type": "object"
+        },
+        "emptyOnForbidden": {
+          "description": "EmptyOnForbidden treats a typed upstream 403 as no rows for an explicitly opted-in legacy lookup.",
+          "type": "boolean"
         },
         "fieldMap": {
           "additionalProperties": {
@@ -6300,19 +7010,22 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "48d38337a938aece80a6aed4695fc33ae31d58c6",
+    "baseCommit": "073f1d95ca9f71dccb7ae65f2385b9416d9c5dbd",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
-      "datasource_projection.go": "854b7858c0e997ea0e84bb3a91c9805c8ed728c39a8b740713e524cc43529ec9",
+      "datasource_projection.go": "87f165b7c9558d0c43fadc6b006bb0f110bd905226b5301dcb5d8a06eb2a692e",
+      "dialog_resource.go": "36dbaee1db9c979ba32359f29d61af006ae9bcb32e8b35e74c6fa0a4243466e8",
       "form.go": "aa2114822f1e688942aa4b63ec51c4b4c0f728b44b6d82b8b04fbf95efa807f0",
-      "github.com/viant/forge/backend/datasource/contract.datasource.go": "33d3c236e21caef143a61306ce173d4cdf36ef56fd516a6591f093df42e57783",
+      "gate_requirements_editor.go": "94b32304fae82298136f1b9ed5f6d440e427ab74aaccfafca0382721e3edc0a9",
+      "github.com/viant/forge/backend/datasource/contract.backend_json.go": "aa901f5debe6f5c0876faf0188f4355b5b77fd4616c0be6651cc649696e40da7",
+      "github.com/viant/forge/backend/datasource/contract.datasource.go": "c5c5978ee764e082f373713ebd13be74d816ebb5286ffdcab77dbc3d3dcfe7b4",
       "github.com/viant/forge/backend/datasource/contract.denial.go": "33f9f5fd666591f7b90392b410efe982051197652fa18881f8f2a238b7e24d05",
       "github.com/viant/forge/backend/datasource/contract.method_variants.go": "e4aa1178a31ee0f8ebd15dfd83c512dc8a8d84afb8ba5e6a856cc993870e682c",
       "github.com/viant/forge/backend/provider/contract.catalog.go": "570746519947177f2681e7ce63da4461173f129149bdfdcb4d22eaf12d6fc1d7",
       "github.com/viant/forge/backend/provider/contract.datasource.go": "a29fb4c0208c3036e572d9bd952e3df0ef6c99362a85249ce5067f1d2820c932",
       "github.com/viant/forge/backend/provider/contract.lifecycle.go": "e4ffdcd8a6660bc325a894206df8f0162b88cd677d1f4ecd01f81c3d7b471bda",
       "github.com/viant/forge/backend/provider/contract.mcp_app.go": "a52f98962f47f5766d96a451465297f2728a32504509514dbd511b4ab74a134d",
-      "github.com/viant/forge/backend/provider/contract.methods.go": "7fa0e8bc2df0fefb6b0f6ac3a77912dd3555b9826c9c0fdbb21a9ad3e446dd63",
+      "github.com/viant/forge/backend/provider/contract.methods.go": "6e4a0230d460203501f3c9e64a4d20ed1b30dd45fa9ff5fbbe7adf5f0710b975",
       "github.com/viant/forge/backend/provider/contract.model.go": "fd8546cc7a8a3a40288eba267c771dc45584b563cc9b1a2e6d8ee11656d5096b",
       "github.com/viant/forge/backend/provider/contract.toolfeed.go": "67049e40066c4f0594a8f799d202159cbe73ab224128612f73462897819db50f",
       "github.com/viant/forge/backend/resource.actor.go": "514487161fff419ba4a593e267eb6f997e67decaa18070fce8ef113449feeb2e",
@@ -6324,20 +7037,31 @@
       "github.com/viant/forge/backend/resource.resource.go": "b9a066383710fcb6047f18183fd539278153a4832abd4a546484a341934a2828",
       "github.com/viant/forge/backend/resource.selection_binding.go": "a09f48c8aef6c4395435e1e73beba7cbeb47c4f803761da126a38d450926890b",
       "github.com/viant/forge/backend/window/contract.component.go": "1f3b9b0e6ff7b707dfbbae3d9ecafaa145c5a8eb682156da64290464717eb1d8",
-      "github.com/viant/forge/backend/window/contract.model.go": "3f7687bb19b0849e8322404ee29d397c17c088a5071feba02f3f05c1f3d75681",
+      "github.com/viant/forge/backend/window/contract.model.go": "ba7b581c5a80d94fbd95b45d5b1a7d8c7971a5c207d02acc502afa9826a8070b",
       "github.com/viant/forge/backend/window/contract.presentation.go": "239b91f0d3dd60a87b46d1b33ac8e45d15beb7b94d2b0aed01e2fa14d464250a",
       "github.com/viant/forge/backend/window/contract.resource.go": "3d405993972615d81f63d4f8fdf1ed99539af092353f20e7b80005fd196fc467",
+      "host_content.go": "f9f870afe88756eb3abd04b79cc717f60a696a5dc2501dec11ffba0f87dbc0fd",
       "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
-      "model.go": "f1ee67063372bda80a831405f226c36694775ac6ace48b874a7d2c73f4c15b39",
-      "presentation_primitives.go": "89be7b5723b17e57cfbaab70136f79f11bd87bc1958000e7b2d2ce491ca867a3",
+      "local_state_owner.go": "987402ce2487f4b7714a3991c405aab0dda74a573d8690f8f6561d4ce020ab8f",
+      "model.go": "230fdf04a873db4e4853eb42e59b2880b10f1448893bd035f3b1f27aee458a24",
+      "parameter_editor.go": "a176f3b63d74714d216daf57ba5c3c3ee8e12aaf8ccf2c0ee1b663c95a657bf6",
+      "predicate_composition_editor.go": "881bcf68a5f5e16cae2f58ef7495ac14582398236cfd263cc8585e89f97cab4b",
+      "presentation_primitives.go": "02a6a592152be515ce4a0632a586a1c94c926090ebfe39e5a29868d2b496b6cb",
+      "preview_workbench.go": "eccac81a142c97d69c2e86be4443a4c79719f57a195ca4270540baa1c15636d6",
+      "reader_workbench.go": "4c41b6e595a1152d9dd002144bb974057616338c1bf813a053d0dcb64e7895c0",
+      "resource_assignment.go": "80ad53f8050041d9e652f3954084f6148fc8e53c324510126904a5ab35e3507e",
       "resource_model.go": "2d09c19334a806ae9879b9e022e403640cc5ca0f7cabe494b38aaa86881cd610",
       "resource_model_validation.go": "be1cb0525d5f0a2f609775e46b2fe2cb7a3f74dd4160fed26764bfd3a9fa8fb4",
+      "resource_policy_editor.go": "6f3a00bf5ac0751a133fe121e727f5aa2671489dfb07b98a29314cc7a380b8c2",
+      "result_preview.go": "bd913237174dc663cf40a5cd30bf5e835ec077930e7f0916f7ce906671f3dbff",
       "rule_editor.go": "3eda2833f57c5a64adec603e42213423907151451998fa4ba538fe258273f6e6",
-      "window_compiled_resource.go": "4ef03d542848c1d062238e59cb84b99c33e51007a021690412e53a85232f4905",
+      "window_compiled_resource.go": "57eb863c93ec4ea1c661678f99b31924d266e0f7d2a878dd3531fd46e3e18acd",
       "window_descriptor.go": "99170237b79c06523e72302b7917e0f573ef5f54bbc4bf0b8a4625915274c789",
-      "window_resource.go": "e4df4c63255a775d4aab5cd8dcfd171c697ad76f4c1e90691c4f33dad9cf424f",
+      "window_reference_manifest.go": "fe66bf7b36823b396742d8e36d8aa5c559c494125e0f4ed1bba89219fbaf0635",
+      "window_resource.go": "f9426cf66d40ae52bf029f4776fbc34930764a31ff850f38c76e72e8ab960a2e",
       "window_target_proof.go": "53605c132aae2b8c8d6e377daaae416f347e0ff8c48a39fb2a0f15f95ad5faeb",
-      "workflow_primitives.go": "8753a760e7eb7f1caea772849f2933df0252f82e129b5f1d8dc28f9ce93855ec"
+      "workflow_primitives.go": "01de185cf0d0e591cfc4a4cdee8d19ee26a360a3e87cf5f992ba20d164cb9334",
+      "workspace_summary.go": "d9cf3867d3d3bfa3f65c9fdeccad91d21bd9d2602e066823bb36cbff079c86c1"
     },
     "sourceNote": "Generated from committed canonical Forge authored model and Forge-owned public contracts; SHA-256 identifies every parsed source file."
   }
