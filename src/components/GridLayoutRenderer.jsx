@@ -210,13 +210,13 @@ export default function GridLayoutRenderer({
     const sourceEntries = entries || items || [];
     sourceEntries.forEach((item) => {
         const dsRef = item?.dataSourceRef || baseDataSourceRef;
-        const scoped = typeof context?.Context === 'function' ? context.Context(dsRef) : context;
+        const scoped = dsRef && typeof context?.Context === 'function' ? context.Context(dsRef) : context;
         trackVisibleWhen(item?.visibleWhen, scoped);
         trackVisibleWhen(item?.hiddenWhen, scoped);
     });
     const visibleEntries = sourceEntries.filter((item) => {
         const dsRef = item?.dataSourceRef || baseDataSourceRef;
-        const scoped = typeof context?.Context === 'function' ? context.Context(dsRef) : context;
+        const scoped = dsRef && typeof context?.Context === 'function' ? context.Context(dsRef) : context;
         if (item?.visibleWhen && !evaluatePlainVisibleWhen(item.visibleWhen, scoped)) return false;
         if (item?.hiddenWhen && evaluatePlainVisibleWhen(item.hiddenWhen, scoped)) return false;
         return true;
@@ -237,7 +237,7 @@ export default function GridLayoutRenderer({
             data-forge-label-alignment={alignment}>
             {placements.map(({ item, r, c, w, h }) => {
                 const dsRef = item.dataSourceRef || baseDataSourceRef;
-                const subCtx = typeof context?.Context === 'function' ? context.Context(dsRef) : context;
+                const subCtx = dsRef && typeof context?.Context === 'function' ? context.Context(dsRef) : context;
                 const accessibility=createControlDOMIdentity({windowId:subCtx?.identity?.windowId,formId:container?.id || subCtx?.identity?.dataSourceRef,controlId:item.id || item.name,instanceId:gridInstanceId});
                 const hasLabel = !!item.label && !item.hideLabel && !item.isStandalone && labelMode !== 'none';
                 accessibility.labelOwned=hasLabel;
