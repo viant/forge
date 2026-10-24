@@ -916,6 +916,10 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     ), [chart, embedded]);
 
     const configuredBarSize = typeof chart?.barSize === "number" && Number.isFinite(chart.barSize) && chart.barSize > 0 ? chart.barSize : undefined;
+    const barPointIdentity = (seriesKey, row) => ({
+        "data-series-id": String(seriesKey),
+        "data-category": String(row?.[xAxis?.dataKey] ?? ""),
+    });
 
     const cartesianSeriesElements = renderableSeriesDefinitions.map((entry, seriesIndex) => {
         const defaultLineDash = renderableSeriesDefinitions.length > 1 && (entry.type === "line" || entry.type === "area")
@@ -941,11 +945,11 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         if (entry.type === "bar") {
             return (
                 <Bar key={entry.value} {...commonProps} radius={entry.stackId ? 0 : resolveChartBarCornerRadii(1, 'vertical')} barSize={configuredBarSize} stackId={entry.stackId} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
-                    {entry.pointColorMode === "bySign"
-                        ? normalizedChartData.map((row, index) => (
-                            <Cell key={`${entry.value}-cell-${index}`} fill={resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} />
-                        ))
-                        : null}
+                    {normalizedChartData.map((row, index) => (
+                        <Cell key={`${entry.value}-cell-${index}`}
+                              {...barPointIdentity(entry.value, row)}
+                              {...(entry.pointColorMode === "bySign" ? {fill: resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} : {})} />
+                    ))}
                     {showSeriesDataLabels ? (
                         <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="var(--forge-chart-text-muted, #5f6b7c)" fontSize={chartTypography.captionSize} fontFamily={chartTypography.family} />
                     ) : null}
@@ -1138,6 +1142,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         {normalizedChartData.map((row, index) => (
                             <Cell
                                 key={`cell-${index}`}
+                                {...barPointIdentity(primarySeries.value, row)}
                                 fill={resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], primarySeries.pointColorMode === "bySign"
                                     ? resolveConditionalSeriesColor(primarySeries, row?.[primarySeries.value], activePalette[index % activePalette.length])
                                     : activePalette[index % activePalette.length])}
@@ -1157,11 +1162,11 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                             stackId={responsiveChartType === "funnel_bar" ? undefined : entry.stackId}
                             {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}
                         >
-                            {entry.pointColorMode === "bySign"
-                                ? normalizedChartData.map((row, index) => (
-                                    <Cell key={`${entry.value}-cell-${index}`} fill={resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} />
-                                ))
-                                : null}
+                            {normalizedChartData.map((row, index) => (
+                                <Cell key={`${entry.value}-cell-${index}`}
+                                      {...barPointIdentity(entry.value, row)}
+                                      {...(entry.pointColorMode === "bySign" ? {fill: resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} : {})} />
+                            ))}
                             {shouldRenderSeriesDataLabels(entry, responsiveChartType, normalizedChartData.length, embedded) ? (
                                 <LabelList dataKey={entry.value} content={(props) => <HorizontalBarValueLabel {...props} formatter={buildDataLabelFormatter(entry.format || leftAxis.format)} />} />
                             ) : null}
