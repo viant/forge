@@ -589,14 +589,11 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const isPieChart = responsiveChartType === "pie" || responsiveChartType === "donut";
     const isHorizontalBar = isHorizontalBarType(responsiveChartType);
     const prepared = useMemo(() => {
-        const chartRows = applyChartRowLimit(
-            materializeChartDisplayRows(chart, effectiveCollection || []),
-            chart?.rowLimit,
-        );
+        const chartRows = materializeChartDisplayRows(chart, effectiveCollection || []);
         if (isPieChart) {
             const nameKey = series.nameKey || "name";
             const valueKey = series.valueKey || selectedValueKey || "value";
-            const rows = buildPieChartData(chartRows, nameKey, valueKey);
+            const rows = buildPieChartData(applyChartRowLimit(chartRows, chart?.rowLimit), nameKey, valueKey);
             return {
                 chartData: rows,
                 availableDataKeys: rows.map((row) => row.name),
@@ -605,7 +602,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         }
 
         if (directSeriesChart) {
-            const sorted = aggregateDirectSeriesData(chartRows, xAxis?.dataKey, seriesDefinitions);
+            const sorted = applyChartRowLimit(aggregateDirectSeriesData(chartRows, xAxis?.dataKey, seriesDefinitions), chart?.rowLimit);
             return {
                 chartData: sorted,
                 availableDataKeys: seriesDefinitions.map((entry) => entry.value),
@@ -616,7 +613,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         const {data, keys} = transformData(chartRows, chart, selectedValueKey);
         const selectedValue = (series.values || []).find((val) => val.value === selectedValueKey);
         return {
-            chartData: data,
+            chartData: applyChartRowLimit(data, chart?.rowLimit),
             availableDataKeys: keys,
                 yAxisLabel: selectedValue?.name || selectedValue?.label || leftAxis.label || "",
         };

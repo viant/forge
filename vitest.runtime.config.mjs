@@ -9,6 +9,7 @@ export default defineConfig({
       'src/components/Chart.measurements.render.test.jsx',
       'src/components/Chart.barIdentity.render.test.jsx',
       'src/components/Chart.pointIdentity.render.test.jsx',
+      'src/components/Chart.rowLimit.render.test.jsx',
       'src/core/ui/controlActions.render.test.jsx',
       'src/components/primitives/RelationDrill.render.test.jsx',
       'src/components/DataSource.projection.render.test.jsx',
