@@ -2126,7 +2126,7 @@ function resolveRuntimeCompositeConfig(blocks = []) {
   return { composites, ...resolveReportRuntimeCompositeOwnership(blocks) };
 }
 
-function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = null, block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false }) {
+function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = null, block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false, displayMode, onDisplayModeChange = null }) {
   const authoredBlock = (Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : [])
     .find((candidate) => normalizeString(candidate?.id) === normalizeString(block?.id)) || {};
   const tableAccentTone = normalizeString(block?.content?.accentTone || block?.accentTone).toLowerCase();
@@ -2143,12 +2143,22 @@ function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = n
   const collapsible = block?.content?.collapsible === true || block?.collapsible === true;
   const authoredDefaultCollapsed = block?.content?.defaultCollapsed ?? block?.defaultCollapsed;
   const defaultCollapsed = collapsible && authoredDefaultCollapsed !== false;
-  const [collapsed, setCollapsed] = useState(() => collapsible && defaultCollapsed);
-  const [paginating, setPaginating] = useState(false);
+  const [localCollapsed, setLocalCollapsed] = useState(() => collapsible && defaultCollapsed);
+  const [localPaginating, setLocalPaginating] = useState(false);
+  const controlled = displayMode !== undefined;
+  const collapsed = controlled ? displayMode === "preview" || (displayMode === "default" && defaultCollapsed) : localCollapsed;
+  const paginating = controlled ? displayMode === "paginate" : localPaginating;
+  const chooseDisplayMode = (mode) => {
+    if (controlled) onDisplayModeChange?.(block.id, mode);
+    else {
+      setLocalCollapsed(mode === "preview");
+      setLocalPaginating(mode === "paginate");
+    }
+  };
   const previousDefaultCollapsedRef = useRef(defaultCollapsed);
   useEffect(() => {
     if (shouldApplyTableDefaultCollapsed(previousDefaultCollapsedRef.current, defaultCollapsed, collapsible)) {
-      setCollapsed(true);
+      setLocalCollapsed(true);
     }
     previousDefaultCollapsedRef.current = defaultCollapsed;
   }, [collapsible, defaultCollapsed]);
@@ -2246,8 +2256,7 @@ function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = n
           onClick={() => {
             const expanding = collapsed || localPaging;
             if (expanding && !locallyComplete && !page.loading && dataset?.id) onDatasetExpand?.({ datasetId: dataset.id });
-            setPaginating(false);
-            setCollapsed(!expanding);
+            chooseDisplayMode(expanding ? "expanded" : "preview");
           }}
           style={{ border: "1px solid var(--forge-report-control-border, #d4dee8)", background: "var(--forge-report-control-surface, #fff)", borderRadius: 8, padding: "5px 9px", cursor: "pointer", color: "var(--forge-report-text-secondary, #30404d)", display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)" }}
         >
@@ -2257,7 +2266,7 @@ function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = n
         {canPaginate ? <button type="button" className="forge-report-runtime-table-toggle"
           aria-label={`Paginate ${normalizeString(block?.title || "Table")}`}
           aria-pressed={localPaging}
-          onClick={() => { setPaginating(!localPaging); setCollapsed(localPaging); }}
+          onClick={() => chooseDisplayMode(localPaging ? "preview" : "paginate")}
           style={{ border: "1px solid var(--forge-report-control-border, #d4dee8)", background: "var(--forge-report-control-surface, #fff)", borderRadius: 8, padding: "5px 9px", cursor: "pointer", color: "var(--forge-report-text-secondary, #30404d)", fontSize: "var(--forge-report-type-small-size, 12px)" }}
         >Paginate</button> : null}
       </span>) : null}
@@ -2883,6 +2892,8 @@ export default function ReportRuntime({
   datasetPages = {},
   onDatasetPageChange = null,
   onDatasetExpand = null,
+  tableDisplayModes = null,
+  onTableDisplayModeChange = null,
   showContextSummary = true,
   suppressFilterBarBlocks = false,
   suppressFilterBarBlockDatasetRefs = [],
@@ -3226,6 +3237,8 @@ export default function ReportRuntime({
           page={datasetPages[dataset?.id] || {}}
           onDatasetPageChange={onDatasetPageChange}
           onDatasetExpand={onDatasetExpand}
+          displayMode={tableDisplayModes ? (tableDisplayModes[block.id] || "default") : undefined}
+          onDisplayModeChange={onTableDisplayModeChange}
           reportSpec={reportSpec}
           providerActionsByField={providerActionsByField}
           runtimeHandlers={runtimeHandlers}

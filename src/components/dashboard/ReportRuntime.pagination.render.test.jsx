@@ -1,4 +1,4 @@
-import React, { act } from 'react';
+import React, { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import ReportRuntime from './ReportRuntime.jsx';
@@ -85,5 +85,41 @@ it('requests an admitted complete result on Expand without treating a partial pa
     await act(async () => host.querySelector('[aria-label="Collapse Evidence"]').click());
     await act(async () => host.querySelector('[aria-label="Expand Evidence"]').click());
     expect(expand).toHaveBeenCalledTimes(1);
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+
+it('restores a host-held Paginate choice after a data refresh and resets it for a new definition', async () => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host);
+  function PreviewHost({ data, loading = false, definition = 'revision-one' }) {
+    const [choice, setChoice] = useState({ definition, modes: {} });
+    const modes = choice.definition === definition ? choice.modes : {};
+    return loading ? <div role="status">Loading fresh rows</div> : <ReportRuntime {...fixture(data)}
+      tableDisplayModes={modes}
+      onTableDisplayModeChange={(blockId, mode) => setChoice(current => ({ definition, modes: { ...(current.definition === definition ? current.modes : {}), [blockId]: mode } }))}
+    />;
+  }
+  const render = async (data, loading = false, definition = 'revision-one') => act(async () => root.render(<PreviewHost data={data} loading={loading} definition={definition} />));
+  try {
+    await render(rows(43));
+    await act(async () => host.querySelector('[aria-label="Paginate Evidence"]').click());
+    await act(async () => host.querySelector('.forge-dashboard-table-pager button:last-child').click());
+    expect(host.textContent).toContain('Rows 26–43 of 43');
+    await render(rows(43), true);
+    expect(host.querySelectorAll('tbody tr')).toHaveLength(0);
+    await render(rows(116));
+    expect(host.querySelector('[aria-label="Paginate Evidence"]').getAttribute('aria-pressed')).toBe('true');
+    expect(host.textContent).toContain('Rows 1–25 of 116');
+    expect(host.querySelector('.forge-dashboard-table-pager button:first-child').disabled).toBe(true);
+    await act(async () => host.querySelector('[aria-label="Expand Evidence"]').click());
+    expect(host.querySelectorAll('tbody tr')).toHaveLength(116);
+    await render(rows(116), true);
+    await render(rows(31));
+    expect(host.querySelectorAll('tbody tr')).toHaveLength(31);
+    expect(host.querySelector('[aria-label="Collapse Evidence"]')).not.toBeNull();
+    await render(rows(116), false, 'revision-two');
+    expect(host.querySelector('[aria-label="Paginate Evidence"]').getAttribute('aria-pressed')).toBe('false');
+    expect(host.textContent).toContain('Showing 5 of 116 rows');
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
