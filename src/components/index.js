@@ -29,6 +29,7 @@ export {
 } from './primitives/resourceModel.js';
 export { DashboardBlock } from './dashboard/DashboardBlocks.jsx';
 export { default as ReportRuntime } from './dashboard/ReportRuntime.jsx';
+export { default as ReportResourceRuntime } from './dashboard/ReportResourceRuntime.jsx';
 export { default as ReportDesigner } from './dashboard/ReportDesigner.jsx';
 export { default as ReportBlockDesigner } from './dashboard/ReportBlockDesigner.jsx';
 export {
