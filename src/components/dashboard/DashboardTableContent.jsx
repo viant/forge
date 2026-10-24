@@ -291,10 +291,10 @@ export default function DashboardTableContent({
                                     <th
                                         key={col.key}
                                         className={col.frozen ? 'forge-table-frozen-identifier' : undefined}
-                                        onClick={() => handleSort(col.key)}
-                                        style={{textAlign: col.align || 'left', color: active ? 'var(--forge-dashboard-table-link, #2367d1)' : undefined, cursor: 'pointer', userSelect: 'none', ...(col.frozen ? {'--forge-frozen-column-width': `${col.resolvedCompactWidth}px`, '--forge-frozen-left': multiSelect ? '42px' : '0px'} : {})}}
+                                        aria-sort={active ? sortDir === 'asc' ? 'ascending' : 'descending' : 'none'}
+                                        style={{textAlign: col.align || 'left', color: active ? 'var(--forge-dashboard-table-link, #2367d1)' : undefined, ...(col.frozen ? {'--forge-frozen-column-width': `${col.resolvedCompactWidth}px`, '--forge-frozen-left': multiSelect ? '42px' : '0px'} : {})}}
                                     >
-                                        {col.label}{arrow}
+                                        <button type="button" className="forge-dashboard-table__sort-button" aria-label={`Sort by ${col.label || col.key}`} onClick={() => handleSort(col.key)}>{col.label}<span aria-hidden="true">{arrow}</span></button>
                                     </th>
                                 );
                             })}
