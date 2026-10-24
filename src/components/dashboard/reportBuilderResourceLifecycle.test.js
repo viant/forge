@@ -17,3 +17,20 @@ const complete={...current,resourceDefinition:{...current.resourceDefinition,rep
 const editor=resourceEditorDocument(complete);assert.equal(editor.blocks[0].source.dataSourceRef,"approved-source");
 editor.blocks[1].markdown="Edited";editor.blocks[0].state.selectedMeasures=["new-measure"];
 const edited=resourceEditorDefinition(complete,editor);assert.equal(edited.reportDocument.blocks.length,1);assert.equal(edited.reportDocument.blocks[0].markdown,"Edited");assert.deepEqual(edited.state.selectedMeasures,["new-measure"]);assert.deepEqual(edited.builderDefinition,complete.resourceDefinition.builderDefinition);assert.deepEqual(edited.dependencies,complete.resourceDefinition.dependencies);
+
+
+// Screen-only projection must be explicitly requested; every other caller still
+// requires full print materialization, including lazy Print preparation.
+const fillOnly={resource:{...pin},reportSpec:{title:'Screen report'},reportFill:{},reportPrint:null};
+assert.throws(()=>validateReportResourceRunResult(fillOnly,pin),/selected/);
+for(const option of [undefined,false,'true',1])assert.throws(()=>validateReportResourceRunResult(fillOnly,pin,{}, {fillOnly:option}),/selected/);
+assert.equal(validateReportResourceRunResult(fillOnly,pin,{}, {fillOnly:true}),fillOnly);
+for(const field of ['providerIdentity','uri','kind','revision','contentFingerprint','authorityBinding','validUntil']){
+ assert.throws(()=>validateReportResourceRunResult({...fillOnly,resource:{...pin,[field]:'substitution'}},pin,{}, {fillOnly:true}),/selected/);
+}
+for(const field of ['reportSpec','reportFill'])assert.throws(()=>validateReportResourceRunResult({...fillOnly,[field]:null},pin,{}, {fillOnly:true}),/selected/);
+const choices={trend:{primaryField:'count',secondaryField:'rate'}};
+assert.throws(()=>validateReportResourceRunResult(fillOnly,pin,choices,{fillOnly:true}),/selected chart metrics/);
+const selectedFill={...fillOnly,reportSpec:{blocks:[{id:'trend',chartSpec:{metricSelection:choices.trend}}]}};
+assert.equal(validateReportResourceRunResult(selectedFill,pin,choices,{fillOnly:true}),selectedFill);
+console.log('reportBuilderResourceLifecycle ✓ explicit fill-only projection retains authority, scope and metric checks');
