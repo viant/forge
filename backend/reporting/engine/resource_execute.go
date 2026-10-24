@@ -44,6 +44,10 @@ type ExecuteResourceRequest struct {
 	Parameters            map[string]interface{}                       `json:"parameters,omitempty"`
 	ChartMetricSelections map[string]materializer.ChartMetricSelection `json:"chartMetricSelections,omitempty"`
 	DatasetIDs            []string                                     `json:"datasetIds,omitempty"`
+	// A non-nil table ID selects exactly one authored table from the compiled,
+	// admitted ReportSpec. An empty ID is valid only for a single-table report.
+	// It is mutually exclusive with caller-provided DatasetIDs.
+	TableBlockID *string `json:"tableBlockId,omitempty"`
 }
 
 type DatasetFetchMode string
@@ -212,6 +216,11 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 		}
 	}()
 	var spec struct {
+		Blocks []struct {
+			ID         string `json:"id"`
+			Kind       string `json:"kind"`
+			DatasetRef string `json:"datasetRef"`
+		} `json:"blocks"`
 		Datasets []struct {
 			ID             string                       `json:"id"`
 			DataSourceRef  string                       `json:"dataSourceRef"`
@@ -239,6 +248,26 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 	if decodeSpec(executionSpec, &spec) != nil || len(spec.Datasets) == 0 {
 		return nil, fmt.Errorf("report has no executable datasets")
 	}
+	selectedIDs := request.DatasetIDs
+	if request.TableBlockID != nil {
+		if selectedIDs != nil {
+			return nil, identity.ErrResourceDenied
+		}
+		var chosen string
+		for _, block := range spec.Blocks {
+			if block.Kind != "tableBlock" || *request.TableBlockID != "" && block.ID != *request.TableBlockID {
+				continue
+			}
+			if chosen != "" || block.DatasetRef == "" {
+				return nil, identity.ErrResourceDenied
+			}
+			chosen = block.DatasetRef
+		}
+		if chosen == "" {
+			return nil, identity.ErrResourceDenied
+		}
+		selectedIDs = []string{chosen}
+	}
 
 	type plannedDataset struct {
 		id             string
@@ -249,12 +278,12 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 	plans := make([]plannedDataset, 0, len(spec.Datasets))
 	seen := map[string]bool{}
 	var selected map[string]bool
-	if request.DatasetIDs != nil {
-		if len(request.DatasetIDs) == 0 || len(request.DatasetIDs) > len(spec.Datasets) {
+	if selectedIDs != nil {
+		if len(selectedIDs) == 0 || len(selectedIDs) > len(spec.Datasets) {
 			return nil, identity.ErrResourceDenied
 		}
-		selected = make(map[string]bool, len(request.DatasetIDs))
-		for _, id := range request.DatasetIDs {
+		selected = make(map[string]bool, len(selectedIDs))
+		for _, id := range selectedIDs {
 			if id == "" || selected[id] {
 				return nil, identity.ErrResourceDenied
 			}
