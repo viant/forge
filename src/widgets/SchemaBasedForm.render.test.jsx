@@ -518,3 +518,5 @@ assert.equal((refinedChoiceHtml.match(/type="text"/g) || []).length, 0);
 assert.ok(!refinedChoiceHtml.includes('checked='));
 assert.match(refinedChoiceHtml, /<legend>Segments \(required\)<\/legend>/);
 console.log('SchemaBasedForm refined array enum render contract passed');
+
+assert.match(fieldTracksHtml, /lucide-chevron-down/);

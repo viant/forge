@@ -1,3 +1,4 @@
+import SharedIcon from '../../components/Icon.jsx';
 import {useRegisteredControlActions} from '../../runtime/useRegisteredControlActions.js';
 import {isLiveControlVisible,validateWidgetControlValue} from '../../core/ui/controlActions.js';
 import Typography, {typographyProps} from '../../components/Typography.jsx';
@@ -808,7 +809,7 @@ export function registerPack() {
                             if (['Enter', ' ', 'ArrowDown'].includes(event.key)) requestOptions('open');
                             onKeyDown?.(event);
                         }}
-                        rightIcon="caret-down"
+                        rightIcon={isFieldTrack ? <SharedIcon name="lucide:chevron-down"/> : "caret-down"}
                         disabled={unavailable}
                     />
                 </Select>

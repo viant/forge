@@ -1,3 +1,4 @@
+import SharedIcon from "../Icon.jsx";
 import React, { useId } from "react";
 import { Button, Icon, Spinner } from "@blueprintjs/core";
 import "./LookupSelectionInput.css";
@@ -115,7 +116,7 @@ export default function LookupSelectionInput({
                     alignText="start"
                     ellipsizeText
                     text={triggerValue || placeholder}
-                    rightIcon={busy ? undefined : "caret-down"}
+                    rightIcon={busy ? undefined : isFieldTrackControl ? <SharedIcon name="lucide:chevron-down"/> : "caret-down"}
                     loading={busy}
                     disabled={disabled || busy}
                     onClick={openBrowse}

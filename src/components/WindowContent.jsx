@@ -1289,7 +1289,8 @@ function WindowContentInner({window, metadata, services}) {
 function WindowContent(props) {
     useSignals();
     const metadata = props.selectedMetadata || (props.window?.windowId ? getMetadataSignal(props.window.windowId).value : null);
-    return <ForgeThemeBoundary windowKey={metadata?.windowKey || props.window?.windowKey} resource={metadata?.resource}><WindowContentRuntime {...props} /></ForgeThemeBoundary>;
+    const documentChat = metadata?.view?.content?.containers?.some(container => container.chat?.appearance === 'document');
+    return <ForgeThemeBoundary presentation={documentChat ? 'document' : undefined} windowKey={metadata?.windowKey || props.window?.windowKey} resource={metadata?.resource}><WindowContentRuntime {...props} /></ForgeThemeBoundary>;
 }
 
 // Local signal subscriptions still update their own window. This boundary only
