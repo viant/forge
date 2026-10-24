@@ -43,7 +43,7 @@ func (s *Service) compileUnscoped(ctx context.Context, request *CompileRequest, 
 	result, err := s.compiler.Compile(ctx, cloneCompileRequest(request))
 	compilerTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
-		return nil, err
+		return nil, compileStageError(CompileStageCompiler, err)
 	}
 	if result == nil {
 		return nil, fmt.Errorf("reporting compile: compiler returned nil result")

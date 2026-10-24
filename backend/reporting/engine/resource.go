@@ -76,10 +76,10 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, 
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&definition); err != nil {
-		return nil, nil, nil, fmt.Errorf("invalid resolved report envelope")
+		return nil, nil, nil, compileStageError(CompileStageEnvelope, fmt.Errorf("invalid resolved report envelope"))
 	}
 	if decoder.Decode(new(any)) != io.EOF || (len(definition.ReportDocument) == 0 && len(definition.ReportSpec) == 0) || !(definition.SchemaVersion == 1 && definition.Format != registry.ResourceReportFormat && len(definition.DataSourceResources) == 0 && definition.SourceFormat == "" || definition.SchemaVersion == 2 && definition.Format == registry.ResourceReportFormat && len(definition.DataSourceResources) > 0) {
-		return nil, nil, nil, fmt.Errorf("invalid resolved report definition")
+		return nil, nil, nil, compileStageError(CompileStageEnvelope, fmt.Errorf("invalid resolved report definition"))
 	}
 	bindTiming := observe.Start(ctx, "report.compile.bind", observe.Labels{Kind: "report"})
 	dependencyPins, dependencyToken, err := s.bindOperationDependencies(ctx, request.ResolvedResource, pin, definition, request.DependencyPins, request.DependencyToken)
@@ -102,7 +102,7 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, 
 	switch definition.Format {
 	case "":
 		if len(definition.ReportSpec) == 0 || len(definition.BuilderDefinition) != 0 || len(definition.Dependencies) != 0 {
-			return nil, nil, nil, fmt.Errorf("invalid native report definition")
+			return nil, nil, nil, compileStageError(CompileStageEnvelope, fmt.Errorf("invalid native report definition"))
 		}
 		spec = definition.ReportSpec
 	case registry.AuthoredReportFormat:
@@ -113,16 +113,16 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, 
 		}
 		requestBase, bindErr := bindAuthoredCompileParameters(raw, request.Parameters)
 		if bindErr != nil {
-			return nil, nil, nil, bindErr
+			return nil, nil, nil, compileStageError(CompileStageBind, bindErr)
 		}
 		lowerTiming := observe.Start(ctx, "report.compile.lower", observe.Labels{Kind: "report"})
 		spec, err = materializer.LowerWithRequestBase(ctx, raw, requestBase)
 		lowerTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, nil, nil, compileStageError(CompileStageLower, err)
 		}
 	default:
-		return nil, nil, nil, fmt.Errorf("unsupported resolved report format")
+		return nil, nil, nil, compileStageError(CompileStageEnvelope, fmt.Errorf("unsupported resolved report format"))
 	}
 	boundRef := identity.ResourceRef{URI: pin.URI, Revision: pin.Selector()}
 	return &CompileRequest{DependencyPins: dependencyPins, DependencyToken: dependencyToken, ResolvedResource: cloneResolvedResource(pin), Resource: &boundRef, ArtifactRef: pin.URI, SourceKind: SourceKindReportSpec, Document: append(json.RawMessage(nil), spec...)}, pin, resolver, nil
