@@ -544,3 +544,15 @@ including local approval forms. Explicit datasource references still resolve
 through Context and missing named sources still raise the existing error.
 The schema-form render contract verifies a local form against the real strict
 Context, rather than an always-successful context stub.
+
+## Scoped document profiles
+
+`ForgeThemeBoundary presentation="document"` marks only that renderer boundary
+and its owned portal. It keeps the existing theme identity, mode and portal
+ownership. Core's optional theme `presentations.document` mapping can supply an
+existing workspace-owned profile at that marker. Omitting it retains the selected
+theme. Native document-chat metadata marks its window; hosted document reports
+and authored document Tool Feeds select their respective boundary. Legacy windows
+remain unmarked. Use the existing optional contract rather than duplicating role
+values in a component. Shared field-track select and lookup triggers use the same
+Lucide chevron as SelectControl; legacy triggers keep their existing icon.

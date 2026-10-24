@@ -36,3 +36,15 @@ it('keeps provider namespace markers aligned between each window and its portal'
   expect(host.querySelector('[data-forge-resource-namespace="first"]')).toBeNull();
  } finally {await act(async()=>root.unmount());host.remove();}
 });
+
+it('scopes document presentation to its content and owned portal without changing the theme',async()=>{
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try {
+  const view=presentation=><ForgeThemeProvider themeId="example"><ForgeThemeBoundary windowKey="reading" presentation={presentation}><span>Document</span></ForgeThemeBoundary></ForgeThemeProvider>;
+  await act(async()=>root.render(view('document')));
+  const content=host.querySelector('.agently-workspace'),portal=document.body.querySelector('[data-forge-theme-portal][data-forge-window-key="reading"]');
+  expect(content.dataset.forgeTheme).toBe('example');expect(content.dataset.forgePresentation).toBe('document');expect(portal.dataset.forgePresentation).toBe('document');
+  await act(async()=>root.render(view(undefined)));
+  expect(content.hasAttribute('data-forge-presentation')).toBe(false);expect(portal.hasAttribute('data-forge-presentation')).toBe(false);
+ } finally {await act(async()=>root.unmount());host.remove();}
+});
