@@ -20,6 +20,7 @@ import { withFrozenIdentifierColumn } from "./tableFrozenIdentifier.js";
 import { renderDashboardTableCell, titleizeDashboardKey } from "./dashboardVisualUtils.jsx";
 import { clampPresentationText, normalizePresentationClampConfig, normalizePresentationText } from "../../utils/presentationText.js";
 import { buildDashboardTableLayout } from "./dashboardTableLayout.js";
+import { compareDashboardTableValues } from "./dashboardTableSort.js";
 
 const DEFAULT_SUBTITLE_STYLE = {
     fontSize: 'var(--forge-dashboard-table-small-size, 12px)',
@@ -171,11 +172,7 @@ export default function DashboardTableContent({
             const bvLink = resolveTableLink({row: b, column: sortColumn, value: bvRaw});
             const av = avLink ? avLink.text : avRaw;
             const bv = bvLink ? bvLink.text : bvRaw;
-            const an = Number(av);
-            const bn = Number(bv);
-            const numeric = Number.isFinite(an) && Number.isFinite(bn);
-            const cmp = numeric ? an - bn : String(av ?? '').localeCompare(String(bv ?? ''));
-            return sortDir === 'desc' ? -cmp : cmp;
+            return compareDashboardTableValues(av, bv, sortColumn, sortDir);
         });
         return ordered.slice(0, limit);
     }, [quickFilteredCollection, limit, runtimeColumns, sortKey, sortDir]);

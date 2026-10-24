@@ -51,3 +51,22 @@ it('sorts all admitted local rows before a five-row preview limit and local pagi
   expect(host.textContent).toContain('Rows 1–2 of 3');
  }finally{await act(async()=>root.unmount());host.remove();}
 });
+
+it.each([
+ ['number',{type:'number'},[{id:'zero',value:0},{id:'missing',value:null},{id:'measured',value:294}],['zero','measured','missing'],['measured','zero','missing']],
+ ['date',{format:'date'},[{id:'missing',value:null},{id:'later',value:'2026-10-23'},{id:'invalid',value:'invalid-date'},{id:'earlier',value:'2025-01-02'}],['earlier','later','missing','invalid'],['later','earlier','missing','invalid']],
+])('keeps missing %s observations last through actual ascending and descending header clicks',async(_kind,column,collection,ascending,descending)=>{
+ const host=document.createElement('div');document.body.append(host);
+ const root=createRoot(host);globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const context={signals:{collection:{value:collection},control:{value:{loading:false,error:null}},selection:{value:null}},identity:{dataSourceRef:'missing-observations'}};
+ const container={id:'missing-observations',columns:[{key:'id',label:'ID'},{key:'value',label:'Value',...column}]};
+ const visible=()=>[...host.querySelectorAll('tbody tr')].map(row=>row.cells[0].textContent);
+ try{
+  await act(async()=>root.render(<DashboardTableContent container={container} context={context}/>));
+  const sort=host.querySelector('button[aria-label="Sort by Value"]');
+  await act(async()=>sort.click());
+  expect(visible()).toEqual(ascending);
+  await act(async()=>sort.click());
+  expect(visible()).toEqual(descending);
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
