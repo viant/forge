@@ -60,7 +60,7 @@
     [data-forge-widget="text"],
     [data-forge-widget="number"],
     [data-forge-widget="select"],
-    [data-forge-widget="dateRange"],
+    [data-forge-widget="dateRange"]:not(.forge-document-date-range),
     [data-forge-widget="booleanPill"]
 ),
 [data-forge-part="form"][data-forge-form-appearance="field-tracks"] .forge-lookup-selection-input__control,
@@ -112,14 +112,14 @@
     color: var(--forge-text-muted);
 }
 
-[data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"] {
+[data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"]:not(.forge-document-date-range) {
     width: 100% !important;
     height: var(--forge-form-control-height, 40px) !important;
     padding: 0 !important;
     gap: 0 !important;
 }
 
-[data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"] > input {
+[data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"]:not(.forge-document-date-range) > input {
     box-sizing: border-box;
     min-width: 0;
     height: 100%;
@@ -131,7 +131,7 @@
     padding-inline: var(--forge-form-control-padding-inline, 12px) !important;
 }
 
-[data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"] > span {
+[data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"]:not(.forge-document-date-range) > span {
     padding-inline: var(--forge-form-label-control-gap, 8px);
     color: var(--forge-text-muted) !important;
     font-weight: 400 !important;
@@ -218,7 +218,7 @@
     [data-forge-widget="text"],
     [data-forge-widget="number"],
     [data-forge-widget="select"],
-    [data-forge-widget="dateRange"],
+    [data-forge-widget="dateRange"]:not(.forge-document-date-range),
     .forge-lookup-selection-input__control,
     .forge-lookup-selection-input__trigger
 ):not([aria-disabled="true"]):not(:disabled):hover {
@@ -246,7 +246,7 @@
     .forge-lookup-selection-input__trigger
 ):focus-visible,
 [data-forge-part="form"][data-forge-form-appearance="field-tracks"] :is(
-    [data-forge-widget="dateRange"],
+    [data-forge-widget="dateRange"]:not(.forge-document-date-range),
     .forge-lookup-selection-input__control
 ):focus-within {
     outline: 2px solid var(--forge-focus-color);
@@ -259,7 +259,7 @@
     [data-forge-widget="select"],
     [data-forge-widget="booleanPill"]
 ):disabled,
-[data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"][aria-disabled="true"],
+[data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"]:not(.forge-document-date-range)[aria-disabled="true"],
 [data-forge-part="form"][data-forge-form-appearance="field-tracks"] .forge-lookup-selection-input__trigger:disabled,
 [data-forge-part="form"][data-forge-form-appearance="field-tracks"] .forge-lookup-selection-input.is-disabled .forge-lookup-selection-input__control {
     border-color: var(--forge-control-border) !important;
@@ -271,7 +271,7 @@
     [data-forge-widget="text"],
     [data-forge-widget="number"],
     [data-forge-widget="select"],
-    [data-forge-widget="dateRange"],
+    [data-forge-widget="dateRange"]:not(.forge-document-date-range),
     [data-forge-widget="booleanPill"]
 )[aria-invalid="true"],
 [data-forge-part="form"][data-forge-form-appearance="field-tracks"] .forge-lookup-selection-input.is-invalid .forge-lookup-selection-input__trigger,
@@ -403,14 +403,14 @@
 }
 
 @container (max-width: 420px) {
-    [data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"] {
+    [data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"]:not(.forge-document-date-range) {
         grid-template-columns: minmax(0, 1fr) !important;
         height: auto !important;
         gap: var(--forge-form-label-control-gap, 8px) !important;
         padding-block: var(--forge-form-label-control-gap, 8px) !important;
     }
 
-    [data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"] > input {
+    [data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"]:not(.forge-document-date-range) > input {
         height: var(--forge-form-mobile-control-height, 44px);
     }
 }
@@ -419,7 +419,7 @@
     [data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="text"],
     [data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="number"],
     [data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="select"],
-    [data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"],
+    [data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"]:not(.forge-document-date-range),
     [data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="booleanPill"],
     [data-forge-part="form"][data-forge-form-appearance="field-tracks"] .forge-lookup-selection-input__trigger,
     [data-forge-part="form"][data-forge-form-appearance="field-tracks"] .forge-lookup-selection-input__control {
@@ -456,14 +456,14 @@
 }
 
 @media (max-width: 420px) {
-    [data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"] {
+    [data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"]:not(.forge-document-date-range) {
         grid-template-columns: minmax(0, 1fr) !important;
         height: auto !important;
         gap: var(--forge-form-label-control-gap, 8px) !important;
         padding-block: var(--forge-form-label-control-gap, 8px) !important;
     }
 
-    [data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"] > input {
+    [data-forge-part="form"][data-forge-form-appearance="field-tracks"] [data-forge-widget="dateRange"]:not(.forge-document-date-range) > input {
         height: var(--forge-form-mobile-control-height, 44px);
     }
 

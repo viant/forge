@@ -25,6 +25,9 @@ import {
     supportsStackForSeries,
 } from "./reportBuilderChartRules.js";
 import { placeReportBuilderTableColumnKeyRelative } from "./reportBuilderTableColumnOrder.js";
+import {DocumentPresentationContext} from '../documentPresentation.js';
+import Typography, {typographyProps} from '../Typography.jsx';
+import SharedButton from '../Button.jsx';
 
 const REPORT_BUILDER_TABLE_DND_MIME = "application/x-forge-report-builder-table";
 const REPORT_BUILDER_FILTER_GROUP_DND_MIME = "application/x-forge-report-builder-filter-group";
@@ -4884,6 +4887,7 @@ export function InlineStaticFilterControl({
     issue = null,
     providerDiagnostics = [],
 }) {
+    const documentPresentation = React.useContext(DocumentPresentationContext);
     if (!filter) {
         return null;
     }
@@ -4908,6 +4912,24 @@ export function InlineStaticFilterControl({
     ].filter(Boolean).join(" ");
 
     if (filter.type === "dateRange") {
+        if (documentPresentation) return <fieldset className="forge-report-document-date-filter" title={title}>
+            <Typography as="legend" typeRole="label">{filter.label || filter.id}</Typography>
+            <div className="forge-report-document-date-fields">
+                {['start','end'].map(edge => <label key={edge} {...typographyProps('metadata')}>
+                    {edge === 'start' ? 'Start date or relative expression' : 'End date or relative expression'}
+                    <input type="text" {...typographyProps('body')} data-forge-part="input"
+                        aria-label={`${edge === 'start' ? 'Start' : 'End'} date or relative expression`}
+                        placeholder={edge === 'start' ? 'YYYY-MM-DD or 7 days ago' : 'YYYY-MM-DD or today'}
+                        value={value?.[`${edge}Expression`] ?? value?.[edge] ?? ''}
+                        onChange={event=>onDateRange(edge,event.target.value)}/>
+                </label>)}
+            </div>
+            <div className="forge-report-document-actions" role="group" aria-label="Relative date presets">
+                {[['today','Today'],['yesterday','Yesterday'],['last7Days','Last 7 days'],['last30Days','Last 30 days']].map(([preset,label])=><SharedButton key={preset} variant="ghost" size="compact" aria-pressed={value?.preset===preset} onClick={()=>onDateRange('preset',preset)}>{label}</SharedButton>)}
+            </div>
+            {description ? <Typography as="p" typeRole="metadata">{description}</Typography> : null}
+            {semanticNotice ? <Typography as="p" typeRole="metadata" role="alert">{semanticNotice}</Typography> : null}
+        </fieldset>;
         return (
             <div className={rootClassName} title={title}>
                 <div className="forge-report-builder__inline-filter-row">

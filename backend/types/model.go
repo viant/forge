@@ -92,6 +92,9 @@ func targetStringList(values []string) []string {
 }
 
 type Chart struct {
+	Appearance            string             `json:"appearance,omitempty" yaml:"appearance,omitempty"`
+	Layout                string             `json:"layout,omitempty" yaml:"layout,omitempty"`
+	Stacked               bool               `json:"stacked,omitempty" yaml:"stacked,omitempty"`
 	BarSize               float64            `json:"barSize,omitempty" yaml:"barSize,omitempty"`
 	Margin                map[string]float64 `json:"margin,omitempty" yaml:"margin,omitempty"`
 	ShowControls          *bool              `json:"showControls,omitempty" yaml:"showControls,omitempty"`
@@ -532,6 +535,7 @@ type TableRowDetails struct {
 }
 
 type Container struct {
+	Appearance                 string             `json:"appearance,omitempty" yaml:"appearance,omitempty"`
 	TablePresentation          *TablePresentation `json:"tablePresentation,omitempty" yaml:"tablePresentation,omitempty"`
 	MCPApp                     *MCPAppSpec        `json:"mcpApp,omitempty" yaml:"mcpApp,omitempty"`
 	ID                         string             `json:"id" yaml:"id"`
@@ -726,6 +730,8 @@ type Terminal struct {
 }
 
 type Chat struct {
+	// Appearance selects the shared document chat recipe; omitted retains legacy rendering.
+	Appearance string `json:"appearance,omitempty" yaml:"appearance,omitempty"`
 	// Optional composer selector visibility; omitted preserves existing behavior.
 	AllowAgentSelection *bool `json:"allowAgentSelection,omitempty" yaml:"allowAgentSelection,omitempty"`
 	AllowModelSelection *bool `json:"allowModelSelection,omitempty" yaml:"allowModelSelection,omitempty"`

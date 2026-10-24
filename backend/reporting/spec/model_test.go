@@ -58,6 +58,21 @@ func TestDecodeJSON_PreservesBlockRuntimeContract(t *testing.T) {
 	require.Equal(t, "region", spec.Blocks[0].Runtime["filterBindings"].(map[string]any)["region"])
 }
 
+func TestDecodeJSON_PreservesChartPresentation(t *testing.T) {
+	fixture := loadReportSpecFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	chart := fixture["blocks"].([]any)[3].(map[string]any)
+	for _, key := range []string{"chartSpec", "chartModel"} {
+		value := chart[key].(map[string]any)
+		value["type"], value["appearance"], value["layout"] = "line", "document", "small-multiples"
+	}
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+	decoded, err := DecodeJSON(data)
+	require.NoError(t, err)
+	require.Equal(t, "document", decoded.Blocks[3].ChartSpec["appearance"])
+	require.Equal(t, "small-multiples", decoded.Blocks[3].ChartModel["layout"])
+}
+
 func TestDecodeJSON_PreservesCollapsibleTablePresentation(t *testing.T) {
 	fixture := loadReportSpecFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
 	blocks := fixture["blocks"].([]any)
@@ -505,4 +520,85 @@ func loadReportSpecFixtureBytes(t *testing.T, filename string) []byte {
 	}
 	require.NoError(t, json.Unmarshal(data, &exportRequest))
 	return exportRequest.ReportSpec
+}
+
+func TestReportDocumentViewerRoundTrip(t *testing.T) {
+	var viewer ReportViewerSettings
+	require.NoError(t, json.Unmarshal([]byte(`{"appearance":"document","allowChartTableSwitch":false}`), &viewer))
+	require.Equal(t, "document", viewer.Appearance)
+	require.NotNil(t, viewer.AllowChartTableSwitch)
+	require.False(t, *viewer.AllowChartTableSwitch)
+	encoded, err := json.Marshal(viewer)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"appearance":"document","allowChartTableSwitch":false}`, string(encoded))
+}
+
+func TestReadOnlyRecordPresentation(t *testing.T) {
+	fixture := loadReportSpecFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	blocks := fixture["blocks"].([]any)
+	var table map[string]any
+	for _, value := range blocks {
+		block := value.(map[string]any)
+		if block["kind"] == "tableBlock" {
+			table = block
+			break
+		}
+	}
+	field := table["columns"].([]any)[0].(map[string]any)["key"].(string)
+	table["recordTitleField"] = field
+	table["description"] = "Bounded coverage: all returned rows displayed"
+	column := table["columns"].([]any)[0].(map[string]any)
+	column["flex"] = true
+	column["minWidth"] = 240
+	column["displayValueMap"] = map[string]any{"false": "Not selected"}
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+	spec, err := DecodeJSON(data)
+	require.NoError(t, err)
+	encoded, err := json.Marshal(spec)
+	require.NoError(t, err)
+	require.Contains(t, string(encoded), `"recordTitleField":"`+field+`"`)
+	require.Contains(t, string(encoded), `"description":"Bounded coverage: all returned rows displayed"`)
+	require.Contains(t, string(encoded), `"minWidth":240`)
+	require.Contains(t, string(encoded), `"displayValueMap":{"false":"Not selected"}`)
+	table["recordTitleField"] = "missing_column"
+	data, err = json.Marshal(fixture)
+	require.NoError(t, err)
+	_, err = DecodeJSON(data)
+	require.ErrorContains(t, err, "recordTitleField must name an existing column")
+}
+
+func TestReviewTableSelectionContract(t *testing.T) {
+	fixture := loadReportSpecFixtureMap(t, "capacity-direct-series-export-request-fixture.v1.json")
+	var table map[string]any
+	for _, value := range fixture["blocks"].([]any) {
+		block := value.(map[string]any)
+		if block["kind"] == "tableBlock" {
+			table = block
+			break
+		}
+	}
+	table["selection"] = map[string]any{"mode": "checkbox", "field": "selected"}
+	data, err := json.Marshal(fixture)
+	require.NoError(t, err)
+	decoded, err := DecodeJSON(data)
+	require.NoError(t, err)
+	encoded, err := json.Marshal(decoded)
+	require.NoError(t, err)
+	require.Contains(t, string(encoded), `"selection":{"mode":"checkbox","field":"selected"}`)
+	table["selection"] = map[string]any{"mode": "checkbox", "field": "selected", "labelFields": []string{"site", "path"}}
+	data, err = json.Marshal(fixture)
+	require.NoError(t, err)
+	decoded, err = DecodeJSON(data)
+	require.NoError(t, err)
+	encoded, err = json.Marshal(decoded)
+	require.NoError(t, err)
+	require.Contains(t, string(encoded), `"labelFields":["site","path"]`)
+	for _, invalid := range []map[string]any{{"mode": "radio", "field": "selected"}, {"mode": "checkbox", "field": ""}, {"mode": "checkbox", "field": "selected", "callback": "save"}, {"mode": "checkbox", "field": "selected", "labelFields": []string{}}, {"mode": "checkbox", "field": "selected", "labelFields": []string{"site", "site"}}} {
+		table["selection"] = invalid
+		data, err = json.Marshal(fixture)
+		require.NoError(t, err)
+		_, err = DecodeJSON(data)
+		require.Error(t, err)
+	}
 }

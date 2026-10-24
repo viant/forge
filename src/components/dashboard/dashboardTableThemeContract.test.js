@@ -58,6 +58,9 @@ assert.deepEqual(documentTableLayout(visible, {hasRowActions: true}), {columnWid
 assert.throws(() => documentTableColumns(columns, {variant: 'document', rowDetails: {field: 'name'}}), /read-only column/);
 assert.throws(() => documentTableColumns(columns, {variant: 'invented'}), /Unsupported table/);
 assert.equal(documentTableColumns(columns), columns, 'Legacy metadata remains unchanged');
+const generatedColumns = [{key:'recordId',kind:'dimension'}, {key:'recordName',kind:'dimension'}, {key:'count',kind:'measure'}];
+assert.deepEqual(documentTableLayout(generatedColumns).columnWidths, [112,null,112], 'Generated names grow instead of identifier columns');
+assert.deepEqual(documentTableLayout(generatedColumns.map((column,index)=>({...column,flex:index===0}))).columnWidths, [null,112,112], 'Authored flexible columns keep priority');
 const documentStyles = fs.readFileSync(new URL('./documentTable.css', import.meta.url), 'utf8');
 for (const role of ['body', 'label', 'metadata']) for (const property of ['family', 'size', 'weight', 'line-height', 'letter-spacing']) {
     assert.ok(documentStyles.includes(`--forge-type-${role}-${property}`), `Document table must consume all ${role} properties`);

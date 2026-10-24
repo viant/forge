@@ -1,0 +1,6 @@
+.forge-review-table { display: grid; min-width: 0; gap: var(--forge-spacing-3, 12px); }
+.forge-review-table > h3, .forge-review-table > p { margin: 0; }
+.forge-review-table__footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--forge-spacing-3, 12px); }
+.forge-review-table__actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--forge-spacing-2, 8px); }
+
+.forge-review-table .forge-dashboard-table-scroll-hint { display: block; }

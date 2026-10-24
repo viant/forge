@@ -1,4 +1,5 @@
 import {normalizeChartMetricSelection, applyChartMetricSelection} from "../chartMetricSelection.js";
+import {validateChartAppearance} from '../chartAppearance.js';
 import { resolveKey } from "../../utils/selector.js";
 import { normalizeSemanticBinding, validateSemanticBinding } from "../../semantic/modelValidation.js";
 import {
@@ -475,6 +476,7 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
     if (!chartSpec || typeof chartSpec !== "object" || Array.isArray(chartSpec)) {
         return null;
     }
+    validateChartAppearance(chartSpec);
     const title = String(chartSpec.title || "").trim();
     const eyebrow = String(chartSpec.eyebrow || "").trim();
     const accentTone = String(chartSpec.accentTone || "").trim();
@@ -493,6 +495,9 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         ...(accentTone ? { accentTone } : {}),
         ...(highlights.length > 0 ? { highlights } : {}),
         type,
+        ...(chartSpec.appearance ? {appearance:chartSpec.appearance} : {}),
+        ...(chartSpec.layout ? {layout:chartSpec.layout} : {}),
+        ...(typeof chartSpec.stacked === 'boolean' ? {stacked:chartSpec.stacked} : {}),
         xField,
         yFields: Array.from(new Set(yFields)),
         ...(seriesField ? { seriesField } : {}),
@@ -2314,6 +2319,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
             collection: container.collection,
             chart: {
                 type: seriesType,
+                ...(normalized.appearance ? {appearance:normalized.appearance} : {}),
                 series: {
                     nameKey: xDisplayKey || normalized.xField,
                     ...(xSourceKey && ((xDisplayKey && xDisplayKey !== xSourceKey) || hasXDisplayValueMap) ? { sourceNameKey: xSourceKey } : {}),
@@ -2332,6 +2338,9 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
     const hasXDisplayValueMap = xField?.displayValueMap && typeof xField.displayValueMap === "object" && !Array.isArray(xField.displayValueMap);
     const baseChart = {
         type: seriesType,
+        ...(normalized.appearance ? {appearance:normalized.appearance} : {}),
+        ...(normalized.layout ? {layout:normalized.layout} : {}),
+        ...(typeof normalized.stacked === 'boolean' ? {stacked:normalized.stacked} : {}),
         xAxis: {
             dataKey: xDisplayKey || xSourceKey,
             label: xField?.label || xField?.id || xSourceKey,

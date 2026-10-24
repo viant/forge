@@ -7,7 +7,7 @@ const schema = {
         due: { type: 'string', format: 'date-time' },
     secret: { type: 'string', format: 'password' },
     details: { type: 'object', readOnly: true },
-    reportingWindow: { type: 'object', 'x-ui-widget': 'dateRange' },
+    reportingWindow: { type: 'object', 'x-ui-widget': 'dateRange', 'x-ui-hide-label': true, 'x-ui-properties': {appearance: 'document'} },
     advertiserId: { type: 'number', lookup: {dialogId: 'advertiserPicker'} },
     },
 };
@@ -49,4 +49,14 @@ for (const field of fields) {
         console.error(`Field '${field.name}' must bind id and dataField to its schema property`);
         process.exitCode = 1;
     }
+}
+
+const period = fields.find(field => field.name === 'reportingWindow');
+if (period.properties?.appearance !== 'document' || period.hideLabel !== true) {
+    console.error('Schema forms must forward explicit appearance and label ownership');
+    process.exitCode = 1;
+}
+if (fields.find(field => field.name === 'eventDate')?.hideLabel !== undefined) {
+    console.error('Legacy schema fields retain their labels');
+    process.exitCode = 1;
 }

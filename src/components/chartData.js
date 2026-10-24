@@ -363,7 +363,7 @@ export function aggregateDirectSeriesData(rawData = [], xAxisKey = "", seriesDef
     );
 }
 
-export function buildPieChartData(rawData = [], nameKey = "", valueKey = "") {
+export function buildPieChartData(rawData = [], nameKey = "", valueKey = "", {includeNonPositive = false} = {}) {
     const resolvedNameKey = normalizeChartKey(nameKey);
     const resolvedValueKey = normalizeChartKey(valueKey);
     if (!resolvedNameKey || !resolvedValueKey || !Array.isArray(rawData) || rawData.length === 0) {
@@ -383,7 +383,7 @@ export function buildPieChartData(rawData = [], nameKey = "", valueKey = "") {
         existing.__chartSelectionRows.push(row);
         grouped.set(category, existing);
     });
-    return Array.from(grouped.values()).filter((row) => row.value > 0);
+    return Array.from(grouped.values()).filter((row) => includeNonPositive || row.value > 0);
 }
 
 export function buildPieSliceCellKey(entry = {}, index = 0) {

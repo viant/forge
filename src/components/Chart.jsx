@@ -91,6 +91,12 @@ import {
     resolveThemeAwareChartPalette,
 } from "./chartTheme.js";
 import "./Chart.css";
+import ComparisonBars from './ComparisonBars.jsx';
+import ChartPoint from './ChartPoint.jsx';
+import Typography, {typographyProps} from './Typography.jsx';
+import SelectControl from './SelectControl.jsx';
+import SharedButton from './Button.jsx';
+import {validateChartAppearance, resolveDocumentChartStyle, sharedChartDomain} from './chartAppearance.js';
 
 let categoryTickMeasureCanvas = null;
 
@@ -158,11 +164,13 @@ function HorizontalBarValueLabel({ x = 0, y = 0, width = 0, height = 0, value = 
 function ChartActionButton({
     children,
     onClick,
-    active = false,
+    active,
     disabled = false,
     title = '',
     style = {},
+    documentAppearance = false,
 }) {
+    if (documentAppearance) return <SharedButton variant={active ? 'secondary' : 'ghost'} aria-pressed={typeof active==='boolean'?active:undefined} disabled={disabled} title={title || undefined} onClick={onClick} style={style}>{children}</SharedButton>;
     return (
         <button
             type="button"
@@ -243,7 +251,7 @@ function defaultCategoricalPalette() {
 }
 
 function getSeriesDefinitions(chart = {}) {
-    const palette = resolveThemeAwareChartPalette(chart?.series?.palette || []);
+    const palette = resolveThemeAwareChartPalette(chart?.series?.palette || [], {forceRole:chart.appearance === 'document'});
     return (chart?.series?.values || []).map((entry, index) => ({
         ...entry,
         value: entry?.value,
@@ -251,7 +259,7 @@ function getSeriesDefinitions(chart = {}) {
         name: entry?.name || entry?.label || entry?.value || `Series ${index + 1}`,
         type: entry?.type || chart?.type || "line",
         axis: entry?.axis || "left",
-        color: resolveThemeAwareChartColor(entry?.color, index)
+        color: resolveThemeAwareChartColor(entry?.color, index, {forceRole:chart.appearance === 'document'})
             || palette[index % Math.max(palette.length, 1)]
             || chartSeriesColor(index + 1, "#137cbd"),
         dataLabels: entry?.dataLabels,
@@ -324,8 +332,10 @@ export function resolveConditionalSeriesColor(series = {}, value, fallbackColor 
     return "var(--forge-chart-neutral, #98a2b3)";
 }
 
-function createAxisTickFormatter(formatType) {
-    return (value) => formatValueByFormat(value, formatType);
+function createAxisTickFormatter(formatType, compact = false) {
+    return (value) => compact && ['currency','currency2'].includes(formatType)
+        ? new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',notation:'compact',maximumFractionDigits:1}).format(value)
+        : formatValueByFormat(value, formatType);
 }
 
 function tooltipFormatterForFormat(formatType) {
@@ -508,6 +518,9 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const authoredChart = container.chart;
     const [metricChoice, setMetricChoice] = useState(null);
     const chart = useMemo(() => applyChartMetricSelection(authoredChart, metricChoice), [authoredChart, metricChoice]);
+    validateChartAppearance(chart);
+    const documentAppearance = chart.appearance === 'document';
+    const smallMultiples = chart.layout === 'small-multiples';
     const [chartRef, chartSize] = useMeasuredContainer();
 
     // Extract chart configuration
@@ -521,27 +534,30 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         height,
         series,
     } = chart;
-    const palette = useMemo(() => resolveThemeAwareChartPalette(series?.palette || []), [series?.palette]);
-    const [chartTypography, setChartTypography] = useState(() => resolveChartTypography(null));
+    const palette = useMemo(() => resolveThemeAwareChartPalette(series?.palette || [], {forceRole:documentAppearance}), [series?.palette,documentAppearance]);
+    const [chartTypography, setChartTypography] = useState(() => ({...resolveChartTypography(null), documentStyle: resolveDocumentChartStyle(null)}));
     useEffect(() => {
         let frame;
         const update = () => {
             cancelAnimationFrame(frame);
             frame = requestAnimationFrame(() => {
-                const next = resolveChartTypography(chartRef.current);
+                const next = {...resolveChartTypography(chartRef.current), documentStyle: resolveDocumentChartStyle(chartRef.current)};
                 setChartTypography(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
             });
         };
         const observer = new MutationObserver(update);
+        const stylesheetLoaded = event => { if(event.target?.tagName === 'LINK' && event.target.rel === 'stylesheet') update(); };
         observer.observe(document.documentElement, {attributes: true});
         observer.observe(document.head, {childList: true, subtree: true, characterData: true});
         for (let node = chartRef.current; node && node !== document.documentElement; node = node.parentElement) {
             observer.observe(node, {attributes: true, attributeFilter: ['style', 'class', 'data-forge-theme', 'data-forge-color-mode']});
         }
         document.fonts?.addEventListener('loadingdone', update);
+        document.addEventListener('load',stylesheetLoaded,true);
         update();
-        return () => { cancelAnimationFrame(frame); observer.disconnect(); document.fonts?.removeEventListener('loadingdone', update); };
-    }, []);
+        return () => { cancelAnimationFrame(frame); observer.disconnect(); document.fonts?.removeEventListener('loadingdone', update); document.removeEventListener('load',stylesheetLoaded,true); };
+    }, [documentAppearance]);
+    const documentStyle = chartTypography.documentStyle;
     const directSeriesChart = isDirectSeriesChart(chart);
     const seriesDefinitions = useMemo(() => getSeriesDefinitions(chart), [chart]);
     const leftAxis = useMemo(() => ({...yAxis, ...(axes.left || {})}), [yAxis, axes]);
@@ -615,7 +631,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         if (isPieChart) {
             const nameKey = series.nameKey || "name";
             const valueKey = series.valueKey || selectedValueKey || "value";
-            const rows = buildPieChartData(chartRows, nameKey, valueKey);
+            const rows = buildPieChartData(chartRows, nameKey, valueKey, {includeNonPositive:documentAppearance});
             return {
                 chartData: rows,
                 availableDataKeys: rows.map((row) => row.name),
@@ -639,7 +655,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             availableDataKeys: keys,
             yAxisLabel: selectedValue ? selectedValue.name : (leftAxis.label || ""),
         };
-    }, [chart, directSeriesChart, effectiveCollection, isPieChart, leftAxis.label, selectedValueKey, series, seriesDefinitions, xAxis?.dataKey]);
+    }, [chart, documentAppearance, directSeriesChart, effectiveCollection, isPieChart, leftAxis.label, selectedValueKey, series, seriesDefinitions, xAxis?.dataKey]);
 
     const visibleState = resolveVisibleChartState({
         chartData: prepared.chartData,
@@ -708,14 +724,14 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     }, [series?.valueKey, seriesDefinitionKeysSignature, seriesDefinitions, seriesValueKeysSignature, series]);
 
     useEffect(() => {
-        if ((embedded || !viewSwitchEnabled) && viewMode !== "chart") {
+        if (((embedded && !documentAppearance) || !viewSwitchEnabled) && viewMode !== "chart") {
             setViewMode("chart");
         }
-    }, [embedded, viewSwitchEnabled, viewMode]);
+    }, [embedded, documentAppearance, viewSwitchEnabled, viewMode]);
 
     const allTableColumns = useMemo(
-        () => [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
-        [xAxis?.dataKey, stableAvailableDataKeys],
+        () => documentAppearance && isPieChart ? ["name", "value"] : [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
+        [xAxis?.dataKey, stableAvailableDataKeys,documentAppearance,isPieChart],
     );
     const [visibleColumns, setVisibleColumns] = useState(allTableColumns);
 
@@ -759,7 +775,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         : (embedded
             ? {top: 24, right: 12, left: 6, bottom: 34 + categoryLabelBottomOffset}
             : {top: 24, right: 60, left: 14, bottom: Math.max(42 + categoryLabelBottomOffset, cartesianAxisTitleBottomMargin, responsiveCivilDateAxis.bottomMargin)});
-    const chartMargin = resolveChartMargins(chart?.margin, defaultChartMargin);
+    const chartMargin = documentAppearance ? {top:documentStyle.insetTop,right:documentStyle.insetRight,bottom:documentStyle.insetBottom,left:0} : resolveChartMargins(chart?.margin, defaultChartMargin);
     const horizontalLegendSeriesCount = directSeriesChart
         ? seriesDefinitions.length
         : availableDataKeys.length;
@@ -768,7 +784,9 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         : (isHorizontalBar && horizontalLegendSeriesCount > 1
             ? {verticalAlign: "top", align: "center", wrapperStyle: {fontSize: chartTypography.smallSize, lineHeight: `${chartTypography.smallLineHeight}px`, paddingBottom: "8px", color: "var(--forge-chart-text-muted, #5f6b7c)", fontFamily: chartTypography.smallFamily, fontWeight: chartTypography.smallWeight, letterSpacing: chartTypography.smallLetterSpacing}}
             : {});
-    const axisTickStyle = embedded
+    const axisTickStyle = documentAppearance
+        ? {fontSize:chartTypography.smallSize,lineHeight:`${documentStyle.axisLineHeight}px`,fill:'var(--forge-chart-text-muted, #667085)',fontFamily:chartTypography.smallFamily,fontWeight:chartTypography.smallWeight,letterSpacing:chartTypography.smallLetterSpacing}
+        : embedded
         ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fill: "var(--forge-chart-text-muted, #5f6b7c)", fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing}
         : {fontSize: chartTypography.smallSize, lineHeight: `${chartTypography.smallLineHeight}px`, fill: "var(--forge-chart-text-muted, #667085)", fontFamily: chartTypography.smallFamily, fontWeight: chartTypography.smallWeight, letterSpacing: chartTypography.smallLetterSpacing};
     const axisLabelStyle = embedded
@@ -779,10 +797,10 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         : axisTickStyle;
     const renderYAxisCategoryTick = categoryLabelConfig
         ? ((props) => <ClampedCategoryTick {...props} config={categoryLabelConfig} orientation="y" style={axisTickStyle} availableWidth={Math.max(0, horizontalBarLayout.categoryWidth - 10)} />)
-        : (embedded ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fill: "var(--forge-chart-text-muted, #5f6b7c)", fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing} : undefined);
+        : (embedded || documentAppearance ? axisTickStyle : undefined);
     const gridStroke = "var(--forge-chart-grid, rgba(152,162,179,0.22))";
-    const showEmbeddedSeriesSelector = embedded && !isPieChart && availableDataKeys.length > 1;
-    const showChartLegend = chart?.showLegend !== false && !showEmbeddedSeriesSelector && (embedded || !controlsVisible);
+    const showEmbeddedSeriesSelector = !documentAppearance && embedded && !isPieChart && availableDataKeys.length > 1;
+    const showChartLegend = !documentAppearance && chart?.showLegend !== false && !showEmbeddedSeriesSelector && (embedded || !controlsVisible);
 
     const seriesToggleOptions = useMemo(() => availableDataKeys.map((dataKey, index) => {
         const seriesDef = seriesDefinitions.find((entry) => entry.value === dataKey);
@@ -803,6 +821,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             label: dataKey,
             name: dataKey,
             type,
+            stackId: chart.stacked ? "total" : undefined,
             axis: "left",
             color: resolveCategoryColor(chart?.series?.categoryColors, dataKey, palette[index % Math.max(palette.length, 1)] || chartSeriesColor(index + 1, "#137cbd")),
         }));
@@ -812,6 +831,24 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
         })
     ));
+
+    const documentValueAxisWidth = (axis, axisId = 'left') => {
+        let minimum = 0, maximum = 0;
+        for (const row of normalizedChartData) {
+            let positiveTotal = 0, negativeTotal = 0;
+            for (const series of renderableSeriesDefinitions.filter(entry => (entry.axis || 'left') === axisId)) {
+                const value = Number(readChartDataValue(row, series.value));
+                if (!Number.isFinite(value)) continue;
+                minimum = Math.min(minimum, value); maximum = Math.max(maximum, value);
+                if (value >= 0) positiveTotal += value; else negativeTotal += value;
+            }
+            if (chart.stacked) { minimum = Math.min(minimum, negativeTotal); maximum = Math.max(maximum, positiveTotal); }
+        }
+        for (const value of Array.isArray(axis?.domain) ? axis.domain : []) if (Number.isFinite(value)) { minimum = Math.min(minimum, value); maximum = Math.max(maximum, value); }
+        const format = createAxisTickFormatter(axis?.format, true);
+        const width = Math.max(...[minimum, maximum, minimum * 1.25, maximum * 1.25, 0].map(value => measureCategoryTickText(format(value), axisTickStyle)));
+        return Math.max(documentStyle.axisWidth, Math.ceil(width) + documentStyle.axisTickMargin * 2);
+    };
 
     const emitDatumSelection = React.useCallback((event) => {
         if (!interactiveDatumSelection) {
@@ -931,12 +968,20 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         __seriesAxes: Object.fromEntries(renderableSeriesDefinitions.map((entry) => [entry.value, entry.axis === "right" ? rightAxis?.format : leftAxis.format])),
     }));
     const normalizedChartData = normalizedAllChartData;
+    const smallMultiplesDomain = smallMultiples ? sharedChartDomain(normalizedChartData,renderableSeriesDefinitions,leftAxis.domain) : null;
+    const documentPoint = (props,entry) => {
+        const value=readChartDataValue(props.payload,entry.value);
+        if(!isChartNumericValue(value)) return null;
+        const label=`${entry.name || entry.label || entry.value}, ${formatChartXAxisValue(readChartDataValue(props.payload,xAxis.dataKey),resolvedTickFormat,resolvedTickValueMode)}: ${formatValueByFormat(value,entry.format || leftAxis.format)}`;
+        const color=resolveCategoryColor(chart.series?.categoryColors,readChartDataValue(props.payload,xAxis.dataKey),resolveConditionalSeriesColor(entry,value,entry.color));
+        return <ChartPoint {...props} firstIndex={normalizedChartData.findIndex(row=>isChartNumericValue(readChartDataValue(row,entry.value)))} label={label} color={color} style={documentStyle} onSelect={interactiveDatumSelection ? ()=>emitSeriesDatumSelection(entry.value,props.payload) : undefined}/>;
+    };
 
     const resolvedChartAnnotations = React.useMemo(() => (
         buildRuntimeChartAnnotationElements(normalizeChartAnnotations(chart), { embedded })
     ), [chart, embedded]);
 
-    const configuredBarSize = typeof chart?.barSize === "number" && Number.isFinite(chart.barSize) && chart.barSize > 0 ? chart.barSize : undefined;
+    const configuredBarSize = documentAppearance ? (isHorizontalBar ? documentStyle.barSize : documentStyle.columnSize) : typeof chart?.barSize === "number" && Number.isFinite(chart.barSize) && chart.barSize > 0 ? chart.barSize : undefined;
 
     const cartesianSeriesElements = renderableSeriesDefinitions.map((entry, seriesIndex) => {
         const defaultLineDash = renderableSeriesDefinitions.length > 1 && (entry.type === "line" || entry.type === "area")
@@ -948,18 +993,19 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             yAxisId: entry.axis || "left",
             stroke: entry.color,
             fill: entry.color,
-            strokeWidth: entry.strokeWidth || (embedded ? 3 : 2),
-            strokeDasharray: entry.strokeDasharray || defaultLineDash,
+            strokeWidth: documentAppearance ? documentStyle.lineWidth : entry.strokeWidth || (embedded ? 3 : 2),
+            strokeDasharray: documentAppearance ? undefined : entry.strokeDasharray || defaultLineDash,
             fillOpacity: entry.fillOpacity ?? (entry.type === "area" ? 0.22 : 1),
             opacity: entry.opacity,
             isAnimationActive: resolveChartAnimationActive(chart),
         };
-        const showSeriesDataLabels = shouldRenderSeriesDataLabels(entry, type, normalizedChartData.length, embedded);
+        const showSeriesDataLabels = shouldRenderSeriesDataLabels(entry, type, normalizedChartData.length, embedded)
+            && (!documentAppearance || !chart.stacked || entry.dataLabels === "always");
         const dataLabelFormatter = buildDataLabelFormatter(entry.format || leftAxis.format);
 
         if (entry.type === "bar") {
             return (
-                <Bar key={entry.value} {...commonProps} barSize={configuredBarSize} stackId={entry.stackId} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
+                <Bar key={entry.value} {...commonProps} barSize={documentAppearance ? undefined : configuredBarSize} maxBarSize={documentAppearance ? configuredBarSize : undefined} stackId={entry.stackId || (chart.stacked ? 'total' : undefined)} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                     {entry.pointColorMode === "bySign"
                         ? normalizedChartData.map((row, index) => (
                             <Cell key={`${entry.value}-cell-${index}`} fill={resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} />
@@ -972,7 +1018,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             );
         }
         if (entry.type === "area") {
-            const dotRenderer = embedded || interactiveDatumSelection || entry.pointColorMode === "bySign"
+            const dotRenderer = documentAppearance ? props=>documentPoint(props,entry) : embedded || interactiveDatumSelection || entry.pointColorMode === "bySign"
                 ? ((props = {}) => (
                     <circle
                         cx={props.cx}
@@ -985,14 +1031,14 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 ))
                 : false;
             return (
-                <Area key={entry.value} {...commonProps} type="monotone" connectNulls={true} dot={dotRenderer} activeDot={embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
+                <Area key={entry.value} {...commonProps} type={documentAppearance ? 'linear' : 'monotone'} connectNulls={!documentAppearance} dot={dotRenderer} activeDot={documentAppearance ? {r:documentStyle.pointRadius + 1,strokeWidth:documentStyle.pointStrokeWidth} : embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                     {showSeriesDataLabels ? (
                         <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="var(--forge-chart-text-muted, #5f6b7c)" fontSize={chartTypography.captionSize} fontFamily={chartTypography.captionFamily} fontWeight={chartTypography.captionWeight} letterSpacing={chartTypography.captionLetterSpacing} />
                     ) : null}
                 </Area>
             );
         }
-        const lineDotRenderer = embedded || interactiveDatumSelection || entry.pointColorMode === "bySign"
+        const lineDotRenderer = documentAppearance ? props=>documentPoint(props,entry) : embedded || interactiveDatumSelection || entry.pointColorMode === "bySign"
             ? ((props = {}) => (
                 <circle
                     cx={props.cx}
@@ -1005,7 +1051,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             ))
             : false;
         return (
-            <Line key={entry.value} {...commonProps} type="monotone" connectNulls={true} strokeLinecap="round" strokeLinejoin="round" dot={lineDotRenderer} activeDot={embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
+            <Line key={entry.value} {...commonProps} type={documentAppearance ? 'linear' : 'monotone'} connectNulls={!documentAppearance} strokeLinecap="round" strokeLinejoin="round" dot={lineDotRenderer} activeDot={documentAppearance ? {r:documentStyle.pointRadius + 1,strokeWidth:documentStyle.pointStrokeWidth} : embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                 {showSeriesDataLabels ? (
                     <LabelList dataKey={entry.value} position="top" formatter={dataLabelFormatter} fill="var(--forge-chart-text-muted, #5f6b7c)" fontSize={chartTypography.captionSize} fontFamily={chartTypography.captionFamily} fontWeight={chartTypography.captionWeight} letterSpacing={chartTypography.captionLetterSpacing} />
                 ) : null}
@@ -1015,14 +1061,14 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
 
     const sharedChartChildren = (
         <>
-            <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={gridStroke}/>
+            <CartesianGrid strokeDasharray={documentAppearance ? undefined : cartesianGrid.strokeDasharray} vertical={!documentAppearance} stroke={gridStroke}/>
             {resolvedChartAnnotations.background}
             <XAxis
                 dataKey={xAxis?.dataKey || "name"}
                 ticks={responsiveCivilDateAxis.ticks}
                 tickFormatter={(val) => formatChartXAxisValue(
                     val,
-                    responsiveCivilDateAxis.tickFormat || resolvedTickFormat,
+                    documentAppearance ? resolvedTickFormat : responsiveCivilDateAxis.tickFormat || resolvedTickFormat,
                     responsiveCivilDateAxis.compact ? "civil" : resolvedTickValueMode,
                 )}
                 tick={renderXAxisCategoryTick}
@@ -1038,8 +1084,9 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             />
             <YAxis
                 yAxisId="left"
-                width={embedded ? 56 : 76}
-                tickFormatter={createAxisTickFormatter(leftAxis.format)}
+                width={documentAppearance ? documentValueAxisWidth(leftAxis) : embedded ? 56 : 76}
+                tickMargin={documentAppearance ? documentStyle.axisTickMargin : undefined}
+                tickFormatter={createAxisTickFormatter(leftAxis.format,documentAppearance)}
                 tick={axisTickStyle}
                 axisLine={false}
                 tickLine={false}
@@ -1055,13 +1102,14 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 <YAxis
                     yAxisId="right"
                     orientation="right"
-                    width={embedded ? 56 : 68}
-                    tickFormatter={createAxisTickFormatter(rightAxis?.format)}
+                    width={documentAppearance ? documentValueAxisWidth(rightAxis, 'right') : embedded ? 56 : 68}
+                    tickMargin={documentAppearance ? documentStyle.axisTickMargin : undefined}
+                    tickFormatter={createAxisTickFormatter(rightAxis?.format,documentAppearance)}
                     tick={axisTickStyle}
                     axisLine={false}
                     tickLine={false}
-                    label={rightAxis?.label ? {
-                        value: embedded ? "" : rightAxis.label,
+                    label={!embedded && rightAxis?.label ? {
+                        value: rightAxis.label,
                         angle: 90,
                         position: "insideRight",
                         ...axisLabelStyle,
@@ -1075,7 +1123,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     const formatType = item?.payload?.__seriesFormats?.[item?.dataKey] || item?.payload?.__seriesAxes?.[item?.dataKey];
                     return [tooltipFormatterForFormat(formatType)(value), name];
                 }}
-                contentStyle={embedded ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing, color: "var(--forge-chart-text, #30404d)", background: "var(--forge-chart-surface, #ffffff)", borderRadius: "8px", border: "1px solid var(--forge-chart-border, #d8e1e8)"} : undefined}
+                contentStyle={embedded || documentAppearance ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing, color: "var(--forge-chart-text, #30404d)", background: "var(--forge-chart-surface, #ffffff)", borderRadius: documentAppearance ? "var(--forge-radius-surface, 8px)" : "8px", border: documentAppearance ? "var(--forge-border-width, 1px) solid var(--forge-chart-border, #d8e1e8)" : "1px solid var(--forge-chart-border, #d8e1e8)"} : undefined}
             />
             {showChartLegend ? <Legend {...legendProps} {...(interactiveLegendContent ? { content: interactiveLegendContent } : {})}/> : null}
             {cartesianSeriesElements}
@@ -1084,19 +1132,19 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     );
 
     const composedChart = (
-        <ComposedChart data={normalizedChartData} margin={chartMargin}>
+        <ComposedChart accessibilityLayer={documentAppearance || undefined} data={normalizedChartData} margin={chartMargin}>
             {sharedChartChildren}
         </ComposedChart>
     );
 
     const lineChart = (
-        <LineChart data={normalizedChartData} margin={chartMargin}>
+        <LineChart accessibilityLayer={documentAppearance || undefined} data={normalizedChartData} margin={chartMargin}>
             {sharedChartChildren}
         </LineChart>
     );
 
     const barChart = (
-        <BarChart data={normalizedChartData} margin={chartMargin}>
+        <BarChart accessibilityLayer={documentAppearance || undefined} data={normalizedChartData} margin={chartMargin}>
             {sharedChartChildren}
         </BarChart>
     );
@@ -1108,17 +1156,17 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
 
         const activePalette = (palette && palette.length > 0) ? palette : defaultCategoricalPalette();
         const categoryWidth = horizontalBarLayout.categoryWidth;
-        const barSize = configuredBarSize ?? (embedded ? 10 : 12);
+        const barSize = configuredBarSize ?? (documentAppearance ? documentStyle.barSize : embedded ? 10 : 12);
         const showHorizontalDataLabels = shouldRenderSeriesDataLabels(primarySeries, responsiveChartType, normalizedChartData.length, embedded);
         const primaryDataLabelFormatter = buildDataLabelFormatter(primarySeries.format || leftAxis.format);
 
         return (
-            <BarChart data={normalizedChartData} margin={chartMargin} layout="vertical">
-                <CartesianGrid strokeDasharray={cartesianGrid.strokeDasharray} stroke={gridStroke}/>
+            <BarChart accessibilityLayer={documentAppearance || undefined} data={normalizedChartData} margin={chartMargin} layout="vertical">
+                <CartesianGrid strokeDasharray={documentAppearance ? undefined : cartesianGrid.strokeDasharray} vertical={!documentAppearance} stroke={gridStroke}/>
                 {resolvedChartAnnotations.background}
                 <XAxis
                     type="number"
-                    tickFormatter={createAxisTickFormatter(primarySeries.format || leftAxis.format)}
+                    tickFormatter={createAxisTickFormatter(primarySeries.format || leftAxis.format,documentAppearance)}
                     tick={axisTickStyle}
                     label={{
                         value: embedded ? "" : (leftAxis.label || primarySeries.label || ""),
@@ -1138,7 +1186,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 />
                 <Tooltip
                     formatter={(value) => tooltipFormatterForFormat(primarySeries.format || leftAxis.format)(value)}
-                    contentStyle={embedded ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing, color: "var(--forge-chart-text, #30404d)", background: "var(--forge-chart-surface, #ffffff)", borderRadius: "8px", border: "1px solid var(--forge-chart-border, #d8e1e8)"} : undefined}
+                    contentStyle={embedded || documentAppearance ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing, color: "var(--forge-chart-text, #30404d)", background: "var(--forge-chart-surface, #ffffff)", borderRadius: documentAppearance ? "var(--forge-radius-surface, 8px)" : "8px", border: documentAppearance ? "var(--forge-border-width, 1px) solid var(--forge-chart-border, #d8e1e8)" : "1px solid var(--forge-chart-border, #d8e1e8)"} : undefined}
                 />
                 {chart?.showLegend !== false && selectedSeriesDefinitions.length > 1 ? <Legend {...legendProps} {...(interactiveLegendContent ? { content: interactiveLegendContent } : {})} /> : null}
                 {selectedSeriesDefinitions.length === 1 ? (
@@ -1191,7 +1239,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     })();
 
     const areaChart = (
-        <AreaChart data={normalizedChartData} margin={chartMargin}>
+        <AreaChart accessibilityLayer={documentAppearance || undefined} data={normalizedChartData} margin={chartMargin}>
             {sharedChartChildren}
         </AreaChart>
     );
@@ -1217,8 +1265,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 innerRadius={pieInnerRadius}
                 outerRadius={compactPie ? "52%" : "78%"}
                 paddingAngle={pieFilteredData.length > 1 ? 2 : 0}
-                label={embedded || compactPie ? false : ({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
-                labelLine={!embedded && !compactPie}
+                label={embedded || compactPie || documentAppearance ? false : ({name, percent}) => `${name} ${(percent * 100).toFixed(0)}%`}
+                labelLine={!embedded && !compactPie && !documentAppearance}
             >
                 {pieFilteredData.map((entry, index) => (
                     <Cell key={buildPieSliceCellKey(entry, index)} fill={resolveCategoryColor(chart?.series?.categoryColors, entry.name, piePalette[index % piePalette.length])} />
@@ -1226,7 +1274,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             </Pie>
             <Tooltip
                 formatter={(value) => formatLargeNumber(value)}
-                contentStyle={embedded ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing, color: "var(--forge-chart-text, #30404d)", background: "var(--forge-chart-surface, #ffffff)", borderRadius: "8px", border: "1px solid var(--forge-chart-border, #d8e1e8)"} : undefined}
+                contentStyle={embedded || documentAppearance ? {fontSize: chartTypography.captionSize, lineHeight: `${chartTypography.captionLineHeight}px`, fontFamily: chartTypography.captionFamily, fontWeight: chartTypography.captionWeight, letterSpacing: chartTypography.captionLetterSpacing, color: "var(--forge-chart-text, #30404d)", background: "var(--forge-chart-surface, #ffffff)", borderRadius: documentAppearance ? "var(--forge-radius-surface, 8px)" : "8px", border: documentAppearance ? "var(--forge-border-width, 1px) solid var(--forge-chart-border, #d8e1e8)" : "1px solid var(--forge-chart-border, #d8e1e8)"} : undefined}
             />
             {showChartLegend ? (
                 <Legend
@@ -1380,7 +1428,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     </label>
                 );
             })}
-            <ChartActionButton
+            <ChartActionButton documentAppearance={documentAppearance}
                 title="Clear series selection"
                 onClick={handleClearSelection}
             >
@@ -1401,7 +1449,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     );
     const resolvedHeight = isHorizontalBar
         ? normalizeChartExtent(height, horizontalBarDefaultHeight)
-        : normalizeChartExtent(height, embedded ? 380 : 240);
+        : normalizeChartExtent(height, documentAppearance ? documentStyle.plotHeight : embedded ? 380 : 240);
     const effectiveViewportHeight = showEmptyDataMessage
         ? normalizeChartExtent(chart?.emptyHeight, resolvedHeight)
         : resolvedHeight;
@@ -1417,8 +1465,8 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     })();
     const chartViewportStyle = {
         width: "100%",
-        height: effectiveViewportHeight,
-        minHeight: resolvedMinHeight || undefined,
+        height: smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? 'auto' : effectiveViewportHeight,
+        minHeight: smallMultiples || (documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1) ? undefined : resolvedMinHeight || undefined,
         minWidth: 0,
         flex: "0 0 auto",
         margin: isHorizontalBar ? "0 auto" : undefined,
@@ -1431,23 +1479,37 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             data-dashboard-chart-id={chartExportId}
             data-chart-loading={effectiveLoading ? "true" : "false"}
             data-chart-stale={staleWhileLoading ? "true" : "false"}
+            className={documentAppearance ? 'forge-chart-document' : undefined}
+            data-forge-chart-appearance={chart.appearance}
+            data-forge-chart-layout={chart.layout}
+            data-forge-chart-type={type}
+            aria-busy={effectiveLoading || undefined}
         >
-            {!embedded && chart.metricSelection ? (
+            {documentAppearance && !smallMultiples && chart.showLegend !== false && availableDataKeys.length > 1 && <div className="forge-chart-document-legend" aria-label="Chart series">
+                {seriesToggleOptions.map(option => <button key={option.value} type="button" aria-pressed={selectedDataKeys.includes(option.value)} onClick={() => interactiveLegendSelection ? emitLegendSelection({dataKey:option.value,value:option.label}) : handleDataKeySelect(option.value)}>
+                    <span aria-hidden="true" style={{background:option.color}}/>{option.label}
+                </button>)}
+            </div>}
+            {(!embedded || documentAppearance) && chart.metricSelection ? (
                 <div className="forge-chart-metric-selectors" role="group" aria-label="Trend metrics">
-                    {[["primaryField", "Primary metric"], ["secondaryField", "Secondary metric"]].map(([field, label]) => (
-                        <label key={field}>
-                            <span>{label}</span>
-                            <HTMLSelect aria-label={label} value={chart.metricSelection[field]} onChange={event => {
+                    {[["primaryField", "Primary metric"], ["secondaryField", "Secondary metric"]].map(([field, label]) => {
+                        const selectProps={
+                            'aria-label':label,value:chart.metricSelection[field],onChange:event=>{
                                 const choice = {primaryField: chart.metricSelection.primaryField, secondaryField: chart.metricSelection.secondaryField, [field]: event.target.value};
                                 selectionStateRef.current = {initialized: false, touched: false};
                                 setMetricChoice(choice);
                                 onMetricSelectionChange?.(choice);
-                            }} options={[
+                            },
+                        };
+                        const options=[
                                 ...(field === "secondaryField" ? [{value: "", label: "None"}] : []),
                                 ...chart.metricSelection.options.filter(option => option.value !== chart.metricSelection[field === "primaryField" ? "secondaryField" : "primaryField"]).map(option => ({value: option.value, label: option.label || option.value})),
-                            ]}/>
-                        </label>
-                    ))}
+                        ];
+                        return <label key={field} {...(documentAppearance ? typographyProps('label') : {})}>
+                            <span>{label}</span>
+                            {documentAppearance ? <SelectControl {...typographyProps('body')} {...selectProps}>{options.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}</SelectControl> : <HTMLSelect {...selectProps} options={options}/>}
+                        </label>;
+                    })}
                 </div>
             ) : null}
             {controlsVisible && showEmbeddedSeriesSelector && showSeriesSelectionControls ? (
@@ -1500,7 +1562,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     })}
                 </div>
             ) : null}
-            {(controlsVisible || viewSwitchEnabled) && !embedded && showSeriesSelectionControls ? (
+            {(controlsVisible || viewSwitchEnabled) && (!embedded || documentAppearance) && showSeriesSelectionControls ? (
                 <>
                     {controlsVisible && !directSeriesChart && !isPieChart ? (
                         <RadioGroup
@@ -1516,10 +1578,10 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     ) : null}
                     <div style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 8, flexWrap: "wrap"}}>
                         {viewSwitchEnabled && <div style={{display: "flex", gap: 6}}>
-                            <ChartActionButton active={viewMode === "chart"} onClick={() => setViewMode("chart")}>
+                            <ChartActionButton documentAppearance={documentAppearance} active={viewMode === "chart"} onClick={() => setViewMode("chart")}>
                                 Chart
                             </ChartActionButton>
-                            <ChartActionButton active={viewMode === "table"} onClick={() => setViewMode("table")}>
+                            <ChartActionButton documentAppearance={documentAppearance} active={viewMode === "table"} onClick={() => setViewMode("table")}>
                                 Table
                             </ChartActionButton>
                         </div>}
@@ -1527,19 +1589,19 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                             ? renderSeriesSelectionControls({compact: true})
                             : (
                                 <div style={{display: "flex", gap: 6}}>
-                                    <ChartActionButton onClick={() => setShowColumnDialog(true)}>Columns</ChartActionButton>
-                                    <ChartActionButton onClick={downloadCsv}>CSV</ChartActionButton>
+                                    <ChartActionButton documentAppearance={documentAppearance} onClick={() => setShowColumnDialog(true)}>Columns</ChartActionButton>
+                                    <ChartActionButton documentAppearance={documentAppearance} onClick={downloadCsv}>CSV</ChartActionButton>
                                 </div>
                             ))}
                     </div>
                 </>
             ) : null}
             {chartErrorMessage && (
-                <div style={{color: 'var(--forge-status-danger-foreground, #a82a2a)', padding: 4}}>{chartErrorMessage}</div>
+                <div role={documentAppearance ? 'alert' : undefined} style={{color: 'var(--forge-status-danger-foreground, #a82a2a)', padding: 4}}>{chartErrorMessage}</div>
             )}
 
             {viewMode === "chart" ? (
-                <div ref={chartRef} style={chartViewportStyle}>
+                <div ref={chartRef} data-forge-part="chart-viewport" style={chartViewportStyle}>
                     {effectiveLoading && !staleWhileLoading && !showResolvedEmptyStateWhileLoading && !error ? (
                         <div
                             style={{
@@ -1629,6 +1691,28 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         >
                             Select at least one series to render the chart.
                         </div>
+                    ) : documentAppearance && chartErrorMessage ? null : documentAppearance && isPieChart && pieFilteredData.some(row => Number(row.value) < 0) ? (
+                        <Typography as="p" typeRole="body" role="alert">Pie and donut charts require non-negative values. Use a bar chart to compare negative values.</Typography>
+                    ) : smallMultiples ? (
+                        <div className="forge-chart-multiples">
+                            <Typography as="p" typeRole="metadata" className="forge-chart-scale-note">All plots use the same scale: {formatValueByFormat(smallMultiplesDomain[0],leftAxis.format)} to {formatValueByFormat(smallMultiplesDomain[1],leftAxis.format)}.</Typography>
+                            {renderableSeriesDefinitions.map(entry => {
+                                const childChart={
+                                    ...chart,layout:undefined,height:documentStyle.smallPlotHeight,
+                                    allowTableSwitch:false,showLegend:false,showControls:false,
+                                    xAxis:{...xAxis},yAxis:{...leftAxis,domain:smallMultiplesDomain},axes:undefined,
+                                    series:{values:[{...entry,color:chartSeriesColor(1,'#137cbd')}]},
+                                };
+                                const select=interactiveDatumSelection ? selection=>emitSeriesDatumSelection(entry.value,
+                                    normalizedChartData.find(row=>String(readChartDataValue(row,xAxis.dataKey))===String(selection.xValue))) : undefined;
+                                return <figure key={entry.value}>
+                                    <Typography as="figcaption" typeRole="label">{entry.name || entry.label || entry.value}</Typography>
+                                    <Chart container={{id:`${chartExportId}-${entry.value}`,collection:normalizedChartData,chart:childChart}} context={chartContext} embedded onDatumSelect={select}/>
+                                </figure>;
+                            })}
+                        </div>
+                    ) : documentAppearance && isHorizontalBar && renderableSeriesDefinitions.length === 1 ? (
+                        <ComparisonBars rows={normalizedChartData} series={renderableSeriesDefinitions[0]} categoryKey={xAxis.dataKey} colors={chart.series?.categoryColors} colorForValue={value=>resolveConditionalSeriesColor(renderableSeriesDefinitions[0],value,renderableSeriesDefinitions[0].color)} formatter={buildDataLabelFormatter((renderableSeriesDefinitions[0].format || leftAxis.format) === 'currency' ? 'currency2' : renderableSeriesDefinitions[0].format || leftAxis.format)} onSelect={interactiveDatumSelection ? row => emitSeriesDatumSelection(renderableSeriesDefinitions[0].value,row) : undefined}/>
                     ) : chartCanRenderViewport ? (
                         <ResponsiveContainer width={chartSize.width} height={chartSize.height}>
                             {isPieChart

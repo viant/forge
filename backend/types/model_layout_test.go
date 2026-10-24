@@ -162,3 +162,30 @@ func TestColumnPreservesPressedWhenValue(t *testing.T) {
 		t.Fatalf("pressedWhenValue missing from JSON: %s", payload)
 	}
 }
+
+func TestContainerDocumentPresentationSurvivesMetadata(t *testing.T) {
+	for _, appearance := range []string{"document", "document-header", "document-summary", "document-scope"} {
+		var container Container
+		if err := yaml.Unmarshal([]byte("appearance: "+appearance+"\nlayout:\n  kind: grid\n  appearance: document-flow\n"), &container); err != nil {
+			t.Fatal(err)
+		}
+		encoded, err := json.Marshal(container)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var decoded Container
+		if err = json.Unmarshal(encoded, &decoded); err != nil {
+			t.Fatal(err)
+		}
+		if decoded.Appearance != appearance || decoded.Layout == nil || decoded.Layout.Appearance != "document-flow" {
+			t.Fatalf("document contract lost: %s", encoded)
+		}
+	}
+	legacy, err := json.Marshal(Container{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(legacy), `"appearance"`) {
+		t.Fatalf("legacy container opted in: %s", legacy)
+	}
+}

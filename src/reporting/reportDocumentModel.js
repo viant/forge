@@ -533,6 +533,9 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
     if (!request || typeof request !== "object" || Array.isArray(request)) {
       return false;
     }
+    if (["staticJson", "staticCsv"].includes(request.kind)) {
+      return Array.isArray(request.columnKeys) && request.columnKeys.includes(normalizeString(fieldKey));
+    }
     const catalogEntry = resolveReportBuilderCatalogEntry(datasetFieldCatalogs.get(normalizedDatasetRef)||fieldCatalog, fieldKey);
     if (!catalogEntry) {
       return false;
@@ -2520,13 +2523,6 @@ export function lowerReportDocumentToReportSpec(document = {}, {
   }
   const buildDatasetSpecificRuntimeContext = (datasetRef = "") => {
     const normalizedDatasetRef = normalizeString(datasetRef || "primary") || "primary";
-    if (!normalizedDatasetRef || normalizedDatasetRef === "primary") {
-      return {
-        config: effectiveConfig,
-        fieldCatalog: effectiveFieldCatalog,
-        container: loweredContainer,
-      };
-    }
     const staticDataset = staticDatasetIndex.get(normalizedDatasetRef) || null;
     if (staticDataset) {
       const datasetConfig = buildStaticDatasetReportBuilderConfig(effectiveConfig, staticDataset);

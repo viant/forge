@@ -481,6 +481,7 @@
     "Chat": {
       "additionalProperties": true,
       "properties": {
+        "appearance": {"type": "string", "enum": ["document"], "description": "Optional shared document chat presentation."},
         "abortVisible": {
           "$ref": "#/$defs/SelectorCondition",
           "description": "AbortVisible allows declarative, data-bound control of the abort button\nvisibility. When provided, the UI shows the abort button if the value\nresolved at `selector` matches `when` (or is truthy if `when` is omitted).\nExample:\n  abortVisible: { selector: \"job.status\", when: [\"queued\", \"running\"] }"

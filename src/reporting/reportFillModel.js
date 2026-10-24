@@ -1026,7 +1026,8 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
         content: {
           columns,
           rowCount: Number(dataset?.provenance?.rowCount || 0),
-          resolvedRows: buildReportFillTableRows(columns, dataset?.rows || []),
+          resolvedRows: buildReportFillTableRows(block.selection && !columns.some(column => column.key === block.selection.field)
+            ? [...columns,{key:block.selection.field,label:'Selected'}] : columns, dataset?.rows || []),
         },
       };
     }

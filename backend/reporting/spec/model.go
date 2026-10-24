@@ -9,7 +9,8 @@ import (
 )
 
 type ReportViewerSettings struct {
-	AllowChartTableSwitch *bool `json:"allowChartTableSwitch,omitempty"`
+	Appearance            string `json:"appearance,omitempty"`
+	AllowChartTableSwitch *bool  `json:"allowChartTableSwitch,omitempty"`
 }
 
 type ReportSpec struct {
@@ -160,17 +161,22 @@ type SemanticSelectionItems struct {
 }
 
 type TableColumn struct {
-	Key               string         `json:"key"`
-	SourceKey         string         `json:"sourceKey,omitempty"`
-	DisplayKey        string         `json:"displayKey,omitempty"`
-	Label             string         `json:"label"`
-	Kind              string         `json:"kind,omitempty"`
-	Format            string         `json:"format,omitempty"`
-	Align             string         `json:"align,omitempty"`
-	CellVisual        any            `json:"cellVisual,omitempty"`
-	Link              map[string]any `json:"link,omitempty"`
-	RuntimeFilterable bool           `json:"runtimeFilterable,omitempty"`
-	LabelClamp        *TextClamp     `json:"labelClamp,omitempty"`
+	Key               string            `json:"key"`
+	SourceKey         string            `json:"sourceKey,omitempty"`
+	DisplayKey        string            `json:"displayKey,omitempty"`
+	DisplayValueMap   map[string]any    `json:"displayValueMap,omitempty"`
+	DisplayIconMap    map[string]string `json:"displayIconMap,omitempty"`
+	Label             string            `json:"label"`
+	Kind              string            `json:"kind,omitempty"`
+	Format            string            `json:"format,omitempty"`
+	Align             string            `json:"align,omitempty"`
+	Width             *float64          `json:"width,omitempty"`
+	MinWidth          *float64          `json:"minWidth,omitempty"`
+	Flex              bool              `json:"flex,omitempty"`
+	CellVisual        any               `json:"cellVisual,omitempty"`
+	Link              map[string]any    `json:"link,omitempty"`
+	RuntimeFilterable bool              `json:"runtimeFilterable,omitempty"`
+	LabelClamp        *TextClamp        `json:"labelClamp,omitempty"`
 }
 
 type StepperStep struct {
@@ -227,6 +233,8 @@ type Block struct {
 	ID                       string           `json:"id"`
 	Kind                     string           `json:"kind"`
 	Title                    string           `json:"title,omitempty"`
+	Selection                *TableSelection  `json:"selection,omitempty"`
+	RecordTitleField         string           `json:"recordTitleField,omitempty"`
 	AccentTone               string           `json:"accentTone,omitempty"`
 	Collapsible              bool             `json:"collapsible,omitempty"`
 	DefaultCollapsed         bool             `json:"defaultCollapsed,omitempty"`
@@ -319,16 +327,25 @@ type rawBlockHeader struct {
 	DatasetRef string `json:"datasetRef,omitempty"`
 }
 
+type TableSelection struct {
+	LabelFields []string `json:"labelFields,omitempty"`
+	Mode        string   `json:"mode"`
+	Field       string   `json:"field"`
+}
+
 type rawTableBlock struct {
-	ID               string        `json:"id"`
-	Kind             string        `json:"kind"`
-	Title            string        `json:"title,omitempty"`
-	AccentTone       string        `json:"accentTone,omitempty"`
-	Collapsible      bool          `json:"collapsible,omitempty"`
-	DefaultCollapsed bool          `json:"defaultCollapsed,omitempty"`
-	LabelClamp       *TextClamp    `json:"labelClamp,omitempty"`
-	DatasetRef       string        `json:"datasetRef"`
-	Columns          []TableColumn `json:"columns"`
+	Selection        *TableSelection `json:"selection,omitempty"`
+	ID               string          `json:"id"`
+	Kind             string          `json:"kind"`
+	Title            string          `json:"title,omitempty"`
+	Description      string          `json:"description,omitempty"`
+	RecordTitleField string          `json:"recordTitleField,omitempty"`
+	AccentTone       string          `json:"accentTone,omitempty"`
+	Collapsible      bool            `json:"collapsible,omitempty"`
+	DefaultCollapsed bool            `json:"defaultCollapsed,omitempty"`
+	LabelClamp       *TextClamp      `json:"labelClamp,omitempty"`
+	DatasetRef       string          `json:"datasetRef"`
+	Columns          []TableColumn   `json:"columns"`
 }
 
 type rawChartBlock struct {
@@ -689,6 +706,31 @@ func (r *ReportSpec) Validate() error {
 			if len(block.Columns) == 0 {
 				return fmt.Errorf("reportSpec.blocks[%d].columns must not be empty for tableBlock", index)
 			}
+			if block.Selection != nil && (block.Selection.Mode != "checkbox" || strings.TrimSpace(block.Selection.Field) == "") {
+				return fmt.Errorf("reportSpec.blocks[%d].selection requires checkbox mode and a field", index)
+			}
+			if block.Selection != nil && block.Selection.LabelFields != nil {
+				seen := map[string]bool{}
+				if len(block.Selection.LabelFields) == 0 {
+					return fmt.Errorf("selection.labelFields must not be empty")
+				}
+				for _, field := range block.Selection.LabelFields {
+					key := strings.TrimSpace(field)
+					if key == "" || seen[key] {
+						return fmt.Errorf("selection.labelFields requires unique non-empty field names")
+					}
+					seen[key] = true
+				}
+			}
+			if block.RecordTitleField != "" {
+				found := false
+				for _, column := range block.Columns {
+					found = found || column.Key == block.RecordTitleField
+				}
+				if !found {
+					return fmt.Errorf("reportSpec.blocks[%d].recordTitleField must name an existing column", index)
+				}
+			}
 			if block.DefaultCollapsed && !block.Collapsible {
 				return fmt.Errorf("reportSpec.blocks[%d].defaultCollapsed requires collapsible for tableBlock", index)
 			}
@@ -696,6 +738,9 @@ func (r *ReportSpec) Validate() error {
 				return fmt.Errorf("reportSpec.blocks[%d].labelClamp.lines must be 1 or 2 for tableBlock", index)
 			}
 			for columnIndex, column := range block.Columns {
+				if (column.Width != nil && *column.Width < 48) || (column.MinWidth != nil && *column.MinWidth < 48) {
+					return fmt.Errorf("reportSpec.blocks[%d].columns[%d] width and minWidth must be at least 48", index, columnIndex)
+				}
 				if strings.TrimSpace(column.Key) == "" {
 					return fmt.Errorf("reportSpec.blocks[%d].columns[%d].key is required", index, columnIndex)
 				}
@@ -958,6 +1003,9 @@ func decodeBlock(payload json.RawMessage, index int) (result Block, resultErr er
 			ID:               block.ID,
 			Kind:             block.Kind,
 			Title:            block.Title,
+			Description:      block.Description,
+			Selection:        block.Selection,
+			RecordTitleField: block.RecordTitleField,
 			AccentTone:       block.AccentTone,
 			Collapsible:      block.Collapsible,
 			DefaultCollapsed: block.DefaultCollapsed,

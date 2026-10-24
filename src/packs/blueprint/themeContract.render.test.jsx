@@ -100,8 +100,8 @@ assert.match(themeCSS, /:is\(\[data-forge-part="container-card"\], \[data-forge-
 assert.match(themeCSS, /\[data-forge-part="container-section"\]\s*>\s*\.bp6-section-header\s*{[^}]*background:\s*var\(--forge-section-header-surface\)/s);
 assert.match(themeCSS, /\[data-forge-part="container-section"\]\[data-forge-section-appearance="primary"\]\s*>\s*\.bp6-section-header\s*{[^}]*background:\s*var\(--forge-section-primary-header-surface, var\(--forge-section-header-surface\)\)/s);
 assert.match(themeCSS, /\[data-forge-part="container-section"\]\[data-forge-section-appearance="quiet"\]\s*>\s*\.bp6-section-header\s*{[^}]*background:\s*var\(--forge-section-quiet-header-surface, var\(--forge-section-header-surface\)\)/s);
-assert.match(themeCSS, /data-forge-section-appearance="primary"[^}]*> \.bp6-section-header \.bp6-heading\s*{[^}]*font-size:\s*var\(--forge-section-primary-header-font-size, var\(--forge-section-header-font-size\)\)/s);
-assert.match(themeCSS, /data-forge-section-appearance="quiet"[^}]*> \.bp6-section-header \.bp6-heading\s*{[^}]*font-size:\s*var\(--forge-section-quiet-header-font-size, var\(--forge-section-header-font-size\)\)/s);
+assert.match(themeCSS, /data-forge-section-appearance="primary"[^}]*> \.bp6-section-header \.bp6-heading:not\(\[data-forge-type\]\)\s*{[^}]*font-size:\s*var\(--forge-section-primary-header-font-size, var\(--forge-section-header-font-size\)\)/s);
+assert.match(themeCSS, /data-forge-section-appearance="quiet"[^}]*> \.bp6-section-header \.bp6-heading:not\(\[data-forge-type\]\)\s*{[^}]*font-size:\s*var\(--forge-section-quiet-header-font-size, var\(--forge-section-header-font-size\)\)/s);
 console.log('optional semantic color fallbacks passed');
 
 const {default: Typography, typographyRoles} = await import('../../components/Typography.jsx');
@@ -173,3 +173,139 @@ assert.match(documentHTML, /Notes: Always-visible row detail/);
 assert.match(documentHTML, /lucide-x/);
 assert.doesNotMatch(documentHTML, /forge-table-frozen-identifier|<th[^>]*>notes/);
 console.log('actual editable document table anatomy, multiline edit and row detail passed');
+const compoundHTML = renderToStaticMarkup(<DashboardEditableTable embedded container={{id:'compound', dataSourceRef:'rows', tablePresentation:{variant:'document'}, columns:[
+    {key:'name', label:'Name', width:220, editor:{type:'multiline', commitOnEnter:true}},
+    {key:'amount', label:'Amount', width:104, editor:{type:'number'}, dataBar:{color:'red'}},
+    {key:'frequency', label:'Frequency', width:260, editor:{type:'frequency', disabledWhen:'${locked}'}},
+]}} context={{Context:()=>({handlers:{dataSource:{peekFullCollection:()=>[{name:'Example',amount:12,frequency:'3 per 1 day',locked:true}]}}})}}/>);
+assert.match(compoundHTML, /<textarea[^>]*data-commit-on-enter="true"/);
+assert.match(compoundHTML, /forge-select-control forge-document-select/);
+assert.match(compoundHTML, /<select[^>]*disabled=""/);
+assert.doesNotMatch(compoundHTML, /linear-gradient/, 'Document numeric fields retain the quiet editor appearance');
+assert.doesNotMatch(documentHTML, /data-commit-on-enter="true"/, 'Multiline notes retain Enter for newlines unless explicitly selected');
+
+
+const {default: SelectControl} = await import('../../components/SelectControl.jsx');
+const nativeSelect = renderToStaticMarkup(<label htmlFor="native-choice">Choice<SelectControl id="native-choice" name="choice" aria-describedby="choice-help" data-forge-type="body" required defaultValue="long"><option value="short">Short</option><option value="long">A longer choice</option></SelectControl></label>);
+assert.match(nativeSelect, /<select[^>]*id="native-choice"[^>]*name="choice"[^>]*aria-describedby="choice-help"[^>]*data-forge-type="body"[^>]*required=""/);
+assert.match(nativeSelect, /<option value="long" selected="">/);
+const selectIcon = nativeSelect.match(/<svg\b[^>]*>/)?.[0];
+assert.match(selectIcon, /aria-hidden="true"/);
+assert.match(selectIcon, /lucide-chevron-down/);
+assert.doesNotMatch(nativeSelect, /style=/);
+assert.match(renderToStaticMarkup(<SelectControl disabled/>), /<select disabled=""/);
+assert.throws(() => renderToStaticMarkup(<SelectControl data-forge-type="body" style={{fontSize:18}}/>), /typography role and tokens/);
+console.log('shared native select retains label, form, selected, disabled and typography contracts');
+
+const {documentAppearance,documentAttributes}=await import('../../components/documentPresentation.js');
+const {default:DocumentSpecimen}=await import('../../demos/theme/DocumentSpecimen.jsx');
+assert.equal(documentAppearance({}),'');
+assert.deepEqual(documentAttributes({appearance:'document'}),{'data-forge-appearance':'document'});
+assert.throws(()=>documentAppearance({appearance:'custom'}),/Unsupported container appearance/);
+assert.throws(()=>documentAppearance({appearance:'document',style:{padding:9}}),/shared geometry/);
+const documentSpecimenHTML=renderToStaticMarkup(<DocumentSpecimen/>);
+assert.match(documentSpecimenHTML,/<h1[^>]*data-forge-type="title"/);
+assert.match(documentSpecimenHTML,/data-forge-appearance="document-header"/);
+assert.match(documentSpecimenHTML,/forge-document-records/);
+assert.match(documentSpecimenHTML,/forge-document-date-range/);
+assert.match(documentSpecimenHTML,/<h3(?=[^>]*data-forge-type="section")(?=[^>]*data-forge-part="section-title")[^>]*>/);
+assert.match(documentSpecimenHTML,/class="forge-document-date-range"[^>]*data-forge-part="group"/);
+assert.match(documentSpecimenHTML,/<input[^>]*type="date"[^>]*data-forge-type="body"[^>]*data-forge-part="input"/);
+assert.match(documentSpecimenHTML,/value="2026-01-01"/);
+assert.match(documentSpecimenHTML,/value="2026-01-31"/);
+assert.match(documentSpecimenHTML,/<dt[^>]*data-forge-type="metadata"/);
+assert.doesNotMatch(documentSpecimenHTML,/for="[^"]*period[^"]*"[^>]*data-forge-part="label"/,'Split date labels replace the redundant group label');
+const {workspaceToolbarItem}=await import('../../core/context/WorkspacePresentation.jsx');
+const namedExport={id:'export-example',label:'Export example',hideLabel:false};
+assert.equal(workspaceToolbarItem(namedExport,{kind:'report'}),namedExport,'Explicit named actions retain their visible labels');
+console.log('actual document layout, native paired dates, summary roles, visible actions and legacy opt-out passed');
+
+const {default: ReportDocumentSpecimen} = await import('../../demos/theme/ReportDocumentSpecimen.jsx');
+const analyticalDocument = renderToStaticMarkup(<ReportDocumentSpecimen/>);
+assert.match(analyticalDocument,/data-forge-report-appearance="document"/);
+assert.match(analyticalDocument,/<h1[^>]*data-forge-type="title"/);
+assert.match(analyticalDocument,/data-forge-type="metric"/);
+assert.doesNotMatch(analyticalDocument,/font-weight:800|forge-report-runtime-kpi-panel/);
+const {normalizeReportViewerSettings,resolveReportChartTableSwitch} = await import('../../reporting/reportViewerSettings.js');
+assert.deepEqual(normalizeReportViewerSettings({appearance:'document',allowChartTableSwitch:false}),{appearance:'document',allowChartTableSwitch:false});
+assert.throws(()=>normalizeReportViewerSettings({appearance:'invented'}));
+assert.equal(resolveReportChartTableSwitch({reportSpec:{viewer:{appearance:'document'}},presentationMode:'preview'}),true);
+console.log('real analytical document specimen, viewer validation and legacy chart switch fallback passed');
+const {default: RecordTable}=await import('../../components/dashboard/DashboardTableContent.jsx');
+const recordContext={dataSource:{uniqueKey:['name']},signals:{collection:{value:[{name:'First record',selected:false}]},control:{value:{}},selection:{value:{selection:[]}}}};
+const recordContainer={tablePresentation:{variant:'document',recordTitleField:'name'},columns:[{key:'name',label:'Name'},{key:'selected',label:'Selected',displayValueMap:{false:'Not selected'}}]};
+const recordHTML=renderToStaticMarkup(<RecordTable container={recordContainer} context={recordContext}/>);
+assert.match(recordHTML,/<summary[^>]*data-forge-type="body"/);
+assert.match(recordHTML,/Not selected/);
+assert.doesNotMatch(recordHTML,/<input|<table/);
+const actionHTML=renderToStaticMarkup(<RecordTable container={{...recordContainer,rowActions:[{kind:'detail',label:'Read record'}]}} context={recordContext}/>);
+assert.match(actionHTML,/<table/,'Record presentation must not conceal row actions');
+const selectionHTML=renderToStaticMarkup(<RecordTable container={recordContainer} context={{...recordContext,dataSource:{...recordContext.dataSource,selectionMode:'multi'}}}/>);
+assert.match(selectionHTML,/type="checkbox"/,'Record presentation must not conceal selection controls');
+console.log('read-only record semantics and interactive-table fallback passed');
+await import('../../reporting/inlineReportCompiler.test.js');
+
+const {default: GeographicReportRuntime}=await import('../../components/dashboard/ReportRuntime.jsx');
+const {compileInlineReport: compileGeographicReport}=await import('../../reporting/inlineReportCompiler.js');
+const geographicSource={title:'Geographic evidence',viewer:{appearance:'document'},blocks:[
+  {id:'states',kind:'geoMapBlock',title:'State evidence',datasetRef:'states',geo:{shape:'us-states',key:'code',labelKey:'name',metric:{key:'count',label:'Records',format:'number'},aggregate:'sum'}},
+  {id:'empty',kind:'geoMapBlock',title:'Missing geography',datasetRef:'empty',geo:{shape:'us-states',key:'code',metric:{key:'count',label:'Records',format:'number'},aggregate:'sum'}},
+  {id:'timeline',kind:'timelineBlock',title:'Observation timeline',events:[{id:'one',date:'2026-01-01',title:'Recorded observation',body:'Scope unchanged.'}]},
+]};
+const geographicCompiled=compileGeographicReport({reportId:'geographic',grammar:'report-document-v1',source:geographicSource,dataSources:{states:{rows:[{code:'CA',name:'California',count:0}]},empty:{rows:[]}}});
+const geographicHTML=renderToStaticMarkup(<GeographicReportRuntime {...geographicCompiled}/>);
+assert.match(geographicHTML,/<button(?=[^>]*data-forge-type="caption")(?=[^>]*aria-label="California \(CA\): 0")[^>]*>/);
+assert.match(geographicHTML,/No geo data\./);
+assert.match(geographicHTML,/<ol class="forge-report-document-timeline"/);
+assert.match(geographicHTML,/<h3[^>]*data-forge-type="label"[^>]*>Recorded observation/);
+assert.doesNotMatch(geographicHTML.slice(geographicHTML.indexOf('data-report-runtime-block-id="states"')),/font-size:|font-weight:|text-transform:/,'Migrated map/timeline consumers must use complete roles');
+const legacyGeographic=renderToStaticMarkup(<GeographicReportRuntime {...geographicCompiled} reportSpec={{...geographicCompiled.reportSpec,viewer:{}}}/>);
+assert.match(legacyGeographic,/forge-report-runtime-geo-tiles/,'Legacy map remains compatible');
+console.log('shared document map/timeline roles, zero/empty data and legacy rendering passed');
+const geographicErrorHTML=renderToStaticMarkup(<GeographicReportRuntime {...geographicCompiled} reportFill={{...geographicCompiled.reportFill,diagnostics:[{blockId:'states',severity:'error',code:'missingEvidence',message:'Source unavailable',suggestedFix:'Retry the original read.'}]}}/>);
+assert.match(geographicErrorHTML,/data-forge-status="danger" role="alert"/);
+assert.match(geographicErrorHTML,/<p[^>]*data-forge-type="body"[^>]*>Source unavailable/);
+const {default: WorldMapControl}=await import('../../components/dashboard/WorldCountryMap.jsx');
+const worldControlHTML=renderToStaticMarkup(<WorldMapControl/>);
+assert.match(worldControlHTML,/aria-label="Zoom in map"/);
+assert.match(worldControlHTML,/aria-label="Zoom out map"[^>]*disabled/);
+assert.match(worldControlHTML,/<small[^>]*data-forge-type="caption"[^>]*>Natural Earth country boundaries/);
+console.log('document geography error roles and shared world-map controls passed');
+
+// The document workflow reuses semantic roles; legacy rendering remains available.
+const workflowSource={title:'Example workflow',viewer:{appearance:'document'},blocks:[
+  {id:'steps',kind:'stepperBlock',title:'Sequence',steps:[{id:'inspect',title:'Inspect evidence',body:'Read the complete source.'}]},
+  {id:'board',kind:'kanbanBlock',title:'Stages',columns:[{id:'queued',title:'Queued',cards:[{id:'one',title:'Read source',body:'Preserve context.',badge:'Review'}]}]},
+]};
+const workflowReport=compileGeographicReport({reportId:'workflow',grammar:'report-document-v1',source:workflowSource});
+const workflowHTML=renderToStaticMarkup(<GeographicReportRuntime {...workflowReport}/>);
+assert.match(workflowHTML,/<ol(?=[^>]*data-forge-type="body")(?=[^>]*class="forge-report-document-steps")/);
+assert.match(workflowHTML,/<h3[^>]*data-forge-type="label"/);
+assert.match(workflowHTML,/<h4[^>]*data-forge-type="label"/);
+assert.doesNotMatch(workflowHTML,/text-transform:uppercase|font-weight:800|draggable=/);
+const emptyWorkflow=compileGeographicReport({reportId:'workflow-empty',grammar:'report-document-v1',source:{...workflowSource,blocks:[{id:'steps',kind:'stepperBlock',steps:[]},{id:'board',kind:'kanbanBlock',columns:[]}]}});
+const emptyWorkflowHTML=renderToStaticMarkup(<GeographicReportRuntime {...emptyWorkflow}/>);
+assert.match(emptyWorkflowHTML,/No process steps configured/);assert.match(emptyWorkflowHTML,/No pipeline columns configured/);
+console.log('semantic read-only process/stage documents and empty states passed');
+
+assert.match(analyticalDocument,/class="forge-report-document-metrics"/);
+const explicitStackSource={title:'Explicit stack',viewer:{appearance:'document'},blocks:[{id:'a',kind:'kpiBlock',value:1},{id:'b',kind:'kpiBlock',value:2},{id:'group',kind:'compositeBlock',layout:'stack',childBlockIds:['a','b']}]};
+const explicitStack=compileGeographicReport({reportId:'explicit-stack',grammar:'report-document-v1',source:explicitStackSource});
+assert.doesNotMatch(renderToStaticMarkup(<GeographicReportRuntime {...explicitStack}/>),/class="forge-report-document-metrics"/,'Explicit composite layouts remain authoritative');
+
+const {updateReportChartTableSwitch}=await import('../../reporting/reportViewerSettings.js');
+for(const value of ['true','false','']) {
+ const viewer=updateReportChartTableSwitch({appearance:'document',allowChartTableSwitch:false},value);
+ assert.equal(viewer.appearance,'document');
+ assert.equal(viewer.allowChartTableSwitch,value===''?undefined:value==='true');
+}
+assert.equal(updateReportChartTableSwitch({allowChartTableSwitch:true},''),null);
+assert.deepEqual(updateReportChartTableSwitch(null,'true'),{allowChartTableSwitch:true});
+assert.throws(()=>updateReportChartTableSwitch({appearance:'invented'},'true'));
+console.log('chart switching edits retain independent appearance and legacy defaults');
+
+const {default:ReviewTable}=await import('../../components/dashboard/ReviewTable.jsx');
+const lockedReview=renderToStaticMarkup(<ReviewTable id="locked" rows={[{name:'Example',selected:true}]} columns={[{key:'name',label:'Item'}]} disabled showDownload={false}/>);
+assert.match(lockedReview,/<input[^>]*disabled/);
+assert.doesNotMatch(lockedReview,/Download CSV/);
+console.log('shared resolved review disables native selection without introducing an export action');

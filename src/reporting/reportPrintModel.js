@@ -2204,7 +2204,11 @@ function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {
 function renderReportPrintTableBlock(state = {}, block = {}, {
   layoutNote = "",
 } = {}) {
-  const columns = Array.isArray(block?.content?.columns) ? block.content.columns : [];
+  const description = normalizeString(block?.description);
+  if (description && !layoutNote.includes(description)) layoutNote = [description, layoutNote].filter(Boolean).join("\n");
+  const authoredColumns = Array.isArray(block?.content?.columns) ? block.content.columns : [];
+  const columns = block.selection && !authoredColumns.some(column => column.key === block.selection.field)
+    ? [...authoredColumns,{key:block.selection.field,label:'Selected'}] : authoredColumns;
   let rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
   const minimumWidths = minimumReportPrintColumnWidths(state, block, columns);
   if (columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
@@ -2226,6 +2230,7 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
       renderReportPrintTableBlock(state, {
         ...block,
         id: `${block.id}__columns_${index + 1}`,
+        selection: undefined,
         title,
         content: { ...block.content, title, columns: groupColumns },
       }, { layoutNote });
