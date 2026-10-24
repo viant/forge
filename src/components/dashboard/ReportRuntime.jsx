@@ -2126,7 +2126,7 @@ function resolveRuntimeCompositeConfig(blocks = []) {
   return { composites, ...resolveReportRuntimeCompositeOwnership(blocks) };
 }
 
-function TableBlock({ page = {}, onDatasetPageChange = null, block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false }) {
+function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = null, block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false }) {
   const authoredBlock = (Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : [])
     .find((candidate) => normalizeString(candidate?.id) === normalizeString(block?.id)) || {};
   const tableAccentTone = normalizeString(block?.content?.accentTone || block?.accentTone).toLowerCase();
@@ -2243,7 +2243,12 @@ function TableBlock({ page = {}, onDatasetPageChange = null, block = {}, diagnos
           aria-label={`${collapsed || localPaging ? "Expand" : "Collapse"} ${normalizeString(block?.title || "Table")}`}
           aria-expanded={!collapsed && !localPaging}
           aria-controls={`${normalizeString(block?.id || "tableBlock")}__table_content`}
-          onClick={() => { setPaginating(false); setCollapsed(collapsed || localPaging ? false : true); }}
+          onClick={() => {
+            const expanding = collapsed || localPaging;
+            if (expanding && !locallyComplete && !page.loading && dataset?.id) onDatasetExpand?.({ datasetId: dataset.id });
+            setPaginating(false);
+            setCollapsed(!expanding);
+          }}
           style={{ border: "1px solid var(--forge-report-control-border, #d4dee8)", background: "var(--forge-report-control-surface, #fff)", borderRadius: 8, padding: "5px 9px", cursor: "pointer", color: "var(--forge-report-text-secondary, #30404d)", display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)" }}
         >
           <Icon icon={collapsed || localPaging ? "chevron-down" : "chevron-up"} size={14} aria-hidden="true" />
@@ -2877,6 +2882,7 @@ export default function ReportRuntime({
   onChartMetricSelectionChange = null,
   datasetPages = {},
   onDatasetPageChange = null,
+  onDatasetExpand = null,
   showContextSummary = true,
   suppressFilterBarBlocks = false,
   suppressFilterBarBlockDatasetRefs = [],
@@ -3219,6 +3225,7 @@ export default function ReportRuntime({
           dataset={dataset}
           page={datasetPages[dataset?.id] || {}}
           onDatasetPageChange={onDatasetPageChange}
+          onDatasetExpand={onDatasetExpand}
           reportSpec={reportSpec}
           providerActionsByField={providerActionsByField}
           runtimeHandlers={runtimeHandlers}
