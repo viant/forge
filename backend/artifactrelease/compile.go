@@ -145,7 +145,16 @@ func policyResourceKey(value authz.Resource) string {
 // The producer must fence Compilation.Dependencies and use its own post-commit
 // outbox/retry before claiming the persisted channel is active.
 func MergeActivation(existing artifactcohort.Manifest, key Key, current Compilation) ([]authz.Document, []artifactcohort.Cohort, error) {
-	if !key.Valid() {
+	return MergeProjectedActivation(existing, key, key.Tenant, current)
+}
+
+// MergeProjectedActivation replaces a channel's compiled ordinary cohort
+// projection when the receiving host uses a different verified audience
+// tenant from the Studio storage tenant. The channel key and named-policy
+// dependencies remain in the storage tenant; only ordinary output tenancy is
+// changed by the trusted producer before this merge.
+func MergeProjectedActivation(existing artifactcohort.Manifest, key Key, projectionTenant string, current Compilation) ([]authz.Document, []artifactcohort.Cohort, error) {
+	if !key.Valid() || projectionTenant == "" || strings.TrimSpace(projectionTenant) != projectionTenant {
 		return nil, nil, ErrInvalid
 	}
 	if existing.Hash != "" && artifactcohort.ValidateManifest(existing) != nil {
@@ -155,25 +164,25 @@ func MergeActivation(existing artifactcohort.Manifest, key Key, current Compilat
 	policies := make([]authz.Document, 0, len(existing.Policies)+len(current.Policies))
 	cohorts := make([]artifactcohort.Cohort, 0, len(existing.Cohorts)+len(current.Cohorts))
 	for _, doc := range existing.Policies {
-		if doc.Resource.Tenant == key.Tenant && doc.Resource.Kind == "cohort" && strings.HasPrefix(doc.Resource.ID, prefix) {
+		if doc.Resource.Tenant == projectionTenant && doc.Resource.Kind == "cohort" && strings.HasPrefix(doc.Resource.ID, prefix) {
 			continue
 		}
 		policies = append(policies, doc)
 	}
 	for _, cohort := range existing.Cohorts {
-		if cohort.Tenant == key.Tenant && strings.HasPrefix(cohort.Name, prefix) {
+		if cohort.Tenant == projectionTenant && strings.HasPrefix(cohort.Name, prefix) {
 			continue
 		}
 		cohorts = append(cohorts, cohort)
 	}
 	for _, doc := range current.Policies {
-		if doc.Resource.Tenant != key.Tenant || doc.Resource.Kind != "cohort" || !strings.HasPrefix(doc.Resource.ID, prefix) {
+		if doc.Resource.Tenant != projectionTenant || doc.Resource.Kind != "cohort" || !strings.HasPrefix(doc.Resource.ID, prefix) {
 			return nil, nil, ErrInvalid
 		}
 		policies = append(policies, doc)
 	}
 	for _, cohort := range current.Cohorts {
-		if cohort.Tenant != key.Tenant || !strings.HasPrefix(cohort.Name, prefix) {
+		if cohort.Tenant != projectionTenant || !strings.HasPrefix(cohort.Name, prefix) {
 			return nil, nil, ErrInvalid
 		}
 		cohorts = append(cohorts, cohort)

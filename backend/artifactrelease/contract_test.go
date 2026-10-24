@@ -334,3 +334,25 @@ func TestMergeActivationPreservesUnrelatedAndOverlappingCohorts(t *testing.T) {
 		t.Fatal("activation candidate shares mutable roots with prior generation")
 	}
 }
+
+func TestMergeProjectedActivationUsesAudienceTenantWithoutChangingChannelIdentity(t *testing.T) {
+	key := Key{Tenant: "studio", Account: "2222", Workspace: "workspace", Namespace: "dspui", Name: "standard"}
+	other := Key{Tenant: "studio", Account: "2222", Workspace: "workspace", Namespace: "dspui", Name: "preview"}
+	audience := "https://idp.example.test/"
+	root := artifactcohort.RootRef{URI: "skill://dspui/guide", Kind: "skill", Version: 1, Hash: strings.Repeat("a", 64)}
+	old := authz.Resource{Tenant: audience, Kind: "cohort", ID: ReleaseCohortPrefix(key) + "old", Version: "logical"}
+	held := authz.Resource{Tenant: audience, Kind: "cohort", ID: ReleaseCohortPrefix(other) + "held", Version: "logical"}
+	next := authz.Resource{Tenant: audience, Kind: "cohort", ID: ReleaseCohortPrefix(key) + "new", Version: "logical"}
+	existing := artifactcohort.Manifest{Policies: []authz.Document{{Resource: old}, {Resource: held}}, Cohorts: []artifactcohort.Cohort{{Tenant: audience, Name: ReleaseCohortPrefix(key) + "old"}, {Tenant: audience, Name: ReleaseCohortPrefix(other) + "held"}}}
+	compiled := Compilation{Policies: []authz.Document{{Resource: next}}, Cohorts: []artifactcohort.Cohort{{Tenant: audience, Name: ReleaseCohortPrefix(key) + "new", Roots: []artifactcohort.RootRef{root}}}}
+	policies, cohorts, err := MergeProjectedActivation(existing, key, audience, compiled)
+	if err != nil || len(policies) != 2 || len(cohorts) != 2 || policies[0].Resource != held || policies[1].Resource != next || cohorts[0].Name != ReleaseCohortPrefix(other)+"held" || cohorts[1].Roots[0] != root {
+		t.Fatalf("external audience projection retained stale channel or changed unrelated release: %+v %+v %v", policies, cohorts, err)
+	}
+	if _, _, err = MergeActivation(existing, key, compiled); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("storage-tenant merge accepted external projection: %v", err)
+	}
+	if _, _, err = MergeProjectedActivation(existing, key, "bad\nname", compiled); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("invalid audience tenant accepted: %v", err)
+	}
+}
