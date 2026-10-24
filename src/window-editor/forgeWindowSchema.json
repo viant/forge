@@ -1053,6 +1053,10 @@
           },
           "type": "array"
         },
+        "literalGrammar": {
+          "description": "Simple opts into legacy producers that cannot represent embedded quotes.",
+          "type": "string"
+        },
         "parameter": {
           "type": "string"
         }
@@ -7010,7 +7014,7 @@
   "$ref": "#/$defs/Window",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-forge-provenance": {
-    "baseCommit": "073f1d95ca9f71dccb7ae65f2385b9416d9c5dbd",
+    "baseCommit": "aa2a747378bd14baaca367b008161b92f7b94457",
     "generator": "scripts/window-schema/main.go",
     "sha256": {
       "datasource_projection.go": "87f165b7c9558d0c43fadc6b006bb0f110bd905226b5301dcb5d8a06eb2a692e",
@@ -7043,7 +7047,7 @@
       "host_content.go": "f9f870afe88756eb3abd04b79cc717f60a696a5dc2501dec11ffba0f87dbc0fd",
       "json_metadata_clone.go": "baa9bde7e567774737f28b87c45a2bb145d9c5b2fadc81da3024578b17c6c09c",
       "local_state_owner.go": "987402ce2487f4b7714a3991c405aab0dda74a573d8690f8f6561d4ce020ab8f",
-      "model.go": "230fdf04a873db4e4853eb42e59b2880b10f1448893bd035f3b1f27aee458a24",
+      "model.go": "36ac3aca8e5ff03a0717c69c6167c944ff203536fef289052e41ae1f9fb3eeb4",
       "parameter_editor.go": "a176f3b63d74714d216daf57ba5c3c3ee8e12aaf8ccf2c0ee1b663c95a657bf6",
       "predicate_composition_editor.go": "881bcf68a5f5e16cae2f58ef7495ac14582398236cfd263cc8585e89f97cab4b",
       "presentation_primitives.go": "02a6a592152be515ce4a0632a586a1c94c926090ebfe39e5a29868d2b496b6cb",
