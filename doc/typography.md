@@ -538,3 +538,9 @@ retain their existing behavior and do not inherit the whole-form disabled prop.
 Existing form layout/render checks and the host's mounted
 approval test verify the actual field value reaches the saved decision payload.
 This does not alter backend authorization, submit routing or business validation.
+
+Field-track grids reuse their current context when no datasource is authored,
+including local approval forms. Explicit datasource references still resolve
+through Context and missing named sources still raise the existing error.
+The schema-form render contract verifies a local form against the real strict
+Context, rather than an always-successful context stub.
