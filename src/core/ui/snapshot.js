@@ -1,5 +1,6 @@
 import {getOperationRevision} from './operationRevision.js';
 import {buildSemanticUIContext} from './semanticContext.js';
+import {snapshotWindowResourceLocator} from '../../runtime/windowResourceLocator.js';
 import {
   activeWindows,
   selectedTabId,
@@ -380,6 +381,7 @@ export function buildUISnapshot(options = {}) {
       const state = {
         windowId: w.windowId,
         windowKey: w.windowKey,
+        ...snapshotWindowResourceLocator(w),
         windowTitle: w.windowTitle,
         conversationId: w.conversationId || null,
         presentation: w.presentation || null,

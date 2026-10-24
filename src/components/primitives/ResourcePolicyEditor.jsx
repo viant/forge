@@ -95,7 +95,7 @@ export function ResourceAccessEditor({ api, resource, actions = [], choices = {}
   const cannotManage = readOnly || editorContext?.canManage === false;
   const disabled = cannotManage || saving || loading;
   const incompleteRules = Object.values(draft?.policies ?? {}).some(policy => ((policy.mode === 'protected' || policy.mode === 'named') && policy.rule && !completeRule(policy.rule)) || (policy.mode === 'named' && (!policy.named?.resource?.id || !policy.named?.revision)));
-  const namedPolicies = resource.kind === 'window' ? (editorContext?.namedPolicies || []) : [];
+  const namedPolicies = editorContext?.namedPolicies || [];
   const namedKey = ref => JSON.stringify(ref?.resource || null);
   const selectedNamed = namedPolicies.find(item => namedKey(item) === namedKey(policy?.named));
   const providerChoices = editorContext?.choices || choices;
@@ -137,7 +137,7 @@ export function ResourceAccessEditor({ api, resource, actions = [], choices = {}
         }}>{applyGroupLabel}</Button>}
         {policy?.mode === 'public' && <Callout icon="globe">No identity rule is required for this action. Dependencies can still restrict access.</Callout>}
         {policy?.mode === 'named' && <>
-          <FormGroup label="Named policy" labelFor="resource-access-named" helperText="Assignments follow the current policy. Changes to the named policy apply to every assigned window.">
+          <FormGroup label="Named policy" labelFor="resource-access-named" helperText="Assignments follow the current policy. Changes to the named policy apply to every assigned resource.">
             <HTMLSelect id="resource-access-named" fill disabled={disabled || !namedPolicies.length} value={policy.named ? namedKey(policy.named) : ''} onChange={event => {
               const selected = namedPolicies.find(item => namedKey(item) === event.target.value);
               if (selected) update({...policy, named:{resource:selected.resource,revision:selected.revision}});

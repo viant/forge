@@ -516,7 +516,10 @@ function augmentReportRequestForAuthoredBlocks(baseSpec = {}, blocks = [], confi
   }
   const nextSpec = cloneValue(baseSpec);
   const fieldCatalog = buildReportBuilderFieldCatalog(config);
-  const datasetFieldCatalogs=new Map(normalizeReportBuilderPublishedDataSources(config).map(source=>[source.id,buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config,source))]));
+  const datasetFieldCatalogs = new Map(normalizeReportBuilderPublishedDataSources(config).map((source) => [
+    source.id,
+    buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config, source, { borrowBase: true })),
+  ]));
   const calculatedFields = Array.isArray(nextSpec?.calculatedFields) ? nextSpec.calculatedFields : [];
   nextSpec.calculatedFields = calculatedFields;
   const calculatedFieldIds = new Set(
@@ -2537,7 +2540,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
     }
     const publishedDataset = publishedDatasetIndex.get(normalizedDatasetRef) || null;
     if (publishedDataset) {
-      const datasetConfig = buildReportBuilderPublishedDatasetConfig(effectiveConfig, publishedDataset);
+      const datasetConfig = buildReportBuilderPublishedDatasetConfig(effectiveConfig, publishedDataset, { borrowBase: true });
       return {
         config: datasetConfig,
         fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig),

@@ -1403,6 +1403,24 @@ assert.equal(explicitDatasetDocument.datasets.some((dataset) => dataset.id === "
 assert.equal(explicitDatasetDocument.datasets.some((dataset) => dataset.id === "primary"), true);
 assert.equal(Array.isArray(resolveBuilderBlock(explicitDatasetDocument).config?.datasets), false);
 assert.equal(Array.isArray(resolveBuilderBlock(explicitDatasetDocument).config?.dataSources), false);
+const publishedChartDocument = structuredClone(explicitDatasetDocument);
+publishedChartDocument.blocks.push({
+  id: "reachChart",
+  kind: "chartBlock",
+  datasetRef: "reach_summary",
+  chartSpec: { type: "bar", xField: "country", yFields: ["hhUniqs"] },
+});
+const publishedChartSource = JSON.stringify(publishedChartDocument);
+const publishedChartFirst = lowerReportDocumentToReportSpec(publishedChartDocument);
+assert.equal(JSON.stringify(publishedChartDocument), publishedChartSource, "lowering must not mutate its borrowed authored config");
+const publishedChartResult = JSON.stringify(publishedChartFirst);
+const publishedChartDataset = publishedChartFirst.datasets.find((dataset) => dataset.id === "reach_summary");
+assert.ok(publishedChartDataset);
+publishedChartDataset.source.tool = "changed.after.lowering";
+publishedChartDataset.request.limit = 1;
+assert.equal(JSON.stringify(publishedChartDocument), publishedChartSource, "result mutation must not reach the authored document");
+assert.equal(JSON.stringify(lowerReportDocumentToReportSpec(publishedChartDocument)), publishedChartResult,
+  "a prior result mutation must not affect the next lowering");
 
 const deduplicatedDatasetDocument = buildReportBuilderReportDocument({
   container,

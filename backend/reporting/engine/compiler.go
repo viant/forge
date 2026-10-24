@@ -9,6 +9,7 @@ import (
 
 	"fmt"
 
+	"github.com/viant/forge/backend/provider/contract/observe"
 	identity "github.com/viant/forge/backend/resource"
 
 	"github.com/viant/forge/backend/reporting/registry"
@@ -28,7 +29,9 @@ func (s *Service) compileUnscoped(ctx context.Context, request *CompileRequest) 
 	var resolver ResourceReader
 	if request.Resource != nil || request.ResolvedResource != nil {
 		var err error
+		resolvedTiming := observe.Start(ctx, "report.compile.resolve", observe.Labels{Kind: "report"})
 		request, pin, resolver, err = s.compileResolved(ctx, request)
+		resolvedTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 		if err != nil {
 			return nil, err
 		}
@@ -36,7 +39,9 @@ func (s *Service) compileUnscoped(ctx context.Context, request *CompileRequest) 
 	if len(bytes.TrimSpace(request.Document)) == 0 {
 		return nil, fmt.Errorf("reporting compile: document is required")
 	}
+	compilerTiming := observe.Start(ctx, "report.compile.compiler", observe.Labels{Kind: "report"})
 	result, err := s.compiler.Compile(ctx, cloneCompileRequest(request))
+	compilerTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, err
 	}
@@ -44,18 +49,23 @@ func (s *Service) compileUnscoped(ctx context.Context, request *CompileRequest) 
 		return nil, fmt.Errorf("reporting compile: compiler returned nil result")
 	}
 	if pin != nil {
+		recheckTiming := observe.Start(ctx, "report.compile.recheck", observe.Labels{Kind: "report"})
 		raw, fresh, err := resolver.ReadResolved(ctx, *pin)
 		if err != nil {
+			recheckTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 			return nil, err
 		}
 		pin = fresh
 		var envelope registry.ReportEnvelope
 		if json.Unmarshal(raw, &envelope) != nil {
+			recheckTiming.End(observe.Error, observe.CacheUnknown)
 			return nil, identity.ErrResourceDenied
 		}
 		if err = s.verifyDependencies(ctx, *pin, envelope, request.DependencyPins, request.DependencyToken); err != nil {
+			recheckTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 			return nil, err
 		}
+		recheckTiming.End(observe.OK, observe.CacheUnknown)
 	}
 	next := cloneCompileResult(result)
 	if pin != nil {

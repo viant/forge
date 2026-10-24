@@ -7,11 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	dsproto "github.com/viant/forge/backend/datasource/contract"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	"github.com/viant/forge/backend/reporting/registry"
 	requestctx "github.com/viant/forge/backend/requestctx"
 	identity "github.com/viant/forge/backend/resource"
 	authsvc "github.com/viant/mcp/client/auth/link"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -75,7 +77,10 @@ func TestAuthoredResourceExecutesRealDatasourcePipeline(t *testing.T) {
 		during()
 		return `{"data":[{"channelV2":"CTV","eventDate":"2026-10-07","avails":10,"hhUniqs":5}]}`, nil
 	}), service.AuthorizeResourceDataset))
-	ctx := authsvc.InjectUser(context.Background(), "fixture-user")
+	var events []observe.Event
+	ctx := observe.WithObserver(authsvc.InjectUser(context.Background(), "fixture-user"), observe.ObserverFunc(func(event observe.Event) {
+		events = append(events, event)
+	}))
 	request := &ExecuteResourceRequest{Resource: &identity.ResourceRef{URI: uri.String()}}
 	result, err := service.ExecuteResource(ctx, request)
 	if err != nil {
@@ -83,6 +88,29 @@ func TestAuthoredResourceExecutesRealDatasourcePipeline(t *testing.T) {
 	}
 	if calls != len(result.Datasets) || len(result.Datasets["primary"].Rows) != 1 || len(result.ReportFill) == 0 || len(result.ReportPrint) == 0 {
 		t.Fatalf("missing actual execution artifacts: %+v", result)
+	}
+	fillOnly, fillErr := service.ExecuteResource(ctx, &ExecuteResourceRequest{Resource: request.Resource, FillOnly: true})
+	if fillErr != nil || fillOnly == nil || len(fillOnly.ReportFill) == 0 || len(fillOnly.ReportPrint) != 0 || len(fillOnly.Datasets) != len(result.Datasets) {
+		t.Fatalf("fill-only execution changed admitted data or returned print: %v", fillErr)
+	}
+	var fullFill, projectedFill any
+	if json.Unmarshal(result.ReportFill, &fullFill) != nil || json.Unmarshal(fillOnly.ReportFill, &projectedFill) != nil || !reflect.DeepEqual(fullFill, projectedFill) {
+		t.Fatal("fill-only preview changed report fill")
+	}
+	seen := map[observe.Phase]bool{}
+	for _, event := range events {
+		if !strings.HasPrefix(string(event.Phase), "report.resource.") {
+			continue
+		}
+		if event.Outcome != observe.OK || event.Duration < 0 || event.Labels.Kind != "report" {
+			t.Fatalf("unsafe report timing event: %+v", event)
+		}
+		seen[event.Phase] = true
+	}
+	for _, phase := range []observe.Phase{"report.resource.entry", "report.resource.total", "report.resource.select", "report.resource.compile", "report.resource.precheck", "report.resource.plan", "report.resource.fetch", "report.resource.materialize", "report.resource.final"} {
+		if !seen[phase] {
+			t.Fatalf("missing report timing phase %s", phase)
+		}
 	}
 	originalPin := *result.Resource
 	for _, test := range []struct {

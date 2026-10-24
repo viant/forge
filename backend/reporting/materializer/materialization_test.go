@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	"github.com/viant/forge/backend/reporting/registry"
 )
 
@@ -19,6 +20,46 @@ type stewardMaterializationGolden struct {
 	ReportSpec  string `json:"reportSpec"`
 	ReportFill  string `json:"reportFill"`
 	ReportPrint string `json:"reportPrint"`
+}
+
+func TestMaterializerTimingSeparatesBundleBootstrapFromInvocation(t *testing.T) {
+	paths, err := filepath.Glob("testdata/steward/*.json")
+	if err != nil || len(paths) == 0 {
+		t.Fatal("missing authored fixture", err)
+	}
+	envelope, err := os.ReadFile(paths[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	dataset, err := os.ReadFile(filepath.Join("testdata/steward_materialization", filepath.Base(paths[0])))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var datasets map[string]json.RawMessage
+	if err = json.Unmarshal(dataset, &datasets); err != nil {
+		t.Fatal(err)
+	}
+	var events []observe.Event
+	ctx := observe.WithObserver(context.Background(), observe.ObserverFunc(func(event observe.Event) { events = append(events, event) }))
+	spec, err := Lower(ctx, envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = Materialize(ctx, spec, datasets); err != nil {
+		t.Fatal(err)
+	}
+	seen := map[observe.Phase]bool{}
+	for _, event := range events {
+		if event.Outcome != observe.OK || event.Duration < 0 || event.Kind != "report" {
+			t.Fatalf("unsafe materializer timing: %+v", event)
+		}
+		seen[event.Phase] = true
+	}
+	for _, phase := range []observe.Phase{"report.materializer.lower.run", "report.materializer.normalize", "report.materializer.run", "report.materializer.runtime.bootstrap", "report.materializer.runtime.invoke"} {
+		if !seen[phase] {
+			t.Fatalf("missing materializer phase %s", phase)
+		}
+	}
 }
 
 func TestStewardGojaMaterializationMatchesOfficialNodeOutput(t *testing.T) {
@@ -56,6 +97,10 @@ func TestStewardGojaMaterializationMatchesOfficialNodeOutput(t *testing.T) {
 			artifacts, err := materializeAtFixtureTime(t, spec, datasets)
 			if err != nil {
 				t.Fatal(err)
+			}
+			fillOnly, err := MaterializeFill(context.Background(), spec, datasets)
+			if err != nil || fillOnly == nil || len(fillOnly.ReportPrint) != 0 || canonicalJSONSHA256(fillOnly.ReportFill) != canonicalJSONSHA256(artifacts.ReportFill) {
+				t.Fatalf("fill-only projection changed report fill or produced print: %v", err)
 			}
 			golden := manifest[filepath.Base(path)]
 			if got := canonicalJSONSHA256(spec); got != golden.ReportSpec {

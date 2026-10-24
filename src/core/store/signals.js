@@ -4,6 +4,7 @@ import {generateIntHash} from "../../utils/hash.js";
 import { injectActions } from '../../actions/action.js';
 import {clearWindowContext} from '../context/registry.js';
 import {invalidateWindowDataSourceRequests, invalidateDataSourceRequests} from '../../components/dataSourceRequestLifecycle.js';
+import {snapshotWindowResourceLocator} from '../../runtime/windowResourceLocator.js';
 // Create per-key signals for metadata and data
 
 
@@ -702,6 +703,7 @@ export const restoreWindowsFromSnapshot = (snapshot) => {
         conversationId: win?.conversationId || null,
         parentKey: win?.parentKey || null,
         windowKey: win?.windowKey || '',
+        ...snapshotWindowResourceLocator(win),
         presentation: win?.presentation || '',
         region: win?.region || '',
         workspaceSharePct: win?.workspaceSharePct ?? undefined,
@@ -889,6 +891,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
             parameters,
             identityParameters: identityParameterNames,
             resourceRef: options.resourceRef ? {...options.resourceRef} : undefined,
+            linkedRevision: options.linkedRevision,
             providerIdentity: options.providerIdentity,
             pickerDialogId: options.pickerDialogId,
             pickerParameters: options.pickerParameters,
@@ -965,6 +968,7 @@ export const addWindow = (windowTitle, parentKey, windowKey, windowData, inTab =
             parameters,
             identityParameters: identityParameterNames,
             resourceRef: options.resourceRef ? {...options.resourceRef} : undefined,
+            linkedRevision: options.linkedRevision,
             providerIdentity: options.providerIdentity,
             pickerDialogId: options.pickerDialogId,
             pickerParameters: options.pickerParameters,

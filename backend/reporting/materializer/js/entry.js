@@ -14,6 +14,7 @@ import "@formatjs/intl-datetimeformat/add-all-tz.js";
 import {buildReportBuilderReportDocument, lowerReportDocumentToReportSpec} from "../../../../src/reporting/reportDocumentModel.js";
 import {buildReportFillFromReportSpec} from "../../../../src/reporting/reportFillModel.js";
 import {buildReportPrintFromReportFill} from "../../../../src/reporting/reportPrintModel.js";
+import {normalizeReportBuilderPredicates} from "../../../../src/components/dashboard/reportBuilderPredicates.js";
   function isObject(value) {
     return !!value && typeof value === "object" && !Array.isArray(value);
   }
@@ -31,6 +32,32 @@ import {buildReportPrintFromReportFill} from "../../../../src/reporting/reportPr
       }
     });
     return result;
+  }
+  function bindInvocationScope(config, state, request) {
+    if (!request) return state;
+    const safe = (name) => typeof name === "string" && /^[A-Za-z][A-Za-z0-9_]*$/.test(name)
+      && !["constructor", "prototype", "__proto__"].includes(name);
+    const read = (path) => {
+      const parts = typeof path === "string" ? path.split(".") : [];
+      if (!parts.length || !["filters", "options"].includes(parts[0]) || !parts.every(safe)) return undefined;
+      return parts.reduce((value, key) => isObject(value) && Object.prototype.hasOwnProperty.call(value, key) ? value[key] : undefined, request);
+    };
+    const params = {...(isObject(state.scopeParams) ? state.scopeParams : {})};
+    for (const predicate of normalizeReportBuilderPredicates(config)) {
+      if (!safe(predicate?.id)) continue;
+      if (predicate.kind === "dateRange") {
+        const start = read(predicate.startParamPath), end = read(predicate.endParamPath);
+        if (start !== undefined || end !== undefined) params[predicate.id] = {
+          ...(isObject(params[predicate.id]) ? params[predicate.id] : {}),
+          ...(start !== undefined ? {start: clone(start)} : {}),
+          ...(end !== undefined ? {end: clone(end)} : {}),
+        };
+      } else {
+        const value = read(predicate.paramPath);
+        if (value !== undefined) params[predicate.id] = clone(value);
+      }
+    }
+    return {...state, scopeParams: params};
   }
   function normalizeDataSources(dataSources) {
     if (dataSources == null) return [];
@@ -75,7 +102,7 @@ import {buildReportPrintFromReportFill} from "../../../../src/reporting/reportPr
     const generated = buildReportBuilderReportDocument({
       container,
       config,
-      state: isObject(envelope.state) ? clone(envelope.state) : {},
+      state: bindInvocationScope(config, isObject(envelope.state) ? clone(envelope.state) : {}, requestBaseParameters),
       additionalBlocks: authoredBlocks,
       refinements: Array.isArray(sourceDocument.refinements) ? sourceDocument.refinements : [],
       semanticSummary: isObject(sourceDocument.semanticSummary) ? sourceDocument.semanticSummary : null
@@ -112,8 +139,17 @@ import {buildReportPrintFromReportFill} from "../../../../src/reporting/reportPr
     return JSON.stringify({ reportFill, reportPrint });
   }
 
+  // Interactive preview needs the fill model. Complete print/export keeps
+  // using materialize on a fresh authorized execution.
+  export function materializeFill(inputJSON) {
+    const input = JSON.parse(inputJSON);
+    if (!isObject(input.reportSpec) || input.reportSpec.kind !== "reportSpec" || !isObject(input.datasets)) throw new Error("Trusted reportSpec and executed datasets required.");
+    const reportFill = buildReportFillFromReportSpec(input.reportSpec, input.datasets);
+    return JSON.stringify({ reportFill });
+  }
+
 export function present(inputJSON) {
  const input=JSON.parse(inputJSON);
  return JSON.stringify(applyReportChartSelections(input.reportSpec,input.chartMetricSelections));
 }
-globalThis.ForgeAuthoredLowerer = {lower, materialize, present};
+globalThis.ForgeAuthoredLowerer = {lower, materialize, materializeFill, present};

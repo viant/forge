@@ -103,7 +103,7 @@ export function ReaderResourcesDialog({ isOpen, mode = 'all', initialAction = ''
     if (!api?.listMCPTools) return;
     let cancelled = false;
     setToolsLoading(true); setToolsError('');
-    api.listMCPTools().then((tools) => { if (!cancelled) setMCPTools(tools); }).catch((cause) => { if (!cancelled) setToolsError(cause.message || 'Unable to load live MCP tools.'); }).finally(() => { if (!cancelled) setToolsLoading(false); });
+    api.listMCPTools(api.namespaceId,api.namespaceName).then((tools) => { if (!cancelled) setMCPTools(tools); }).catch((cause) => { if (!cancelled) setToolsError(cause.message || 'Unable to load live MCP tools.'); }).finally(() => { if (!cancelled) setToolsLoading(false); });
     return () => { cancelled = true; };
   };
   useEffect(() => { if (!isOpen) return; return loadMCPTools(); }, [api, isOpen]);

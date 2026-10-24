@@ -99,7 +99,7 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale) {
                     width: '100%',
                     minHeight: 24,
                     padding: '2px 8px',
-                    borderRadius: 8,
+                    borderRadius: 999,
                     background: '#f7fafc',
                     overflow: 'hidden',
                 }}
@@ -115,6 +115,7 @@ export function renderExplicitReportTableCellVisual(cell, row, column, locale) {
                         minWidth: visualState.percent > 0 ? 6 : 0,
                         background: `linear-gradient(90deg, ${background} 0%, ${foreground} 100%)`,
                         opacity: 0.9,
+                        borderRadius: 999,
                     }}
                 />
                 <span style={{ position: 'relative', zIndex: 1, fontWeight: 600, color: '#10243a' }}>

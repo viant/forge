@@ -29,7 +29,7 @@ const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false
     const closeWindow = windowId => {
         const decision=windowCloseDecision(getWindowContext(windowId));
         if(decision.requiresConfirmation){setPendingClose({windowId,message:decision.message});return false;}
-        const result=performClose(windowId);return result && typeof result.then==='function'?result.then(()=>true):true;
+        const result=performClose(windowId);return result && typeof result.then==='function'?result.then(value=>value!==false):result!==false;
     };
     useEffect(()=>{
         const beforeUnload=event=>preventDirtyWindowUnload(event,(activeWindows.peek() || []).map(win=>getWindowContext(win.windowId)));
@@ -96,7 +96,7 @@ const WindowManager = ({renderWindowContent, isTabVisible, includeHosted = false
     const visibleTabId = resolveVisibleTabId(tabWindows, tabId);
 
     const frameOperation = useRef(null);
-    const confirmClose = () => {const id=pendingClose?.windowId;setPendingClose(null);const result=id?performClose(id):null;return result && typeof result.then==='function'?result.then(()=>({status:'closed',accepted:true})):{status:'closed',accepted:true};};
+    const confirmClose = () => {const id=pendingClose?.windowId;setPendingClose(null);const result=id?performClose(id,{discardConfirmed:true}):null;const done=value=>value===false?{status:'cancelled',accepted:false}:{status:'closed',accepted:true};return result && typeof result.then==='function'?result.then(done):done(result);};
     const cancelClose = () => {setPendingClose(null);return {status:'cancelled',accepted:false};};
     frameOperation.current={pendingClose,closeWindow,confirmClose,cancelClose};
     const frameWindowIds=[...new Set([...tabWindows,...floatingWindows].map(win=>win.windowId))].sort().join('|');

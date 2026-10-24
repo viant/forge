@@ -72,6 +72,7 @@ var ForgeAuthoredLowerer = (() => {
     lower: () => lower,
     lowerWithRequestBase: () => lowerWithRequestBase,
     materialize: () => materialize,
+    materializeFill: () => materializeFill,
     present: () => present
   });
 
@@ -45958,6 +45959,10 @@ Please __addLocaleData before adding additional unit data`);
         presentation: String(entry.presentation || "").trim(),
         semanticRef: String(entry.semanticRef || "").trim(),
         options: Array.isArray(entry.options) ? clone2(entry.options) : void 0,
+        optionsDataSourceRef: String(entry.optionsDataSourceRef || "").trim(),
+        optionsFetchMode: String(entry.optionsFetchMode || "").trim(),
+        optionValueField: String(entry.optionValueField || "").trim(),
+        optionLabelField: String(entry.optionLabelField || "").trim(),
         default: entry.default !== void 0 ? clone2(entry.default) : void 0,
         paramPath: String(entry.paramPath || "").trim(),
         startParamPath: String(entry.startParamPath || "").trim(),
@@ -46053,6 +46058,9 @@ Please __addLocaleData before adding additional unit data`);
     }
     if (predicate.options !== void 0) {
       filter.options = clone2(predicate.options);
+    }
+    for (const field of ["optionsDataSourceRef", "optionsFetchMode", "optionValueField", "optionLabelField"]) {
+      if (predicate[field]) filter[field] = predicate[field];
     }
     if (predicate.default !== void 0) {
       filter.default = clone2(predicate.default);
@@ -46873,6 +46881,9 @@ Please __addLocaleData before adding additional unit data`);
     if (chartFamilyForType(normalized) === "cartesian") return true;
     return normalized === "horizontal_bar";
   }
+  function chartFamilyAllowsSeriesDimension(type = "") {
+    return chartFamilyForType(type) === "cartesian" || String(type || "").trim().toLowerCase() === "horizontal_bar";
+  }
   function isValidPerSeriesType(chartType = "", perSeriesType = "") {
     const family = chartFamilyForType(chartType);
     const normalized = String(perSeriesType || "").trim().toLowerCase();
@@ -47197,7 +47208,7 @@ Please __addLocaleData before adding additional unit data`);
     return normalizeArray3(values).flatMap((entry) => typeof entry === "string" ? entry.split(/[\s,]+/) : [entry]).map((entry) => String(entry != null ? entry : "").trim()).filter(Boolean);
   }
   function resolveRelativeDateRangeDefault(seed = {}) {
-    return resolveReportRelativeDateRange(seed == null ? void 0 : seed.preset);
+    return (seed == null ? void 0 : seed.startExpression) || (seed == null ? void 0 : seed.endExpression) ? resolveReportRelativeDateRangeSpec(seed) : resolveReportRelativeDateRange(seed == null ? void 0 : seed.preset);
   }
   function defaultSelectedIds(items = [], fallbackCount = 1) {
     const explicit = normalizeArray3(items).filter((item) => item == null ? void 0 : item.default).map((item) => String(item.id || "").trim()).filter(Boolean);
@@ -47459,6 +47470,7 @@ Please __addLocaleData before adding additional unit data`);
       ...chartSpec.categoryColors && typeof chartSpec.categoryColors === "object" && !Array.isArray(chartSpec.categoryColors) ? { categoryColors: { ...chartSpec.categoryColors } } : {},
       ...seriesOptions ? { seriesOptions } : {},
       ...categoryLabel ? { categoryLabel } : {},
+      ...chartSpec.preserveCategoryOrder === true ? { preserveCategoryOrder: true } : {},
       ...metricSelection ? { metricSelection } : {},
       ...typeof chartSpec.allowTableSwitch === "boolean" ? { allowTableSwitch: chartSpec.allowTableSwitch } : {}
     };
@@ -47515,9 +47527,9 @@ Please __addLocaleData before adding additional unit data`);
       if (!universe.has(normalized.seriesField)) {
         return null;
       }
-      if (family === "category") {
+      if (!chartFamilyAllowsSeriesDimension(normalized.type)) {
         delete normalized.seriesField;
-      } else if (family === "cartesian" && normalized.yFields.length > 1) {
+      } else if (normalized.yFields.length > 1) {
         delete normalized.seriesField;
       } else if (normalized.seriesField === normalized.xField) {
         delete normalized.seriesField;
@@ -47744,9 +47756,9 @@ Please __addLocaleData before adding additional unit data`);
       if (normalized.seriesField === normalized.xField) {
         errors.push({ field: "seriesField", code: "duplicateField" });
       }
-      if (family === "category") {
+      if (!chartFamilyAllowsSeriesDimension(normalized.type)) {
         errors.push({ field: "seriesField", code: "notAllowed" });
-      } else if (family === "cartesian") {
+      } else {
         if (Array.isArray(normalized.yFields) && normalized.yFields.length > 1) {
           errors.push({ field: "seriesField", code: "tooManyMeasures" });
         }
@@ -47763,7 +47775,7 @@ Please __addLocaleData before adding additional unit data`);
         errors.push({ field: "seriesOptions", code: "notAllowed" });
       }
     }
-    const canValidateSeriesOptionsEntries = !!normalized.seriesOptions && typeof normalized.seriesOptions === "object" && !(normalized.seriesField && family === "cartesian") && !!chartFamilyAllowsSeriesOptions(normalized.type);
+    const canValidateSeriesOptionsEntries = !!normalized.seriesOptions && typeof normalized.seriesOptions === "object" && !(normalized.seriesField && chartFamilyAllowsSeriesDimension(normalized.type)) && !!chartFamilyAllowsSeriesOptions(normalized.type);
     if (canValidateSeriesOptionsEntries) {
       const ySet = new Set(Array.isArray(normalized.yFields) ? normalized.yFields : []);
       const stackAxis = /* @__PURE__ */ new Map();
@@ -47985,7 +47997,7 @@ Please __addLocaleData before adding additional unit data`);
     const suggestSeriesField = (options == null ? void 0 : options.suggestSeriesField) === true;
     const seededYFields = Array.isArray(normalizedSeed.yFields) && normalizedSeed.yFields.length > 0 ? normalizedSeed.yFields : defaultYField ? [defaultYField] : [];
     const yFields = SINGLE_MEASURE_CATEGORY_TYPES.has(type) ? seededYFields.slice(0, 1) : seededYFields;
-    const allowSeriesField = family === "cartesian" && yFields.length === 1;
+    const allowSeriesField = chartFamilyAllowsSeriesDimension(type) && yFields.length === 1;
     const seriesField = allowSeriesField ? normalizedSeed.seriesField || (suggestSeriesField ? (_d = dimensions.find((entry) => entry.key !== xField)) == null ? void 0 : _d.key : null) || null : null;
     const allowSeriesOptions = chartFamilyAllowsSeriesOptions(type) && !seriesField;
     const seriesOptions = allowSeriesOptions ? normalizedSeed.seriesOptions : null;
@@ -48423,6 +48435,7 @@ Please __addLocaleData before adding additional unit data`);
     const hasXDisplayValueMap = (xField == null ? void 0 : xField.displayValueMap) && typeof xField.displayValueMap === "object" && !Array.isArray(xField.displayValueMap);
     const baseChart = {
       type: seriesType,
+      ...normalized.preserveCategoryOrder === true ? { preserveCategoryOrder: true } : {},
       xAxis: {
         dataKey: xDisplayKey || xSourceKey,
         label: (xField == null ? void 0 : xField.label) || (xField == null ? void 0 : xField.id) || xSourceKey,
@@ -48436,7 +48449,7 @@ Please __addLocaleData before adding additional unit data`);
         format: (_b = yMeasures[0]) == null ? void 0 : _b.format
       }
     };
-    if (family === "cartesian" && normalized.seriesField && yMeasures.length === 1) {
+    if (chartFamilyAllowsSeriesDimension(seriesType) && normalized.seriesField && yMeasures.length === 1) {
       const yMeasure = yMeasures[0];
       const seriesDimension = resolveReportBuilderDimensionByField(config, normalized.seriesField);
       const seriesDisplayKey = resolveReportBuilderDimensionDisplayKey(seriesDimension) || normalized.seriesField;
@@ -49345,7 +49358,7 @@ Please __addLocaleData before adding additional unit data`);
       };
     });
   }
-  function buildReportBuilderPublishedDatasetConfig(baseConfig = {}, source = null) {
+  function buildReportBuilderPublishedDatasetConfig(baseConfig = {}, source = null, { borrowBase = false } = {}) {
     var _a5;
     const normalizedSource = source && typeof source === "object" && !Array.isArray(source) ? source : null;
     if (!normalizedSource) {
@@ -49393,7 +49406,11 @@ Please __addLocaleData before adding additional unit data`);
       ...normalizeString27(column == null ? void 0 : column.format) ? { format: normalizeString27(column.format) } : {}
     })).filter((entry) => entry.id && entry.key && entry.label);
     return {
-      ...isPlainObject6(baseConfig) ? cloneValue17(baseConfig) : {},
+      // The authored lowerer only reads its invocation-local builder config.
+      // Preserve the public detached result by default; its internal read-only
+      // callers can borrow the base instead of serializing the entire builder
+      // once for every published dataset and authored block.
+      ...isPlainObject6(baseConfig) ? borrowBase ? baseConfig : cloneValue17(baseConfig) : {},
       dataSourceRef: normalizeString27((normalizedSource == null ? void 0 : normalizedSource.dataSourceRef) || (baseConfig == null ? void 0 : baseConfig.dataSourceRef)),
       dimensions,
       measures
@@ -50191,7 +50208,10 @@ Please __addLocaleData before adding additional unit data`);
     }
     const nextSpec = cloneValue18(baseSpec);
     const fieldCatalog = buildReportBuilderFieldCatalog(config);
-    const datasetFieldCatalogs = new Map(normalizeReportBuilderPublishedDataSources(config).map((source) => [source.id, buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config, source))]));
+    const datasetFieldCatalogs = new Map(normalizeReportBuilderPublishedDataSources(config).map((source) => [
+      source.id,
+      buildReportBuilderFieldCatalog(buildReportBuilderPublishedDatasetConfig(config, source, { borrowBase: true }))
+    ]));
     const calculatedFields = Array.isArray(nextSpec == null ? void 0 : nextSpec.calculatedFields) ? nextSpec.calculatedFields : [];
     nextSpec.calculatedFields = calculatedFields;
     const calculatedFieldIds = new Set(
@@ -51910,7 +51930,7 @@ Please __addLocaleData before adding additional unit data`);
       }
       const publishedDataset = publishedDatasetIndex.get(normalizedDatasetRef) || null;
       if (publishedDataset) {
-        const datasetConfig = buildReportBuilderPublishedDatasetConfig(effectiveConfig, publishedDataset);
+        const datasetConfig = buildReportBuilderPublishedDatasetConfig(effectiveConfig, publishedDataset, { borrowBase: true });
         return {
           config: datasetConfig,
           fieldCatalog: buildReportBuilderFieldCatalog(datasetConfig),
@@ -54055,6 +54075,22 @@ Please __addLocaleData before adding additional unit data`);
       return value === null || value === void 0 ? "" : String(value);
     }
     return formatTimestamp(value, normalizedTickFormat, valueMode);
+  }
+  var CHART_BAR_END_RADIUS = 999;
+  function resolveChartBarRadius(width, height) {
+    const w2 = Math.abs(Number(width)), h4 = Math.abs(Number(height));
+    return Number.isFinite(w2) && Number.isFinite(h4) ? Math.min(CHART_BAR_END_RADIUS, w2 / 2, h4 / 2) : 0;
+  }
+  function resolveChartBarCornerRadii(value, orientation = "horizontal", radius = CHART_BAR_END_RADIUS) {
+    const negative = Number(value) < 0;
+    if (orientation === "vertical") return negative ? [0, 0, radius, radius] : [radius, radius, 0, 0];
+    return negative ? [radius, 0, 0, radius] : [0, radius, radius, 0];
+  }
+  function buildChartBarPath({ x: x2, y: y4, width, height, value, orientation = "horizontal" }) {
+    if (![x2, y4, width, height].every(Number.isFinite) || width <= 0 || height <= 0) return "";
+    const [tl, tr, br, bl] = resolveChartBarCornerRadii(value, orientation, resolveChartBarRadius(width, height));
+    const right = x2 + width, bottom = y4 + height, k2 = 0.5522847498307936;
+    return `M ${x2 + tl} ${y4} L ${right - tr} ${y4} C ${right - tr + k2 * tr} ${y4} ${right} ${y4 + tr - k2 * tr} ${right} ${y4 + tr} L ${right} ${bottom - br} C ${right} ${bottom - br + k2 * br} ${right - br + k2 * br} ${bottom} ${right - br} ${bottom} L ${x2 + bl} ${bottom} C ${x2 + bl - k2 * bl} ${bottom} ${x2} ${bottom - bl + k2 * bl} ${x2} ${bottom - bl} L ${x2} ${y4 + tl} C ${x2} ${y4 + tl - k2 * tl} ${x2 + tl - k2 * tl} ${y4} ${x2 + tl} ${y4} Z`;
   }
 
   // src/reporting/reportFillChartPayload.js
@@ -58951,7 +58987,7 @@ ${indent}${end}`;
     }
     if (normalizeString37(resolvedChart == null ? void 0 : resolvedChart.kind) === "groupedSeries") {
       return (Array.isArray(resolvedChart == null ? void 0 : resolvedChart.seriesKeys) ? resolvedChart.seriesKeys : []).map((seriesKey, index) => {
-        var _a6;
+        var _a6, _b;
         const normalizedKey = normalizeString37(seriesKey);
         if (!normalizedKey) {
           return null;
@@ -58961,7 +58997,7 @@ ${indent}${end}`;
           label: normalizedKey,
           type: chartType,
           color: printColor(resolveCategoryColor((_a6 = chartModel == null ? void 0 : chartModel.series) == null ? void 0 : _a6.categoryColors, normalizedKey, palette[index % palette.length])),
-          format: "",
+          format: normalizeString37((_b = chartModel == null ? void 0 : chartModel.yAxis) == null ? void 0 : _b.format),
           dataLabels: "",
           pointColorMode: ""
         };
@@ -59615,11 +59651,16 @@ ${indent}${end}`;
     );
     const bottomPad = xAxisLabel ? 50 : 34;
     const plotHeight = 180;
-    const plotWidth = Math.max(200, width - leftPad - rightPad);
+    const plotWidth = Math.max(1, width - leftPad - rightPad);
     const xAxisKey = normalizeString37(resolvedChart == null ? void 0 : resolvedChart.xAxisKey);
     const valueRange = bounds.maxValue - bounds.minValue || 1;
     const baselineY = topPad + (bounds.maxValue - 0) / valueRange * plotHeight;
+    const barSeries = seriesDescriptors.filter((series) => resolveChartSupportedSeriesType(series.type) === "bar");
+    const categoryWidth = plotWidth / Math.max(rows.length, 1);
     const xPositions = rows.map((row, index) => {
+      if (barSeries.length > 0) {
+        return leftPad + (index + 0.5) * categoryWidth;
+      }
       if (rows.length === 1) {
         return leftPad + plotWidth / 2;
       }
@@ -59661,25 +59702,34 @@ ${indent}${end}`;
       const y4 = topPad + index / 3 * plotHeight;
       return `<text data-report-print-axis="right" x="${leftPad + plotWidth + 8}" y="${y4 + 4}" text-anchor="start" font-size="10" fill="#667085">${escapeXml(formatAxisTick(value, (_a6 = rightSeries[0]) == null ? void 0 : _a6.format))}</text>`;
     }).join("\n") : "";
-    const xAxisLabels = rows.map((row, index) => {
+    const xTicks = rows.flatMap((row, index) => {
       var _a6, _b2, _c2;
-      if (index % labelStep !== 0 && index !== rows.length - 1) {
-        return "";
-      }
+      if (index % labelStep !== 0 && index !== rows.length - 1) return [];
       const label = formatChartXAxisValue(
         readChartDataValue(row, xAxisKey),
         normalizeString37((_a6 = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _a6.tickFormat),
         normalizeString37((_b2 = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _b2.valueMode)
       );
-      return renderPrintLabelLines(
-        buildPrintLabelLines(label, (_c2 = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _c2.categoryLabel, 14),
-        { x: xPositions[index], y: topPad + plotHeight + 18 }
-      );
-    }).join("\n");
+      const lines = buildPrintLabelLines(label, (_c2 = chartModel == null ? void 0 : chartModel.xAxis) == null ? void 0 : _c2.categoryLabel, 14);
+      const halfWidth = Math.max(0, ...lines.map((line) => line.length * 2.8));
+      return [{ lines, halfWidth, x: Math.max(halfWidth, Math.min(width - halfWidth, xPositions[index])) }];
+    });
+    const visibleXTicks = [];
+    const lastXTick = xTicks.at(-1);
+    const ticksApart = (left, right) => right.x - left.x >= left.halfWidth + right.halfWidth + 8;
+    for (const tick of xTicks) {
+      if (tick !== lastXTick && visibleXTicks.length && !ticksApart(tick, lastXTick)) continue;
+      if (visibleXTicks.length && !ticksApart(visibleXTicks.at(-1), tick)) continue;
+      visibleXTicks.push(tick);
+    }
+    const xAxisLabels = visibleXTicks.map((tick) => renderPrintLabelLines(
+      tick.lines,
+      { x: tick.x, y: topPad + plotHeight + 18 }
+    )).join("\n");
     const xAxisTitle = xAxisLabel ? `<text x="${leftPad + plotWidth / 2}" y="${topPad + plotHeight + 36}" text-anchor="middle" font-size="11" font-weight="600" fill="#475467">${escapeXml(xAxisLabel)}</text>` : "";
-    const barSeries = seriesDescriptors.filter((series) => resolveChartSupportedSeriesType(series.type) === "bar");
-    const groupWidth = Math.min(48, Math.max(14, plotWidth / Math.max(rows.length, 1) * 0.56));
-    const barWidth = barSeries.length > 0 ? Math.max(8, groupWidth / barSeries.length) : 0;
+    const groupWidth = Math.min(48, categoryWidth * 0.56);
+    const barWidth = barSeries.length > 0 ? groupWidth / barSeries.length : 0;
+    const drawnBarWidth = Math.max(0, barWidth - Math.min(1, barWidth * 0.12));
     const renderedSeries = seriesDescriptors.map((series) => {
       const supportedType = resolveChartSupportedSeriesType(series.type);
       const seriesBounds = series.axis === "right" && rightBounds ? rightBounds : bounds;
@@ -59712,9 +59762,9 @@ ${indent}${end}`;
           const y4 = Math.min(point.y, seriesBaselineY);
           const barHeight = Math.max(1, Math.abs(seriesBaselineY - point.y));
           const fillColor = resolveSeriesPointColor(series, point.value, series.color);
-          const label = shouldRenderReportPrintSeriesDataLabels(series, supportedType, rows.length) ? `<text x="${x2 + (barWidth - 1) / 2}" y="${y4 - 4}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(point.value, series.format))}</text>` : "";
+          const label = shouldRenderReportPrintSeriesDataLabels(series, supportedType, rows.length) ? `<text x="${x2 + drawnBarWidth / 2}" y="${y4 - 4}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(point.value, series.format))}</text>` : "";
           return `
-          <rect x="${x2}" y="${y4}" width="${barWidth - 1}" height="${barHeight}" rx="2" fill="${escapeXml(fillColor)}" />
+          <path class="forge-chart-bar" d="${buildChartBarPath({ x: x2, y: y4, width: drawnBarWidth, height: barHeight, value: point.value, orientation: "vertical" })}" fill="${escapeXml(fillColor)}" />
           ${label}
         `;
         }).join("\n");
@@ -59887,7 +59937,7 @@ ${indent}${end}`;
       const fillColor = printColor(resolveCategoryColor((_a5 = chartModel == null ? void 0 : chartModel.series) == null ? void 0 : _a5.categoryColors, readChartDataValue(row, xAxisKey), resolveSeriesPointColor(series, value, series.color)));
       const valueLabel = shouldRenderReportPrintSeriesDataLabels(series, "horizontal_bar", rows.length) ? `<text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(value, series.format))}</text>` : "";
       return `
-        <rect x="${x2}" y="${barY}" width="${barWidth}" height="${perSeriesHeight}" rx="2" fill="${escapeXml(fillColor)}" />
+        <path class="forge-chart-bar" d="${buildChartBarPath({ x: x2, y: barY, width: barWidth, height: perSeriesHeight, value })}" fill="${escapeXml(fillColor)}" />
         ${valueLabel}
       `;
     }).join("\n")).join("\n");
@@ -66251,7 +66301,7 @@ ${indent}${end}`;
     if (!normalized) {
       return [];
     }
-    const maxChars = Math.max(8, Math.floor(Math.max(1, width) / Math.max(4, fontSize * 0.56)));
+    const maxChars = Math.max(1, Math.floor(Math.max(1, width) / Math.max(4, fontSize * 0.56)));
     const wrapped = [];
     normalized.split("\n").forEach((line) => {
       const trimmedLine = line.trim();
@@ -66488,9 +66538,17 @@ ${indent}${end}`;
     color = REPORT_PRINT_THEME.bodyColor,
     align = "",
     x: x2 = void 0,
-    width = void 0
+    width = void 0,
+    onPageBreak = null
   } = {}) {
     var _a5, _b;
+    const ensureLineSpace = (height) => {
+      const pageIndex = state.currentPageIndex;
+      ensureReportPrintSpace(state, height);
+      if (pageIndex != null && state.currentPageIndex !== pageIndex && onPageBreak) {
+        onPageBreak();
+      }
+    };
     const boxX = (_a5 = normalizeNonNegativeNumber(x2)) != null ? _a5 : state.contentLeft;
     const boxWidth = (_b = normalizeNonNegativeNumber(width, { minimum: 1, allowZero: false })) != null ? _b : state.contentWidth;
     let sequence = 0;
@@ -66500,12 +66558,12 @@ ${indent}${end}`;
         return;
       }
       if (line === "") {
-        ensureReportPrintSpace(state, lineHeight / 2);
+        ensureLineSpace(lineHeight / 2);
         state.cursorY += lineHeight / 2;
         return;
       }
       wrapReportPrintText(line, boxWidth, fontSize).forEach((wrappedLine) => {
-        ensureReportPrintSpace(state, lineHeight);
+        ensureLineSpace(lineHeight);
         const element = pushReportPrintElement(state, buildReportPrintTextElement({
           id: `${idPrefix}_${sequence}`,
           kind: "text",
@@ -66738,14 +66796,15 @@ ${indent}${end}`;
   function renderReportPrintTextSectionBlock(state = {}, block = {}, lines = [], {
     layoutNote = ""
   } = {}) {
-    ensureReportPrintSpace(
-      state,
-      reportPrintTitleHeight(state, block, layoutNote) + REPORT_PRINT_THEME.bodyLineHeight
-    );
+    const titleHeight = reportPrintTitleHeight(state, block, layoutNote);
+    const bodyHeight = lines.reduce((height, line) => height + (line === "" ? REPORT_PRINT_THEME.bodyLineHeight / 2 : wrapReportPrintText(line, state.contentWidth).length * REPORT_PRINT_THEME.bodyLineHeight), 0);
+    const sectionHeight = titleHeight + bodyHeight;
+    ensureReportPrintSpace(state, sectionHeight <= state.contentBottom - state.contentTop ? sectionHeight : titleHeight + REPORT_PRINT_THEME.bodyLineHeight);
     renderReportPrintSectionTitle(state, block, { layoutNote });
     renderReportPrintTextLines(state, {
       idPrefix: `${normalizeString39((block == null ? void 0 : block.id) || (block == null ? void 0 : block.kind) || "block")}__line`,
-      lines
+      lines,
+      onPageBreak: () => renderReportPrintSectionTitle(state, block, { layoutNote, continuation: true })
     });
     finishReportPrintBlock(state);
   }
@@ -67503,12 +67562,12 @@ ${indent}${end}`;
           max: visualState.value
         };
         const palette = Array.isArray(visualState == null ? void 0 : visualState.palette) ? visualState.palette : [];
-        const trackRadius = Math.min(cellInnerHeight / 2, 8);
         const fillWidth = Math.max(0, cellInnerWidth * Math.max(0, Math.min(1, Number(visualState == null ? void 0 : visualState.percent) || 0)));
         const normalizedVisualKind = normalizeString39(visualState == null ? void 0 : visualState.kind);
         const trackHeight = normalizedVisualKind === "progressBar" ? Math.max(6, Math.min(10, cellInnerHeight - 6)) : normalizedVisualKind === "sparkBar" ? Math.max(10, Math.min(12, cellInnerHeight - 4)) : cellInnerHeight;
         const trackY = normalizedVisualKind === "progressBar" || normalizedVisualKind === "sparkBar" ? cellInnerY + Math.max(0, (cellInnerHeight - trackHeight) / 2) : cellInnerY;
         const trackWidth = normalizedVisualKind === "sparkBar" ? Math.min(cellInnerWidth, 40) : cellInnerWidth;
+        const trackRadius = resolveChartBarRadius(trackWidth, trackHeight);
         pushReportPrintElement(state, buildReportPrintRectElement({
           id: `${normalizeString39((block == null ? void 0 : block.id) || "table")}__${rowKey}__${columnKey}__${normalizedVisualKind === "progressBar" ? "progress_track" : normalizedVisualKind === "sparkBar" ? "spark_track" : "bar_track"}`,
           kind: "rect",
@@ -67670,7 +67729,7 @@ ${indent}${end}`;
     const columns = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.columns) ? block.content.columns : [];
     let rows = Array.isArray((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.resolvedRows) ? block.content.resolvedRows : [];
     const minimumWidths = minimumReportPrintColumnWidths(state, block, columns);
-    if (columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
+    if (rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
       const groups = [];
       let group = [columns[0]];
       let width = minimumWidths[0];
@@ -67772,11 +67831,22 @@ ${indent}${end}`;
   function renderReportPrintChartBlock(state = {}, block = {}, {
     layoutNote = ""
   } = {}) {
-    var _a5, _b, _c, _d;
+    var _a5, _b, _c, _d, _e, _f, _g;
+    const datasetRef = normalizeString39(block == null ? void 0 : block.datasetRef);
+    const declared = (Array.isArray((_a5 = state.reportSpec) == null ? void 0 : _a5.datasets) ? state.reportSpec.datasets : []).some((dataset2) => (dataset2 == null ? void 0 : dataset2.id) === datasetRef);
+    const dataset = (Array.isArray((_b = state.reportFill) == null ? void 0 : _b.datasets) ? state.reportFill.datasets : []).find((dataset2) => (dataset2 == null ? void 0 : dataset2.id) === datasetRef);
+    const provenance = dataset == null ? void 0 : dataset.provenance;
+    if (declared && ((_c = block == null ? void 0 : block.content) == null ? void 0 : _c.rowCount) === 0 && (provenance == null ? void 0 : provenance.hasMore) === false && (provenance == null ? void 0 : provenance.truncated) === false && Array.isArray(provenance == null ? void 0 : provenance.diagnostics) && provenance.diagnostics.length === 0) {
+      ensureReportPrintSpace(state, reportPrintTitleHeight(state, block, layoutNote) + REPORT_PRINT_THEME.bodyLineHeight);
+      renderReportPrintSectionTitle(state, block, { layoutNote });
+      renderReportPrintTextLines(state, { idPrefix: `${normalizeString39(block.id)}__empty`, lines: ["No data for the selected scope."], color: REPORT_PRINT_THEME.mutedColor });
+      finishReportPrintBlock(state);
+      return;
+    }
     const titleHeight = reportPrintTitleHeight(state, block, layoutNote);
     const chartPages = buildReportPrintChartPages({
-      chartModel: ((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.chartModel) || (block == null ? void 0 : block.chartModel) || {},
-      resolvedChart: ((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.resolvedChart) || null,
+      chartModel: ((_d = block == null ? void 0 : block.content) == null ? void 0 : _d.chartModel) || (block == null ? void 0 : block.chartModel) || {},
+      resolvedChart: ((_e = block == null ? void 0 : block.content) == null ? void 0 : _e.resolvedChart) || null,
       width: state.contentWidth,
       maxHeight: state.contentBottom - state.contentTop - titleHeight,
       firstMaxHeight: state.contentBottom - state.cursorY - titleHeight >= 180 ? state.contentBottom - state.cursorY - titleHeight : state.contentBottom - state.contentTop - titleHeight - (state.sectionHeadingHeight || 0)
@@ -67805,7 +67875,7 @@ ${indent}${end}`;
       }
       ensureReportPrintSpace(state, chartHeight);
       const svgElement = pushReportPrintElement(state, buildReportPrintSvgElement({
-        id: `${normalizeString39((block == null ? void 0 : block.id) || "chart")}__svg_page_${(_c = state.currentPage) == null ? void 0 : _c.number}`,
+        id: `${normalizeString39((block == null ? void 0 : block.id) || "chart")}__svg_page_${(_f = state.currentPage) == null ? void 0 : _f.number}`,
         kind: "svg",
         box: {
           x: state.contentLeft,
@@ -67824,7 +67894,7 @@ ${indent}${end}`;
           elementId: svgElement == null ? void 0 : svgElement.id
         });
       });
-      if ((_d = svgResult.labelDetails) == null ? void 0 : _d.length) {
+      if ((_g = svgResult.labelDetails) == null ? void 0 : _g.length) {
         renderReportPrintTextLines(state, { idPrefix: `${block.id}__labels_${pageIndex}`, lines: svgResult.labelDetails, fontSize: 9, lineHeight: 12 });
       }
       finishReportPrintBlock(state);
@@ -67961,21 +68031,40 @@ ${indent}${end}`;
     }
   }
   function keepReportPrintSectionWithNext(state, blocks, index) {
-    var _a5, _b, _c, _d;
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i;
     if (((_a5 = blocks[index]) == null ? void 0 : _a5.kind) !== "sectionBlock") return;
-    const probe = { ...state, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null, cursorY: state.contentTop };
+    let probe = { ...state, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null, cursorY: state.contentTop };
     let next = index;
     while (((_b = blocks[next]) == null ? void 0 : _b.kind) === "sectionBlock") {
       renderReportPrintBlock(probe, blocks[next], {});
       next += 1;
+    }
+    const sectionProbe = probe;
+    const firstContent = next;
+    for (let introductions = 0; introductions < 2 && ((_c = blocks[next]) == null ? void 0 : _c.kind) === "markdownBlock"; introductions += 1) {
+      const candidate = { ...probe, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null };
+      moveToReportPrintPage(candidate, 0);
+      candidate.cursorY = probe.cursorY;
+      renderReportPrintBlock(candidate, blocks[next], {});
+      if (candidate.currentPageIndex > 0 || candidate.cursorY - candidate.contentTop > (state.contentBottom - state.contentTop) / 3) break;
+      probe = candidate;
+      next += 1;
+    }
+    if (!blocks[next]) {
+      probe = sectionProbe;
+      next = firstContent;
     }
     const headingHeight = probe.cursorY - probe.contentTop;
     state.sectionHeadingHeight = Math.max(state.sectionHeadingHeight || 0, headingHeight);
     if (!blocks[next]) return;
     const contentProbe = { ...probe, sectionHeadingHeight: headingHeight, pages: [], bookmarks: [], diagnostics: [], currentPage: null, currentPageIndex: null, cursorY: state.contentTop };
     renderReportPrintBlock(contentProbe, blocks[next], {});
-    const firstPageElements = ((_c = contentProbe.pages[0]) == null ? void 0 : _c.elements) || [];
-    const contentHeight = blocks[next].kind === "tableBlock" ? (((_d = firstPageElements.find((element) => element.id.includes("__row_rule_0"))) == null ? void 0 : _d.box.y) || state.contentTop) - state.contentTop : blocks[next].kind === "chartBlock" ? Math.min(reportPrintTitleHeight(state, blocks[next]) + 180, Math.max(0, ...firstPageElements.map((element) => element.box.y + element.box.height - state.contentTop))) : Math.max(0, ...firstPageElements.map((element) => element.box.y + element.box.height - state.contentTop));
+    const firstPageElements = ((_d = contentProbe.pages[0]) == null ? void 0 : _d.elements) || [];
+    const firstContentHeight = Math.max(0, ...firstPageElements.map((element) => element.box.y + element.box.height - state.contentTop));
+    const firstRowRule = firstPageElements.find((element) => element.id.includes("__row_rule_0"));
+    const chartType = normalizeString39(((_g = (_f = (_e = blocks[next]) == null ? void 0 : _e.content) == null ? void 0 : _f.chartModel) == null ? void 0 : _g.type) || ((_i = (_h = blocks[next]) == null ? void 0 : _h.chartModel) == null ? void 0 : _i.type)).toLowerCase();
+    const paginatedChart = blocks[next].kind === "chartBlock" && ["horizontal_bar", "funnel_bar"].includes(chartType) && contentProbe.pages.length > 1;
+    const contentHeight = blocks[next].kind === "tableBlock" && firstRowRule ? firstRowRule.box.y - state.contentTop : paginatedChart ? Math.min(reportPrintTitleHeight(state, blocks[next]) + 180, firstContentHeight) : firstContentHeight;
     ensureReportPrintSpace(state, Math.min(state.contentBottom - state.contentTop, headingHeight + contentHeight));
   }
   function buildReportPrintFromReportFill({
@@ -68111,6 +68200,31 @@ ${indent}${end}`;
     });
     return result;
   }
+  function bindInvocationScope(config, state, request) {
+    if (!request) return state;
+    const safe = (name) => typeof name === "string" && /^[A-Za-z][A-Za-z0-9_]*$/.test(name) && !["constructor", "prototype", "__proto__"].includes(name);
+    const read = (path) => {
+      const parts = typeof path === "string" ? path.split(".") : [];
+      if (!parts.length || !["filters", "options"].includes(parts[0]) || !parts.every(safe)) return void 0;
+      return parts.reduce((value, key) => isObject(value) && Object.prototype.hasOwnProperty.call(value, key) ? value[key] : void 0, request);
+    };
+    const params = { ...isObject(state.scopeParams) ? state.scopeParams : {} };
+    for (const predicate of normalizeReportBuilderPredicates(config)) {
+      if (!safe(predicate == null ? void 0 : predicate.id)) continue;
+      if (predicate.kind === "dateRange") {
+        const start = read(predicate.startParamPath), end = read(predicate.endParamPath);
+        if (start !== void 0 || end !== void 0) params[predicate.id] = {
+          ...isObject(params[predicate.id]) ? params[predicate.id] : {},
+          ...start !== void 0 ? { start: clone4(start) } : {},
+          ...end !== void 0 ? { end: clone4(end) } : {}
+        };
+      } else {
+        const value = read(predicate.paramPath);
+        if (value !== void 0) params[predicate.id] = clone4(value);
+      }
+    }
+    return { ...state, scopeParams: params };
+  }
   function normalizeDataSources(dataSources) {
     if (dataSources == null) return [];
     if (!isObject(dataSources)) throw new Error("Report envelope dataSources must be an object map.");
@@ -68154,7 +68268,7 @@ ${indent}${end}`;
     const generated = buildReportBuilderReportDocument({
       container,
       config,
-      state: isObject(envelope.state) ? clone4(envelope.state) : {},
+      state: bindInvocationScope(config, isObject(envelope.state) ? clone4(envelope.state) : {}, requestBaseParameters),
       additionalBlocks: authoredBlocks,
       refinements: Array.isArray(sourceDocument.refinements) ? sourceDocument.refinements : [],
       semanticSummary: isObject(sourceDocument.semanticSummary) ? sourceDocument.semanticSummary : null
@@ -68190,10 +68304,16 @@ ${indent}${end}`;
     if (!reportPrint) throw new Error("Trusted report print materialization failed.");
     return JSON.stringify({ reportFill, reportPrint });
   }
+  function materializeFill(inputJSON) {
+    const input = JSON.parse(inputJSON);
+    if (!isObject(input.reportSpec) || input.reportSpec.kind !== "reportSpec" || !isObject(input.datasets)) throw new Error("Trusted reportSpec and executed datasets required.");
+    const reportFill = buildReportFillFromReportSpec(input.reportSpec, input.datasets);
+    return JSON.stringify({ reportFill });
+  }
   function present(inputJSON) {
     const input = JSON.parse(inputJSON);
     return JSON.stringify(applyReportChartSelections(input.reportSpec, input.chartMetricSelections));
   }
-  globalThis.ForgeAuthoredLowerer = { lower, materialize, present };
+  globalThis.ForgeAuthoredLowerer = { lower, materialize, materializeFill, present };
   return __toCommonJS(entry_exports);
 })();

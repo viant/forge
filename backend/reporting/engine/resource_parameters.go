@@ -132,6 +132,33 @@ type reportExecutionDatasetScope struct {
 	} `json:"relativeDateRange"`
 }
 
+func removeExcludedReportParameter(args, local map[string]interface{}, path string) {
+	parts := strings.Split(path, ".")
+	// Local values have already been materialized into the compiled request.
+	current := local
+	for i, part := range parts {
+		value, exists := current[part]
+		if !exists {
+			break
+		}
+		if i == len(parts)-1 {
+			return
+		}
+		current, _ = value.(map[string]interface{})
+	}
+	current = args
+	for i, part := range parts {
+		if i == len(parts)-1 {
+			delete(current, part)
+			return
+		}
+		current, _ = current[part].(map[string]interface{})
+		if current == nil {
+			return
+		}
+	}
+}
+
 func (scope *reportExecutionDatasetScope) preserves(declaration reportParameterDeclaration) bool {
 	if scope == nil {
 		return false

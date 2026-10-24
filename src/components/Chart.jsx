@@ -35,6 +35,8 @@ import {
 import { useDataSourceState } from "../hooks/useDataSourceState.js";
 import {
     aggregateDirectSeriesData,
+    orderHorizontalChartRows,
+    resolveChartBarCornerRadii,
     applyChartRowLimit,
     buildPieSliceCellKey,
     buildPieChartData,
@@ -143,7 +145,8 @@ function ClampedCategoryTick({ x = 0, y = 0, payload = {}, config = null, valueF
     );
 }
 
-function HorizontalBarValueLabel({ x = 0, y = 0, width = 0, height = 0, value = 0, formatter = null }) {
+export function HorizontalBarValueLabel({ x = 0, y = 0, width = 0, height = 0, value, formatter = null }) {
+    if (!isChartNumericValue(value)) return null;
     const layout = resolveHorizontalBarDataLabelLayout({ x, width, value });
     const label = typeof formatter === "function" ? formatter(value) : value;
     return (
@@ -653,7 +656,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         return {
             chartData: data,
             availableDataKeys: keys,
-            yAxisLabel: selectedValue ? selectedValue.name : (leftAxis.label || ""),
+                yAxisLabel: selectedValue?.name || selectedValue?.label || leftAxis.label || "",
         };
     }, [chart, documentAppearance, directSeriesChart, effectiveCollection, isPieChart, leftAxis.label, selectedValueKey, series, seriesDefinitions, xAxis?.dataKey]);
 
@@ -957,10 +960,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     );
 
     const normalizedAllChartData = (isHorizontalBar
-        ? [...denseChartData].sort((a, b) => {
-            const primaryKey = renderableSeriesDefinitions[0]?.value;
-            return Number(b?.[primaryKey] || 0) - Number(a?.[primaryKey] || 0);
-        })
+        ? orderHorizontalChartRows(denseChartData, renderableSeriesDefinitions[0]?.value, chart?.preserveCategoryOrder === true)
         : denseChartData
     ).map((row) => ({
         ...row,
@@ -1003,9 +1003,11 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             && (!documentAppearance || !chart.stacked || entry.dataLabels === "always");
         const dataLabelFormatter = buildDataLabelFormatter(entry.format || leftAxis.format);
 
+        // Recharts mirrors these logical corners with signed width/height.
+        // The same tip corners therefore handle positive and negative bars.
         if (entry.type === "bar") {
             return (
-                <Bar key={entry.value} {...commonProps} barSize={documentAppearance ? undefined : configuredBarSize} maxBarSize={documentAppearance ? configuredBarSize : undefined} stackId={entry.stackId || (chart.stacked ? 'total' : undefined)} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
+                <Bar key={entry.value} {...commonProps} radius={entry.stackId || chart.stacked ? 0 : resolveChartBarCornerRadii(1, 'vertical')} barSize={documentAppearance ? undefined : configuredBarSize} maxBarSize={documentAppearance ? configuredBarSize : undefined} stackId={entry.stackId || (chart.stacked ? 'total' : undefined)} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                     {entry.pointColorMode === "bySign"
                         ? normalizedChartData.map((row, index) => (
                             <Cell key={`${entry.value}-cell-${index}`} fill={resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} />
@@ -1169,7 +1171,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     tickFormatter={createAxisTickFormatter(primarySeries.format || leftAxis.format,documentAppearance)}
                     tick={axisTickStyle}
                     label={{
-                        value: embedded ? "" : (leftAxis.label || primarySeries.label || ""),
+                        value: embedded ? "" : (leftAxis.label || yAxisLabel || (directSeriesChart ? primarySeries.label : "") || ""),
                         position: "insideBottomRight",
                         offset: 0,
                     }}
@@ -1192,6 +1194,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 {selectedSeriesDefinitions.length === 1 ? (
                     <Bar
                         dataKey={primarySeries.value}
+                        radius={resolveChartBarCornerRadii(1, 'horizontal')}
                         name={primarySeries.name || primarySeries.label}
                         fill={primarySeries.color}
                         barSize={barSize}
@@ -1214,6 +1217,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                     selectedSeriesDefinitions.map((entry) => (
                         <Bar
                             key={entry.value}
+                            radius={entry.stackId ? 0 : resolveChartBarCornerRadii(1, 'horizontal')}
                             dataKey={entry.value}
                             name={entry.name || entry.label}
                             fill={entry.color}

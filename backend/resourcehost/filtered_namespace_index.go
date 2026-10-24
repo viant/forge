@@ -28,7 +28,7 @@ func resourceFiltersSupported(ctx context.Context, client mcpclient.Interface) b
 	if _, ok := client.(filteredResourceClient); !ok {
 		return false
 	}
-	initialized, err := client.Initialize(ctx)
+	initialized, err := cachedOrInitialize(ctx, client)
 	if err != nil || initialized == nil || initialized.Capabilities.Resources == nil {
 		return false
 	}
@@ -48,6 +48,20 @@ func resourceFiltersSupported(ctx context.Context, client mcpclient.Interface) b
 		fields[field] = true
 	}
 	return fields["namespace"] && fields["kind"]
+}
+
+// Cached negotiated capabilities are a detached snapshot of the completed
+// MCP handshake. Optional transports that do not expose them keep the normal
+// Initialize path; no result is fabricated when neither succeeds.
+func cachedOrInitialize(ctx context.Context, client mcpclient.Interface) (*schema.InitializeResult, error) {
+	if negotiated, ok := client.(interface {
+		NegotiatedServer() (*schema.InitializeResult, error)
+	}); ok {
+		if result, err := negotiated.NegotiatedServer(); err == nil && result != nil {
+			return result, nil
+		}
+	}
+	return client.Initialize(ctx)
 }
 
 func (g *Gateway) readFilteredNamespaceIndex(ctx context.Context, client mcpclient.Interface, namespace namespaces.Namespace, resources map[string]primitive.ResourceState) error {

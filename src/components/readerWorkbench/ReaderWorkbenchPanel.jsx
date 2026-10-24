@@ -24,6 +24,7 @@ export default function ReaderWorkbenchPanel({container,context}) {
  React.useEffect(()=>{context.services.hostWindow?.setDirty?.(Boolean(busy||local.dirty));},[busy,local.dirty,context]);
  const invoke=(name,value)=>spec[name]?context.lookupHandler?.(spec[name])?.({context,value}):undefined;
  const report=resolveSelector(form,spec.reportField||'report');
+ api.namespaceName=report?.namespace||'';
  if(!report)return null;
  return <WorkbenchMutationContext.Provider value={lifecycle}><ReaderBuilder onStateChange={localChanged} api={api} report={report} defaults={spec.defaults} openResources={Boolean(resolveSelector(form,spec.openResourcesField||'openResources'))} resourceAction={resolveSelector(form,spec.resourceActionField||'resourceAction')||''} onBack={()=>invoke('onBack')} onReportUpdated={value=>invoke('onReportUpdated',value)} onResourcesClosed={()=>invoke('onResourcesClosed')}/></WorkbenchMutationContext.Provider>;
 }

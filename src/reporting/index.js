@@ -16,3 +16,5 @@ export {applyReportChartSelections} from "./reportPresentationModel.js";
 export {getReportBlockDatasetRefs} from "./reportDatasetRefModel.js";
 export {reportSectionDatasets} from './reportSectionDatasets.js';
 export {buildRuntimeSections} from './reportSections.js';
+
+export {resolveReportRelativeDateRangeSpec} from "./reportRelativeDateRangeModel.js";

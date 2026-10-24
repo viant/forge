@@ -46,11 +46,11 @@ func Present(ctx context.Context, spec json.RawMessage, selections map[string]Ch
 	if programError != nil {
 		return nil, programError
 	}
-	value, err := runEntry(ctx, program, "present", raw)
+	value, err := runTrustedEntry(ctx, program, "present", raw)
 	if err != nil {
 		return nil, err
 	}
-	result := json.RawMessage(value.String())
+	result := json.RawMessage(value)
 	if len(result) > 16<<20 || !json.Valid(result) {
 		return nil, fmt.Errorf("report presentation output invalid")
 	}

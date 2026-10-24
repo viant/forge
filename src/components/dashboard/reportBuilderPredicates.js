@@ -174,6 +174,10 @@ export function normalizeReportBuilderPredicates(config = {}) {
             presentation: String(entry.presentation || "").trim(),
             semanticRef: String(entry.semanticRef || "").trim(),
             options: Array.isArray(entry.options) ? clone(entry.options) : undefined,
+            optionsDataSourceRef: String(entry.optionsDataSourceRef || "").trim(),
+            optionsFetchMode: String(entry.optionsFetchMode || "").trim(),
+            optionValueField: String(entry.optionValueField || "").trim(),
+            optionLabelField: String(entry.optionLabelField || "").trim(),
             default: entry.default !== undefined ? clone(entry.default) : undefined,
             paramPath: String(entry.paramPath || "").trim(),
             startParamPath: String(entry.startParamPath || "").trim(),
@@ -277,6 +281,9 @@ function lowerPinnedPredicate(predicate) {
     }
     if (predicate.options !== undefined) {
         filter.options = clone(predicate.options);
+    }
+    for (const field of ["optionsDataSourceRef", "optionsFetchMode", "optionValueField", "optionLabelField"]) {
+        if (predicate[field]) filter[field] = predicate[field];
     }
     if (predicate.default !== undefined) {
         filter.default = clone(predicate.default);

@@ -82,6 +82,9 @@ func emitRenderPlan(plan *renderPlan, options Options) (*RenderResult, error) {
 		Size:           size,
 	})
 	doc.SetMargins(0, 0, 0)
+	// Canonical text boxes already include their padding. FPDF's implicit
+	// cell margin would narrow them again and re-wrap measured header lines.
+	doc.SetCellMargin(0)
 	doc.SetAutoPageBreak(false, 0)
 	doc.SetCatalogSort(true)
 	doc.SetCompression(false)
@@ -254,7 +257,26 @@ func (r *renderer) renderWrappedTextOperation(operation textPaintOperation) {
 			lines = lines[:maxLines]
 		}
 	}
-	r.pdf.MultiCell(operation.box.Width, lineHeight, strings.Join(lines, "\n"), "", horizontalAlignment(operation.align), false)
+	// The canonical print model already measured these exact lines. MultiCell
+	// would wrap them again using font metrics and can add an unallocated line.
+	// Render each line once, fitting unusually wide glyphs to its measured box.
+	for index, line := range lines {
+		y := operation.box.Y + float64(index)*lineHeight
+		width := operation.box.Width
+		measuredWidth := r.pdf.GetStringWidth(line)
+		fit := width > 0 && measuredWidth > width
+		if fit {
+			r.pdf.TransformBegin()
+			r.pdf.TransformScaleX(100*width/measuredWidth, operation.box.X, y)
+			width = measuredWidth
+		}
+		r.pdf.SetXY(operation.box.X, y)
+		r.pdf.CellFormat(width, lineHeight, line, "", 0, horizontalAlignment(operation.align), false, 0, "")
+		if fit {
+			r.pdf.TransformEnd()
+		}
+	}
+
 }
 
 func (r *renderer) resolveWrappedTextLines(text string, width float64) []string {
@@ -297,14 +319,17 @@ func (r *renderer) renderTableCellDataBarOperation(operation dataBarPaintOperati
 	if operation.box.Width <= 0 || operation.box.Height <= 0 {
 		return
 	}
+	radius := math.Min(operation.box.Width, operation.box.Height) / 2
 	// ReportPrint lowering already resolves the proportional bar geometry into
 	// absolute print-space width. Value/min/max remain on the element for
 	// provenance and diagnostics, not for a second scaling pass here.
 	if !hasPaintValue(operation.backgroundColor) {
 		r.applyOptionalFillColor(operation.fillColor)
-		r.pdf.Rect(operation.box.X, operation.box.Y, operation.box.Width, operation.box.Height, "F")
+		r.pdf.RoundedRect(operation.box.X, operation.box.Y, operation.box.Width, operation.box.Height, radius, "1234", "F")
 		return
 	}
+	r.pdf.ClipRoundedRect(operation.box.X, operation.box.Y, operation.box.Width, operation.box.Height, radius, false)
+	defer r.pdf.ClipEnd()
 	startRed, startGreen, startBlue := parseHexColor(operation.backgroundColor, 255, 255, 255)
 	endRed, endGreen, endBlue := parseHexColor(operation.fillColor, startRed, startGreen, startBlue)
 	const steps = 64

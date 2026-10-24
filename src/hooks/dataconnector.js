@@ -1,4 +1,5 @@
 import {createTransportConnector} from './connectorTransport.js';
+import {recordWindowPerfPhase} from '../runtime/windowPerfPhases.js';
 import {useSetting} from "../core/index.js";
 import { getLogger } from "../utils/logger.js";
 import { appendTargetContextQuery } from "../runtime/targetContext.js";
@@ -52,6 +53,9 @@ export function createDataConnector(dataSource, runtime = {}) {
         targetContext = {},
         auth = {},
         prepareRequest,
+        recoverWindowBinding,
+        windowId = '',
+        dataSourceRef = '',
     } = runtime || {};
     const {authStates, defaultAuthProvider} = auth;
     const {paging, parameters = []} = dataSource;
@@ -302,12 +306,12 @@ export function createDataConnector(dataSource, runtime = {}) {
     /**
      * GET method
      */
-    async function get({filter = {}, page, cursor, pageSize, inputParameters = {}, cache = null, invocationId = null, signal = null, fresh = false}) {
+    async function get({filter = {}, page, cursor, pageSize, inputParameters = {}, cache = null, invocationId = null, signal = null, fresh = false, responseInfo = null, ifNoneMatch = '', bindingRetry = false} = {}) {
         try {
             let {method, url, headers} = getUrlAndHeaders();
             let queryParams = new URLSearchParams();
             const requestMethod = String(method || 'GET').toUpperCase();
-            const isDatasourceFetchRoute = /\/v1\/api\/datasources\/[^/]+\/fetch$/.test(url);
+            const isDatasourceFetchRoute = /\/v1\/api\/datasources\/[^/?]+\/fetch(?:\?[^#]*)?$/.test(url);
             const pagingValues = String(dataSource?.paginationMode || '').toLowerCase() === 'client'
                 ? null
                 : resolvePagingValues(page, withPagingSize(paging, pageSize), cursor);
@@ -346,6 +350,7 @@ export function createDataConnector(dataSource, runtime = {}) {
                 })
                 : body;
             if (invocationId) headers = {...(headers || {}), 'X-Forge-Invocation-Id': String(invocationId)};
+            if (requestMethod === 'GET' && ifNoneMatch) headers = {...(headers || {}), 'If-None-Match': String(ifNoneMatch)};
             ({url, method, headers, queryParams, body: payload} = applyRequestPreparation({
                 url,
                 method: requestMethod,
@@ -356,6 +361,8 @@ export function createDataConnector(dataSource, runtime = {}) {
 
             const finalUrl = appendQueryParams(url, queryParams);
             const request = {method: String(method || requestMethod).toUpperCase(), headers, ...(signal ? {signal} : {}), ...(fresh === true ? {cache:'no-store'} : {})};
+            const requestSession=typeof headers?.get==='function' ? headers.get('Mcp-Session-Id') || ''
+                : Object.entries(headers || {}).find(([name])=>name.toLowerCase()==='mcp-session-id')?.[1] || '';
 
             if (requestMethod !== 'GET' && isDatasourceFetchRoute) {
                 request["body"] = JSON.stringify(payload);
@@ -375,7 +382,13 @@ export function createDataConnector(dataSource, runtime = {}) {
                 return inFlightGetRequests.get(requestKey);
             }
             const performRequest = (async () => {
+                if (dataSourceRef) recordWindowPerfPhase('datasource-fetch-start',windowId);
                 const resp = await fetch(finalUrl, request);
+                if (responseInfo && typeof responseInfo === 'object') {
+                    responseInfo.artifactHash = resp.headers?.get?.('X-Artifact-Hash') || '';
+                    responseInfo.etag = resp.headers?.get?.('ETag') || '';
+                }
+                if (resp.status === 304 && ifNoneMatch && requestMethod === 'GET') return {notModified:true};
                 if (!resp.ok) {
                     const err = await makeRequestError(resp, 'GET error');
                     notifyUnauthorized(err);
@@ -385,16 +398,27 @@ export function createDataConnector(dataSource, runtime = {}) {
                 try { log.debug('[response]', { url: finalUrl, status: resp.status }); } catch(_) {}
                 return json;
             })();
-            if (requestKey) {
-                inFlightGetRequests.set(requestKey, performRequest);
-            }
-            try {
-                return await performRequest;
-            } finally {
-                if (requestKey) {
-                    inFlightGetRequests.delete(requestKey);
+            const completion=(async()=>{
+                try {
+                    return await performRequest;
+                } catch (error) {
+                    let cohortDatasource=false;
+                    try { cohortDatasource=isDatasourceFetchRoute && new URL(finalUrl,'http://localhost').searchParams.get('cohort')==='1'; } catch (_) {}
+                    if (!bindingRetry && cohortDatasource && dataSourceRef && windowId && requestSession && !signal?.aborted &&
+                        Number(error?.status)===403 && error?.code==='window_binding_required' && error?.scope==='window' &&
+                        typeof recoverWindowBinding==='function') {
+                        if (requestKey && inFlightGetRequests.get(requestKey)===completion)inFlightGetRequests.delete(requestKey);
+                        await recoverWindowBinding({windowId,signal,sessionId:requestSession});
+                        if (signal?.aborted) throw new DOMException('The operation was aborted.','AbortError');
+                        return get({filter,page,cursor,pageSize,inputParameters,cache,invocationId,signal,fresh,responseInfo,ifNoneMatch,bindingRetry:true});
+                    }
+                    throw error;
+                } finally {
+                    if (requestKey && inFlightGetRequests.get(requestKey)===completion)inFlightGetRequests.delete(requestKey);
                 }
-            }
+            })();
+            if (requestKey)inFlightGetRequests.set(requestKey,completion);
+            return await completion;
         } catch (err) {
             console.error("Failed to fetch data", err);
             throw err;

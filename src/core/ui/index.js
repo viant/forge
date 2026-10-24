@@ -6,3 +6,4 @@ export * from './autostart.js';
 export * from './dashboardExport.js';
 export * from './dashboardDemo.js';
 export * from './dashboardDemoArtifacts.js';
+export {refreshWorkspace} from './workspaceRefresh.js';

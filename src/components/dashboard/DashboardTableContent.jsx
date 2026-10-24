@@ -199,7 +199,7 @@ export default function DashboardTableContent({
     const sortedRows = pagingEnabled
         ? allSortedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize)
         : allSortedRows;
-    useEffect(() => { setPage(1); }, [quickFilter, sortKey, sortDir, pageSize]);
+    useEffect(() => { setPage(1); }, [quickFilter, sortKey, sortDir, pageSize, pagingEnabled, container?.paging?.resetKey]);
     useEffect(() => {
         onPresentationStateChange?.({
             rowCount: allSortedRows.length,
@@ -522,7 +522,9 @@ export default function DashboardTableContent({
             {pagingEnabled && pageCount > 1 ? (
                 <div className="forge-dashboard-table-pager">
                     <button type="button" disabled={currentPage <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
-                    <span>Page {currentPage} of {pageCount}</span>
+                    <span>{container?.paging?.rangeLabel === 'complete'
+                        ? `Rows ${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, allSortedRows.length)} of ${allSortedRows.length}`
+                        : `Page ${currentPage} of ${pageCount}`}</span>
                     <button type="button" disabled={currentPage >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))}>Next</button>
                 </div>
             ) : null}
