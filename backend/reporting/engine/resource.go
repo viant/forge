@@ -17,9 +17,17 @@ import (
 // operation. The source must serve Forge working/stamped report definitions.
 type ResourceResolver func(context.Context, string) (*identity.ResourceResolver, error)
 
+// admittedCompileDefinition is a private, invocation-local delivery from
+// ExecuteResource's selected read. It never crosses a request or enters the
+// public CompileRequest.
+type admittedCompileDefinition struct {
+	raw json.RawMessage
+	pin identity.ResolvedResource
+}
+
 // compileResolved consumes the shared Forge report envelope, not a second
 // client-supplied definition. It preserves the selected identity through compile.
-func (s *Service) compileResolved(ctx context.Context, request *CompileRequest) (*CompileRequest, *identity.ResolvedResource, ResourceReader, error) {
+func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, admitted *admittedCompileDefinition) (*CompileRequest, *identity.ResolvedResource, ResourceReader, error) {
 	if !s.hasResourceReader() {
 		return nil, nil, nil, identity.ErrResourceDenied
 	}
@@ -48,7 +56,18 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest) 
 		pin = cloneResolvedResource(request.ResolvedResource)
 	}
 	readTiming := observe.Start(ctx, "report.compile.read", observe.Labels{Kind: "report"})
-	raw, pin, err := selectResourceRead(ctx, resolver, ref, pin)
+	var raw json.RawMessage
+	if admitted != nil {
+		if pin == nil || !identity.SameResolvedResource(*pin, admitted.pin) ||
+			!identity.MetadataExpiryValid(pin.ValidUntil, s.now()) || ctx.Err() != nil ||
+			identity.ContentFingerprint(admitted.raw) != pin.ContentFingerprint {
+			err = identity.ErrResourceDenied
+		} else {
+			raw = append(json.RawMessage(nil), admitted.raw...)
+		}
+	} else {
+		raw, pin, err = selectResourceRead(ctx, resolver, ref, pin)
+	}
 	readTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, nil, nil, err
