@@ -23,6 +23,11 @@ const activated = (result, expectedRevision) => {
 // exact server-provided references; it never computes membership or admission.
 export default function ReleaseManager({api, channelKey, disabled = false, onActivated}) {
   const scopeID = JSON.stringify([channelKey?.tenant, channelKey?.account, channelKey?.workspace, channelKey?.namespace]);
+  return <ScopedReleaseManager key={scopeID} api={api} channelKey={channelKey} disabled={disabled} onActivated={onActivated}/>;
+}
+
+function ScopedReleaseManager({api, channelKey, disabled, onActivated}) {
+  const scopeID = JSON.stringify([channelKey?.tenant, channelKey?.account, channelKey?.workspace, channelKey?.namespace]);
   const [channels, setChannels] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [availablePolicies, setAvailablePolicies] = useState([]);
@@ -41,6 +46,7 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
   const [notice, setNotice] = useState('');
   const [progress, setProgress] = useState('');
   const request = useRef(0);
+  const alive = useRef(true);
   const submitLock = useRef(false);
   const pendingName = useRef('');
   const current = channels.find(channel => channelName(channel) === selected);
@@ -76,7 +82,7 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
       if (ticket === request.current) setLoading(false);
     }
   };
-  useEffect(() => { load(); return () => { request.current++; }; }, [api, scopeID]);
+  useEffect(() => { alive.current=true; load(); return () => { alive.current=false; request.current++; }; }, [api, scopeID]);
 
   const choose = async releaseName => {
     if (pending) return;
@@ -112,6 +118,7 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
     setNotice('');
   };
   const refreshAfterActivation = async (channel, message, selectedRoots) => {
+    if (!alive.current) return;
     setChannels(previous => [...previous.filter(item => channelName(item) !== channelName(channel)), channel]);
     setSelected(channelName(channel));
     setName(channelName(channel));
@@ -123,13 +130,16 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
     catch (cause) { setError(`Release activated, but the host could not update: ${cause?.message || 'try reloading.'}`); }
     try {
       const next = rows(await api.list(channelKey), 'channels');
+      if (!alive.current) return;
       const listed = next.find(item => channelName(item) === channelName(channel));
       const active = listed?.activeBundleHash === channel.activeBundleHash && Number(listed.revision) >= Number(channel.revision) ? listed : channel;
       setChannels([...next.filter(item => channelName(item) !== channelName(channel)), active]);
-      setHistory(rows(await api.history(active.key), 'bundles').map(historyEntry));
+      const nextHistory = rows(await api.history(active.key), 'bundles').map(historyEntry);
+      if (!alive.current) return;
+      setHistory(nextHistory);
       if (active.bundle?.roots) setRoots(active.bundle.roots);
     } catch (cause) {
-      setError(`Release activated, but its current list could not refresh: ${cause?.message || 'try reloading.'}`);
+      if (alive.current) setError(`Release activated, but its current list could not refresh: ${cause?.message || 'try reloading.'}`);
     }
   };
   const submit = async mode => {
@@ -149,6 +159,7 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
         ? {key: key(releaseName), description: description.trim(), roots: roots.map(({uri, kind, version, hash}) => ({uri, kind, version, hash})), policies: policies.map(({resource, revision}) => ({resource, revision})), expectedRevision}
         : {key: target.key, expectedRevision: target.revision, bundleHash: mode === 'promote' ? current.activeBundleHash : rollbackHash};
       const result = await (mode === 'publish' ? api.publish(input) : api.promote(input));
+      if (!alive.current) return;
       if (result?.status === 'pending' && result?.activated === false) {
         pendingName.current = input.key.name;
         setProgress(`${mode === 'publish' ? 'Publishing' : mode === 'promote' ? 'Promoting' : 'Rolling back'} is in progress. Refresh releases to check activation.`);
@@ -159,11 +170,10 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
       if (!channel || channelName(channel) !== input.key.name || (mode !== 'publish' && channel.activeBundleHash !== input.bundleHash)) throw new Error('The release has not been confirmed active. Reload its current state before trying again.');
       await refreshAfterActivation(channel, mode === 'publish' ? 'Release activated.' : mode === 'promote' ? `Promoted to ${input.key.name}.` : `Rolled back ${input.key.name}.`, result.bundle?.roots || (mode === 'rollback' ? chosenRollback.roots : roots));
     } catch (cause) {
-      setError(cause?.message || 'The release did not activate. Your selections are preserved.');
+      if (alive.current) setError(cause?.message || 'The release did not activate. Your selections are preserved.');
     } finally {
       submitLock.current = false;
-      setPending(false);
-      setPendingAction('');
+      if (alive.current) { setPending(false); setPendingAction(''); }
     }
   };
   const rootChoices = [...candidates, ...roots.filter(root => !candidates.some(candidate => rootID(candidate) === rootID(root)))];

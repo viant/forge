@@ -17,11 +17,11 @@ const api = (overrides={}) => ({
   history:vi.fn(async()=>history),publish:vi.fn(async()=>({channel:{key:{...scope,name:'poc'},activeBundleHash:'sha256:new',revision:1},status:'active',activated:true})),
   promote:vi.fn(async()=>({channel:{...channel,activeBundleHash:'sha256:older',revision:5},status:'active',activated:true})),...overrides,
 });
-const render = async adapter => {
+const render = async (adapter, channelKey=scope, onActivated) => {
   globalThis.IS_REACT_ACT_ENVIRONMENT=true;
   const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
-  await act(async()=>{root.render(<ReleaseManager api={adapter} channelKey={scope}/>);});
-  return {host,close:async()=>{await act(async()=>root.unmount());host.remove();}};
+  await act(async()=>{root.render(<ReleaseManager api={adapter} channelKey={channelKey} onActivated={onActivated}/>);});
+  return {host,update:async(nextAPI,nextScope,onNextActivated)=>act(async()=>root.render(<ReleaseManager api={nextAPI} channelKey={nextScope} onActivated={onNextActivated}/>)),close:async()=>{await act(async()=>root.unmount());host.remove();}};
 };
 const text = async(input,value) => act(async()=>{
   const setter=Object.getOwnPropertyDescriptor(input instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype,'value').set;
@@ -35,6 +35,41 @@ const include = async(host,version=3) => {
   const option=[...input.options].find(item=>item.textContent.includes(`Revision ${version}`));
   await select(input,option.value);
 };
+
+it('resets namespace-scoped edits and ignores an old inventory response after switching scope',async()=>{
+  const oldList=deferred(),old=api({list:vi.fn(()=>oldList.promise)});
+  const nextScope={...scope,namespace:'other'};
+  const next=api({list:vi.fn(async()=>[]),candidates:vi.fn(async()=>[]),policies:vi.fn(async()=>[])});
+  const view=await render(old);
+  try{
+    await view.update(next,nextScope);
+    expect(view.host.querySelector('#release-name').value).toBe('');
+    expect(view.host.querySelector('#release-channel').value).toBe('');
+    await act(async()=>oldList.resolve([channel]));
+    expect(view.host.querySelector('#release-channel').options.length).toBe(1);
+    expect(view.host.textContent).not.toContain('First release');
+  }finally{await view.close();}
+});
+
+it('cannot announce an old namespace activation after the host switches scope',async()=>{
+  const pending=deferred(),onActivated=vi.fn();
+  const old=api({publish:vi.fn(()=>pending.promise)});
+  const nextScope={...scope,namespace:'other'};
+  const next=api({list:vi.fn(async()=>[]),candidates:vi.fn(async()=>[]),policies:vi.fn(async()=>[])});
+  const view=await render(old,scope,onActivated);
+  try{
+    await text(view.host.querySelector('#release-name'),'poc');
+    await click(view.host.querySelector('input[type="checkbox"]'));
+    await include(view.host);
+    await click(button(view.host,'Publish'));
+    expect(old.publish).toHaveBeenCalledOnce();
+    await view.update(next,nextScope,onActivated);
+    await act(async()=>pending.resolve({channel:{...channel,activeBundleHash:'sha256:new',revision:5},status:'active',activated:true}));
+    expect(onActivated).not.toHaveBeenCalled();
+    expect(view.host.querySelector('#release-name').value).toBe('');
+    expect(view.host.textContent).not.toContain('Release activated.');
+  }finally{await view.close();}
+});
 
 it('publishes exact roots and policy references within the host-bound namespace',async()=>{
   const adapter=api();const view=await render(adapter);
