@@ -40,6 +40,7 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated}) {
   const [promotionTarget, setPromotionTarget] = useState('');
   const [rollbackHash, setRollbackHash] = useState('');
   const [loading, setLoading] = useState(true);
+  const [inventoryReady, setInventoryReady] = useState(false);
   const [pending, setPending] = useState(false);
   const [pendingAction, setPendingAction] = useState('');
   const [error, setError] = useState('');
@@ -56,6 +57,7 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated}) {
   const load = async () => {
     const ticket = ++request.current;
     setLoading(true);
+    setInventoryReady(false);
     setError('');
     try {
       const [nextChannels, nextCandidates, nextPolicies] = await Promise.all([
@@ -66,6 +68,7 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated}) {
       setChannels(listed);
       setCandidates(rows(nextCandidates, 'roots'));
       setAvailablePolicies(rows(nextPolicies, 'policies'));
+      setInventoryReady(true);
       if (pendingName.current) {
         const outcome = listed.find(channel => channelName(channel) === pendingName.current);
         if (outcome?.releaseStatus === 'active' && outcome.activated === true) {
@@ -139,11 +142,12 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated}) {
       setHistory(nextHistory);
       if (active.bundle?.roots) setRoots(active.bundle.roots);
     } catch (cause) {
+      if (alive.current) setInventoryReady(false);
       if (alive.current) setError(`Release activated, but its current list could not refresh: ${cause?.message || 'try reloading.'}`);
     }
   };
   const submit = async mode => {
-    if (submitLock.current || disabled || loading) return;
+    if (submitLock.current || disabled || loading || !inventoryReady) return;
     const releaseName = name.trim();
     const target = mode === 'promote' ? channels.find(channel => channelName(channel) === promotionTarget) : current;
     const chosenRollback = history.find(bundle => bundle.hash === rollbackHash);
@@ -193,7 +197,7 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated}) {
     {progress && <Callout intent="primary" role="status">{progress} <Button minimal disabled={pending} onClick={load}>Refresh releases</Button></Callout>}
     {current?.releaseStatus === 'pending' && <Callout intent="primary" role="status">This channel has a release in progress. Refresh releases to check activation.</Callout>}
     <FormGroup label="Release channel" labelFor="release-channel">
-      <HTMLSelect id="release-channel" fill value={selected} disabled={disabled || pending || loading} onChange={event => choose(event.target.value)}>
+      <HTMLSelect id="release-channel" fill value={selected} disabled={disabled || pending || loading || !inventoryReady} onChange={event => choose(event.target.value)}>
         <option value="">New release</option>
         {channels.map(channel => <option key={channelName(channel)} value={channelName(channel)}>{channelName(channel)} · revision {channel.revision}</option>)}
       </HTMLSelect>
@@ -204,14 +208,14 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated}) {
     <FormGroup label="Description" labelFor="release-description">
       <TextArea id="release-description" fill value={description} disabled={disabled || pending || loading} onChange={event => { setDescription(event.target.value); setNotice(''); }}/>
     </FormGroup>
-    <fieldset disabled={disabled || pending || loading}><legend>Who can use this?</legend>
+    <fieldset disabled={disabled || pending || loading || !inventoryReady}><legend>Who can use this?</legend>
       {policyChoices.length ? policyChoices.map(policy => <label key={policyID(policy)} className="forge-release-manager-choice">
         <input type="checkbox" checked={policies.some(item => policyID(item) === policyID(policy))} disabled={!availablePolicies.some(candidate => policyID(candidate) === policyID(policy)) && !policies.some(item => policyID(item) === policyID(policy))} onChange={() => toggle(policies, setPolicies, policy, policyID)}/>
         <span>{policyLabel(policy)}{!availablePolicies.some(candidate => policyID(candidate) === policyID(policy)) ? ' · Unavailable for new releases' : ''}</span>
       </label>) : !error && <p>No policies are available for this release. Create an account policy in Security, then reload.</p>}
     </fieldset>
     {!policiesAssignable && <Callout intent="warning">Remove unavailable policies before publishing. The server will verify every chosen policy again.</Callout>}
-    <fieldset disabled={disabled || pending || loading}><legend>Included artifacts</legend>
+    <fieldset disabled={disabled || pending || loading || !inventoryReady}><legend>Included artifacts</legend>
       {artifactGroups.length ? artifactGroups.map(({id, choices}, index) => {
         const selectedRoot = roots.find(root => artifactID(root) === id);
         const title = `${choices[0].kind} · ${artifactTitle(choices[0])}`;
@@ -234,23 +238,23 @@ function ScopedReleaseManager({api, channelKey, disabled, onActivated}) {
       {!!policies.length && <ul>{policies.map(policy => <li key={policyID(policy)}>{policyLabel(policy)} · {policy.resource?.kind}:{policy.resource?.id} · resource v{policy.resource?.version} · policy revision {policy.revision}</li>)}</ul>}
       {!!roots.length && <ul>{roots.map(root => <li key={rootID(root)}>{root.kind} · {root.uri} · revision {root.version} · hash <code title={root.hash}>{shortHash(root.hash)}</code></li>)}</ul>}
     </details>
-    <Button intent="primary" loading={pendingAction === 'publish'} disabled={disabled || pending || loading || !currentRootsKnown || !policiesAssignable || !name.trim() || !roots.length || !policies.length} onClick={() => submit('publish')}>Publish</Button>
+    <Button intent="primary" loading={pendingAction === 'publish'} disabled={disabled || pending || loading || !inventoryReady || !currentRootsKnown || !policiesAssignable || !name.trim() || !roots.length || !policies.length} onClick={() => submit('publish')}>Publish</Button>
     {current && <section aria-label="Promotion and rollback">
       <h3>Promotion and rollback</h3>
       <FormGroup label="Promote to…" labelFor="release-promotion-target">
-        <HTMLSelect id="release-promotion-target" fill value={promotionTarget} disabled={disabled || pending || loading || !promotionChannels.length} onChange={event => setPromotionTarget(event.target.value)}>
+        <HTMLSelect id="release-promotion-target" fill value={promotionTarget} disabled={disabled || pending || loading || !inventoryReady || !promotionChannels.length} onChange={event => setPromotionTarget(event.target.value)}>
           <option value="">Choose a channel</option>
           {promotionChannels.map(channel => <option key={channelName(channel)} value={channelName(channel)}>{channelName(channel)}{channel.description ? ` · ${channel.description}` : ''}</option>)}
         </HTMLSelect>
       </FormGroup>
-      <Button disabled={disabled || pending || loading || !promotionTarget || !current.activeBundleHash} loading={pendingAction === 'promote'} onClick={() => submit('promote')}>Promote to {promotionTarget || 'channel'}</Button>
+      <Button disabled={disabled || pending || loading || !inventoryReady || !promotionTarget || !current.activeBundleHash} loading={pendingAction === 'promote'} onClick={() => submit('promote')}>Promote to {promotionTarget || 'channel'}</Button>
       <FormGroup label="Roll back to…" labelFor="release-rollback-target">
-        <HTMLSelect id="release-rollback-target" fill value={rollbackHash} disabled={disabled || pending || loading || !priorReleases.length} onChange={event => setRollbackHash(event.target.value)}>
+        <HTMLSelect id="release-rollback-target" fill value={rollbackHash} disabled={disabled || pending || loading || !inventoryReady || !priorReleases.length} onChange={event => setRollbackHash(event.target.value)}>
           <option value="">Choose a prior release</option>
           {priorReleases.map(bundle => <option key={bundle.hash} value={bundle.hash}>{historyLabel(bundle)}</option>)}
         </HTMLSelect>
       </FormGroup>
-      <Button disabled={disabled || pending || loading || !rollbackHash} loading={pendingAction === 'rollback'} onClick={() => submit('rollback')}>Roll back {selected}</Button>
+      <Button disabled={disabled || pending || loading || !inventoryReady || !rollbackHash} loading={pendingAction === 'rollback'} onClick={() => submit('rollback')}>Roll back {selected}</Button>
     </section>}
   </section>;
 }
