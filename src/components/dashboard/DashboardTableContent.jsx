@@ -162,10 +162,9 @@ export default function DashboardTableContent({
     const pageSize = Math.max(1, Number(container?.paging?.size || context?.dataSource?.paging?.size || 20));
 
     const allSortedRows = useMemo(() => {
-        const rows = quickFilteredCollection.slice(0, limit);
-        if (!sortKey) return rows;
+        if (!sortKey) return quickFilteredCollection.slice(0, limit);
         const sortColumn = runtimeColumns.find((col) => col.key === sortKey);
-        return [...rows].sort((a, b) => {
+        const ordered = [...quickFilteredCollection].sort((a, b) => {
             const avRaw = resolveDashboardTableColumnValue(a, sortColumn, { preferDisplay: true });
             const bvRaw = resolveDashboardTableColumnValue(b, sortColumn, { preferDisplay: true });
             const avLink = resolveTableLink({row: a, column: sortColumn, value: avRaw});
@@ -178,6 +177,7 @@ export default function DashboardTableContent({
             const cmp = numeric ? an - bn : String(av ?? '').localeCompare(String(bv ?? ''));
             return sortDir === 'desc' ? -cmp : cmp;
         });
+        return ordered.slice(0, limit);
     }, [quickFilteredCollection, limit, runtimeColumns, sortKey, sortDir]);
     const pageCount = pagingEnabled ? Math.max(1, Math.ceil(allSortedRows.length / pageSize)) : 1;
     const currentPage = Math.min(page, pageCount);
