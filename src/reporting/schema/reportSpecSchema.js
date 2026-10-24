@@ -22,7 +22,7 @@ export const reportSpecSchema = {
     source: { $ref: "#/$defs/source" },
     title: { type: "string" },
     subtitle: { type: "string" },
-    viewer: {type:"object",additionalProperties:false,properties:{allowChartTableSwitch:{type:"boolean"}}},
+    viewer: {type:"object",additionalProperties:false,properties:{allowChartTableSwitch:{type:"boolean"},appearance:{enum:['document']}}},
     theme: { $ref: "#/$defs/reportTheme" },
     binding: { $ref: "#/$defs/binding" },
     semanticSummary: { $ref: "#/$defs/semanticSummary" },
@@ -592,6 +592,9 @@ export const reportSpecSchema = {
         kind: { type: "string" },
         format: { type: "string" },
         align: { type: "string" },
+        width: { type: "number", minimum: 48 },
+        minWidth: { type: "number", minimum: 48 },
+        flex: { type: "boolean" },
         runtimeFilterable: { type: "boolean" },
         link: { $ref: "#/$defs/tableLink" },
         cellVisual: { $ref: "#/$defs/tableCellVisual" },
@@ -748,7 +751,7 @@ export const reportSpecSchema = {
         runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         datasetRef: { type: "string" },
-        rowLimit: { type: "integer", minimum: 1 },
+        rowLimit: { type: "integer", minimum: 0 },
         chartSpec: { $ref: "#/$defs/chartSpec" },
         chartModel: { $ref: "#/$defs/chartModel" },
       },
@@ -779,6 +782,9 @@ export const reportSpecSchema = {
           items: { type: "string" },
         },
         type: { type: "string" },
+        appearance: {enum:["document"]},
+        layout: {enum:["small-multiples"]},
+        stacked: {type:"boolean"},
         xField: { type: "string" },
         yFields: {
           type: "array",
@@ -852,6 +858,7 @@ export const reportSpecSchema = {
       additionalProperties: false,
       required: ["nameKey", "valueKey", "values", "palette"],
       properties: {
+        categoryColors: {type: "object", additionalProperties: {type: "string"}},
         nameKey: { type: "string" },
         sourceNameKey: { type: "string" },
         displayValueMap: {
@@ -875,6 +882,7 @@ export const reportSpecSchema = {
       additionalProperties: false,
       required: ["values", "palette"],
       properties: {
+        categoryColors: {type: "object", additionalProperties: {type: "string"}},
         values: {
           type: "array",
           minItems: 1,
@@ -907,6 +915,7 @@ export const reportSpecSchema = {
       additionalProperties: false,
       required: ["valueKey", "values"],
       properties: {
+        categoryColors: {type: "object", additionalProperties: {type: "string"}},
         valueKey: { type: "string", minLength: 1 },
         values: {
           type: "array",
@@ -921,6 +930,7 @@ export const reportSpecSchema = {
       additionalProperties: false,
       required: ["nameKey", "valueKey", "palette"],
       properties: {
+        categoryColors: {type: "object", additionalProperties: {type: "string"}},
         nameKey: { type: "string" },
         sourceNameKey: { type: "string" },
         displayValueMap: {
@@ -1022,6 +1032,9 @@ export const reportSpecSchema = {
       required: ["type", "series"],
       properties: {
         type: { type: "string" },
+        appearance: {enum:["document"]},
+        layout: {enum:["small-multiples"]},
+        stacked: {type:"boolean"},
         xAxis: { $ref: "#/$defs/chartAxis" },
         yAxis: { $ref: "#/$defs/chartYAxis" },
         axes: {type:"object",additionalProperties:false,properties:{left:{$ref:"#/$defs/chartYAxis"},right:{$ref:"#/$defs/chartYAxis"}}},
@@ -1047,6 +1060,12 @@ export const reportSpecSchema = {
         kind: { const: "tableBlock" },
         runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
+        description: { type: "string" },
+        selection: {type:'object', additionalProperties:false, required:['mode','field'], properties:{
+          mode:{const:'checkbox'}, field:{type:'string', minLength:1},
+          labelFields:{type:'array',minItems:1,uniqueItems:true,items:{type:'string',minLength:1}},
+        }},
+        recordTitleField: { type: "string", minLength: 1 },
         accentTone: { enum: ["blue", "green", "amber", "rose", "slate"] },
         collapsible: { type: "boolean" },
         defaultCollapsed: { type: "boolean" },

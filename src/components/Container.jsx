@@ -73,6 +73,8 @@ import {resolveDynamicDataSourceRef} from '../runtime/dataSourceRef.js';
 import {isPureBoundLabelSection} from './containerEmptyState.js';
 import {containerAnchorProps} from './containerAnchor.js';
 import {containerSizingStyle, resolveContainerSizing} from './containerSizing.js';
+import {documentAttributes, DocumentPresentationContext} from './documentPresentation.js';
+import './documentPresentation.css';
 
 const ReaderWorkbenchPanel = React.lazy(() => import("./readerWorkbench/ReaderWorkbenchPanel.jsx"));
 
@@ -771,7 +773,7 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
     return wrapContainerChrome(container, (
         <PermissionBoundary sizingMode={sizingMode} container={container} context={effectiveContext}>
             <DataStateBoundary sizingMode={sizingMode} container={container} context={effectiveContext}>
-            <div {...(!container?.card && !container?.section ? containerAnchorProps(container) : {})} className={!container.card && !container.section ? containerSurfaceClass(container, 'body') : 'forge-container-body'} data-forge-part="container-content" data-forge-sizing={sizingMode} data-forge-scroll={container.scrollMode === 'self' ? 'self' : 'parent'} style={rootSizingStyle}>
+            <div {...documentAttributes(container)} {...(!container?.card && !container?.section ? containerAnchorProps(container) : {})} className={!container.card && !container.section ? containerSurfaceClass(container, 'body') : 'forge-container-body'} data-forge-part="container-content" data-forge-sizing={sizingMode} data-forge-scroll={container.scrollMode === 'self' ? 'self' : 'parent'} style={rootSizingStyle}>
                 <DraftBody {...draftBodyProps}>
                 {resourceHeaderPanel}
                 {notificationRulesPanel}
@@ -892,6 +894,7 @@ const Container = props => {
     useSignals();
     const reference = resolveDynamicDataSourceRef(props.container, props.context, props.container?.dataSourceRef || props.context?.identity?.dataSourceRef);
     if (reference && !props.context?.metadata?.dataSource?.[reference]) return null;
-    return <MissingDataSourceBoundary metadata={props.context?.metadata} reference={reference}><ContainerContent {...props}/></MissingDataSourceBoundary>;
+    const content = <MissingDataSourceBoundary metadata={props.context?.metadata} reference={reference}><ContainerContent {...props}/></MissingDataSourceBoundary>;
+    return props.container?.appearance === 'document' ? <DocumentPresentationContext.Provider value={true}>{content}</DocumentPresentationContext.Provider> : content;
 };
 export default Container;

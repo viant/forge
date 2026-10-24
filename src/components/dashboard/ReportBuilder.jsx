@@ -1,3 +1,4 @@
+import {updateReportChartTableSwitch} from '../../reporting/reportViewerSettings.js';
 import {reportDatasetReadContextIdentity} from './reportBuilderConcurrentRead.js';
 import ReportResourceEditor from "./ReportResourceEditor.jsx";
 import ReportResourceRuntime from "./ReportResourceRuntime.jsx";
@@ -13432,7 +13433,8 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             return;
         }
         if (normalizedField === "reportDocumentViewer") {
-            if (value === "true" || value === "false") nextState.reportDocumentViewer = {allowChartTableSwitch:value === "true"};
+            const viewer = updateReportChartTableSwitch(nextState.reportDocumentViewer, value);
+            if (viewer) nextState.reportDocumentViewer = viewer;
             else delete nextState.reportDocumentViewer;
             persistExplorationMutation(nextState,{sourceKind:"reportBuilder.result",sourceContext:{label:"Report chart/table switching"}});
             return;

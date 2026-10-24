@@ -3,8 +3,9 @@ import {Button, Dialog, DialogBody, DialogFooter} from '@blueprintjs/core';
 import {Camera} from '@phosphor-icons/react';
 import {cameraErrorMessage, captureCameraPhoto, createCameraSession, createPhotoCaptureAttempt} from './cameraCapture.js';
 import './CameraCapture.css';
+import SharedButton from '../Button.jsx';
 
-export default function CameraCapture({disabled, onCapture}) {
+export default function CameraCapture({disabled, onCapture, documentAppearance}) {
     const [open, setOpen] = useState(false);
     const [attempt, setAttempt] = useState(0);
     const [ready, setReady] = useState(false);
@@ -40,7 +41,7 @@ export default function CameraCapture({disabled, onCapture}) {
         finally {if (captureRef.current === attempt) setCapturing(false);}
     };
     return <>
-        <Button type="button" minimal small disabled={disabled} icon={<Camera size={20}/>} className="composer-icon-btn composer-icon-btn--camera" aria-label="Add camera photo" title="Add camera photo" onClick={() => setOpen(true)}/>
+        {documentAppearance ? <SharedButton variant="ghost" icon="lucide:camera" disabled={disabled} onClick={() => setOpen(true)}>Add camera photo</SharedButton> : <Button type="button" minimal small disabled={disabled} icon={<Camera size={20}/>} className="composer-icon-btn composer-icon-btn--camera" aria-label="Add camera photo" title="Add camera photo" onClick={() => setOpen(true)}/>}
         <Dialog isOpen={open} onClose={close} title="Take a photo" className="forge-camera-capture" aria-describedby="forge-camera-description">
             <DialogBody>
                 <p id="forge-camera-description">Preview your camera, then capture a photo to attach to your message.</p>

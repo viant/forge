@@ -5,6 +5,11 @@ import { useDataSourceState } from "../hooks/useDataSourceState.js";
 // Re-exported building blocks living under src/components/chat
 import MessageFeed from "./chat/MessageFeed.jsx";
 import "./chat/ChatContainer.css";
+import StarterTaskBrowser from './chat/StarterTaskBrowser.jsx';
+import Typography from './Typography.jsx';
+import SharedButton from './Button.jsx';
+import useStarterSelection from './chat/useStarterSelection.js';
+import useComposerDraft from './chat/useComposerDraft.js';
 import Composer     from "./chat/Composer.jsx";
 import MessageCard  from "./chat/MessageCard.jsx";
 import FormRenderer from "./FormRenderer.jsx";
@@ -461,7 +466,7 @@ export default function Chat({
     const [metaSnapshot, setMetaSnapshot] = useState({});
     const [conversationSnapshot, setConversationSnapshot] = useState({});
     const [usageSnapshot, setUsageSnapshot] = useState({});
-    const [composerDraft, setComposerDraft] = useState('');
+
     const normalizeMessages = chatService.normalizeMessages || defaultNormalizeMessages;
     const {
         messages,
@@ -528,7 +533,8 @@ export default function Chat({
         const handleConversationActive = (event) => {
             const conversationId = String(event?.detail?.id || '').trim();
             if (!conversationId) {
-                setComposerDraft('');
+                setSelectedStarter(null);
+
                 clearPendingAttachments();
                 try { uploader.reset(); } catch (_) {}
                 announcedDone.current = new Set();
@@ -684,6 +690,13 @@ export default function Chat({
         : internalHandleAutoSelectToolsChange;
 
     const conversationID = normalizeString(externalComposerProps?.conversationId || conversationSnapshot?.id);
+    const documentAppearance = chatCfg.appearance === 'document';
+    if (chatCfg.appearance && !documentAppearance) throw new Error(`Unsupported chat appearance: ${chatCfg.appearance}`);
+    const [selectedStarter, setSelectedStarter] = useStarterSelection(documentAppearance ? conversationID : '');
+    const [taskLibrary, setTaskLibrary] = useState(selectedStarter?.source.library || false);
+    const draftKey = conversationID || (selectedStarter ? `starter:${selectedStarter.id}` : '__pending__');
+    const [composerDraft, setComposerDraft] = useComposerDraft(draftKey);
+
     const backendConversationRunning = effectiveBackendConversationRunning(conversationSnapshot);
     const queuedTurns = Array.isArray(conversationSnapshot?.queuedTurns) ? conversationSnapshot.queuedTurns : [];
     const queuedCountValue = conversationSnapshot?.queuedCount;
@@ -1020,84 +1033,10 @@ export default function Chat({
         });
     };
 
-    return (
-        <div
-            className={`forge-chat-container px-4 pt-4 gap-3${effectiveHeight !== undefined ? " has-explicit-height" : ""}`}
-            data-testid="chat-root"
-            style={{
-                ...heightStyle,
-            }}
-        >
-
-            {/* Optional toolbar */}
-            {effectiveToolbar && (
-                <div className="flex-none mb-1" data-testid="chat-toolbar">
-                    {renderChatToolbar({ effectiveToolbar, context })}
-                </div>
-            )}
-            {/* Error banner */}
-            {(() => {
-                if (!error) return null;
-                try {
-                    const errText = String(error?.message || error);
-                    // Extra debug to troubleshoot Error objects reaching render
-                    // eslint-disable-next-line no-console
-                    return <div className="text-red-500 text-sm py-1" data-testid="chat-error">{errText}</div>;
-                } catch (e) {
-                    return <div className="text-red-500 text-sm py-1" data-testid="chat-error">An error occurred</div>;
-                }
-            })()}
-
-            <div
-                className="chat-feed-stage"
-                data-testid="chat-feed-stage"
-                style={{
-                    flexGrow: 1,
-                    flexShrink: 1,
-                    flexBasis: '0px',
-                    minHeight: 0,
-                    minWidth: 0,
-                    overflow: 'auto',
-                    display: 'flex',
-                    flexDirection: 'column',
-                }}
-            >
-                {showStarterTasks ? (
-                    <div className="chat-starter-stage" data-testid="chat-starter-stage">
-                        <StarterTaskGrid
-                            tasks={starterTasks}
-                            categories={starterTaskCategories}
-                            onSelect={(task) => {
-                                const prompt = String(task?.prompt || '').trim();
-                                if (!prompt) return;
-                                const assignedAgent = String(task?.agentId || '').trim();
-                                if (assignedAgent) handleAgentChange(assignedAgent);
-                                setComposerDraft(prompt);
-                            }}
-                        />
-                    </div>
-                ) : usesExternalFeedState ? (
-                    <ExternalFeedBoundary
-                        renderFeed={renderFeed}
-                        conversationId={conversationID}
-                        context={context}
-                    />
-                ) : (
-                    <MessageFeed
-                        messages={messages}
-                        batchSize={chatCfg.batchSize || 50}
-                        context={context}
-                        classifyMessage={classifyMessage}
-                        renderers={renderers}
-                        fallback={fallback}
-                        resolveIcon={resolveAvatarIcon}
-                    />
-                )}
-            </div>
-
-            {/* Prompt composer */}
-            {effectiveShowInput && (
-                <Composer
+    const composer = effectiveShowInput && (
+                <Composer key="conversation-composer"
+                    appearance={chatCfg.appearance}
+                    draftKey={documentAppearance ? draftKey : undefined}
                     draftValue={composerDraft}
                     onDraftChange={setComposerDraft}
                     showUpload={chatCfg.showUpload}
@@ -1174,7 +1113,100 @@ export default function Chat({
                     activeChips={activeChips}
                     onChipClear={(chip) => handleChipClear(chip)}
                 />
+            );
+
+    return (
+        <div
+            className={`forge-chat-container${documentAppearance ? ` forge-document-chat${showStarterTasks ? " is-starting" : ""}${showStarterTasks && taskLibrary && !selectedStarter ? " is-task-library" : ""}` : " px-4 pt-4 gap-3"}${effectiveHeight !== undefined ? " has-explicit-height" : ""}`}
+            data-testid="chat-root"
+            style={{
+                ...heightStyle,
+            }}
+        >
+
+            {documentAppearance && showStarterTasks ? <>
+                {selectedStarter ? <SharedButton className="forge-chat-task-back" variant="ghost" icon="lucide:arrow-left" onClick={() => setSelectedStarter(null)}>{selectedStarter.source.library ? 'All tasks' : 'New Chat'}</SharedButton> : null}
+                <Typography className="forge-chat-welcome" as="h1" typeRole="display">Start a new conversation</Typography>
+            </> : null}
+            {/* Optional toolbar */}
+            {effectiveToolbar && (
+                <div className="flex-none mb-1" data-testid="chat-toolbar">
+                    {renderChatToolbar({ effectiveToolbar, context })}
+                </div>
             )}
+            {/* Error banner */}
+            {(() => {
+                if (!error) return null;
+                try {
+                    const errText = String(error?.message || error);
+                    // Extra debug to troubleshoot Error objects reaching render
+                    // eslint-disable-next-line no-console
+                    return <div className="text-red-500 text-sm py-1" data-testid="chat-error">{errText}</div>;
+                } catch (e) {
+                    return <div className="text-red-500 text-sm py-1" data-testid="chat-error">An error occurred</div>;
+                }
+            })()}
+
+            {documentAppearance && showStarterTasks && composer}
+            <div
+                className="chat-feed-stage"
+                data-testid="chat-feed-stage"
+                style={showStarterTasks && documentAppearance ? undefined : {
+                    flexGrow: 1,
+                    flexShrink: 1,
+                    flexBasis: '0px',
+                    minHeight: 0,
+                    minWidth: 0,
+                    overflow: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                }}
+            >
+                {showStarterTasks && documentAppearance ? <div hidden={!!selectedStarter}><StarterTaskBrowser library={taskLibrary} onLibraryChange={setTaskLibrary} assistantName={externalComposerProps?.assistantName} initialLibrary={selectedStarter?.source.library} tasks={starterTasks} categories={starterTaskCategories} onSelect={(task, source) => {
+                    const assignedAgent = String(task.agentId || '').trim();
+                    if (assignedAgent) handleAgentChange(assignedAgent);
+                    const prompt = chatService.resolveStarterPrompt?.(task.prompt) || String(task.prompt || '');
+                    setSelectedStarter({id: task.id, source});
+                    try {
+                        const raw = JSON.parse(sessionStorage.getItem(COMPOSER_DRAFTS_KEY) || '{}');
+                        if (raw[`starter:${task.id}`] === undefined) raw[`starter:${task.id}`] = prompt;
+                        sessionStorage.setItem(COMPOSER_DRAFTS_KEY, JSON.stringify(raw));
+                    } catch {}
+                    requestAnimationFrame(() => document.querySelector('[data-testid="chat-composer-input"]')?.focus({preventScroll: true}));
+                }}/><div className="forge-chat-home-recent">{externalComposerProps?.renderHomeRecent?.()}</div></div> : showStarterTasks ? (
+                    <div className="chat-starter-stage" data-testid="chat-starter-stage">
+                        <StarterTaskGrid
+                            tasks={starterTasks}
+                            categories={starterTaskCategories}
+                            onSelect={(task) => {
+                                const prompt = String(task?.prompt || '').trim();
+                                if (!prompt) return;
+                                const assignedAgent = String(task?.agentId || '').trim();
+                                if (assignedAgent) handleAgentChange(assignedAgent);
+                                setComposerDraft(prompt);
+                            }}
+                        />
+                    </div>
+                ) : usesExternalFeedState ? (
+                    <ExternalFeedBoundary
+                        renderFeed={renderFeed}
+                        conversationId={conversationID}
+                        context={context}
+                    />
+                ) : (
+                    <MessageFeed
+                        messages={messages}
+                        batchSize={chatCfg.batchSize || 50}
+                        context={context}
+                        classifyMessage={classifyMessage}
+                        renderers={renderers}
+                        fallback={fallback}
+                        resolveIcon={resolveAvatarIcon}
+                    />
+                )}
+            </div>
+
+            {!(documentAppearance && showStarterTasks) && composer}
 
             {/* Attachment dialog */}
             <AttachmentDialog

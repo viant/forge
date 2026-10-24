@@ -23,6 +23,8 @@ import { clampPresentationText, normalizePresentationClampConfig, normalizePrese
 import "./documentTable.css";
 import {documentTableLayout} from "./documentTable.js";
 import { buildDashboardTableLayout } from "./dashboardTableLayout.js";
+import Typography from '../Typography.jsx';
+import ForgeIcon from '../Icon.jsx';
 
 const DEFAULT_SUBTITLE_STYLE = {
     fontSize: 'var(--forge-dashboard-table-small-size, 12px)',
@@ -118,6 +120,7 @@ export default function DashboardTableContent({
             format: col?.format,
             align: col?.align,
             type: col?.type,
+            kind: col?.kind,
             link: col?.link,
             cellVisual: col?.cellVisual,
             frozen: col?.frozen === true,
@@ -149,6 +152,9 @@ export default function DashboardTableContent({
         [normalizedColumns, quickFilteredCollection],
     );
     const displayColumns = useMemo(() => documentTable ? runtimeColumns.map(column => ({...column, frozen: false})) : withFrozenIdentifierColumn(runtimeColumns), [runtimeColumns, documentTable]);
+    // Read-only records keep the same data/formatting path. Interactive tables retain their actions and selection.
+    const recordTitleColumn = documentTable && !multiSelect && rowActions.length === 0
+        ? displayColumns.find(column => column.key === container.tablePresentation?.recordTitleField) : null;
     const mobileTitleColumn = mobileCards
         ? displayColumns.find((column) => column.key === mobileCards.titleField)
         : null;
@@ -206,7 +212,12 @@ export default function DashboardTableContent({
         });
     }, [allSortedRows.length, onPresentationStateChange, quickFilter, sortDir, sortKey, sortLabel]);
     const allSelected = multiSelect && sortedRows.length > 0 && sortedRows.every(rowSelected);
+    const partiallySelected = multiSelect && !allSelected && sortedRows.some(rowSelected);
     const selectionLabelField = String(container?.selectionLabelField || displayColumns[0]?.key || '').trim();
+    const selectionLabelFields = Array.isArray(container?.selectionLabelFields) && container.selectionLabelFields.length
+        ? container.selectionLabelFields : [selectionLabelField];
+    const selectionRowLabel = (row,index) => selectionLabelFields.map(field => resolveKey(row,field))
+        .filter(value => value !== undefined && value !== null && value !== '').join(' · ') || `row ${index + 1}`;
 
     const handleSort = (key) => {
         if (sortKey === key) {
@@ -258,6 +269,15 @@ export default function DashboardTableContent({
             ) : null}
             {sortedRows.length > 0 ? (
                 <>
+                {recordTitleColumn ? <div className="forge-document-record-list">
+                    {sortedRows.map(row => <details key={uniqueFields.length ? rowIdentity(row) : JSON.stringify(row)}>
+                        <Typography as="summary" typeRole="body"><ForgeIcon name="lucide:chevron-right"/><div>{renderDashboardTableCell(resolveDashboardTableColumnValue(row,recordTitleColumn,{preferDisplay:true}),row,recordTitleColumn,locale,context)}</div></Typography>
+                        <dl>{displayColumns.filter(column => column !== recordTitleColumn).map(column => <div key={column.key}>
+                            <Typography as="dt" typeRole="metadata">{column.label || column.key}</Typography>
+                            <Typography as="dd" typeRole="body">{renderDashboardTableCell(resolveDashboardTableColumnValue(row,column,{preferDisplay:true}),row,column,locale,context)}</Typography>
+                        </div>)}</dl>
+                    </details>)}
+                </div> : <>
                 {tableLayout.horizontallyScrollable ? (
                     <div className={`forge-dashboard-table-scroll-hint${mobileCards ? ' forge-dashboard-table-scroll-hint--mobile-cards' : ''}`}>Scroll horizontally to view all columns</div>
                 ) : null}
@@ -283,14 +303,17 @@ export default function DashboardTableContent({
                         <tr>
                             {multiSelect ? (
                                 <th style={{width: 42, textAlign: 'center'}}>
-                                    <input
+                                    <label className="forge-table-selection-target"><input
                                         type="checkbox"
+                                        disabled={container.readOnly === true}
                                         aria-label="Select all rows"
+                                        aria-checked={partiallySelected ? 'mixed' : undefined}
+                                        ref={node => { if (node) node.indeterminate = partiallySelected; }}
                                         checked={allSelected}
                                         onChange={(event) => event.target.checked
                                             ? selectionHandlers.setAllSelection?.()
                                             : selectionHandlers.resetSelection?.()}
-                                    />
+                                    /></label>
                                 </th>
                             ) : null}
                             {displayColumns.map((col) => {
@@ -331,12 +354,13 @@ export default function DashboardTableContent({
                                 <tr key={index} className={rowClassName} style={rowStyle}>
                                     {multiSelect ? (
                                         <td style={{textAlign: 'center'}}>
-                                            <input
+                                            <label className="forge-table-selection-target"><input
                                                 type="checkbox"
-                                                aria-label={`Select ${String(resolveKey(row, selectionLabelField) || `row ${index + 1}`)}`}
+                                                disabled={container.readOnly === true}
+                                                aria-label={`Select ${selectionRowLabel(row,index)}`}
                                                 checked={rowSelected(row)}
                                                 onChange={() => selectionHandlers.toggleSelection?.({row, rowIndex: index})}
-                                            />
+                                            /></label>
                                         </td>
                                     ) : null}
                                     {displayColumns.map((col, ci) => {
@@ -444,12 +468,13 @@ export default function DashboardTableContent({
                                     <header className="forge-dashboard-table-card__header">
                                         {multiSelect ? (
                                             <label className="forge-dashboard-table-card__title">
-                                                <input
+                                                <label className="forge-table-selection-target"><input
                                                     type="checkbox"
+                                                    disabled={container.readOnly === true}
                                                     aria-label={`Select ${titleLabel}`}
                                                     checked={rowSelected(row)}
                                                     onChange={() => selectionHandlers.toggleSelection?.({row, rowIndex: index})}
-                                                />
+                                                /></label>
                                                 <strong>{renderDashboardTableCell(titleValue, row, mobileTitleColumn, locale, context)}</strong>
                                             </label>
                                         ) : (
@@ -491,6 +516,7 @@ export default function DashboardTableContent({
                         })}
                     </div>
                 ) : null}
+                </>}
                 </>
             ) : null}
             {pagingEnabled && pageCount > 1 ? (

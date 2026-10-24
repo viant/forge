@@ -20,7 +20,7 @@ export function distinctWorkspaceTitle(title, workspaceLabel) {
 }
 
 export function workspaceToolbarItem(item = {}, workspace = null) {
-  if (!workspace) return item;
+  if (!workspace || item.hideLabel === false) return item;
   const type = String(item.type || item.widget || 'button').toLowerCase();
   if (!['button', 'tableexport', 'menu', 'dropdown'].includes(type)) return item;
   const id = String(item.id || '').toLowerCase();

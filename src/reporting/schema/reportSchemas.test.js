@@ -105,6 +105,24 @@ const reportPrint = buildReportPrintFromReportFill({
   reportFill,
 });
 
+const documentChartSpec=JSON.parse(JSON.stringify(reportSpec));
+const documentChartBlock=documentChartSpec.blocks.find(block=>block.kind==='chartBlock');
+assert.ok(documentChartBlock,'Fixture must exercise an actual report chart');
+Object.assign(documentChartBlock.chartSpec,{type:'line',appearance:'document',layout:'small-multiples',stacked:false});
+Object.assign(documentChartBlock.chartModel,{type:'line',appearance:'document',layout:'small-multiples',stacked:false});
+documentChartBlock.rowLimit=0;
+assert.deepEqual(validateReportSpec(documentChartSpec),{valid:true,errors:[]});
+const documentChartFill=buildReportFillFromReportSpec(documentChartSpec,{primary:{rows:[
+  {eventDate:'2026-05-01',channelId:'Display',totalSpend:40400,impressions:16500},
+  {eventDate:'2026-05-01',channelId:'CTV',totalSpend:34300,impressions:14700},
+]}});
+assert.deepEqual(validateReportFill(documentChartFill),{valid:true,errors:[]});
+assert.equal(documentChartFill.blocks.find(block=>block.kind==='chartBlock').chartModel.layout,'small-multiples');
+assert.deepEqual(validateReportPrint(buildReportPrintFromReportFill({reportSpec:documentChartSpec,reportFill:documentChartFill})),{valid:true,errors:[]});
+const invalidDocumentChart=JSON.parse(JSON.stringify(documentChartSpec));
+invalidDocumentChart.blocks.find(block=>block.kind==='chartBlock').chartSpec.appearance='rainbow';
+assert.equal(validateReportSpec(invalidDocumentChart).valid,false,'Unknown chart recipes must fail before rendering');
+
 const badgesReportSpec = {
   ...reportSpec,
   layoutIntent: {
@@ -1881,3 +1899,12 @@ assert.deepEqual(validateReportFill(compactNumberKpiReportFill), {
 });
 
 console.log("reportSchemas ✓ validates current ReportSpec/ReportFill/ReportPrint artifacts and rejects unknown fields");
+const documentViewerSpec = {...reportSpec, viewer:{appearance:'document',allowChartTableSwitch:false}};
+assert.equal(validateReportSpec(documentViewerSpec).valid,true);
+assert.equal(validateReportSpec({...documentViewerSpec,viewer:{appearance:'invented'}}).valid,false);
+const mappedColorSpec=structuredClone(reportSpec);
+const mappedChart=mappedColorSpec.blocks.find(block=>block.kind==='chartBlock');
+mappedChart.chartModel.series.categoryColors={Direct:'var(--example-direct)'};
+assert.equal(validateReportSpec(mappedColorSpec).valid,true,'Compiled category colors must remain exportable');
+mappedChart.chartModel.series.categoryColors.Direct=42;
+assert.equal(validateReportSpec(mappedColorSpec).valid,false,'Category colors retain string validation');

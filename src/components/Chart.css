@@ -90,6 +90,43 @@
 }
 
 .forge-chart-metric-selectors { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:12px; }
-.forge-chart-metric-selectors label { display:flex; flex-direction:column; gap:4px; min-width:0; font-size:var(--forge-type-small-size,12px); color:var(--forge-chart-text,#41566d); }
+.forge-chart-metric-selectors label { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.forge-chart-metric-selectors label:not([data-forge-type]) { font-size:var(--forge-type-small-size,12px); color:var(--forge-chart-text,#41566d); }
 .forge-chart-metric-selectors select { max-width:100%; }
 @media(max-width:600px) { .forge-chart-metric-selectors label { flex:1 1 140px; } }
+
+/* The document recipe owns geometry; workspaces supply its reviewed values. */
+.forge-chart-document { color:var(--forge-chart-text,var(--forge-text)); }
+.forge-chart-document .recharts-cartesian-axis-tick text { line-height:var(--forge-chart-axis-line-height,var(--forge-type-small-line-height,18px)); }
+.forge-chart-document .recharts-default-tooltip {
+    font-family:var(--forge-type-caption-family,var(--forge-font-family));
+    font-size:var(--forge-type-caption-size,11px);
+    font-weight:var(--forge-type-caption-weight,400);
+    line-height:var(--forge-type-caption-line-height,16px);
+    letter-spacing:var(--forge-type-caption-letter-spacing,0em);
+}
+.forge-chart-document-legend { display:flex; flex-wrap:wrap; gap:var(--forge-spacing-2,8px) var(--forge-chart-legend-gap,20px); order:2; margin-top:var(--forge-chart-legend-inset,10px); }
+.forge-chart-document-legend button { display:inline-flex; align-items:center; gap:var(--forge-chart-legend-marker-gap,7px); border:0; padding:var(--forge-spacing-1,4px) 0; background:transparent; color:var(--forge-chart-text-muted,var(--forge-text-muted)); font-family:var(--forge-type-caption-family,var(--forge-font-family)); font-size:var(--forge-type-caption-size,11px); font-weight:var(--forge-type-caption-weight,400); line-height:var(--forge-type-caption-line-height,16px); letter-spacing:var(--forge-type-caption-letter-spacing,0em); cursor:pointer; }
+.forge-chart-document-legend button[aria-pressed=false] { opacity:var(--forge-disabled-opacity,.5); }
+.forge-chart-document-legend button > span { width:var(--forge-chart-legend-marker-size,9px); height:var(--forge-chart-legend-marker-size,9px); border-radius:var(--forge-chart-legend-marker-radius,2px); flex-shrink:0; }
+.forge-chart-document :is(button,.recharts-wrapper):focus-visible { outline:var(--forge-focus-width,2px) solid var(--forge-focus-color,currentColor); outline-offset:var(--forge-focus-offset,2px); }
+.forge-chart-document [data-forge-chart-point] { cursor:pointer; }
+.forge-chart-document [data-forge-chart-point]:focus-visible { outline:var(--forge-focus-width,2px) solid var(--forge-focus-color,currentColor); outline-offset:var(--forge-focus-offset,2px); }
+.forge-chart-comparisons { display:grid; gap:var(--forge-chart-comparison-gap,18px); list-style:none; margin:var(--forge-chart-comparison-margin,20px 0 4px); padding:0; }
+.forge-chart-comparisons li > :is(div,button) { display:grid; grid-template-columns:minmax(150px,200px) minmax(0,1fr) minmax(90px,max-content); align-items:center; gap:var(--forge-spacing-4,16px); width:100%; border:0; padding:0; text-align:left; background:transparent; color:inherit; font-family:var(--forge-type-small-family,var(--forge-font-family)); font-size:var(--forge-type-small-size,12px); font-weight:var(--forge-type-small-weight,400); line-height:var(--forge-chart-comparison-leading,var(--forge-type-small-line-height,18px)); letter-spacing:var(--forge-type-small-letter-spacing,0em); }
+.forge-chart-comparisons button { cursor:pointer; }
+.forge-chart-comparison-label { overflow-wrap:anywhere; }
+.forge-chart-comparison-track { position:relative; display:block; height:var(--forge-chart-bar-size,8px); border-radius:var(--forge-chart-bar-radius,4px); background:var(--forge-chart-surface-subtle,var(--forge-surface-subtle)); overflow:hidden; }
+.forge-chart-comparison-track > span { position:absolute; display:block; height:100%; border-radius:inherit; }
+.forge-chart-comparison-value { font-weight:var(--forge-type-label-weight,500); text-align:right; font-variant-numeric:tabular-nums; }
+.forge-chart-multiples { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); gap:var(--forge-chart-multiples-gap,24px 30px); }
+.forge-chart-multiples > p { grid-column:1/-1; margin:0; color:var(--forge-chart-text-muted,var(--forge-text-muted)); }
+.forge-chart-multiples > figure { min-width:0; margin:0; padding-top:var(--forge-chart-multiple-inset,14px); border-top:var(--forge-border-width,1px) solid var(--forge-chart-border,var(--forge-border)); }
+.forge-chart-multiples figcaption { margin-bottom:var(--forge-spacing-2,8px); overflow-wrap:anywhere; }
+.forge-chart-document .forge-chart-table { font-family:var(--forge-type-body-family,var(--forge-font-family)); font-size:var(--forge-type-body-size,13px); font-weight:var(--forge-type-body-weight,400); line-height:var(--forge-type-body-line-height,20px); letter-spacing:var(--forge-type-body-letter-spacing,0em); }
+.forge-chart-document .forge-chart-table th { font-family:var(--forge-type-metadata-family,var(--forge-font-family)); font-size:var(--forge-type-metadata-size,12px); font-weight:var(--forge-type-label-weight,500); line-height:var(--forge-type-metadata-line-height,16px); letter-spacing:var(--forge-type-metadata-letter-spacing,0em); }
+@media(max-width:600px) {
+    .forge-chart-comparisons li > :is(div,button) { grid-template-columns:minmax(0,1fr) minmax(90px,max-content); gap:var(--forge-spacing-2,8px) var(--forge-spacing-3,12px); }
+    .forge-chart-comparison-track { grid-column:1/-1; grid-row:2; }
+}
+@media(pointer:coarse) { .forge-chart-document-legend button,.forge-chart-comparisons button { min-height:44px; } }

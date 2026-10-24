@@ -3009,3 +3009,5 @@ for (const allowChartTableSwitch of [false,true]) {
  assert.deepEqual(configured.viewer,{allowChartTableSwitch});
  assert.deepEqual(lowerReportDocumentToReportSpec(JSON.parse(JSON.stringify(configured))).viewer,{allowChartTableSwitch});
 }
+const documentViewer=buildReportBuilderReportDocument({container,config,state:{...state,reportDocumentViewer:{appearance:'document',allowChartTableSwitch:false}}});
+assert.deepEqual(lowerReportDocumentToReportSpec(JSON.parse(JSON.stringify(documentViewer))).viewer,{appearance:'document',allowChartTableSwitch:false});
