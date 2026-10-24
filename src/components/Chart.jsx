@@ -916,10 +916,31 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     ), [chart, embedded]);
 
     const configuredBarSize = typeof chart?.barSize === "number" && Number.isFinite(chart.barSize) && chart.barSize > 0 ? chart.barSize : undefined;
-    const barPointIdentity = (seriesKey, row) => ({
+    const chartPointIdentity = (seriesKey, row) => ({
         "data-series-id": String(seriesKey),
         "data-category": String(row?.[xAxis?.dataKey] ?? ""),
     });
+    const renderSeriesPoint = (entry, visible) => (props = {}) => {
+        const row = props.payload ?? normalizedChartData[props.index];
+        const value = row?.[entry.value] ?? (Array.isArray(props.value) ? props.value.at(-1) : props.value);
+        if (!Number.isFinite(Number(value)) || value === null || value === "") return null;
+        const category = String(row?.[xAxis?.dataKey] ?? "");
+        return <circle
+            key={props.index}
+            cx={props.cx}
+            cy={props.cy}
+            r={visible ? (embedded || interactiveDatumSelection ? 4 : 3) : 6}
+            {...chartPointIdentity(entry.value, row)}
+            role="img"
+            aria-label={`${entry.label || entry.value} at ${category}: ${value}`}
+            strokeWidth={visible ? 1 : 0}
+            stroke={visible ? "var(--forge-chart-surface, #ffffff)" : "none"}
+            fill={visible
+                ? resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))
+                : "transparent"}
+            {...(!visible ? {pointerEvents: "all"} : {})}
+        />;
+    };
 
     const cartesianSeriesElements = renderableSeriesDefinitions.map((entry, seriesIndex) => {
         const defaultLineDash = renderableSeriesDefinitions.length > 1 && (entry.type === "line" || entry.type === "area")
@@ -947,7 +968,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 <Bar key={entry.value} {...commonProps} radius={entry.stackId ? 0 : resolveChartBarCornerRadii(1, 'vertical')} barSize={configuredBarSize} stackId={entry.stackId} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                     {normalizedChartData.map((row, index) => (
                         <Cell key={`${entry.value}-cell-${index}`}
-                              {...barPointIdentity(entry.value, row)}
+                              {...chartPointIdentity(entry.value, row)}
                               {...(entry.pointColorMode === "bySign" ? {fill: resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} : {})} />
                     ))}
                     {showSeriesDataLabels ? (
@@ -957,18 +978,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             );
         }
         if (entry.type === "area") {
-            const dotRenderer = embedded || interactiveDatumSelection || entry.pointColorMode === "bySign"
-                ? ((props = {}) => (
-                    <circle
-                        cx={props.cx}
-                        cy={props.cy}
-                        r={embedded || interactiveDatumSelection ? 4 : 3}
-                        strokeWidth={1}
-                        stroke="var(--forge-chart-surface, #ffffff)"
-                        fill={resolveCategoryColor(chart?.series?.categoryColors, props?.payload?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, props?.payload?.[entry.value], entry.color))}
-                    />
-                ))
-                : false;
+            const dotRenderer = renderSeriesPoint(entry, embedded || interactiveDatumSelection || entry.pointColorMode === "bySign");
             return (
                 <Area key={entry.value} {...commonProps} type="monotone" connectNulls={true} dot={dotRenderer} activeDot={embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                     {showSeriesDataLabels ? (
@@ -977,18 +987,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                 </Area>
             );
         }
-        const lineDotRenderer = embedded || interactiveDatumSelection || entry.pointColorMode === "bySign"
-            ? ((props = {}) => (
-                <circle
-                    cx={props.cx}
-                    cy={props.cy}
-                    r={embedded || interactiveDatumSelection ? 4 : 3}
-                    strokeWidth={1}
-                    stroke="var(--forge-chart-surface, #ffffff)"
-                    fill={resolveCategoryColor(chart?.series?.categoryColors, props?.payload?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, props?.payload?.[entry.value], entry.color))}
-                />
-            ))
-            : false;
+        const lineDotRenderer = renderSeriesPoint(entry, embedded || interactiveDatumSelection || entry.pointColorMode === "bySign");
         return (
             <Line key={entry.value} {...commonProps} type="monotone" connectNulls={true} strokeLinecap="round" strokeLinejoin="round" dot={lineDotRenderer} activeDot={embedded || interactiveDatumSelection ? { r: 6, strokeWidth: 1.5 } : { r: 4 }} {...(interactiveDatumSelection ? { onClick: (payload) => emitSeriesDatumSelection(entry.value, payload) } : {})}>
                 {showSeriesDataLabels ? (
@@ -1142,7 +1141,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         {normalizedChartData.map((row, index) => (
                             <Cell
                                 key={`cell-${index}`}
-                                {...barPointIdentity(primarySeries.value, row)}
+                                {...chartPointIdentity(primarySeries.value, row)}
                                 fill={resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], primarySeries.pointColorMode === "bySign"
                                     ? resolveConditionalSeriesColor(primarySeries, row?.[primarySeries.value], activePalette[index % activePalette.length])
                                     : activePalette[index % activePalette.length])}
@@ -1164,7 +1163,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
                         >
                             {normalizedChartData.map((row, index) => (
                                 <Cell key={`${entry.value}-cell-${index}`}
-                                      {...barPointIdentity(entry.value, row)}
+                                      {...chartPointIdentity(entry.value, row)}
                                       {...(entry.pointColorMode === "bySign" ? {fill: resolveCategoryColor(chart?.series?.categoryColors, row?.[xAxis?.dataKey], resolveConditionalSeriesColor(entry, row?.[entry.value], entry.color))} : {})} />
                             ))}
                             {shouldRenderSeriesDataLabels(entry, responsiveChartType, normalizedChartData.length, embedded) ? (
