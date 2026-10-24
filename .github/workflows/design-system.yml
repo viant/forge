@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: viant/agently-core
-          ref: af4e6f828ab11a0bbe7183652ae3fb68fd44abf0
+          ref: a78fa92078bfa125d28d35284510eac8980a6895
           path: agently-core
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
@@ -33,9 +33,11 @@ jobs:
         with:
           go-version-file: forge/go.mod
           cache-dependency-path: forge/go.sum
-      - run: go test ./backend/types
+      - run: go test ./backend/types ./backend/reporting/spec
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - run: node --no-warnings src/components/Chart.test.js && node --no-warnings src/components/dashboard/reportBuilderUtils.test.js
+      - run: npm run test:schema-form-layout
       - run: npm run test:workspace-theme
       - run: npm run build
       - name: Check contributor entry points
