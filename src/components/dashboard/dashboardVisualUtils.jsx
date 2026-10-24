@@ -417,7 +417,7 @@ export function renderDashboardTableCell(cell, row, column, locale, context) {
         return explicitVisual;
     }
     const text = formatDashboardTableCellText(cell, row, column, locale);
-    if (isDashboardStatusValue(text)) {
+    if (column?.statusPresentation !== 'text' && isDashboardStatusValue(text)) {
         const tone = dashboardStatusTone(text);
         return (
             <span style={{fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.03em', color: tone.text, background: tone.background, border: `1px solid ${tone.border}`, borderRadius: '999px', padding: '2px 8px'}}>

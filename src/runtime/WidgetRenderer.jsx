@@ -1,3 +1,4 @@
+import {typographyProps} from '../components/Typography.jsx';
 import MissingDataSourceBoundary from '../components/MissingDataSourceBoundary.jsx';
 /* -------------------------------------------------------------------------
  * WidgetRenderer – generic control renderer (Phase 1 placeholder)
@@ -257,6 +258,10 @@ function WidgetRendererContent({
         ...combinedProps,
         ...mergedEvents,
     };
+    if (widgetProps.typographyRole) {
+        Object.assign(widgetProps, typographyProps(widgetProps.typographyRole));
+        delete widgetProps.typographyRole;
+    }
     if (resolvedCurrency) widgetProps.currency = resolvedCurrency;
     delete widgetProps.currencyField;
     delete widgetProps.currencySelector;
@@ -292,6 +297,7 @@ function WidgetRendererContent({
             widgetProps[k] = item[k];
         }
     });
+    if (widgetProps['data-forge-type']) typographyProps(widgetProps['data-forge-type'], widgetProps.style);
     if (resolvedItemLink && widgetProps.link === undefined) {
         widgetProps.link = item?.link;
     }

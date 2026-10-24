@@ -32,24 +32,24 @@
     cursor: not-allowed;
 }
 .agently-workspace:not([data-forge-theme]) {
-    --forge-type-caption-size: 11px;
-    --forge-type-caption-line-height: 16px;
-    --forge-type-small-size: 12px;
-    --forge-type-small-line-height: 18px;
-    --forge-type-body-size: 14px;
-    --forge-type-body-line-height: 20px;
-    --forge-type-section-size: 15px;
-    --forge-type-section-line-height: 22px;
-    --forge-type-heading-size: 18px;
-    --forge-type-heading-line-height: 24px;
-    --forge-type-title-size: 22px;
-    --forge-type-title-line-height: 28px;
-    --forge-type-metric-size: 28px;
-    --forge-type-metric-line-height: 34px;
-    --forge-type-display-size: 32px;
-    --forge-type-display-line-height: 40px;
-    --forge-type-code-size: 13px;
-    --forge-type-code-line-height: 20px;
+    --forge-type-caption-size: var(--forge-default-type-caption-size);
+    --forge-type-caption-line-height: var(--forge-default-type-caption-line-height);
+    --forge-type-small-size: var(--forge-default-type-small-size);
+    --forge-type-small-line-height: var(--forge-default-type-small-line-height);
+    --forge-type-body-size: var(--forge-font-size, var(--forge-default-type-body-size));
+    --forge-type-body-line-height: var(--forge-default-type-body-line-height);
+    --forge-type-section-size: var(--forge-default-type-section-size);
+    --forge-type-section-line-height: var(--forge-default-type-section-line-height);
+    --forge-type-heading-size: var(--forge-default-type-heading-size);
+    --forge-type-heading-line-height: var(--forge-default-type-heading-line-height);
+    --forge-type-title-size: var(--forge-default-type-title-size);
+    --forge-type-title-line-height: var(--forge-default-type-title-line-height);
+    --forge-type-metric-size: var(--forge-default-type-metric-size);
+    --forge-type-metric-line-height: var(--forge-default-type-metric-line-height);
+    --forge-type-display-size: var(--forge-default-type-display-size);
+    --forge-type-display-line-height: var(--forge-default-type-display-line-height);
+    --forge-type-code-size: var(--forge-default-type-code-size);
+    --forge-type-code-line-height: var(--forge-default-type-code-line-height);
     --forge-canvas: #f5f6f8;
     --forge-surface: #ffffff;
     --forge-surface-subtle: #f1f3f7;
@@ -111,24 +111,24 @@
 }
 /* Public theme hooks. No named-theme boundary means existing appearance. */
 .agently-workspace[data-forge-theme] {
-    --forge-type-caption-size: 11px;
-    --forge-type-caption-line-height: 16px;
-    --forge-type-small-size: 12px;
-    --forge-type-small-line-height: 18px;
-    --forge-type-body-size: var(--forge-font-size, 14px);
-    --forge-type-body-line-height: 20px;
-    --forge-type-section-size: 15px;
-    --forge-type-section-line-height: 22px;
-    --forge-type-heading-size: 18px;
-    --forge-type-heading-line-height: 24px;
-    --forge-type-title-size: 22px;
-    --forge-type-title-line-height: 28px;
-    --forge-type-metric-size: 28px;
-    --forge-type-metric-line-height: 34px;
-    --forge-type-display-size: 32px;
-    --forge-type-display-line-height: 40px;
-    --forge-type-code-size: 13px;
-    --forge-type-code-line-height: 20px;
+    --forge-type-caption-size: var(--forge-default-type-caption-size);
+    --forge-type-caption-line-height: var(--forge-default-type-caption-line-height);
+    --forge-type-small-size: var(--forge-default-type-small-size);
+    --forge-type-small-line-height: var(--forge-default-type-small-line-height);
+    --forge-type-body-size: var(--forge-font-size, var(--forge-default-type-body-size));
+    --forge-type-body-line-height: var(--forge-default-type-body-line-height);
+    --forge-type-section-size: var(--forge-default-type-section-size);
+    --forge-type-section-line-height: var(--forge-default-type-section-line-height);
+    --forge-type-heading-size: var(--forge-default-type-heading-size);
+    --forge-type-heading-line-height: var(--forge-default-type-heading-line-height);
+    --forge-type-title-size: var(--forge-default-type-title-size);
+    --forge-type-title-line-height: var(--forge-default-type-title-line-height);
+    --forge-type-metric-size: var(--forge-default-type-metric-size);
+    --forge-type-metric-line-height: var(--forge-default-type-metric-line-height);
+    --forge-type-display-size: var(--forge-default-type-display-size);
+    --forge-type-display-line-height: var(--forge-default-type-display-line-height);
+    --forge-type-code-size: var(--forge-default-type-code-size);
+    --forge-type-code-line-height: var(--forge-default-type-code-line-height);
     --forge-canvas: var(--forge-surface);
     --forge-surface-subtle: var(--forge-control-bg);
     --forge-surface-raised: var(--forge-surface);
@@ -257,17 +257,22 @@
 .agently-workspace[data-forge-theme] [data-forge-part="input"] {
     background-color: var(--forge-control-bg);
     color: var(--forge-control-text);
-    border: 1px solid var(--forge-control-border);
+    border: var(--forge-border-width, 1px) solid var(--forge-control-border);
     box-shadow: none;
     padding-inline: var(--forge-control-padding-inline);
     border-radius: var(--forge-control-radius);
     min-height: var(--forge-control-height);
+
+}
+/* Explicit semantic roles own all five type properties. */
+.agently-workspace[data-forge-theme] [data-forge-part="input"]:not([data-forge-type]) {
     font: inherit;
 }
+
 .agently-workspace[data-forge-theme] [data-forge-part="input"]:focus-visible,
 .agently-workspace[data-forge-theme] [data-forge-part="button"]:focus-visible {
-    outline: 2px solid var(--forge-focus-color);
-    outline-offset: 2px;
+    outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color);
+    outline-offset: var(--forge-focus-offset, 2px);
 }
 .agently-workspace[data-forge-theme] [data-forge-part="input"]:disabled {
     background-color: var(--forge-disabled-bg);
@@ -293,7 +298,7 @@
 :is([data-forge-part="input"], .forge-control-wrapper input,
     .forge-control-wrapper textarea, .forge-control-wrapper select):focus {
     outline: 2px solid var(--forge-focus-color, #2563eb);
-    outline-offset: 2px;
+    outline-offset: var(--forge-focus-offset, 2px);
 }
 
 .agently-workspace[data-forge-theme] {
@@ -401,7 +406,7 @@
 }
 .forge-switch:focus-visible {
     outline: 2px solid var(--forge-focus-color, #2563eb);
-    outline-offset: 2px;
+    outline-offset: var(--forge-focus-offset, 2px);
 }
 .forge-switch__thumb {
     display: block;
@@ -486,3 +491,18 @@
     min-width: 0;
 }
 .forge-file-control__input { min-width: 0; flex: 1 1 auto; }
+
+/* Role-selected controls use the portable foundation without changing legacy buttons. */
+.forge-button[data-forge-type] {
+    gap: var(--forge-spacing-2, 6px);
+    border-width: var(--forge-border-width, 1px);
+    transition-property: background-color, border-color, color;
+    transition-duration: var(--forge-motion-fast, 120ms);
+}
+.forge-button[data-forge-type] .bp6-icon svg {
+    width: var(--forge-icon-size, 14px);
+    height: var(--forge-icon-size, 14px);
+}
+@media (prefers-reduced-motion: reduce) {
+    .forge-button[data-forge-type] { transition-duration: 0s; }
+}
