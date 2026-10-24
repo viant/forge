@@ -111,6 +111,26 @@ it('keeps edits after a server error and blocks a duplicate in-flight publicatio
   }finally{await view.close();}
 });
 
+it('keeps edits but blocks publication when one inventory refresh fails',async()=>{
+  const original=api(),view=await render(original);
+  try{
+    await text(view.host.querySelector('#release-name'),'poc');
+    await click(view.host.querySelector('input[type="checkbox"]'));
+    await include(view.host);
+    expect(button(view.host,'Publish').disabled).toBe(false);
+    const failed=api({policies:vi.fn(async()=>{throw new Error('Policy inventory unavailable');})});
+    await view.update(failed,scope);
+    expect(view.host.querySelector('[role="alert"]').textContent).toContain('Policy inventory unavailable');
+    expect(view.host.querySelector('#release-name').value).toBe('poc');
+    expect(view.host.querySelector('#release-artifact-0').selectedIndex).toBeGreaterThan(0);
+    expect(button(view.host,'Publish').disabled).toBe(true);
+    await click(button(view.host,'Publish'));
+    expect(failed.publish).not.toHaveBeenCalled();
+    await view.update(api(),scope);
+    expect(button(view.host,'Publish').disabled).toBe(false);
+  }finally{await view.close();}
+});
+
 it('chooses only one exact revision for an artifact URI',async()=>{
   const adapter=api();const view=await render(adapter);
   try{
