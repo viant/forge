@@ -1,5 +1,7 @@
 export function resourceWindowMetadata(envelope,target={platform:'web',formFactor:'desktop'}) {
- if(envelope?.schemaVersion!==3||!envelope.variants||!Array.isArray(envelope.targets))throw new Error('Invalid window resource.');
+ const supported=envelope?.schemaVersion===2&&envelope.format==='window.bundle'
+  ||envelope?.schemaVersion===3&&envelope.format==='window.references';
+ if(!supported||!envelope.variants||!Array.isArray(envelope.targets))throw new Error('Invalid window resource.');
  const binding=envelope.targets.find(entry=>entry.target?.platform===target.platform&&entry.target?.formFactor===target.formFactor)||envelope.targets.find(entry=>!entry.target||!Object.keys(entry.target).length);
  const variant=envelope.variants[binding?.variant];if(!variant?.window)throw new Error('Window has no matching target.');
  const sources=Object.fromEntries(Object.entries(variant.dataSources||{}).map(([id,source])=>[id,typeof source==='string'?JSON.parse(source):source]));
