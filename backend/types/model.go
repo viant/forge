@@ -1419,6 +1419,7 @@ type TableLink struct {
 	Rel                 string                 `json:"rel,omitempty" yaml:"rel,omitempty"`
 	DialogId            string                 `json:"dialogId,omitempty" yaml:"dialogId,omitempty"`
 	WindowKey           string                 `json:"windowKey,omitempty" yaml:"windowKey,omitempty"`
+	Revision            string                 `json:"revision,omitempty" yaml:"revision,omitempty"`
 	IdentityParameters  []string               `json:"identityParameters,omitempty" yaml:"identityParameters,omitempty"`
 	WindowTitle         string                 `json:"windowTitle,omitempty" yaml:"windowTitle,omitempty"`
 	ChipName            string                 `json:"chipName,omitempty" yaml:"chipName,omitempty"`
