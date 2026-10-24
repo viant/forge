@@ -43,5 +43,6 @@ producer's actual paging/count selectors and required field projection.
 
 String literals use SQL quote doubling. A producer must support that literal
 grammar. The deployed legacy Datly0.39 Criteria parser rejects embedded quoted
-strings; such requests remain errors until that producer parser is upgraded.
+strings. Bind those producers with `literalGrammar: simple` to reject quoted
+values before dispatch; such values remain unsupported until that parser is upgraded.
 Do not claim support for those values from a successful unquoted-name test.
