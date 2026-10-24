@@ -82,7 +82,11 @@ type ExtensionDirectory struct {
 	Suffixes           []string
 	ExcludeDirectories []string
 	FallbackDirectory  string
-	Load               ExtensionLoader
+	// IncludeFile optionally distinguishes definition entry points from support
+	// files sharing the same suffix. It runs through the confined reader before
+	// a file receives a resource identity; nil retains suffix-only discovery.
+	IncludeFile func(context.Context, *ExtensionReader, string) (bool, error)
+	Load        ExtensionLoader
 }
 
 // ExtensionReader confines native loader reads to a trusted workspace directory.
@@ -433,6 +437,15 @@ func extensionBindings(ctx context.Context, rootPath string, directories []Exten
 			}
 			if name == "" {
 				return nil
+			}
+			if directory.IncludeFile != nil {
+				include, err := directory.IncludeFile(ctx, reader, file)
+				if err != nil {
+					return err
+				}
+				if !include {
+					return nil
+				}
 			}
 			if directory.FallbackDirectory != "" {
 				for _, suffix := range suffixes {

@@ -2,7 +2,7 @@ import {resolveCategoryColor} from '../components/chartTheme.js';
 import { compactReportPrintSequence, wrapReportPrintLabel } from "./reportPrintLabels.js";
 import { formatExportNumericValue } from "./reportExportValueFormatter.js";
 import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "./reportChartAnnotations.js";
-import { formatChartXAxisValue, readChartDataValue, isChartNumericValue } from "../components/chartData.js";
+import { formatChartXAxisValue, readChartDataValue, isChartNumericValue, buildChartBarPath } from "../components/chartData.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -131,7 +131,7 @@ function resolveCartesianSeriesDescriptors(chartModel = {}, resolvedChart = {}) 
           label: normalizedKey,
           type: chartType,
           color: printColor(resolveCategoryColor(chartModel?.series?.categoryColors, normalizedKey, palette[index % palette.length])),
-          format: "",
+          format: normalizeString(chartModel?.yAxis?.format),
           dataLabels: "",
           pointColorMode: "",
         };
@@ -840,11 +840,20 @@ function renderCartesianChartSvg({
   );
   const bottomPad = xAxisLabel ? 50 : 34;
   const plotHeight = 180;
-  const plotWidth = Math.max(200, width - leftPad - rightPad);
+  // The caller owns the grid allocation; a minimum plot width must not
+  // extend a narrow dashboard tile into its neighbor or beyond the page.
+  const plotWidth = Math.max(1, width - leftPad - rightPad);
   const xAxisKey = normalizeString(resolvedChart?.xAxisKey);
   const valueRange = bounds.maxValue - bounds.minValue || 1;
   const baselineY = topPad + ((bounds.maxValue - 0) / valueRange) * plotHeight;
+  const barSeries = seriesDescriptors.filter((series) => resolveChartSupportedSeriesType(series.type) === "bar");
+  const categoryWidth = plotWidth / Math.max(rows.length, 1);
   const xPositions = rows.map((row, index) => {
+    // Bars occupy category bands. Centering edge categories on the axis itself
+    // places half of their bars over tick labels or beyond the plotting area.
+    if (barSeries.length > 0) {
+      return leftPad + ((index + 0.5) * categoryWidth);
+    }
     if (rows.length === 1) {
       return leftPad + (plotWidth / 2);
     }
@@ -886,27 +895,37 @@ function renderCartesianChartSvg({
     return `<text data-report-print-axis="right" x="${leftPad+plotWidth+8}" y="${y+4}" text-anchor="start" font-size="10" fill="#667085">${escapeXml(formatAxisTick(value,rightSeries[0]?.format))}</text>`;
   }).join("\n") : "";
 
-  const xAxisLabels = rows.map((row, index) => {
-    if (index % labelStep !== 0 && index !== rows.length - 1) {
-      return "";
-    }
+  const xTicks = rows.flatMap((row, index) => {
+    if (index % labelStep !== 0 && index !== rows.length - 1) return [];
     const label = formatChartXAxisValue(
       readChartDataValue(row, xAxisKey),
       normalizeString(chartModel?.xAxis?.tickFormat),
       normalizeString(chartModel?.xAxis?.valueMode),
     );
-    return renderPrintLabelLines(
-      buildPrintLabelLines(label, chartModel?.xAxis?.categoryLabel, 14),
-      { x: xPositions[index], y: topPad + plotHeight + 18 },
-    );
-  }).join("\n");
+    const lines = buildPrintLabelLines(label, chartModel?.xAxis?.categoryLabel, 14);
+    const halfWidth = Math.max(0, ...lines.map(line => line.length * 2.8));
+    return [{lines, halfWidth, x: Math.max(halfWidth, Math.min(width - halfWidth, xPositions[index]))}];
+  });
+  // Keep both endpoints, then fit intermediate ticks to the actual tile width.
+  // A forced last tick can be much closer than the normal periodic spacing.
+  const visibleXTicks = [];
+  const lastXTick = xTicks.at(-1);
+  const ticksApart = (left, right) => right.x - left.x >= left.halfWidth + right.halfWidth + 8;
+  for (const tick of xTicks) {
+    if (tick !== lastXTick && visibleXTicks.length && !ticksApart(tick, lastXTick)) continue;
+    if (visibleXTicks.length && !ticksApart(visibleXTicks.at(-1), tick)) continue;
+    visibleXTicks.push(tick);
+  }
+  const xAxisLabels = visibleXTicks.map(tick => renderPrintLabelLines(
+    tick.lines, {x: tick.x, y: topPad + plotHeight + 18},
+  )).join("\n");
   const xAxisTitle = xAxisLabel
     ? `<text x="${leftPad + (plotWidth / 2)}" y="${topPad + plotHeight + 36}" text-anchor="middle" font-size="11" font-weight="600" fill="#475467">${escapeXml(xAxisLabel)}</text>`
     : "";
 
-  const barSeries = seriesDescriptors.filter((series) => resolveChartSupportedSeriesType(series.type) === "bar");
-  const groupWidth = Math.min(48, Math.max(14, (plotWidth / Math.max(rows.length, 1)) * 0.56));
-  const barWidth = barSeries.length > 0 ? Math.max(8, groupWidth / barSeries.length) : 0;
+  const groupWidth = Math.min(48, categoryWidth * 0.56);
+  const barWidth = barSeries.length > 0 ? groupWidth / barSeries.length : 0;
+  const drawnBarWidth = Math.max(0, barWidth - Math.min(1, barWidth * 0.12));
 
   const renderedSeries = seriesDescriptors.map((series) => {
     const supportedType = resolveChartSupportedSeriesType(series.type);
@@ -935,10 +954,10 @@ function renderCartesianChartSvg({
         const barHeight = Math.max(1, Math.abs(seriesBaselineY - point.y));
         const fillColor = resolveSeriesPointColor(series, point.value, series.color);
         const label = shouldRenderReportPrintSeriesDataLabels(series, supportedType, rows.length)
-          ? `<text x="${x + ((barWidth - 1) / 2)}" y="${y - 4}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(point.value, series.format))}</text>`
+          ? `<text x="${x + (drawnBarWidth / 2)}" y="${y - 4}" text-anchor="middle" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(point.value, series.format))}</text>`
           : "";
         return `
-          <rect x="${x}" y="${y}" width="${barWidth - 1}" height="${barHeight}" rx="2" fill="${escapeXml(fillColor)}" />
+          <path class="forge-chart-bar" d="${buildChartBarPath({x,y,width:drawnBarWidth,height:barHeight,value:point.value,orientation:"vertical"})}" fill="${escapeXml(fillColor)}" />
           ${label}
         `;
       }).join("\n");
@@ -1127,7 +1146,7 @@ function renderHorizontalBarChartSvg({
         ? `<text x="${labelX}" y="${barY + perSeriesHeight - 2}" text-anchor="${labelAnchor}" font-size="10" fill="#667085">${escapeXml(formatSeriesDataLabel(value, series.format))}</text>`
         : "";
       return `
-        <rect x="${x}" y="${barY}" width="${barWidth}" height="${perSeriesHeight}" rx="2" fill="${escapeXml(fillColor)}" />
+        <path class="forge-chart-bar" d="${buildChartBarPath({x,y:barY,width:barWidth,height:perSeriesHeight,value})}" fill="${escapeXml(fillColor)}" />
         ${valueLabel}
       `;
     }).join("\n")

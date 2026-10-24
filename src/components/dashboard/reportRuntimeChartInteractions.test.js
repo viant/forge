@@ -76,3 +76,4 @@ assert.deepEqual(resolveReportRuntimeChartInteractionSupport({}), {
 });
 
 console.log("reportRuntimeChartInteractions ✓ describes the supported authored runtime chart action surface");
+assert.deepEqual(resolveReportRuntimeChartInteractionSupport({type:'horizontal_bar',seriesField:'campaignId'}),{enabled:true,reason:'',message:'',legendEnabled:true});

@@ -67,6 +67,54 @@ func TestIsCurrentClientPinsExactOwnerSessionAndDoesNotRenew(t *testing.T) {
 	}
 }
 
+func TestEvictCurrentClientFencesStaleFailuresAndRetiresActiveCalls(t *testing.T) {
+	var made []*lifecycleClient
+	mgr, err := New(&concurrencyProviderStub{}, WithClientFactory(func(context.Context, string, string) (mcpclient.Interface, error) {
+		client := &lifecycleClient{}
+		if len(made) == 0 {
+			client.started = make(chan struct{})
+			client.release = make(chan struct{})
+		}
+		made = append(made, client)
+		return client, nil
+	}))
+	require.NoError(t, err)
+	defer mgr.CloseConversation("conv")
+	alice := authctx.WithUserInfo(context.Background(), &authctx.UserInfo{Subject: "alice"})
+	bob := authctx.WithUserInfo(context.Background(), &authctx.UserInfo{Subject: "bob"})
+	first, err := mgr.Get(alice, "conv", "server")
+	require.NoError(t, err)
+	foreign, err := mgr.Get(bob, "conv", "server")
+	require.NoError(t, err)
+	done := make(chan error, 1)
+	go func() {
+		_, err := first.CallTool(alice, nil)
+		done <- err
+	}()
+	select {
+	case <-made[0].started:
+	case <-time.After(time.Second):
+		t.Fatal("business call did not start")
+	}
+	require.False(t, mgr.EvictCurrentClient(bob, "conv", "server", first), "other actor cannot retire a client")
+	require.True(t, mgr.EvictCurrentClient(alice, "conv", "server", first))
+	require.Equal(t, int32(0), made[0].closed.Load(), "active call must retain transport")
+	require.True(t, mgr.IsCurrentClient(bob, "conv", "server", foreign))
+	replacement, err := mgr.Get(alice, "conv", "server")
+	require.NoError(t, err)
+	require.NotSame(t, first, replacement)
+	require.False(t, mgr.EvictCurrentClient(alice, "conv", "server", first), "late failure cannot retire newer client")
+	require.True(t, mgr.IsCurrentClient(alice, "conv", "server", replacement))
+	close(made[0].release)
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("business call did not finish")
+	}
+	waitClosed(t, made[0], 1)
+}
+
 func TestIsCurrentClientPreservesUnrelatedServerAndCanonicalPrincipalPools(t *testing.T) {
 	for _, customOwner := range []bool{false, true} {
 		t.Run(map[bool]string{false: "canonical-principal", true: "configured-owner"}[customOwner], func(t *testing.T) {

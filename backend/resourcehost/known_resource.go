@@ -13,10 +13,17 @@ import (
 // definition and revision. Do not publish this partial view into discovery cache.
 func (g *Gateway) knownResourceCapabilities(ctx context.Context, actor identity.VerifiedActor, binding *resourceReadBinding, connection Connection, uri identity.ResourceURI) (capabilities, bool) {
 	options := binding.options
-	// Collection restrictions may use opaque namespace locators. Keep their
-	// existing discovery path rather than guessing a URI-authority mapping.
-	if options.PrimitiveProviderIdentity == "" || options.PrimitiveProviderIdentity != connection.ProviderIdentity || len(options.PrimitiveNamespaces) != 0 || !resourceFiltersSupported(ctx, binding.client) || !standardResourceReadSupported(ctx, binding.client) {
+	// Collection restrictions may use opaque namespace locators. Only the MCP
+	// definition reader's authenticated exact-list proof can bypass the full
+	// collection walk for a matching configured URI namespace.
+	if options.PrimitiveProviderIdentity == "" || options.PrimitiveProviderIdentity != connection.ProviderIdentity || !resourceFiltersSupported(ctx, binding.client) || !standardResourceReadSupported(ctx, binding.client) {
 		return capabilities{}, false
+	}
+	if len(options.PrimitiveNamespaces) != 0 {
+		proof, ok := ctx.Value(mcpReferenceProofKey{}).(mcpReferenceProof)
+		if !ok || uri.Kind != "mcp" || proof.uri != uri.String() || proof.connection != connection || len(options.PrimitiveNamespaces) != 1 || options.PrimitiveNamespaces[0] != "ns://"+uri.Namespace {
+			return capabilities{}, false
+		}
 	}
 	return capabilities{
 		actor: actor, connection: connection, expires: actor.ValidUntil,

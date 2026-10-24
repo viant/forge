@@ -23,6 +23,7 @@ import {
     primeWindowSignals,
     clearProtectedWindowState,
     clearProtectedWindowDenial,
+    getActiveUIBridgeTransportContext,
     protectedWindowDenials,
     removeWindow,
 } from '../core';
@@ -56,6 +57,8 @@ import { buildReportBuilderHostServices } from './dashboard/reportBuilderHostSer
 import { windowMetadataEndpoint } from './windowMetadataEndpoint.js';
 import {useViewPartition} from './useViewPartition.js';
 import {applyTablePagingMetadata} from '../runtime/tablePagingMetadata.js';
+import {admittedPublishedWindowModel,publishedWindowConditionalETag} from '../runtime/publishedWindowModelCache.js';
+import {recordWindowPerfPhase} from '../runtime/windowPerfPhases.js';
 
 export function reuseShallowEqualRuntimeObject(previous = null, candidate = null) {
     if (!previous || !candidate || typeof previous !== 'object' || typeof candidate !== 'object') {
@@ -65,6 +68,20 @@ export function reuseShallowEqualRuntimeObject(previous = null, candidate = null
     const candidateKeys = Object.keys(candidate);
     if (previousKeys.length !== candidateKeys.length) return candidate;
     return candidateKeys.every((key) => Object.is(previous[key], candidate[key])) ? previous : candidate;
+}
+
+export function scopedWindowHostServices(services = {}, windowState = null) {
+    if (typeof services?.createHostWindow !== 'function') return services;
+    const hostWindow = services.createHostWindow(windowState);
+    return hostWindow && typeof hostWindow === 'object'
+        ? {...services, hostWindow: {...(services.hostWindow || {}), ...hostWindow}}
+        : services;
+}
+
+export function resolveWindowModelCacheScope(services = {}, bridgeSessionId = '') {
+    return typeof services?.windowModelCacheScope === 'function'
+        ? services.windowModelCacheScope() || ''
+        : bridgeSessionId || '';
 }
 
 function useStableRuntimeIdentity(dependencies = []) {
@@ -218,6 +235,22 @@ export async function applyWindowPermissionMetadata(completeMetadata, {
     });
 }
 
+// The cohort HTTP handler admits the selected root and binds this UI instance
+// before emitting these headers, including on 304. A legacy window GET lacks
+// this representation marker and retains its separate permission preflight.
+export function isAdmittedPublishedWindowResponse(responseInfo, window, metadata) {
+    const hash = String(responseInfo?.artifactHash || '');
+    const etag = String(responseInfo?.etag || '');
+    const uri = String(window?.resourceRef?.uri || '');
+    const providerIdentity = String(window?.providerIdentity || '');
+    const cohortETag = /^"([a-f0-9]{64})\.cohort-v\d+"$/i.exec(etag);
+    if (!/^[a-f0-9]{64}$/i.test(hash) || cohortETag?.[1]?.toLowerCase() !== hash.toLowerCase() ||
+        !/^window:\/\/[^/]+\/.+/.test(uri) || !providerIdentity || !metadata?.view) return false;
+    if (metadata.resource?.uri && metadata.resource.uri !== uri) return false;
+    if (metadata.resource?.providerIdentity && metadata.resource.providerIdentity !== providerIdentity) return false;
+    return true;
+}
+
 export function resolveInitialWindowFormValues(metadata) {
     const windowCfg = metadata?.window || {};
     const onEntries = [
@@ -240,12 +273,16 @@ export function resolveInitialWindowFormValues(metadata) {
 }
 
 export function resolveDefaultDataSourceRef(metadata) {
+    const dataSourceRefs = Object.keys(metadata?.dataSource || {});
     return String(
         metadata?.view?.dataSourceRef
         || metadata?.view?.content?.dataSourceRef
         || metadata?.window?.titleBinding?.dataSourceRef
         || metadata?.window?.titleBinding?.ref
-        || Object.keys(metadata?.dataSource || {})[0]
+        // An implicit default is unambiguous only for a single-source window.
+        // Multi-source definitions may serialize a command datasource first;
+        // selecting that key would execute it when the window opens.
+        || (dataSourceRefs.length === 1 ? dataSourceRefs[0] : '')
         || ''
     ).trim();
 }
@@ -353,6 +390,8 @@ function collectRequiredDataSourceRefs(node, scope, refs, viewState = {}, fetchU
     addRef(node.definitionDataSourceRef);
     addRef(node.runtime?.definitionDataSourceRef);
     addRef(node.dashboard?.reportBuilder?.definitionDataSourceRef);
+    addRef(node.reportBuilder?.campaignChoicesDataSourceRef, true);
+    addRef(node.dashboard?.reportBuilder?.campaignChoicesDataSourceRef, true);
     addRef(resolveMappedRef(node), node.fetchData === false);
 
     // Commands execute through datasource signals. Their contexts must be
@@ -1285,6 +1324,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
         return () => globalThis.removeEventListener?.('forge:retry-window-metadata', retry);
     }, []);
     const [signalsReady, setSignalsReady] = useState(() => !!(metadataSignalHandle?.peek?.()));
+    const admittedRefreshDefinitions = useMemo(() => new WeakSet(), []);
 
     // Settings & connector
     const {endpoints = {}, connectorConfig = {}, services = {}, targetContext = {}, useAuth = () => ({})} = useSetting();
@@ -1310,8 +1350,9 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
         conversationId: runtimeWindow?.conversationId,
         prepareRequest: prepareConnectorRequest,
     }), [services, endpoints, auth, service?.endpoint, runtimeWindow?.conversationId, prepareConnectorRequest]);
+    const scopedServices = useMemo(() => scopedWindowHostServices(reportBuilderServices, runtimeWindow), [reportBuilderServices, runtimeWindow]);
     const resolvedServices = useMemo(() => ({
-        ...reportBuilderServices,
+        ...scopedServices,
         windowState: runtimeWindow,
         __connectorRuntime: {
             endpoints,
@@ -1319,8 +1360,10 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             auth,
             transport: services.dataConnectorTransport,
             prepareRequest: prepareConnectorRequest,
+            recoverWindowBinding: services.recoverWindowBinding,
+            windowId,
         },
-    }), [reportBuilderServices, runtimeWindow, endpoints, targetContext, auth, prepareConnectorRequest]);
+    }), [scopedServices, runtimeWindow, endpoints, targetContext, auth, prepareConnectorRequest]);
     const config  = {service: {...service, uri: windowMetadataEndpoint(service.uri, baseKey, runtimeWindow), includeTargetContext: true}};
     const connector = createDataConnector(config, {
         endpoints, targetContext, auth,
@@ -1405,19 +1448,47 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             }
         }
 
-        withWindowPermissionDeadline(() => connector.get({})
+        const modelIdentity = {
+            providerIdentity: window?.providerIdentity,
+            uri: window?.resourceRef?.uri,
+            revision: window?.resourceRef?.revision,
+            target: targetContext,
+            sessionId: resolveWindowModelCacheScope(services,getActiveUIBridgeTransportContext()?.sessionId),
+        };
+        const responseInfo = {};
+        withWindowPermissionDeadline(async () => {
+            recordWindowPerfPhase('metadata-request-scheduled',windowId);
+            return connector.get({responseInfo,ifNoneMatch:await publishedWindowConditionalETag(modelIdentity)})
             .then(async (resp) => {
                 if (cancelled || expired) return;
+                recordWindowPerfPhase('metadata-response-parsed',windowId);
                 setFetchError(null);
-                const selectedDefinition = resolveWindowMetadataForTarget(resp.data, targetContext);
-                const completeMetadata = services.resourceFS
-                    ? await services.resourceFS.loadWindow(selectedDefinition) : selectedDefinition;
+                let completeMetadata;
+                const compileModel = async definition => {
+                    const selected = resolveWindowMetadataForTarget(definition, targetContext);
+                    return services.resourceFS ? services.resourceFS.loadWindow(selected) : selected;
+                };
+                const modelRequest = {...modelIdentity,hash:responseInfo.artifactHash,etag:responseInfo.etag,compile:compileModel};
+                let admittedResponseInfo=responseInfo;
+                try {
+                    completeMetadata = await admittedPublishedWindowModel({...modelRequest,definition:resp.notModified ? null : resp.data});
+                } catch (error) {
+                    if (!resp.notModified) throw error;
+                    // A concurrent eviction after the conditional GET cannot
+                    // turn an empty 304 into a usable definition.
+                    const freshInfo = {};
+                    const fresh = await connector.get({responseInfo:freshInfo,fresh:true});
+                    completeMetadata = await admittedPublishedWindowModel({...modelIdentity,hash:freshInfo.artifactHash,etag:freshInfo.etag,
+                        definition:fresh.data,compile:compileModel});
+                    admittedResponseInfo=freshInfo;
+                }
                 if (cancelled || expired) return;
                 fetchedProtectedMetadata = isProtectedWindowMetadata(completeMetadata);
                 // A signed delivery is emitted only after host OPEN admission. Its
                 // snapshot is a rendering hint, not a data-operation preflight.
                 const selectionBinding = canonicalSelectionBinding(window);
-                const permissionAppliedMetadata = selectionBinding ? completeMetadata : await applyWindowPermissionMetadata(completeMetadata, {
+                const permissionAppliedMetadata = selectionBinding || isAdmittedPublishedWindowResponse(admittedResponseInfo,window,completeMetadata)
+                    ? completeMetadata : await applyWindowPermissionMetadata(completeMetadata, {
                     services,
                     windowId,
                     windowKey: baseKey,
@@ -1444,7 +1515,9 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
                     __provisionalInline: false,
                 };
                 metadataSignalHandle.value = heldMetadata;
-            }))
+                recordWindowPerfPhase('metadata-signal-published',windowId);
+            });
+        })
             .catch((err) => {
                 rejectWindowStateAdoption(adoption);
                 if (Number(err?.status) === 504) expired = true;
@@ -1471,6 +1544,7 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
         if (!metadata || typeof metadata !== 'object') return;
         syncWindowRuntimeHints(windowId, metadata, window);
         primeWindowSignals(windowId, metadata);
+        recordWindowPerfPhase('metadata-prime-complete',windowId);
         setSignalsReady(true);
     }, [windowId, metadataSignalHandle?.value, resolvedServices, window]);
 
@@ -1510,13 +1584,37 @@ function WindowContentRuntime({window, isInTab = false, selectedMetadata = null}
             // A signal bypasses only the connector's concurrent GET sharing;
             // this remains the normal host-selected definition/admission path.
             const controller=new AbortController();
-            const response=await connector.get({signal:controller.signal,fresh:true,cache:{bypassCache:true}});
-            const selected=resolveWindowMetadataForTarget(response.data,targetContext);
-            return services.resourceFS?services.resourceFS.loadWindow(selected):selected;
+            const identity={providerIdentity:runtimeWindow?.providerIdentity,uri:runtimeWindow?.resourceRef?.uri,
+                revision:runtimeWindow?.resourceRef?.revision,target:targetContext,
+                sessionId:resolveWindowModelCacheScope(services,getActiveUIBridgeTransportContext()?.sessionId)};
+            const responseInfo={};
+            const compile=async raw=>{
+                const selected=resolveWindowMetadataForTarget(raw,targetContext);
+                return services.resourceFS?services.resourceFS.loadWindow(selected):selected;
+            };
+            const response=await connector.get({signal:controller.signal,fresh:true,cache:{bypassCache:true},responseInfo,
+                ifNoneMatch:await publishedWindowConditionalETag(identity)});
+            let admittedInfo=responseInfo,definition;
+            try{
+                definition=await admittedPublishedWindowModel({...identity,hash:responseInfo.artifactHash,etag:responseInfo.etag,
+                    definition:response.notModified?null:response.data,compile});
+            }catch(error){
+                if(!response.notModified)throw error;
+                // A 304 without an intact local model still needs a complete
+                // admitted GET; it cannot render or bind from an empty body.
+                const freshInfo={};
+                const fresh=await connector.get({signal:controller.signal,fresh:true,cache:{bypassCache:true},responseInfo:freshInfo});
+                definition=await admittedPublishedWindowModel({...identity,hash:freshInfo.artifactHash,etag:freshInfo.etag,
+                    definition:fresh.data,compile});
+                admittedInfo=freshInfo;
+            }
+            if(isAdmittedPublishedWindowResponse(admittedInfo,runtimeWindow,definition))admittedRefreshDefinitions.add(definition);
+            return definition;
         },
         prepareMetadata:async definition=>{
             const binding=canonicalSelectionBinding(runtimeWindow);
-            const applied=binding?definition:await applyWindowPermissionMetadata(definition,{services,windowId,windowKey:baseKey,
+            const admittedRefresh=admittedRefreshDefinitions.delete(definition);
+            const applied=binding||admittedRefresh?definition:await applyWindowPermissionMetadata(definition,{services,windowId,windowKey:baseKey,
                 resource:window.resource || window.parameters || {},windowParams:window.parameters || {},conversationId:window.conversationId || '',targetContext});
             if(workspaceRefreshScopeIdentity(applied)!==workspaceRefreshScopeIdentity(definition))throw new Error('Workspace admission changed the held resource scope');
             // Scope equality is verified against unmodified producer output by

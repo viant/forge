@@ -76,6 +76,19 @@ const inheritedPublishedRuntimeConfig = buildReportBuilderPublishedDatasetConfig
 assert.deepEqual(inheritedPublishedRuntimeConfig.dimensions, rawConfig.dimensions);
 assert.deepEqual(inheritedPublishedRuntimeConfig.measures, rawConfig.measures);
 assert.equal(inheritedPublishedRuntimeConfig.dataSourceRef, "summarySource");
+const detachedPublishedConfigInput = {
+  ...rawConfig,
+  extra: { nested: { value: "original" } },
+};
+const detachedPublishedConfig = buildReportBuilderPublishedDatasetConfig(detachedPublishedConfigInput, {
+  id: "summary",
+  dataSourceRef: "summarySource",
+  capabilities: { inheritRuntimeFieldCatalog: true },
+});
+detachedPublishedConfig.extra.nested.value = "changed";
+detachedPublishedConfig.dimensions[0].label = "Changed date";
+assert.equal(detachedPublishedConfigInput.extra.nested.value, "original");
+assert.equal(detachedPublishedConfigInput.dimensions[0].label, "Date");
 
 const rawState = {
   selectedMeasures: ["totalSpend", "impressions"],

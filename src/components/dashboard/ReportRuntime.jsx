@@ -2273,6 +2273,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, bl
   const authoredDefaultCollapsed = block?.content?.defaultCollapsed ?? block?.defaultCollapsed;
   const defaultCollapsed = collapsible && authoredDefaultCollapsed !== false;
   const [collapsed, setCollapsed] = useState(() => collapsible && defaultCollapsed);
+  const [paginating, setPaginating] = useState(false);
   const previousDefaultCollapsedRef = useRef(defaultCollapsed);
   useEffect(() => {
     if (shouldApplyTableDefaultCollapsed(previousDefaultCollapsedRef.current, defaultCollapsed, collapsible)) {
@@ -2321,6 +2322,13 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, bl
   });
   const runtimeTableRows = buildRuntimeTableRows(block, dataset);
   const collapsedPreviewLimit = Math.min(5, runtimeTableRows.length);
+  // Display paging is only for a complete result already held by this report.
+  // Partial results keep their host-owned ReportDatasetPager below the table.
+  const locallyComplete = dataset?.provenance?.hasMore === false
+    && dataset?.provenance?.truncated !== true
+    && !(Number(page?.offset) > 0);
+  const canPaginate = collapsible && locallyComplete && runtimeTableRows.length > 25;
+  const localPaging = canPaginate && paginating;
   const rowActions = tableInteractionState.actions
     .filter((action) => supportsReportRuntimeExecution(action, runtimeHandlers))
     .map((action) => ({
@@ -2359,25 +2367,33 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, bl
       title={normalizeString(block?.title || "Table")}
       subtitle={normalizeString(block?.description || authoredBlock?.description)}
       style={tablePanelStyle}
-      headerAction={collapsible ? (
+      headerAction={collapsible ? (<span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
         <button
           type="button"
           className="forge-report-runtime-table-toggle"
-          aria-label={`${collapsed ? "Expand" : "Collapse"} ${normalizeString(block?.title || "Table")}`}
-          aria-expanded={!collapsed}
+          aria-label={`${collapsed || localPaging ? "Expand" : "Collapse"} ${normalizeString(block?.title || "Table")}`}
+          aria-expanded={!collapsed && !localPaging}
           aria-controls={`${normalizeString(block?.id || "tableBlock")}__table_content`}
-          onClick={() => setCollapsed((value) => !value)}
+          onClick={() => { setPaginating(false); setCollapsed(collapsed || localPaging ? false : true); }}
           style={{ border: "1px solid var(--forge-report-control-border, #d4dee8)", background: "var(--forge-report-control-surface, #fff)", borderRadius: 8, padding: "5px 9px", cursor: "pointer", color: "var(--forge-report-text-secondary, #30404d)", display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)" }}
         >
-          <Icon icon={collapsed ? "chevron-down" : "chevron-up"} size={14} aria-hidden="true" />
-          <span>{collapsed ? "Expand" : "Collapse"}</span>
+          <Icon icon={collapsed || localPaging ? "chevron-down" : "chevron-up"} size={14} aria-hidden="true" />
+          <span>{collapsed || localPaging ? "Expand" : "Collapse"}</span>
         </button>
-      ) : null}
+        {canPaginate ? <button type="button" className="forge-report-runtime-table-toggle"
+          aria-label={`Paginate ${normalizeString(block?.title || "Table")}`}
+          aria-pressed={localPaging}
+          onClick={() => { setPaginating(!localPaging); setCollapsed(localPaging); }}
+          style={{ border: "1px solid var(--forge-report-control-border, #d4dee8)", background: "var(--forge-report-control-surface, #fff)", borderRadius: 8, padding: "5px 9px", cursor: "pointer", color: "var(--forge-report-text-secondary, #30404d)", fontSize: "var(--forge-report-type-small-size, 12px)" }}
+        >Paginate</button> : null}
+      </span>) : null}
     >
       <BlockDiagnosticsCallout diagnostics={diagnostics} onRetryProviderActions={onRetryProviderActions} providerActionsLoading={providerActionsLoading} />
-      {collapsible && collapsed ? (
+      {collapsible && collapsed && !localPaging ? (
         <div className="forge-report-runtime-table-collapsed-summary" aria-live="polite" style={{ display: "flex", flexWrap: "wrap", gap: 8, fontSize: "var(--forge-report-type-small-size, 12px)", lineHeight: "var(--forge-report-type-small-line-height, normal)", color: "var(--forge-report-text-muted, #5f6b7c)" }}>
-          <span>Showing {collapsedPreviewLimit} of {runtimeTableRows.length} {runtimeTableRows.length === 1 ? "row" : "rows"}</span>
+          <span>{locallyComplete
+            ? `Showing ${collapsedPreviewLimit} of ${runtimeTableRows.length} ${runtimeTableRows.length === 1 ? "row" : "rows"}`
+            : `Showing ${collapsedPreviewLimit} of ${runtimeTableRows.length} rows on this page${dataset?.provenance?.hasMore === true ? "; more available" : ""}`}</span>
           {tablePresentation.sort ? <span>Sorted by {tablePresentation.sort.label} ({tablePresentation.sort.direction})</span> : null}
           {tablePresentation.filter ? <span>Filter: {tablePresentation.filter}</span> : null}
         </div>
@@ -2410,7 +2426,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, bl
               density: "compact",
               limit: collapsed
                 ? Math.max(1, collapsedPreviewLimit)
-                : Math.max(1, Number(dataset?.provenance?.rowCount || reportSpec?.parameters?.pageSize || 50) || 50),
+                : (locallyComplete ? Math.max(1, runtimeTableRows.length) : Math.max(1, Number(dataset?.provenance?.rowCount || reportSpec?.parameters?.pageSize || 50) || 50)),
               rowActionDisplay: "compact",
               rowActions,
               labelClamp: block?.content?.labelClamp || block?.labelClamp,
@@ -2421,6 +2437,7 @@ function TableBlock({ sourceRows = [], page = {}, onDatasetPageChange = null, bl
                 || [],
             },
           },
+          paging: localPaging ? { enabled: true, size: 25, rangeLabel: "complete", resetKey: dataset?.rows } : undefined,
         }}
         context={createRuntimeContext({
           ...dataset,
@@ -3042,6 +3059,9 @@ export default function ReportRuntime({
   sectionPresentation = "tabs",
   selectedSectionId = "",
   onSectionChange = null,
+  sectionLoading = false,
+  sectionError = "",
+  onSectionRetry = null,
   onChartMetricSelectionChange = null,
   datasetPages = {},
   onDatasetPageChange = null,
@@ -3183,10 +3203,12 @@ export default function ReportRuntime({
   };
   const runtimeFilterValues = useMemo(
     () => ({
+      ...resolveReportRuntimeFilterValues(scopeParamIndex),
+      // Hosts may supply values from the completed execution. Authored scope
+      // defaults are a fallback for presentation, not a newer execution result.
       ...(conditionValues && typeof conditionValues === "object" && !Array.isArray(conditionValues)
         ? conditionValues
         : {}),
-      ...resolveReportRuntimeFilterValues(scopeParamIndex),
     }),
     [conditionValues, scopeParamIndex],
   );
@@ -3537,15 +3559,17 @@ export default function ReportRuntime({
                 gap: "var(--forge-spacing-4, 16px)",
               }}
             >
-              {childBlocks.map((childBlock) => (
-                <div
+              {childBlocks.map((childBlock) => {
+                const rendered = renderBlock(childBlock);
+                if (rendered == null) return null;
+                return <div
                   key={`runtime:${normalizeString(block?.id || "composite")}:${childBlock?.id || "block"}`}
                   data-report-runtime-block-id={normalizeString(childBlock?.id)}
                   style={{ minWidth: 0 }}
                 >
-                  {renderBlock(childBlock)}
-                </div>
-              ))}
+                  {rendered}
+                </div>;
+              })}
             </div> : renderLayoutBlockGrid(childBlocks, `runtime:${normalizeString(block?.id || "composite")}`)
           ) : (
             <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
@@ -3604,8 +3628,10 @@ export default function ReportRuntime({
         }}
         data-report-runtime-layout-columns={runtimeGridColumns}
       >
-        {blocks.map((block) => (
-          <div
+        {blocks.map((block) => {
+          const rendered = renderBlock(block);
+          if (rendered == null) return null;
+          return <div
             key={`${keyPrefix}:${block?.id || "block"}`}
             data-report-runtime-block-id={normalizeString(block?.id)}
             data-report-runtime-layout-span={resolveRuntimeLayoutSpanForBlock(block)}
@@ -3614,9 +3640,9 @@ export default function ReportRuntime({
               gridColumn: resolveResponsiveRuntimeLayoutGridColumn(block, runtimeGridColumns),
             }}
           >
-            {renderBlock(block)}
-          </div>
-        ))}
+            {rendered}
+          </div>;
+        })}
       </div>
     );
   };
@@ -3734,10 +3760,19 @@ export default function ReportRuntime({
                 value={{ ...workspacePresentation, sectionLabel: section.navigationLabel }}
               >
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  {section.block && (!documentPresentation || sectionHeaderAction) && hasSectionHeaderDetail(section.block, sectionHeaderAction, section.navigationLabel)
-                    ? renderBlock(section.block)
-                    : null}
-                  {renderLayoutBlockGrid(section.items, `runtime:${section.id}`)}
+                  {sectionLoading || sectionError ? (
+                    <section role={sectionError ? "alert" : "status"} aria-busy={sectionLoading}
+                      className="forge-report-runtime-section-transition"
+                      style={{minHeight:160,display:"grid",placeItems:"center",padding:24,border:"1px solid var(--forge-report-border, #d8e0e7)",borderRadius:8}}>
+                      <div>{sectionError ? <><p>{sectionError}</p>{onSectionRetry ? <button type="button" onClick={onSectionRetry}>Retry section</button> : null}</>
+                        : "Loading section…"}</div>
+                    </section>
+                  ) : <>
+                    {section.block && (!documentPresentation || sectionHeaderAction) && hasSectionHeaderDetail(section.block, sectionHeaderAction, section.navigationLabel)
+                      ? renderBlock(section.block)
+                      : null}
+                    {renderLayoutBlockGrid(section.items, `runtime:${section.id}`)}
+                  </>}
                 </div>
               </WorkspacePresentationProvider>
             );

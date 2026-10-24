@@ -108,6 +108,19 @@ it('window close uses the normal dirty confirmation, preserves draft on cancel a
  await act(async()=>{activeWindows.value=[{windowId:'clean-close',windowKey:'clean',windowTitle:'Clean',inTab:true}];selectedTabId.value='clean-close';});
  await act(async()=>{result=await runUICommand({method:'ui.window.close',params:{windowId:'clean-close'}});});expect(result.status).toBe('closed');expect(activeWindows.peek()).toHaveLength(0);
 });
+it('host close cancellation keeps its mounted window and a later accepted close removes it',async()=>{
+ activeWindows.value=[{windowId:'operate-render',windowKey:'preview-window',windowTitle:'Preview',inTab:true}];
+ selectedTabId.value='operate-render';selectedWindowId.value='operate-render';
+ let allow=false;
+ const close=vi.fn(id=>{if(!allow)return false;activeWindows.value=activeWindows.peek().filter(window=>window.windowId!==id);return true;});
+ await act(async()=>root.render(<WindowManager onCloseWindow={close} renderWindowContent={()=><div>Preview</div>}/>));
+ await act(async()=>{await runUICommand({method:'ui.window.close',params:{windowId:'operate-render'}});});
+ expect(activeWindows.peek().some(window=>window.windowId==='operate-render')).toBe(true);
+ allow=true;
+ await act(async()=>{await runUICommand({method:'ui.window.close',params:{windowId:'operate-render'}});});
+ expect(close).toHaveBeenCalledTimes(2);
+ expect(activeWindows.peek().some(window=>window.windowId==='operate-render')).toBe(false);
+});
 it('unregistered window close fails without removing the live instance',async()=>{
  activeWindows.value=[{windowId:'unregistered-close',windowKey:'test'}];
  await expect(runUICommand({method:'ui.window.close',params:{windowId:'unregistered-close'}})).rejects.toThrow(/unsupported or unmounted/);expect(activeWindows.peek()).toHaveLength(1);activeWindows.value=[];

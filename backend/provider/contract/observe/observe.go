@@ -68,6 +68,7 @@ type Event struct {
 	Duration time.Duration
 	Outcome  Outcome
 	Cache    Cache
+	Bytes    int64 // optional transferred or decoded byte count; never content
 }
 
 // Observer callbacks execute synchronously, must be safe for concurrent calls,
@@ -115,11 +116,14 @@ func bounded(value string) string {
 	return value
 }
 func (span Span) End(outcome Outcome, cache Cache) {
+	span.EndBytes(outcome, cache, 0)
+}
+func (span Span) EndBytes(outcome Outcome, cache Cache, bytes int64) {
 	if span.observer == nil {
 		return
 	}
 	duration := time.Since(span.start)
-	span.observer.Observe(Event{Phase: span.phase, Labels: Labels{Kind: bounded(span.labels.Kind), Provider: bounded(span.labels.Provider), Namespace: bounded(span.labels.Namespace)}, Duration: duration, Outcome: outcome, Cache: cache})
+	span.observer.Observe(Event{Phase: span.phase, Labels: Labels{Kind: bounded(span.labels.Kind), Provider: bounded(span.labels.Provider), Namespace: bounded(span.labels.Namespace)}, Duration: duration, Outcome: outcome, Cache: cache, Bytes: bytes})
 }
 func OutcomeFor(err error) Outcome {
 	if err == nil {

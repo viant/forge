@@ -433,3 +433,63 @@ const missingLine=buildReportPrintChartSvg({chartModel:{type:'line',xAxis:{dataK
 assert.match(missingLine.svg,/<path d="M[^\"]* M/,'Missing values must break printed lines');
 const nullLine=buildReportPrintChartSvg({chartModel:{type:'line',series:{values:[{value:'value',label:'Value'}]}},resolvedChart:{kind:'directSeries',seriesKeys:['value'],rows:[{value:null}]}});
 assert.equal(nullLine.svg,'','Missing observations must not print as zero');
+
+// A three-column letter-page dashboard gives each chart roughly 170 points.
+// Geometry must obey that allocation rather than extending into the next tile.
+for (const width of [140, 170, 210, 680]) {
+  const output = buildReportPrintChartSvg({
+    width,
+    chartModel: {type:'bar',xAxis:{dataKey:'campaignId'},yAxis:{format:'currency2'},series:{values:[{value:'spend',label:'Spend',format:'currency2',type:'bar'}]}},
+    resolvedChart: {kind:'directSeries',type:'bar',xAxisKey:'campaignId',seriesKeys:['spend'],rows:[{campaignId:'101',spend:67.75}]},
+  });
+  assert.equal(output.diagnostics.length,0);
+  const xCoordinates = [...output.svg.matchAll(/\b(?:x1|x2)="([\d.-]+)"/g)].map(match=>Number(match[1]));
+  assert.ok(xCoordinates.length>0);
+  assert.ok(xCoordinates.every(x=>x>=0&&x<=width),`Chart geometry escapes ${width}-point allocation: ${Math.max(...xCoordinates)}`);
+  for(const match of output.svg.matchAll(/<rect\b[^>]*\bx="([\d.-]+)"[^>]*\bwidth="([\d.-]+)"/g)) {
+    assert.ok(Number(match[1])+Number(match[2])<=width,`Bar escapes ${width}-point allocation`);
+  }
+}
+
+// A forced final date tick must not collide with the preceding periodic tick.
+for (const count of [20, 30]) {
+  for (const width of [170, 270, 680]) {
+    const output = buildReportPrintChartSvg({
+      width,
+      chartModel: {type:'line',xAxis:{dataKey:'date',tickFormat:'MMM d',valueMode:'civil'},series:{values:[{value:'value',label:'Value'}]}},
+      resolvedChart: {kind:'directSeries',type:'line',xAxisKey:'date',seriesKeys:['value'],rows:Array.from({length:count},(_,i)=>({date:`2026-10-${String(i+1).padStart(2,'0')}`,value:i+1}))},
+    });
+    const ticks=[...output.svg.matchAll(/<text x="([\d.-]+)" y="214"[^>]*><tspan>(Oct \d+)<\/tspan><\/text>/g)].map(m=>({x:Number(m[1]),label:m[2]}));
+    assert.equal(ticks[0]?.label,'Oct 1');
+    assert.equal(ticks.at(-1)?.label,`Oct ${count}`);
+    for(let i=1;i<ticks.length;i++) {
+      const needed=(ticks[i-1].label.length+ticks[i].label.length)*2.8+8;
+      assert.ok(ticks[i].x-ticks[i-1].x>=needed,`Date labels overlap at width ${width}: ${JSON.stringify(ticks)}`);
+    }
+  }
+}
+
+// Campaign shares retain their published unit after grouped-series lowering.
+// Multiple categories and many series must fit inside category bands, including
+// the first and last groups on a narrow dashboard tile.
+for(const [format,expected] of [['percentFraction',/>84\.8%</],['currency2',/>\$0\.85</]]) {
+ for(const width of [140,270,640]) for(const seriesCount of [2,8]) {
+  const seriesKeys=Array.from({length:seriesCount},(_,i)=>String(101+i));
+  const rows=['top 1-10','top 11-25','top 26-50'].map((bucket,i)=>({bucket,...Object.fromEntries(seriesKeys.map((key,j)=>[key,i===0&&j===1?.848:.681/(i+1)]))}));
+  const output=buildReportPrintChartSvg({width,chartModel:{type:'bar',xAxis:{dataKey:'bucket'},yAxis:{format}},resolvedChart:{kind:'groupedSeries',type:'bar',xAxisKey:'bucket',seriesKeys,rows}});
+  assert.equal(output.diagnostics.length,0);
+  assert.match(output.svg,expected,'Grouped series must inherit the measure axis format');
+  const bars=[...output.svg.matchAll(/<path class="forge-chart-bar" d="([^"]+)"/g)];
+  assert.equal(bars.length,rows.length*seriesCount);
+  for(const [,path] of bars){
+   const coords=path.match(/-?\d+(?:\.\d+)?(?:e[-+]?\d+)?/gi).map(Number);
+   const xs=coords.filter((_,i)=>i%2===0);
+   assert.ok(Math.max(...xs)>Math.min(...xs),'Dense grouped bars must retain positive width');
+   assert.ok(Math.min(...xs)>=52,'First category bars must not cover the y-axis or its labels');
+   assert.ok(Math.max(...xs)<=width-16,'Last category bars must remain inside the plot');
+  }
+ }
+}
+
+const tinyAudienceCost=buildReportPrintChartSvg({width:640,chartModel:{type:'horizontal_bar',series:{values:[{value:'cost',label:'Cost per published reach (USD)',type:'horizontal_bar',format:'number5'}]}},resolvedChart:{kind:'directSeries',type:'horizontal_bar',xAxisKey:'publisher',seriesKeys:['cost'],rows:[{publisher:'One',cost:.00123}]}});
+assert.match(tinyAudienceCost.svg,/>0\.00123</,'Printed cost labels must retain small authored values');

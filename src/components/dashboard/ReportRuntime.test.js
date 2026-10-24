@@ -3304,6 +3304,35 @@ const selectedSectionRuntimeHtml = renderToStaticMarkup(React.createElement(Repo
 assert.match(selectedSectionRuntimeHtml, /Second section body/);
 assert.doesNotMatch(selectedSectionRuntimeHtml, /First section body/);
 
+const transitioningSectionHtml = renderToStaticMarkup(React.createElement(ReportRuntime, {
+  reportSpec: {title: "Section transition", layoutIntent: {blockOrder: ["tabs", "first", "firstBody", "second", "secondBody"]}, blocks: [], datasets: []},
+  reportFill: {diagnostics: [], datasets: [], blocks: [
+    {id: "tabs", kind: "tabGroupBlock", sectionIds: ["first", "second"], defaultSectionId: "first", includeUnlistedSections: false},
+    {id: "first", kind: "sectionBlock", title: "First", blockIds: ["firstBody"]},
+    {id: "firstBody", kind: "markdownBlock", content: {markdown: "Old first rows"}},
+    {id: "second", kind: "sectionBlock", title: "Second", blockIds: ["secondBody"]},
+    {id: "secondBody", kind: "markdownBlock", content: {markdown: "Old second rows"}},
+  ]},
+  selectedSectionId: "second", sectionLoading: true, presentationMode: "report",
+}));
+assert.match(transitioningSectionHtml, /Loading section/);
+assert.match(transitioningSectionHtml, /aria-busy="true"/);
+assert.doesNotMatch(transitioningSectionHtml, /Old first rows|Old second rows/);
+const failedSectionHtml = renderToStaticMarkup(React.createElement(ReportRuntime, {
+  reportSpec: {title: "Section transition", layoutIntent: {blockOrder: ["tabs", "first", "firstBody", "second", "secondBody"]}, blocks: [], datasets: []},
+  reportFill: {diagnostics: [], datasets: [], blocks: [
+    {id: "tabs", kind: "tabGroupBlock", sectionIds: ["first", "second"], defaultSectionId: "first", includeUnlistedSections: false},
+    {id: "first", kind: "sectionBlock", title: "First", blockIds: ["firstBody"]},
+    {id: "firstBody", kind: "markdownBlock", content: {markdown: "Old first rows"}},
+    {id: "second", kind: "sectionBlock", title: "Second", blockIds: ["secondBody"]},
+    {id: "secondBody", kind: "markdownBlock", content: {markdown: "Old second rows"}},
+  ]},
+  selectedSectionId: "second", sectionError: "Section unavailable", onSectionRetry: () => {}, presentationMode: "report",
+}));
+assert.match(failedSectionHtml, /Section unavailable/);
+assert.match(failedSectionHtml, /Retry section/);
+assert.doesNotMatch(failedSectionHtml, /Old first rows|Old second rows/);
+
 const compositeRuntimeHtml = renderToStaticMarkup(
   React.createElement(ReportRuntime, {
     reportSpec: {
@@ -3601,8 +3630,17 @@ const renderConditionalRuntime = (conditionValues, scope) => renderToStaticMarku
 }));
 assert.match(renderConditionalRuntime({ showDetails: true }), /Composite child must stay hidden/);
 assert.doesNotMatch(renderConditionalRuntime({ showDetails: false }), /Composite child must stay hidden/);
-assert.doesNotMatch(renderConditionalRuntime({ showDetails: true }, {
+assert.match(renderConditionalRuntime({ showDetails: true }, {
   params: [{ id: "showDetails", value: false }],
+}), /Composite child must stay hidden/);
+assert.doesNotMatch(renderConditionalRuntime({}, {
+  params: [{ id: "showDetails", value: false }],
+}), /Composite child must stay hidden/);
+assert.match(renderConditionalRuntime({}, {
+  params: [{ id: "showDetails", value: true }],
+}), /Composite child must stay hidden/);
+assert.doesNotMatch(renderConditionalRuntime({ showDetails: false }, {
+  params: [{ id: "showDetails", value: true }],
 }), /Composite child must stay hidden/);
 console.log("ReportRuntime ✓ preserves metadata disclosure, workspace titles, section details/actions, and option visibility after merge");
 
@@ -3611,3 +3649,21 @@ const distinctSectionTitleHtml = renderMergedSections([
   ...mergedSections.slice(1),
 ]);
 assert.match(distinctSectionTitleHtml, /Regional utilization/);
+
+// Conditional alternatives must not leave empty grid rows/gaps in a dashboard.
+const conditionalTiles = Array.from({length: 9},(_,i)=>({
+ id:`rankAlternative${i}`,kind:"markdownBlock",content:{markdown:`Metric ${i}`},
+ runtime:{visibleWhen:{source:"filters",field:"rankingMetric",equals:String(i)}},
+}));
+const noGapHtml = renderToStaticMarkup(React.createElement(ReportRuntime,{
+ reportSpec:{blocks:conditionalTiles},reportFill:{blocks:conditionalTiles},conditionValues:{rankingMetric:"8"},
+}));
+assert.equal((noGapHtml.match(/data-report-runtime-block-id=/g)||[]).length,1);
+assert.match(noGapHtml,/data-report-runtime-block-id="rankAlternative8"/);
+assert.doesNotMatch(noGapHtml,/data-report-runtime-block-id="rankAlternative[0-7]"/);
+const conditionalGroup={id:"conditionalGroup",kind:"compositeBlock",content:{layout:"grid",columns:2,childBlockIds:conditionalTiles.map(b=>b.id)}};
+const groupedNoGapHtml=renderToStaticMarkup(React.createElement(ReportRuntime,{
+ reportSpec:{blocks:[conditionalGroup,...conditionalTiles]},reportFill:{blocks:[conditionalGroup,...conditionalTiles]},conditionValues:{rankingMetric:"8"},
+}));
+assert.doesNotMatch(groupedNoGapHtml,/data-report-runtime-block-id="rankAlternative[0-7]"/);
+assert.match(groupedNoGapHtml,/data-report-runtime-block-id="rankAlternative8"/);

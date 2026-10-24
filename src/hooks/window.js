@@ -327,6 +327,7 @@ export function useWindowHandlers(windowId) {
                 || maybe.workspaceMinHeight !== undefined
                 || maybe.workspaceCollapsed !== undefined
                 || maybe.resourceRef !== undefined
+                || maybe.linkedRevision !== undefined
                 || maybe.providerIdentity !== undefined
                 || maybe.pickerDialogId !== undefined
                 || maybe.identityParameters !== undefined
@@ -418,6 +419,7 @@ export function useWindowHandlers(windowId) {
                 workspaceCollapsed: options.workspaceCollapsed,
                 identityParameters: options.identityParameters,
                 resourceRef: options.resourceRef,
+                linkedRevision: options.linkedRevision,
                 providerIdentity: options.providerIdentity !== undefined
                     ? options.providerIdentity
                     : activeOwnerWindow && !options.resourceRef
@@ -489,6 +491,7 @@ export function useWindowHandlers(windowId) {
             return undefined;
         }
         const options = {};
+        if (target.revision !== undefined) options.linkedRevision = String(target.revision);
         if (target.awaitResult === true) options.awaitResult = true;
         if (target.newInstance === true) options.newInstance = true;
         if (target.autoIndexTitle === true) options.autoIndexTitle = true;

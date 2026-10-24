@@ -11,6 +11,7 @@ import (
 	"time"
 
 	primitive "github.com/viant/forge/backend/provider/contract"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
 	"github.com/viant/jsonrpc"
@@ -43,7 +44,9 @@ func (g *Gateway) discoverStandardResources(ctx context.Context, actor identity.
 	allPublic := true
 	seenCursor := map[string]bool{}
 	for cursor, page := (*string)(nil), 0; page < 100; page++ {
+		listTiming := observe.Start(ctx, "gateway.resource.list", observe.Labels{Provider: name})
 		listed, err := client.ListResources(ctx, cursor)
+		listTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 		if err != nil {
 			var rpc *jsonrpc.Error
 			if page == 0 && errors.As(err, &rpc) && rpc.Code == -32601 {
@@ -123,6 +126,13 @@ func (g *Gateway) discoverStandardResources(ctx context.Context, actor identity.
 }
 
 func standardResourceReadSupported(ctx context.Context, client mcpclient.Interface) bool {
+	if negotiated, ok := client.(interface {
+		NegotiatedServer() (*schema.InitializeResult, error)
+	}); ok {
+		if result, err := negotiated.NegotiatedServer(); err == nil && result != nil && result.Capabilities.Resources != nil {
+			return true
+		}
+	}
 	if discovery, ok := client.(mcpclient.DiscoveryInterface); ok {
 		if result, err := discovery.Discover(ctx); err == nil && result != nil && result.Capabilities.Resources != nil {
 			return true
@@ -132,31 +142,39 @@ func standardResourceReadSupported(ctx context.Context, client mcpclient.Interfa
 	return err == nil && result != nil && result.Capabilities.Resources != nil
 }
 
-func standardDefinitionGet(ctx context.Context, client mcpclient.Interface, caps capabilities, ref identity.ResourceRef) (primitive.GetResult, error) {
+func standardDefinitionGet(ctx context.Context, client mcpclient.Interface, caps capabilities, ref identity.ResourceRef) (result primitive.GetResult, resultErr error) {
 	resource, ok := caps.indexedResources[ref.URI]
 	if !ok {
 		return primitive.GetResult{}, identity.ErrResourceDenied
 	}
+	labels := observe.Labels{Kind: resource.Kind, Provider: caps.connection.Name}
+	prepareTiming := observe.Start(ctx, "gateway.resource.prepare", labels)
 	params := &schema.ReadResourceRequestParams{Uri: ref.URI}
 	metadata := map[string]any{}
 	if ref.Revision != "" {
 		metadata[primitive.RevisionMeta] = ref.Revision
 	}
 	if resource.Kind == "window" {
-		if supportsIndependentWindowDefinitions(ctx, client) {
+		references, targetSupported := windowResourceCapabilities(ctx, client)
+		if references {
 			metadata[types.WindowDeliveryExtension] = "references"
 		}
-		if target := presentationWindowTarget(ctx); target != nil && supportsWindowTarget(ctx, client) {
+		if target := presentationWindowTarget(ctx); target != nil && targetSupported {
 			metadata[windowTargetExtension] = target
 		}
 	}
 	if len(metadata) > 0 {
 		params.Meta.AdditionalProperties = metadata
 	}
+	prepareTiming.End(observe.OK, observe.CacheUnknown)
+	readTiming := observe.Start(ctx, "gateway.resource.read", labels)
 	read, err := client.ReadResource(ctx, params)
+	readTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return primitive.GetResult{}, err
 	}
+	decodeTiming := observe.Start(ctx, "gateway.resource.decode", labels)
+	defer func() { decodeTiming.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	if read == nil || read.ResultType != "" && read.ResultType != schema.ResultTypeComplete || len(read.Contents) != 1 || read.Contents[0].Uri != ref.URI || read.Contents[0].Blob != "" || len(read.Contents[0].Text) == 0 || len(read.Contents[0].Text) > 4<<20 {
 		return primitive.GetResult{}, identity.ErrResource
 	}

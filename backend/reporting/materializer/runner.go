@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/viant/forge/backend/provider/contract/observe"
 	"github.com/viant/forge/backend/reporting/registry"
 	identity "github.com/viant/forge/backend/resource"
 )
@@ -66,11 +67,13 @@ func LowerWithRequestBase(ctx context.Context, raw json.RawMessage, requestBase 
 		}
 		entry = "lowerWithRequestBase"
 	}
-	result, err := runEntry(ctx, program, entry, input)
+	lowerTiming := observe.Start(ctx, "report.materializer.lower.run", observe.Labels{Kind: "report"})
+	result, err := runTrustedEntry(ctx, program, entry, input)
+	lowerTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, err
 	}
-	output := json.RawMessage(result.String())
+	output := json.RawMessage(result)
 	if len(output) > 16<<20 || !json.Valid(output) {
 		return nil, fmt.Errorf("trusted lowerer returned invalid spec")
 	}
@@ -168,6 +171,7 @@ func runEntryWithTimeSource(ctx context.Context, program *goja.Program, entry st
 }
 
 func runEntryWithTimeSourceTimeout(ctx context.Context, program *goja.Program, entry string, raw json.RawMessage, now goja.Now, timeout time.Duration) (goja.Value, error) {
+	bootstrapTiming := observe.Start(ctx, "report.materializer.runtime.bootstrap", observe.Labels{Kind: "report"})
 	runtime := goja.New()
 	if now != nil {
 		runtime.SetTimeSource(now)
@@ -187,14 +191,18 @@ func runEntryWithTimeSourceTimeout(ctx context.Context, program *goja.Program, e
 		}
 	}()
 	if _, err := runtime.RunProgram(program); err != nil {
+		bootstrapTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 		return nil, loweringError(bounded, err)
 	}
+	bootstrapTiming.End(observe.OK, observe.CacheUnknown)
 	api := runtime.Get("ForgeAuthoredLowerer").ToObject(runtime)
 	lower, ok := goja.AssertFunction(api.Get(entry))
 	if !ok {
 		return nil, fmt.Errorf("trusted lowerer entry missing")
 	}
+	invokeTiming := observe.Start(ctx, "report.materializer.runtime.invoke", observe.Labels{Kind: "report"})
 	result, err := lower(goja.Undefined(), runtime.ToValue(string(raw)))
+	invokeTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, loweringError(bounded, err)
 	}
@@ -211,6 +219,16 @@ type Artifacts struct {
 }
 
 func Materialize(ctx context.Context, spec json.RawMessage, datasets map[string]json.RawMessage) (*Artifacts, error) {
+	return materialize(ctx, spec, datasets, false)
+}
+
+// MaterializeFill computes the validated report fill without constructing a
+// print model. Complete execution and export retain Materialize by default.
+func MaterializeFill(ctx context.Context, spec json.RawMessage, datasets map[string]json.RawMessage) (*Artifacts, error) {
+	return materialize(ctx, spec, datasets, true)
+}
+
+func materialize(ctx context.Context, spec json.RawMessage, datasets map[string]json.RawMessage, fillOnly bool) (*Artifacts, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("materializer context required")
 	}
@@ -224,7 +242,9 @@ func Materialize(ctx context.Context, spec json.RawMessage, datasets map[string]
 	if size > 16<<20 {
 		return nil, fmt.Errorf("report materialization input limit")
 	}
+	normalizeTiming := observe.Start(ctx, "report.materializer.normalize", observe.Labels{Kind: "report"})
 	normalized, err := normalizeDatasetResults(spec, datasets)
+	normalizeTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, err
 	}
@@ -242,15 +262,21 @@ func Materialize(ctx context.Context, spec json.RawMessage, datasets map[string]
 	if programError != nil {
 		return nil, programError
 	}
-	result, err := runEntry(ctx, program, "materialize", raw)
+	runTiming := observe.Start(ctx, "report.materializer.run", observe.Labels{Kind: "report"})
+	entry := "materialize"
+	if fillOnly {
+		entry = "materializeFill"
+	}
+	result, err := runTrustedEntry(ctx, program, entry, raw)
+	runTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, err
 	}
-	if len(result.String()) > 32<<20 {
+	if len(result) > 32<<20 {
 		return nil, fmt.Errorf("report materialization output limit")
 	}
 	var output Artifacts
-	if json.Unmarshal([]byte(result.String()), &output) != nil || len(output.ReportFill) == 0 || len(output.ReportPrint) == 0 {
+	if json.Unmarshal([]byte(result), &output) != nil || len(output.ReportFill) == 0 || !fillOnly && len(output.ReportPrint) == 0 || fillOnly && len(output.ReportPrint) != 0 {
 		return nil, fmt.Errorf("report materialization invalid")
 	}
 	return &output, nil

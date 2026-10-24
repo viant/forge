@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	manager "github.com/viant/forge/backend/clientpool"
+	primitive "github.com/viant/forge/backend/provider/contract"
 	"github.com/viant/forge/backend/requestctx"
 	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
@@ -18,11 +19,13 @@ import (
 
 type targetResourceClient struct {
 	*filteredIndexClient
-	advertise   bool
-	readTargets []string
+	advertise       bool
+	readTargets     []string
+	initializeCalls int
 }
 
 func (c *targetResourceClient) Initialize(ctx context.Context, opts ...mcpclient.RequestOption) (*schema.InitializeResult, error) {
+	c.initializeCalls++
 	r, err := c.filteredIndexClient.Initialize(ctx, opts...)
 	if c.advertise {
 		r.Capabilities.Extensions[windowTargetExtension] = map[string]interface{}{"schemaVersion": 1}
@@ -86,4 +89,17 @@ func TestStandardWindowTargetMetadataAndCachePartition(t *testing.T) {
 			require.Len(t, client.readTargets, 2, "existing definition cache reuses each normalized target separately")
 		})
 	}
+}
+
+func TestStandardWindowReadNegotiatesCapabilitiesOnce(t *testing.T) {
+	const uri = "window://remote/orders"
+	client := &targetResourceClient{filteredIndexClient: &filteredIndexClient{t: t}, advertise: true}
+	caps := capabilities{connection: Connection{Name: "remote", ProviderIdentity: "producer"}, indexedResources: map[string]primitive.ResourceState{uri: {URI: uri, Kind: "window"}}}
+	target := &types.WindowTarget{Platform: "web", FormFactor: "desktop", Surface: "browser", Capabilities: []string{"a", "z"}}
+	ctx := requestctx.WithWindowTarget(context.Background(), target)
+	result, err := standardDefinitionGet(ctx, client, caps, identity.ResourceRef{URI: uri})
+	require.NoError(t, err)
+	require.NotNil(t, result.ResolvedResource)
+	require.Equal(t, 1, client.initializeCalls)
+	require.Equal(t, []string{"desktop"}, client.readTargets)
 }

@@ -928,6 +928,7 @@ export const reportFillSchema = {
         appearance: {enum:["document"]},
         layout: {enum:["small-multiples"]},
         stacked: {type:"boolean"},
+        preserveCategoryOrder: {type:"boolean"},
         xField: { type: "string" },
         yFields: {
           type: "array",
@@ -935,6 +936,7 @@ export const reportFillSchema = {
           items: { type: "string" },
         },
         seriesField: { type: "string" },
+        preserveCategoryOrder: {type:"boolean"},
         metricSelection: {type:"object",additionalProperties:false,required:["primaryField","secondaryField"],properties:{primaryField:{type:"string",minLength:1},secondaryField:{type:"string"}}},
         categoryColors: {type: "object", additionalProperties: {type: "string"}},
         categoryLabel: { $ref: "#/$defs/presentationTextClamp" },

@@ -32,6 +32,7 @@ import {
 import {
     ALL_SUPPORTED_CHART_TYPES,
     chartFamilyAllowsSeriesOptions,
+    chartFamilyAllowsSeriesDimension,
     chartFamilyForType,
     CARTESIAN_CHART_TYPES,
     isValidPerSeriesType,
@@ -57,7 +58,7 @@ import {
     resolveReportBuilderDynamicFilterGroups,
     resolveReportBuilderScopeParamFilters,
 } from "./reportBuilderPredicates.js";
-import { resolveReportRelativeDateRange } from "../../reporting/reportRelativeDateRangeModel.js";
+import { resolveReportRelativeDateRange, resolveReportRelativeDateRangeSpec } from "../../reporting/reportRelativeDateRangeModel.js";
 
 export {
     normalizeDynamicGroupRows,
@@ -164,7 +165,9 @@ export function resolveReportBuilderRailFilterState({
 }
 
 function resolveRelativeDateRangeDefault(seed = {}) {
-    return resolveReportRelativeDateRange(seed?.preset);
+    return seed?.startExpression || seed?.endExpression
+        ? resolveReportRelativeDateRangeSpec(seed)
+        : resolveReportRelativeDateRange(seed?.preset);
 }
 
 function defaultSelectedIds(items = [], fallbackCount = 1) {
@@ -504,6 +507,7 @@ export function normalizeReportBuilderChartSpec(chartSpec = {}) {
         ...(chartSpec.categoryColors && typeof chartSpec.categoryColors === "object" && !Array.isArray(chartSpec.categoryColors) ? {categoryColors: {...chartSpec.categoryColors}} : {}),
         ...(seriesOptions ? { seriesOptions } : {}),
         ...(categoryLabel ? { categoryLabel } : {}),
+        ...(chartSpec.preserveCategoryOrder === true ? {preserveCategoryOrder:true} : {}),
         ...(metricSelection ? {metricSelection} : {}),
         ...(typeof chartSpec.allowTableSwitch === "boolean" ? {allowTableSwitch:chartSpec.allowTableSwitch} : {}),
     };
@@ -566,9 +570,9 @@ function sanitizeChartSpecAgainstConfig(config = {}, chartSpec = null) {
         if (!universe.has(normalized.seriesField)) {
             return null;
         }
-        if (family === "category") {
+        if (!chartFamilyAllowsSeriesDimension(normalized.type)) {
             delete normalized.seriesField;
-        } else if (family === "cartesian" && normalized.yFields.length > 1) {
+        } else if (normalized.yFields.length > 1) {
             delete normalized.seriesField;
         } else if (normalized.seriesField === normalized.xField) {
             delete normalized.seriesField;
@@ -826,9 +830,9 @@ export function validateReportBuilderChartSpec(config = {}, chartSpec = null, co
         if (normalized.seriesField === normalized.xField) {
             errors.push({ field: "seriesField", code: "duplicateField" });
         }
-        if (family === "category") {
+        if (!chartFamilyAllowsSeriesDimension(normalized.type)) {
             errors.push({ field: "seriesField", code: "notAllowed" });
-        } else if (family === "cartesian") {
+        } else {
             if (Array.isArray(normalized.yFields) && normalized.yFields.length > 1) {
                 errors.push({ field: "seriesField", code: "tooManyMeasures" });
             }
@@ -851,7 +855,7 @@ export function validateReportBuilderChartSpec(config = {}, chartSpec = null, co
 
     const canValidateSeriesOptionsEntries = !!normalized.seriesOptions
         && typeof normalized.seriesOptions === "object"
-        && !(normalized.seriesField && family === "cartesian")
+        && !(normalized.seriesField && chartFamilyAllowsSeriesDimension(normalized.type))
         && !(!chartFamilyAllowsSeriesOptions(normalized.type));
 
     if (canValidateSeriesOptionsEntries) {
@@ -1123,7 +1127,7 @@ export function buildDefaultReportBuilderChartSpec(config = {}, state = {}, seed
         ? normalizedSeed.yFields
         : (defaultYField ? [defaultYField] : []);
     const yFields = SINGLE_MEASURE_CATEGORY_TYPES.has(type) ? seededYFields.slice(0, 1) : seededYFields;
-    const allowSeriesField = family === "cartesian" && yFields.length === 1;
+    const allowSeriesField = chartFamilyAllowsSeriesDimension(type) && yFields.length === 1;
     const seriesField = allowSeriesField
         ? (
             normalizedSeed.seriesField
@@ -2341,6 +2345,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
         ...(normalized.appearance ? {appearance:normalized.appearance} : {}),
         ...(normalized.layout ? {layout:normalized.layout} : {}),
         ...(typeof normalized.stacked === 'boolean' ? {stacked:normalized.stacked} : {}),
+        ...(normalized.preserveCategoryOrder === true ? {preserveCategoryOrder:true} : {}),
         xAxis: {
             dataKey: xDisplayKey || xSourceKey,
             label: xField?.label || xField?.id || xSourceKey,
@@ -2359,7 +2364,7 @@ export function buildExplicitReportBuilderChartContainer(container = {}, config 
         },
     };
 
-    if (family === "cartesian" && normalized.seriesField && yMeasures.length === 1) {
+    if (chartFamilyAllowsSeriesDimension(seriesType) && normalized.seriesField && yMeasures.length === 1) {
         const yMeasure = yMeasures[0];
         const seriesDimension = resolveReportBuilderDimensionByField(config, normalized.seriesField);
         const seriesDisplayKey = resolveReportBuilderDimensionDisplayKey(seriesDimension) || normalized.seriesField;

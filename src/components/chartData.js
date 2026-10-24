@@ -144,7 +144,7 @@ export {isChartNumericValue};
 // number fallback for an unformatted axis.
 export function formatChartDisplayValue(value, formatType) {
     if (value == null || typeof value === "string" && !value.trim()) return value;
-    if (["currency", "currency2", "compactNumber", "percent", "percentFraction", "percentFraction2"].includes(formatType)) {
+    if (["currency", "currency2", "compactNumber", "percent", "percentFraction", "percentFraction2", "number", "number2", "number5"].includes(formatType)) {
         return formatDisplayValue(value, formatType);
     }
     return formatChartNumber(value);
@@ -538,4 +538,36 @@ export function resolveChartValueAxisDomain(chartType = "", explicitDomain = und
 
 export function resolveChartAnimationActive(chart = {}) {
     return chart?.animate === true || chart?.animation === true;
+}
+
+// Preserve server-ranked categories when requested; existing charts retain their
+// descending-value default. Neither path mutates the executed row collection.
+export function orderHorizontalChartRows(rows = [], primaryKey, preserveSourceOrder = false) {
+    const ordered = [...rows];
+    if (preserveSourceOrder) return ordered;
+    return ordered.sort((a, b) => Number(b?.[primaryKey] || 0) - Number(a?.[primaryKey] || 0));
+}
+
+// Recharts clamps the requested radius to the bar bounds. Print uses the same
+// pill geometry explicitly, including very short and negative-value bars.
+export const CHART_BAR_END_RADIUS = 999;
+export function resolveChartBarRadius(width, height) {
+    const w = Math.abs(Number(width)), h = Math.abs(Number(height));
+    return Number.isFinite(w) && Number.isFinite(h)
+        ? Math.min(CHART_BAR_END_RADIUS, w / 2, h / 2) : 0;
+}
+
+// Corner order matches Recharts: top-left, top-right, bottom-right, bottom-left.
+// Keep the origin/zero edge square; round only the end away from the baseline.
+export function resolveChartBarCornerRadii(value, orientation = 'horizontal', radius = CHART_BAR_END_RADIUS) {
+    const negative = Number(value) < 0;
+    if (orientation === 'vertical') return negative ? [0, 0, radius, radius] : [radius, radius, 0, 0];
+    return negative ? [radius, 0, 0, radius] : [0, radius, radius, 0];
+}
+
+export function buildChartBarPath({x, y, width, height, value, orientation = 'horizontal'}) {
+    if (![x,y,width,height].every(Number.isFinite) || width <= 0 || height <= 0) return '';
+    const [tl,tr,br,bl] = resolveChartBarCornerRadii(value,orientation,resolveChartBarRadius(width,height));
+    const right=x+width,bottom=y+height,k=0.5522847498307936;
+    return `M ${x+tl} ${y} L ${right-tr} ${y} C ${right-tr+k*tr} ${y} ${right} ${y+tr-k*tr} ${right} ${y+tr} L ${right} ${bottom-br} C ${right} ${bottom-br+k*br} ${right-br+k*br} ${bottom} ${right-br} ${bottom} L ${x+bl} ${bottom} C ${x+bl-k*bl} ${bottom} ${x} ${bottom-bl+k*bl} ${x} ${bottom-bl} L ${x} ${y+tl} C ${x} ${y+tl-k*tl} ${x+tl-k*tl} ${y} ${x+tl} ${y} Z`;
 }

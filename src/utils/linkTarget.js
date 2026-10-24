@@ -221,6 +221,7 @@ export function resolveLinkTarget({ linkConfig = null, row = null, value = null,
             text,
             title: normalizeString(linkConfig.title),
             windowKey,
+            ...(normalizeString(linkConfig.revision) ? {revision: normalizeString(linkConfig.revision)} : {}),
             ...(Array.isArray(linkConfig.identityParameters) && linkConfig.identityParameters.length > 0
                 ? {identityParameters: [...linkConfig.identityParameters]}
                 : {}),

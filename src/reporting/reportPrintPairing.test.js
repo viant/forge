@@ -42,6 +42,24 @@ assert.match(text, /\[x20\]/);
 assert.match(text, /20 touchpoints/);
 assert.match(text, /Pathway evidence \(1\/2\)/);
 assert.match(text, /Pathway evidence \(2\/2\)/);
+const emptyWideFixture = buildPairingPrintFixture();
+const emptyWideTable = {
+  ...emptyWideFixture.reportFill.blocks.find((block) => block.id === "evidence"),
+  content: {
+    ...emptyWideFixture.reportFill.blocks.find((block) => block.id === "evidence").content,
+    columns: Array.from({ length: 20 }, (_, index) => ({ key: `field${index}`, label: `Measurement${index}` })),
+    resolvedRows: [],
+  },
+};
+emptyWideFixture.reportSpec.blocks = [emptyWideTable];
+emptyWideFixture.reportSpec.layoutIntent.blockOrder = [emptyWideTable.id];
+emptyWideFixture.reportFill.blocks = [emptyWideTable];
+emptyWideFixture.reportFill.specHash = buildReportSpecHash(emptyWideFixture.reportSpec);
+const emptyWidePrint = buildReportPrintFromReportFill(emptyWideFixture);
+const emptyWideText = emptyWidePrint.pages.flatMap((page) => page.elements).map((element) => element.text || "").join("\n");
+assert.equal((emptyWideText.match(/No rows are available for print\./g) || []).length, 1,
+  "An empty wide table has one empty state, not one per column partition");
+assert.doesNotMatch(emptyWideText, /Pathway evidence \(\d+\/\d+\)/);
 for (let i = 0; i < 9; i += 1) assert.match(text, new RegExp(`Evidence metric ${i}`));
 for (const page of result.pages) {
   for (const element of page.elements) {
@@ -85,3 +103,52 @@ assert.match(labelOutput, /Category 3/);
 assert.doesNotMatch(labelOutput, /dy=/);
 
 console.log("MTA print pairing regressions passed");
+
+// Short context sections move together; long ones repeat their heading on each page.
+function textSectionPrint(blocks, datasets = []) {
+  const source = { kind: 'reportBuilder', containerId: 'text-pagination', stateKey: 'text-pagination', dataSourceRef: 'primary' };
+  const reportSpec = { version: 1, kind: 'reportSpec', title: 'Context pagination', source, blocks, datasets: datasets.map(dataset=>({id:dataset.id,dataSourceRef:'fixture'})), layoutIntent: { blockOrder: blocks.map(block => block.id) } };
+  const reportFill = { version: 1, kind: 'reportFill', specVersion: 1, specHash: buildReportSpecHash(reportSpec), source, blocks, datasets };
+  return buildReportPrintFromReportFill({ reportSpec, reportFill });
+}
+const contextBlocks = [
+  { id: 'introText', kind: 'markdownBlock', title: 'Introduction', content: { markdown: Array.from({length: 31}, (_, i) => `Introduction line ${i}`).join('\n') } },
+  { id: 'shortOptions', kind: 'filterBarBlock', title: 'Selected report options', content: { params: Array.from({length: 7}, (_, i) => ({id:`option${i}`, value:`Selected ${i}`})) } },
+];
+const shortContext = textSectionPrint(contextBlocks);
+const shortPages = shortContext.pages.filter(page => page.elements.some(element => element.id.startsWith('shortOptions__')));
+assert.equal(shortPages.length, 1, 'an options section that fits on a fresh page must stay together');
+assert.equal(shortPages[0].number, 2);
+const longContext = textSectionPrint([{ id: 'longOptions', kind: 'filterBarBlock', title: 'Selected report options', content: { params: Array.from({length: 90}, (_, i) => ({id:`option${i}`, value:`Selected ${i}`})) } }]);
+assert.ok(longContext.pages.length >= 3);
+for (const page of longContext.pages) {
+  assert.ok(page.elements.some(element => element.id.startsWith('longOptions__title')), 'continued options must retain their heading');
+  assert.ok(page.elements.every(element => element.box.y + element.box.height <= 724.01), 'context stays inside printable page');
+}
+assert.equal(longContext.bookmarks.length, 1, 'continuation headings do not duplicate bookmarks');
+const longElements = longContext.pages.flatMap(page=>page.elements);
+assert.equal(new Set(longElements.map(element=>element.id)).size, longElements.length);
+for (let i=0;i<90;i++) assert.equal(longElements.filter(element=>element.text===`option${i}: Selected ${i}`).length,1,'every option retained exactly once');
+console.log('Text context pagination regressions passed');
+
+
+const emptyChart = { id:'emptyChart',kind:'chartBlock',title:'Daily amount',datasetRef:'measurements',content:{rowCount:0,resolvedChart:null,chartModel:{type:'horizontal_bar',series:{values:[{value:'amount',label:'Amount'}]}}} };
+const emptyDataset = { id:'measurements',provenance:{rowCount:0,hasMore:false,truncated:false,diagnostics:[]},rows:[] };
+const emptyPrint=textSectionPrint([emptyChart],[emptyDataset]);
+const emptyText=emptyPrint.pages.flatMap(page=>page.elements).map(element=>element.text||'').join(' ');
+assert.match(emptyText,/No data for the selected scope/,'A complete empty dataset is a normal no-data state');
+assert.doesNotMatch(emptyText,/ReportPrint block/);
+for(const bad of [[],[{...emptyDataset,provenance:{...emptyDataset.provenance,hasMore:true}}],[{...emptyDataset,provenance:{...emptyDataset.provenance,diagnostics:[{code:'sourceFailure',severity:'error',message:'Fixture source failed'}]}}]]) {
+ const rejected=textSectionPrint([emptyChart],bad);
+ assert.doesNotMatch(rejected.pages.flatMap(page=>page.elements).map(element=>element.text||'').join(' '),/No data for the selected scope/,'Missing/incomplete/failed datasets must not become ordinary no-data');
+ assert.ok(rejected.diagnostics.some(d=>d.code==='unsupportedReportPrintChartPayload'));
+}
+const contextBeforeChart=textSectionPrint([
+ {id:'preceding',kind:'markdownBlock',title:'Preceding analysis',content:{markdown:Array.from({length:21},(_,i)=>`Evidence line ${i}`).join('\n')}},
+ {id:'dailySection',kind:'sectionBlock',title:'Daily trends'},
+ {id:'dailyContext',kind:'markdownBlock',title:'Trend context',content:{markdown:'Compare the reported daily observations in the selected period.'}},
+ {...chart,id:'dailyChart',title:'Daily observations',runtime:{},content:{...chart.content,resolvedChart:{...chart.content.resolvedChart,rows:[{pathway:'A',revenue:5},{pathway:'B',revenue:3}]}}},
+]);
+const dailySectionPage=contextBeforeChart.pages.find(page=>page.elements.some(element=>element.id.startsWith('dailySection__title')));
+assert.ok(dailySectionPage.elements.some(element=>element.id.startsWith('dailyChart__svg')),'A section and its short context stay with the first analytical block');
+console.log('Empty chart and section-introduction pagination regressions passed');

@@ -667,6 +667,63 @@ func TestRender_RoundedRectPlaybackEmitsCurvedPath(t *testing.T) {
 	require.True(t, hasMatchingPathBounds(contentStream, 36, 708, 116, 668, "f"))
 }
 
+func TestRender_TableDataBarsHaveRoundedEndsWithoutRescaling(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version:     1,
+		Kind:        "reportPrint",
+		SpecVersion: 1,
+		SpecHash:    "fnv1a:test-spec",
+		FillVersion: 1,
+		FillHash:    "fnv1a:test-fill",
+		Source: reportprint.Source{
+			Kind:          "dashboard.reportBuilder",
+			ContainerID:   "roundedRectBuilder",
+			StateKey:      "roundedRectBuilder",
+			DataSourceRef: "demoReportSource",
+		},
+		Title: "Rounded Rect",
+		PageGeometry: reportprint.PageGeometry{
+			Width:        612,
+			Height:       792,
+			MarginTop:    36,
+			MarginRight:  36,
+			MarginBottom: 36,
+			MarginLeft:   36,
+			HeaderHeight: 36,
+			FooterHeight: 24,
+		},
+		Pages: []reportprint.Page{
+			{
+				Number: 1,
+				Elements: []reportprint.Element{
+					{
+						ID:        "rounded_rect",
+						Kind:      "tableCellDataBar",
+						Box:       reportprint.Box{X: 36, Y: 84, Width: 80, Height: 40},
+						FillColor: "#f8fafc",
+						RowKey:    "row", ColumnKey: "value", Value: 25, Min: 0, Max: 100,
+					},
+				},
+			},
+		},
+	}
+
+	for _, background := range []string{"", "#ffffff"} {
+		report.Pages[0].Elements[0].BackgroundColor = background
+		result, err := Render(report, Options{})
+		require.NoError(t, err)
+		require.Empty(t, result.Diagnostics)
+
+		contentStream := extractPDFContentStreams(t, result.Bytes)
+		require.Contains(t, contentStream, " c", "Rounded ends must use curved paths")
+		if background == "" {
+			require.True(t, hasMatchingPathBounds(contentStream, 36, 708, 116, 668, "f"), "Canonical width must not be multiplied by value/max again")
+		} else {
+			require.Contains(t, contentStream, "W", "Gradient must be clipped to rounded bounds")
+		}
+	}
+}
+
 func TestRender_RawFixtureRendersCanonicalSVGContent(t *testing.T) {
 	report := loadRawFixtureReportPrint(t)
 
@@ -3394,4 +3451,23 @@ func collectPreviewVisibleSVGLabels(report *reportprint.ReportPrint) []string {
 		appendLabels(page.FooterElements)
 	}
 	return result
+}
+
+func TestRender_NarrowBoldHeaderKeepsCanonicalLines(t *testing.T) {
+	report := &reportprint.ReportPrint{
+		Version: 1, Kind: "reportPrint", SpecVersion: 1, SpecHash: "fnv1a:test-spec", FillVersion: 1, FillHash: "fnv1a:test-fill",
+		Source: reportprint.Source{Kind: "dashboard.reportBuilder", ContainerID: "header", StateKey: "header", DataSourceRef: "source"}, Title: "Header",
+		PageGeometry: reportprint.PageGeometry{Width: 612, Height: 792, MarginTop: 36, MarginRight: 36, MarginBottom: 36, MarginLeft: 36, HeaderHeight: 36, FooterHeight: 24},
+		Pages:        []reportprint.Page{{Number: 1, Elements: []reportprint.Element{{ID: "header", Kind: "text", Box: reportprint.Box{X: 42, Y: 136, Width: 42.63, Height: 24}, Text: "Campaign ID", FontSize: 9, FontWeight: "600", Wrap: true}}}},
+	}
+	result, err := Render(report, Options{})
+	require.NoError(t, err)
+	inspected := inspectRenderedPDF(t, result.Bytes)
+	var labels []string
+	for _, run := range inspected.pageRuns[1] {
+		labels = append(labels, strings.TrimSpace(run.Text))
+	}
+	require.Contains(t, labels, "Campaign", "FPDF must not split a line already measured by the canonical print model")
+	require.Contains(t, labels, "ID")
+	require.Len(t, labels, 2, "An extra PDF-only line would overflow the measured header")
 }

@@ -11,6 +11,10 @@ import (
 // assignment and descriptor loading. Check reports sticky access denials even
 // when legacy branch probing or optional-asset loading suppresses an error.
 type LoaderOptions struct {
+	// RequireCompleteResources makes published, immutable top-level windows
+	// fail on unresolved explicit assignments or declarative references.
+	// Working/legacy loads retain their warning-tolerant default.
+	RequireCompleteResources bool
 	// StaticAssets is optional and exists only inside one source compilation.
 	StaticAssets       *StaticAssetCompilation
 	SourceCatalog      func(bool)
