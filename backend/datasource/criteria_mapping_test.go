@@ -10,6 +10,7 @@ import (
 
 	dsproto "github.com/viant/forge/backend/datasource/contract"
 	"github.com/viant/forge/backend/types"
+	windowprotocol "github.com/viant/forge/backend/window/contract"
 )
 
 func criteriaBackend() *dsproto.Backend {
@@ -140,5 +141,20 @@ func TestCriteriaMappingDescriptorRoundTrip(t *testing.T) {
 	}
 	if !strings.Contains(string(wire), "criteriaMapping") {
 		t.Fatal("mapping was omitted")
+	}
+	var delivered windowprotocol.Backend
+	if err = json.Unmarshal(wire, &delivered); err != nil {
+		t.Fatal(err)
+	}
+	delivery, err := json.Marshal(delivered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var restored dsproto.Backend
+	if err = json.Unmarshal(delivery, &restored); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(restored.CriteriaMapping, actual.CriteriaMapping) {
+		t.Fatal("window delivery dropped criteria mapping")
 	}
 }
