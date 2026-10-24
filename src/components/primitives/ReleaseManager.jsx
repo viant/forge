@@ -14,7 +14,8 @@ const historyEntry = item => item.bundle ? {...item.bundle, revision:item.revisi
 const historyLabel = item => [item.description, item.revision != null ? `Revision ${item.revision}` : '', item.activatedAt ? new Date(item.activatedAt).toLocaleDateString() : ''].filter(Boolean).join(' · ') || `Retained release ${item.hash?.slice(0, 8) || ''}`;
 const channelName = channel => channel.key?.name || channel.name || '';
 const activated = (result, expectedRevision) => {
-  const channel = result?.channel || result;
+  if (result?.status !== 'active' || result?.activated !== true) return null;
+  const channel = result.channel;
   return channel?.activeBundleHash && Number(channel.revision) > Number(expectedRevision) ? channel : null;
 };
 
@@ -38,8 +39,10 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
   const [pendingAction, setPendingAction] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [progress, setProgress] = useState('');
   const request = useRef(0);
   const submitLock = useRef(false);
+  const pendingName = useRef('');
   const current = channels.find(channel => channelName(channel) === selected);
   const expectedRevision = current?.revision ?? 0;
   const key = releaseName => ({...channelKey, name: releaseName});
@@ -53,9 +56,20 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
         api.list(channelKey), api.candidates(channelKey), api.policies(channelKey),
       ]);
       if (ticket !== request.current) return;
-      setChannels(rows(nextChannels, 'channels'));
+      const listed = rows(nextChannels, 'channels');
+      setChannels(listed);
       setCandidates(rows(nextCandidates, 'roots'));
       setAvailablePolicies(rows(nextPolicies, 'policies'));
+      if (pendingName.current) {
+        const outcome = listed.find(channel => channelName(channel) === pendingName.current);
+        if (outcome?.releaseStatus === 'active' && outcome.activated === true) {
+          setSelected(channelName(outcome));setName(channelName(outcome));setDescription(outcome.description || '');setPolicies(outcome.policies || []);
+          setRoots(outcome.bundle?.roots || []);
+          setProgress('');setNotice('Release activated.');pendingName.current='';
+        } else if (outcome?.releaseStatus === 'failed') {
+          setProgress('');setError('The release failed to activate. Your selections are preserved.');pendingName.current='';
+        }
+      }
     } catch (cause) {
       if (ticket === request.current) setError(cause?.message || 'Releases could not load.');
     } finally {
@@ -78,13 +92,14 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
     setRollbackHash('');
     setError('');
     setNotice('');
+    setProgress('');
     if (!channel) return;
     setLoading(true);
     try {
       const value = rows(await api.history(channel.key), 'bundles').map(historyEntry);
       if (ticket !== request.current) return;
       setHistory(value);
-      setRoots(value.find(bundle => bundle.hash === channel.activeBundleHash)?.roots || []);
+      setRoots(channel.bundle?.roots || value.find(bundle => bundle.hash === channel.activeBundleHash)?.roots || []);
     } catch (cause) {
       if (ticket === request.current) setError(cause?.message || 'Release history could not load.');
     } finally {
@@ -102,7 +117,7 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
     setName(channelName(channel));
     setDescription(channel.description || '');
     setPolicies(channel.policies || []);
-    setRoots(selectedRoots);
+    setRoots(selectedRoots || []);
     setNotice(message);
     try { onActivated?.(channel); }
     catch (cause) { setError(`Release activated, but the host could not update: ${cause?.message || 'try reloading.'}`); }
@@ -112,6 +127,7 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
       const active = listed?.activeBundleHash === channel.activeBundleHash && Number(listed.revision) >= Number(channel.revision) ? listed : channel;
       setChannels([...next.filter(item => channelName(item) !== channelName(channel)), active]);
       setHistory(rows(await api.history(active.key), 'bundles').map(historyEntry));
+      if (active.bundle?.roots) setRoots(active.bundle.roots);
     } catch (cause) {
       setError(`Release activated, but its current list could not refresh: ${cause?.message || 'try reloading.'}`);
     }
@@ -121,20 +137,27 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
     const releaseName = name.trim();
     const target = mode === 'promote' ? channels.find(channel => channelName(channel) === promotionTarget) : current;
     const chosenRollback = history.find(bundle => bundle.hash === rollbackHash);
-    if (!releaseName || (mode === 'publish' && (!roots.length || !policies.length)) || (mode === 'promote' && (!current?.activeBundleHash || !target || target === current)) || (mode === 'rollback' && !chosenRollback)) return;
+    if (!releaseName || (mode === 'publish' && (!currentRootsKnown || !roots.length || !policies.length)) || (mode === 'promote' && (!current?.activeBundleHash || !target || target === current)) || (mode === 'rollback' && !chosenRollback)) return;
     submitLock.current = true;
     setPending(true);
     setPendingAction(mode);
     setError('');
     setNotice('');
+    setProgress('');
     try {
       const input = mode === 'publish'
         ? {key: key(releaseName), description: description.trim(), roots: roots.map(({uri, kind, version, hash}) => ({uri, kind, version, hash})), policies: policies.map(({resource, revision}) => ({resource, revision})), expectedRevision}
         : {key: target.key, expectedRevision: target.revision, bundleHash: mode === 'promote' ? current.activeBundleHash : rollbackHash};
       const result = await (mode === 'publish' ? api.publish(input) : api.promote(input));
+      if (result?.status === 'pending' && result?.activated === false) {
+        pendingName.current = input.key.name;
+        setProgress(`${mode === 'publish' ? 'Publishing' : mode === 'promote' ? 'Promoting' : 'Rolling back'} is in progress. Refresh releases to check activation.`);
+        return;
+      }
+      if (result?.status === 'failed') throw new Error('The release failed to activate. Your selections are preserved.');
       const channel = activated(result, input.expectedRevision);
       if (!channel || channelName(channel) !== input.key.name || (mode !== 'publish' && channel.activeBundleHash !== input.bundleHash)) throw new Error('The release has not been confirmed active. Reload its current state before trying again.');
-      await refreshAfterActivation(channel, mode === 'publish' ? 'Release activated.' : mode === 'promote' ? `Promoted to ${input.key.name}.` : `Rolled back ${input.key.name}.`, mode === 'rollback' ? chosenRollback.roots : roots);
+      await refreshAfterActivation(channel, mode === 'publish' ? 'Release activated.' : mode === 'promote' ? `Promoted to ${input.key.name}.` : `Rolled back ${input.key.name}.`, result.bundle?.roots || (mode === 'rollback' ? chosenRollback.roots : roots));
     } catch (cause) {
       setError(cause?.message || 'The release did not activate. Your selections are preserved.');
     } finally {
@@ -146,6 +169,7 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
   const rootChoices = [...candidates, ...roots.filter(root => !candidates.some(candidate => rootID(candidate) === rootID(root)))];
   const policyChoices = [...availablePolicies, ...policies.filter(policy => !availablePolicies.some(candidate => policyID(candidate) === policyID(policy)))];
   const artifactGroups = [...new Set(rootChoices.map(artifactID))].map(id => ({id, choices:rootChoices.filter(root => artifactID(root) === id).sort((a,b) => Number(b.version)-Number(a.version))}));
+  const currentRootsKnown = !current?.activeBundleHash || Array.isArray(current?.bundle?.roots) || history.some(bundle => bundle.hash === current.activeBundleHash && Array.isArray(bundle.roots));
   const priorReleases = history.filter(bundle => bundle.hash !== current?.activeBundleHash);
   const promotionChannels = channels.filter(channel => channelName(channel) !== selected);
 
@@ -155,6 +179,8 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
     {loading && <div role="status"><Spinner size={16}/> Loading releases…</div>}
     {error && <Callout intent="danger" role="alert">{error} <Button minimal disabled={pending} onClick={load}>Reload</Button></Callout>}
     {notice && <Callout intent="success" role="status">{notice}</Callout>}
+    {progress && <Callout intent="primary" role="status">{progress} <Button minimal disabled={pending} onClick={load}>Refresh releases</Button></Callout>}
+    {current?.releaseStatus === 'pending' && <Callout intent="primary" role="status">This channel has a release in progress. Refresh releases to check activation.</Callout>}
     <FormGroup label="Release channel" labelFor="release-channel">
       <HTMLSelect id="release-channel" fill value={selected} disabled={disabled || pending || loading} onChange={event => choose(event.target.value)}>
         <option value="">New release</option>
@@ -189,13 +215,14 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
         </FormGroup>;
       }) : <p>No artifact revisions are available.</p>}
     </fieldset>
+    {!currentRootsKnown && <Callout intent="warning">This server has not supplied the active release’s included artifacts. Refresh its history before changing the bundle.</Callout>}
     {current && <p>Current release revision {current.revision}</p>}
     <details><summary>Technical details</summary>
       {current?.activeBundleHash && <p>Active bundle hash: <code title={current.activeBundleHash}>{shortHash(current.activeBundleHash)}</code></p>}
       {!!policies.length && <ul>{policies.map(policy => <li key={policyID(policy)}>{policyLabel(policy)} · {policy.resource?.kind}:{policy.resource?.id} · resource v{policy.resource?.version} · policy revision {policy.revision}</li>)}</ul>}
       {!!roots.length && <ul>{roots.map(root => <li key={rootID(root)}>{root.kind} · {root.uri} · revision {root.version} · hash <code title={root.hash}>{shortHash(root.hash)}</code></li>)}</ul>}
     </details>
-    <Button intent="primary" loading={pendingAction === 'publish'} disabled={disabled || pending || loading || !name.trim() || !roots.length || !policies.length} onClick={() => submit('publish')}>Publish</Button>
+    <Button intent="primary" loading={pendingAction === 'publish'} disabled={disabled || pending || loading || !currentRootsKnown || !name.trim() || !roots.length || !policies.length} onClick={() => submit('publish')}>Publish</Button>
     {current && <section aria-label="Promotion and rollback">
       <h3>Promotion and rollback</h3>
       <FormGroup label="Promote to…" labelFor="release-promotion-target">

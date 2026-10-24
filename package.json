@@ -36,6 +36,7 @@
     "./result-preview/model": "./src/components/primitives/resultPreviewModel.js",
     "./resource-policy-editor": "./src/components/primitives/ResourcePolicyEditor.jsx",
     "./release-manager": "./src/components/primitives/ReleaseManager.jsx",
+    "./release-manager/adapter": "./src/components/primitives/releaseMCPAdapter.js",
     "./resource-policy-editor/model": "./src/components/primitives/resourcePolicyReview.js",
     "./resource-window": "./src/components/ResourceWindow.jsx",
     "./host-window/download": "./src/runtime/hostWindowDownload.js",

@@ -14,8 +14,8 @@ const history = [{namespace:'sales',hash:'sha256:old',roots:[rootRef],revision:4
 const deferred = () => {let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};};
 const api = (overrides={}) => ({
   list:vi.fn(async()=>[]),candidates:vi.fn(async()=>[rootRef,olderRoot]),policies:vi.fn(async()=>[policy]),
-  history:vi.fn(async()=>history),publish:vi.fn(async()=>({key:{...scope,name:'poc'},activeBundleHash:'sha256:new',revision:1})),
-  promote:vi.fn(async()=>({...channel,activeBundleHash:'sha256:older',revision:5})),...overrides,
+  history:vi.fn(async()=>history),publish:vi.fn(async()=>({channel:{key:{...scope,name:'poc'},activeBundleHash:'sha256:new',revision:1},status:'active',activated:true})),
+  promote:vi.fn(async()=>({channel:{...channel,activeBundleHash:'sha256:older',revision:5},status:'active',activated:true})),...overrides,
 });
 const render = async adapter => {
   globalThis.IS_REACT_ACT_ENVIRONMENT=true;
@@ -89,7 +89,7 @@ it('chooses only one exact revision for an artifact URI',async()=>{
 });
 
 it('promotes the source channel bundle to a target channel using the target revision and policies',async()=>{
-  const adapter=api({list:vi.fn(async()=>[channel,main]),promote:vi.fn(async()=>({...main,activeBundleHash:channel.activeBundleHash,revision:7}))});const view=await render(adapter);
+  const adapter=api({list:vi.fn(async()=>[channel,main]),promote:vi.fn(async()=>({channel:{...main,activeBundleHash:channel.activeBundleHash,revision:7},status:'active',activated:true}))});const view=await render(adapter);
   try{
     await select(view.host.querySelector('#release-channel'),'poc');
     expect(view.host.querySelector('#release-name').value).toBe('poc');
@@ -116,7 +116,7 @@ it('rolls back to a readable retained release on the same channel',async()=>{
 });
 
 it('publishes edits to an existing channel with its current revision and retained exact roots',async()=>{
-  const adapter=api({list:vi.fn(async()=>[channel]),publish:vi.fn(async()=>({...channel,activeBundleHash:'sha256:new',revision:5}))});
+  const adapter=api({list:vi.fn(async()=>[channel]),publish:vi.fn(async()=>({channel:{...channel,activeBundleHash:'sha256:new',revision:5},status:'active',activated:true}))});
   const view=await render(adapter);
   try{
     await select(view.host.querySelector('#release-channel'),'poc');
@@ -126,14 +126,27 @@ it('publishes edits to an existing channel with its current revision and retaine
   }finally{await view.close();}
 });
 
+it('does not replace an existing bundle when the server omits its active artifact closure',async()=>{
+  const adapter=api({list:vi.fn(async()=>[channel]),history:vi.fn(async()=>[{hash:'sha256:old',revision:4}])});
+  const view=await render(adapter);
+  try{
+    await select(view.host.querySelector('#release-channel'),'poc');
+    await include(view.host);
+    expect(view.host.textContent).toContain('has not supplied the active release’s included artifacts');
+    expect(button(view.host,'Publish').disabled).toBe(true);
+    expect(adapter.publish).not.toHaveBeenCalled();
+  }finally{await view.close();}
+});
+
 it('does not report success when the adapter returns an unactivated proposal',async()=>{
-  const adapter=api({publish:vi.fn(async()=>({key:{...scope,name:'poc'},revision:0,activeBundleHash:''}))});const view=await render(adapter);
+  const adapter=api({publish:vi.fn(async()=>({channel:{key:{...scope,name:'poc'},revision:0,activeBundleHash:''},status:'pending',activated:false}))});const view=await render(adapter);
   try{
     await text(view.host.querySelector('#release-name'),'poc');
     await click(view.host.querySelector('input[type="checkbox"]'));
     await include(view.host);
     await click(button(view.host,'Publish'));
-    expect(view.host.querySelector('[role="alert"]').textContent).toContain('not been confirmed active');
+    expect(view.host.querySelector('[role="status"]').textContent).toContain('Publishing is in progress');
+    expect(view.host.textContent).not.toContain('Release activated.');
     expect(view.host.querySelector('#release-name').value).toBe('poc');
   }finally{await view.close();}
 });
@@ -148,5 +161,22 @@ it('keeps confirmed activation visible when the subsequent list refresh fails',a
     await click(button(view.host,'Publish'));
     expect(view.host.querySelector('[role="status"]').textContent).toContain('Release activated.');
     expect(view.host.querySelector('[role="alert"]').textContent).toContain('current list could not refresh');
+  }finally{await view.close();}
+});
+
+it('reports a pending publication as active only after an authoritative refreshed list confirms it',async()=>{
+  const published={key:{...scope,name:'poc'},description:'Review',policies:[policy],activeBundleHash:'sha256:published',revision:1,releaseStatus:'active',activated:true,bundle:{roots:[rootRef]}};
+  const adapter=api({list:vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([published]),publish:vi.fn(async()=>({status:'pending',activated:false,channel:{...published,activeBundleHash:''}}))});
+  const view=await render(adapter);
+  try{
+    await text(view.host.querySelector('#release-name'),'poc');
+    await click(view.host.querySelector('input[type="checkbox"]'));
+    await include(view.host);
+    await click(button(view.host,'Publish'));
+    expect(view.host.textContent).toContain('Publishing is in progress');
+    expect(view.host.textContent).not.toContain('Release activated.');
+    await click(button(view.host,'Refresh releases'));
+    expect(view.host.textContent).toContain('Release activated.');
+    expect(view.host.textContent).not.toContain('Publishing is in progress');
   }finally{await view.close();}
 });
