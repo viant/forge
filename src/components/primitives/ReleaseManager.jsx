@@ -137,7 +137,7 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
     const releaseName = name.trim();
     const target = mode === 'promote' ? channels.find(channel => channelName(channel) === promotionTarget) : current;
     const chosenRollback = history.find(bundle => bundle.hash === rollbackHash);
-    if (!releaseName || (mode === 'publish' && (!currentRootsKnown || !roots.length || !policies.length)) || (mode === 'promote' && (!current?.activeBundleHash || !target || target === current)) || (mode === 'rollback' && !chosenRollback)) return;
+    if (!releaseName || (mode === 'publish' && (!currentRootsKnown || !policiesAssignable || !roots.length || !policies.length)) || (mode === 'promote' && (!current?.activeBundleHash || !target || target === current)) || (mode === 'rollback' && !chosenRollback)) return;
     submitLock.current = true;
     setPending(true);
     setPendingAction(mode);
@@ -168,6 +168,7 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
   };
   const rootChoices = [...candidates, ...roots.filter(root => !candidates.some(candidate => rootID(candidate) === rootID(root)))];
   const policyChoices = [...availablePolicies, ...policies.filter(policy => !availablePolicies.some(candidate => policyID(candidate) === policyID(policy)))];
+  const policiesAssignable = policies.every(policy => availablePolicies.some(candidate => policyID(candidate) === policyID(policy)));
   const artifactGroups = [...new Set(rootChoices.map(artifactID))].map(id => ({id, choices:rootChoices.filter(root => artifactID(root) === id).sort((a,b) => Number(b.version)-Number(a.version))}));
   const currentRootsKnown = !current?.activeBundleHash || Array.isArray(current?.bundle?.roots) || history.some(bundle => bundle.hash === current.activeBundleHash && Array.isArray(bundle.roots));
   const priorReleases = history.filter(bundle => bundle.hash !== current?.activeBundleHash);
@@ -195,10 +196,11 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
     </FormGroup>
     <fieldset disabled={disabled || pending || loading}><legend>Who can use this?</legend>
       {policyChoices.length ? policyChoices.map(policy => <label key={policyID(policy)} className="forge-release-manager-choice">
-        <input type="checkbox" checked={policies.some(item => policyID(item) === policyID(policy))} onChange={() => toggle(policies, setPolicies, policy, policyID)}/>
-        <span>{policyLabel(policy)}</span>
-      </label>) : <p>No named policies are available.</p>}
+        <input type="checkbox" checked={policies.some(item => policyID(item) === policyID(policy))} disabled={!availablePolicies.some(candidate => policyID(candidate) === policyID(policy)) && !policies.some(item => policyID(item) === policyID(policy))} onChange={() => toggle(policies, setPolicies, policy, policyID)}/>
+        <span>{policyLabel(policy)}{!availablePolicies.some(candidate => policyID(candidate) === policyID(policy)) ? ' · Unavailable for new releases' : ''}</span>
+      </label>) : !error && <p>No policies are available for this release. Create an account policy in Security, then reload.</p>}
     </fieldset>
+    {!policiesAssignable && <Callout intent="warning">Remove unavailable policies before publishing. The server will verify every chosen policy again.</Callout>}
     <fieldset disabled={disabled || pending || loading}><legend>Included artifacts</legend>
       {artifactGroups.length ? artifactGroups.map(({id, choices}, index) => {
         const selectedRoot = roots.find(root => artifactID(root) === id);
@@ -222,7 +224,7 @@ export default function ReleaseManager({api, channelKey, disabled = false, onAct
       {!!policies.length && <ul>{policies.map(policy => <li key={policyID(policy)}>{policyLabel(policy)} · {policy.resource?.kind}:{policy.resource?.id} · resource v{policy.resource?.version} · policy revision {policy.revision}</li>)}</ul>}
       {!!roots.length && <ul>{roots.map(root => <li key={rootID(root)}>{root.kind} · {root.uri} · revision {root.version} · hash <code title={root.hash}>{shortHash(root.hash)}</code></li>)}</ul>}
     </details>
-    <Button intent="primary" loading={pendingAction === 'publish'} disabled={disabled || pending || loading || !currentRootsKnown || !name.trim() || !roots.length || !policies.length} onClick={() => submit('publish')}>Publish</Button>
+    <Button intent="primary" loading={pendingAction === 'publish'} disabled={disabled || pending || loading || !currentRootsKnown || !policiesAssignable || !name.trim() || !roots.length || !policies.length} onClick={() => submit('publish')}>Publish</Button>
     {current && <section aria-label="Promotion and rollback">
       <h3>Promotion and rollback</h3>
       <FormGroup label="Promote to…" labelFor="release-promotion-target">

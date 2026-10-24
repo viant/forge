@@ -180,3 +180,31 @@ it('reports a pending publication as active only after an authoritative refreshe
     expect(view.host.textContent).not.toContain('Publishing is in progress');
   }finally{await view.close();}
 });
+
+it('explains an empty assignable policy list without offering publication',async()=>{
+  const view=await render(api({policies:vi.fn(async()=>[])}));
+  try{
+    expect(view.host.textContent).toContain('No policies are available for this release');
+    expect(view.host.textContent).toContain('Create an account policy in Security');
+    expect(button(view.host,'Publish').disabled).toBe(true);
+  }finally{await view.close();}
+});
+
+it('surfaces policy candidate errors without pretending the inventory is empty',async()=>{
+  const view=await render(api({policies:vi.fn(async()=>{throw new Error('Release policy choices could not load.');})}));
+  try{
+    expect(view.host.querySelector('[role="alert"]').textContent).toContain('Release policy choices could not load.');
+    expect(view.host.textContent).not.toContain('No policies are available for this release');
+    expect(button(view.host,'Publish').disabled).toBe(true);
+  }finally{await view.close();}
+});
+
+it('shows a previously selected policy removed from candidates but will not republish it',async()=>{
+  const view=await render(api({list:vi.fn(async()=>[channel]),policies:vi.fn(async()=>[])}));
+  try{
+    await select(view.host.querySelector('#release-channel'),'poc');
+    expect(view.host.textContent).toContain('Unavailable for new releases');
+    expect(view.host.textContent).toContain('Remove unavailable policies before publishing');
+    expect(button(view.host,'Publish').disabled).toBe(true);
+  }finally{await view.close();}
+});
