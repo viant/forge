@@ -65,6 +65,23 @@ it('keeps partial results on the host pager without a local total', async () => 
   } finally { await act(async () => root.unmount()); host.remove(); }
 });
 
+it('sorts a collapsed report preview against the complete loaded result before showing five rows', async () => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host);
+  const data = [65, 66, 66, 67, 67, 3, 1, 2, 98, 99].map(id => ({ id }));
+  const visible = () => [...host.querySelectorAll('.forge-report-runtime-table-panel tbody tr')].map(row => Number(row.cells[0].textContent));
+  try {
+    await act(async () => root.render(<ReportRuntime {...fixture(data)} />));
+    expect(visible()).toEqual([65, 66, 66, 67, 67]);
+    const sort = host.querySelector('[aria-label="Sort by ID"]');
+    await act(async () => sort.click());
+    expect(visible()).toEqual([1, 2, 3, 65, 66]);
+    await act(async () => sort.click());
+    expect(visible()).toEqual([99, 98, 67, 67, 66]);
+  } finally { await act(async () => root.unmount()); host.remove(); }
+});
+
 it('requests an admitted complete result on Expand without treating a partial page as complete', async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const host = document.createElement('div'); document.body.append(host);
