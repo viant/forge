@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 
 import { resolveLinkTarget } from './linkTarget.js';
 
+assert.equal(resolveLinkTarget({linkConfig:{kind:'window',windowKey:'campaign',revision:'7'},value:'Campaign'}).revision,'7');
+
 assert.deepEqual(resolveLinkTarget({
   row: {recordId: 42},
   value: 'Record 42',
