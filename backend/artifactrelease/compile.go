@@ -154,7 +154,7 @@ func MergeActivation(existing artifactcohort.Manifest, key Key, current Compilat
 // dependencies remain in the storage tenant; only ordinary output tenancy is
 // changed by the trusted producer before this merge.
 func MergeProjectedActivation(existing artifactcohort.Manifest, key Key, projectionTenant string, current Compilation) ([]authz.Document, []artifactcohort.Cohort, error) {
-	if !key.Valid() || projectionTenant == "" || strings.TrimSpace(projectionTenant) != projectionTenant {
+	if !key.Valid() || !(Key{Tenant: projectionTenant, Account: key.Account, Workspace: key.Workspace, Namespace: key.Namespace, Name: key.Name}).Valid() {
 		return nil, nil, ErrInvalid
 	}
 	if existing.Hash != "" && artifactcohort.ValidateManifest(existing) != nil {
