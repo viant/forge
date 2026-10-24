@@ -149,7 +149,7 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 		}
 	}
 	compileTiming := observe.Start(ctx, "report.resource.compile", observe.Labels{Kind: "report"})
-	compiled, err := s.Compile(ctx, &CompileRequest{DependencyPins: dependencyPins, DependencyToken: dependencyToken, ResolvedResource: pin, Parameters: request.Parameters})
+	compiled, err := s.compileWithAdmitted(ctx, &CompileRequest{DependencyPins: dependencyPins, DependencyToken: dependencyToken, ResolvedResource: pin, Parameters: request.Parameters}, &admittedCompileDefinition{raw: admittedRaw, pin: *pin})
 	compileTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, err
