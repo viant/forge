@@ -27,6 +27,9 @@ func criteriaArguments(args map[string]interface{}, backend *dsproto.Backend) (m
 	if backend.Kind != dsproto.BackendMCPTool || !criteriaInputName.MatchString(mapping.Parameter) || len(mapping.Fields) == 0 {
 		return nil, "", fmt.Errorf("criteriaMapping requires an MCP tool, selector parameter and explicit fields")
 	}
+	if mapping.LiteralGrammar != "" && mapping.LiteralGrammar != "sql" && mapping.LiteralGrammar != "simple" {
+		return nil, "", fmt.Errorf("unsupported criteriaMapping literal grammar")
+	}
 	for _, key := range backend.RequestMetadata {
 		if key == mapping.Parameter {
 			return nil, "", fmt.Errorf("criteriaMapping selector cannot be request metadata")
@@ -62,6 +65,9 @@ func criteriaArguments(args map[string]interface{}, backend *dsproto.Backend) (m
 		delete(result, field.Input)
 		if !exists || value == nil || value == "" {
 			continue
+		}
+		if mapping.LiteralGrammar == "simple" && containsCriteriaQuote(value) {
+			return nil, "", fmt.Errorf("filter %q contains a quote unsupported by this data source", field.Input)
 		}
 		if op == "in" {
 			values := reflect.ValueOf(value)
@@ -109,6 +115,21 @@ func criteriaArguments(args map[string]interface{}, backend *dsproto.Backend) (m
 	// Explicit cache policies cannot collapse two different mapped filters.
 	sum := sha256.Sum256([]byte(mapping.Parameter + "\x00" + criteria))
 	return result, "|criteria:" + hex.EncodeToString(sum[:]), nil
+}
+
+func containsCriteriaQuote(value interface{}) bool {
+	if text, ok := value.(string); ok {
+		return strings.Contains(text, "'")
+	}
+	v := reflect.ValueOf(value)
+	if v.Kind() == reflect.Slice || v.Kind() == reflect.Array {
+		for i := 0; i < v.Len(); i++ {
+			if containsCriteriaQuote(v.Index(i).Interface()) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func criteriaLiteral(value interface{}, kind string) (string, error) {

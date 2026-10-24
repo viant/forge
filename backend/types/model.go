@@ -1768,6 +1768,8 @@ type SortMapping struct {
 type CriteriaMapping struct {
 	Parameter string          `json:"parameter" yaml:"parameter"`
 	Fields    []CriteriaField `json:"fields" yaml:"fields"`
+	// Simple opts into legacy producers that cannot represent embedded quotes.
+	LiteralGrammar string `json:"literalGrammar,omitempty" yaml:"literalGrammar,omitempty"`
 }
 
 type CriteriaField struct {

@@ -158,3 +158,16 @@ func TestCriteriaMappingDescriptorRoundTrip(t *testing.T) {
 		t.Fatal("window delivery dropped criteria mapping")
 	}
 }
+
+func TestCriteriaMappingLegacyLiteralGrammarFailsBeforeDispatch(t *testing.T) {
+	b := criteriaBackend()
+	b.CriteriaMapping.LiteralGrammar = "simple"
+	for _, value := range []interface{}{"O'Reilly", []string{"safe", "O'Reilly"}} {
+		if _, _, err := criteriaArguments(map[string]interface{}{"Name": value}, b); err == nil {
+			t.Fatal("legacy producer received unsupported quoted text")
+		}
+	}
+	if _, _, err := criteriaArguments(map[string]interface{}{"Name": "plain"}, b); err != nil {
+		t.Fatal(err)
+	}
+}
