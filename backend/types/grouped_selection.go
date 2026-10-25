@@ -20,6 +20,8 @@ type GroupedSelectionSpec struct {
 	AllowRemoveGroups    *bool                     `json:"allowRemoveGroups,omitempty" yaml:"allowRemoveGroups,omitempty"`
 	ReadOnly             *bool                     `json:"readOnly,omitempty" yaml:"readOnly,omitempty"`
 	ReadOnlyWhen         map[string]interface{}    `json:"readOnlyWhen,omitempty" yaml:"readOnlyWhen,omitempty"`
+	DetailFields         []RecordDetailField       `json:"detailFields,omitempty" yaml:"detailFields,omitempty"`
+	DetailPathField      string                    `json:"detailPathField,omitempty" yaml:"detailPathField,omitempty"`
 	OnAction             string                    `json:"onAction" yaml:"onAction"`
 }
 type GroupedSelectionSection struct {

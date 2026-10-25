@@ -584,6 +584,7 @@ type Container struct {
 	RuleEditor                 *RuleEditorSpec                   `json:"ruleEditor,omitempty" yaml:"ruleEditor,omitempty"`
 	TreeEditor                 *TreeEditorSpec                   `json:"treeEditor,omitempty" yaml:"treeEditor,omitempty"`
 	GroupedSelection           *GroupedSelectionSpec             `json:"groupedSelection,omitempty" yaml:"groupedSelection,omitempty"`
+	ChoiceBrowser              *ChoiceBrowserSpec                `json:"choiceBrowser,omitempty" yaml:"choiceBrowser,omitempty"`
 	Wizard                     *WizardSpec                       `json:"wizard,omitempty" yaml:"wizard,omitempty"`
 	UploadCollection           *UploadCollectionSpec             `json:"uploadCollection,omitempty" yaml:"uploadCollection,omitempty"`
 	DerivedDataSource          *DerivedDataSourceSpec            `json:"derivedDataSource,omitempty" yaml:"derivedDataSource,omitempty"`

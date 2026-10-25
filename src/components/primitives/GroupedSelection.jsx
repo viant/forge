@@ -3,6 +3,7 @@ import {Button} from '@blueprintjs/core';
 import {resolveSelector} from '../../utils/selector.js';
 import {evaluatePlainVisibleWhen} from '../visibleWhen.js';
 import {usePredicateSignals} from './usePredicateSignals.js';
+import RecordDetailsPopover from './RecordDetailsPopover.jsx';
 import './GroupedSelection.css';
 
 const dragType = 'application/x-forge-grouped-selection';
@@ -69,6 +70,7 @@ export default function GroupedSelection({container,context}) {
                 onDragOver={event=>{if(!disabled)event.preventDefault();}} onDrop={event=>drop(event,section.id,id,index)}>
                 <div className="forge-grouped-selection__item-content"><span className="forge-grouped-selection__item-label">{name}</span>{description?<span className="forge-grouped-selection__description">{description}</span>:null}</div>
                 <div className="forge-grouped-selection__item-actions">
+                  {(spec.detailFields||[]).length?<RecordDetailsPopover context={scoped} record={item} identity={key} label={name} fields={spec.detailFields} path={resolveSelector(item,spec.detailPathField||'detailPath')||[]} onPath={(pathValue,pathIndex)=>invoke('activatePath',{sectionId:section.id,groupId:id,itemId:key,pathValue,pathIndex},false)}/>:null}
                   <label className="forge-grouped-selection__move-label"><span className="forge-grouped-selection__sr-only">Move {name} to group</span>
                     <select aria-label={`Move ${name} to group`} value={JSON.stringify([section.id,id])} disabled={disabled||!valid||!validItem} onChange={event=>{
                       const [toSectionId,toGroupId]=JSON.parse(event.currentTarget.value);
