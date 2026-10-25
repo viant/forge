@@ -2,7 +2,7 @@ import {resolveCategoryColor} from '../components/chartTheme.js';
 import { compactReportPrintSequence, wrapReportPrintLabel } from "./reportPrintLabels.js";
 import { formatExportNumericValue } from "./reportExportValueFormatter.js";
 import { normalizeChartAnnotations, resolveChartAnnotationStrokeDasharray } from "./reportChartAnnotations.js";
-import { formatChartXAxisValue, readChartDataValue, isChartNumericValue, buildChartBarPath } from "../components/chartData.js";
+import { formatChartXAxisValue, readChartDataValue, isChartNumericValue, buildChartBarPath, applyChartRowLimit } from "../components/chartData.js";
 
 function normalizeString(value = "") {
   return String(value || "").trim();
@@ -1180,7 +1180,11 @@ export function buildReportPrintChartSvg({
   chartModel = {},
   resolvedChart = {},
   width = 680,
+  rowLimit = 0,
 } = {}) {
+  // Resolved rows already contain complete category aggregations. Limit marks,
+  // never source rows, so duplicate categories retain their complete values.
+  resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart?.rows, rowLimit) };
   const kind = normalizeString(resolvedChart?.kind);
   if (kind === "category") {
     return renderCategoryChartSvg({ chartModel, resolvedChart, width });
@@ -1204,7 +1208,8 @@ export function buildReportPrintChartSvg({
   };
 }
 
-export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}, width = 680, maxHeight = 620, firstMaxHeight = maxHeight } = {}) {
+export function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}, width = 680, maxHeight = 620, firstMaxHeight = maxHeight, rowLimit = 0 } = {}) {
+  resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart?.rows, rowLimit) };
   const type = normalizeString(chartModel?.type || resolvedChart?.type).toLowerCase();
   if (!["horizontal_bar", "funnel_bar"].includes(type) || !["directSeries", "groupedSeries"].includes(resolvedChart?.kind)) {
     return [buildReportPrintChartSvg({ chartModel, resolvedChart, width })];

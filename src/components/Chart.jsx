@@ -593,7 +593,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         if (isPieChart) {
             const nameKey = series.nameKey || "name";
             const valueKey = series.valueKey || selectedValueKey || "value";
-            const rows = buildPieChartData(applyChartRowLimit(chartRows, chart?.rowLimit), nameKey, valueKey);
+            const rows = applyChartRowLimit(buildPieChartData(chartRows, nameKey, valueKey), chart?.rowLimit);
             return {
                 chartData: rows,
                 availableDataKeys: rows.map((row) => row.name),
