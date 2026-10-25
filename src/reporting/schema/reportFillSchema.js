@@ -1164,6 +1164,7 @@ export const reportFillSchema = {
       required: ["type", "series"],
       properties: {
         type: { type: "string" },
+        preserveCategoryOrder: { type: "boolean" },
         xAxis: { $ref: "#/$defs/chartAxis" },
         yAxis: { $ref: "#/$defs/chartYAxis" },
         axes: {type:"object",additionalProperties:false,properties:{left:{$ref:"#/$defs/chartYAxis"},right:{$ref:"#/$defs/chartYAxis"}}},
