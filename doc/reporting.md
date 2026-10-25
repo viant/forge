@@ -742,6 +742,7 @@ Authoring fields:
 - `title`
 - optional `description`
 - optional `layout`: `stack` or `responsiveGrid`
+- optional `runtime`: `desktopColumns` (1–6), `tabletColumns` (1–3), `mobileColumns` (1–3), and `minColumnWidth` for browser grid sizing
 - `childBlockIds[]`
 
 Runtime behavior:
@@ -749,7 +750,7 @@ Runtime behavior:
 - child blocks render inside the grouped panel once
 - grouped child blocks are suppressed from the top-level document flow
 - omitted `layout` preserves the legacy child-span behavior (which stacks children without authored spans); explicit `stack` forces one full-width child per row
-- `responsiveGrid` renders three columns above 960px, two columns from 641px through 960px, and one column at 640px or below
+- `responsiveGrid` defaults to three columns above 960px, two columns from 641px through 960px, and one column at 640px or below; explicit runtime column counts override those defaults, subject to `minColumnWidth`
 - print/export lowers the grouped children inside the composite panel in order
 - print/export lowers `responsiveGrid` deterministically as three equal columns; it does not depend on a browser viewport
 

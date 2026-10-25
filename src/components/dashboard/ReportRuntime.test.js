@@ -3408,6 +3408,27 @@ assert.equal(resolveReportRuntimeCompositeColumns({...responsiveComposite, runti
 assert.equal(resolveReportRuntimeCompositeColumns({...responsiveComposite, runtime: {tabletColumns: 1}}, 800), 1);
 assert.equal(resolveReportRuntimeCompositeColumns({...responsiveComposite, runtime: {desktopColumns: 2, minColumnWidth: 520}}, 1440), 2);
 assert.equal(resolveReportRuntimeCompositeColumns({...responsiveComposite, runtime: {desktopColumns: 2, minColumnWidth: 520}}, 1024), 1);
+const sixKpiLayout = {...responsiveComposite, runtime: {desktopColumns: 6, tabletColumns: 3, mobileColumns: 1, minColumnWidth: 240}};
+assert.equal(resolveReportRuntimeCompositeColumns(sixKpiLayout, 1440), 6);
+assert.equal(resolveReportRuntimeCompositeColumns(sixKpiLayout, 1024), 4);
+assert.equal(resolveReportRuntimeCompositeColumns(sixKpiLayout, 800), 3);
+assert.equal(resolveReportRuntimeCompositeColumns(sixKpiLayout, 500), 1);
+assert.equal(resolveReportRuntimeCompositeColumns({...responsiveComposite, runtime: {desktopColumns: 99}}, 1920), 6);
+const sixKpiBlocks = Array.from({length: 6}, (_, index) => ({
+  id: `summaryKpi${index}`, kind: "kpiBlock", title: `Summary metric ${index}`,
+  content: {title: `Summary metric ${index}`, value: index, rowCount: 1},
+}));
+const sixKpiRuntimeHtml = renderToStaticMarkup(React.createElement(ReportRuntime, {
+  reportSpec: {title: "Six summary metrics", layoutIntent: {blockOrder: ["summary", ...sixKpiBlocks.map(block => block.id)]}, blocks: [], datasets: []},
+  reportFill: {diagnostics: [], datasets: [], blocks: [
+    {id: "summary", kind: "compositeBlock", content: {...sixKpiLayout, childBlockIds: sixKpiBlocks.map(block => block.id)}},
+    ...sixKpiBlocks,
+  ]},
+  presentationMode: "report",
+}));
+assert.match(sixKpiRuntimeHtml, /data-report-runtime-composite-columns="6"/);
+assert.match(sixKpiRuntimeHtml, /grid-template-columns:repeat\(6, minmax\(0, 1fr\)\)/);
+for (let index = 0; index < 6; index++) assert.equal((sixKpiRuntimeHtml.match(new RegExp(`Summary metric ${index}`, "g")) || []).length, 1);
 assert.ok(compositeRuntimeHtml.includes("Summary panel"));
 assert.ok(compositeRuntimeHtml.includes("Summary child"));
 assert.ok(compositeRuntimeHtml.includes("Headline child KPI"));
