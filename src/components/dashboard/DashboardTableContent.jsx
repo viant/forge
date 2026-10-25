@@ -291,7 +291,7 @@ export default function DashboardTableContent({
                                         aria-sort={active ? sortDir === 'asc' ? 'ascending' : 'descending' : 'none'}
                                         style={{textAlign: col.align || 'left', color: active ? 'var(--forge-dashboard-table-link, #2367d1)' : undefined, ...(col.frozen ? {'--forge-frozen-column-width': `${col.resolvedCompactWidth}px`, '--forge-frozen-left': multiSelect ? '42px' : '0px'} : {})}}
                                     >
-                                        <button type="button" className="forge-dashboard-table__sort-button" aria-label={`Sort by ${col.label || col.key}`} onClick={() => handleSort(col.key)}>{col.label}<span aria-hidden="true">{arrow}</span></button>
+                                        <button type="button" className="forge-dashboard-table__sort-button" title={col.label || col.key} aria-label={`Sort by ${col.label || col.key}`} onClick={() => handleSort(col.key)}><span className="forge-dashboard-table__header-label">{col.label || col.key}</span><span aria-hidden="true">{arrow}</span></button>
                                     </th>
                                 );
                             })}

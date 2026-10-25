@@ -382,6 +382,12 @@
     outline-offset: 3px;
 }
 
+.forge-dashboard-table__header-label {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
 .forge-dashboard-table__actions-head {
     letter-spacing: 0.04em;
 }
