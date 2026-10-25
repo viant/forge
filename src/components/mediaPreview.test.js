@@ -27,5 +27,16 @@ assert.equal(normalizeMediaPreview({kind:'image',image:{mimeType:'image/png',pay
 const oversized = Buffer.alloc(MAX_EMBEDDED_IMAGE_BYTES+1);oversized.set([137,80,78,71,13,10,26,10]);
 assert.equal(embedded('image/png',oversized.toString('base64')).kind,'unsupported');
 console.log('media preview tests passed');
+const frame = normalizeMediaPreview({kind:'frame',url:'https://example.test/render?id=42',width:350,height:280,
+    sources:[{label:'SOURCE',url:'view-source:http://example.test/render?id=42'},
+        {label:'Bad',url:'javascript:alert(1)'},{label:'Credentials',url:'https://user:pass@example.test/'}]});
+assert.equal(frame.kind,'frame');
+assert.equal(frame.width,350);
+assert.deepEqual(frame.sources,[{label:'SOURCE',url:'view-source:http://example.test/render?id=42'}]);
+assert.deepEqual(normalizeMediaPreview(frame),frame);
+for(const url of ['javascript:alert(1)','data:text/html,hello','view-source:javascript:alert(1)','https://','https://user:pass@example.test/']) {
+    assert.equal(normalizeMediaPreview({kind:'frame',url}).kind,'unsupported');
+}
+assert.equal(normalizeMediaPreview({kind:'frame',url:'https://example.test',width:-1,height:Infinity}).width,400);
 const card=normalizeMediaPreview({kind:'imageCard',url:'https://example.test/image.png',title:'<script>text</script>',description:'Caption',caption:'Sponsor',href:'javascript:alert(1)',identity:42});
 assert.equal(card.kind,'imagecard');assert.equal(card.href,'');assert.equal(card.identity,'42');assert.equal(card.title,'<script>text</script>');assert.equal(normalizeMediaPreview({kind:'imageCard',title:'No image'}).kind,'imagecard');
