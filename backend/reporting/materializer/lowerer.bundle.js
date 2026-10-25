@@ -50534,6 +50534,8 @@ Please __addLocaleData before adding additional unit data`);
         ...normalizeString29(entry == null ? void 0 : entry.displayKey) ? { displayKey: normalizeString29(entry.displayKey) } : {},
         ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: cloneValue18(entry.displayValueMap) } : {},
         ...normalizeString29(entry == null ? void 0 : entry.format) ? { format: normalizeString29(entry.format) } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: normalizeString29(entry.tickFormat) } : {},
+        ...["civil", "instant"].includes(normalizeString29(entry == null ? void 0 : entry.valueMode)) ? { valueMode: normalizeString29(entry.valueMode) } : {},
         ...normalizeString29(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString29(entry.rawId) } : {},
         ...normalizeString29(entry == null ? void 0 : entry.description) ? { description: normalizeString29(entry.description) } : {},
         ...normalizeString29(entry == null ? void 0 : entry.category) ? { category: normalizeString29(entry.category) } : {},
@@ -50619,6 +50621,8 @@ Please __addLocaleData before adding additional unit data`);
           ...(entry == null ? void 0 : entry.displayKey) ? { displayKey: entry.displayKey } : {},
           ...(entry == null ? void 0 : entry.displayValueMap) ? { displayValueMap: cloneValue18(entry.displayValueMap) } : {},
           ...(entry == null ? void 0 : entry.format) ? { format: entry.format } : {},
+          ...(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: entry.tickFormat } : {},
+          ...(entry == null ? void 0 : entry.valueMode) ? { valueMode: entry.valueMode } : {},
           ...(entry == null ? void 0 : entry.rawId) ? { rawId: entry.rawId } : {},
           ...(entry == null ? void 0 : entry.description) ? { description: entry.description } : {},
           ...(entry == null ? void 0 : entry.category) ? { category: entry.category } : {},
@@ -50678,6 +50682,8 @@ Please __addLocaleData before adding additional unit data`);
           label: entry.label,
           kind: "dimension",
           ...(entry == null ? void 0 : entry.format) ? { format: entry.format } : {},
+          ...(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: entry.tickFormat } : {},
+          ...(entry == null ? void 0 : entry.valueMode) ? { valueMode: entry.valueMode } : {},
           ...(entry == null ? void 0 : entry.rawId) ? { rawId: entry.rawId } : {},
           ...(entry == null ? void 0 : entry.description) ? { description: entry.description } : {},
           ...(entry == null ? void 0 : entry.category) ? { category: entry.category } : {},
@@ -50923,6 +50929,8 @@ Please __addLocaleData before adding additional unit data`);
         ...normalizeString29(entry == null ? void 0 : entry.displayKey) ? { displayKey: normalizeString29(entry.displayKey) } : {},
         ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: cloneValue18(entry.displayValueMap) } : {},
         ...normalizeString29(entry == null ? void 0 : entry.format) ? { format: normalizeString29(entry.format) } : {},
+        ...normalizeString29(entry == null ? void 0 : entry.tickFormat) ? { tickFormat: normalizeString29(entry.tickFormat) } : {},
+        ...["civil", "instant"].includes(normalizeString29(entry == null ? void 0 : entry.valueMode)) ? { valueMode: normalizeString29(entry.valueMode) } : {},
         ...buildPrimaryDatasetFieldContract(entry)
       };
     }).filter(Boolean);
