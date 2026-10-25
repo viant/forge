@@ -19,6 +19,7 @@ export default defineConfig({
       'src/components/dashboard/reportBuilderImmediateExport.render.test.jsx',
       'src/components/dashboard/ReportDatasetPager.render.test.jsx',
       'src/components/dashboard/ReportRuntime.pagination.render.test.jsx',
+      'src/components/dashboard/ReportRuntime.emptyChart.render.test.jsx',
       'src/components/dashboard/ReportPrintPreview.render.test.jsx',
       'src/components/dashboard/reportBuilderConcurrentRead.render.test.jsx',
       'src/components/WindowContentMount.render.test.jsx',
