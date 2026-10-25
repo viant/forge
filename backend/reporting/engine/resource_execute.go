@@ -121,7 +121,8 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 func (s *Service) executeResourceDefinition(ctx context.Context, request *ExecuteResourceRequest, derive WindowBuilderDeriver) (output *ExecuteResourceResult, resultErr error) {
 	totalTiming := observe.Start(ctx, "report.resource.total", observe.Labels{Kind: "report"})
 	defer func() { totalTiming.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
-	if request == nil || !s.hasResourceReader() || s.resourceDatasetExecutor == nil {
+	prepared := preparedReportFromContext(ctx)
+	if request == nil || prepared == nil && !s.hasResourceReader() || s.resourceDatasetExecutor == nil {
 		return nil, identity.ErrResourceDenied
 	}
 	if request.DatasetFetchMode != "" && request.DatasetFetchMode != DatasetFetchPage && request.DatasetFetchMode != DatasetFetchComplete {
@@ -138,21 +139,28 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 	if err != nil || derive == nil && uri.Kind != "report" || derive != nil && uri.Kind != "window" {
 		return nil, identity.ErrResourceDenied
 	}
-	resolver, err := s.resourceReaderFor(ctx, "report.execute")
-	if err != nil {
-		return nil, err
-	}
-	if resolver == nil {
-		return nil, identity.ErrResourceDenied
-	}
-	pin := cloneResolvedResource(request.ResolvedResource)
-	// Select and deliver through one admitted read; no discarded definition.
-	original := cloneResolvedResource(pin)
-	selectTiming := observe.Start(ctx, "report.resource.select", observe.Labels{Kind: "report"})
-	admittedRaw, pin, err := selectResourceRead(ctx, resolver, ref, pin)
-	selectTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
-	if err != nil {
-		return nil, err
+	var resolver ResourceReader
+	var pin *identity.ResolvedResource
+	var admittedRaw json.RawMessage
+	original := cloneResolvedResource(request.ResolvedResource)
+	if prepared != nil {
+		pin = cloneResolvedResource(&prepared.pin)
+		admittedRaw = cloneJSON(prepared.raw)
+	} else {
+		resolver, err = s.resourceReaderFor(ctx, "report.execute")
+		if err != nil {
+			return nil, err
+		}
+		if resolver == nil {
+			return nil, identity.ErrResourceDenied
+		}
+		pin = cloneResolvedResource(request.ResolvedResource)
+		selectTiming := observe.Start(ctx, "report.resource.select", observe.Labels{Kind: "report"})
+		admittedRaw, pin, err = selectResourceRead(ctx, resolver, ref, pin)
+		selectTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if original == nil {
 		original = cloneResolvedResource(pin)
@@ -166,6 +174,9 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 		}
 		sourceDependencies := 0
 		for _, dependency := range definition.Dependencies {
+			if prepared != nil {
+				break
+			}
 			if dependency.Kind == "window" {
 				sourceDependencies++
 				if dependency.ID != pin.URI || dependency.ContentFingerprint != pin.ContentFingerprint {
@@ -173,7 +184,7 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 				}
 			}
 		}
-		if sourceDependencies != 1 {
+		if prepared == nil && sourceDependencies != 1 {
 			return nil, identity.ErrResourceDenied
 		}
 		definitionRaw, err = json.Marshal(definition)
@@ -195,7 +206,16 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 	}
 	admitted.pin = *pin
 	compileTiming := observe.Start(ctx, "report.resource.compile", observe.Labels{Kind: "report"})
-	compiled, err := s.compileWithAdmitted(ctx, &CompileRequest{DependencyPins: dependencyPins, DependencyToken: dependencyToken, ResolvedResource: pin, Parameters: request.Parameters}, admitted)
+	var compiled *CompileResult
+	if prepared != nil {
+		invocation := *prepared
+		if derive != nil {
+			invocation.raw = definitionRaw
+		}
+		compiled, err = s.compilePreparedReport(ctx, &invocation, request.Parameters)
+	} else {
+		compiled, err = s.compileWithAdmitted(ctx, &CompileRequest{DependencyPins: dependencyPins, DependencyToken: dependencyToken, ResolvedResource: pin, Parameters: request.Parameters}, admitted)
+	}
 	compileTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, err
@@ -218,6 +238,9 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 		}
 	}
 	finalCheck := func() error {
+		if prepared != nil {
+			return ctx.Err()
+		}
 		original := cloneResolvedResource(pin)
 		_, fresh, e := resolver.ReadResolved(ctx, *pin)
 		if e != nil {
@@ -238,6 +261,9 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 		return s.verifyDependencies(ctx, *pin, envelope, compiled.DependencyPins, compiled.DependencyToken)
 	}
 	check := func() error {
+		if prepared != nil {
+			return ctx.Err()
+		}
 		if ctx.Err() != nil || !identity.MetadataExpiryValid(pin.ValidUntil, s.now()) {
 			return identity.ErrResourceDenied
 		}
@@ -412,8 +438,10 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 	if err != nil {
 		return nil, err
 	}
-	if err := validateReportSpecRoot(specRoot); err != nil {
-		return nil, err
+	if prepared == nil {
+		if err := validateReportSpecRoot(specRoot); err != nil {
+			return nil, err
+		}
 	}
 	effectiveSpec, err := json.Marshal(specRoot)
 	if err != nil {
