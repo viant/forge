@@ -359,9 +359,13 @@ func (s *Service) Fetch(ctx context.Context, id string, inputs map[string]interf
 	scopeID := s.scopeID(ctx, policy.Scope)
 	normalizedInputs := normalizeFilterSemantics(inputs, &ds.DataSource)
 	mergedArgs := expandNestedArgs(mergeArgs(normalizedInputs, ds.Backend.Pinned))
+	backendArgs, criteriaKey, err := criteriaArguments(mergedArgs, ds.Backend)
+	if err != nil {
+		return nil, err
+	}
 	executionDS := ds
 	if len(ds.Backend.MethodVariants) > 0 {
-		method, resolveErr := ds.Backend.ResolveMCPMethod(mergedArgs)
+		method, resolveErr := ds.Backend.ResolveMCPMethod(backendArgs)
 		if resolveErr != nil {
 			return nil, resolveErr
 		}
@@ -385,7 +389,7 @@ func (s *Service) Fetch(ctx context.Context, id string, inputs map[string]interf
 			}
 		}
 	}
-	cacheKey := responseAliasCacheKey(buildCacheKey(scopeID, ds.ID, policy.Key, mergedArgs), aliases)
+	cacheKey := responseAliasCacheKey(buildCacheKey(scopeID, ds.ID, policy.Key, mergedArgs), aliases) + criteriaKey
 	if pin, bound := runtimerequestctx.ResolvedResourceFromContext(ctx); bound {
 		target := opts.Target
 		if target == nil {
@@ -453,7 +457,7 @@ func (s *Service) Fetch(ctx context.Context, id string, inputs map[string]interf
 	// The managing MCP owns dataset authorization after dispatch. An upstream
 	// denial must not trigger a second artifact read or a host permission check.
 	backend := observe.Start(ctx, observe.Phase("datasource.service.backend"), observe.Labels{Kind: "datasource"})
-	raw, err := s.runBackend(ctx, executionDS, mergedArgs)
+	raw, err := s.runBackend(ctx, executionDS, backendArgs)
 	backend.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return FetchErrorResult(ctx, executionDS, err)

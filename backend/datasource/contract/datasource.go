@@ -89,7 +89,8 @@ type Backend struct {
 	MethodVariants   []MCPMethodVariant `json:"methodVariants,omitempty" yaml:"methodVariants,omitempty"`
 	// RequestMetadata names literal top-level logical request keys omitted only
 	// from MCP transport arguments. Cache and admission identity retain these keys.
-	RequestMetadata []string `json:"requestMetadata,omitempty" yaml:"requestMetadata,omitempty"`
+	RequestMetadata []string               `json:"requestMetadata,omitempty" yaml:"requestMetadata,omitempty"`
+	CriteriaMapping *types.CriteriaMapping `json:"criteriaMapping,omitempty" yaml:"criteriaMapping,omitempty"`
 	// MCPRequest declares where an authored report query is placed in tool
 	// arguments. Report compilers require an explicit mapping.
 	MCPRequest *MCPRequestBinding `json:"mcpRequest,omitempty" yaml:"mcpRequest,omitempty"`
