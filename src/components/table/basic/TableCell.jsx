@@ -140,7 +140,7 @@ const TableCell = ({
     };
 
     let cellContent = null;
-    if(type === "mediaPreview" && normalizeMediaPreview(value).kind !== "imagecard") type="link";
+    if(type === "mediaPreview" && !["imagecard","frame"].includes(normalizeMediaPreview(value).kind)) type="link";
     switch (type) {
         case "mediaPreview":
             cellContent=<MediaPreviewPopover value={value} {...col.preview}/>;

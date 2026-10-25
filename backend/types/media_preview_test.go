@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"gopkg.in/yaml.v3"
+	"reflect"
 	"testing"
 )
 
@@ -31,7 +32,19 @@ func TestMediaPreviewColumnAndValueRoundtrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	var actual MediaPreviewValue
-	if err = json.Unmarshal(raw, &actual); err != nil || actual != value {
+	if err = json.Unmarshal(raw, &actual); err != nil || !reflect.DeepEqual(actual, value) {
 		t.Fatal("value contract changed")
+	}
+}
+
+func TestFramePreviewSourceRoundtrip(t *testing.T) {
+	value := MediaPreviewValue{Kind: "frame", URL: "https://example.test/render?id=42", Width: 350, Height: 280, Sources: []MediaPreviewSource{{Label: "HTTPS", URL: "https://example.test/render?id=42"}, {Label: "SOURCE", URL: "view-source:http://example.test/render?id=42"}}}
+	raw, err := yaml.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var actual MediaPreviewValue
+	if err := yaml.Unmarshal(raw, &actual); err != nil || !reflect.DeepEqual(actual, value) {
+		t.Fatalf("frame source metadata lost: %s, %v", raw, err)
 	}
 }
