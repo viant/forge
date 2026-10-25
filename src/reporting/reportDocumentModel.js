@@ -805,6 +805,8 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
           ? { displayValueMap: cloneValue(entry.displayValueMap) }
           : {}),
         ...(normalizeString(entry?.format) ? { format: normalizeString(entry.format) } : {}),
+        ...(normalizeString(entry?.tickFormat) ? { tickFormat: normalizeString(entry.tickFormat) } : {}),
+        ...(["civil", "instant"].includes(normalizeString(entry?.valueMode)) ? { valueMode: normalizeString(entry.valueMode) } : {}),
         ...(normalizeString(entry?.rawId) ? { rawId: normalizeString(entry.rawId) } : {}),
         ...(normalizeString(entry?.description) ? { description: normalizeString(entry.description) } : {}),
         ...(normalizeString(entry?.category) ? { category: normalizeString(entry.category) } : {}),
@@ -898,6 +900,8 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
           ...(entry?.displayKey ? { displayKey: entry.displayKey } : {}),
           ...(entry?.displayValueMap ? { displayValueMap: cloneValue(entry.displayValueMap) } : {}),
           ...(entry?.format ? { format: entry.format } : {}),
+          ...(entry?.tickFormat ? { tickFormat: entry.tickFormat } : {}),
+          ...(entry?.valueMode ? { valueMode: entry.valueMode } : {}),
           ...(entry?.rawId ? { rawId: entry.rawId } : {}),
           ...(entry?.description ? { description: entry.description } : {}),
           ...(entry?.category ? { category: entry.category } : {}),
@@ -957,6 +961,8 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
           label: entry.label,
           kind: "dimension",
           ...(entry?.format ? { format: entry.format } : {}),
+          ...(entry?.tickFormat ? { tickFormat: entry.tickFormat } : {}),
+          ...(entry?.valueMode ? { valueMode: entry.valueMode } : {}),
           ...(entry?.rawId ? { rawId: entry.rawId } : {}),
           ...(entry?.description ? { description: entry.description } : {}),
           ...(entry?.category ? { category: entry.category } : {}),
@@ -1256,6 +1262,8 @@ export function applyPrimaryDatasetFallbackConfig(document = null, baseConfig = 
           ? { displayValueMap: cloneValue(entry.displayValueMap) }
           : {}),
         ...(normalizeString(entry?.format) ? { format: normalizeString(entry.format) } : {}),
+        ...(normalizeString(entry?.tickFormat) ? { tickFormat: normalizeString(entry.tickFormat) } : {}),
+        ...(["civil", "instant"].includes(normalizeString(entry?.valueMode)) ? { valueMode: normalizeString(entry.valueMode) } : {}),
         ...buildPrimaryDatasetFieldContract(entry),
       };
     }).filter(Boolean);
