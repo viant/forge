@@ -306,6 +306,26 @@ assert.deepEqual(await teardownPromise, {
 });
 console.log('openDialog ✓ isolates owners and cancels pending work on owner teardown');
 
+{
+  const previous=activeWindows.peek();
+  activeWindows.value=[{windowId:'await-parent',windowKey:'parent',inTab:true,parameters:{}}];
+  const parent=useWindowHandlers('await-parent');
+  const cancelled=parent.openTarget({target:{kind:'window',windowKey:'await-child',awaitResult:true,inTab:true,replaceHostedRegion:false},context:{identity:{windowId:'await-parent'}}});
+  const child=activeWindows.peek().find(entry=>entry.windowKey==='await-child');
+  assert.ok(child);
+  removeWindow(child.windowId);
+  assert.deepEqual(await cancelled,{status:'canceled',canceled:true,reason:'window_closed'});
+  const committed=parent.openTarget({target:{kind:'window',windowKey:'await-child',awaitResult:true,inTab:true,replaceHostedRegion:false},context:{identity:{windowId:'await-parent'}}});
+  const next=activeWindows.peek().find(entry=>entry.windowKey==='await-child');
+  useWindowHandlers(next.windowId).commit({payload:{id:7}});
+  assert.deepEqual(await committed,{id:7},'removal must not overwrite an accepted commit receipt');
+  const removed=parent.openTarget({target:{kind:'window',windowKey:'await-cleanup',awaitResult:true,inTab:true,replaceHostedRegion:false},context:{identity:{windowId:'await-parent'}}});
+  activeWindows.value=[];
+  assert.deepEqual(await removed,{status:'canceled',canceled:true,reason:'window_closed'});
+  activeWindows.value=previous;
+}
+console.log('openTarget ✓ settles direct removal and session cleanup without replacing commit results');
+
 let disposeCount = 0;
 setWindowContext('W_dispose', {dispose() { disposeCount += 1; }});
 activeWindows.value = [{windowId: 'W_dispose', windowKey: 'advertiser', inTab: true}];
