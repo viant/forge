@@ -18,6 +18,22 @@ const fixture = (data, provenance = { hasMore: false }, page = {}) => ({
   datasetPages: { primary: page },
 });
 
+it('does not restore source rows when a presented fill has zero matches', async () => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host);
+  const input = fixture(rows(32));
+  input.reportFill.blocks[0].content.resolvedRows = [];
+  input.reportFill.blocks[0].content.rowCount = 0;
+  try {
+    await act(async () => root.render(<ReportRuntime {...input} />));
+    expect(host.querySelectorAll('.forge-report-runtime-table-panel tbody tr')).toHaveLength(0);
+    expect(host.textContent).toContain('No data.');
+  } finally {
+    await act(async () => root.unmount()); host.remove();
+  }
+});
+
 it('previews five rows, paginates all loaded rows after global sorting, and expands the complete result', async () => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   const host = document.createElement('div'); document.body.append(host);

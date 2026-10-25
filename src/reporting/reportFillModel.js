@@ -1,3 +1,4 @@
+import {applyReportTablePresentations} from './reportTablePresentation.js';
 import {materializeKpiSparkline} from './reportKpiSparklineModel.js';
 import { calculateKpiSecondaryValue, normalizeKpiSecondaryCalculation } from "./reportKpiComparisonModel.js";
 import {
@@ -30,6 +31,7 @@ import {
   formatDashboardValue,
 } from "../components/dashboard/dashboardUtils.js";
 import { resolveKey } from "../utils/selector.js";
+import { isNumericValue } from "../utils/isNumericValue.js";
 import equal from "fast-deep-equal";
 import { resolveReportDatasetRefResolution } from "./reportDatasetRefModel.js";
 import { formatReportRelativeTime, resolveReportRelativeDateRange } from "./reportRelativeDateRangeModel.js";
@@ -249,6 +251,17 @@ function resolveReportFillMacroFormat(value = "") {
   }
 }
 
+function reportFillComparableValue(value) {
+  if (isNumericValue(value)) return { kind: "number", value: Number(value) };
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}(?:T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}))?$/.test(value)) return null;
+  const civil = value.slice(0, 10);
+  const date = new Date(`${civil}T00:00:00Z`);
+  // Date.parse alone normalizes impossible dates, such as February 30.
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== civil) return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? { kind: "date", value: timestamp } : null;
+}
+
 function resolveReportFillSelectedRow(dataset = {}, rowSelector = "", {
   valueField = "",
 } = {}) {
@@ -264,14 +277,22 @@ function resolveReportFillSelectedRow(dataset = {}, rowSelector = "", {
   if (!normalizedValueField) {
     return rows[0] && typeof rows[0] === "object" && !Array.isArray(rows[0]) ? rows[0] : null;
   }
-  const comparableRows = rows.filter((row) => row && typeof row === "object" && !Array.isArray(row) && Number.isFinite(Number(resolveKey(row, normalizedValueField))));
+  const comparableRows = rows.flatMap((row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return [];
+    const comparable = reportFillComparableValue(resolveKey(row, normalizedValueField));
+    return comparable ? [{ row, ...comparable }] : [];
+  });
   if (comparableRows.length === 0) {
     return rows[0] && typeof rows[0] === "object" && !Array.isArray(rows[0]) ? rows[0] : null;
   }
-  const reducer = normalizedRowSelector === "minbyvalue"
-    ? ((best, row) => (Number(resolveKey(row, normalizedValueField)) < Number(resolveKey(best, normalizedValueField)) ? row : best))
-    : ((best, row) => (Number(resolveKey(row, normalizedValueField)) > Number(resolveKey(best, normalizedValueField)) ? row : best));
-  return comparableRows.slice(1).reduce(reducer, comparableRows[0]);
+  const reducer = (best, candidate) => {
+    // Do not compare epoch milliseconds to unrelated numeric observations.
+    if (candidate.kind !== best.kind) return best;
+    const better = normalizedRowSelector === "minbyvalue"
+      ? candidate.value < best.value : candidate.value > best.value;
+    return better ? candidate : best;
+  };
+  return comparableRows.slice(1).reduce(reducer, comparableRows[0]).row;
 }
 
 function resolveReportFillTemplateRawValue(token = "", {
@@ -1201,6 +1222,7 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
 export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads = {}, {
   unifiedFilterContent = null,
   runtimeSelection = {},
+  tablePresentations = null,
 } = {}) {
   const normalizedReportSpec = cloneValue(reportSpec || {});
   // Fingerprint the spec as provided: consumers compare fill.specHash against
@@ -1220,7 +1242,7 @@ export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads =
     buildReportFillDataset(dataset, datasetPayloads?.[normalizeString(dataset?.id)] || {}, calculatedFields)
   ));
   const datasetsById = new Map(datasets.map((dataset) => [dataset.id, dataset]));
-  return {
+  return applyReportTablePresentations({
     version: 1,
     kind: "reportFill",
     specVersion: Number(normalizedReportSpec?.version || 0) || 1,
@@ -1235,7 +1257,7 @@ export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads =
       runtimeSelection,
     }),
     diagnostics: datasets.flatMap((dataset) => dataset?.provenance?.diagnostics || []),
-  };
+  }, tablePresentations);
 }
 
 export function buildReportBuilderReportFill({

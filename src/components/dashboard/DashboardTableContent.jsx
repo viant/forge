@@ -62,6 +62,7 @@ export default function DashboardTableContent({
     locale = 'en-US',
     subtitleStyle = DEFAULT_SUBTITLE_STYLE,
     onPresentationStateChange = null,
+    initialPresentationState = null,
 }) {
     const {collection, loading, error, selection} = useDataSourceState(context);
     const dashboardFilterSignal = context?.dashboardKey ? getDashboardFilterSignal(context.dashboardKey) : null;
@@ -69,7 +70,7 @@ export default function DashboardTableContent({
     const dashboardFilters = useSignalSnapshot(dashboardFilterSignal, {});
     const dashboardSelection = useSignalSnapshot(dashboardSelectionSignal, {});
     const limit = container.dashboard?.table?.limit || container.limit || Number.MAX_SAFE_INTEGER;
-    const [quickFilter, setQuickFilter] = useState("");
+    const [quickFilter, setQuickFilter] = useState(() => initialPresentationState?.filter || "");
     const quickFilterEnabled = container.dashboard?.table?.quickFilter === true || container.quickFilter === true;
     const density = container.dashboard?.table?.density || container.density || "comfortable";
     const rowActions = container.dashboard?.table?.rowActions || container.rowActions || [];
@@ -156,8 +157,8 @@ export default function DashboardTableContent({
         hasRowActions: rowActions.length > 0,
     }), [displayColumns, multiSelect, rowActions.length]);
 
-    const [sortKey, setSortKey] = useState(null);
-    const [sortDir, setSortDir] = useState('asc');
+    const [sortKey, setSortKey] = useState(() => initialPresentationState?.sort?.key || null);
+    const [sortDir, setSortDir] = useState(() => initialPresentationState?.sort?.direction === 'desc' ? 'desc' : 'asc');
     const [page, setPage] = useState(1);
     const pagingEnabled = context?.dataSource?.paging?.enabled === true || container?.paging?.enabled === true;
     const pageSize = Math.max(1, Number(container?.paging?.size || context?.dataSource?.paging?.size || 20));

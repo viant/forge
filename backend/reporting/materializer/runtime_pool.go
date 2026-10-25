@@ -65,7 +65,7 @@ func PrepareTrustedRuntime(ctx context.Context) error {
 }
 
 func runTrustedEntry(ctx context.Context, compiled *goja.Program, entry string, raw json.RawMessage) (output string, err error) {
-	if compiled == nil || compiled != program || entry != "lower" && entry != "lowerWithRequestBase" && entry != "materialize" && entry != "materializeFill" && entry != "present" {
+	if compiled == nil || compiled != program || entry != "lower" && entry != "lowerWithRequestBase" && entry != "materialize" && entry != "materializeFill" && entry != "present" && entry != "prepareWindowBuilder" && entry != "reportWindowIdentity" && entry != "mapReportRequest" {
 		return "", fmt.Errorf("untrusted materializer entry")
 	}
 	if err := ctx.Err(); err != nil {
@@ -118,7 +118,7 @@ func runTrustedEntry(ctx context.Context, compiled *goja.Program, entry string, 
 	}
 	invocation := observe.Start(ctx, "report.materializer.runtime.invoke", observe.Labels{Kind: "report"})
 	var result goja.Value
-	result, err = invoke(goja.Undefined(), runtime.ToValue(string(raw)))
+	result, err = invokeMaterializerEntry(bounded, runtime, entry, invoke, raw)
 	invocation.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return "", loweringError(bounded, err)

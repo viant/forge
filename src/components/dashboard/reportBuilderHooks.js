@@ -1,4 +1,5 @@
 import { resolveKey } from "../../utils/selector.js";
+import {mapReportRequestEnvelope} from "../../reporting/reportRequestEnvelope.js";
 import { extractData } from "../dataSourceExtract.js";
 import {
     projectLookupSelections,
@@ -87,7 +88,11 @@ export function applyReportBuilderStateHook(builderContext, config = {}, state =
     }
 }
 
-export function applyReportBuilderRequestHook(builderContext, config = {}, state = {}, request = {}) {
+export function applyReportBuilderRequestHook(builderContext, config = {}, state = {}, request = {}, {datasetId='primary'} = {}) {
+    if (config.request?.envelope) {
+        if (!config.request.envelopeContext) return null;
+        return mapReportRequestEnvelope(config,request,datasetId);
+    }
     const handlerName = String(config?.hooks?.buildRequest || "").trim();
     if (!handlerName || !builderContext?.lookupHandler) {
         return request;

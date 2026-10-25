@@ -56,6 +56,11 @@ func (s *Service) compileUnscoped(ctx context.Context, request *CompileRequest, 
 			return nil, err
 		}
 		pin = fresh
+		if admitted != nil && len(admitted.windowEnvelope) > 0 {
+			// ReadResolved above revalidated the original window. The derived
+			// envelope has no independent persisted identity to read or refresh.
+			raw = admitted.windowEnvelope
+		}
 		var envelope registry.ReportEnvelope
 		if json.Unmarshal(raw, &envelope) != nil {
 			recheckTiming.End(observe.Error, observe.CacheUnknown)

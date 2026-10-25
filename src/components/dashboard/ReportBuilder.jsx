@@ -500,6 +500,8 @@ import {
 import {
     useReportBuilderExportExecution,
 } from "./useReportBuilderExportExecution.js";
+import { snapshotWindowBuilderExportSelection, snapshotWindowBuilderParameters } from "../../reporting/windowBuilderExportState.js";
+import { advisoryReportExportTables } from "./reportBuilderImmediateExport.js";
 import {
     buildReportBuilderExportEventDetail,
     buildReportBuilderRunEvent,
@@ -10223,6 +10225,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                 displayConfig,
                 state,
                 runtimePreviewCanonicalRequest,
+                {datasetId: runtimePreviewPrimaryDataset?.id || "primary"},
             )
             : null)),
         [frozenRestore, builderContext, displayConfig, runtimePreviewCanonicalRequest, state],
@@ -10325,7 +10328,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     id: normalizeString(dataset?.id),
                     dataSourceRef: normalizeString(dataset?.dataSourceRef),
                     request: canonicalRequest
-                        ? applyReportBuilderRequestHook(builderContext, displayConfig, state, canonicalRequest)
+                        ? applyReportBuilderRequestHook(builderContext, displayConfig, state, canonicalRequest, {datasetId: dataset.id})
                         : null,
                     resultContract: dataset?.resultContract && typeof dataset.resultContract === "object" && !Array.isArray(dataset.resultContract)
                         ? cloneReportBuilderValue(dataset.resultContract)
@@ -10690,6 +10693,16 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             metadata: runtimeExportMetadata,
         });
     }, [runtimeExportMetadata, runtimePreviewArtifact]);
+    const currentWindowExportTables = useMemo(() => {
+        if (typeof reportExportHandler?.exportCurrent !== "function") return [];
+        try {
+            return advisoryReportExportTables(runtimePreviewArtifact?.reportSpec);
+        } catch (_) {
+            // Advisory metadata never chooses an ambiguous table. The server
+            // independently rejects it before dispatch when export is tried.
+            return [];
+        }
+    }, [reportExportHandler, runtimePreviewArtifact?.reportSpec]);
     const canSaveCurrentReportFile = useMemo(
         () => !!showAuthoredReportSurface
             && !!runtimePreviewArtifact?.document
@@ -10876,8 +10889,43 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
             setChartApplyFeedback,
         ],
     );
+    const currentWindowBuilderExportSelection = React.useCallback(
+        () => snapshotWindowBuilderExportSelection(container, state),
+        [container, state],
+    );
+    const currentWindowExportParameterIdentity = (() => {
+        try {
+            return JSON.stringify(snapshotWindowBuilderParameters(context?.metadata || {}, rootWindowFormSignal?.peek?.() || rootWindowFormValue));
+        } catch (_) {
+            return "invalid-window-export-parameters";
+        }
+    })();
+    const currentWindowExportParameters = React.useCallback(
+        () => snapshotWindowBuilderParameters(context?.metadata || {}, rootWindowFormSignal?.peek?.() || rootWindowFormValue),
+        [context?.metadata,rootWindowFormSignal,currentWindowExportParameterIdentity],
+    );
+    const [currentTablePresentationState, setCurrentTablePresentationState] = useState({scope:"",values:{}});
+    const currentTableBlockIdentity=JSON.stringify((runtimePreviewArtifact?.reportSpec?.blocks || []).filter(block=>block.kind==="tableBlock").map(block=>block.id).sort());
+    const currentTableBlockIds=useMemo(()=>new Set(JSON.parse(currentTableBlockIdentity)),[currentTableBlockIdentity]);
+    const currentWindowTablePresentations = useMemo(() => (
+        currentTablePresentationState.scope === currentWindowExportParameterIdentity
+            ? Object.fromEntries(Object.entries(currentTablePresentationState.values).filter(([id])=>currentTableBlockIds.has(id))) : {}
+    ), [currentTablePresentationState,currentWindowExportParameterIdentity,currentTableBlockIds]);
+    const onCurrentTablePresentationChange = React.useCallback((blockId,value) => {
+        if (!currentTableBlockIds.has(blockId)) return;
+        const presentation={filter:value?.filter ?? "",sort:value?.sort ? {key:value.sort.key,direction:value.sort.direction} : null};
+        setCurrentTablePresentationState(previous => {
+            const values=previous.scope===currentWindowExportParameterIdentity ? previous.values : {};
+            if (!Object.hasOwn(values,blockId) && presentation.filter==="" && presentation.sort===null) return previous;
+            if (JSON.stringify(values[blockId])===JSON.stringify(presentation)) return previous;
+            return {scope:currentWindowExportParameterIdentity,values:{...values,[blockId]:presentation}};
+        });
+    }, [currentWindowExportParameterIdentity,currentTableBlockIds]);
     const draftExportExecution = useReportBuilderExportExecution({
         ...exportExecutionConfigs.draft,
+        builderSelection: currentWindowBuilderExportSelection,
+        windowParameters: currentWindowExportParameters,
+        tablePresentations: currentWindowTablePresentations,
         eventSourceKind: activeReportEventSourceKind,
         eventRuntimeRequest: currentRequest,
         eventReportId: activeReportEventId,
@@ -10885,6 +10933,9 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
     });
     const draftXlsxExportExecution = useReportBuilderExportExecution({
         request: draftXlsxExportRequest,
+        builderSelection: currentWindowBuilderExportSelection,
+        windowParameters: currentWindowExportParameters,
+        tablePresentations: currentWindowTablePresentations,
         sourceKind: "draft",
         eventSourceKind: activeReportEventSourceKind,
         localSavedPayloads: configuredExportContextSavedPayloads,
@@ -16144,8 +16195,14 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     icon={draftXlsxPending ? "time" : "th"}
                     text={draftXlsxPending ? `Exporting ${draftXlsxFormatLabel}…` : (draftXlsxReady ? `Export ${draftXlsxFormatLabel} again` : draftXlsxFormatLabel)}
                     disabled={!draftXlsxExportRequest || draftXlsxPending}
-                    onClick={closeAndRun(triggerDraftXlsxExport)}
-                />
+                    onClick={currentWindowExportTables.length > 1 ? undefined : closeAndRun(triggerDraftXlsxExport)}
+                >
+                    {currentWindowExportTables.length > 1 ? currentWindowExportTables.map(table => <MenuItem
+                        key={table.id}
+                        text={table.title}
+                        onClick={closeAndRun(() => triggerDraftXlsxExport({tableBlockId: table.id}))}
+                    />) : null}
+                </MenuItem>
                 <MenuItem
                     icon="th-list"
                     text="CSV"
@@ -16179,6 +16236,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         canDownloadCsv,
         triggerDraftExport,
         triggerDraftXlsxExport,
+        currentWindowExportTables,
     ]);
     const draftToolbarExportControlState = useMemo(() => {
         if (draftPdfReady && !draftXlsxReady) {
@@ -20676,8 +20734,11 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     }
                     const runtimeContent = (
                         <ReportRuntime
+                            key={currentWindowExportParameterIdentity}
                             headerActions={reportOptionHeaderActions}
                             reportSpec={previewStateForDisplay.runtimeConfig.reportSpec}
+                            tablePresentations={currentWindowTablePresentations}
+                            onTablePresentationChange={onCurrentTablePresentationChange}
                             reportDocument={previewArtifactForDisplay?.document || null}
                             reportFill={previewStateForDisplay.runtimeConfig.reportFill}
                             selectedSectionId={runtimePreviewSectionSelection?.sectionId || ""}
