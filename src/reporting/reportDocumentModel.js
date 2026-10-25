@@ -2021,7 +2021,10 @@ export function buildReportDocumentChartBlock(block = {}) {
 }
 
 export function buildReportDocumentTableBlock(block = {}) {
-  return normalizeReportDocumentTableBlock(block);
+  const normalized = normalizeReportDocumentTableBlock(block);
+  return block?.runtime?.printRowReference === true
+    ? withReportBlockRuntime(normalized, block)
+    : normalized;
 }
 
 export function buildReportDocumentGeoMapBlock(block = {}) {
@@ -2066,6 +2069,7 @@ export function normalizeReportBlockRuntime(runtime = null, block = {}) {
     ? cloneValue(source.actions)
     : (Array.isArray(block?.actions) ? cloneValue(block.actions) : []);
   const normalized = {
+    ...(source?.printRowReference === true ? { printRowReference: true } : {}),
     ...(visibleWhen ? { visibleWhen } : {}),
     ...(filterBindings && Object.keys(filterBindings).length > 0 ? { filterBindings } : {}),
     ...(selectionBindings && Object.keys(selectionBindings).length > 0 ? { selectionBindings } : {}),

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strconv"
+	"strings"
 	"testing"
 
 	reportcsv "github.com/viant/forge/backend/reporting/export/csv"
@@ -154,4 +156,96 @@ func TestRowIdentityNativeMaterializationAndExports(t *testing.T) {
 	if !reflect.DeepEqual(sheetParts(xWith), sheetParts(xWithout)) {
 		t.Fatal("identity metadata changed XLSX cells or number formats")
 	}
+	// Row references are print-only; ordinary data exports retain original columns.
+	source["blocks"].([]any)[0].(map[string]any)["runtime"] = map[string]any{"printRowReference": true}
+	referenceSpec, _ := json.Marshal(source)
+	referenceOut, err := Materialize(context.Background(), referenceSpec, map[string]json.RawMessage{"primary": payload})
+	if err != nil {
+		t.Fatal(err)
+	}
+	referenceFill, err := reportfill.DecodeJSON(referenceOut.ReportFill)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(referenceFill.Blocks[0].Content.Columns) != len(columns) {
+		t.Fatal("generated column leaked into fill")
+	}
+	for _, row := range referenceFill.Blocks[0].Content.ResolvedRows {
+		if len(row.Cells) != len(columns) {
+			t.Fatal("generated cells leaked into fill")
+		}
+	}
+	var referencePrint struct {
+		Pages []struct {
+			Elements []struct{ ID, Kind, RowKey, ColumnKey, Text string }
+		}
+	}
+	if err = json.Unmarshal(referenceOut.ReportPrint, &referencePrint); err != nil {
+		t.Fatal(err)
+	}
+	bandReferences := map[string]map[int]bool{}
+	byRow := map[string]int{}
+	for _, page := range referencePrint.Pages {
+		for _, cell := range page.Elements {
+			if cell.Kind != "tableCellText" || !strings.HasPrefix(cell.ColumnKey, "__forge_print_row_reference") {
+				continue
+			}
+			ordinal, parseErr := strconv.Atoi(cell.Text)
+			if parseErr != nil || ordinal < 1 || ordinal > len(rows) {
+				t.Fatalf("invalid print-only reference %q", cell.Text)
+			}
+			if cell.RowKey != fmt.Sprintf("row_%d", ordinal) {
+				t.Fatal("reference does not follow final row order")
+			}
+			byRow[cell.RowKey] = ordinal
+			band := strings.Split(cell.ID, "__row_")[0]
+			if bandReferences[band] == nil {
+				bandReferences[band] = map[int]bool{}
+			}
+			if bandReferences[band][ordinal] {
+				t.Fatal("reference repeated within a band")
+			}
+			bandReferences[band][ordinal] = true
+		}
+	}
+	if len(bandReferences) < 2 {
+		t.Fatal("fixture must exercise horizontal bands")
+	}
+	for _, refs := range bandReferences {
+		if len(refs) != len(rows) {
+			t.Fatal("reference numbering reset or dropped a row")
+		}
+	}
+	for _, page := range referencePrint.Pages {
+		for _, cell := range page.Elements {
+			if cell.Kind != "tableCellText" {
+				continue
+			}
+			ordinal := byRow[cell.RowKey]
+			if ordinal == 0 {
+				t.Fatal("cell has no matching print reference")
+			}
+			if cell.ColumnKey == "campaign" && cell.Text != fmt.Sprint(ids[ordinal-1]) {
+				t.Fatal("reference changed precise business ID")
+			}
+			if cell.ColumnKey == "label" && cell.Text != fmt.Sprintf("Entity %d", ordinal-1) {
+				t.Fatal("reference changed source identity")
+			}
+		}
+	}
+	referenceCSV, err := reportcsv.Render(referenceFill)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(csvWith, referenceCSV) {
+		t.Fatal("print reference changed CSV columns or data")
+	}
+	referenceXLSX, err := reportxlsx.Render(referenceFill)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(sheetParts(xWith), sheetParts(referenceXLSX)) {
+		t.Fatal("print reference changed XLSX cells or formats")
+	}
+
 }
