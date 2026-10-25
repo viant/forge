@@ -2195,6 +2195,7 @@ export function buildReportBuilderRequest(config = {}, state = {}) {
 }
 
 export function resolveReportBuilderReadiness(config = {}, state = {}) {
+    if (config.request?.envelope && !config.request.envelopeContext) return {canRun:false,reason:"definition"};
     const selectedMeasures = normalizeArray(state?.selectedMeasures).map((entry) => String(entry).trim()).filter(Boolean);
     if (selectedMeasures.length === 0) {
         return { canRun: false, reason: "measure" };

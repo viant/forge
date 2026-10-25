@@ -72,12 +72,28 @@ type ExecuteResourceResult struct {
 // performs ordinary datasource/tool admission; it cannot choose another source.
 type ResourceDatasetExecutor func(context.Context, identity.ResolvedResource, *dsproto.DataSource, map[string]interface{}) (*dsproto.FetchResult, error)
 
+// WindowBuilderDeriver is a trusted host composition callback, not a request
+// payload. It receives the admitted original window and returns an invocation-
+// local envelope built from its selected container and attached bindings.
+type WindowBuilderDeriver func(context.Context, identity.ResolvedResource, json.RawMessage) (registry.ReportEnvelope, error)
+
 func (s *Service) SetResourceDatasetExecutor(execute ResourceDatasetExecutor) {
 	if s != nil {
 		s.resourceDatasetExecutor = execute
 	}
 }
 func (s *Service) ExecuteResource(ctx context.Context, request *ExecuteResourceRequest) (out *ExecuteResourceResult, resultErr error) {
+	return s.executeResourceScoped(ctx, request, nil)
+}
+
+func (s *Service) ExecuteWindowBuilder(ctx context.Context, request *ExecuteResourceRequest, derive WindowBuilderDeriver) (*ExecuteResourceResult, error) {
+	if derive == nil {
+		return nil, identity.ErrResourceDenied
+	}
+	return s.executeResourceScoped(ctx, request, derive)
+}
+
+func (s *Service) executeResourceScoped(ctx context.Context, request *ExecuteResourceRequest, derive WindowBuilderDeriver) (out *ExecuteResourceResult, resultErr error) {
 	entryTiming := observe.Start(ctx, "report.resource.entry", observe.Labels{Kind: "report"})
 	defer func() { entryTiming.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	if s != nil && s.reportCatalog != nil && s.hasResourceReader() {
@@ -96,9 +112,12 @@ func (s *Service) ExecuteResource(ctx context.Context, request *ExecuteResourceR
 		}()
 		ctx = scoped
 	}
-	return s.executeResourceUnscoped(ctx, request)
+	return s.executeResourceDefinition(ctx, request, derive)
 }
 func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteResourceRequest) (output *ExecuteResourceResult, resultErr error) {
+	return s.executeResourceDefinition(ctx, request, nil)
+}
+func (s *Service) executeResourceDefinition(ctx context.Context, request *ExecuteResourceRequest, derive WindowBuilderDeriver) (output *ExecuteResourceResult, resultErr error) {
 	totalTiming := observe.Start(ctx, "report.resource.total", observe.Labels{Kind: "report"})
 	defer func() { totalTiming.End(observe.OutcomeFor(resultErr), observe.CacheUnknown) }()
 	if request == nil || !s.hasResourceReader() || s.resourceDatasetExecutor == nil {
@@ -115,7 +134,7 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 		ref = identity.ResourceRef{URI: request.ResolvedResource.URI, Revision: request.ResolvedResource.Selector()}
 	}
 	uri, err := identity.ParseResourceURI(ref.URI)
-	if err != nil || uri.Kind != "report" {
+	if err != nil || derive == nil && uri.Kind != "report" || derive != nil && uri.Kind != "window" {
 		return nil, identity.ErrResourceDenied
 	}
 	resolver, err := s.resourceReaderFor(ctx, "report.execute")
@@ -137,10 +156,35 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 	if original == nil {
 		original = cloneResolvedResource(pin)
 	}
+	admitted := &admittedCompileDefinition{raw: admittedRaw, pin: *pin}
+	definitionRaw := admittedRaw
+	if derive != nil {
+		definition, e := derive(ctx, *pin, append(json.RawMessage(nil), admittedRaw...))
+		if e != nil {
+			return nil, e
+		}
+		sourceDependencies := 0
+		for _, dependency := range definition.Dependencies {
+			if dependency.Kind == "window" {
+				sourceDependencies++
+				if dependency.ID != pin.URI || dependency.ContentFingerprint != pin.ContentFingerprint {
+					return nil, identity.ErrResourceDenied
+				}
+			}
+		}
+		if sourceDependencies != 1 {
+			return nil, identity.ErrResourceDenied
+		}
+		definitionRaw, err = json.Marshal(definition)
+		if err != nil {
+			return nil, err
+		}
+		admitted.windowEnvelope = definitionRaw
+	}
 	dependencyPins, dependencyToken := cloneDependencyPins(request.DependencyPins), request.DependencyToken
 	if dependencyPins != nil && !original.ValidUntil.Equal(pin.ValidUntil) {
 		var admittedDefinition registry.ReportEnvelope
-		if json.Unmarshal(admittedRaw, &admittedDefinition) != nil {
+		if json.Unmarshal(definitionRaw, &admittedDefinition) != nil {
 			return nil, identity.ErrResourceDenied
 		}
 		dependencyPins, dependencyToken, err = s.bindOperationDependencies(ctx, original, pin, admittedDefinition, dependencyPins, dependencyToken)
@@ -148,8 +192,9 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 			return nil, err
 		}
 	}
+	admitted.pin = *pin
 	compileTiming := observe.Start(ctx, "report.resource.compile", observe.Labels{Kind: "report"})
-	compiled, err := s.compileWithAdmitted(ctx, &CompileRequest{DependencyPins: dependencyPins, DependencyToken: dependencyToken, ResolvedResource: pin, Parameters: request.Parameters}, &admittedCompileDefinition{raw: admittedRaw, pin: *pin})
+	compiled, err := s.compileWithAdmitted(ctx, &CompileRequest{DependencyPins: dependencyPins, DependencyToken: dependencyToken, ResolvedResource: pin, Parameters: request.Parameters}, admitted)
 	compileTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, err
@@ -160,7 +205,7 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 	// Compile retains the selected candidate and authority. Its original admitted
 	// definition is immutable, so execution composes from those exact bytes.
 	pin = cloneResolvedResource(compiled.Resource)
-	raw := admittedRaw
+	raw := definitionRaw
 	var envelope registry.ReportEnvelope
 	if json.Unmarshal(raw, &envelope) != nil || len(envelope.DataSources) == 0 {
 		return nil, fmt.Errorf("report execution requires trusted datasource descriptors")
@@ -310,6 +355,10 @@ func (s *Service) executeResourceUnscoped(ctx context.Context, request *ExecuteR
 			return nil, identity.ErrResourceDenied
 		}
 		args, err := reportDatasetArguments(dataset.Request, request.Parameters, descriptor, envelope.BuilderDefinition, dataset.Scope)
+		if err != nil {
+			return nil, err
+		}
+		args, err = materializer.MapBuilderRequest(ctx, envelope.BuilderDefinition, args, dataset.ID)
 		if err != nil {
 			return nil, err
 		}
