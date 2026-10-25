@@ -53,6 +53,7 @@ export default defineConfig({
       'src/components/optionsFetchOwnership.test.jsx',
       'src/components/Editor.formBinding.render.test.jsx',
       'src/components/WindowContent.fetchQueue.test.jsx',
+      'src/components/WindowContent.dateRangePreset.render.test.jsx',
       'src/components/WindowContent.lazyOptions.render.test.jsx',
       'src/components/dashboard/reportBuilderLazyFilterChoices.render.test.jsx',
       'src/components/DataSource.spread.render.test.jsx',

@@ -59,6 +59,9 @@ import {useViewPartition} from './useViewPartition.js';
 import {applyTablePagingMetadata} from '../runtime/tablePagingMetadata.js';
 import {admittedPublishedWindowModel,publishedWindowConditionalETag} from '../runtime/publishedWindowModelCache.js';
 import {recordWindowPerfPhase} from '../runtime/windowPerfPhases.js';
+import {normalizeLifetimeStart, resolveDateRangePreset, resolveDateRangePresetSyncPatch} from '../packs/blueprint/dateRangePreset.js';
+
+const EMPTY_WINDOW_METRICS = Object.freeze({});
 
 export function reuseShallowEqualRuntimeObject(previous = null, candidate = null) {
     if (!previous || !candidate || typeof previous !== 'object' || typeof candidate !== 'object') {
@@ -117,6 +120,63 @@ function collectInitialWindowFormItemValues(node, initial) {
             collectInitialWindowFormItemValues(child, initial);
         }
     }
+}
+
+function collectWindowFormDatePresetItems(node, presets) {
+    if (!node || typeof node !== 'object') return;
+    if (node.parameterEditor) {
+        collectWindowFormDatePresetItems({items: node.parameterEditor.fields}, presets);
+        for (const section of node.parameterEditor.sections || []) collectWindowFormDatePresetItems({items: section.fields}, presets);
+    }
+    for (const item of Array.isArray(node.items) ? node.items : []) {
+        if (String(item?.scope || '').trim() !== 'windowForm'
+            || item?.widget !== 'dateRangePreset' && item?.type !== 'dateRangePreset') continue;
+        const properties = item.properties || {};
+        presets.push({
+            field: String(item.bindingPath || item.dataField || item.id || '').trim(),
+            fallbackValue: item.value,
+            startField: properties.startField || 'customDateStart',
+            endField: properties.endField || 'customDateEnd',
+            granularityField: properties.granularityField || 'granularity',
+            lifetimeStart: properties.lifetimeStart || '2026-01-01',
+            lifetimeStartSelector: properties.lifetimeStartSelector || '',
+            timeZone: properties.timeZone || 'UTC',
+            timeZoneSelector: properties.timeZoneSelector || '',
+        });
+    }
+    for (const child of Array.isArray(node.containers) ? node.containers : []) collectWindowFormDatePresetItems(child, presets);
+}
+
+export function compileWindowFormDatePresets(metadata) {
+    const presets = [];
+    collectWindowFormDatePresetItems(metadata?.view?.content, presets);
+    return presets;
+}
+
+// Resolve the same deterministic preset values that the mounted control uses,
+// before datasource priming can observe a half-initialized window form.
+export function resolveInitialDateRangePresetValues(metadataOrPresets, current = {}, metrics = {}, now = new Date()) {
+    const presets = Array.isArray(metadataOrPresets) ? metadataOrPresets : compileWindowFormDatePresets(metadataOrPresets);
+    let next = current;
+    for (const preset of presets) {
+        const value = preset.field ? next[preset.field] ?? preset.fallbackValue : preset.fallbackValue;
+        if (!value || String(value).toLowerCase() === 'custom') continue;
+        const resolvedLifetimeStart = normalizeLifetimeStart(
+            preset.lifetimeStartSelector ? resolveSelector(metrics, preset.lifetimeStartSelector) : preset.lifetimeStart,
+            preset.lifetimeStart,
+        );
+        const resolvedTimeZone = preset.timeZoneSelector
+            ? resolveSelector(metrics, preset.timeZoneSelector) || preset.timeZone
+            : preset.timeZone;
+        const resolved = resolveDateRangePreset(value, now, resolvedLifetimeStart, resolvedTimeZone);
+        const patch = resolveDateRangePresetSyncPatch(next, resolved, {
+            startField: preset.startField,
+            endField: preset.endField,
+            granularityField: preset.granularityField,
+        });
+        if (patch) next = {...next, ...patch};
+    }
+    return next;
 }
 
 export function compileWindowAuthorizationMetadata(metadata, parameters = {}, selectionBinding = null) {
@@ -782,11 +842,12 @@ function WindowContentInner({window, metadata, services}) {
     const shouldFillParent = windowFillsAllocatedSpace(window, isHostedWorkspaceSurface);
     const defaultDataSourceRef = resolveDefaultDataSourceRef(metadata);
     const initialWindowFormSeed = useMemo(() => ({
-        ...(parameters && typeof parameters === 'object' ? parameters : {}),
         ...resolveInitialWindowFormValues(metadata),
+        ...(parameters && typeof parameters === 'object' ? parameters : {}),
     }), [parameters, metadata]);
     const windowFormSignal = useMemo(() => findFormSignal(`${windowId}:windowForm`), [windowId]);
     const windowViewSignal = useMemo(() => getViewSignal(windowId), [windowId]);
+    const datePresets = useMemo(() => compileWindowFormDatePresets(metadata), [metadata]);
 
     const hookContext = Context(windowId, metadata, defaultDataSourceRef, services);
     const existingContext = getWindowContext(windowId);
@@ -804,15 +865,21 @@ function WindowContentInner({window, metadata, services}) {
     );
 
     const liveWindowForm = windowFormSignal?.value || {};
+    const liveMetrics = context?.signals?.metrics?.value || context?.signals?.metrics?.peek?.() || EMPTY_WINDOW_METRICS;
     const windowTabsSignal = useViewPartition(windowViewSignal, 'tabs');
     const liveWindowTabs = windowTabsSignal.value;
     const windowSectionsSignal = useViewPartition(windowViewSignal, 'sections');
     const liveWindowSections = windowSectionsSignal.value;
     const liveWindowView = useMemo(() => ({tabs: liveWindowTabs || {}, sections: liveWindowSections || {}}), [liveWindowTabs, liveWindowSections]);
-    const windowFormSnapshot = useMemo(() => ({
+    const windowFormSnapshot = useMemo(() => resolveInitialDateRangePresetValues(datePresets, {
         ...initialWindowFormSeed,
         ...liveWindowForm,
-    }), [initialWindowFormSeed, liveWindowForm]);
+    }, liveMetrics), [datePresets, initialWindowFormSeed, liveWindowForm, liveMetrics]);
+    const preserveWindowFormFields = useMemo(() => new Set([
+        ...Object.keys(parameters && typeof parameters === 'object' ? parameters : {}),
+        ...Object.keys(liveWindowForm),
+        ...Object.keys(windowFormSnapshot).filter(key => !Object.is(windowFormSnapshot[key], initialWindowFormSeed[key])),
+    ]), [parameters, liveWindowForm, windowFormSnapshot, initialWindowFormSeed]);
 
     const desiredWindowTitle = resolveBoundWindowTitle(metadata, window);
 
@@ -986,6 +1053,7 @@ function WindowContentInner({window, metadata, services}) {
             log,
             windowId,
             windowKey,
+            preserveWindowFormFields,
         });
 
         // cleanup → onDestroy

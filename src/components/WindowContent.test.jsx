@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, isAdmittedPublishedWindowResponse, isProtectedWindowMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowModelCacheScope, resolveWindowRootContainer, reuseShallowEqualRuntimeObject, scopedWindowHostServices, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
+import { applyWindowPermissionMetadata, canUseInlineMetadataFallback, compilePermissionAppliedMetadata, formatWindowMetadataError, isAdmittedPublishedWindowResponse, isProtectedWindowMetadata, resolveDefaultDataSourceRef, resolveFetcherOwnedDataSourceRefs, resolveInitialDateRangePresetValues, resolveInitialWindowFormValues, resolveRequiredDataSourceRefs, resolveWindowDataSourceFetchFlag, resolveWindowMetadataDisplayState, resolveWindowMetadataForTarget, resolveWindowModelCacheScope, resolveWindowRootContainer, reuseShallowEqualRuntimeObject, scopedWindowHostServices, shouldPreserveMissingResolvedParameters, shouldPrimeDataSourceFetch, shouldResetWindowDashboardState } from './WindowContent.jsx';
 
 describe('window-scoped host capability',()=>{
   it('binds each published window to its own host callbacks without changing global services',()=>{
@@ -199,6 +199,27 @@ describe('resolveInitialWindowFormValues', () => {
       booleanSeed: true,
       periodView: 'today',
       granularity: 'day',
+    });
+  });
+});
+
+describe('resolveInitialDateRangePresetValues', () => {
+  const metadata = {view:{content:{items:[{id:'periodView',scope:'windowForm',widget:'dateRangePreset',value:'month',properties:{startField:'customDateStart',endField:'customDateEnd',granularityField:'granularity',timeZoneSelector:'reportTimeZone'}}]}}};
+  it('resolves the selected preset before the first datasource read in its declared time zone', () => {
+    const current={AdvertiserId:[350],periodView:'month',customDateStart:'',customDateEnd:'',granularity:'day'};
+    expect(resolveInitialDateRangePresetValues(metadata,current,{reportTimeZone:'America/Los_Angeles'},new Date('2026-10-25T01:00:00Z'))).toEqual({
+      AdvertiserId:[350],periodView:'month',customDateStart:'2026-09-24',customDateEnd:'2026-10-24',granularity:'day',
+    });
+    expect(current.customDateStart).toBe('');
+  });
+  it('preserves explicit custom dates and unrelated live fields', () => {
+    const current={periodView:'custom',customDateStart:'2026-05-01',customDateEnd:'2026-05-10',AdvertiserId:[350]};
+    expect(resolveInitialDateRangePresetValues(metadata,current,{},new Date('2026-10-25T12:00:00Z'))).toBe(current);
+  });
+  it('uses the declared lifetime start selector without replacing other fields', () => {
+    const lifetime={view:{content:{items:[{id:'periodView',scope:'windowForm',type:'dateRangePreset',properties:{lifetimeStartSelector:'accountStart',startField:'From',endField:'To'}}]}}};
+    expect(resolveInitialDateRangePresetValues(lifetime,{periodView:'lifetime',AdvertiserId:[350]},{accountStart:'2024-04-02'},new Date('2026-10-25T12:00:00Z'))).toEqual({
+      periodView:'lifetime',AdvertiserId:[350],From:'2024-04-02',To:'2026-10-25',granularity:'day',
     });
   });
 });
