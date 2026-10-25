@@ -25,7 +25,7 @@ func NewReportSpecCompiler(now func() time.Time) *ReportSpecCompiler {
 }
 
 // Compile validates and returns a canonical ReportSpec payload.
-func (c *ReportSpecCompiler) Compile(_ context.Context, request *CompileRequest) (*CompileResult, error) {
+func (c *ReportSpecCompiler) Compile(ctx context.Context, request *CompileRequest) (*CompileResult, error) {
 	if request == nil {
 		return nil, fmt.Errorf("invalid reporting compile request: request is required")
 	}
@@ -42,6 +42,9 @@ func (c *ReportSpecCompiler) Compile(_ context.Context, request *CompileRequest)
 		return nil, fmt.Errorf("invalid reporting compile document: %w", err)
 	}
 	if err := validateReportSpecRoot(root); err != nil {
+		return nil, err
+	}
+	if err := ValidateReportReferences(ctx, request.Document); err != nil {
 		return nil, err
 	}
 	expandedDocument, err := expandReportSpecTimeSemantics(request.Document, c.now())
