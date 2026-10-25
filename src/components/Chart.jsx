@@ -691,9 +691,17 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         }
     }, [embedded, viewSwitchEnabled, viewMode]);
 
+    // Category charts expose aggregated name/value rows, not one column per legend key.
+    const tableXAxis = useMemo(() => isPieChart ? {dataKey: 'name', label: 'Category'} : xAxis, [isPieChart, xAxis]);
+    const tableSeriesDefinitions = useMemo(() => {
+        if (!isPieChart) return seriesDefinitions;
+        const metric = seriesDefinitions.find(entry => entry.value === (series.valueKey || selectedValueKey)) || {};
+        return [{...metric, value: 'value', label: metric.label || metric.name || 'Value'}];
+    }, [isPieChart, seriesDefinitions, series.valueKey, selectedValueKey]);
+
     const allTableColumns = useMemo(
-        () => [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
-        [xAxis?.dataKey, stableAvailableDataKeys],
+        () => isPieChart ? ['name', 'value'] : [xAxis?.dataKey, ...stableAvailableDataKeys].filter(Boolean),
+        [isPieChart, xAxis?.dataKey, stableAvailableDataKeys],
     );
     const [visibleColumns, setVisibleColumns] = useState(allTableColumns);
 
@@ -1225,7 +1233,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
     const computedWidthByCol = React.useMemo(() => {
         const out = {};
         allTableColumns.forEach((key) => {
-            const meta = chartTableColumnMeta(key, xAxis, seriesDefinitions);
+            const meta = chartTableColumnMeta(key, tableXAxis, tableSeriesDefinitions);
             const headerLen = String(meta.label || key || "").length;
             let maxLen = headerLen;
             chartData.forEach((row) => {
@@ -1237,7 +1245,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             out[key] = w;
         });
         return out;
-    }, [allTableColumns, chartData, resolvedTickFormat, resolvedTickValueMode, seriesDefinitions, xAxis]);
+    }, [allTableColumns, chartData, resolvedTickFormat, resolvedTickValueMode, tableSeriesDefinitions, tableXAxis]);
 
     const tableColumnWidths = visibleColumns.map((key) => {
         const persisted = Number(columnWidths[key]);
@@ -1254,7 +1262,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
 
     const downloadCsv = () => {
         const cols = visibleColumns.length ? visibleColumns : allTableColumns;
-        const lines = [cols.map((key) => escapeCsvCell(chartTableColumnMeta(key, xAxis, seriesDefinitions).label)).join(",")];
+        const lines = [cols.map((key) => escapeCsvCell(chartTableColumnMeta(key, tableXAxis, tableSeriesDefinitions).label)).join(",")];
         chartData.forEach((row) => {
             lines.push(cols.map((c) => escapeCsvCell(readChartDataValue(row, c))).join(","));
         });
@@ -1270,7 +1278,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
         URL.revokeObjectURL(url);
     };
 
-    const tableColumnMeta = visibleColumns.map((columnKey) => chartTableColumnMeta(columnKey, xAxis, seriesDefinitions));
+    const tableColumnMeta = visibleColumns.map((columnKey) => chartTableColumnMeta(columnKey, tableXAxis, tableSeriesDefinitions));
 
     const chartExportId = container?.id && String(container?.kind || '').startsWith('dashboard.')
         ? container.id
@@ -1686,7 +1694,7 @@ const Chart = ({container, context, isActive = true, embedded = false, onDatumSe
             <Dialog isOpen={!embedded && showColumnDialog} onClose={() => setShowColumnDialog(false)} title="Column customization">
                 <div style={{padding: 12, display: "flex", flexDirection: "column", gap: 10}}>
                     {allTableColumns.map((key) => {
-                        const meta = chartTableColumnMeta(key, xAxis, seriesDefinitions);
+                        const meta = chartTableColumnMeta(key, tableXAxis, tableSeriesDefinitions);
                         return (
                         <div key={key} style={{display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12}}>
                             <label className="bp4-control bp4-checkbox" style={{marginBottom: 0}}>

@@ -5,6 +5,12 @@ import Chart from './Chart.jsx';
 
 it.each([
     {
+        name: 'donut categories with a formatted measure',
+        chart: {type: 'donut', rowLimit: 1, series: {nameKey: 'publisher', valueKey: 'spend', values: [{value: 'spend', label: 'Spend', format: 'currency2'}]}},
+        rows: [{publisher: 'Acme', spend: 5}, {publisher: 'Acme', spend: 7}, {publisher: 'Beacon', spend: 9}],
+        expected: '$12.00',
+    },
+    {
         name: 'pie categories',
         chart: {type: 'pie', rowLimit: 1, series: {nameKey: 'publisher', valueKey: 'spend'}},
         rows: [{publisher: 'Acme', spend: 5}, {publisher: 'Acme', spend: 7}, {publisher: 'Beacon', spend: 9}],
@@ -47,12 +53,13 @@ it.each([
             expect(selected.mock.calls[0][0].row).toMatchObject({name: 'Acme', value: 12});
             expect(rows.map(row => row.spend)).toEqual([5, 7, 9]);
             expect(host.textContent).not.toContain('Beacon');
-            return;
         }
         const tableButton = [...host.querySelectorAll('button')].find(button => button.textContent === 'Table');
         await act(async () => tableButton.click());
         const tableRows = [...host.querySelectorAll('.forge-chart-table tbody tr')];
         expect(tableRows).toHaveLength(1);
+        if (chart.type === 'pie') expect([...host.querySelectorAll('th')].map(cell => cell.textContent)).toEqual(['Category', 'Value']);
+        if (chart.type === 'donut') expect([...host.querySelectorAll('th')].map(cell => cell.textContent)).toEqual(['Category', 'Spend']);
         expect(tableRows[0].textContent).toContain(expected);
         expect(tableRows[0].textContent).toContain('Acme');
         expect(host.textContent).not.toContain('Beacon');
