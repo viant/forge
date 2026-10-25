@@ -60,6 +60,7 @@ export default defineConfig({
       'src/components/DataSource.aggregateOffset.render.test.jsx',
       'src/components/primitives/EditableCollection.readiness.render.test.jsx',
       'src/components/primitives/StatusWorkflow.switch.render.test.jsx',
+      'src/components/primitives/GroupedSelection.render.test.jsx',
     ],
     setupFiles: ['./scripts/react-runtime-test-setup.js'],
     maxWorkers: 2,

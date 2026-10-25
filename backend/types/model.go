@@ -583,6 +583,7 @@ type Container struct {
 	ParameterEditor            *ParameterEditorSpec              `json:"parameterEditor,omitempty" yaml:"parameterEditor,omitempty"`
 	RuleEditor                 *RuleEditorSpec                   `json:"ruleEditor,omitempty" yaml:"ruleEditor,omitempty"`
 	TreeEditor                 *TreeEditorSpec                   `json:"treeEditor,omitempty" yaml:"treeEditor,omitempty"`
+	GroupedSelection           *GroupedSelectionSpec             `json:"groupedSelection,omitempty" yaml:"groupedSelection,omitempty"`
 	Wizard                     *WizardSpec                       `json:"wizard,omitempty" yaml:"wizard,omitempty"`
 	UploadCollection           *UploadCollectionSpec             `json:"uploadCollection,omitempty" yaml:"uploadCollection,omitempty"`
 	DerivedDataSource          *DerivedDataSourceSpec            `json:"derivedDataSource,omitempty" yaml:"derivedDataSource,omitempty"`

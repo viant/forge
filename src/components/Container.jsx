@@ -21,6 +21,7 @@ import ResultPreviewPanel from "./primitives/ResultPreview.jsx";
 import WorkspaceSummary from "./primitives/WorkspaceSummary.jsx";
 import ParameterEditor from "./primitives/ParameterEditor.jsx";
 import RuleEditor from "./primitives/RuleEditor.jsx";
+import GroupedSelection from "./primitives/GroupedSelection.jsx";
 import TreeEditor from "./primitives/TreeEditor.jsx";
 import Wizard from "./primitives/Wizard.jsx";
 import UploadCollection from "./primitives/UploadCollection.jsx";
@@ -268,6 +269,7 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
     const workspaceSummaryPanel = container.workspaceSummary ? <WorkspaceSummary container={container} context={effectiveContext}/> : null;
     const parameterEditorPanel = container.parameterEditor ? <ParameterEditor container={container} context={effectiveContext}/> : null;
     const ruleEditorPanel = container.ruleEditor ? <RuleEditor container={container} context={effectiveContext}/> : null;
+    const groupedSelectionPanel = container.groupedSelection ? <GroupedSelection container={container} context={effectiveContext}/> : null;
     const treeEditorPanel = container.treeEditor
         ? <TreeEditor container={container} context={effectiveContext}/>
         : null;
@@ -483,7 +485,7 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
         !!InstalledContainerRenderer || container?.kind === 'mcpApp' ||
         (visualItems?.length || 0) > 0 ||
         !!container.toolbar ||
-        previewWorkbenchPanel || predicateCompositionPanel || gateRequirementsEditorPanel || readerWorkbenchPanel || resourcePolicyEditorPanel || hostContentPanel || resultPreviewPanel || workspaceSummaryPanel || tablePanel || assignmentPanel || derivedDataSourcePanel || mutationCommandPanel || statusWorkflowPanel || parameterEditorPanel || ruleEditorPanel || treeEditorPanel || wizardPanel || uploadCollectionPanel || historyDiffPanel || scheduleEditorPanel || container.draftForm || queryToolbarPanel || resourceHeaderPanel || relationDrillPanel || notificationRulesPanel || metricSummaryPanel || detailViewPanel || masterDetailPanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || treeBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
+        previewWorkbenchPanel || predicateCompositionPanel || gateRequirementsEditorPanel || readerWorkbenchPanel || resourcePolicyEditorPanel || hostContentPanel || resultPreviewPanel || workspaceSummaryPanel || tablePanel || assignmentPanel || derivedDataSourcePanel || mutationCommandPanel || statusWorkflowPanel || parameterEditorPanel || ruleEditorPanel || groupedSelectionPanel || treeEditorPanel || wizardPanel || uploadCollectionPanel || historyDiffPanel || scheduleEditorPanel || container.draftForm || queryToolbarPanel || resourceHeaderPanel || relationDrillPanel || notificationRulesPanel || metricSummaryPanel || detailViewPanel || masterDetailPanel || chartPanel || chatPanel || terminalPanel || fileBrowserPanel || treeBrowserPanel || editorPanel || schemaFormPanel || formPanel || (containers && containers.length > 0);
     if (!hasVisual && !shouldSkipGenericNonVisualEarlyReturn(container)) {
         return (
             <>
@@ -838,6 +840,7 @@ const ContainerContent = ({context, container, isActive, suppressTitle = false, 
                 {workspaceSummaryPanel}
                 {parameterEditorPanel}
                 {ruleEditorPanel}
+                {groupedSelectionPanel}
                 {treeEditorPanel}
                 {wizardPanel}
                 {uploadCollectionPanel}
