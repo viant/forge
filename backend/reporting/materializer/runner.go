@@ -224,7 +224,7 @@ func runEntryWithTimeSourceTimeout(ctx context.Context, program *goja.Program, e
 		return nil, fmt.Errorf("trusted lowerer entry missing")
 	}
 	invokeTiming := observe.Start(ctx, "report.materializer.runtime.invoke", observe.Labels{Kind: "report"})
-	result, err := lower(goja.Undefined(), runtime.ToValue(string(raw)))
+	result, err := invokeMaterializerEntry(bounded, runtime, entry, lower, raw)
 	invokeTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, loweringError(bounded, err)
