@@ -51513,6 +51513,7 @@ Please __addLocaleData before adding additional unit data`);
     const selectionBindings = isPlainObject7(source == null ? void 0 : source.selectionBindings) ? cloneValue18(source.selectionBindings) : isPlainObject7(block == null ? void 0 : block.selectionBindings) ? cloneValue18(block.selectionBindings) : null;
     const actions = Array.isArray(source == null ? void 0 : source.actions) ? cloneValue18(source.actions) : Array.isArray(block == null ? void 0 : block.actions) ? cloneValue18(block.actions) : [];
     const normalized = {
+      ...(source == null ? void 0 : source.printRowReference) === true ? { printRowReference: true } : {},
       ...visibleWhen ? { visibleWhen } : {},
       ...filterBindings && Object.keys(filterBindings).length > 0 ? { filterBindings } : {},
       ...selectionBindings && Object.keys(selectionBindings).length > 0 ? { selectionBindings } : {},
@@ -67761,6 +67762,30 @@ ${indent}${end}`;
       }));
     });
   }
+  function withReportPrintRowReference(block, columns, rows) {
+    const keys = /* @__PURE__ */ new Set();
+    const reserve = (entry) => [entry == null ? void 0 : entry.key, entry == null ? void 0 : entry.sourceKey, entry == null ? void 0 : entry.displayKey].map((value) => normalizeString39(value)).filter(Boolean).forEach((key2) => keys.add(key2));
+    columns.forEach(reserve);
+    rows.forEach((row) => ((row == null ? void 0 : row.cells) || []).forEach(reserve));
+    const prefix = "__forge_print_row_reference";
+    let key = prefix;
+    let suffix = 1;
+    while (keys.has(key)) key = `${prefix}_${suffix++}`;
+    const hasIdentity = columns.some((column) => (column == null ? void 0 : column.rowIdentity) === true);
+    const sourceColumns = hasIdentity ? columns : columns.map((column, index) => index === 0 ? { ...column, rowIdentity: true } : column);
+    return {
+      ...block,
+      content: {
+        ...block.content,
+        columns: [{ key, label: "Row (print)", format: "id", align: "right", rowIdentity: true }, ...sourceColumns],
+        resolvedRows: rows.map((row, index) => ({
+          ...row,
+          rowIndex: index,
+          cells: [{ key, sourceKey: key, displayKey: key, value: index + 1, displayValue: index + 1 }, ...(row == null ? void 0 : row.cells) || []]
+        }))
+      }
+    };
+  }
   function partitionReportPrintTableColumns(columns, minimumWidths, contentWidth) {
     let identityIndexes = columns.flatMap((column, index) => (column == null ? void 0 : column.rowIdentity) === true ? [index] : []);
     if (identityIndexes.length === 0) identityIndexes = [0];
@@ -67788,9 +67813,14 @@ ${indent}${end}`;
     layoutNote = "",
     columnBand = false
   } = {}) {
-    var _a5, _b;
-    const columns = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.columns) ? block.content.columns : [];
+    var _a5, _b, _c;
+    let columns = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.columns) ? block.content.columns : [];
     let rows = Array.isArray((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.resolvedRows) ? block.content.resolvedRows : [];
+    if (!columnBand && ((_c = block == null ? void 0 : block.runtime) == null ? void 0 : _c.printRowReference) === true && columns.length > 0 && rows.length > 0) {
+      block = withReportPrintRowReference(block, columns, rows);
+      columns = block.content.columns;
+      rows = block.content.resolvedRows;
+    }
     const resolveText = state.resolveTableCellText;
     const minimumWidths = minimumReportPrintColumnWidths(state, block, columns, resolveText);
     if (!columnBand && rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {

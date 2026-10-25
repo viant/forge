@@ -2250,6 +2250,36 @@ function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {
   });
 }
 
+// This reference belongs only to this printed table. Resolve it from the final
+// fill order once, before horizontal bands are planned; never change the fill.
+function withReportPrintRowReference(block, columns, rows) {
+  const keys = new Set();
+  const reserve = (entry) => [entry?.key, entry?.sourceKey, entry?.displayKey]
+    .map((value) => normalizeString(value)).filter(Boolean).forEach((key) => keys.add(key));
+  columns.forEach(reserve);
+  rows.forEach((row) => (row?.cells || []).forEach(reserve));
+  const prefix = "__forge_print_row_reference";
+  let key = prefix;
+  let suffix = 1;
+  while (keys.has(key)) key = `${prefix}_${suffix++}`;
+  const hasIdentity = columns.some((column) => column?.rowIdentity === true);
+  const sourceColumns = hasIdentity ? columns : columns.map((column, index) => (
+    index === 0 ? { ...column, rowIdentity: true } : column
+  ));
+  return {
+    ...block,
+    content: {
+      ...block.content,
+      columns: [{ key, label: "Row (print)", format: "id", align: "right", rowIdentity: true }, ...sourceColumns],
+      resolvedRows: rows.map((row, index) => ({
+        ...row,
+        rowIndex: index,
+        cells: [{ key, sourceKey: key, displayKey: key, value: index + 1, displayValue: index + 1 }, ...(row?.cells || [])],
+      })),
+    },
+  };
+}
+
 // Plan each payload column exactly once. Explicit identity columns lead every
 // band; unmarked legacy tables retain their original first-column anchor.
 // A band always admits one payload column, even when its anchors exceed the
@@ -2282,8 +2312,13 @@ function renderReportPrintTableBlock(state = {}, block = {}, {
   layoutNote = "",
   columnBand = false,
 } = {}) {
-  const columns = Array.isArray(block?.content?.columns) ? block.content.columns : [];
+  let columns = Array.isArray(block?.content?.columns) ? block.content.columns : [];
   let rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
+  if (!columnBand && block?.runtime?.printRowReference === true && columns.length > 0 && rows.length > 0) {
+    block = withReportPrintRowReference(block, columns, rows);
+    columns = block.content.columns;
+    rows = block.content.resolvedRows;
+  }
   const resolveText = state.resolveTableCellText;
   const minimumWidths = minimumReportPrintColumnWidths(state, block, columns, resolveText);
   if (!columnBand && rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
