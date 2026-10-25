@@ -123,7 +123,7 @@ const FilterDialog = ({
                                 <HTMLSelect
                                     id={`forge-filter-${tpl.id}`}
                                     fill
-                                    value={filterValues[tpl.id] || ''}
+                                    value={filterValues[tpl.id] ?? ''}
                                     onChange={(e) => handleInputChange(tpl.id, e.target.value)}
                                 >
                                     <option value="">All</option>
@@ -135,7 +135,7 @@ const FilterDialog = ({
                                 <InputGroup
                                     id={`forge-filter-${tpl.id}`}
                                     placeholder={tpl.operator}
-                                    value={filterValues[tpl.id] || ""}
+                                    value={filterValues[tpl.id] ?? ""}
                                     onChange={(e) => handleInputChange(tpl.id, e.target.value)}
                                 />
                             )}
