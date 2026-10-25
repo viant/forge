@@ -779,6 +779,13 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
   const primaryComputedMeasures = Array.isArray(effectiveConfig?.computedMeasures) ? cloneValue(effectiveConfig.computedMeasures) : [];
   const primaryTableCalculations = Array.isArray(effectiveConfig?.tableCalculations) ? cloneValue(effectiveConfig.tableCalculations) : [];
   const dataSourceRef = resolveDocumentDataSourceRef(container, config);
+  // The primary logical dataset may declare its transport result shape with
+  // the other published datasets. Match both identities: another dataset on
+  // the same endpoint is not the primary result contract.
+  const primarySource = normalizeReportBuilderPublishedDataSources(config)
+    .find(dataset => dataset.id === "primary" && dataset.dataSourceRef === dataSourceRef);
+  const primaryResultContract = isPlainObject(config?.resultContract)
+    ? config.resultContract : primarySource?.resultContract;
   const dimensions = (Array.isArray(effectiveConfig?.dimensions) ? effectiveConfig.dimensions : [])
     .map((entry) => {
       const id = normalizeString(entry?.id || entry?.key);
@@ -873,7 +880,7 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
       kindLabel: "primary",
       ...(isPlainObject(config?.scope) ? { scope: cloneValue(config.scope) } : {}),
       ...(isPlainObject(config?.source) ? { source: cloneValue(config.source) } : {}),
-      ...(isPlainObject(config?.resultContract) ? { resultContract: cloneValue(config.resultContract) } : {}),
+      ...(isPlainObject(primaryResultContract) ? { resultContract: cloneValue(primaryResultContract) } : {}),
       ...(isPlainObject(config?.capabilities) ? { capabilities: cloneValue(config.capabilities) } : {}),
       request: cloneValue(buildReportBuilderRequest(config, state)),
       ...(primaryDimensions.length > 0 ? { dimensions: primaryDimensions } : {}),
