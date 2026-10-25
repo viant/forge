@@ -76,16 +76,17 @@ type DatasetRelativeDateRange struct {
 	EndParamPath    string `json:"endParamPath"`
 }
 type DatasetCapabilities struct {
-	BackendRefetch  *bool             `json:"backendRefetch,omitempty"`
-	Export          *bool             `json:"export,omitempty"`
-	FieldCatalog    *bool             `json:"fieldCatalog,omitempty"`
-	Preview         *bool             `json:"preview,omitempty"`
-	ScopeParams     *bool             `json:"scopeParams,omitempty"`
-	SemanticBinding *bool             `json:"semanticBinding,omitempty"`
-	LiveFilters     *bool             `json:"liveFilters,omitempty"`
-	Drill           *bool             `json:"drill,omitempty"`
-	LookupHydration *bool             `json:"lookupHydration,omitempty"`
-	RequestModel    map[string]string `json:"requestModel,omitempty"`
+	InheritRuntimeFieldCatalog *bool             `json:"inheritRuntimeFieldCatalog,omitempty"`
+	BackendRefetch             *bool             `json:"backendRefetch,omitempty"`
+	Export                     *bool             `json:"export,omitempty"`
+	FieldCatalog               *bool             `json:"fieldCatalog,omitempty"`
+	Preview                    *bool             `json:"preview,omitempty"`
+	ScopeParams                *bool             `json:"scopeParams,omitempty"`
+	SemanticBinding            *bool             `json:"semanticBinding,omitempty"`
+	LiveFilters                *bool             `json:"liveFilters,omitempty"`
+	Drill                      *bool             `json:"drill,omitempty"`
+	LookupHydration            *bool             `json:"lookupHydration,omitempty"`
+	RequestModel               map[string]string `json:"requestModel,omitempty"`
 }
 type DatasetSource struct {
 	Kind          string `json:"kind,omitempty"`
