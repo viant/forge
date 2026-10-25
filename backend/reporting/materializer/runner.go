@@ -130,14 +130,20 @@ func validateEnvelope(e registry.ReportEnvelope) error {
 		switch dep.Kind {
 		case "builder":
 			builderCount++
-			if dep.ID != e.BuilderRef || dep.ContentFingerprint != identity.ContentFingerprint(e.BuilderDefinition) {
+			if dep.ID != e.BuilderRef {
 				return fmt.Errorf("authored builder fingerprint mismatch")
+			}
+			if dep.ContentFingerprint != identity.ContentFingerprint(e.BuilderDefinition) {
+				return &AuthoredDependencyFingerprintError{kind: "builder"}
 			}
 		case "datasource":
 			descriptor := e.DataSources[dep.ID]
 			var object map[string]any
-			if len(descriptor) == 0 || json.Unmarshal(descriptor, &object) != nil || len(object) == 0 || dep.ContentFingerprint != identity.ContentFingerprint(descriptor) {
+			if len(descriptor) == 0 || json.Unmarshal(descriptor, &object) != nil || len(object) == 0 {
 				return fmt.Errorf("authored datasource fingerprint mismatch")
+			}
+			if dep.ContentFingerprint != identity.ContentFingerprint(descriptor) {
+				return &AuthoredDependencyFingerprintError{kind: "datasource"}
 			}
 			ds[dep.ID] = true
 		case "report":
