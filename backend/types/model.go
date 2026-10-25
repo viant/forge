@@ -1456,14 +1456,23 @@ type Toolbar struct {
 // MediaPreviewValue is a reusable media value; imageCard adds escaped text and
 // an optional external destination around an image. Runtime validates URLs.
 type MediaPreviewValue struct {
-	Kind        string `json:"kind" yaml:"kind"`
-	URL         string `json:"url,omitempty" yaml:"url,omitempty"`
-	Alt         string `json:"alt,omitempty" yaml:"alt,omitempty"`
-	Title       string `json:"title,omitempty" yaml:"title,omitempty"`
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
-	Caption     string `json:"caption,omitempty" yaml:"caption,omitempty"`
-	Href        string `json:"href,omitempty" yaml:"href,omitempty"`
-	Identity    string `json:"identity,omitempty" yaml:"identity,omitempty"`
+	Kind        string               `json:"kind" yaml:"kind"`
+	URL         string               `json:"url,omitempty" yaml:"url,omitempty"`
+	Alt         string               `json:"alt,omitempty" yaml:"alt,omitempty"`
+	Title       string               `json:"title,omitempty" yaml:"title,omitempty"`
+	Description string               `json:"description,omitempty" yaml:"description,omitempty"`
+	Caption     string               `json:"caption,omitempty" yaml:"caption,omitempty"`
+	Href        string               `json:"href,omitempty" yaml:"href,omitempty"`
+	Identity    string               `json:"identity,omitempty" yaml:"identity,omitempty"`
+	Sources     []MediaPreviewSource `json:"sources,omitempty" yaml:"sources,omitempty"`
+	Width       int                  `json:"width,omitempty" yaml:"width,omitempty"`
+	Height      int                  `json:"height,omitempty" yaml:"height,omitempty"`
+}
+
+// MediaPreviewSource is an authored URL choice for a generic frame preview.
+type MediaPreviewSource struct {
+	Label string `json:"label" yaml:"label"`
+	URL   string `json:"url" yaml:"url"`
 }
 
 // MediaPreviewOptions configures the shared table/card preview trigger.
