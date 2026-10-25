@@ -638,7 +638,7 @@ assert.ok(printElements.some((element) => element.kind === "tableCellBadge"));
 assert.ok(printElements.some((element) => (
   element.kind === "rect"
   && element.id.endsWith("__bar_track")
-  && element.radius === 8
+  && element.radius === 6
 )));
 assert.ok(printElements.some((element) => (
   element.kind === "tableCellBadge"
