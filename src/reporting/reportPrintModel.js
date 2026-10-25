@@ -2434,6 +2434,7 @@ function renderReportPrintChartBlock(state = {}, block = {}, {
   const chartPages = buildReportPrintChartPages({
     chartModel: block?.content?.chartModel || block?.chartModel || {},
     resolvedChart: block?.content?.resolvedChart || null,
+    rowLimit: block?.content?.rowLimit ?? block?.rowLimit ?? 0,
     width: state.contentWidth,
     maxHeight: state.contentBottom - state.contentTop - titleHeight,
     firstMaxHeight: state.contentBottom - state.cursorY - titleHeight >= 180

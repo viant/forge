@@ -72,3 +72,40 @@ assert.equal(xlsxSubmission.mode, "legacy");
 assert.equal(xlsxSubmission.input.request.target.format, "xlsx");
 
 console.log("reportBuilderExportSubmission ✓ normalizes export-from-run, enforces exact PDF references, and preserves legacy/XLSX paths");
+
+const currentCalls = [];
+const selection = {version: 1, containerId: "builder", state: {selectedMeasures: ["count"]}};
+const controller = new AbortController();
+const currentSubmission = resolveReportBuilderExportSubmission({
+    request: {target: {format: "xlsx", tableBlockId: "details"}, reportSpec: {rows: ["untrusted"]}, reportFill: {}},
+    builderSelection: selection,
+    signal: controller.signal,
+    reportExportHandler: {exportCurrent: async (...args) => currentCalls.push(args)},
+});
+assert.equal(currentSubmission.mode, "current");
+assert.deepEqual(currentSubmission.input, {builder: selection, format: "xlsx", tableBlockId: "details"});
+selection.state.selectedMeasures.push("later");
+assert.deepEqual(currentSubmission.input.builder.state.selectedMeasures, ["count"]);
+await currentSubmission.execute();
+assert.equal(currentCalls[0][1].signal, controller.signal);
+assert.equal("request" in currentCalls[0][0], false);
+assert.equal(resolveReportBuilderExportSubmission({
+    request: {target: {format: "pdf"}}, builderSelection: selection, requireRunReference: true,
+    reportExportHandler: {exportCurrent: () => assert.fail("cannot substitute a current draft for an exact historical run")},
+}), null);
+let captures = 0;
+const historical = resolveReportBuilderExportSubmission({
+    request: {target: {format: "pdf"}}, runReference: {reportRunId: "exact-completed"}, requireRunReference: true,
+    builderSelection: () => { captures++; throw new Error("historical export must not inspect current state"); },
+    reportExportHandler: {exportCurrent: () => assert.fail("current export cannot replace exact history"), submitRun: async input => input},
+});
+assert.equal(historical.mode, "run");
+assert.equal((await historical.execute()).reportRunId, "exact-completed");
+assert.equal(captures, 0);
+const tables={details:{filter:"East",sort:{key:"count",direction:"desc"}}};
+const presented=resolveReportBuilderExportSubmission({request:{target:{format:"xlsx"},reportSpec:{rows:["not sent"]}},builderSelection:{version:1,containerId:"builder",state:{}},windowParameters:()=>({AdvertiserId:[42],Trial:false}),tablePresentations:tables,reportExportHandler:{exportCurrent:async input=>input}});
+tables.details.filter="later";
+assert.deepEqual((await presented.execute()).tablePresentations,{details:{filter:"East",sort:{key:"count",direction:"desc"}}});
+assert.deepEqual(presented.input.parameters,{AdvertiserId:[42],Trial:false});
+assert.equal("reportSpec" in presented.input,false);
+console.log("reportBuilderExportSubmission ✓ current builder handoff excludes client render artifacts and preserves cancellation");

@@ -15,6 +15,8 @@ import {buildReportBuilderReportDocument, lowerReportDocumentToReportSpec} from 
 import {buildReportFillFromReportSpec} from "../../../../src/reporting/reportFillModel.js";
 import {buildReportPrintFromReportFill} from "../../../../src/reporting/reportPrintModel.js";
 import {normalizeReportBuilderPredicates} from "../../../../src/components/dashboard/reportBuilderPredicates.js";
+import {prepareWindowBuilderExport} from "../../../../src/reporting/windowBuilderExportState.js";
+import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../../src/reporting/reportRequestEnvelope.js";
   function isObject(value) {
     return !!value && typeof value === "object" && !Array.isArray(value);
   }
@@ -130,26 +132,48 @@ import {normalizeReportBuilderPredicates} from "../../../../src/components/dashb
     const document = authoredReportDocument(input.envelope, input.requestBaseParameters);
     return JSON.stringify(lowerReportDocumentToReportSpec(document));
   }
-  export function materialize(inputJSON) {
+  export function materialize(inputJSON, stage) {
+    stage?.("parse");
     const input = JSON.parse(inputJSON);
     if (!isObject(input.reportSpec) || input.reportSpec.kind !== "reportSpec" || !isObject(input.datasets)) throw new Error("Trusted reportSpec and executed datasets required.");
-    const reportFill = buildReportFillFromReportSpec(input.reportSpec, input.datasets);
+    stage?.("fill");
+    const reportFill = buildReportFillFromReportSpec(input.reportSpec, input.datasets, {tablePresentations: input.tablePresentations});
+    stage?.("print");
     const reportPrint = buildReportPrintFromReportFill({ reportSpec: input.reportSpec, reportFill });
     if (!reportPrint) throw new Error("Trusted report print materialization failed.");
-    return JSON.stringify({ reportFill, reportPrint });
+    stage?.("serialize");
+    const output = JSON.stringify({ reportFill, reportPrint });
+    stage?.("done");
+    return output;
   }
 
   // Interactive preview needs the fill model. Complete print/export keeps
   // using materialize on a fresh authorized execution.
-  export function materializeFill(inputJSON) {
+  export function materializeFill(inputJSON, stage) {
+    stage?.("parse");
     const input = JSON.parse(inputJSON);
     if (!isObject(input.reportSpec) || input.reportSpec.kind !== "reportSpec" || !isObject(input.datasets)) throw new Error("Trusted reportSpec and executed datasets required.");
-    const reportFill = buildReportFillFromReportSpec(input.reportSpec, input.datasets);
-    return JSON.stringify({ reportFill });
+    stage?.("fill");
+    const reportFill = buildReportFillFromReportSpec(input.reportSpec, input.datasets, {tablePresentations: input.tablePresentations});
+    stage?.("serialize");
+    const output = JSON.stringify({ reportFill });
+    stage?.("done");
+    return output;
   }
 
 export function present(inputJSON) {
  const input=JSON.parse(inputJSON);
  return JSON.stringify(applyReportChartSelections(input.reportSpec,input.chartMetricSelections));
 }
-globalThis.ForgeAuthoredLowerer = {lower, materialize, materializeFill, present};
+export function prepareWindowBuilder(inputJSON) {
+ return JSON.stringify(prepareWindowBuilderExport(JSON.parse(inputJSON)));
+}
+export function reportWindowIdentity(inputJSON) {
+ const input = JSON.parse(inputJSON);
+ return JSON.stringify(reportRequestWindowIdentity(input.config, input.windowParameters));
+}
+export function mapReportRequest(inputJSON) {
+ const input = JSON.parse(inputJSON);
+ return JSON.stringify(mapReportRequestEnvelope(input.config, input.query, input.datasetId));
+}
+globalThis.ForgeAuthoredLowerer = {lower, materialize, materializeFill, present, prepareWindowBuilder, reportWindowIdentity, mapReportRequest};

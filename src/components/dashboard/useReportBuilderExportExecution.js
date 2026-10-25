@@ -21,6 +21,7 @@ import {
     emitReportBuilderUIEvent,
 } from "./reportBuilderUIEvents.js";
 import { resolveReportBuilderExportSubmission } from "./reportBuilderExportSubmission.js";
+import { immediateReportExportDownload } from "./reportBuilderImmediateExport.js";
 
 export { resolveReportBuilderExportSubmission } from "./reportBuilderExportSubmission.js";
 
@@ -72,6 +73,7 @@ function buildExportFormatLabel(format = "") {
 
 export const REPORT_EXPORT_STATUS_POLL_INTERVAL_MS = 1500;
 export const REPORT_EXPORT_SUBMIT_TIMEOUT_MS = 30000;
+export const REPORT_EXPORT_CURRENT_TIMEOUT_MS = 120000;
 export const REPORT_EXPORT_STATUS_TIMEOUT_MS = 15000;
 export const REPORT_EXPORT_ARTIFACT_TIMEOUT_MS = 30000;
 export const REPORT_EXPORT_HISTORY_TIMEOUT_MS = 20000;
@@ -211,6 +213,9 @@ export function useReportBuilderExportExecution({
     reportEventHandler = null,
     reportEventContext = {},
     resolveRunReference = null,
+    builderSelection = null,
+    windowParameters = null,
+    tablePresentations = null,
     setFeedback = () => {},
     missingRequestMessage = "No export request is available.",
     missingJobMessage = "No export job is available to refresh.",
@@ -246,6 +251,16 @@ export function useReportBuilderExportExecution({
     const statusRequestVersionRef = React.useRef(0);
     const statusPollTimerRef = React.useRef(null);
     const completedEventKeysRef = React.useRef(new Set());
+    const currentExportRef = React.useRef(null);
+    const exportContextRef = React.useRef(null);
+    exportContextRef.current = { requestIdentity, reportExportHandler, builderSelection, windowParameters, tablePresentations };
+    React.useEffect(() => {
+        setSubmitting(false);
+        return () => {
+            currentExportRef.current?.abort();
+            currentExportRef.current = null;
+        };
+    }, [requestIdentity, reportExportHandler, builderSelection, windowParameters, tablePresentations]);
     const jobSummary = React.useMemo(
         () => buildReportBuilderExportJobSummary(job),
         [job],
@@ -409,7 +424,8 @@ export function useReportBuilderExportExecution({
             return null;
         }
         if (typeof reportExportHandler?.submitRequest !== "function"
-            && typeof reportExportHandler?.submitRun !== "function") {
+            && typeof reportExportHandler?.submitRun !== "function"
+            && typeof reportExportHandler?.exportCurrent !== "function") {
             setRequestOpen(true);
             setFeedback({
                 level: "info",
@@ -417,6 +433,17 @@ export function useReportBuilderExportExecution({
             });
             return null;
         }
+        currentExportRef.current?.abort();
+        const controller = new AbortController();
+        currentExportRef.current = controller;
+        const selectedContext = exportContextRef.current;
+        const stillCurrent = () => !controller.signal.aborted
+            && currentExportRef.current === controller
+            && exportContextRef.current.requestIdentity === selectedContext.requestIdentity
+            && exportContextRef.current.reportExportHandler === selectedContext.reportExportHandler
+            && exportContextRef.current.builderSelection === selectedContext.builderSelection
+            && exportContextRef.current.windowParameters === selectedContext.windowParameters
+            && exportContextRef.current.tablePresentations === selectedContext.tablePresentations;
         setSubmitting(true);
         runReportBuilderExportSideEffect(
             () => emitExportEvent("report.export_start"),
@@ -434,16 +461,34 @@ export function useReportBuilderExportExecution({
                 reportExportHandler,
                 runReference,
                 requireRunReference,
+                builderSelection,
+                signal: controller.signal,
+                windowParameters,
+                tablePresentations,
+                tableBlockId: typeof submissionOptions?.tableBlockId === "string" ? submissionOptions.tableBlockId : undefined,
             });
             const submitOperation = submission?.execute
                 || (() => Promise.reject(new Error("No exact completed report run is available for export.")));
             const result = await runReportBuilderExportOperation(
                 submitOperation,
                 {
-                    timeoutMs: REPORT_EXPORT_SUBMIT_TIMEOUT_MS,
-                    timeoutMessage: `Export submission did not respond within ${REPORT_EXPORT_SUBMIT_TIMEOUT_MS / 1000} seconds. Check recent exports before retrying.`,
+                    timeoutMs: submission?.mode === "current" ? REPORT_EXPORT_CURRENT_TIMEOUT_MS : REPORT_EXPORT_SUBMIT_TIMEOUT_MS,
+                    timeoutMessage: submission?.mode === "current"
+                        ? `Report export did not finish within ${REPORT_EXPORT_CURRENT_TIMEOUT_MS / 1000} seconds. Retry the export.`
+                        : `Export submission did not respond within ${REPORT_EXPORT_SUBMIT_TIMEOUT_MS / 1000} seconds. Check recent exports before retrying.`,
                 },
             );
+            if (!stillCurrent()) return null;
+            const immediate = immediateReportExportDownload(result, request?.target?.format);
+            if (immediate) {
+                if (submission?.mode !== "current") throw new Error("The export handler returned an unexpected immediate artifact.");
+                if (!triggerDownload(immediate)) throw new Error("The browser could not start the report download.");
+                setJob(null);
+                setArtifact(null);
+                setFeedback({level: "success", message: `Downloaded ${format} export for ${title}.`});
+                return result;
+            }
+            if (submission?.mode === "current") throw new Error("The host did not return a downloadable report.");
             const normalizedJob = normalizeReportBuilderExportJob(result);
             if (normalizedJob) {
                 setJob(normalizedJob);
@@ -485,6 +530,7 @@ export function useReportBuilderExportExecution({
             }
             return result || { ok: true };
         } catch (error) {
+            if (!stillCurrent()) return null;
             const failure = resolveReportBuilderExportSubmitFailure(error, { format, title });
             if (failure.job) {
                 setJob(failure.job);
@@ -496,10 +542,17 @@ export function useReportBuilderExportExecution({
             });
             return null;
         } finally {
-            setSubmitting(false);
+            controller.abort();
+            if (currentExportRef.current === controller) {
+                currentExportRef.current = null;
+                setSubmitting(false);
+            }
         }
     }, [
         historyAvailable,
+        builderSelection,
+        windowParameters,
+        tablePresentations,
         missingRequestMessage,
         refreshHistory,
         reportAuditActorRef,
@@ -510,6 +563,7 @@ export function useReportBuilderExportExecution({
         reportExportHandler,
         reportEventContext?.conversationId,
         request,
+        requestIdentity,
         resolveRunReference,
         setFeedback,
         sourceKind,

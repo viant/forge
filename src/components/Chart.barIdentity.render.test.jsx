@@ -39,6 +39,7 @@ it.each(['bar', 'horizontal_bar'])('identifies bars in %s charts by series and c
         expect(chart).toBeTruthy();
         const campaignAcme = chart.querySelector('.recharts-bar-rectangle [data-series-id="campaign"][data-category="Acme"]');
         expect(campaignAcme?.tagName.toLowerCase()).toBe('path');
+        expect(campaignAcme.getAttribute('radius')).toBe(type === 'bar' ? '6,6,0,0' : '0,6,6,0');
         expect(chart.querySelectorAll('.recharts-bar-rectangle [data-series-id][data-category]')).toHaveLength(4);
         expect(chart.querySelector('[data-series-id="campaign"][data-category="Beacon"]')).toBeTruthy();
         expect(chart.querySelector('[data-series-id="other"][data-category="Acme"]')).toBeTruthy();

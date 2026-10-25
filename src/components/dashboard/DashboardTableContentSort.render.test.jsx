@@ -4,6 +4,21 @@ import {createRoot} from 'react-dom/client';
 import {expect,it} from 'vitest';
 import DashboardTableContent from './DashboardTableContent.jsx';
 
+it('restores table sort and filter when its report tab remounts',async()=>{
+ const host=document.createElement('div');document.body.append(host);
+ const root=createRoot(host);globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+ const rows=[{name:'Cedar',value:1},{name:'Birch',value:99},{name:'Cedar',value:2}];
+ const context={signals:{collection:{value:rows},control:{value:{loading:false,error:null}},selection:{value:null}},identity:{dataSourceRef:'restored'}};
+ const changes=[];
+ try{
+  await act(async()=>root.render(<DashboardTableContent container={{id:'restored',quickFilter:true,columns:[{key:'name',label:'Name'},{key:'value',label:'Value'}]}} context={context} initialPresentationState={{filter:'Cedar',sort:{key:'value',direction:'desc'}}} onPresentationStateChange={state=>changes.push(state)}/>));
+  expect([...host.querySelectorAll('tbody tr')].map(row=>row.cells[1].textContent)).toEqual(['2','1']);
+  expect(host.querySelector('input[placeholder="Quick filter rows..."]').value).toBe('Cedar');
+  expect(changes.at(-1).sort).toMatchObject({key:'value',direction:'desc'});
+  expect(changes.at(-1).filter).toBe('Cedar');
+ }finally{await act(async()=>root.unmount());host.remove();}
+});
+
 it('sorts through a focusable header button and reports the current direction',async()=>{
  const host=document.createElement('div');document.body.append(host);
  const root=createRoot(host);

@@ -78,7 +78,7 @@ const chart = fixture.reportFill.blocks.find((block) => block.id === "revenue");
 const pages = buildReportPrintChartPages({ ...chart.content, width: 540, maxHeight: 500 });
 assert.ok(pages.length > 1);
 assert.ok(pages.every((page) => page.height <= 500));
-assert.equal(pages.reduce((count, page) => count + (page.svg.match(/<rect /g) || []).length - 1, 0), 20, "every source bar is retained once");
+assert.equal(pages.reduce((count, page) => count + (page.svg.match(/<rect /g) || []).length - 1 + (page.svg.match(/<path /g) || []).length, 0), 20, "every source bar is retained once");
 assert.ok(pages.every((page) => page.svg.includes('>2K</text>')), "chart chunks share their value axis");
 assert.equal(compactReportPrintSequence("A -> A -> B -> A"), "A [x2] -> B -> A (4 touchpoints)");
 assert.equal(compactReportPrintSequence("A -> B -> A"), "A -> B -> A");

@@ -351,6 +351,13 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                         dialogDataSourceHandlers?.resetSelection?.();
                         dialogDataSourceHandlers?.setCollection?.([]);
                         dialogDataSourceHandlers?.setFormData?.({values: formSeed});
+                        // A fresh dialog instance starts at the first page. Do
+                        // not use setPage here: it schedules a read before the
+                        // caller's new parameters and filter have been bound.
+                        if (dialogContext?.signals?.input) {
+                            const input = dialogContext.signals.input;
+                            input.value = {...input.peek(), page: 1, fetch: false, refresh: false};
+                        }
                         if (dialogContext?.signals?.collectionInfo) {
                             dialogContext.signals.collectionInfo.value = {};
                         }
@@ -577,7 +584,14 @@ const ViewDialog = ({context, dialog, focusRequest = 0}) => {
                 <div className={contentClassName} style={contentStyle}>
                     <LayoutRenderer
                         context={dsCtx}
-                        container={{dataSourceRef: resolvedDataSourceRef, ...dialog.content}}
+                        container={{
+                            dataSourceRef: resolvedDataSourceRef,
+                            ...dialog.content,
+                            // The open effect owns this read after binding caller
+                            // arguments. Keep distinct child sources independent.
+                            ...(fetchOnOpen && (!dialog.content?.dataSourceRef || dialog.content.dataSourceRef === resolvedDataSourceRef)
+                                ? {fetchData: false} : {}),
+                        }}
                         sizingMode="content"
                     />
                 </div>

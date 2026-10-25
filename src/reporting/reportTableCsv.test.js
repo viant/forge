@@ -37,6 +37,9 @@ const actualFill=buildReportFillFromReportSpec(spec,{primary:{rows:sourceRows,ha
 const resolved=authoredReportCsvTables(doc,actualFill)[0];
 assert.equal(resolved.unavailable,'');
 assert.equal(renderReportTableCsv(resolved.table),'Campaign ID,Spend\n'+sourceRows.map(row=>`${row.campaign},${row.spend}`).join('\n')+'\n');
+const presentedFill=buildReportFillFromReportSpec(spec,{primary:{rows:sourceRows,hasMore:false}},{tablePresentations:{evidence:{filter:'campaign-',sort:{key:'spend',direction:'desc'}}}});
+assert.equal(renderReportTableCsv(authoredReportCsvTables(doc,presentedFill)[0].table),'Campaign ID,Spend\n'+[...sourceRows].reverse().map(row=>`${row.campaign},${row.spend}`).join('\n')+'\n');
+assert.deepEqual(presentedFill.datasets,actualFill.datasets,'table presentation must not change source data or chart inputs');
 const incomplete=buildReportFillFromReportSpec(spec,{primary:{rows:sourceRows.slice(0,25),hasMore:true}});
 assert.match(authoredReportCsvTables(doc,incomplete)[0].unavailable,/Complete table data/);
 console.log('Authored table CSV: complete rows, column order/labels, raw values, escaping, empty and incomplete cases passed.');
