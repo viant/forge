@@ -11,3 +11,17 @@ describe('window onInit without an implicit datasource',()=>{
     expect(refresh).toHaveBeenCalledOnce();
   });
 });
+
+describe('seeded window-form defaults',()=>{
+  it('does not replay authored constants over an explicit selection, but still runs dynamic initialization',()=>{
+    const windowFormSignal={value:{periodView:'custom',current:'selected'},peek(){return this.value;}};
+    const metadata={window:{on:[
+      {event:'onInit',handler:'dataSource.setWindowFormData',parameters:[{name:'periodView',in:'const',location:'month'},{name:'granularity',in:'const',location:'day'}]},
+      {event:'onInit',handler:'dataSource.setWindowFormData',parameters:[{name:'copied',in:'windowForm',location:'current'}]},
+    ]}};
+    runWindowLifecycleHandlers({metadata,windowFormSignal,preserveWindowFormFields:new Set(['periodView'])});
+    expect(windowFormSignal.value).toMatchObject({periodView:'custom',granularity:'day',copied:'selected'});
+    runWindowLifecycleHandlers({metadata:{window:{on:[metadata.window.on[0]]}},windowFormSignal});
+    expect(windowFormSignal.value.periodView).toBe('month','unseeded hosts retain their existing lifecycle behavior');
+  });
+});
