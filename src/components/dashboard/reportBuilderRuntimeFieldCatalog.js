@@ -1,5 +1,6 @@
 import { normalizeReportBuilderOptionDefinitions } from "./reportBuilderOptions.js";
 import { normalizePresentationClampConfig } from "../../utils/presentationText.js";
+import {hydrateReportRequestEnvelope} from "../../reporting/reportRequestEnvelope.js";
 
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -50,10 +51,13 @@ function normalizeTablePresentation(value = null) {
 
 export function applyReportBuilderRuntimeFieldCatalog(config = {}, windowForm = {}) {
   const next = clone(config) || {};
-  if (next?.runtimeFieldCatalog?.enabled !== true) {
-    return next;
-  }
+  if (next.request?.envelope) delete next.request.envelopeContext;
   const definition = windowForm?.reportDefinition || {};
+  const finish = () => next.request?.envelope && definition?.fieldCatalog
+    ? hydrateReportRequestEnvelope(next,windowForm,definition) : next;
+  if (next?.runtimeFieldCatalog?.enabled !== true) {
+    return finish();
+  }
   const nestedCatalog = definition?.fieldCatalog || windowForm?.fieldCatalog || windowForm?.FieldCatalog || {};
   const catalog = Array.isArray(nestedCatalog?.columns)
     ? nestedCatalog
@@ -88,7 +92,7 @@ export function applyReportBuilderRuntimeFieldCatalog(config = {}, windowForm = 
     }))
     .filter((column) => column.name && (column.role === "dimension" || column.role === "measure"));
   if (columns.length === 0) {
-    return next;
+    return finish();
   }
 
   const defaultDimensions = new Set(normalizeList(catalog?.defaultDimensions));
@@ -112,6 +116,9 @@ export function applyReportBuilderRuntimeFieldCatalog(config = {}, windowForm = 
     paramPath: `measures.${column.name}`,
   }));
   next.primaryMeasure = normalizeList(catalog?.defaultMeasures)[0] || measures[0]?.name || "";
+  if (Number.isSafeInteger(catalog?.maxRows) && catalog.maxRows>0) {
+    next.request={...(next.request || {}),maxRows:Math.min(Number.isSafeInteger(next.request?.maxRows) && next.request.maxRows>0 ? next.request.maxRows : catalog.maxRows,catalog.maxRows)};
+  }
 
   const allowedSorts = new Set(normalizeList(catalog?.allowedSorts));
   next.result = {
@@ -171,5 +178,5 @@ export function applyReportBuilderRuntimeFieldCatalog(config = {}, windowForm = 
     default: normalizeList(catalog?.defaultDimensions)[0] || dimensions[0]?.name || "",
     options: dimensions.map((column) => ({ value: column.name, label: column.label, dimensionId: column.name })),
   };
-  return next;
+  return finish();
 }

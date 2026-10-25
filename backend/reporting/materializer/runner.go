@@ -33,6 +33,16 @@ func Lower(ctx context.Context, raw json.RawMessage) (json.RawMessage, error) {
 // LowerWithRequestBase validates the original fingerprinted envelope before
 // applying host-bound predicate values to an invocation-local builder copy.
 func LowerWithRequestBase(ctx context.Context, raw json.RawMessage, requestBase map[string]interface{}) (json.RawMessage, error) {
+	return lowerWithSourceKind(ctx, raw, requestBase, "report")
+}
+
+// LowerWindowBuilderWithRequestBase is restricted to a host-derived envelope.
+// The engine retains and revalidates the original window pin independently.
+func LowerWindowBuilderWithRequestBase(ctx context.Context, raw json.RawMessage, requestBase map[string]interface{}) (json.RawMessage, error) {
+	return lowerWithSourceKind(ctx, raw, requestBase, "window")
+}
+
+func lowerWithSourceKind(ctx context.Context, raw json.RawMessage, requestBase map[string]interface{}, sourceKind string) (json.RawMessage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("materializer context required")
 	}
@@ -51,7 +61,7 @@ func LowerWithRequestBase(ctx context.Context, raw json.RawMessage, requestBase 
 	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF {
 		return nil, fmt.Errorf("invalid authored report envelope")
 	}
-	if err := validateEnvelope(envelope); err != nil {
+	if err := validateEnvelopeSourceKind(envelope, sourceKind); err != nil {
 		return nil, err
 	}
 	programOnce.Do(func() { program, programError = goja.Compile("forge-authored-lowerer", bundle, true) })
@@ -104,6 +114,13 @@ func loweringError(ctx context.Context, err error) error {
 	return fmt.Errorf("authored report lowering failed: %w", err)
 }
 func validateEnvelope(e registry.ReportEnvelope) error {
+	return validateEnvelopeSourceKind(e, "report")
+}
+
+func validateEnvelopeSourceKind(e registry.ReportEnvelope, sourceKind string) error {
+	if sourceKind != "report" && sourceKind != "window" {
+		return identity.ErrResourceDenied
+	}
 	if e.SchemaVersion != 1 || e.Format != registry.AuthoredReportFormat || len(e.ReportSpec) != 0 || e.BuilderRef == "" || len(e.ReportDocument) == 0 || len(e.BuilderDefinition) == 0 || len(e.DataSources) == 0 {
 		return fmt.Errorf("incomplete authored report envelope")
 	}
@@ -146,10 +163,10 @@ func validateEnvelope(e registry.ReportEnvelope) error {
 				return &AuthoredDependencyFingerprintError{kind: "datasource"}
 			}
 			ds[dep.ID] = true
-		case "report":
+		case "report", "window":
 			reportCount++
 			uri, err := identity.ParseResourceURI(dep.ID)
-			if err != nil || uri.Kind != "report" {
+			if err != nil || dep.Kind != sourceKind || uri.Kind != sourceKind {
 				return fmt.Errorf("invalid authored report dependency identity")
 			}
 		default:

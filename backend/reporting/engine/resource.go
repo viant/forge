@@ -23,6 +23,9 @@ type ResourceResolver func(context.Context, string) (*identity.ResourceResolver,
 type admittedCompileDefinition struct {
 	raw json.RawMessage
 	pin identity.ResolvedResource
+	// A host-derived window envelope is invocation-local, never the source
+	// returned by a ResourceReader and never fingerprinted as the window bytes.
+	windowEnvelope json.RawMessage
 }
 
 // compileResolved consumes the shared Forge report envelope, not a second
@@ -41,7 +44,8 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, 
 		ref.URI = request.ArtifactRef
 	}
 	uri, err := identity.ParseResourceURI(ref.URI)
-	if err != nil || uri.Kind != "report" {
+	windowBuilder := admitted != nil && len(admitted.windowEnvelope) > 0
+	if err != nil || uri.Kind != "report" && !(windowBuilder && uri.Kind == "window") {
 		return nil, nil, nil, identity.ErrResourceDenied
 	}
 	resolver, err := s.resourceReaderFor(ctx, "report.compile")
@@ -71,6 +75,9 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, 
 	readTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
 		return nil, nil, nil, err
+	}
+	if windowBuilder {
+		raw = append(json.RawMessage(nil), admitted.windowEnvelope...)
 	}
 	var definition registry.ReportEnvelope
 	decoder := json.NewDecoder(bytes.NewReader(raw))
@@ -107,7 +114,7 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, 
 		spec = definition.ReportSpec
 	case registry.AuthoredReportFormat:
 		for _, dependency := range definition.Dependencies {
-			if dependency.Kind == "report" && dependency.ID != pin.URI {
+			if (dependency.Kind == "report" || dependency.Kind == "window") && dependency.ID != pin.URI {
 				return nil, nil, nil, identity.ErrResourceDenied
 			}
 		}
@@ -116,7 +123,11 @@ func (s *Service) compileResolved(ctx context.Context, request *CompileRequest, 
 			return nil, nil, nil, compileStageError(CompileStageBind, bindErr)
 		}
 		lowerTiming := observe.Start(ctx, "report.compile.lower", observe.Labels{Kind: "report"})
-		spec, err = materializer.LowerWithRequestBase(ctx, raw, requestBase)
+		if windowBuilder {
+			spec, err = materializer.LowerWindowBuilderWithRequestBase(ctx, raw, requestBase)
+		} else {
+			spec, err = materializer.LowerWithRequestBase(ctx, raw, requestBase)
+		}
 		lowerTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 		if err != nil {
 			return nil, nil, nil, compileStageError(CompileStageLower, err)

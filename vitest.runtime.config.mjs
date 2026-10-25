@@ -16,6 +16,7 @@ export default defineConfig({
       'src/components/DataSource.saveSynchronization.render.test.jsx',
       'src/components/dashboard/ReportResourceRuntime.render.test.jsx',
       'src/components/dashboard/ReportOutputActions.render.test.jsx',
+      'src/components/dashboard/reportBuilderImmediateExport.render.test.jsx',
       'src/components/dashboard/ReportDatasetPager.render.test.jsx',
       'src/components/dashboard/ReportRuntime.pagination.render.test.jsx',
       'src/components/dashboard/ReportPrintPreview.render.test.jsx',
