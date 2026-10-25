@@ -275,10 +275,10 @@ export function resolveReportRuntimeCompositeColumns(block = {}, viewportWidth =
   }
   const normalizedWidth = Number(viewportWidth) || 0;
   const runtime = block?.content?.runtime || block?.runtime || {};
-  const requestedColumns = (name, fallback) => {
+  const requestedColumns = (name, fallback, maximum = 3) => {
     const requested = Number(runtime?.[name]);
     return Number.isFinite(requested)
-      ? Math.max(1, Math.min(3, Math.floor(requested)))
+      ? Math.max(1, Math.min(maximum, Math.floor(requested)))
       : fallback;
   };
   const constrainForMinimumWidth = (columns) => {
@@ -294,7 +294,7 @@ export function resolveReportRuntimeCompositeColumns(block = {}, viewportWidth =
   if (normalizedWidth > 0 && normalizedWidth <= 960) {
     return constrainForMinimumWidth(requestedColumns("tabletColumns", 2));
   }
-  return constrainForMinimumWidth(requestedColumns("desktopColumns", 3));
+  return constrainForMinimumWidth(requestedColumns("desktopColumns", 3, 6));
 }
 
 function formatKpiValue(value, format = "", locale = "en-US") {
