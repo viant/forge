@@ -40,6 +40,26 @@ Two guards protect different concerns. A command-instance guard suppresses the s
 
 Every mutation exposed by `editableCollection`, `assignmentPicker`, `statusWorkflow`, `treeEditor`, `wizard`, `uploadCollection`, `scheduleEditor`, `draftForm`, or mutation-capable actions in `resourceHeader` and `notificationRules` composes this executor. Specialized preparation such as file-byte encoding or timezone normalization occurs before the one writer call. Primitive shorthand such as a status transition's `confirm` is normalized into the embedded `MutationCommand`; the primitive never runs a second confirmation path.
 
+An optional `prepare: Host.prepareParameters` handler supports asynchronous
+staging before that writer call. After validation and confirmation, the executor
+passes `{context, parameters, extras, signal}` to the handler and awaits a full
+parameter map. `parameters` and `extras` are snapshots captured before confirmation;
+changing the live draft during preparation does not silently change the submitted
+request. The handler can stage attachments and replace their local file values
+with returned references. It must return the complete final parameter map and
+must not persist the resource itself. No business-specific upload contract is
+built into Forge.
+
+The command remains guarded in phase `preparing`. A preparation error, invalid
+return value, or timeout does not invoke the writer and releases the guard for
+retry. Preparation uses `timeoutMs` (default 30 seconds, minimum 1 second); its
+AbortSignal is cancelled on timeout. Handlers should pass that signal to their
+transport and avoid applying late results to live form state. Authorization is
+checked again before writer invocation. A preparation timeout differs from a
+writer timeout: the former has `writerStatus: not_invoked`; the latter retains
+the existing indeterminate-outcome guard. Confirmation cancellation performs no
+preparation or write.
+
 Forge workflow primitives keep interaction mechanics in the runtime and business rules in datasource contracts. Metadata selects datasources, fields, permissions, transitions, reconciliation, and layout; it does not implement transactions. Mutation datasources should normally set `replayPendingFetchOnRestore: false`.
 
 ## Resource models and typed marshalling
