@@ -50516,6 +50516,8 @@ Please __addLocaleData before adding additional unit data`);
     const primaryComputedMeasures = Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.computedMeasures) ? cloneValue18(effectiveConfig.computedMeasures) : [];
     const primaryTableCalculations = Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.tableCalculations) ? cloneValue18(effectiveConfig.tableCalculations) : [];
     const dataSourceRef = resolveDocumentDataSourceRef(container, config);
+    const primarySource = normalizeReportBuilderPublishedDataSources(config).find((dataset) => dataset.id === "primary" && dataset.dataSourceRef === dataSourceRef);
+    const primaryResultContract = isPlainObject7(config == null ? void 0 : config.resultContract) ? config.resultContract : primarySource == null ? void 0 : primarySource.resultContract;
     const dimensions = (Array.isArray(effectiveConfig == null ? void 0 : effectiveConfig.dimensions) ? effectiveConfig.dimensions : []).map((entry) => {
       const id = normalizeString29((entry == null ? void 0 : entry.id) || (entry == null ? void 0 : entry.key));
       const key = normalizeString29((entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id));
@@ -50599,7 +50601,7 @@ Please __addLocaleData before adding additional unit data`);
       kindLabel: "primary",
       ...isPlainObject7(config == null ? void 0 : config.scope) ? { scope: cloneValue18(config.scope) } : {},
       ...isPlainObject7(config == null ? void 0 : config.source) ? { source: cloneValue18(config.source) } : {},
-      ...isPlainObject7(config == null ? void 0 : config.resultContract) ? { resultContract: cloneValue18(config.resultContract) } : {},
+      ...isPlainObject7(primaryResultContract) ? { resultContract: cloneValue18(primaryResultContract) } : {},
       ...isPlainObject7(config == null ? void 0 : config.capabilities) ? { capabilities: cloneValue18(config.capabilities) } : {},
       request: cloneValue18(buildReportBuilderRequest(config, state)),
       ...primaryDimensions.length > 0 ? { dimensions: primaryDimensions } : {},
