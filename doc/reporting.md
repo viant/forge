@@ -856,6 +856,19 @@ Runtime behavior:
   - rank chips
   - spark bars
 
+### Printed table row identity
+
+An authored table column may set `rowIdentity: true`. Together, all marked columns
+form the printed row identity and lead every horizontal continuation band in their
+authored order. Mark the complete composite key, such as an entity ID and its
+human-readable label. Values and formats are preserved; this flag does not change
+screen tables, CSV, XLSX, filtering, ordering, or dataset requests.
+
+Unmarked tables keep the legacy behavior of repeating their first column.
+Non-identity columns appear in one band each. Bands are planned once, including
+when the identity set is wider than the page; the existing layout wraps cells
+without reducing the font or discarding columns. Table row density is unchanged.
+
 ### Table Visual Kinds
 
 Current authored `cellVisual.kind` values:

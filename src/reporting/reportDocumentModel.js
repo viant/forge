@@ -473,6 +473,7 @@ export function buildStaticDatasetReportBuilderConfig(baseConfig = {}, dataset =
       key: normalizeString(column?.key),
       label: normalizeString(column?.label || column?.key),
       ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
+      ...(column?.rowIdentity === true ? { rowIdentity: true } : {}),
     }))
     .filter((entry) => entry.id && entry.key && entry.label);
   const measures = inheritRuntimeFieldCatalog ? cloneValue(baseConfig?.measures || []) : columnOptions
@@ -482,6 +483,7 @@ export function buildStaticDatasetReportBuilderConfig(baseConfig = {}, dataset =
       key: normalizeString(column?.key),
       label: normalizeString(column?.label || column?.key),
       ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
+      ...(column?.rowIdentity === true ? { rowIdentity: true } : {}),
     }))
     .filter((entry) => entry.id && entry.key && entry.label);
   return {
@@ -679,6 +681,7 @@ function buildPrimaryDatasetFieldContract(entry = {}) {
   const definitionRef = normalizeString(entry?.definitionRef);
   return {
     ...(paramPath ? { paramPath } : {}),
+    ...(entry?.rowIdentity === true ? { rowIdentity: true } : {}),
     ...(entry?.default === true ? { default: true } : {}),
     ...(entry?.chartAxis === true ? { chartAxis: true } : {}),
     ...(entry?.required === true ? { required: true } : {}),
@@ -788,6 +791,7 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
         key,
         label: normalizeString(entry?.label || key) || key,
         kind: "dimension",
+        ...(entry?.rowIdentity === true ? { rowIdentity: true } : {}),
         ...(normalizeString(entry?.sourceKey || entry?.key || entry?.id) ? { sourceKey: normalizeString(entry?.sourceKey || entry?.key || entry?.id) } : {}),
         ...(normalizeString(entry?.displayKey) ? { displayKey: normalizeString(entry.displayKey) } : {}),
         ...(entry?.displayValueMap && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap)
@@ -823,6 +827,7 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
         key,
         label: normalizeString(entry?.label || key) || key,
         kind: "measure",
+        ...(entry?.rowIdentity === true ? { rowIdentity: true } : {}),
         ...(normalizeString(entry?.format) ? { format: normalizeString(entry.format) } : {}),
         ...(normalizeString(entry?.sourceKey || entry?.key || entry?.id) ? { sourceKey: normalizeString(entry?.sourceKey || entry?.key || entry?.id) } : {}),
         ...(normalizeString(entry?.rawId) ? { rawId: normalizeString(entry.rawId) } : {}),
@@ -854,6 +859,7 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
         key,
         label: normalizeString(entry?.label || key) || key,
         kind: "measure",
+        ...(entry?.rowIdentity === true ? { rowIdentity: true } : {}),
         ...(normalizeString(entry?.format) ? { format: normalizeString(entry.format) } : {}),
       };
     }),
@@ -880,6 +886,7 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
           key: entry.key,
           label: entry.label,
           kind: "dimension",
+          ...(entry?.rowIdentity === true ? { rowIdentity: true } : {}),
           ...(entry?.sourceKey ? { sourceKey: entry.sourceKey } : {}),
           ...(entry?.displayKey ? { displayKey: entry.displayKey } : {}),
           ...(entry?.displayValueMap ? { displayValueMap: cloneValue(entry.displayValueMap) } : {}),
@@ -899,6 +906,7 @@ function buildReportBuilderReportDocumentDatasets(container = {}, config = {}, s
           key: entry.key,
           label: entry.label,
           kind: "measure",
+          ...(entry?.rowIdentity === true ? { rowIdentity: true } : {}),
           ...(entry?.sourceKey ? { sourceKey: entry.sourceKey } : {}),
           ...(entry?.format ? { format: entry.format } : {}),
           ...(entry?.rawId ? { rawId: entry.rawId } : {}),

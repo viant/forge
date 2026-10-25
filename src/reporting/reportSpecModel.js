@@ -144,6 +144,7 @@ function buildReportSpecColumns(columns = []) {
     ...(normalizeString(column?.format) ? { format: normalizeString(column.format) } : {}),
     ...(normalizeString(column?.align) ? { align: normalizeString(column.align) } : {}),
     ...(column?.runtimeFilterable === true ? { runtimeFilterable: true } : {}),
+    ...(column?.rowIdentity === true ? { rowIdentity: true } : {}),
     ...(normalizeReportTableCellVisual(column?.cellVisual) ? { cellVisual: normalizeReportTableCellVisual(column.cellVisual) } : {}),
     ...(normalizePresentationClampConfig(column?.labelClamp) ? { labelClamp: normalizePresentationClampConfig(column.labelClamp) } : {}),
   })).filter((column) => column.key);
