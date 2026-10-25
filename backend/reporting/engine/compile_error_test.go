@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/viant/forge/backend/reporting/materializer"
+	"github.com/viant/forge/backend/reporting/registry"
 	identity "github.com/viant/forge/backend/resource"
 )
 
@@ -57,5 +59,28 @@ func TestCompileStageErrorPreservesCauseAndAdmission(t *testing.T) {
 	var stage *CompileStageError
 	if !errors.Is(err, readerFailure) || errors.As(err, &stage) {
 		t.Fatalf("reader failure mislabeled: %v", err)
+	}
+}
+
+func TestCompileStageErrorPreservesAuthoredFingerprintCause(t *testing.T) {
+	ctx := context.Background()
+	builder := json.RawMessage(`{"id":"builder","reportBuilder":{"document":{"title":"Original"}}}`)
+	rows := json.RawMessage(`{"id":"rows","backend":{"kind":"inline","rows":[]}}`)
+	document := json.RawMessage(`{"title":"Synthetic"}`)
+	envelope := registry.ReportEnvelope{SchemaVersion: 1, Format: registry.AuthoredReportFormat, BuilderRef: "builder", BuilderDefinition: json.RawMessage(`{"id":"builder","reportBuilder":{"document":{"title":"Changed"}}}`), ReportDocument: document, State: json.RawMessage(`{}`), DataSources: map[string]json.RawMessage{"rows": rows}, Dependencies: []registry.ReportDependency{{Kind: "report", ID: "report://example/report", ContentFingerprint: identity.ContentFingerprint(document)}, {Kind: "builder", ID: "builder", ContentFingerprint: identity.ContentFingerprint(builder)}, {Kind: "datasource", ID: "rows", ContentFingerprint: identity.ContentFingerprint(rows)}}}
+	raw, err := json.Marshal(envelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uri, _ := identity.ParseResourceURI("report://example/report")
+	resolver := &identity.ResourceResolver{Source: &identity.LocalResource{URI: uri, Load: func(context.Context) (json.RawMessage, error) { return raw, nil }}, Policy: reportPolicyFunc(func(_ context.Context, _ identity.ResourceRef, c []identity.ResourceCandidate) (identity.ResourceDecision, error) {
+		return identity.ResourceDecision{Candidate: c[0], AuthorityBinding: "synthetic", ValidUntil: time.Now().Add(time.Minute)}, nil
+	})}
+	service := New(Options{Compiler: NewReportSpecCompiler(nil), ResourceResolver: func(context.Context, string) (*identity.ResourceResolver, error) { return resolver, nil }})
+	_, err = service.Compile(ctx, &CompileRequest{Resource: &identity.ResourceRef{URI: uri.String()}})
+	var stage *CompileStageError
+	var mismatch *materializer.AuthoredDependencyFingerprintError
+	if !errors.As(err, &stage) || stage.Stage != CompileStageLower || !errors.As(err, &mismatch) || mismatch.AuthoredDependencyKind() != "builder" {
+		t.Fatalf("typed fingerprint cause lost at actual compiler boundary: %v", err)
 	}
 }
