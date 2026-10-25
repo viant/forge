@@ -18,4 +18,17 @@ assert.ok(compareDashboardTableValues('Alpha','Beta')<0);
 assert.ok(compareDashboardTableValues('Alpha','Beta',{},'desc')>0);
 assert.notEqual(compareDashboardTableValues('-',null),0,'Visible strings are not missing-value heuristics');
 assert.ok(compareDashboardTableValues('09:00','12:00',{format:'wallClockHour'})<0,'Hour-only text retains its existing string comparison');
+const identifiers = [
+ {id:'larger',value:'9007199254740993'},
+ {id:'smaller',value:'9007199254740992'},
+ {id:'negative',value:'-9007199254740993'},
+ {id:'more-negative',value:'-9007199254740994'},
+ {id:'missing',value:null},
+];
+assert.deepEqual(ordered(identifiers,{},'asc'),['more-negative','negative','smaller','larger','missing']);
+assert.deepEqual(ordered(identifiers,{},'desc'),['larger','smaller','negative','more-negative','missing']);
+assert.equal(compareDashboardTableValues('+00042',42),0);
+assert.equal(compareDashboardTableValues('-000',0),0);
+assert.ok(compareDashboardTableValues('1.25','1.5')<0);
+assert.ok(compareDashboardTableValues('999999999999999999999999999999','1000000000000000000000000000000')<0);
 console.log('dashboardTableSort: numeric/date missing values remain last in both directions');
