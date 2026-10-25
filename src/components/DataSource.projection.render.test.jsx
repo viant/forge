@@ -14,6 +14,7 @@ async function mount({nativeEnvelope=false}={}){
 it('serves three local views from one reader and keeps nested values isolated',async()=>{
  const v=await mount();try{
   expect(v.transport).toHaveBeenCalledTimes(1);
+  for(const id of ['properties','defaults','permissions']) expect(v.context.Context(id).signals.control.peek()).toMatchObject({loaded:true,loading:false,stale:false,error:null});
   expect(v.context.Context('defaults').signals.collection.peek()).toEqual([{id:7,channels:['DISPLAY']}]);
   expect(v.context.Context('permissions').signals.collection.peek()).toEqual([{id:11,role:'OWNER'}]);
   expect(v.context.Context('permissions').signals.selection.peek().selected).toBeNull();
@@ -67,6 +68,22 @@ it('waits for the parent request and never calls a projection transport',async()
   await v.settle(()=>finish({data:[{id:7,name:'Original',channels:['CTV'],acl:[]}]}));
   await expect(completed).resolves.toBeDefined();expect(defaults.signals.control.peek().loading).toBe(false);
   expect(defaults.signals.form.peek().channels).toEqual(['CTV']);expect(v.transport.mock.calls.every(([request])=>request.dataSourceRef==='record')).toBe(true);
+ }finally{await v.close();}
+});
+
+it('clears a stale projection only after its parent read succeeds',async()=>{
+ const v=await mount();try{
+  const defaults=v.context.Context('defaults');
+  await v.settle(()=>{defaults.signals.control.value={...defaults.signals.control.peek(),stale:true};});
+  let finish;v.transport.mockImplementationOnce(()=>new Promise(resolve=>{finish=resolve;}));
+  let completed;await v.settle(()=>{completed=defaults.handlers.dataSource.fetchCollection({cache:{bypassCache:true},invocationId:'stale-projection'});});
+  expect(defaults.signals.control.peek().loading).toBe(true);
+  expect(defaults.signals.control.peek().stale).toBe(true);
+  await v.settle(()=>finish({data:[{id:7,name:'Refreshed',channels:['CTV'],acl:[]}]}));
+  await expect(completed).resolves.toBeDefined();
+  expect(defaults.signals.control.peek()).toMatchObject({loaded:true,loading:false,stale:false,error:null});
+  expect(defaults.signals.form.peek().channels).toEqual(['CTV']);
+  expect(v.transport).toHaveBeenCalledTimes(2);
  }finally{await v.close();}
 });
 
