@@ -53,6 +53,7 @@ it('sorts all admitted local rows before a five-row preview limit and local pagi
 });
 
 it.each([
+ ['large identifiers',{},[{id:'larger',value:'9007199254740993'},{id:'missing',value:null},{id:'smaller',value:'9007199254740992'}],['smaller','larger','missing'],['larger','smaller','missing']],
  ['number',{type:'number'},[{id:'zero',value:0},{id:'missing',value:null},{id:'measured',value:294}],['zero','measured','missing'],['measured','zero','missing']],
  ['date',{format:'date'},[{id:'missing',value:null},{id:'later',value:'2026-10-23'},{id:'invalid',value:'invalid-date'},{id:'earlier',value:'2025-01-02'}],['earlier','later','missing','invalid'],['later','earlier','missing','invalid']],
 ])('keeps missing %s observations last through actual ascending and descending header clicks',async(_kind,column,collection,ascending,descending)=>{
