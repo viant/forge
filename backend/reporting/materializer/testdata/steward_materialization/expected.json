@@ -1,52 +1,52 @@
 {
   "forecast_country_dashboard_brief.json": {
-    "reportSpec": "efe574a81daac36e446eba0ef2de0b54e5f2a6b75b70ec996af42b5902844c76",
     "reportFill": "4d1a1682ee9c4727c6bf40216812f6c0d2930ea6e352a9430bc4147adb160480",
-    "reportPrint": "008a79ed3f6e2fda08eccc7b0dbc71094bba5e69ff166039aa9cb2ec16d9dc7c"
+    "reportPrint": "08673cf5f8234355394e633bc040043492f968b62e754dc81db2c5579f0e0264",
+    "reportSpec": "efe574a81daac36e446eba0ef2de0b54e5f2a6b75b70ec996af42b5902844c76"
   },
   "forecast_inventory_brief.json": {
-    "reportSpec": "cd8cb3671f01614df3cb79390d9cf6fe5d993c7ebe3785fb8a507769871bd46b",
     "reportFill": "6e742639d5f61005e9c58040a367edca961848afc653b368a2bc4d98a221e4cb",
-    "reportPrint": "cd8a901b4b1e963b550798dbdb6a1e95c48fafd8570853a17a090a3b987024e7"
+    "reportPrint": "e937c59fa81033b05f44343d9a4e922674d4839e17286b6ce9bc4309da06c257",
+    "reportSpec": "cd8cb3671f01614df3cb79390d9cf6fe5d993c7ebe3785fb8a507769871bd46b"
   },
   "forecast_supply_command_center.json": {
-    "reportSpec": "9b57932044e23c4730093a8390838861a0bc44f3f8b8cabf4a419147135d216a",
     "reportFill": "a5ee4513f8c922d87b28f0c630f203f3fdd14af539342a54c1de3e6baa656982",
-    "reportPrint": "c2a5a552d0046085bac14499882c378315af6b8f641a962499eb54818b778e11"
+    "reportPrint": "1348ff73e10ccfefc7a0a5c96a4d0427ad6e86bddf8c3e78d1bb6de8c1c73806",
+    "reportSpec": "9b57932044e23c4730093a8390838861a0bc44f3f8b8cabf4a419147135d216a"
   },
   "performance_country_dashboard_brief.json": {
-    "reportSpec": "8fceb6b95dafa8741e3062e90bac52898f2c5c18984cc8fc54ad4b50c1644ba7",
     "reportFill": "9660e6981d1817314c51fd2b60d481b36fcfeff06fb73eeb01738b453424a329",
-    "reportPrint": "350319284a9220fe576d61891436c608b782ba40afc616d25d9f55830a7de67b"
+    "reportPrint": "da3d02a65ec29f5050f6d7c196239ce9998bd49e47e9ca29968d0889e95b56e6",
+    "reportSpec": "8fceb6b95dafa8741e3062e90bac52898f2c5c18984cc8fc54ad4b50c1644ba7"
   },
   "performance_delivery_command_center.json": {
-    "reportSpec": "3865a8685f9726f22b538cd037f737dd1e4ddfa2dea00ce39c5f52425fb2022e",
     "reportFill": "2beab3cdf7114ed9b4cbaa312f3d6a3781f08e92ff89edb371152754d79d404d",
-    "reportPrint": "f05fdfea9859fdac69500d2420fb18762988f5ccb339b94d77430e3ca4f5f1a4"
+    "reportPrint": "899ecf90a91c968314e0abee337c694095a82fadc1de931432a6468f240b8f34",
+    "reportSpec": "3865a8685f9726f22b538cd037f737dd1e4ddfa2dea00ce39c5f52425fb2022e"
   },
   "performance_inventory_brief.json": {
-    "reportSpec": "4133d95ea43df09a35adf0c7a83ef903fc65f2df6f1deb3c46da19bec1c69230",
     "reportFill": "d7a02bca3e1e7d2fe0c6c0b31e5da76b34c8c15c4d02c57c3460d272e0c4b27c",
-    "reportPrint": "f92e8585094107761f8efa65702f7c7f25173b9be5ae9ed40b318d73622914be"
+    "reportPrint": "f92e8585094107761f8efa65702f7c7f25173b9be5ae9ed40b318d73622914be",
+    "reportSpec": "4133d95ea43df09a35adf0c7a83ef903fc65f2df6f1deb3c46da19bec1c69230"
   },
   "performance_operations_storyboard.json": {
-    "reportSpec": "307b79240c51314257dc2e73be9b71afc64743007a2d051ebbc83adfc42bb616",
     "reportFill": "ebecc2a8a4ffe4c677555f4aafd85da584ea2df281c1fc727dcb9b0610136a8d",
-    "reportPrint": "be3b21530e01f3e9533701828aa4798d775c619ece428481101b3504af50522e"
+    "reportPrint": "be3b21530e01f3e9533701828aa4798d775c619ece428481101b3504af50522e",
+    "reportSpec": "307b79240c51314257dc2e73be9b71afc64743007a2d051ebbc83adfc42bb616"
   },
   "spo_client_deal_by_advertiser_deal_v1.json": {
-    "reportSpec": "48b55aa09619a8fff772d33e8a019553a8648686f61a4e682a1997576c5ae126",
-    "reportFill": "37d8bd845a15dbf8f3700a5edeb4d118171ce2161044e42389c3aeceec3c3c66",
-    "reportPrint": "066b4c260a98e3c148f2e74a31074696f0e22e92b09f16ffe604677e14555e09"
+    "reportFill": "4016291ed00b3e3b8a30ea85a430d38e824f12aec0b23dd9fbdeb62a2f3cd189",
+    "reportPrint": "f3461bc51b0a00a4223fc6fb2069eed23458e8f1e8c8d4dc867f7eda1cc5e840",
+    "reportSpec": "941305ef3969b9099db6814ecabc868a35e6089261dc50315090e48c44982f45"
   },
   "spo_executive_path_report_v5.json": {
-    "reportSpec": "1ee2e7c025963d66454cfaf74b312fdd7a44e5364cb4672ddb5f636d45f457d8",
-    "reportFill": "8f65059d2b95f80a40357efb9eaeebec6115106791ffbd82cfd32323eb1d4a15",
-    "reportPrint": "0682f0ab267326a5989bf828b17576f8197cf9c0aef6349bbbd3c2ae835e4c3d"
+    "reportFill": "57d04fb4f9acdfa885a51986e242a70c101810fff327cfeb1fbdd0f891dabce5",
+    "reportPrint": "b2be1a0fcde5091671458e3ac2a953205591fbaa67c8b057a373d8e13e2624a0",
+    "reportSpec": "8cdf0412ddc7dc0f3e838f7100822d29477846bb4dca3375fd98bdf78fb0a7aa"
   },
   "supply_hygiene_direct_access_v4.json": {
-    "reportSpec": "09e7ed7f4ba9a6195a5fb3122992c68aca8c3026993f8e3eb87f5ef106ef5ac8",
-    "reportFill": "3ac2e6f868848d76d679018ae908f8219e11ed763d8de32e342c0b056c6e33ab",
-    "reportPrint": "ea357a9b3a789c0a8d9eb4330ab07dd7a1c8a78b1e6cff33fe615abd88ce8d77"
+    "reportFill": "0d6cf9f1deb148e701c6f607f5016fe7ee2dcfb408aaad758423e770a7b2330e",
+    "reportPrint": "89b4ae31710f06e469af3b736c121743bc7ecc35283651e951f12b0e99d32603",
+    "reportSpec": "7d8bd6a968fa098085d769544390dc2468b8a1f2e33e1f650d1548e435cfcbb0"
   }
 }
