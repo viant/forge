@@ -38,3 +38,13 @@ print hashes were regenerated with the official Node bundle after checking those
 artifacts against the preceding bundle. Compact/wide table tests cover complete
 cell retention and page bounds, and the 600-row Goja regression enforces a single
 horizontal pane without changing the materializer time budget.
+
+Retained goldens also include dataset result contracts, civil date-axis metadata,
+and the canonical chart SVG corner geometry. Regenerate with
+`node scripts/generate-steward-materialization-fixtures.mjs --write` from the
+repository root after auditing semantic changes against the previous bundle.
+The generator executes the official bundle in Node at the fixture time; its small
+Go hashing utility only applies standard JSON canonicalization to those Node
+artifacts and does not import the materializer. Running without `--write` detects
+stale hashes. Go tests independently execute the bundle in Goja and compare all
+ten complete results to these retained hashes.
