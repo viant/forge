@@ -1236,6 +1236,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "sectionBlock" },
+        datasetRef: { type: "string" },
         runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         subtitle: { type: "string" },
@@ -1251,6 +1252,7 @@ export const reportSpecSchema = {
       properties: {
         id: { type: "string" },
         kind: { const: "compositeBlock" },
+        datasetRef: { type: "string" },
         runtime: { $ref: "#/$defs/jsonObject" },
         title: { type: "string" },
         description: { type: "string" },
