@@ -188,18 +188,20 @@ type TextClamp struct {
 }
 
 type TableColumn struct {
-	Key               string         `json:"key"`
-	SourceKey         string         `json:"sourceKey,omitempty"`
-	DisplayKey        string         `json:"displayKey,omitempty"`
-	Label             string         `json:"label"`
-	Kind              string         `json:"kind,omitempty"`
-	Format            string         `json:"format,omitempty"`
-	Align             string         `json:"align,omitempty"`
-	CellVisual        any            `json:"cellVisual,omitempty"`
-	Link              map[string]any `json:"link,omitempty"`
-	RuntimeFilterable bool           `json:"runtimeFilterable,omitempty"`
-	RowIdentity       bool           `json:"rowIdentity,omitempty"`
-	LabelClamp        *TextClamp     `json:"labelClamp,omitempty"`
+	Key               string            `json:"key"`
+	SourceKey         string            `json:"sourceKey,omitempty"`
+	DisplayKey        string            `json:"displayKey,omitempty"`
+	DisplayValueMap   map[string]any    `json:"displayValueMap,omitempty"`
+	DisplayIconMap    map[string]string `json:"displayIconMap,omitempty"`
+	Label             string            `json:"label"`
+	Kind              string            `json:"kind,omitempty"`
+	Format            string            `json:"format,omitempty"`
+	Align             string            `json:"align,omitempty"`
+	CellVisual        any               `json:"cellVisual,omitempty"`
+	Link              map[string]any    `json:"link,omitempty"`
+	RuntimeFilterable bool              `json:"runtimeFilterable,omitempty"`
+	RowIdentity       bool              `json:"rowIdentity,omitempty"`
+	LabelClamp        *TextClamp        `json:"labelClamp,omitempty"`
 }
 
 type TableContent struct {
