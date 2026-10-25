@@ -233,3 +233,14 @@ for (const type of ['checkbox', 'toggle']) {
  handlers.files.events.onChange({target:{value:'C:\\fakepath\\a.mp4'}});
  assert.equal(current,encoded);assert.equal(observed,encoded);
 }
+
+// Window-scoped controls do not need a datasource just to update display state.
+for (const [type, event, value] of [['filterChips','onChange',['a']],['text','onChange',''],['number','onValueChange',0],['checkbox','onChange',false]]) {
+ const context=createContext([]);let observed;
+ context.signals.windowForm.value={filters:{other:'retained'}};
+ context.lookupHandler=id=>{assert.equal(id,'changed','no datasource handler lookup');return ()=>{observed=context.signals.windowForm.value.filters.value;};};
+ const controls=useControlEvents(context,[{id:'control',type,scope:'windowForm',dataField:'filters.value',on:[{event:'onChange',handler:'changed'}]}]);
+ controls.control.events[event](value);
+ assert.deepEqual(observed,value,'authored callback observes the new value');
+ assert.deepEqual(context.signals.windowForm.value,{filters:{other:'retained',value}});
+}

@@ -129,10 +129,7 @@ registerStateAdapter('windowForm', (ctx, item) => {
         set: (v) => {
             const prev = ctx?.signals?.windowForm?.peek?.() || {};
             if (ctx?.signals?.windowForm) {
-                ctx.signals.windowForm.value = {
-                    ...prev,
-                    [fieldKey]: v,
-                };
+                ctx.signals.windowForm.value = setSelector(prev, fieldKey, v);
             }
         },
     };
