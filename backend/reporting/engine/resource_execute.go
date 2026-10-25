@@ -513,7 +513,7 @@ func reportDatasetArguments(base, parameters map[string]interface{}, descriptor 
 			continue
 		}
 		if strings.HasPrefix(key, "_") || key == "backend" || key == "source" || key == "service" || key == "method" || !allowed[key] {
-			return nil, fmt.Errorf("report parameter %q not declared by approved datasource", key)
+			return nil, newReportParameterBindingError(key, allowed, declarations)
 		}
 		if current, exists := args[key]; exists {
 			if old, ok := current.(map[string]interface{}); ok {
