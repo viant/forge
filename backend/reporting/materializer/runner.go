@@ -174,7 +174,7 @@ func validateEnvelopeSourceKind(e registry.ReportEnvelope, sourceKind string) er
 		}
 	}
 	if builderCount != 1 || reportCount != 1 || len(ds) != len(e.DataSources) {
-		return fmt.Errorf("incomplete authored report dependency closure")
+		return &AuthoredDependencyClosureError{}
 	}
 	return nil
 }
