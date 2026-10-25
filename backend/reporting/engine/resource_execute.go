@@ -43,6 +43,7 @@ type ExecuteResourceRequest struct {
 	ResolvedResource      *identity.ResolvedResource                   `json:"resolvedResource,omitempty"`
 	Parameters            map[string]interface{}                       `json:"parameters,omitempty"`
 	ChartMetricSelections map[string]materializer.ChartMetricSelection `json:"chartMetricSelections,omitempty"`
+	TablePresentations    materializer.TablePresentations              `json:"tablePresentations,omitempty"`
 	DatasetIDs            []string                                     `json:"datasetIds,omitempty"`
 	// A non-nil table ID selects exactly one authored table from the compiled,
 	// admitted ReportSpec. An empty ID is valid only for a single-table report.
@@ -293,6 +294,9 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 	if decodeSpec(executionSpec, &spec) != nil || len(spec.Datasets) == 0 {
 		return nil, fmt.Errorf("report has no executable datasets")
 	}
+	if err := materializer.ValidateTablePresentations(executionSpec, request.TablePresentations); err != nil {
+		return nil, err
+	}
 	selectedIDs := request.DatasetIDs
 	if request.TableBlockID != nil {
 		if selectedIDs != nil {
@@ -476,9 +480,9 @@ func (s *Service) executeResourceDefinition(ctx context.Context, request *Execut
 	materializeTiming := observe.Start(ctx, "report.resource.materialize", observe.Labels{Kind: "report"})
 	var artifacts *materializer.Artifacts
 	if request.FillOnly {
-		artifacts, err = materializer.MaterializeFill(ctx, effectiveSpec, payloads)
+		artifacts, err = materializer.MaterializePresented(ctx, effectiveSpec, payloads, request.TablePresentations, true)
 	} else {
-		artifacts, err = materializer.Materialize(ctx, effectiveSpec, payloads)
+		artifacts, err = materializer.MaterializePresented(ctx, effectiveSpec, payloads, request.TablePresentations, false)
 	}
 	materializeTiming.End(observe.OutcomeFor(err), observe.CacheUnknown)
 	if err != nil {
