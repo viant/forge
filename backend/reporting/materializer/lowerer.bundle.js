@@ -58091,6 +58091,15 @@ ${indent}${end}`;
         return normalizeString35(value);
     }
   }
+  function reportFillComparableValue(value) {
+    if (isNumericValue(value)) return { kind: "number", value: Number(value) };
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}(?:T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}))?$/.test(value)) return null;
+    const civil = value.slice(0, 10);
+    const date = /* @__PURE__ */ new Date(`${civil}T00:00:00Z`);
+    if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== civil) return null;
+    const timestamp2 = Date.parse(value);
+    return Number.isFinite(timestamp2) ? { kind: "date", value: timestamp2 } : null;
+  }
   function resolveReportFillSelectedRow(dataset = {}, rowSelector = "", {
     valueField = ""
   } = {}) {
@@ -58106,12 +58115,20 @@ ${indent}${end}`;
     if (!normalizedValueField) {
       return rows[0] && typeof rows[0] === "object" && !Array.isArray(rows[0]) ? rows[0] : null;
     }
-    const comparableRows = rows.filter((row) => row && typeof row === "object" && !Array.isArray(row) && Number.isFinite(Number(resolveKey(row, normalizedValueField))));
+    const comparableRows = rows.flatMap((row) => {
+      if (!row || typeof row !== "object" || Array.isArray(row)) return [];
+      const comparable = reportFillComparableValue(resolveKey(row, normalizedValueField));
+      return comparable ? [{ row, ...comparable }] : [];
+    });
     if (comparableRows.length === 0) {
       return rows[0] && typeof rows[0] === "object" && !Array.isArray(rows[0]) ? rows[0] : null;
     }
-    const reducer = normalizedRowSelector === "minbyvalue" ? (best, row) => Number(resolveKey(row, normalizedValueField)) < Number(resolveKey(best, normalizedValueField)) ? row : best : (best, row) => Number(resolveKey(row, normalizedValueField)) > Number(resolveKey(best, normalizedValueField)) ? row : best;
-    return comparableRows.slice(1).reduce(reducer, comparableRows[0]);
+    const reducer = (best, candidate) => {
+      if (candidate.kind !== best.kind) return best;
+      const better = normalizedRowSelector === "minbyvalue" ? candidate.value < best.value : candidate.value > best.value;
+      return better ? candidate : best;
+    };
+    return comparableRows.slice(1).reduce(reducer, comparableRows[0]).row;
   }
   function resolveReportFillTemplateRawValue(token = "", {
     content = {},
