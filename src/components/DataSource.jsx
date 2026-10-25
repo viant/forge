@@ -165,8 +165,8 @@ export default function DataSource({context}) {
                 if (keepDraft) handlers.dataSource.setEditedFormData({values: draft});
             }
             const previous = control.peek() || {};
-            if (previous.loaded !== !parentControl.inactive || previous.loading || previous.error || previous.inactive !== !!parentControl.inactive) {
-                control.value = {...previous, loaded: !parentControl.inactive, loading: false, error: null, inactive: !!parentControl.inactive};
+            if (previous.loaded !== !parentControl.inactive || previous.loading || previous.error || previous.stale !== false || previous.inactive !== !!parentControl.inactive) {
+                control.value = {...previous, loaded: !parentControl.inactive, loading: false, error: null, stale: false, inactive: !!parentControl.inactive};
             }
             const notify = !parentControl.inactive && (projectionRef.current?.signature !== signature || projectionRef.current?.error || projectionRef.current?.inactive);
             projectionRef.current = {signature, parentIdentity, inactive: !!parentControl.inactive};
