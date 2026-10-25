@@ -7,8 +7,8 @@ package window
 
 import (
 	"encoding/json"
-	identity "github.com/viant/forge/backend/resource"
 	reportspec "github.com/viant/forge/backend/reporting/spec"
+	identity "github.com/viant/forge/backend/resource"
 	"github.com/viant/forge/backend/types"
 )
 
@@ -63,10 +63,11 @@ type Backend struct {
 	Kind              string            `json:"kind" yaml:"kind"`
 	// Service is a logical alias for explicit consumer host bindings only.
 	// Provider-delegated sources leave this empty.
-	Service    string         `json:"service,omitempty" yaml:"service,omitempty"`
-	Method     string         `json:"method" yaml:"method"`
-	Pinned     map[string]any `json:"pinned" yaml:"pinned"`
-	MCPRequest map[string]any `json:"mcpRequest,omitempty" yaml:"mcpRequest,omitempty"`
+	Service         string                 `json:"service,omitempty" yaml:"service,omitempty"`
+	Method          string                 `json:"method" yaml:"method"`
+	Pinned          map[string]any         `json:"pinned" yaml:"pinned"`
+	MCPRequest      map[string]any         `json:"mcpRequest,omitempty" yaml:"mcpRequest,omitempty"`
+	CriteriaMapping *types.CriteriaMapping `json:"criteriaMapping,omitempty" yaml:"criteriaMapping,omitempty"`
 }
 type DataSource struct {
 	types.DataSource `json:",inline" yaml:",inline"`

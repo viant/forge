@@ -1772,6 +1772,22 @@ type SortMapping struct {
 	ThenBy    []string          `json:"thenBy,omitempty" yaml:"thenBy,omitempty"`
 }
 
+// CriteriaMapping opts a datasource into a producer's string Criteria selector.
+// Inputs remain logical request/cache values; only MCP transport is translated.
+type CriteriaMapping struct {
+	Parameter string          `json:"parameter" yaml:"parameter"`
+	Fields    []CriteriaField `json:"fields" yaml:"fields"`
+	// Simple opts into legacy producers that cannot represent embedded quotes.
+	LiteralGrammar string `json:"literalGrammar,omitempty" yaml:"literalGrammar,omitempty"`
+}
+
+type CriteriaField struct {
+	Input    string `json:"input" yaml:"input"`
+	Field    string `json:"field" yaml:"field"`
+	Operator string `json:"operator" yaml:"operator"`
+	Type     string `json:"type" yaml:"type"`
+}
+
 type SelectionMode string
 
 const (
