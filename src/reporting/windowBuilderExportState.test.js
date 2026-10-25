@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import {resolveReportDatasetFetchResult} from './reportDatasetResultContract.js';
+import {buildReportFillFromReportSpec} from './reportFillModel.js';
 import {snapshotWindowBuilderExportSelection, snapshotWindowBuilderParameters, prepareWindowBuilderExport} from './windowBuilderExportState.js';
 
 const container = {id: 'localBuilder', dataSourceRef: 'approved', title: 'Synthetic export contract'};
@@ -45,3 +47,28 @@ assert.deepEqual(parameters,{AdvertiserId:[42],Trial:false,Zero:0});
 assert.deepEqual(snapshotWindowBuilderParameters({}, {rows:['not sent']}),{});
 assert.throws(()=>snapshotWindowBuilderParameters({parameters:[{name:'source'}]}, {source:'not a context override'}), /declaration/);
 console.log('Window builder export state contracts passed; server admission and renderer/browser acceptance remain separate.');
+
+// Real datasource fetches can return one tabular frame, rather than flat row
+// objects. Its authored primary contract must survive document construction
+// and lowering, so the complete export normalizer can resolve every row.
+const frameContract = {shape: 'tabular', rowPath: 'rows.0'};
+const framedConfig = {...config, dataSources: [{id: 'primary', dataSourceRef: 'approved', resultContract: frameContract}]};
+const framed = prepare({config: framedConfig});
+assert.deepEqual(framed.reportDocument.datasets.find(dataset => dataset.id === 'primary').resultContract, frameContract);
+assert.deepEqual(framed.reportSpec.datasets.find(dataset => dataset.id === 'primary').resultContract, frameContract);
+const frame = {columns: [{name: 'region'}, {name: 'count'}], rows: Array.from({length: 32}, (_, i) => [`local-${i}`, i]), hasMore: false};
+const normalized = resolveReportDatasetFetchResult({body: {rows: [frame], dataInfo: frame}, resultContract: framed.reportSpec.datasets[0].resultContract});
+assert.equal(normalized.rows.length, 32);
+const framedFill = buildReportFillFromReportSpec(framed.reportSpec, {primary: normalized});
+assert.equal(framedFill.datasets[0].rows.length, 32);
+assert.equal(framedFill.blocks.find(block => block.id === 'details').content.resolvedRows.length, 32);
+// Explicit top-level contracts retain precedence; unrelated logical datasets
+// sharing the transport and mismatched primary descriptors cannot donate one.
+const explicit = {shape: 'rows', rowPath: 'rows'};
+assert.deepEqual(prepare({config: {...framedConfig, resultContract: explicit}}).reportSpec.datasets[0].resultContract, explicit);
+for (const descriptor of [
+    {id: 'other', dataSourceRef: 'approved', resultContract: frameContract},
+    {id: 'primary', dataSourceRef: 'foreign', resultContract: frameContract},
+    {id: 'primary', dataSourceRef: 'approved', resultContract: null},
+    {id: 'primary', dataSourceRef: 'approved', resultContract: []},
+]) assert.equal(prepare({config: {...config, dataSources: [descriptor]}}).reportSpec.datasets[0].resultContract, undefined);
