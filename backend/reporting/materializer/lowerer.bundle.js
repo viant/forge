@@ -54289,6 +54289,11 @@ Please __addLocaleData before adding additional unit data`);
   function cloneValue20(value) {
     return value == null ? value : JSON.parse(JSON.stringify(value));
   }
+  function applyChartRowLimit(rows = [], rowLimit = 0) {
+    const source = Array.isArray(rows) ? rows : [];
+    const limit = Math.trunc(Number(rowLimit) || 0);
+    return Number.isInteger(limit) && limit > 0 ? source.slice(0, limit) : source;
+  }
   var isChartNumericValue = isNumericValue;
   function attachChartSelectionRowsMetadata(target, initialValue) {
     if (!target || typeof target !== "object") {
@@ -60421,8 +60426,10 @@ ${indent}${end}`;
   function buildReportPrintChartSvg({
     chartModel = {},
     resolvedChart = {},
-    width = 680
+    width = 680,
+    rowLimit = 0
   } = {}) {
+    resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart == null ? void 0 : resolvedChart.rows, rowLimit) };
     const kind = normalizeString39(resolvedChart == null ? void 0 : resolvedChart.kind);
     if (kind === "category") {
       return renderCategoryChartSvg({ chartModel, resolvedChart, width });
@@ -60445,7 +60452,8 @@ ${indent}${end}`;
       ].filter(Boolean)
     };
   }
-  function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}, width = 680, maxHeight = 620, firstMaxHeight = maxHeight } = {}) {
+  function buildReportPrintChartPages({ chartModel = {}, resolvedChart = {}, width = 680, maxHeight = 620, firstMaxHeight = maxHeight, rowLimit = 0 } = {}) {
+    resolvedChart = { ...resolvedChart, rows: applyChartRowLimit(resolvedChart == null ? void 0 : resolvedChart.rows, rowLimit) };
     const type = normalizeString39((chartModel == null ? void 0 : chartModel.type) || (resolvedChart == null ? void 0 : resolvedChart.type)).toLowerCase();
     if (!["horizontal_bar", "funnel_bar"].includes(type) || !["directSeries", "groupedSeries"].includes(resolvedChart == null ? void 0 : resolvedChart.kind)) {
       return [buildReportPrintChartSvg({ chartModel, resolvedChart, width })];
@@ -68368,7 +68376,7 @@ ${indent}${end}`;
   function renderReportPrintChartBlock(state = {}, block = {}, {
     layoutNote = ""
   } = {}) {
-    var _a5, _b, _c, _d, _e, _f, _g;
+    var _a5, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     const datasetRef = normalizeString41(block == null ? void 0 : block.datasetRef);
     const declared = (Array.isArray((_a5 = state.reportSpec) == null ? void 0 : _a5.datasets) ? state.reportSpec.datasets : []).some((dataset2) => (dataset2 == null ? void 0 : dataset2.id) === datasetRef);
     const dataset = (Array.isArray((_b = state.reportFill) == null ? void 0 : _b.datasets) ? state.reportFill.datasets : []).find((dataset2) => (dataset2 == null ? void 0 : dataset2.id) === datasetRef);
@@ -68384,6 +68392,7 @@ ${indent}${end}`;
     const chartPages = buildReportPrintChartPages({
       chartModel: ((_d = block == null ? void 0 : block.content) == null ? void 0 : _d.chartModel) || (block == null ? void 0 : block.chartModel) || {},
       resolvedChart: ((_e = block == null ? void 0 : block.content) == null ? void 0 : _e.resolvedChart) || null,
+      rowLimit: (_h = (_g = (_f = block == null ? void 0 : block.content) == null ? void 0 : _f.rowLimit) != null ? _g : block == null ? void 0 : block.rowLimit) != null ? _h : 0,
       width: state.contentWidth,
       maxHeight: state.contentBottom - state.contentTop - titleHeight,
       firstMaxHeight: state.contentBottom - state.cursorY - titleHeight >= 180 ? state.contentBottom - state.cursorY - titleHeight : state.contentBottom - state.contentTop - titleHeight - (state.sectionHeadingHeight || 0)
@@ -68412,7 +68421,7 @@ ${indent}${end}`;
       }
       ensureReportPrintSpace(state, chartHeight);
       const svgElement = pushReportPrintElement(state, buildReportPrintSvgElement({
-        id: `${normalizeString41((block == null ? void 0 : block.id) || "chart")}__svg_page_${(_f = state.currentPage) == null ? void 0 : _f.number}`,
+        id: `${normalizeString41((block == null ? void 0 : block.id) || "chart")}__svg_page_${(_i = state.currentPage) == null ? void 0 : _i.number}`,
         kind: "svg",
         box: {
           x: state.contentLeft,
@@ -68431,7 +68440,7 @@ ${indent}${end}`;
           elementId: svgElement == null ? void 0 : svgElement.id
         });
       });
-      if ((_g = svgResult.labelDetails) == null ? void 0 : _g.length) {
+      if ((_j = svgResult.labelDetails) == null ? void 0 : _j.length) {
         renderReportPrintTextLines(state, { idPrefix: `${block.id}__labels_${pageIndex}`, lines: svgResult.labelDetails, fontSize: 9, lineHeight: 12 });
       }
       finishReportPrintBlock(state);
