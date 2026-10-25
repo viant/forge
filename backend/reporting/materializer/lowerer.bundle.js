@@ -59824,6 +59824,14 @@ ${indent}${end}`;
       diagnostics: []
     };
   }
+  function horizontalBarChartMetrics(rowCount, seriesCount) {
+    const topPad = 16;
+    const bottomPad = 34;
+    const groupGap = 8;
+    const rowHeight = Math.max(24, seriesCount * 18);
+    const plotHeight = Math.max(80, rowCount * rowHeight + Math.max(0, rowCount - 1) * groupGap);
+    return { topPad, bottomPad, groupGap, rowHeight, plotHeight, height: topPad + plotHeight + bottomPad + 12 };
+  }
   function renderHorizontalBarChartSvg({
     chartModel = {},
     resolvedChart = {},
@@ -59882,17 +59890,13 @@ ${indent}${end}`;
     ), 0);
     const leftPad = Math.min(Math.floor(width * 0.38), Math.max(116, 20 + longestCategoryLine * 6));
     const rightPad = 66;
-    const topPad = 16;
-    const bottomPad = 34;
+    const { topPad, bottomPad, groupGap, rowHeight, plotHeight, height: baseHeight } = horizontalBarChartMetrics(rows.length, seriesDescriptors.length);
     const plotWidth = Math.max(40, width - leftPad - rightPad);
     const valueRange = bounds.maxValue - bounds.minValue || 1;
     const baselineX = leftPad + (0 - bounds.minValue) / valueRange * plotWidth;
-    const groupGap = 8;
-    const rowHeight = Math.max(24, seriesDescriptors.length * 18);
     const perSeriesHeight = Math.max(10, Math.floor((rowHeight - Math.max(0, seriesDescriptors.length - 1) * 4) / Math.max(seriesDescriptors.length, 1)));
-    const plotHeight = Math.max(80, rows.length * rowHeight + Math.max(0, rows.length - 1) * groupGap);
     const legend = buildLegendSvg(seriesDescriptors, width, topPad + plotHeight + bottomPad + 4);
-    const height = topPad + plotHeight + bottomPad + legend.height + 12;
+    const height = baseHeight + legend.height;
     const annotations = renderHorizontalBarAnnotationsSvg({
       chartModel,
       rows,
@@ -60006,17 +60010,21 @@ ${indent}${end}`;
     if (!rows.length) return [buildReportPrintChartSvg({ chartModel, resolvedChart, width })];
     const descriptors = resolveCartesianSeriesDescriptors(chartModel, resolvedChart);
     const valueBounds = computeCartesianValueBounds(rows, descriptors);
+    const hasLayout = valueBounds && descriptors.length > 0 && descriptors.every((series) => resolveChartSupportedSeriesType(series.type) === "horizontal_bar");
+    const legendHeight = hasLayout ? buildLegendSvg(descriptors, width, 0).height : 0;
     const pages = [];
     let offset = 0;
     while (offset < rows.length) {
-      let count = rows.length - offset;
-      let page;
-      do {
-        page = renderHorizontalBarChartSvg({ chartModel, resolvedChart: { ...resolvedChart, rows: rows.slice(offset, offset + count) }, width, valueBounds, categoryOffset: offset });
-        if (page.height <= (offset === 0 ? firstMaxHeight : maxHeight) || count === 1) break;
-        count -= 1;
-      } while (count > 0);
-      pages.push(page);
+      const availableHeight = offset === 0 ? firstMaxHeight : maxHeight;
+      let count = 1;
+      let upper = rows.length - offset;
+      while (count < upper) {
+        const middle = Math.ceil((count + upper) / 2);
+        const height = hasLayout ? horizontalBarChartMetrics(middle, descriptors.length).height + legendHeight : 0;
+        if (height <= availableHeight) count = middle;
+        else upper = middle - 1;
+      }
+      pages.push(renderHorizontalBarChartSvg({ chartModel, resolvedChart: { ...resolvedChart, rows: rows.slice(offset, offset + count) }, width, valueBounds, categoryOffset: offset }));
       offset += count;
     }
     return pages;
