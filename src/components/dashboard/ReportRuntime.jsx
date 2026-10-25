@@ -1,3 +1,4 @@
+import {buildRuntimeTableRows} from "../../reporting/reportRuntimeTableRows.js";
 import ReportDatasetPager from "./ReportDatasetPager.jsx";
 import {resolveReportChartTableSwitch} from "../../reporting/reportViewerSettings.js";
 import KpiSparkline from './KpiSparkline.jsx';
@@ -182,26 +183,6 @@ export function shouldApplyTableDefaultCollapsed(previousDefaultCollapsed, nextD
   return collapsible === true && nextDefaultCollapsed === true && previousDefaultCollapsed !== true;
 }
 
-function buildRuntimeTableRows(block = {}, dataset = {}) {
-  const resolvedRows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
-  const originalRows = Array.isArray(dataset?.rows) ? dataset.rows : [];
-  if (resolvedRows.length === 0) {
-    return originalRows;
-  }
-  return resolvedRows.map((resolvedRow, rowIndex) => {
-    const cells = Array.isArray(resolvedRow?.cells) ? resolvedRow.cells : [];
-    return cells.reduce((acc, cell) => {
-      const sourceKey = normalizeString(cell?.sourceKey || cell?.key);
-      const displayKey = normalizeString(cell?.displayKey || cell?.key);
-      const next = sourceKey
-        ? setSelector(acc, sourceKey, cloneValue(cell?.value))
-        : acc;
-      return displayKey && displayKey !== sourceKey
-        ? setSelector(next, displayKey, cloneValue(cell?.displayValue))
-        : next;
-    }, cloneValue(originalRows[rowIndex]) || {});
-  });
-}
 
 function RuntimePanel({ title = "", subtitle = "", children, className = "", style = {}, headerAction = null }) {
   const presentation = useWorkspacePresentation();
@@ -2126,7 +2107,7 @@ function resolveRuntimeCompositeConfig(blocks = []) {
   return { composites, ...resolveReportRuntimeCompositeOwnership(blocks) };
 }
 
-function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = null, block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false, displayMode, onDisplayModeChange = null }) {
+function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = null, block = {}, diagnostics = [], dataset = {}, reportSpec = {}, providerActionsByField = new Map(), runtimeHandlers = null, locale = "en-US", onRetryProviderActions = null, providerActionsLoading = false, onRuntimeSelection = null, publicMode = false, displayMode, onDisplayModeChange = null, initialPresentationState = null, onTablePresentationChange = null }) {
   const authoredBlock = (Array.isArray(reportSpec?.blocks) ? reportSpec.blocks : [])
     .find((candidate) => normalizeString(candidate?.id) === normalizeString(block?.id)) || {};
   const tableAccentTone = normalizeString(block?.content?.accentTone || block?.accentTone).toLowerCase();
@@ -2164,8 +2145,8 @@ function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = n
   }, [collapsible, defaultCollapsed]);
   const [tablePresentation, setTablePresentation] = useState(() => ({
     rowCount: Number(block?.content?.rowCount ?? dataset?.provenance?.rowCount ?? 0) || 0,
-    filter: "",
-    sort: null,
+    filter: initialPresentationState?.filter || "",
+    sort: initialPresentationState?.sort || null,
   }));
   const handleTablePresentationChange = useCallback((next = {}) => {
     setTablePresentation((current) => {
@@ -2182,6 +2163,12 @@ function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = n
       return { rowCount: nextRowCount, filter: nextFilter, sort: nextSort };
     });
   }, []);
+  useEffect(() => {
+    onTablePresentationChange?.(block.id, {
+      filter: tablePresentation.filter,
+      sort: tablePresentation.sort ? {key: tablePresentation.sort.key, direction: tablePresentation.sort.direction} : null,
+    });
+  }, [block.id, tablePresentation.filter, tablePresentation.sort, onTablePresentationChange]);
   if (invalidDiagnostic) {
     return (
       <RuntimePanel
@@ -2319,6 +2306,7 @@ function TableBlock({ page = {}, onDatasetPageChange = null, onDatasetExpand = n
           rows: runtimeTableRows,
         }, locale, { publicMode })}
         locale={locale}
+        initialPresentationState={initialPresentationState}
         onPresentationStateChange={handleTablePresentationChange}
       />
       </div>
@@ -2894,6 +2882,8 @@ export default function ReportRuntime({
   onDatasetExpand = null,
   tableDisplayModes = null,
   onTableDisplayModeChange = null,
+  tablePresentations = null,
+  onTablePresentationChange = null,
   showContextSummary = true,
   suppressFilterBarBlocks = false,
   suppressFilterBarBlockDatasetRefs = [],
@@ -3239,6 +3229,8 @@ export default function ReportRuntime({
           onDatasetExpand={onDatasetExpand}
           displayMode={tableDisplayModes ? (tableDisplayModes[block.id] || "default") : undefined}
           onDisplayModeChange={onTableDisplayModeChange}
+          initialPresentationState={tablePresentations?.[block.id]}
+          onTablePresentationChange={onTablePresentationChange}
           reportSpec={reportSpec}
           providerActionsByField={providerActionsByField}
           runtimeHandlers={runtimeHandlers}

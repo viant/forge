@@ -1,3 +1,4 @@
+import {applyReportTablePresentations} from './reportTablePresentation.js';
 import {materializeKpiSparkline} from './reportKpiSparklineModel.js';
 import { calculateKpiSecondaryValue, normalizeKpiSecondaryCalculation } from "./reportKpiComparisonModel.js";
 import {
@@ -1201,6 +1202,7 @@ function buildReportFillBlocks(reportSpec = {}, datasetsById = new Map(), {
 export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads = {}, {
   unifiedFilterContent = null,
   runtimeSelection = {},
+  tablePresentations = null,
 } = {}) {
   const normalizedReportSpec = cloneValue(reportSpec || {});
   // Fingerprint the spec as provided: consumers compare fill.specHash against
@@ -1220,7 +1222,7 @@ export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads =
     buildReportFillDataset(dataset, datasetPayloads?.[normalizeString(dataset?.id)] || {}, calculatedFields)
   ));
   const datasetsById = new Map(datasets.map((dataset) => [dataset.id, dataset]));
-  return {
+  return applyReportTablePresentations({
     version: 1,
     kind: "reportFill",
     specVersion: Number(normalizedReportSpec?.version || 0) || 1,
@@ -1235,7 +1237,7 @@ export function buildReportFillFromReportSpec(reportSpec = {}, datasetPayloads =
       runtimeSelection,
     }),
     diagnostics: datasets.flatMap((dataset) => dataset?.provenance?.diagnostics || []),
-  };
+  }, tablePresentations);
 }
 
 export function buildReportBuilderReportFill({
