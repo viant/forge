@@ -242,16 +242,16 @@ type Artifacts struct {
 }
 
 func Materialize(ctx context.Context, spec json.RawMessage, datasets map[string]json.RawMessage) (*Artifacts, error) {
-	return materialize(ctx, spec, datasets, false)
+	return materialize(ctx, spec, datasets, false, nil)
 }
 
 // MaterializeFill computes the validated report fill without constructing a
 // print model. Complete execution and export retain Materialize by default.
 func MaterializeFill(ctx context.Context, spec json.RawMessage, datasets map[string]json.RawMessage) (*Artifacts, error) {
-	return materialize(ctx, spec, datasets, true)
+	return materialize(ctx, spec, datasets, true, nil)
 }
 
-func materialize(ctx context.Context, spec json.RawMessage, datasets map[string]json.RawMessage, fillOnly bool) (*Artifacts, error) {
+func materialize(ctx context.Context, spec json.RawMessage, datasets map[string]json.RawMessage, fillOnly bool, presentations TablePresentations) (*Artifacts, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("materializer context required")
 	}
@@ -272,9 +272,10 @@ func materialize(ctx context.Context, spec json.RawMessage, datasets map[string]
 		return nil, err
 	}
 	raw, err := json.Marshal(struct {
-		Spec     json.RawMessage            `json:"reportSpec"`
-		Datasets map[string]json.RawMessage `json:"datasets"`
-	}{spec, normalized})
+		Spec               json.RawMessage            `json:"reportSpec"`
+		Datasets           map[string]json.RawMessage `json:"datasets"`
+		TablePresentations TablePresentations         `json:"tablePresentations,omitempty"`
+	}{spec, normalized, presentations})
 	if err != nil {
 		return nil, err
 	}
