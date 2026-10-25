@@ -1424,6 +1424,7 @@ type TableLink struct {
 	WindowTitle         string                 `json:"windowTitle,omitempty" yaml:"windowTitle,omitempty"`
 	ChipName            string                 `json:"chipName,omitempty" yaml:"chipName,omitempty"`
 	ChipIcon            string                 `json:"chipIcon,omitempty" yaml:"chipIcon,omitempty"`
+	WindowTitleTemplate string                 `json:"windowTitleTemplate,omitempty" yaml:"windowTitleTemplate,omitempty"`
 	WindowTitleSelector string                 `json:"windowTitleSelector,omitempty" yaml:"windowTitleSelector,omitempty"`
 	WindowTitleSource   string                 `json:"windowTitleSource,omitempty" yaml:"windowTitleSource,omitempty"`
 	InTab               *bool                  `json:"inTab,omitempty" yaml:"inTab,omitempty"`
