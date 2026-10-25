@@ -54,7 +54,7 @@ func (m *Manager) reserveClientSlotLocked() (mcpclient.Interface, error) {
 		// Transfer the existing slot to the new creation. The caller closes
 		// the retired transport before starting the replacement factory.
 		oldest.capacityHeld = false
-		retired = m.evictEntryLocked(owner, server, oldest)
+		retired = m.evictEntryLocked(owner, server, oldest, ClientCapacityEvicted)
 		return retired, nil
 	}
 	m.capacityUsed++
