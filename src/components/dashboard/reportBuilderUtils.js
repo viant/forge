@@ -2248,6 +2248,7 @@ export function buildReportBuilderColumns(config = {}, state = {}) {
             ...(override.format ? { format: override.format } : {}),
             ...(override.align ? { align: override.align } : {}),
             ...(override.cellVisual ? { cellVisual: clone(override.cellVisual) } : {}),
+            ...(override.rowIdentity === true ? { rowIdentity: true } : {}),
         };
     };
 
@@ -2262,6 +2263,7 @@ export function buildReportBuilderColumns(config = {}, state = {}) {
             label: entry.label || entry.id,
             kind: "dimension",
             format: entry.format,
+            ...(entry?.rowIdentity === true ? { rowIdentity: true } : {}),
             ...(entry?.displayValueMap && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap)
                 ? { displayValueMap: clone(entry.displayValueMap) }
                 : {}),
@@ -2278,6 +2280,7 @@ export function buildReportBuilderColumns(config = {}, state = {}) {
             label: entry.label || entry.id,
             kind: "measure",
             format: entry.format,
+            ...(entry?.rowIdentity === true ? { rowIdentity: true } : {}),
             ...(entry?.displayValueMap && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap)
                 ? { displayValueMap: clone(entry.displayValueMap) }
                 : {}),

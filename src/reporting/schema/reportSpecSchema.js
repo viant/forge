@@ -593,6 +593,7 @@ export const reportSpecSchema = {
         format: { type: "string" },
         align: { type: "string" },
         runtimeFilterable: { type: "boolean" },
+        rowIdentity: { type: "boolean" },
         link: { $ref: "#/$defs/tableLink" },
         cellVisual: { $ref: "#/$defs/tableCellVisual" },
         labelClamp: { $ref: "#/$defs/presentationTextClamp" },

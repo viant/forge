@@ -45229,6 +45229,7 @@ Please __addLocaleData before adding additional unit data`);
       ...normalizeString5(column.format) || normalizeString5(column.valueFormat) ? { format: normalizeString5(column.format) || normalizeString5(column.valueFormat) } : {},
       ...normalizeString5(column.align) ? { align: normalizeString5(column.align) } : {},
       ...(column == null ? void 0 : column.runtimeFilterable) === true ? { runtimeFilterable: true } : {},
+      ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {},
       ...link ? { link } : {},
       ...cellVisual ? { cellVisual } : {},
       ...labelClamp ? { labelClamp } : {}
@@ -48369,7 +48370,8 @@ Please __addLocaleData before adding additional unit data`);
         ...override.label ? { label: override.label } : {},
         ...override.format ? { format: override.format } : {},
         ...override.align ? { align: override.align } : {},
-        ...override.cellVisual ? { cellVisual: clone3(override.cellVisual) } : {}
+        ...override.cellVisual ? { cellVisual: clone3(override.cellVisual) } : {},
+        ...override.rowIdentity === true ? { rowIdentity: true } : {}
       };
     };
     const selectedDimensions = normalizeArray3(state.selectedDimensions).map((id) => dimensions.find((entry) => String((entry == null ? void 0 : entry.id) || "").trim() === String(id).trim())).filter(Boolean).map((entry) => applyPresetColumn({
@@ -48380,6 +48382,7 @@ Please __addLocaleData before adding additional unit data`);
       label: entry.label || entry.id,
       kind: "dimension",
       format: entry.format,
+      ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
       ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: clone3(entry.displayValueMap) } : {},
       ...(entry == null ? void 0 : entry.runtimeFilter) && typeof entry.runtimeFilter === "object" && !Array.isArray(entry.runtimeFilter) ? { runtimeFilterable: true } : {}
     }));
@@ -48388,6 +48391,7 @@ Please __addLocaleData before adding additional unit data`);
       label: entry.label || entry.id,
       kind: "measure",
       format: entry.format,
+      ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
       ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: clone3(entry.displayValueMap) } : {},
       align: entry.align || "right"
     }));
@@ -49300,6 +49304,7 @@ Please __addLocaleData before adding additional unit data`);
       ...normalizeString27(column == null ? void 0 : column.format) ? { format: normalizeString27(column.format) } : {},
       ...normalizeString27(column == null ? void 0 : column.align) ? { align: normalizeString27(column.align) } : {},
       ...(column == null ? void 0 : column.runtimeFilterable) === true ? { runtimeFilterable: true } : {},
+      ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {},
       ...normalizeReportTableCellVisual(column == null ? void 0 : column.cellVisual) ? { cellVisual: normalizeReportTableCellVisual(column.cellVisual) } : {},
       ...normalizePresentationClampConfig(column == null ? void 0 : column.labelClamp) ? { labelClamp: normalizePresentationClampConfig(column.labelClamp) } : {}
     })).filter((column) => column.key);
@@ -50186,13 +50191,15 @@ Please __addLocaleData before adding additional unit data`);
       id: normalizeString29(column == null ? void 0 : column.key),
       key: normalizeString29(column == null ? void 0 : column.key),
       label: normalizeString29((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-      ...normalizeString29(column == null ? void 0 : column.format) ? { format: normalizeString29(column.format) } : {}
+      ...normalizeString29(column == null ? void 0 : column.format) ? { format: normalizeString29(column.format) } : {},
+      ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {}
     })).filter((entry) => entry.id && entry.key && entry.label);
     const measures = inheritRuntimeFieldCatalog ? cloneValue18((baseConfig == null ? void 0 : baseConfig.measures) || []) : columnOptions.filter((column) => normalizeString29(column == null ? void 0 : column.kind) === "measure").map((column) => ({
       id: normalizeString29(column == null ? void 0 : column.key),
       key: normalizeString29(column == null ? void 0 : column.key),
       label: normalizeString29((column == null ? void 0 : column.label) || (column == null ? void 0 : column.key)),
-      ...normalizeString29(column == null ? void 0 : column.format) ? { format: normalizeString29(column.format) } : {}
+      ...normalizeString29(column == null ? void 0 : column.format) ? { format: normalizeString29(column.format) } : {},
+      ...(column == null ? void 0 : column.rowIdentity) === true ? { rowIdentity: true } : {}
     })).filter((entry) => entry.id && entry.key && entry.label);
     return {
       ...isPlainObject7(baseConfig) ? cloneValue18(baseConfig) : {},
@@ -50356,6 +50363,7 @@ Please __addLocaleData before adding additional unit data`);
     const definitionRef = normalizeString29(entry == null ? void 0 : entry.definitionRef);
     return {
       ...paramPath ? { paramPath } : {},
+      ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
       ...(entry == null ? void 0 : entry.default) === true ? { default: true } : {},
       ...(entry == null ? void 0 : entry.chartAxis) === true ? { chartAxis: true } : {},
       ...(entry == null ? void 0 : entry.required) === true ? { required: true } : {},
@@ -50454,6 +50462,7 @@ Please __addLocaleData before adding additional unit data`);
         key,
         label: normalizeString29((entry == null ? void 0 : entry.label) || key) || key,
         kind: "dimension",
+        ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
         ...normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
         ...normalizeString29(entry == null ? void 0 : entry.displayKey) ? { displayKey: normalizeString29(entry.displayKey) } : {},
         ...(entry == null ? void 0 : entry.displayValueMap) && typeof entry.displayValueMap === "object" && !Array.isArray(entry.displayValueMap) ? { displayValueMap: cloneValue18(entry.displayValueMap) } : {},
@@ -50482,6 +50491,7 @@ Please __addLocaleData before adding additional unit data`);
           key,
           label: normalizeString29((entry == null ? void 0 : entry.label) || key) || key,
           kind: "measure",
+          ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
           ...normalizeString29(entry == null ? void 0 : entry.format) ? { format: normalizeString29(entry.format) } : {},
           ...normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) ? { sourceKey: normalizeString29((entry == null ? void 0 : entry.sourceKey) || (entry == null ? void 0 : entry.key) || (entry == null ? void 0 : entry.id)) } : {},
           ...normalizeString29(entry == null ? void 0 : entry.rawId) ? { rawId: normalizeString29(entry.rawId) } : {},
@@ -50511,6 +50521,7 @@ Please __addLocaleData before adding additional unit data`);
           key,
           label: normalizeString29((entry == null ? void 0 : entry.label) || key) || key,
           kind: "measure",
+          ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
           ...normalizeString29(entry == null ? void 0 : entry.format) ? { format: normalizeString29(entry.format) } : {}
         };
       })
@@ -50536,6 +50547,7 @@ Please __addLocaleData before adding additional unit data`);
           key: entry.key,
           label: entry.label,
           kind: "dimension",
+          ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
           ...(entry == null ? void 0 : entry.sourceKey) ? { sourceKey: entry.sourceKey } : {},
           ...(entry == null ? void 0 : entry.displayKey) ? { displayKey: entry.displayKey } : {},
           ...(entry == null ? void 0 : entry.displayValueMap) ? { displayValueMap: cloneValue18(entry.displayValueMap) } : {},
@@ -50555,6 +50567,7 @@ Please __addLocaleData before adding additional unit data`);
           key: entry.key,
           label: entry.label,
           kind: "measure",
+          ...(entry == null ? void 0 : entry.rowIdentity) === true ? { rowIdentity: true } : {},
           ...(entry == null ? void 0 : entry.sourceKey) ? { sourceKey: entry.sourceKey } : {},
           ...(entry == null ? void 0 : entry.format) ? { format: entry.format } : {},
           ...(entry == null ? void 0 : entry.rawId) ? { rawId: entry.rawId } : {},
@@ -67748,38 +67761,52 @@ ${indent}${end}`;
       }));
     });
   }
+  function partitionReportPrintTableColumns(columns, minimumWidths, contentWidth) {
+    let identityIndexes = columns.flatMap((column, index) => (column == null ? void 0 : column.rowIdentity) === true ? [index] : []);
+    if (identityIndexes.length === 0) identityIndexes = [0];
+    const identities = new Set(identityIndexes);
+    const payloadIndexes = columns.map((_2, index) => index).filter((index) => !identities.has(index));
+    if (payloadIndexes.length === 0) return [columns];
+    const anchorWidth = identityIndexes.reduce((sum, index) => sum + minimumWidths[index], 0);
+    const groups = [];
+    let payload = [];
+    let width = anchorWidth;
+    const appendGroup = () => groups.push([...identityIndexes, ...payload].map((index) => columns[index]));
+    for (const index of payloadIndexes) {
+      if (payload.length > 0 && width + minimumWidths[index] > contentWidth) {
+        appendGroup();
+        payload = [];
+        width = anchorWidth;
+      }
+      payload.push(index);
+      width += minimumWidths[index];
+    }
+    appendGroup();
+    return groups;
+  }
   function renderReportPrintTableBlock(state = {}, block = {}, {
-    layoutNote = ""
+    layoutNote = "",
+    columnBand = false
   } = {}) {
     var _a5, _b;
     const columns = Array.isArray((_a5 = block == null ? void 0 : block.content) == null ? void 0 : _a5.columns) ? block.content.columns : [];
     let rows = Array.isArray((_b = block == null ? void 0 : block.content) == null ? void 0 : _b.resolvedRows) ? block.content.resolvedRows : [];
     const resolveText = state.resolveTableCellText;
     const minimumWidths = minimumReportPrintColumnWidths(state, block, columns, resolveText);
-    if (rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
-      const groups = [];
-      let group = [columns[0]];
-      let width = minimumWidths[0];
-      for (let index = 1; index < columns.length; index += 1) {
-        if (group.length > 1 && width + minimumWidths[index] > state.contentWidth) {
-          groups.push(group);
-          group = [columns[0]];
-          width = minimumWidths[0];
-        }
-        group.push(columns[index]);
-        width += minimumWidths[index];
+    if (!columnBand && rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
+      const groups = partitionReportPrintTableColumns(columns, minimumWidths, state.contentWidth);
+      if (groups.length > 1) {
+        groups.forEach((groupColumns, index) => {
+          const title = `${resolveReportPrintBlockTitle(block)} (${index + 1}/${groups.length})`;
+          renderReportPrintTableBlock(state, {
+            ...block,
+            id: `${block.id}__columns_${index + 1}`,
+            title,
+            content: { ...block.content, title, columns: groupColumns }
+          }, { layoutNote, columnBand: true });
+        });
+        return;
       }
-      groups.push(group);
-      groups.forEach((groupColumns, index) => {
-        const title = `${resolveReportPrintBlockTitle(block)} (${index + 1}/${groups.length})`;
-        renderReportPrintTableBlock(state, {
-          ...block,
-          id: `${block.id}__columns_${index + 1}`,
-          title,
-          content: { ...block.content, title, columns: groupColumns }
-        }, { layoutNote });
-      });
-      return;
     }
     const pathwayDetails = [];
     rows = rows.map((row, rowIndex2) => ({

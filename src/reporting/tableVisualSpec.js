@@ -120,6 +120,7 @@ export function normalizeReportTableBlockColumn(column = {}) {
       : {}),
     ...(normalizeString(column.align) ? { align: normalizeString(column.align) } : {}),
     ...(column?.runtimeFilterable === true ? { runtimeFilterable: true } : {}),
+    ...(column?.rowIdentity === true ? { rowIdentity: true } : {}),
     ...(link ? { link } : {}),
     ...(cellVisual ? { cellVisual } : {}),
     ...(labelClamp ? { labelClamp } : {}),

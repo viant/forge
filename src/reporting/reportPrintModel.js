@@ -2250,37 +2250,56 @@ function renderReportPrintTableRow(state = {}, block = {}, columns = [], row = {
   });
 }
 
+// Plan each payload column exactly once. Explicit identity columns lead every
+// band; unmarked legacy tables retain their original first-column anchor.
+// A band always admits one payload column, even when its anchors exceed the
+// width budget. The existing width allocator wraps those cells at the same font.
+function partitionReportPrintTableColumns(columns, minimumWidths, contentWidth) {
+  let identityIndexes = columns.flatMap((column, index) => column?.rowIdentity === true ? [index] : []);
+  if (identityIndexes.length === 0) identityIndexes = [0];
+  const identities = new Set(identityIndexes);
+  const payloadIndexes = columns.map((_, index) => index).filter((index) => !identities.has(index));
+  if (payloadIndexes.length === 0) return [columns];
+  const anchorWidth = identityIndexes.reduce((sum, index) => sum + minimumWidths[index], 0);
+  const groups = [];
+  let payload = [];
+  let width = anchorWidth;
+  const appendGroup = () => groups.push([...identityIndexes, ...payload].map((index) => columns[index]));
+  for (const index of payloadIndexes) {
+    if (payload.length > 0 && width + minimumWidths[index] > contentWidth) {
+      appendGroup();
+      payload = [];
+      width = anchorWidth;
+    }
+    payload.push(index);
+    width += minimumWidths[index];
+  }
+  appendGroup();
+  return groups;
+}
+
 function renderReportPrintTableBlock(state = {}, block = {}, {
   layoutNote = "",
+  columnBand = false,
 } = {}) {
   const columns = Array.isArray(block?.content?.columns) ? block.content.columns : [];
   let rows = Array.isArray(block?.content?.resolvedRows) ? block.content.resolvedRows : [];
   const resolveText = state.resolveTableCellText;
   const minimumWidths = minimumReportPrintColumnWidths(state, block, columns, resolveText);
-  if (rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
-    const groups = [];
-    let group = [columns[0]];
-    let width = minimumWidths[0];
-    for (let index = 1; index < columns.length; index += 1) {
-      if (group.length > 1 && width + minimumWidths[index] > state.contentWidth) {
-        groups.push(group);
-        group = [columns[0]];
-        width = minimumWidths[0];
-      }
-      group.push(columns[index]);
-      width += minimumWidths[index];
+  if (!columnBand && rows.length > 0 && columns.length > 2 && minimumWidths.reduce((sum, width) => sum + width, 0) > state.contentWidth) {
+    const groups = partitionReportPrintTableColumns(columns, minimumWidths, state.contentWidth);
+    if (groups.length > 1) {
+      groups.forEach((groupColumns, index) => {
+        const title = `${resolveReportPrintBlockTitle(block)} (${index + 1}/${groups.length})`;
+        renderReportPrintTableBlock(state, {
+          ...block,
+          id: `${block.id}__columns_${index + 1}`,
+          title,
+          content: { ...block.content, title, columns: groupColumns },
+        }, { layoutNote, columnBand: true });
+      });
+      return;
     }
-    groups.push(group);
-    groups.forEach((groupColumns, index) => {
-      const title = `${resolveReportPrintBlockTitle(block)} (${index + 1}/${groups.length})`;
-      renderReportPrintTableBlock(state, {
-        ...block,
-        id: `${block.id}__columns_${index + 1}`,
-        title,
-        content: { ...block.content, title, columns: groupColumns },
-      }, { layoutNote });
-    });
-    return;
   }
   const pathwayDetails = [];
   rows = rows.map((row, rowIndex) => ({
