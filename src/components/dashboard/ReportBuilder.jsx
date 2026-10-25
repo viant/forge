@@ -1,4 +1,5 @@
 import {reportDatasetReadContextIdentity} from './reportBuilderConcurrentRead.js';
+import {authoredReportCsvTables, renderReportTableCsv} from '../../reporting/reportTableCsv.js';
 import ReportResourceEditor from "./ReportResourceEditor.jsx";
 import ReportResourceRuntime from "./ReportResourceRuntime.jsx";
 import {hostedReportResource, buildReportBuilderResourceSaveRequest} from "./reportBuilderResourceLifecycle.js";
@@ -10980,9 +10981,14 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         }),
         [chartDataPolicy, chartQueryCollection, computedCollection, showingChartView],
     );
-    const canDownloadCsv = authoredDocumentCompileValidation.valid
-        && Array.isArray(selectedColumns) && selectedColumns.length > 0
-        && Array.isArray(exportCollection) && exportCollection.length > 0;
+    const authoredCsvTables = useMemo(
+        () => authoredReportCsvTables(runtimePreviewArtifact?.document, runtimePreviewArtifact?.reportFill),
+        [runtimePreviewArtifact?.document, runtimePreviewArtifact?.reportFill],
+    );
+    const canDownloadCsv = authoredDocumentCompileValidation.valid && (authoredCsvTables.length
+        ? authoredCsvTables.some(table => !table.unavailable)
+        : Array.isArray(selectedColumns) && selectedColumns.length > 0
+            && Array.isArray(exportCollection) && exportCollection.length > 0);
     const canOpenDraftExportMenu = !reportFiltersNeedApply && (!!draftExportRequest || !!draftXlsxExportRequest || canDownloadCsv);
 
     const { activeResultLoading, activeResultError, reportBuilderStateMarker } = useMemo(() => resolveReportBuilderActiveResultState({
@@ -11663,20 +11669,31 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         }
     }, [backendSharedArtifactsListResponse, listReportDocumentsResponse, listReportDocumentsSelectedReportId]);
 
-    const downloadCsv = React.useCallback(() => {
-        if (!Array.isArray(selectedColumns) || selectedColumns.length === 0 || !Array.isArray(exportCollection) || exportCollection.length === 0) {
-            return;
+    const downloadCsv = React.useCallback((tableId) => {
+        let content;
+        if (authoredCsvTables.length) {
+            const table = tableId ? authoredCsvTables.find(entry => entry.id === tableId)
+                : authoredCsvTables.length === 1 ? authoredCsvTables[0] : null;
+            try {
+                if (!table) throw new Error('Choose a report table to export.');
+                if (table.unavailable) throw new Error(table.unavailable);
+                content = renderReportTableCsv(table.table);
+            } catch (error) {
+                setChartApplyFeedback({level: 'warning', message: error.message});
+                return;
+            }
+        } else {
+            if (!Array.isArray(selectedColumns) || selectedColumns.length === 0 || !Array.isArray(exportCollection) || exportCollection.length === 0) return;
+            const lines = [selectedColumns.map((column) => escapeCsvCell(column.label || column.key)).join(",")];
+            exportCollection.forEach((row) => {
+                lines.push(selectedColumns.map((column) => {
+                    const raw = resolveReportBuilderCellValue(row, column);
+                    return escapeCsvCell(column.kind === "measure" ? formatDashboardValue(raw, column.format, locale) : raw);
+                }).join(","));
+            });
+            content = lines.join("\n");
         }
-        const lines = [selectedColumns.map((column) => escapeCsvCell(column.label || column.key)).join(",")];
-        exportCollection.forEach((row) => {
-            lines.push(selectedColumns.map((column) => {
-                const raw = resolveReportBuilderCellValue(row, column);
-                return escapeCsvCell(column.kind === "measure"
-                    ? formatDashboardValue(raw, column.format, locale)
-                    : raw);
-            }).join(","));
-        });
-        const blob = new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+        const blob = new Blob(["\ufeff" + content], { type: "text/csv;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         const ts = new Date().toISOString().replace(/[:.]/g, "-");
@@ -11686,7 +11703,7 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-    }, [container?.id, exportCollection, locale, selectedColumns]);
+    }, [authoredCsvTables, container?.id, exportCollection, locale, selectedColumns]);
 
     const openCompactSheet = React.useCallback((tab = "scope") => {
         setCompactChartSheetOpen(false);
@@ -16133,14 +16150,23 @@ function ReportBuilderReady({ container: sourceContainer, context, embedded = nu
                     icon="th-list"
                     text="CSV"
                     disabled={!canDownloadCsv}
-                    onClick={closeAndRun(downloadCsv)}
-                />
+                    onClick={authoredCsvTables.length > 1 ? undefined : closeAndRun(downloadCsv)}
+                >
+                    {authoredCsvTables.length > 1 ? authoredCsvTables.map(table => <MenuItem
+                        key={table.id}
+                        text={table.label}
+                        title={table.unavailable || undefined}
+                        disabled={!!table.unavailable}
+                        onClick={closeAndRun(() => downloadCsv(table.id))}
+                    />) : null}
+                </MenuItem>
             </Menu>
         );
     }, [
         downloadDraftExportArtifact,
         downloadDraftXlsxExportArtifact,
         downloadCsv,
+        authoredCsvTables,
         draftExportActionState?.submitDisabled,
         draftExportRequest,
         draftPdfFormatLabel,
