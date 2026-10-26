@@ -6,7 +6,9 @@ whole-file bytes. The handler must return a sanitized final parameter map for
 the configured writer. File references are for local preparation, not connector
 serialization. Both Go model validation and the control reject this transport
 when the command has no preparation handler. Existing `mcpBlob` behavior remains
-the default.
+the default. That legacy name describes a serialized file shape, not a network
+transport. Forge does not implement an MCP adapter; the host application owns
+its connector and protocol integration.
 
 Hosts can import `transferFileChunks` from `forge/core`. It reads one browser file
 slice at a time, base64-encodes only that part, awaits the application's admitted

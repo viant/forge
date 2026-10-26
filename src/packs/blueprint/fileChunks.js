@@ -1,4 +1,4 @@
-import {fileToMCPBlob} from './fileBlob.js';
+import {fileToBlob} from './fileBlob.js';
 
 const abort = signal => {
   if (signal?.aborted) throw new DOMException('File transfer was aborted.', 'AbortError');
@@ -16,7 +16,7 @@ export async function transferFileChunks(file, {chunkBytes, append, signal, onPr
     abort(signal);
     const end = Math.min(offset + chunkBytes, file.size);
     const part = file.slice(offset, end);
-    const blob = await fileToMCPBlob(part);
+    const blob = await fileToBlob(part);
     abort(signal);
     // Browsers normally guarantee slice lengths. Reject custom/short reads
     // rather than accepting an acknowledgement for bytes that were not sent.
