@@ -4,6 +4,7 @@ import { Icon } from "@blueprintjs/core";
 
 import { useDataSourceState } from "../../hooks/useDataSourceState.js";
 import { resolveKey } from "../../utils/selector.js";
+import {formatDataSourceError} from '../../utils/dataSourceError.js';
 import { resolveTableLink } from "../../utils/tableLink.js";
 import { getDashboardFilterSignal, getDashboardSelectionSignal } from "../../core/store/signals.js";
 import { matchingRules, mergeClassNames, mergeStyles, normalizeRuleList } from "../table/formattingRules.js";
@@ -19,6 +20,8 @@ import { buildTableRuntimeColumns } from "./tableCellVisuals.js";
 import { withFrozenIdentifierColumn } from "./tableFrozenIdentifier.js";
 import { renderDashboardTableCell, titleizeDashboardKey } from "./dashboardVisualUtils.jsx";
 import { clampPresentationText, normalizePresentationClampConfig, normalizePresentationText } from "../../utils/presentationText.js";
+import "./documentTable.css";
+import {documentTableLayout} from "./documentTable.js";
 import { buildDashboardTableLayout } from "./dashboardTableLayout.js";
 import { compareDashboardTableValues } from "./dashboardTableSort.js";
 
@@ -95,6 +98,8 @@ export default function DashboardTableContent({
         [container.dashboard?.table?.formattingRules, container.dashboard?.table?.formatting, container.formattingRules]
     );
 
+    const documentTable = container.tablePresentation?.variant === 'document';
+    if (container.tablePresentation?.variant && !documentTable) throw new Error(`Unsupported table variant: ${container.tablePresentation.variant}`);
     const rawColumns = container.dashboard?.table?.columns || container.columns || [];
     const normalizedColumns = useMemo(() => rawColumns.map((col) => {
         if (typeof col === 'string') {
@@ -119,9 +124,12 @@ export default function DashboardTableContent({
             cellVisual: col?.cellVisual,
             frozen: col?.frozen === true,
             width: col?.width,
+            minWidth: col?.minWidth,
+            flex: col?.flex,
+            statusPresentation: documentTable ? 'text' : col?.statusPresentation,
             labelClamp: normalizePresentationClampConfig(col?.labelClamp || container.dashboard?.table?.labelClamp || container.labelClamp),
         };
-    }).filter((col) => !!col.key), [rawColumns]);
+    }).filter((col) => !!col.key), [rawColumns, documentTable]);
 
     const filteredCollection = useMemo(() => {
         const afterFilters = applyDashboardFiltersToCollection(collection || [], container.filterBindings, dashboardFilters);
@@ -142,7 +150,7 @@ export default function DashboardTableContent({
         () => buildTableRuntimeColumns(normalizedColumns, quickFilteredCollection),
         [normalizedColumns, quickFilteredCollection],
     );
-    const displayColumns = useMemo(() => withFrozenIdentifierColumn(runtimeColumns), [runtimeColumns]);
+    const displayColumns = useMemo(() => documentTable ? runtimeColumns.map(column => ({...column, frozen: false})) : withFrozenIdentifierColumn(runtimeColumns), [runtimeColumns, documentTable]);
     const mobileTitleColumn = mobileCards
         ? displayColumns.find((column) => column.key === mobileCards.titleField)
         : null;
@@ -152,10 +160,10 @@ export default function DashboardTableContent({
     const mobileCardColumns = mobileCards
         ? mobileFieldKeys.map((key) => displayColumns.find((column) => column.key === key)).filter(Boolean)
         : [];
-    const tableLayout = useMemo(() => buildDashboardTableLayout(displayColumns, {
+    const tableLayout = useMemo(() => (documentTable ? documentTableLayout : buildDashboardTableLayout)(displayColumns, {
         multiSelect,
         hasRowActions: rowActions.length > 0,
-    }), [displayColumns, multiSelect, rowActions.length]);
+    }), [displayColumns, multiSelect, rowActions.length, documentTable]);
 
     const [sortKey, setSortKey] = useState(() => initialPresentationState?.sort?.key || null);
     const [sortDir, setSortDir] = useState(() => initialPresentationState?.sort?.direction === 'desc' ? 'desc' : 'asc');
@@ -230,9 +238,9 @@ export default function DashboardTableContent({
 
     return (
         <>
-            {loading ? <div style={subtitleStyle}>Loading…</div> : null}
-            {error ? <div style={{...subtitleStyle, color: 'var(--forge-status-danger-foreground, #a82a2a)'}}>{String(error)}</div> : null}
-            {!loading && !error && sortedRows.length === 0 ? <div style={subtitleStyle}>No data.</div> : null}
+            {loading ? <div role="status" style={subtitleStyle}>Loading…</div> : null}
+            {error ? <div role="alert" style={{...subtitleStyle, color: 'var(--forge-status-danger-foreground, #a82a2a)'}}>{formatDataSourceError(error)}</div> : null}
+            {!loading && !error && sortedRows.length === 0 ? <div role="status" style={subtitleStyle}>No data.</div> : null}
             {quickFilterEnabled ? (
                 <div className="forge-dashboard-table-tools">
                     <input
@@ -240,6 +248,7 @@ export default function DashboardTableContent({
                         className="forge-dashboard-search"
                         value={quickFilter}
                         placeholder="Quick filter rows..."
+                        aria-label="Filter table rows"
                         onChange={(event) => setQuickFilter(event.target.value)}
                     />
                     <span style={subtitleStyle}>{allSortedRows.length} rows</span>
@@ -251,7 +260,7 @@ export default function DashboardTableContent({
                     <div className={`forge-dashboard-table-scroll-hint${mobileCards ? ' forge-dashboard-table-scroll-hint--mobile-cards' : ''}`}>Scroll horizontally to view all columns</div>
                 ) : null}
                 <div
-                    className={`forge-dashboard-table-wrap${mobileCards ? ' forge-dashboard-table-wrap--mobile-cards' : ''}`}
+                    className={`forge-dashboard-table-wrap${documentTable ? ' forge-document-table-wrap' : ''}${mobileCards ? ' forge-dashboard-table-wrap--mobile-cards' : ''}`}
                     role={tableLayout.horizontallyScrollable ? "region" : undefined}
                     aria-label={tableLayout.horizontallyScrollable ? "Scrollable data table" : undefined}
                     tabIndex={tableLayout.horizontallyScrollable ? 0 : undefined}
@@ -259,13 +268,13 @@ export default function DashboardTableContent({
                 >
                     <table className={[
                         "forge-dashboard-table",
-                        "forge-dashboard-table--frozen-identifier",
+                        documentTable ? "forge-document-table" : "forge-dashboard-table--frozen-identifier",
                         density === "compact" ? "forge-dashboard-table--compact" : "",
                         rowActions.length > 0 ? "forge-dashboard-table--has-actions" : "",
                     ].filter(Boolean).join(" ")} style={{minWidth: `${tableLayout.minWidth}px`}}>
                         <colgroup>
                             {multiSelect ? <col style={{width: `${tableLayout.selectionWidth}px`}} /> : null}
-                            {tableLayout.columnWidths.map((columnWidth, index) => <col key={`column-width-${displayColumns[index]?.key || index}`} style={{width: `${columnWidth}px`}} />)}
+                            {tableLayout.columnWidths.map((columnWidth, index) => <col key={`column-width-${displayColumns[index]?.key || index}`} style={columnWidth ? {width: `${columnWidth}px`} : undefined} />)}
                             {rowActions.length > 0 ? <col style={{width: `${tableLayout.actionsWidth}px`}} /> : null}
                         </colgroup>
                         <thead>

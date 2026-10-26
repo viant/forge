@@ -14,6 +14,10 @@ kind: dashboard.editableTable
 allowAdd: true
 allowRemove: false
 quickFilter: false
+tablePresentation:
+  variant: document
+  removeIcon: lucide:x
+  rowDetails: {field: notes, label: Notes}
 minRows: 1
 pageSize: 10
 addRow:
@@ -31,10 +35,14 @@ mobileCards:
 columns:
   - key: effectiveAt
     label: Effective At
+    flex: true
+    minWidth: 240
     frozen: true
     editor: {type: date}
   - key: quantity
     label: Quantity
+    width: 104
+    align: right
     cardLabel: Required Quantity
     tooltip: Quantity to allocate
     required: true
@@ -68,6 +76,9 @@ columns:
 	}
 	if column := container.Columns[1]; column.CardLabel != "Required Quantity" || column.Tooltip != "Quantity to allocate" || !column.Required {
 		t.Fatalf("editable-table column presentation was truncated: %#v", column)
+	}
+	if container.TablePresentation == nil || container.TablePresentation.Variant != "document" || container.TablePresentation.RowDetails.Field != "notes" || container.TablePresentation.RemoveIcon != "lucide:x" || !container.Columns[0].Flex || container.Columns[0].MinWidth != 240 || container.Columns[1].Width != 104 || container.Columns[1].Align != "right" {
+		t.Fatal("document table metadata was truncated")
 	}
 	encoded, err := json.Marshal(container)
 	if err != nil {

@@ -1,0 +1,151 @@
+/* Shared anatomy. Workspaces select the palette, scale and table recipes. */
+.forge-document-table-wrap {
+    container-type: inline-size;
+    overflow-x: auto;
+    border: var(--forge-border-width, 1px) solid var(--forge-table-border, var(--forge-border-color, #d8dce2));
+    border-radius: var(--forge-control-radius, 8px);
+    background: var(--forge-surface, #fff);
+}
+.forge-document-table-wrap:focus-visible {
+    outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color, #5f6b7c);
+    outline-offset: var(--forge-focus-offset, 2px);
+}
+.forge-document-table-wrap .forge-document-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    background: var(--forge-surface, #fff);
+    color: var(--forge-text-secondary, #39424e);
+    font-family: var(--forge-type-body-family, inherit);
+    font-size: var(--forge-type-body-size, var(--forge-default-type-body-size));
+    font-weight: var(--forge-type-body-weight, 400);
+    line-height: var(--forge-type-body-line-height, var(--forge-default-type-body-line-height));
+    letter-spacing: var(--forge-type-body-letter-spacing, normal);
+    font-variant-numeric: tabular-nums;
+}
+.forge-document-table-wrap .forge-document-table :is(th, td) {
+    min-width: 0;
+    max-width: none;
+    padding: var(--forge-table-cell-padding-block, 10px) var(--forge-spacing-3, 12px);
+    border: 0;
+    border-bottom: var(--forge-border-width, 1px) solid var(--forge-table-border, var(--forge-border-color, #d8dce2));
+    vertical-align: middle;
+    overflow-wrap: break-word;
+    text-align: left;
+}
+.forge-document-table-wrap .forge-document-table th {
+    background: var(--forge-table-header-surface, var(--forge-surface-subtle, #f7f8fa));
+    color: var(--forge-text-muted, #5f6b7c);
+    font-family: var(--forge-type-metadata-family, inherit);
+    font-size: var(--forge-table-header-size, var(--forge-type-metadata-size, 12px));
+    font-weight: var(--forge-table-header-weight, var(--forge-type-metadata-weight, 500));
+    line-height: var(--forge-table-header-line-height, var(--forge-type-metadata-line-height, 18px));
+    letter-spacing: var(--forge-type-metadata-letter-spacing, normal);
+    text-transform: none;
+    white-space: normal;
+}
+.forge-document-table-wrap .forge-document-table td { background: var(--forge-surface, #fff); }
+.forge-document-table-wrap .forge-document-table tr:last-child td { border-bottom: 0; }
+.forge-document-table-wrap .forge-document-table .forge-dashboard-table-cell-text {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+    white-space: normal;
+}
+.forge-document-table-wrap .forge-document-table :is(input, select, textarea) {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    min-height: var(--forge-control-height, 36px);
+    border: var(--forge-border-width, 1px) solid var(--forge-table-control-border, var(--forge-control-border, #c8ced8));
+    border-radius: var(--forge-table-control-radius, var(--forge-control-radius, 8px));
+    background: var(--forge-control-bg, #fff);
+    color: var(--forge-control-text, #39424e);
+    padding: var(--forge-table-control-padding, var(--forge-spacing-2, 8px));
+    font: inherit;
+    letter-spacing: inherit;
+}
+.forge-document-table-wrap .forge-document-table textarea {
+    display: block;
+    field-sizing: content;
+    resize: none;
+    overflow: hidden;
+}
+.forge-document-table-wrap .forge-document-table td:first-child :is(input, textarea) {
+    font-family: var(--forge-type-label-family, inherit);
+    font-size: var(--forge-type-label-size, inherit);
+    font-weight: var(--forge-type-label-weight, inherit);
+    line-height: var(--forge-type-label-line-height, inherit);
+    letter-spacing: var(--forge-type-label-letter-spacing, inherit);
+}
+.forge-document-table-wrap .forge-document-table [data-column-align="right"],
+.forge-document-table-wrap .forge-document-table [data-column-align="right"] input { text-align: right; }
+.forge-document-table-wrap .forge-document-table :is(input, select, textarea):focus-visible {
+    border-color: var(--forge-focus-color, #5f6b7c);
+    outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color, #5f6b7c);
+    outline-offset: var(--forge-focus-offset, 2px);
+}
+.forge-document-table-wrap .forge-document-table .forge-table-has-details td { border-bottom: 0; padding-bottom: var(--forge-spacing-1, 4px); }
+.forge-document-table-wrap .forge-document-table .forge-table-row-details td { padding-top: 0; padding-bottom: var(--forge-table-details-padding-block, 14px); }
+.forge-table-row-details__content {
+    position: sticky;
+    left: var(--forge-spacing-3, 12px);
+    width: calc(100cqw - 2 * var(--forge-spacing-3, 12px) - 2px);
+    max-width: none;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    color: var(--forge-text-muted, #5f6b7c);
+    line-height: var(--forge-table-details-line-height, inherit);
+}
+.forge-document-table-wrap .forge-editable-collection__actions button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: var(--forge-control-radius, 8px);
+    background: transparent;
+    color: var(--forge-text-muted, #5f6b7c);
+    cursor: pointer;
+}
+.forge-document-table-wrap .forge-editable-collection__actions { padding-inline: 6px; }
+.forge-document-table-wrap .forge-editable-collection__actions button:hover:not(:disabled) { background: var(--forge-surface-subtle, #f7f8fa); }
+.forge-document-table-wrap .forge-editable-collection__actions button:focus-visible { outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color, #5f6b7c); }
+.forge-document-table-wrap .forge-editable-collection__actions button:disabled { opacity: .5; cursor: default; }
+
+/* Native controls retain their labels, keyboard order and geometry at rest. */
+.forge-document-table-wrap .forge-document-table :is(input, select, textarea):not(:disabled):not([readonly]) {
+    width: calc(100% + 2 * var(--forge-spacing-2, 8px));
+    margin-inline: calc(-1 * var(--forge-spacing-2, 8px));
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+}
+.forge-document-table-wrap .forge-document-table td[data-read-only] { color: var(--forge-text-muted, inherit); }
+.forge-document-table-wrap .forge-document-table tr:focus-within td { background: var(--forge-surface-subtle, inherit); }
+@media (hover: hover) {
+    .forge-document-table-wrap .forge-document-table tr:hover td { background: var(--forge-surface-subtle, inherit); }
+    .forge-document-table-wrap .forge-document-table :is(input, select, textarea):hover:not(:disabled):not([readonly]) {
+        border-color: var(--forge-table-control-border, var(--forge-control-border));
+        background: var(--forge-control-bg, var(--forge-surface));
+    }
+    .forge-document-select:hover .forge-icon { opacity: 1; }
+}
+.forge-document-table-wrap .forge-document-table :is(input, select, textarea):focus:not(:disabled):not([readonly]) {
+    border-color: var(--forge-focus-color);
+    background: var(--forge-control-bg, var(--forge-surface));
+    outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color);
+    outline-offset: var(--forge-focus-offset, 2px);
+}
+.forge-document-table input[type=number] { appearance: textfield; }
+.forge-document-table input[type=number]::-webkit-inner-spin-button,
+.forge-document-table input[type=number]::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.forge-document-select { display: inline-block; position: relative; width: calc(100% + 2 * var(--forge-spacing-2, 8px)); margin-inline: calc(-1 * var(--forge-spacing-2, 8px)); }
+.forge-document-table-wrap .forge-document-select select:not(:disabled):not([readonly]) { width: 100%; margin-inline: 0; appearance: none; padding-inline-end: calc(4 * var(--forge-spacing-2, 8px)); }
+.forge-document-select .forge-icon { position: absolute; pointer-events: none; inset-inline-end: var(--forge-control-padding-inline, 10px); top: 50%; transform: translateY(-50%); opacity: 0; }
+.forge-document-select:focus-within .forge-icon { opacity: 1; }
+@media (pointer: coarse) {
+    .forge-document-table-wrap .forge-document-table :is(input, select, textarea) { min-height: 44px; }
+}

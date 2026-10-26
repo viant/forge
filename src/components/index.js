@@ -67,3 +67,7 @@ export {default as ReleaseManager} from './primitives/ReleaseManager.jsx';
 export {RetainedWindowContent, PersistentWindowContent, WindowContentMount} from './WindowContentMount.jsx';
 
 export {default as WorkspaceRuntimeSurface, WorkspaceRuntimeTabs, WorkspaceRuntimePanels} from './WorkspaceRuntimeSurface.jsx';
+
+export {default as Typography, typographyProps, typographyRoles} from './Typography.jsx';
+export {default as Button, buttonVariants, buttonSizes} from './Button.jsx';
+export {default as Icon, iconNames} from './Icon.jsx';
