@@ -207,7 +207,7 @@ export function TableExportControl({context, item, align, disabled = false, rows
         }, 0);});
     };
     return (
-        <span key={`table-export-${item.id}-${align}`} className="forge-toolbar-table-export" style={align === 'right' ? {marginLeft: 10} : {marginRight: 10}} aria-busy={busy || undefined}>
+        <span key={`table-export-${item.id}-${align}`} className={`forge-toolbar-table-export ${align === 'right' ? 'is-aligned-right' : 'is-aligned-left'}`} aria-busy={busy || undefined}>
             <RegisteredPopover context={context} item={item} disabled={exportDisabled} renderContent={close=>(
                     <Menu className="forge-toolbar-select-menu" aria-label={`${item.label || 'Export'} formats`}>
                         {formats.map((format) => (
