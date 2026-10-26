@@ -4,6 +4,17 @@ This Forge Go package embeds the canonical report builder, ReportDocument lowere
 
 Schema version 1 authored envelopes require a complete matching builder, document, state, trusted datasource descriptor map and complete dependency fingerprints. The materializer checks exact builder/descriptor bytes, duplicate JSON fields, the output datasource closure, size limits and context cancellation; execution has a five second bound. The consuming host must still authorize the selected resource, run its ReportSpec compiler, apply datasource admission, and recheck the pinned resource before releasing output. This helper does not grant execution permission or synthesize authenticated request parameters.
 
+Trusted lowering also validates authored chart fields against the chart's own
+dataset catalog before fetching any data. Child datasets need explicit
+`columnOptions`, or an explicit `capabilities.inheritRuntimeFieldCatalog` opt-in
+when they intentionally share the parent catalog. Missing/wrong-kind fields
+produce `AuthoredChartValidationError` with bounded block, dataset and field
+locations through `AuthoredChartValidationDiagnostics()`. The engine projects
+these into its existing `Diagnostic` shape through `ReportChartDiagnostics()`;
+hosts can supply source repair guidance without parsing exception text. No
+diagnostic fields are added to the canonical ReportSpec. Valid empty datasets
+remain valid: source field compatibility does not depend on result rows.
+
 Install the root UI dependencies using its lockfile, then run
 `npm ci --ignore-scripts` in this package. Build with `npm run build` from this
 package. The tracked entry adapter imports the canonical Forge builder, lowerer,

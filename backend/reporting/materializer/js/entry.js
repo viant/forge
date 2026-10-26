@@ -11,7 +11,8 @@ import "@formatjs/intl-numberformat/locale-data/en.js";
 import "@formatjs/intl-datetimeformat/polyfill-force.js";
 import "@formatjs/intl-datetimeformat/locale-data/en.js";
 import "@formatjs/intl-datetimeformat/add-all-tz.js";
-import {buildReportBuilderReportDocument, lowerReportDocumentToReportSpec} from "../../../../src/reporting/reportDocumentModel.js";
+import {buildReportBuilderReportDocument} from "../../../../src/reporting/reportDocumentModel.js";
+import {lowerValidatedReportDocument} from "../../../../src/reporting/reportChartValidation.js";
 import {buildReportFillFromReportSpec} from "../../../../src/reporting/reportFillModel.js";
 import {buildReportPrintFromReportFill} from "../../../../src/reporting/reportPrintModel.js";
 import {normalizeReportBuilderPredicates} from "../../../../src/components/dashboard/reportBuilderPredicates.js";
@@ -125,12 +126,12 @@ import {mapReportRequestEnvelope, reportRequestWindowIdentity} from "../../../..
     if (typeof envelopeJSON !== "string") throw new Error("Authored report input must be JSON text.");
     const envelope = JSON.parse(envelopeJSON);
     const document = authoredReportDocument(envelope);
-    return JSON.stringify(lowerReportDocumentToReportSpec(document));
+    return JSON.stringify(lowerValidatedReportDocument(document));
   }
   export function lowerWithRequestBase(inputJSON) {
     const input = JSON.parse(inputJSON);
     const document = authoredReportDocument(input.envelope, input.requestBaseParameters);
-    return JSON.stringify(lowerReportDocumentToReportSpec(document));
+    return JSON.stringify(lowerValidatedReportDocument(document));
   }
   export function materialize(inputJSON, stage) {
     stage?.("parse");
