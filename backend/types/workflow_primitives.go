@@ -156,15 +156,17 @@ type WizardStep struct {
 }
 
 type UploadCollectionSpec struct {
-	Accept        []string         `json:"accept,omitempty" yaml:"accept,omitempty"`
-	Multiple      *bool            `json:"multiple,omitempty" yaml:"multiple,omitempty"`
-	MaxFiles      int              `json:"maxFiles,omitempty" yaml:"maxFiles,omitempty"`
-	MaxBytes      int64            `json:"maxBytes,omitempty" yaml:"maxBytes,omitempty"`
-	Transport     string           `json:"transport,omitempty" yaml:"transport,omitempty"` // mcpBlob
-	BlobField     string           `json:"blobField,omitempty" yaml:"blobField,omitempty"`
-	MetadataField string           `json:"metadataField,omitempty" yaml:"metadataField,omitempty"`
-	EmptyMessage  string           `json:"emptyMessage,omitempty" yaml:"emptyMessage,omitempty"`
-	Upload        *MutationCommand `json:"upload" yaml:"upload"`
+	Accept              []string         `json:"accept,omitempty" yaml:"accept,omitempty"`
+	Multiple            *bool            `json:"multiple,omitempty" yaml:"multiple,omitempty"`
+	MaxFiles            int              `json:"maxFiles,omitempty" yaml:"maxFiles,omitempty"`
+	MaxBytes            int64            `json:"maxBytes,omitempty" yaml:"maxBytes,omitempty"`
+	Transport           string           `json:"transport,omitempty" yaml:"transport,omitempty"` // mcpBlob
+	BlobField           string           `json:"blobField,omitempty" yaml:"blobField,omitempty"`
+	MetadataField       string           `json:"metadataField,omitempty" yaml:"metadataField,omitempty"`
+	EmptyMessage        string           `json:"emptyMessage,omitempty" yaml:"emptyMessage,omitempty"`
+	ReplaceConfirmation string           `json:"replaceConfirmation,omitempty" yaml:"replaceConfirmation,omitempty"`
+	RetainOnSuccess     bool             `json:"retainOnSuccess,omitempty" yaml:"retainOnSuccess,omitempty"`
+	Upload              *MutationCommand `json:"upload" yaml:"upload"`
 }
 
 type DerivedDataSourceSpec struct {
