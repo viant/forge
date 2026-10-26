@@ -10,6 +10,7 @@ export * from './context/WorkspacePresentation.jsx';
 
 export * from './preferences/tablePreferences.js';
 export * from './preferences/tableViews.js';
+export {transferFileChunks} from '../packs/blueprint/fileChunks.js';
 export {captureWindowStateAdoption, waitForWindowStateAdoption} from '../runtime/windowStateAdoption.js';
 
 export {registerContainerRenderer} from '../runtime/containerRendererRegistry.js';

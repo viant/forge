@@ -14,3 +14,11 @@ const duplicateNames = await encodeUploadFiles([
 ]);
 assert.deepEqual(duplicateNames.files.map((file) => file.data), ['AQ==', 'Ag==']);
 console.log('upload collection MCP blob proof passed');
+
+let reads = 0;
+const nativeFile = {name: 'large.csv', size: 4_096_000_000, arrayBuffer: () => {reads++; throw Error('whole-file read');}};
+const references = await encodeUploadFiles([nativeFile], {transport: 'files', multiple: false, upload: {prepare: 'Upload.transfer'}});
+assert.equal(references.files, nativeFile);
+assert.equal(references.transport, 'files');
+assert.equal(reads, 0);
+await assert.rejects(() => encodeUploadFiles([nativeFile], {transport: 'files'}), /preparation handler/);
