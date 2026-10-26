@@ -31,7 +31,7 @@ type WindowSourceManifest struct {
 	Files   map[string]string `json:"files"`
 }
 
-// CompileWindowSource uses the same native loader as Steward. The temporary
+// CompileWindowSource uses the shared native workspace loader. The temporary
 // workspace is private to this compilation, contains only supplied files, and
 // is deleted before return. It performs no network or business-data operation.
 // Hosts must persist the manifest alongside the returned derived runtime bytes.

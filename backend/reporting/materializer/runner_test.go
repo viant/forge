@@ -12,10 +12,10 @@ import (
 	"time"
 )
 
-func TestStewardAuthoredReports(t *testing.T) {
-	paths, err := filepath.Glob("testdata/steward/*.json")
+func TestSyntheticAuthoredReports(t *testing.T) {
+	paths, err := filepath.Glob("testdata/synthetic/*.json")
 	if err != nil || len(paths) != 10 {
-		t.Fatalf("expected ten actual envelopes: %v %d", err, len(paths))
+		t.Fatalf("expected ten synthetic envelopes: %v %d", err, len(paths))
 	}
 	for _, path := range paths {
 		t.Run(filepath.Base(path), func(t *testing.T) {
@@ -38,7 +38,7 @@ func TestStewardAuthoredReports(t *testing.T) {
 	}
 }
 func TestRejectChangedDescriptorAndBuilder(t *testing.T) {
-	paths, _ := filepath.Glob("testdata/steward/*.json")
+	paths, _ := filepath.Glob("testdata/synthetic/*.json")
 	raw, _ := os.ReadFile(paths[0])
 	var e registry.ReportEnvelope
 	_ = json.Unmarshal(raw, &e)

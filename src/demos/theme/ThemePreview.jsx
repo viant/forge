@@ -1,4 +1,7 @@
 import React, {useState} from 'react';
+import TypographySpecimen from './TypographySpecimen.jsx';
+import FoundationSpecimen from './FoundationSpecimen.jsx';
+import Typography from '../../components/Typography.jsx';
 import {createRoot} from 'react-dom/client';
 import {Button, Popover, Dialog} from '@blueprintjs/core';
 import '@blueprintjs/core/lib/css/blueprint.css';
@@ -28,6 +31,8 @@ function App() {
         <p role="status">{portalStatus}</p>
         <ForgeThemeProvider themeId="baseline" mode={mode} portalContainer={portalRoot}>
             {active && <ForgeThemeBoundary windowKey="theme-proof?instance=1">
+                <FoundationSpecimen/>
+                <TypographySpecimen/>
                 <div style={{padding: 24, display: 'grid', gap: 16, maxWidth: 500}}>
                     {input('customer', 'text', {wrapper: unwrapped ? 'none' : undefined})}
                     {input('amount', 'number')}
@@ -36,7 +41,7 @@ function App() {
                     {input('invalid', 'text', {required: true})}
                     {input('save', 'button')}
                     {input('disabled-button', 'button', {disabled: true})}
-                    <Popover content={<div style={{padding: 16}}>{input('portal', 'text')}<Button onClick={() => setDialogOpen(true)}>Open dialog</Button></div>}>
+                    <Popover content={<div style={{padding: 16}}><Typography typeRole="metadata">Portal metadata</Typography>{input('portal', 'text')}<Button onClick={() => setDialogOpen(true)}>Open dialog</Button></div>}>
                         <Button>Open popup</Button>
                     </Popover>
                     <Dialog isOpen={dialogOpen} onClose={() => setDialogOpen(false)} title="Theme dialog">
