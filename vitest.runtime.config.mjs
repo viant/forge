@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: [
+      'src/components/primitives/UploadCollection.render.test.jsx',
+      'src/components/table/TableViewPresets.render.test.jsx',
       'src/components/control/ProgressBar.render.test.jsx',
       'src/components/lookup/LookupPickerDialog.render.test.jsx',
       'src/components/table/Basic.autoFetch.render.test.jsx',

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import './SettingsDialog.css';
+import TableViewPresets from './TableViewPresets.jsx';
 import {
     Button,
     Checkbox,
@@ -21,6 +22,8 @@ const SettingsDialog = ({
                             isOpen,
                             onClose,
                             columns,
+                            baseColumns = columns,
+                            savedViews,
                             density = 'normal',
                             onSaveColumnSettings,
                             onResetColumns,
@@ -174,6 +177,8 @@ const SettingsDialog = ({
             className="forge-table-settings"
         >
             <DialogBody>
+                {savedViews && <TableViewPresets model={savedViews} columns={localColumns} baseColumns={baseColumns} density={localDensity}
+                    onApply={(nextColumns, preferences) => {setLocalColumns(nextColumns); setLocalDensity(preferences.density || density);}}/>}
                 <FormGroup label="Density" labelFor="table-preference-density"><HTMLSelect id="table-preference-density" value={localDensity} onChange={event=>setLocalDensity(event.target.value)} options={[{label:'Compact',value:'compact'},{label:'Normal',value:'normal'}]}/></FormGroup>
                 <Tabs id="settings-tabs" selectedTabId={selectedTabId} onChange={handleTabChange} animate={false}>
                     <Tab id="visibility" title="Visibility" panel={renderVisibilityPanel()} />
