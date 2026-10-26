@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import TypographySpecimen from './TypographySpecimen.jsx';
+import ChartSpecimen from './ChartSpecimen.jsx';
 import FoundationSpecimen from './FoundationSpecimen.jsx';
 import Typography from '../../components/Typography.jsx';
 import {createRoot} from 'react-dom/client';
@@ -33,6 +34,7 @@ function App() {
             {active && <ForgeThemeBoundary windowKey="theme-proof?instance=1">
                 <FoundationSpecimen/>
                 <TypographySpecimen/>
+                <ChartSpecimen/>
                 <div style={{padding: 24, display: 'grid', gap: 16, maxWidth: 500}}>
                     {input('customer', 'text', {wrapper: unwrapped ? 'none' : undefined})}
                     {input('amount', 'number')}

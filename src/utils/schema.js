@@ -172,6 +172,8 @@ export function jsonSchemaToFields(schema, { mappers = [] } = {}) {
             widget,
             lookup: p.lookup,
             group: p['x-ui-group'] || '',
+            properties: p['x-ui-properties'],
+            ...(p['x-ui-hide-label'] === true ? {hideLabel: true} : {}),
             order: p['x-ui-order'] || 0,
             columnSpan:
                 p['x-ui-span'] ??

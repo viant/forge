@@ -14,7 +14,7 @@ export function containerSizingStyle(container, allocatedMode = 'fill', {chrome 
         minWidth: !chrome ? style.minWidth ?? 0 : 0,
         minHeight: !chrome ? style.minHeight ?? 0 : 0,
         ...(!chrome && style.maxWidth != null ? {maxWidth: style.maxWidth} : {}),
-        display: !chrome && hasContainerClass(container, 'forge-container-hidden') ? undefined : 'flex', flexDirection: 'column',
+        display: !chrome && (container.appearance || hasContainerClass(container, 'forge-container-hidden')) ? undefined : 'flex', flexDirection: 'column',
         flex: !chrome && style.flex != null ? style.flex : ownsHeight ? '0 0 auto' : mode === 'fill' ? '1 1 0' : '0 0 auto',
         // Only the outer boundary applies explicit dimensions. Chrome bodies
         // share the remaining space instead of repeating the parent's height.

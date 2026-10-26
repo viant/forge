@@ -1,7 +1,10 @@
 // Composer.jsx – TextArea prompt with send/upload/tools controls
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
 import { Button, Menu, MenuDivider, MenuItem, Popover, Tag, TextArea } from "@blueprintjs/core";
 import { PaperPlaneRight, Stop, Microphone, ListBullets, UserCircle, Lightbulb, Brain, ImageSquare, XCircle, CaretDown, CaretUp } from '@phosphor-icons/react';
+import DocumentComposer from './DocumentComposer.jsx';
+import {typographyProps} from '../Typography.jsx';
+import Icon from '../Icon.jsx';
 import BundlesDialog from "./BundlesDialog.jsx";
 import CameraCapture from "./CameraCapture.jsx";
 
@@ -82,6 +85,8 @@ function storeDraftForConversation(conversationId = '', draft = '') {
 }
 
 export default function Composer({
+    appearance,
+    draftKey,
     draftValue,
     onDraftChange,
     tools = [],
@@ -162,6 +167,9 @@ export default function Composer({
 		};
 	}, [getMessageHistoryProp]);
 
+    const documentAppearance = appearance === 'document';
+    if (appearance && !documentAppearance) throw new Error(`Unsupported chat appearance: ${appearance}`);
+    const inputHostRef = useRef(null);
 	const [draft, setDraft] = useState(String(draftValue || ""));
     const [composerCollapsed, setComposerCollapsed] = useState(false);
 	const [historyOpen, setHistoryOpen] = useState(false);
@@ -213,11 +221,11 @@ export default function Composer({
 	useEffect(() => {
 	    const applyPrefill = (prompt, conversationId = '') => {
 	        const targetId = String(conversationId || '').trim();
-	        const currentId = currentConversationIdFromLocation();
+	        const currentId = draftKey !== undefined ? String(draftKey) : currentConversationIdFromLocation();
 	        if (targetId && currentId && targetId !== currentId) return;
 	        const next = String(prompt || '');
 	        setDraft((prev) => {
-	            if (prev && prev.trim()) return prev;
+	            if (draftKey === undefined && prev && prev.trim()) return prev;
 	            draftRef.current = next;
 	            onDraftChange?.(next);
 	            return next;
@@ -225,6 +233,7 @@ export default function Composer({
 	    };
 
 	    const restoreCurrentDraft = (conversationId = '') => {
+	        if (draftKey !== undefined) return;
 	        const currentId = String(conversationId || currentConversationIdFromLocation()).trim();
 	        const moved = movePendingDraftToConversation(currentId);
 	        const restored = moved || consumeStoredDraft(currentId) || (!currentId ? consumeStoredDraft('__pending__') : '');
@@ -259,9 +268,10 @@ export default function Composer({
 	        window.removeEventListener(CONVERSATION_ACTIVE_EVENT, handleConversationActive);
 	        window.removeEventListener('popstate', handleConversationActive);
 	    };
-	}, []);
+	}, [draftKey, onDraftChange]);
 
 	useEffect(() => {
+	    if (draftKey !== undefined) return;
 	    storeDraftForConversation(currentConversationIdFromLocation(), draft);
 	}, [draft]);
 
@@ -622,9 +632,32 @@ export default function Composer({
 	    // eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
+    useLayoutEffect(() => {
+        if (!documentAppearance) return;
+        const input = inputHostRef.current?.querySelector('textarea, [contenteditable="true"]');
+        if (!input) return;
+        if (input.tagName !== 'TEXTAREA') return;
+        let active = true;
+        const resize = () => {
+            if (!active) return;
+            input.style.height = 'auto';
+            const minimum = parseFloat(getComputedStyle(input).minHeight) || 36;
+            input.style.height = `${Math.min(200, Math.max(minimum, input.scrollHeight))}px`;
+        };
+        resize();
+        let width = input.getBoundingClientRect().width;
+        const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
+            const next = input.getBoundingClientRect().width;
+            if (next !== width) {width = next; resize();}
+        });
+        observer?.observe(input);
+        document.fonts?.ready?.then(resize);
+        return () => {active = false; observer?.disconnect();};
+    }, [draft, documentAppearance]);
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (disabled) return; // Block submission while disabled
+        if (disabled || inputInvalid) return; // Keep lookup validation authoritative
         const resolver = inputValueResolverRef.current;
         const resolvedValue = typeof resolver === 'function' ? resolver() : '';
         const content = String(resolvedValue || draftRef.current || '').trim();
@@ -634,13 +667,17 @@ export default function Composer({
         storeDraftForConversation(currentConversationIdFromLocation(), '');
         onSubmit?.({ content, toolNames: selectedTools });
         updateDraft("");
+        if (documentAppearance) requestAnimationFrame(() => {
+            inputHostRef.current?.querySelector('textarea, [contenteditable="true"]')?.focus({preventScroll: true});
+            inputHostRef.current?.closest('[data-testid="chat-root"]')?.dispatchEvent(new CustomEvent('forge:chat-submitted', {bubbles: true}));
+        });
     };
 
     const handleComposerKeyDown = (event) => {
         if (!event) return;
         if (event.key !== 'Enter') return;
         if (event.shiftKey) return;
-        if (event.nativeEvent?.isComposing) return;
+        if (event.isComposing || event.nativeEvent?.isComposing || event.keyCode === 229) return;
         event.preventDefault();
         handleSubmit(event);
     };
@@ -1052,11 +1089,11 @@ export default function Composer({
                     <div className="composer-queue-item" key={id} data-testid={`chat-composer-queue-item-${id}`}>
                         <div className={`composer-queue-item-state${queueRunning && idx === 0 ? ' is-next' : ''}`}>
                             <span className="composer-queue-item-state-dot" aria-hidden="true" />
-                            <span className="composer-queue-item-state-label">{stateLabel}</span>
+                            <span {...(documentAppearance ? typographyProps('metadata') : {})} className="composer-queue-item-state-label">{stateLabel}</span>
                         </div>
                         <div className="composer-queue-item-main">
-                            <div className="composer-queue-item-icon" aria-hidden="true">↳</div>
-                            <div className="composer-queue-item-preview" title={preview}>{preview}</div>
+                            <div className="composer-queue-item-icon" aria-hidden="true">{documentAppearance ? <Icon icon="lucide:corner-down-right"/> : '↳'}</div>
+                            <div {...(documentAppearance ? typographyProps('body') : {})} className="composer-queue-item-preview" title={preview}>{preview}</div>
                         </div>
                         <div className="composer-queue-item-actions">
                             <Button
@@ -1064,7 +1101,7 @@ export default function Composer({
                                 minimal
                                 className="composer-queue-action composer-queue-action-primary"
                                 disabled={!queueRunning}
-                                onClick={(e) => { e.preventDefault(); onQueueForceSteer?.(t); }}
+                                onClick={(e) => { e.preventDefault(); onQueueSteer?.(t); }}
                             >
                                 Steer
                             </Button>
@@ -1072,6 +1109,7 @@ export default function Composer({
                                 small
                                 minimal
                                 icon="trash"
+                                aria-label="Remove queued request"
                                 className="composer-queue-action"
                                 onClick={(e) => { e.preventDefault(); onQueueCancel?.(t); }}
                             />
@@ -1107,6 +1145,7 @@ export default function Composer({
                                     small
                                     minimal
                                     icon="more"
+                                    aria-label="Queued request actions"
                                     className="composer-queue-action"
                                     onClick={(e) => e.preventDefault()}
                                 />
@@ -1224,15 +1263,18 @@ export default function Composer({
     const textPadRight = 32 + (rightIcons - 1) * 36; // allow room for mic + send
     const attachmentsRight = 40 + (rightIcons - 1) * 36; // overlay space for right-side icons
 
-    const renderComposerInput = ({ style, className } = {}) => (
+    const renderComposerInput = ({ style, className, documentAppearance = false, describedBy } = {}) => (
         InputComponent ? (
             <InputComponent
+                {...(documentAppearance ? typographyProps('body') : {})}
+                appearance={documentAppearance ? 'document' : undefined}
                 value={draft}
                 onChange={(next) => { updateDraft(next); updateHistorySuggestions(next); }}
                 onFocus={openHistoryOnFocus}
                 onBlur={closeHistory}
                 data-testid="chat-composer-input"
                 aria-label="Message"
+                aria-describedby={describedBy}
                 className={className}
                 placeholder="Type your message…"
                 disabled={disabled}
@@ -1240,21 +1282,25 @@ export default function Composer({
                 onValidityChange={setInputInvalid}
                 onValueResolver={(resolver) => { inputValueResolverRef.current = resolver; }}
                 multiline
-                autoResize={autoResize}
+                autoResize={documentAppearance ? false : autoResize}
+                rows={documentAppearance ? 1 : undefined}
                 style={style}
                 {...inputProps}
             />
         ) : (
             <TextArea
                 fill
+                {...(documentAppearance ? typographyProps('body') : {})}
                 placeholder="Type your message…"
                 value={draft}
-                autoResize={autoResize}
+                autoResize={documentAppearance ? false : autoResize}
+                rows={documentAppearance ? 1 : undefined}
                 onChange={(e) => { const v = e.target.value; updateDraft(v); updateHistorySuggestions(v); }}
                 onFocus={openHistoryOnFocus}
                 onBlur={closeHistory}
                 data-testid="chat-composer-input"
                 aria-label="Message"
+                aria-describedby={describedBy}
                 className={className}
                 style={style}
                 disabled={disabled}
@@ -1348,6 +1394,19 @@ export default function Composer({
 	            {String(reasoningValue || '').trim() ? `Reasoning: ${reasoningValue}` : 'Reasoning'}
 	        </Button>
 	    );
+
+        if (documentAppearance) return <DocumentComposer renderInput={renderComposerInput} inputHostRef={inputHostRef}
+            onSubmit={handleSubmit} draft={draft} attachments={attachments} onRemoveAttachment={onRemoveAttachment}
+            disabled={disabled} inputInvalid={inputInvalid} showUpload={showUpload} onOpenAttach={onOpenAttach} onCaptureImage={onCaptureImage}
+            showMic={showMic} micOn={micOn} toggleMic={toggleMic} showAbort={showAbortButton} onAbort={handleAbort}
+            submitText={submitText} queueTray={queueTray} usageSummary={usageSummary} usageTooltip={usageTooltip}
+            agentOptions={normalizedAgentOptions} agentValue={agentValue} onAgentChange={onAgentChange}
+            modelOptions={normalizedModelOptions} modelValue={modelValue} onModelChange={onModelChange}
+            reasoningOptions={reasoningOptions} reasoningValue={reasoningValue} onReasoningChange={onReasoningChange}
+            autoSelectTools={autoSelectTools} onAutoSelectToolsChange={onAutoSelectToolsChange} hasToolsPicker={hasToolsPicker}
+            openBundles={() => setBundlesOpen(true)} showSettings={showSettings} onOpenSettings={onOpenSettings}
+            bundlesDialog={<BundlesDialog isOpen={bundlesOpen} onClose={() => setBundlesOpen(false)} bundles={bundleCatalog.bundles}
+                selectedBundleIDs={selectedBundleIDs} onChange={updateSelectedBundles} disabled={disabled || !!autoSelectTools}/>}/>;
 
 	    if (commandCenter) {
 	        return (

@@ -1,7 +1,10 @@
 import React from 'react';
 import {Card, Collapse, Icon} from '@blueprintjs/core';
+import Typography from './Typography.jsx';
+import {DocumentPresentationContext} from './documentPresentation.js';
 
 export default function AccessibleSection({title = '', subtitle = '', icon, rightElement, compact = false, collapsible = true, collapseProps = {}, children, className = '', ...cardProps}) {
+    const documentPresentation = React.useContext(DocumentPresentationContext);
     const generatedId = React.useId().replace(/:/g, '');
     const contentId = `forge-section-${generatedId}`;
     const titleId = `${contentId}-title`;
@@ -25,7 +28,7 @@ export default function AccessibleSection({title = '', subtitle = '', icon, righ
                 <div className="bp6-section-header-left">
                     {icon ? <Icon icon={icon} aria-hidden="true" className="bp6-text-muted"/> : null}
                     <div>
-                        <h6 id={titleId} data-forge-part="section-title" className="bp6-heading bp6-section-header-title">{title}</h6>
+                        {documentPresentation ? <Typography as="h3" typeRole="section" id={titleId} data-forge-part="section-title" className="bp6-heading bp6-section-header-title">{title}</Typography> : <h6 id={titleId} data-forge-part="section-title" className="bp6-heading bp6-section-header-title">{title}</h6>}
                         {subtitle ? <div className="bp6-text-muted bp6-section-header-sub-title">{subtitle}</div> : null}
                     </div>
                 </div>

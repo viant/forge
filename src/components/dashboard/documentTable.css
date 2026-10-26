@@ -52,7 +52,7 @@
     -webkit-line-clamp: unset;
     white-space: normal;
 }
-.forge-document-table-wrap .forge-document-table :is(input, select, textarea) {
+.forge-document-table-wrap .forge-document-table :is(input, select, textarea):where(:not([type="checkbox"]):not([type="radio"])) {
     box-sizing: border-box;
     width: 100%;
     min-width: 0;
@@ -81,7 +81,7 @@
 }
 .forge-document-table-wrap .forge-document-table [data-column-align="right"],
 .forge-document-table-wrap .forge-document-table [data-column-align="right"] input { text-align: right; }
-.forge-document-table-wrap .forge-document-table :is(input, select, textarea):focus-visible {
+.forge-document-table-wrap .forge-document-table :is(input, select, textarea):where(:not([type="checkbox"]):not([type="radio"])):focus-visible {
     border-color: var(--forge-focus-color, #5f6b7c);
     outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color, #5f6b7c);
     outline-offset: var(--forge-focus-offset, 2px);
@@ -116,7 +116,7 @@
 .forge-document-table-wrap .forge-editable-collection__actions button:disabled { opacity: .5; cursor: default; }
 
 /* Native controls retain their labels, keyboard order and geometry at rest. */
-.forge-document-table-wrap .forge-document-table :is(input, select, textarea):not(:disabled):not([readonly]) {
+.forge-document-table-wrap .forge-document-table :is(input, select, textarea):where(:not([type="checkbox"]):not([type="radio"])):not(:disabled):not([readonly]) {
     width: calc(100% + 2 * var(--forge-spacing-2, 8px));
     margin-inline: calc(-1 * var(--forge-spacing-2, 8px));
     border-color: transparent;
@@ -127,13 +127,13 @@
 .forge-document-table-wrap .forge-document-table tr:focus-within td { background: var(--forge-surface-subtle, inherit); }
 @media (hover: hover) {
     .forge-document-table-wrap .forge-document-table tr:hover td { background: var(--forge-surface-subtle, inherit); }
-    .forge-document-table-wrap .forge-document-table :is(input, select, textarea):hover:not(:disabled):not([readonly]) {
+    .forge-document-table-wrap .forge-document-table :is(input, select, textarea):where(:not([type="checkbox"]):not([type="radio"])):hover:not(:disabled):not([readonly]) {
         border-color: var(--forge-table-control-border, var(--forge-control-border));
         background: var(--forge-control-bg, var(--forge-surface));
     }
     .forge-document-select:hover .forge-icon { opacity: 1; }
 }
-.forge-document-table-wrap .forge-document-table :is(input, select, textarea):focus:not(:disabled):not([readonly]) {
+.forge-document-table-wrap .forge-document-table :is(input, select, textarea):where(:not([type="checkbox"]):not([type="radio"])):focus:not(:disabled):not([readonly]) {
     border-color: var(--forge-focus-color);
     background: var(--forge-control-bg, var(--forge-surface));
     outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color);
@@ -142,10 +142,45 @@
 .forge-document-table input[type=number] { appearance: textfield; }
 .forge-document-table input[type=number]::-webkit-inner-spin-button,
 .forge-document-table input[type=number]::-webkit-outer-spin-button { appearance: none; margin: 0; }
-.forge-document-select { display: inline-block; position: relative; width: calc(100% + 2 * var(--forge-spacing-2, 8px)); margin-inline: calc(-1 * var(--forge-spacing-2, 8px)); }
-.forge-document-table-wrap .forge-document-select select:not(:disabled):not([readonly]) { width: 100%; margin-inline: 0; appearance: none; padding-inline-end: calc(4 * var(--forge-spacing-2, 8px)); }
-.forge-document-select .forge-icon { position: absolute; pointer-events: none; inset-inline-end: var(--forge-control-padding-inline, 10px); top: 50%; transform: translateY(-50%); opacity: 0; }
+.forge-document-select { width: calc(100% + 2 * var(--forge-spacing-2, 8px)); margin-inline: calc(-1 * var(--forge-spacing-2, 8px)); }
+.forge-document-table-wrap .forge-document-select select:not(:disabled):not([readonly]) { width: 100%; margin-inline: 0; padding-inline-end: var(--forge-select-reserved-space); }
+.forge-document-select .forge-icon { opacity: 0; }
 .forge-document-select:focus-within .forge-icon { opacity: 1; }
-@media (pointer: coarse) {
-    .forge-document-table-wrap .forge-document-table :is(input, select, textarea) { min-height: 44px; }
+.forge-document-table .forge-frequency-editor {
+    display: grid;
+    grid-template-columns: minmax(48px, 1fr) auto minmax(48px, 1fr) minmax(80px, 1.5fr);
+    align-items: center;
+    gap: var(--forge-spacing-2, 8px);
+    min-width: 0;
 }
+.forge-document-table .forge-frequency-editor > span {
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+}
+.forge-document-table-wrap .forge-document-table .forge-frequency-editor :is(input, .forge-document-select) {
+    width: 100%;
+    min-width: 0;
+    margin-inline: 0;
+}
+@media (pointer: coarse) {
+    .forge-document-table-wrap .forge-document-table :is(input, select, textarea):where(:not([type="checkbox"]):not([type="radio"])) { min-height: 44px; }
+}
+.forge-document-record-list details { border-top: var(--forge-border-width, 1px) solid var(--forge-border-color); }
+.forge-document-record-list summary { display: flex; align-items: flex-start; gap: var(--forge-spacing-2, 8px); list-style: none; padding-block: var(--forge-spacing-4, 16px); cursor: pointer; overflow-wrap: anywhere; }
+.forge-document-record-list summary::-webkit-details-marker { display: none; }
+.forge-document-record-list summary > .forge-icon { flex: none; }
+.forge-document-record-list details[open] > summary > .forge-icon { transform: rotate(90deg); }
+.forge-document-record-list summary > div { min-width: 0; }
+.forge-document-record-list summary:focus:not(:focus-visible) { outline: none; }
+.forge-document-record-list summary:focus-visible { outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color); outline-offset: calc(-1 * var(--forge-focus-width, 2px)); }
+.forge-document-record-list dl { display: grid; gap: var(--forge-spacing-2, 8px); margin: 0 0 var(--forge-spacing-5, 20px); }
+.forge-document-record-list dl > div { display: grid; grid-template-columns: minmax(100px, 140px) minmax(0, 1fr); gap: var(--forge-spacing-4, 16px); }
+.forge-document-record-list dt { color: var(--forge-text-muted); }
+.forge-document-record-list dd { margin: 0; overflow-wrap: anywhere; }
+@container (max-width: 600px) { .forge-document-record-list dl > div { grid-template-columns: minmax(0, 1fr); gap: var(--forge-spacing-1, 4px); } }
+
+.forge-document-table .forge-table-selection-target { display: inline-flex; align-items: center; justify-content: center; width: var(--forge-selection-target-size, 32px); height: var(--forge-selection-target-size, 32px); cursor: pointer; }
+.forge-document-table .forge-table-selection-target input[type="checkbox"] { box-sizing: border-box; width: var(--forge-selection-indicator-size, 16px); height: var(--forge-selection-indicator-size, 16px); min-width: var(--forge-selection-indicator-size, 16px); min-height: var(--forge-selection-indicator-size, 16px); margin: 0; padding: 0; accent-color: var(--forge-action); cursor: pointer; }
+.forge-document-table .forge-table-selection-target input:focus:not(:focus-visible) { outline: none; box-shadow: none; }
+.forge-document-table .forge-table-selection-target input:focus-visible { outline: var(--forge-focus-width, 2px) solid var(--forge-focus-color, var(--forge-action)); outline-offset: var(--forge-focus-offset, 2px); }

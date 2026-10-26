@@ -294,6 +294,7 @@ function buildTableProjection(block, prefix, key = "table") {
     title: normalizeString(block?.title || "Table") || "Table",
     datasetRef: ref,
     columns,
+    ...(block.selection !== undefined ? {selection:cloneValue(block.selection)} : {}),
     ...(Array.isArray(block?.content?.formattingRules || block?.formattingRules)
       ? { formattingRules: cloneValue(block?.content?.formattingRules || block.formattingRules) }
       : {}),

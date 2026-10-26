@@ -1,6 +1,6 @@
 import {resolveSectionAppearance} from './containerChrome.js';
 
-const GRID_LAYOUT_APPEARANCES = new Set(['divided-sections']);
+const GRID_LAYOUT_APPEARANCES = new Set(['divided-sections', 'document-flow']);
 
 export function resolveGridLayoutAppearance(layout = {}) {
     const candidate = String(layout?.appearance || '').trim().toLowerCase();

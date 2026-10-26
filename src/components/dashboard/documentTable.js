@@ -2,7 +2,10 @@
 // Numeric widths are layout metadata, never workspace colors or typography.
 export function documentTableLayout(columns = [], {hasRowActions = false, multiSelect = false} = {}) {
     const flexible = columns.some(column => column.flex === true);
-    const columnWidths = columns.map((column, index) => column.flex === true || (!flexible && index === 0)
+    const textIndex = columns.findIndex(column => column.kind === 'dimension'
+        && !/id$/i.test(column.key) && !/date/i.test(column.format || column.key));
+    const defaultFlexibleIndex = textIndex < 0 ? 0 : textIndex;
+    const columnWidths = columns.map((column, index) => column.flex === true || (!flexible && index === defaultFlexibleIndex)
         ? null : Math.max(48, Number(column.width) || 112));
     const actionsWidth = hasRowActions ? 56 : 0;
     const selectionWidth = multiSelect ? 42 : 0;

@@ -116,6 +116,12 @@ const SchemaBasedForm = (props) => {
     }, [data, derivedFields, scope]);
 
     const [values, setValues] = useState(initialValues);
+    const notifiedValues = useRef(values);
+    useEffect(() => {
+        if (scope !== 'local' || notifiedValues.current === values) return;
+        notifiedValues.current = values;
+        props.onChange?.(values);
+    }, [scope, values, props.onChange]);
     const [errors, setErrors] = useState({});
     const [lookupStates, setLookupStates] = useState({});
     const lookupRequests = useRef(new Map());
@@ -263,6 +269,7 @@ const SchemaBasedForm = (props) => {
             : values;
         const formContainer = {id:authoredFormId,layout: fieldTracksLayout};
         const fieldTrackItems = derivedFields.map((field) => {
+            field = {...field, disabled: props.disabled === true || field.disabled === true};
             const fieldId = field.id || field.name;
             const columnSpan = field.columnSpan || (
                 field.type === 'textarea' || field.widget === 'textarea'
@@ -338,7 +345,7 @@ const SchemaBasedForm = (props) => {
                         <button
                             type="submit"
                             className="bp4-button bp4-intent-primary"
-                            disabled={!isDirty}
+                            disabled={props.disabled === true || !isDirty}
                         >
                             {isLinkOnlyForm ? 'Accept' : 'Submit'}
                         </button>
@@ -386,7 +393,7 @@ const SchemaBasedForm = (props) => {
                                 placeholder={`Select ${String(field.label || field.name).toLowerCase()}`}
                                 browseLabel={`Choose ${field.label || field.name}`}
                                 allowManualEntry={false}
-                                disabled={field.readOnly === true || field.disabled === true}
+                                disabled={props.disabled === true || field.readOnly === true || field.disabled === true}
                                 busy={lookupState.busy === true}
                                 error={lookupState.error || ''}
                                 onBrowse={() => openLookupField(field)}
@@ -415,7 +422,7 @@ const SchemaBasedForm = (props) => {
                     type="submit"
                     className="bp4-button bp4-intent-primary"
                     style={{ gridColumn: 'span 2', justifySelf: 'start' }}
-                    disabled={!isDirty}
+                    disabled={props.disabled === true || !isDirty}
                 >
                     {isLinkOnlyForm ? 'Accept' : 'Submit'}
                 </button>

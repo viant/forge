@@ -153,7 +153,8 @@ function buildContainerStyle(layout, rows) {
         style.gridTemplateColumns = `repeat(auto-fit, minmax(min(100%, ${layout.minColumnWidth}), 1fr))`;
         style.gridAutoFlow = 'row';
     }
-    if (spacing.rowGap !== undefined) style.rowGap = spacing.rowGap;
+    if (layout.appearance === 'document-flow') { delete style.gridTemplateRows; }
+    else if (spacing.rowGap !== undefined) style.rowGap = spacing.rowGap;
     if (spacing.columnGap !== undefined) style.columnGap = spacing.columnGap;
     return style;
 }
@@ -285,7 +286,7 @@ export default function GridLayoutRenderer({
                 ) : null;
 
                 // Control cell
-                const controlItem = hasLabel ? { ...item, wrapper: controlWrapperMode } : item;
+                const controlItem = hasLabel || isFieldTracks ? { ...item, wrapper: controlWrapperMode } : item;
                 const required = !!(item?.required || item?.properties?.required);
                 const requiredEditable = required && !item?.readOnly && !item?.disabled;
                 const ev = handlers[item.id]?.events || {};
