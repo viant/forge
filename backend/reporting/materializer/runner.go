@@ -111,6 +111,9 @@ func loweringError(ctx context.Context, err error) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
+	if chartError := authoredChartValidationError(err); chartError != nil {
+		return chartError
+	}
 	return fmt.Errorf("authored report lowering failed: %w", err)
 }
 func validateEnvelope(e registry.ReportEnvelope) error {

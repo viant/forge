@@ -3243,6 +3243,7 @@ export default function ReportRuntime({
       );
     }
     if (kind === "chartBlock") {
+      const sourceDataset = datasetIndex.get(resolveRuntimeBlockDatasetRef(block, { availableDatasetRefs }).datasetRef) || null;
       const dataset = resolveRuntimeDataset(block);
       const diagnostics = resolveDatasetBackedBlockDiagnostics(block, blockDiagnosticsIndex.get(normalizeString(block?.id)) || [], dataset, publicDiagnosticsMode);
       const invalidDiagnostic = diagnostics
@@ -3264,6 +3265,18 @@ export default function ReportRuntime({
       const selectedDatum = selectedChartSelectionsByBlock[normalizeString(block?.id)] || null;
       const chartSpec = block?.content?.chartSpec || block?.chartSpec || {};
       const chartModel = block?.content?.chartModel || block?.chartModel || null;
+      const chartLoading = sectionLoading || datasetPages[dataset?.id]?.loading === true;
+      // A compiler may legitimately omit a model for a completed empty result.
+      // Do not turn missing, partial, failed or contradictory data into "No data".
+      const emptyChart = Array.isArray(sourceDataset?.rows) && Array.isArray(dataset?.rows) && dataset.rows.length === 0
+        && !(Number(sourceDataset?.provenance?.rowCount || 0) > 0)
+        && !(Number(block?.content?.rowCount || 0) > 0)
+        && !(Array.isArray(block?.content?.resolvedChart?.rows) && block.content.resolvedChart.rows.length > 0)
+        && !(Array.isArray(block?.content?.resolvedRows) && block.content.resolvedRows.length > 0)
+        && dataset?.provenance?.hasMore !== true && dataset?.provenance?.truncated !== true
+        && diagnostics.length === 0
+        && !runtimeDiagnostics.some((diagnostic) => !normalizeString(diagnostic?.blockId))
+        && !chartLoading && !sectionError;
       const chartInteractionSupport = resolveReportRuntimeChartInteractionSupport(chartSpec);
       const authoredSelectionActions = resolveReportRuntimeSelectionActions(block);
       const chartInteractionState = buildReportRuntimeChartInteractionState({
@@ -3332,12 +3345,19 @@ export default function ReportRuntime({
               }) : null}
               onLegendItemSelect={!reportPresentation && chartInteractionSupport.legendEnabled ? ((selection) => setSelectedChartSelection(block.id, selection)) : null}
             />
+          ) : chartLoading ? (
+            <div role="status" aria-busy="true">Loading chart…</div>
+          ) : emptyChart ? (
+            <div className="forge-report-runtime-chart-empty" role="status"
+              style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
+              No data for the selected scope.
+            </div>
           ) : (
             <div style={{ fontSize: "var(--forge-report-type-small-size, 12px)", color: "var(--forge-report-text-muted, #5f6b7c)", lineHeight: "var(--forge-report-type-small-line-height, 1.5)" }}>
               Chart actions are unavailable because this authored chart does not compile to a runtime chart model.
             </div>
           )}
-          {!reportPresentation && effectiveChartInteractionSupport.reason !== "readOnlyRuntime" ? (
+          {!emptyChart && !chartLoading && !reportPresentation && effectiveChartInteractionSupport.reason !== "readOnlyRuntime" ? (
             <ChartSelectionPanel
               viewModel={chartSelectionViewModel}
               onAction={(actionId) => executeReportRuntimeAction(chartExecutionsById.get(normalizeString(actionId)), runtimeHandlers)}

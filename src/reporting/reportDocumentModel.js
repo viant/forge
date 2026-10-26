@@ -2487,6 +2487,7 @@ export function filterExclusiveReportRuntimeBlocks(documentBlocks = [], runtimeB
 export function lowerReportDocumentToReportSpec(document = {}, {
   includePrimaryBlocks = true,
   runtimeDatasetScopeParams = null,
+  onChartValidation = null,
 } = {}) {
   const blocks = Array.isArray(document?.blocks) ? document.blocks : [];
   const exclusiveSectionOwnership = buildExclusiveReportSectionOwnership(blocks);
@@ -2527,6 +2528,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
     refinements: normalizeReportRefinements(document?.refinements),
     semanticSummary: document?.semanticSummary || null,
     includePrimaryBlocks,
+    onChartValidation,
   });
   const primaryRequestContext = {
     dataSourceRef: normalizeString(baseSpec?.source?.dataSourceRef || loweredContainer?.dataSourceRef),
@@ -2628,6 +2630,7 @@ export function lowerReportDocumentToReportSpec(document = {}, {
           datasetRef: normalizedBlock?.datasetRef,
           title: normalizedBlock?.title,
           rowLimit: normalizedBlock?.rowLimit,
+          onChartValidation,
         }), normalizedBlock);
       }
       if (normalizeString(normalizedBlock?.kind) === "tableBlock") {
